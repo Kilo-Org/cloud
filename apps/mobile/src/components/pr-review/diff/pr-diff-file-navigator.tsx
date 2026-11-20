@@ -51,7 +51,7 @@ import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
 // and `viewed` are stable across a search re-render, and the callbacks below
@@ -95,6 +95,7 @@ export function PrDiffFileNavigator({
   const router = useRouter();
   const colors = useThemeColors();
   const sideInsetStyle = useSideInsetStyle();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { t } = useTranslation();
   const searchRef = useRef<string>('');
   // The navigator is a formSheet whose bottom edge sits on the Android system
@@ -296,16 +297,18 @@ export function PrDiffFileNavigator({
     );
   } else if (query.isLoading && files.length === 0) {
     body = (
-      <View className="flex-1 gap-3 px-4 pt-2">
-        {[0, 1, 2, 3, 4].map(index => (
-          <View key={`skeleton-${index}`} className="flex-row items-center gap-3 px-2 py-2">
-            <Skeleton className="h-5 w-5 rounded-md" />
-            <View className="flex-1 gap-1.5">
-              <Skeleton className="h-3.5 w-3/4 rounded-md" />
-              <Skeleton className="h-3 w-1/4 rounded-md" />
+      <View className="flex-1" style={sideInsetStyle}>
+        <View className="flex-1 gap-3 px-4 pt-2">
+          {[0, 1, 2, 3, 4].map(index => (
+            <View key={`skeleton-${index}`} className="flex-row items-center gap-3 px-2 py-2">
+              <Skeleton className="h-5 w-5 rounded-md" />
+              <View className="flex-1 gap-1.5">
+                <Skeleton className="h-3.5 w-3/4 rounded-md" />
+                <Skeleton className="h-3 w-1/4 rounded-md" />
+              </View>
             </View>
-          </View>
-        ))}
+          ))}
+        </View>
       </View>
     );
   } else if (files.length === 0) {
@@ -334,6 +337,7 @@ export function PrDiffFileNavigator({
         keyExtractor={file => file.path}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
+        style={sideInsetMarginStyle}
         contentContainerStyle={listContentStyle}
         onEndReached={() => {
           if (!hasActiveSearch && query.hasNextPage && !query.isFetchingNextPage) {
@@ -362,11 +366,15 @@ export function PrDiffFileNavigator({
   // listing cap left fewer listed files than the overview's changed-file count.
   const isTruncated = query.hasNextPage || fetchAll.failure !== null || changedFiles > files.length;
 
+  // The list must stay a direct child of the sheet: react-native-screens sizes
+  // this formSheet's scroll view natively by finding the scroller among the
+  // sheet's direct children, so the column takes the insets per block and the
+  // list takes them on its own frame (`useSideInsetMarginStyle`).
   return (
     <>
       {header}
-      <View className="flex-1" style={sideInsetStyle}>
-        <View collapsable={false} className="bg-background pb-2">
+      <View collapsable={false} className="bg-background pb-2">
+        <View style={sideInsetStyle}>
           <SearchField
             className="mx-4 mt-2"
             defaultValue=""
@@ -426,8 +434,8 @@ export function PrDiffFileNavigator({
             </Card>
           ) : null}
         </View>
-        {body}
       </View>
+      {body}
     </>
   );
 }

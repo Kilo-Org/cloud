@@ -63,7 +63,12 @@ vi.mock('react-native', () => ({
 // The merge body clears the window's side insets itself; a sheet on Android
 // reports none, and the suite asserts the landscape padding from this state.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: state.insets.left, right: state.insets.right }),
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: state.insets.left,
+    right: state.insets.right,
+  }),
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),

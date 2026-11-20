@@ -1077,7 +1077,10 @@ describe('PrReviewScreen tab strip side insets', () => {
   it('wraps the tab selector in the landscape side insets', () => {
     const style = { paddingLeft: 51, paddingRight: 8 };
     sideInsets.style = style;
-    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    // This suite calls the screen shell as a plain function (as the rest of its
+    // cases do), so the capitalised component name never reads as a call.
+    const renderScreen = PrReviewScreen;
+    const element = renderScreen({ owner: 'octocat', repo: 'hello', number: 7 });
 
     // The strip keeps its 14 dp gutter inside a wrapper that clears the
     // cutout: a padding written on the gutter box would replace that gutter.

@@ -973,12 +973,12 @@ describe('PrDiffFileNavigator body side insets', () => {
     });
   }
 
-  it('clears the landscape cutout on the header block and the list together', async () => {
+  it('clears the landscape cutout on the search block', async () => {
     insetsState.left = LANDSCAPE_LEFT;
     const { renderer } = await mountNavigator();
 
-    // The search row, the viewed count and the rows are one column: each sits
-    // inside the inset wrapper, so one padding serves all of them. The 8 dp on
+    // The fixed block above the list takes the padding: the search row, the
+    // viewed count and the retry card are one column inside it. The 8 dp on
     // the other side is the shared helper's clearance for a side status area
     // that leaves the top inset at zero.
     expect(paddedViews(renderer).map(node => node.props.style)).toEqual([
@@ -986,9 +986,23 @@ describe('PrDiffFileNavigator body side insets', () => {
     ]);
   });
 
+  it('keeps the list a direct child of the sheet and insets it by margin', async () => {
+    insetsState.left = LANDSCAPE_LEFT;
+    await mountNavigator();
+
+    // react-native-screens sizes a formSheet by finding the scroller among the
+    // sheet's direct children, so the list cannot sit inside a padded wrapper:
+    // it takes the same insets as a margin on its own frame.
+    expect(flashListProps.current?.style).toEqual({
+      marginLeft: LANDSCAPE_LEFT,
+      marginRight: 8,
+    });
+  });
+
   it('leaves the portrait body without an inset style', async () => {
     const { renderer } = await mountNavigator();
 
     expect(paddedViews(renderer)).toHaveLength(0);
+    expect(flashListProps.current?.style).toBeUndefined();
   });
 });

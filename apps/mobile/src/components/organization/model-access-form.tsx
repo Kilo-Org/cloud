@@ -58,12 +58,12 @@ type FormState = Readonly<{
  * the newer policy.
  *
  * The provider rows are provisional while the catalog is unavailable or names
- * no provider at all: they hold only the providers the organization's own
- * models name, and no provider toggle is possible then. When the rows arrive
- * they rebase to the whole gateway catalog and keep only the edits the deny list
- * holds. Without this the first toggle after a retry would write the provisional
- * rows as the organization's whole allow list, and a draft started while the
- * rows were missing would keep the empty list the notice described.
+ * no provider: they hold only the providers the organization's own models name,
+ * and no provider toggle is possible then. When the rows arrive the baseline
+ * rebases to the whole gateway catalog, deny edits stay, and an empty provider
+ * list — the missing rows — takes the arriving one, while a list the admin built
+ * survives. Without this the first toggle after a retry would write the
+ * provisional rows as the organization's whole allow list.
  *
  * Both rebases compose here, so a catalog that arrives in the same render as a
  * newer deny list keeps that deny list instead of restoring the values the

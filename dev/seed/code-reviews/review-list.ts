@@ -1,6 +1,6 @@
 import { cloud_agent_code_reviews, kilocode_users } from '@kilocode/db/schema';
 import type { ManualCodeReviewConfig } from '@kilocode/db/schema-types';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
@@ -226,14 +226,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
-  // Only this topic's rows: same owner and fixture repository. Never deletes
-  // other personal reviews, which may not belong to this seed topic.
+  // This topic's rows: the current owner's fixtures in the seed repository,
+  // plus the fixed superseded id, which any owner's earlier
+  // `--include-superseded` run may still hold. Never deletes other personal
+  // reviews, which may not belong to this seed topic.
+  const supersededId = eq(cloud_agent_code_reviews.id, SUPERSEDED_REVIEW_ID);
   await db
     .delete(cloud_agent_code_reviews)
     .where(
-      and(
-        eq(cloud_agent_code_reviews.owned_by_user_id, user.id),
-        eq(cloud_agent_code_reviews.repo_full_name, SEED_REPO_FULL_NAME)
+      or(
+        and(
+          eq(cloud_agent_code_reviews.owned_by_user_id, user.id),
+          eq(cloud_agent_code_reviews.repo_full_name, SEED_REPO_FULL_NAME)
+        ),
+        supersededId
       )
     );
 

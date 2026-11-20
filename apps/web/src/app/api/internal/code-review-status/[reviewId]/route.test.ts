@@ -3088,6 +3088,44 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
+    it('omits a live currentStatus from the lost-compare-and-set body', async () => {
+      // The caller parses `currentStatus` as an enum of terminal values, and the
+      // row read at the top is non-terminal on this path, so a live re-read row
+      // must make the body omit `currentStatus` entirely instead of answering
+      // with a non-terminal status the parse would reject.
+      mockGetCodeReviewById
+        .mockResolvedValueOnce(makeReview({ status: 'running' }))
+        .mockResolvedValueOnce(makeReview({ status: 'running' }));
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(false);
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.message).toBe('Review already in terminal state');
+      // A live row answers without the field at all: the orchestrator schema
+      // only accepts terminal values here.
+      expect(body.currentStatus).toBeUndefined();
+      expect(mockGetCodeReviewById).toHaveBeenCalledTimes(2);
+    });
+
+    it('answers a terminal re-read row when the parent compare-and-set loses', async () => {
+      mockGetCodeReviewById
+        .mockResolvedValueOnce(makeReview({ status: 'running' }))
+        .mockResolvedValueOnce(makeReview({ status: 'failed', terminal_reason: 'upstream_error' }));
+      mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(false);
+
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        message: 'Review already in terminal state',
+        currentStatus: 'failed',
+        terminalReason: 'upstream_error',
+      });
+    });
+
     it('returns without a parent update or provider side effects when a failed callback hits a terminal attempt', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'running' }));
       mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(

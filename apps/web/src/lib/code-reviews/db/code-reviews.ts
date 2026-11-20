@@ -1002,6 +1002,12 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
   review: CloudAgentCodeReview,
   analyticsEnabledAtDispatch?: boolean
 ): Promise<CloudAgentCodeReviewAttempt> {
+  // The caller's `review` argument may be stale: `retryFailedCodeReview` passes a
+  // row it read earlier, so two concurrent retries can interleave and the stale
+  // one would rewrite the other's live attempt to terminal. Re-read the review
+  // row and decide the repair on that fresh state instead, falling back to the
+  // argument only when the row is gone (deleted mid-flight).
+  const freshReview = (await getCodeReviewById(review.id)) ?? review;
   let attempt = await getLatestCodeReviewAttempt(review.id);
   if (attempt) {
     if (
@@ -1014,13 +1020,26 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
       // touched.
       !isTerminalCodeReviewStatus(attempt.status) &&
       (attempt.status === 'pending'
-        ? review.session_id || review.cli_session_id || review.status !== 'pending'
-        : isTerminalCodeReviewStatus(review.status))
+        ? freshReview.session_id || freshReview.cli_session_id || freshReview.status !== 'pending'
+        : isTerminalCodeReviewStatus(freshReview.status))
     ) {
       const [updated] = await db
         .update(cloud_agent_code_review_attempts)
-        .set(buildAttemptUpdateData(persistedCodeReviewAttemptFields(review)))
-        .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
+        .set(buildAttemptUpdateData(persistedCodeReviewAttemptFields(freshReview)))
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.id, attempt.id),
+            // Compare-and-set on the review state the repair decided from: the
+            // stored review row must still be in that state, so a review a
+            // concurrent retry reset back to a live state never has its
+            // in-flight attempt rewritten under it.
+            sql`exists (
+              select 1 from ${cloud_agent_code_reviews}
+              where ${cloud_agent_code_reviews.id} = ${review.id}
+                and ${cloud_agent_code_reviews.status} = ${freshReview.status}
+            )`
+          )
+        )
         .returning();
 
       attempt = updated ?? attempt;

@@ -30,6 +30,7 @@ import {
   createInfraRetryAttemptIfMissing,
   recordCodeReviewAttemptPublicationStatus,
 } from '@/lib/code-reviews/db/code-reviews';
+import { isTerminalCodeReviewStatus } from '@/lib/code-reviews/dispatch/dispatch-constants';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
@@ -1748,22 +1749,28 @@ export async function POST(
         // terminal review, so stop before the gate check, reaction, summary
         // comment or publication. Settle idempotently the way the other
         // terminal short-circuits do, and answer like them.
+        const settledReview = await getCodeReviewById(reviewId);
+        const currentStatus = settledReview?.status ?? review.status;
+        const currentTerminalReason = settledReview?.terminal_reason ?? review.terminal_reason;
         logExceptInTest('[code-review-status] Review already in terminal state, skipping update', {
           reviewId,
-          currentStatus: review.status,
+          currentStatus,
           requestedStatus: status,
         });
         await settleCodeReviewLedgerRow({
           reviewId,
-          status: review.status,
-          terminalReason: review.terminal_reason,
-          triggerSource: review.trigger_source,
+          status: currentStatus,
+          terminalReason: currentTerminalReason,
+          triggerSource: settledReview?.trigger_source ?? review.trigger_source,
         });
         return NextResponse.json({
           success: true,
           message: 'Review already in terminal state',
-          currentStatus: review.status,
-          terminalReason: review.terminal_reason,
+          // The caller parses this into an enum of the three terminal values, so
+          // only a terminal row answers with one and a live row omits it.
+          ...(isTerminalCodeReviewStatus(currentStatus)
+            ? { currentStatus, terminalReason: currentTerminalReason }
+            : {}),
         });
       }
       // Settle idempotently: a cross-request redelivery of this terminal

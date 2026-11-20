@@ -3584,6 +3584,60 @@ describe('ensureCurrentCodeReviewAttemptFromReview', () => {
     expect(storedAttempt?.status).toBe('running');
     expect(new Date(storedAttempt?.started_at ?? '').toISOString()).toBe(attemptStartedAt);
   });
+
+  it('does not terminalize a live attempt from a stale terminal review object', async () => {
+    // The interleaving `retryFailedCodeReview` can produce: retry A reads the
+    // failed review, retry B resets and dispatches a fresh attempt, then A
+    // calls this helper holding its stale `failed` row. The re-read inside the
+    // helper sees the live review, so A must not rewrite B's attempt.
+    const review = await insertReview({
+      status: 'failed',
+      terminal_reason: 'sandbox_error',
+      error_message: 'first run failed',
+      completed_at: '2026-02-01T00:00:00.000Z',
+    });
+
+    // The attempt A would have found: still in flight under the failed review.
+    const liveAttempt = await createCodeReviewAttempt({
+      codeReviewId: review.id,
+      status: 'running',
+      startedAt: new Date('2026-02-01T01:00:00.000Z'),
+    });
+
+    // Retry B reset the stored review back to a live state and its attempt
+    // carries the fresh session identity.
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'running',
+        session_id: 'agent_retry_b',
+        cli_session_id: 'ses_retry_b',
+        terminal_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, review.id));
+
+    // A's stale object still claims the review is terminal.
+    const staleReview: typeof review = {
+      ...review,
+      status: 'failed',
+      terminal_reason: 'sandbox_error',
+      error_message: 'first run failed',
+    };
+
+    const attempt = await ensureCurrentCodeReviewAttemptFromReview(staleReview);
+
+    expect(attempt.id).toBe(liveAttempt.id);
+    expect(attempt.status).toBe('running');
+
+    const [storedAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, liveAttempt.id))
+      .limit(1);
+    expect(storedAttempt?.status).toBe('running');
+    expect(storedAttempt?.terminal_reason).toBeNull();
+  });
 });
 
 describe('single review cancel', () => {

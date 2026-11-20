@@ -530,7 +530,8 @@ export const profileRemeasures = sqliteTable(
  * is live: a migration applies before the container deploy, and the worker still serving
  * during that window claims `profile_remeasures` rows and `pending` profiles directly, so
  * a queue row written by the migration itself would be measured at the old revision. That
- * worker never reads this table.
+ * worker never reads this table, and the apply is a no-op while the active revision is
+ * below the row's `required_revision` (see `applyProbeActivations`).
  */
 export const probeActivations = sqliteTable(
   'probe_activations',
@@ -538,6 +539,12 @@ export const probeActivations = sqliteTable(
     router: text('router').$type<AutoRouter>().notNull(),
     /** `remeasure` queues the pair in `profile_remeasures`; `readmit` re-admits it. */
     action: text('action').$type<'remeasure' | 'readmit'>().notNull(),
+    /**
+     * The measurement revision the action needs. `applyProbeActivations` is a no-op below
+     * it and leaves the row staged, so deploying a worker that starts runs under an older
+     * `ACTIVE_MEASUREMENT_REVISION` never moves a row it cannot measure yet.
+     */
+    required_revision: integer('required_revision').notNull(),
     model: text('model').notNull(),
     variant: text('variant').notNull().default(''),
     engine_identity: text('engine_identity').notNull(),

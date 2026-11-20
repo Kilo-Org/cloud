@@ -1303,6 +1303,8 @@ spend bounded:
   the deploy that raises the revision consumes it once
   (`applyProbeActivations`, `src/probe-activation.ts`), and it waits while the deploy holds
   the dispatch lock so no instance of the previous image can be serving when the rows land.
+  Each staged row also names the revision its action needs (`required_revision`), and the
+  apply leaves every row staged whose revision the worker does not run.
 - The 24 pairs that are `ready` at `efficient:v1:6649fed2`, repetitions 3 and need the
   probes become `profile_remeasures` rows (23 platform pairs plus
   `meta/muse-spark-1.2-contributor` `high`, a user-owned pair) — the rows the
@@ -1331,16 +1333,21 @@ spend bounded:
   re-admitted row that is not a retryable failure (or that has a live chunk) moves, or if a
   queued pair schedules a single case outside the probe set.
 - At 3 repetitions and catalog prices the 23 platform pairs cost $19.63 / $19.81 / $20.45
-  (Spark adds $0.14 / $0.14 / $0.15)
   without cache (low/mid/high, $11.09 / $11.28 / $11.92 with half the input read from
-  cache). The Ember re-admit adds $10.22 / $10.25 / $10.32: 3 × 90 agentic cases at the
-  measured rep-1 cost, the 1,021 missing non-agentic case-reps at $5.25, and its probes —
-  a full run, because the re-admit invalidates the failed run's results. Activation total
-  $29.85 / $30.06 / $30.77, $20.65 / $20.86 / $21.58 at 50 % cache.
-- Rolling back is lowering `ACTIVE_MEASUREMENT_REVISION` to 2 and deploying: a staged
-  activation that has not been applied is never applied, one already applied is cancelled by
-  deleting the queued `profile_remeasures` rows, and the six Ember rows can go back to
-  `failed` with their lane failure. The new table is additive and every stored result stays.
+  cache), and `meta/muse-spark-1.2-contributor` `high` — the 24th queued pair — adds
+  $0.14 / $0.14 / $0.15 ($0.14 with half the input cached). The Ember re-admit adds
+  $10.22 / $10.25 / $10.32: 3 × 90 agentic cases at the measured rep-1 cost, the 1,021
+  missing non-agentic case-reps at $5.25, and its probes — a full run, because the re-admit
+  invalidates the failed run's results. Activation total $29.99 / $30.20 / $30.92,
+  $20.79 / $21.00 / $21.72 at 50 % cache.
+- Rolling back is lowering `ACTIVE_MEASUREMENT_REVISION` to 2 and deploying: every staged
+  row carries its `required_revision` (3), and `applyProbeActivations` skips — and leaves
+  staged — every row the worker's revision does not reach. A deploy at revision 2 therefore
+  neither queues the pairs nor re-admits the Ember rows; a later deploy that raises the
+  revision back to 3 applies whatever is still staged. An activation already applied is
+  cancelled by deleting the queued `profile_remeasures` rows, and the six Ember rows can go
+  back to `failed` with their lane failure. The new table is additive and every stored
+  result stays.
 - The platform table keeps publishing every route; only the agentic routes narrow as
   described above.
 

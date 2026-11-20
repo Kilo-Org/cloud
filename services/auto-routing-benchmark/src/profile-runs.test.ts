@@ -1358,6 +1358,70 @@ describe('drainQueue', () => {
     expect(modelRows[1].model).toBe('m/new');
   });
 
+  it('logs the probe activation apply only when it moved rows', async () => {
+    const activationRow = {
+      action: 'remeasure',
+      model: 'platform/a',
+      variant: '',
+      engine_identity: 'efficient:v1:6649fed2',
+      repetitions: 3,
+      requested_at: '2026-11-20T00:00:00.000Z',
+    };
+    const readmitRow = { ...activationRow, action: 'readmit', model: 'platform/b' };
+    // answers the activation read, reports a free dispatch lock, and settles the batch of
+    // queued / re-admitted rows with the given change counts.
+    const activationDatabase = (rows: unknown[], changes: number[]): D1Database => {
+      const prepare = (text: string) => {
+        const statement = {
+          bind: vi.fn(() => statement),
+          first: vi.fn(async () => null),
+          all: vi.fn(async () => ({
+            results: text.includes('FROM probe_activations') ? rows : [],
+          })),
+          run: vi.fn(async () => ({ meta: { changes: 0 } })),
+        };
+        return statement;
+      };
+      return {
+        prepare: vi.fn(prepare),
+        batch: vi.fn(async () => changes.map(count => ({ meta: { changes: count } }))),
+      } as unknown as D1Database;
+    };
+    const appliedLog = vi.fn();
+    vi.spyOn(console, 'log').mockImplementation(appliedLog);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+
+    await drainQueue(
+      {
+        ...env,
+        BENCH_DB: activationDatabase([activationRow, readmitRow], [2, 1, 0]),
+      } as unknown as Env,
+      'user'
+    );
+
+    expect(
+      appliedLog.mock.calls
+        .map(([line]) => String(line))
+        .filter(line => line.includes('benchmark_probe_activation_applied'))
+        .map(line => JSON.parse(line) as Record<string, unknown>)
+    ).toEqual([
+      {
+        event: 'benchmark_probe_activation_applied',
+        router: 'efficient',
+        queued: 2,
+        readmitted: 1,
+      },
+    ]);
+
+    appliedLog.mockClear();
+    await drainQueue({ ...env, BENCH_DB: activationDatabase([], []) } as unknown as Env, 'user');
+    expect(
+      appliedLog.mock.calls
+        .map(([line]) => String(line))
+        .filter(line => line.includes('benchmark_probe_activation_applied'))
+    ).toEqual([]);
+  });
+
   it('fails unavailable owner aliases without retargeting unrelated concrete entries', async () => {
     vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue({
       data: [

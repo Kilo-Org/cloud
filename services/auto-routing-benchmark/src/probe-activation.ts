@@ -1,5 +1,5 @@
 import type { AutoRouter } from '@kilocode/auto-routing-contracts';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { PROBE_CASES } from './datasets/probe-cases';
 import { ACTIVE_MEASUREMENT_REVISION, PWD_BASE_CASE_ID } from './measurement-revision';
@@ -84,14 +84,24 @@ export type ProbeActivationReport = {
 };
 
 type ProbeActivationRow = typeof probeActivations.$inferSelect;
+type StagedActivation = Pick<
+  ProbeActivationRow,
+  'action' | 'model' | 'variant' | 'engine_identity' | 'repetitions' | 'requested_at'
+>;
 
 /**
  * Applies this router's queued `probe_activations` rows once and consumes them in the
  * same batch: `remeasure` rows become `profile_remeasures` rows, `readmit` rows become the
  * per-row Re-admit's UPDATE (`src/profile-refresh.ts`). Both keep the guards the migration
- * used to carry: a pair whose provenance run already holds a revision-3 result for every
- * activation case is not queued, and a row is re-admitted only while it is still `failed`
- * with class `unknown` and no live chunk.
+ * used to carry: a pair whose provenance run already holds a result at the row's
+ * `required_revision` for every activation case is not queued, and a row is re-admitted
+ * only while it is still `failed` with class `unknown` and no live chunk.
+ *
+ * A row is applied only while the active revision reaches its `required_revision`: below
+ * it the row stays staged, untouched, so a deploy that lowers `ACTIVE_MEASUREMENT_REVISION`
+ * back to 2 never turns a revision-3 activation into revision-2 queue rows or re-admits a
+ * pair that would be measured without the probes. Rolling forward again applies the rows
+ * that are still there.
  *
  * The drain of the worker that ships this code applies them, never the migration: a
  * migration applies while the previous image is still serving, and that worker claims
@@ -104,7 +114,8 @@ type ProbeActivationRow = typeof probeActivations.$inferSelect;
 export async function applyProbeActivations(
   db: D1Database,
   router: AutoRouter = PROBE_ACTIVATION_ROUTER,
-  now: number = Date.now()
+  now: number = Date.now(),
+  revision: number = ACTIVE_MEASUREMENT_REVISION
 ): Promise<ProbeActivationReport> {
   // The deploy that ships this code holds the dispatch lock from before it applies the
   // migration through the container rollout, and only after that is no instance of the
@@ -114,10 +125,12 @@ export async function applyProbeActivations(
   const { results } = await db
     .prepare(
       `SELECT action, model, variant, engine_identity, repetitions, requested_at
-      FROM probe_activations WHERE router = ? ORDER BY action, model, variant`
+      FROM probe_activations
+      WHERE router = ? AND required_revision <= ?
+      ORDER BY action, model, variant`
     )
-    .bind(router)
-    .all<Omit<ProbeActivationRow, 'router'>>();
+    .bind(router, revision)
+    .all<StagedActivation>();
   if (results.length === 0) return { queued: 0, readmitted: 0 };
 
   const orm = drizzle(db);
@@ -144,6 +157,7 @@ export async function applyProbeActivations(
           AND ${benchmarkProfiles.engine_identity} = ${probeActivations.engine_identity}
           AND ${benchmarkProfiles.repetitions} = ${probeActivations.repetitions}
         WHERE ${probeActivations.router} = ${router}
+          AND ${probeActivations.required_revision} <= ${revision}
           AND ${probeActivations.action} = 'remeasure'
           AND ${benchmarkProfiles.status} = 'ready'
           AND ${benchmarkProfiles.run_id} IS NOT NULL
@@ -155,7 +169,7 @@ export async function applyProbeActivations(
                 AND measured.model = ${benchmarkProfiles.model}
                 AND measured.variant = ${benchmarkProfiles.variant}
                 AND measured.case_id = probe.value
-                AND measured.prompt_revision >= ${ACTIVE_MEASUREMENT_REVISION}
+                AND measured.prompt_revision >= ${probeActivations.required_revision}
             )
           )
       `)
@@ -191,7 +205,11 @@ export async function applyProbeActivations(
           )
         )
     ),
-    orm.delete(probeActivations).where(eq(probeActivations.router, router)),
+    orm
+      .delete(probeActivations)
+      .where(
+        and(eq(probeActivations.router, router), lte(probeActivations.required_revision, revision))
+      ),
   ];
   // D1's batch is one transaction: the queue rows, the re-admits and the consumed
   // activation rows settle together, so a failed apply leaves the activation for the next

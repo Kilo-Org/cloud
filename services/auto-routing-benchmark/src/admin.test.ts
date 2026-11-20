@@ -307,8 +307,8 @@ beforeEach(() => {
     CREATE TABLE run_lane_failures (run_id TEXT, model TEXT, variant TEXT, rep INTEGER);
     CREATE TABLE scheduler_dispatch_lock (id INTEGER PRIMARY KEY, token TEXT, lease_until INTEGER);
     CREATE TABLE probe_activations (
-      router TEXT, action TEXT, model TEXT, variant TEXT, engine_identity TEXT,
-      repetitions INTEGER, requested_at TEXT,
+      router TEXT, action TEXT, required_revision INTEGER, model TEXT, variant TEXT,
+      engine_identity TEXT, repetitions INTEGER, requested_at TEXT,
       PRIMARY KEY (router, action, model, variant, engine_identity, repetitions)
     );
   `);

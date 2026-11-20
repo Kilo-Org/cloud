@@ -33,13 +33,12 @@ const MIGRATION = readFileSync(
   new URL('../migrations/0035_probe_activation.sql', import.meta.url),
   'utf8'
 );
-/** The `VALUES` rows the migration stages, as `action|model|variant`. */
+/** The `VALUES` rows the migration stages, as `action|model|variant|required_revision`. */
 const stagedRows = [
   ...MIGRATION.replace(/\s+/g, ' ').matchAll(
-    /\('efficient', '([a-z]+)', '([^']+)', '([^']+)', 'efficient:v1:6649fed2', 3,/g
+    /\('efficient', '([a-z]+)', (\d+), '([^']+)', '([^']+)', 'efficient:v1:6649fed2', 3,/g
   ),
-].map(match => `${match[1]}|${match[2]}|${match[3]}`);
-
+].map(match => `${match[1]}|${match[3]}|${match[4]}|${match[2]}`);
 const pairKey = (model: string, variant: string) => `${model}|${variant}`;
 
 const MODEL = 'anthropic/claude-haiku-5.5';
@@ -190,8 +189,8 @@ describe('probe activation migration (real SQLite)', () => {
     expect(PROBE_ACTIVATION_CASE_IDS).toHaveLength(22);
     expect(new Set(PROBE_ACTIVATION_PAIRS.map(p => pairKey(p.model, p.variant))).size).toBe(30);
     expect(stagedRows).toEqual([
-      ...PROBE_ACTIVATION_REMEASURE_PAIRS.map(p => `remeasure|${pairKey(p.model, p.variant)}`),
-      ...PROBE_ACTIVATION_READMIT_PAIRS.map(p => `readmit|${pairKey(p.model, p.variant)}`),
+      ...PROBE_ACTIVATION_REMEASURE_PAIRS.map(p => `remeasure|${pairKey(p.model, p.variant)}|3`),
+      ...PROBE_ACTIVATION_READMIT_PAIRS.map(p => `readmit|${pairKey(p.model, p.variant)}|3`),
     ]);
     expect(MIGRATION).toContain(`'${PROBE_ACTIVATION_ENGINE_IDENTITY}'`);
     expect(MIGRATION).toContain(`'${PROBE_ACTIVATION_REQUESTED_AT}'`);
@@ -272,6 +271,66 @@ describe('probe activation migration (real SQLite)', () => {
     expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, deployLease + 1)).toEqual({
       queued: 24,
       readmitted: 6,
+    });
+  });
+
+  it('applies a staged row only once the active revision reaches its required revision', async () => {
+    for (const pair of PROBE_ACTIVATION_REMEASURE_PAIRS) seedReadyPair(pair);
+    seedFailedEmber();
+    // A row staged for a later revision must stay staged, and the apply must not delete it.
+    seedReadyPair(OUTSIDE);
+    sqlite
+      .prepare(
+        `INSERT INTO probe_activations (router, action, required_revision, model, variant,
+          engine_identity, repetitions, requested_at)
+         VALUES (?, 'remeasure', 4, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        PROBE_ACTIVATION_ROUTER,
+        OUTSIDE.model,
+        OUTSIDE.variant,
+        PROBE_ACTIVATION_ENGINE_IDENTITY,
+        PROBE_ACTIVATION_REPETITIONS,
+        PROBE_ACTIVATION_REQUESTED_AT
+      );
+    const stagedRowsNow = sqlite.prepare(
+      'SELECT action, model, variant, required_revision FROM probe_activations'
+    );
+    const at = Date.parse('2026-11-20T01:00:00.000Z');
+
+    // Revision 2 is the rollback: nothing moves, nothing is consumed.
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, at, 2)).toEqual({
+      queued: 0,
+      readmitted: 0,
+    });
+    expect(queuedPairs()).toEqual([]);
+    expect(profileRow('meta/muse-ember', 'low')).toMatchObject({
+      status: 'failed',
+      failure_class: 'unknown',
+    });
+    expect(stagedRowsNow.all()).toHaveLength(31);
+
+    // Revision 3 applies the 30 rows the migration stages and leaves the revision-4 row.
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, at, 3)).toEqual({
+      queued: 24,
+      readmitted: 6,
+    });
+    expect(stagedRowsNow.all()).toEqual([
+      {
+        action: 'remeasure',
+        model: OUTSIDE.model,
+        variant: OUTSIDE.variant,
+        required_revision: 4,
+      },
+    ]);
+    expect(queuedPairs()).toHaveLength(24);
+    expect(queuedPairs().map(row => pairKey(String(row.model), String(row.variant)))).not.toContain(
+      pairKey(OUTSIDE.model, OUTSIDE.variant)
+    );
+    // Nothing runs twice: the revision-3 rows are gone and the revision-4 row still does not apply.
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, at, 3)).toEqual({
+      queued: 0,
+      readmitted: 0,
     });
   });
 

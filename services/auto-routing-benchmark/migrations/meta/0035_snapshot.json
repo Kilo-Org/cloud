@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "889c6a30-adc2-4f86-a7d7-642294d08f5a",
+  "id": "208f35e0-3d53-48ca-9eda-59a61dd62842",
   "prevId": "9bdd7829-0931-402d-b458-24cf80f0697f",
   "tables": {
     "benchmark_config": {
@@ -1608,6 +1608,13 @@
         "action": {
           "name": "action",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "required_revision": {
+          "name": "required_revision",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

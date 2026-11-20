@@ -15,6 +15,11 @@
 -- never reads `probe_activations`; the drain of the deploy that raises the revision
 -- consumes it once (`applyProbeActivations`, `src/probe-activation.ts`):
 --
+-- Each row names the revision its action needs (`required_revision`, 3 for every row
+-- here). The apply is a no-op below it and leaves the row staged, so a deploy that lowers
+-- `ACTIVE_MEASUREMENT_REVISION` back to 2 neither queues the pairs nor re-admits Ember: the
+-- staged rows wait for a deploy that starts runs at revision 3 again.
+--
 -- 1. `remeasure`: the 24 pairs that are `ready` at `efficient:v1:6649fed2`, repetitions 3 and
 --    queued in `profile_remeasures`, exactly as the `remeasure-prompt-transport` `request`
 --    action queues them. The profile stays ready on its current run and keeps serving; the
@@ -37,6 +42,7 @@
 CREATE TABLE `probe_activations` (
 	`router` text NOT NULL,
 	`action` text NOT NULL,
+	`required_revision` integer NOT NULL,
 	`model` text NOT NULL,
 	`variant` text DEFAULT '' NOT NULL,
 	`engine_identity` text NOT NULL,
@@ -46,66 +52,67 @@ CREATE TABLE `probe_activations` (
 );
 --> statement-breakpoint
 INSERT INTO `probe_activations`
-  (`router`, `action`, `model`, `variant`, `engine_identity`, `repetitions`, `requested_at`)
+  (`router`, `action`, `required_revision`, `model`, `variant`, `engine_identity`, `repetitions`,
+    `requested_at`)
 VALUES
-  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'high', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'anthropic/claude-haiku-5.5', 'high', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'low', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'anthropic/claude-haiku-5.5', 'low', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'max', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'anthropic/claude-haiku-5.5', 'max', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'medium', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'anthropic/claude-haiku-5.5', 'medium', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'none', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'anthropic/claude-haiku-5.5', 'none', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'xhigh', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'anthropic/claude-haiku-5.5', 'xhigh', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'deepseek/deepseek-v4.1-flash-1017', 'high', 'efficient:v1:6649fed2',
+  ('efficient', 'remeasure', 3, 'deepseek/deepseek-v4.1-flash-1017', 'high', 'efficient:v1:6649fed2',
     3, '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'deepseek/deepseek-v4.1-flash-1017', 'low', 'efficient:v1:6649fed2',
+  ('efficient', 'remeasure', 3, 'deepseek/deepseek-v4.1-flash-1017', 'low', 'efficient:v1:6649fed2',
     3, '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'deepseek/deepseek-v4.1-flash-1017', 'max', 'efficient:v1:6649fed2',
+  ('efficient', 'remeasure', 3, 'deepseek/deepseek-v4.1-flash-1017', 'max', 'efficient:v1:6649fed2',
     3, '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'deepseek/deepseek-v4.1-flash-1017', 'none', 'efficient:v1:6649fed2',
+  ('efficient', 'remeasure', 3, 'deepseek/deepseek-v4.1-flash-1017', 'none', 'efficient:v1:6649fed2',
     3, '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'inclusionai/ling-3.1-flash', 'thinking', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'inclusionai/ling-3.1-flash', 'thinking', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'meta/muse-spark-1.2-contributor', 'high', 'efficient:v1:6649fed2',
+  ('efficient', 'remeasure', 3, 'meta/muse-spark-1.2-contributor', 'high', 'efficient:v1:6649fed2',
     3, '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'high', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'openai/gpt-6-luna', 'high', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'low', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'openai/gpt-6-luna', 'low', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'max', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'openai/gpt-6-luna', 'max', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'medium', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'openai/gpt-6-luna', 'medium', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'none', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'openai/gpt-6-luna', 'none', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'qwen/qwen3.8-flash', 'instant', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'qwen/qwen3.8-flash', 'instant', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'qwen/qwen3.8-flash', 'thinking', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'qwen/qwen3.8-flash', 'thinking', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'qwen/qwen3.8-max-0902', 'low', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'qwen/qwen3.8-max-0902', 'low', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'stepfun/step-5-preview', 'high', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'stepfun/step-5-preview', 'high', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'stepfun/step-5-preview', 'medium', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'stepfun/step-5-preview', 'medium', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'xiaomi/mimo-v2.6-pro', 'instant', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'xiaomi/mimo-v2.6-pro', 'instant', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'remeasure', 'z-ai/glm-5.3-flash', 'high', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'remeasure', 3, 'z-ai/glm-5.3-flash', 'high', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'readmit', 'meta/muse-ember', 'high', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'readmit', 3, 'meta/muse-ember', 'high', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'readmit', 'meta/muse-ember', 'low', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'readmit', 3, 'meta/muse-ember', 'low', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'readmit', 'meta/muse-ember', 'max', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'readmit', 3, 'meta/muse-ember', 'max', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'readmit', 'meta/muse-ember', 'medium', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'readmit', 3, 'meta/muse-ember', 'medium', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'readmit', 'meta/muse-ember', 'minimal', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'readmit', 3, 'meta/muse-ember', 'minimal', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z'),
-  ('efficient', 'readmit', 'meta/muse-ember', 'xhigh', 'efficient:v1:6649fed2', 3,
+  ('efficient', 'readmit', 3, 'meta/muse-ember', 'xhigh', 'efficient:v1:6649fed2', 3,
     '2026-11-20T00:00:00.000Z')
 ON CONFLICT DO NOTHING;

@@ -14,7 +14,7 @@ import {
   clientProfiles,
   type ClientProfileStatus,
 } from './db-schema';
-import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
+import { CLIENT_EVAL_REVISION } from './measurement-revision';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { summarize } from './run';
 import type { OfflineSweep } from './scoreboard/schema';
@@ -407,9 +407,13 @@ function asCaseResultRow(
     output_prefix: null,
     event_count: null,
     last_event_types: null,
+    tool_calls: null,
+    tool_names: null,
+    step_count: null,
+    final_finish_reason: null,
     rep: row.rep,
     timed_out: row.timed_out ? 1 : 0,
-    prompt_revision: PROMPT_TRANSPORT_REVISION,
+    prompt_revision: CLIENT_EVAL_REVISION,
   };
 }
 

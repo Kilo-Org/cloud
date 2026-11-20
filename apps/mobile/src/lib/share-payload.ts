@@ -1,12 +1,12 @@
 /* eslint-disable max-lines -- the in-memory store, its durable draft snapshot, the account boundary, and the cache-file hygiene share one module so their scope rules stay in one place */
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
-import * as Sentry from '@sentry/react-native';
 import * as Crypto from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
 import { type ShareIntent } from 'expo-share-intent';
 
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import type * as DraftsModule from '@/lib/persist/drafts';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { registerTempFile } from '@/lib/temp-file-registry';
 
 // Durable persistence of the in-memory payload store (DEC-01 drafts). Loaded
@@ -483,7 +483,9 @@ export function clearAccountStagedSharePayloads(): void {
         })
       );
     } catch (error) {
-      Sentry.captureException(error, {
+      captureTelemetry({
+        error,
+        level: 'warning',
         tags: { 'error.subsystem': 'share', 'error.operation': 'rewrite_retained_draft' },
       });
     }

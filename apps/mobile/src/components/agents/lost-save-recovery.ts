@@ -21,7 +21,7 @@ import {
 export const PROFILE_NAME_TAKEN_MESSAGE = 'A profile with this name already exists';
 
 /** One environment variable a save submits, as the create sends it. */
-export type SaveContentVar = Readonly<{
+type SaveContentVar = Readonly<{
   key: string;
   value: string;
   isSecret: boolean;
@@ -32,6 +32,14 @@ export type SaveContent = Readonly<{
   vars: readonly SaveContentVar[];
   commands: readonly string[];
   setAsDefault: boolean;
+  /**
+   * The description as the create sends it: `undefined` when the sheet was left
+   * blank, because the create omits an absent description instead of storing an
+   * empty one. The recorded attempt and the retry both carry that same form, so
+   * a description typed between the two never compares equal to the blank field
+   * it replaced.
+   */
+  description: string | undefined;
 }>;
 
 /** The last attempt whose response never arrived: what it submitted, and the ids that scope held just before it. */
@@ -48,13 +56,18 @@ export type UnknownSaveAttempt = Readonly<{
  * submitted: a profile created by an unanswered attempt can be edited away, or
  * the person can change the draft before the retry, and adopting that row then
  * confirms a save whose content never reached the server. Commands are an
- * ordered list and compare as one; the default flag is a single value; vars
+ * ordered list and compare as one; the default flag and the description are
+ * single values, and the create stores the trimmed description it was sent, so
+ * an edit to either between the two attempts is a different configuration; vars
  * compare as a set keyed by `key`, because the create stores them in the order
  * the client sent them and a reordered draft is the same configuration, while
  * a changed value or secret flag is not.
  */
-export function sameSaveContent(a: SaveContent, b: SaveContent): boolean {
+function sameSaveContent(a: SaveContent, b: SaveContent): boolean {
   if (a.setAsDefault !== b.setAsDefault) {
+    return false;
+  }
+  if (a.description !== b.description) {
     return false;
   }
   if (
@@ -130,15 +143,20 @@ export type LostSaveQuery = Readonly<{
  * panel did not know before the attempt can only be there because a write landed
  * in between, so exactly one such row is that attempt's own commit. A row the
  * panel already knew is a real clash, not a recovered write, so the caller keeps
- * the draft. The counts come from the refetched row, because the response that
- * would have carried them is the one that was lost and the list is the server's
- * own record.
+ * the draft.
  *
- * Identity is not enough on its own: the row must also be the one this flow
- * submitted, so `retried` is the content this save is sending now and a
- * mismatch leaves the collision unrecovered. A profile the lost attempt created
- * can have been edited since, in which case confirming the save would credit
- * the person with content the stored profile does not hold.
+ * Identity is not enough on its own: the row itself must still hold what this
+ * flow submitted. `retried` is the content this save is sending now, and a
+ * mismatch there leaves the collision unrecovered, because a profile the lost
+ * attempt created can have been edited since and confirming the save would
+ * credit the person with content the stored profile does not hold. The same
+ * holds after the retry agrees with the attempt: a row edited between the lost
+ * write and the refetch reports the edited counts, so the row's own var count,
+ * command count and default flag must match the attempt's content too. The
+ * counts come from the refetched row, because the response that would have
+ * carried them is the one that was lost, and the create stores the submitted
+ * list as one unit, so a count that disagrees with the attempt is that row's own
+ * evidence of a change made outside this flow.
  */
 export function lostSaveProfile({
   data,
@@ -154,6 +172,16 @@ export function lostSaveProfile({
   );
   const [only] = matches;
   if (matches.length !== 1 || only === undefined) {
+    return null;
+  }
+  // The row must still hold what the attempt submitted: the create stores the
+  // submitted list, so a count or default flag that disagrees with it is that
+  // row's own evidence of an edit made after the lost write.
+  if (
+    only.varCount !== attempt.content.vars.length ||
+    only.commandCount !== attempt.content.commands.length ||
+    only.isDefault !== attempt.content.setAsDefault
+  ) {
     return null;
   }
   const ownerType: ProfileSelectorOwnerType =

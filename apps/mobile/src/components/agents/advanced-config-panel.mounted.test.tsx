@@ -974,6 +974,109 @@ describe('AdvancedConfigPanel', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
+  it('refuses a colliding retry that only adds a description', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The first attempt's response never arrives, so its outcome is unknown; the
+    // retry then collides on the name.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    // The unanswered write stored the profile with the counts it submitted, and
+    // the create stores a description, so a description typed after the loss is
+    // content the refetched row does not hold.
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, created] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    // Only the description changes before the retry: the name, the variable and
+    // the command are the ones the lost attempt sent.
+    typeInto(renderer, 'Profile description', 'nightly build');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The retry really carries the new description, so the description is what
+    // differs between the two attempts.
+    expect(mocks.create.mutateAsync.mock.calls[1]).toEqual([
+      { ...MANUAL_PAYLOAD, name: 'prod', description: 'nightly build' },
+    ]);
+    // The row was this flow's commit, but the description the person typed was in
+    // neither attempt, so adopting the row would confirm a save whose description
+    // never reached the server.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('refuses to adopt a refetched row whose counts no longer match the attempt', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The retry sends exactly what the lost attempt sent, so only the row itself
+    // can disagree.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    // The row carries the name and an id the panel did not know, but a second
+    // variable was added to it after the lost write.
+    const edited: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 2,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, edited] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.create.mutateAsync.mock.calls[1]).toEqual(mocks.create.mutateAsync.mock.calls[0]);
+    // The row holds more than this flow submitted, so it is not the save's own
+    // record and the draft stays with the person.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it('states the duplicate sentence when the name was taken before any attempt', async () => {
     const mocks = mutations();
     const refusal = 'A profile with this name already exists';

@@ -378,17 +378,19 @@ export async function getProfile(
 
 /**
  * Make one profile the owner's default: clear whichever profile holds the flag
- * for that owner, then set this one. Accepts a pool or an open transaction so a
- * composite write can flip the default in the same unit as the profile insert.
+ * for that owner, then set this one.
+ *
+ * Takes the caller's open transaction, so the clear and the set-true commit or
+ * roll back together: a clear that ran on its own would leave the owner with no
+ * default when the set-true finds no profile. The set-true update asserts one
+ * affected row, so a bad id throws and the rollback leaves the owner's default
+ * untouched, instead of silently holding no default.
  *
  * Both statements are owner-scoped, so the pair moves the flag only between
- * profiles the owner holds. Callers still authorize the profile themselves. The
- * set-true update asserts one affected row, so a call site that passes an id
- * outside the owner's profiles fails loudly instead of leaving the owner with no
- * default.
+ * profiles the owner holds. Callers still authorize the profile themselves.
  */
 export async function applyDefaultProfile(
-  db: ProfileDatabase,
+  db: ProfileTransaction,
   profileId: string,
   owner: ProfileOwner
 ): Promise<void> {

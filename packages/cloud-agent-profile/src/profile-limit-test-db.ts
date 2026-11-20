@@ -1,4 +1,5 @@
 import type { WorkerDb } from '@kilocode/db';
+import type { ProfileTransaction } from './types';
 import {
   agent_environment_profile_agents,
   agent_environment_profile_commands,
@@ -363,8 +364,8 @@ export function createLimitTestDb(
     update,
     delete: remove,
     execute,
-    transaction: <T>(work: (tx: typeof channel) => Promise<T>): Promise<T> => {
-      const run = tail.then(() => work(channel));
+    transaction: <T>(work: (tx: ProfileTransaction) => Promise<T>): Promise<T> => {
+      const run = tail.then(() => work(channel as unknown as ProfileTransaction));
       tail = run.then(
         () => undefined,
         () => undefined

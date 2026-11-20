@@ -233,7 +233,10 @@ export function AdvancedConfigPanel({
     );
     // What this save submits beside its name. A lost attempt records it so a
     // later collision can compare the row against the configuration this flow
-    // actually sent, not just against the name and an unknown id.
+    // actually sent, not just against the name and an unknown id. The
+    // description enters in the form the create sends: an empty field is
+    // `undefined`, so a description typed between the two attempts never
+    // compares equal to the blank one it replaced.
     const content: SaveContent = {
       vars: manualVars.map(variable => ({
         key: variable.key,
@@ -242,6 +245,7 @@ export function AdvancedConfigPanel({
       })),
       commands: setupCommands,
       setAsDefault: submission.setAsDefault,
+      description: submission.description === '' ? undefined : submission.description,
     };
     try {
       // One server write: the profile, its vars, its commands and the default

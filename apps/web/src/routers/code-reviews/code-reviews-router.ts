@@ -91,6 +91,8 @@ function retryRefusalMessage(reason: CodeReviewRetryRefusalReason): string {
       return 'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.';
     case 'reviewer_disabled':
       return 'Enable Code Reviewer before retrying this review.';
+    case 'superseded':
+      return 'A newer commit replaced this review, and the newer review covers this pull request.';
   }
 }
 

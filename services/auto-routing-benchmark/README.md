@@ -1164,10 +1164,13 @@ below).
 **Per-queue drain** (after any decider terminal state, on the admin's manual
 trigger, and on the one-minute cron):
 
-1. If that queue's run is active, leave its pending registry rows alone.
+1. Skip the queue when one of its runs is still starting (it has no `scheduler_runs`
+   marker yet) or when it already holds `MAX_RUNNING_RUNS_PER_QUEUE` active runs; either
+   way its pending registry rows are left alone.
 2. Otherwise take up to 100 current-engine entries oldest-`requested_at`-first.
-3. `startRun(purpose: queue, entries: snapshot)` persists the workload, then the
-   global scheduler claims only the chunks that fit its current caps.
+3. `startRun(purpose: queue, entries: snapshot)` writes the run row and wakes the
+   dispatcher, which materializes the chunks; the global scheduler then claims only the
+   chunks that fit its current caps.
 
 A row wanted by both queues appears in both listings; whichever run claims it
 first flips it to `running`, so it is still measured exactly once.
@@ -1241,7 +1244,7 @@ everything else is automatic. **Wait** is the delay the flow itself imposes.
 | 1 | Pick the model and save the router config | **manual** (console Policy tab → Save config) | none; the save returns the saved config, its `warnings`, and the `drain` outcome | `registerAdminRoutes` (PUT /admin/config), `syncRegistryAfterConfigSave` (`src/admin.ts`) |
 | 2 | Registry sync: expand the model through the live catalog into every supported effort, insert `pending` rows | automatic, inside the save request | none — runs before the response | `syncPlatformRegistry` (`src/run.ts`), `syncPlatformRegistryRows` (`src/db.ts`) |
 | 3 | Routing table republish (the save also flushes an unchanged table) | automatic, inside the save request | none | `syncRegistryAfterConfigSave` → `publishPlatformRoutingTable` (`src/run.ts`) |
-| 4 | Queue drain: claim the pending rows into a run | automatic. The save drains the **platform** queue itself right after the publish; the per-minute cron still drains both queues for owner registrations, and a decider run reaching a terminal state drains immediately | **none for the platform queue** on a save (bounded at 5 s, then deferred to the cron). Owner registrations still wait **up to 60 s**; the queue's run slot must be free (see "several runs per queue" below) | `drainPlatformAfterConfigSave` (`src/admin.ts`); the scheduled handler (`src/index.ts`) → `sweepStaleRunsAndDrain` → `drainQueues` (`src/run.ts`) |
+| 4 | Queue drain: claim the pending rows into a run | automatic. The save drains the **platform** queue itself right after the publish; the per-minute cron still drains both queues for owner registrations, and a decider run reaching a terminal state drains immediately | **none for the platform queue** on a save (bounded at 5 s, then deferred to the cron). Owner registrations still wait **up to 60 s**; the queue must be able to start a run, i.e. none of its runs is still starting and it holds fewer than `MAX_RUNNING_RUNS_PER_QUEUE` active runs (see "The two registry queues") | `drainPlatformAfterConfigSave` (`src/admin.ts`); the scheduled handler (`src/index.ts`) → `sweepStaleRunsAndDrain` → `drainQueues` (`src/run.ts`) |
 | 5 | Run start: claim registry rows, insert the run row, copy reusable prior results | automatic, same drain pass | none | `startRun` (`src/run.ts`), `markProfilesRunningForRun` (`src/db.ts`), `reuseDeciderCaseResults` (`src/db.ts`, in the dispatcher's initialization) |
 | 6 | Initialization: materialize one scheduler chunk per case per lane | automatic, on the next dispatch pass | **bounded 20 s per pass**; a large run needs several passes (one pass writes 50 chunks per batch) | `scheduleRunChunks` (`src/scheduler.ts`), `initializeScheduledRun` (`src/run.ts`) |
 | 7 | Dispatch: claim chunks that fit the scheduler caps and enqueue them | automatic | none once initialized | `claimScheduledChunks` (`src/scheduler.ts`), `dispatchScheduler` (`src/run.ts`) |
@@ -1281,8 +1284,9 @@ before the 2026-11-20 fixes took hours longer: p50 admit→ready was 2.9 h (plat
   coverage line reads `N of M measured · <effort>: pending` for the sync's new rows. A save
   that could not sync shows a destructive banner naming why (`registry_sync_failed`,
   `routing_table_publish_failed`) plus "save again to retry now". A save whose platform drain
-  did not start a run is not an error: its `drain.skipped` says `active_run` (the queue's run
-  slot is taken), `nothing_pending` (every pair is already measured or in flight), `timeout`
+  did not start a run is not an error: its `drain.skipped` says `active_run` (one of the
+  queue's runs is still starting, or it already holds `MAX_RUNNING_RUNS_PER_QUEUE` active
+  runs), `nothing_pending` (every pair is already measured or in flight), `timeout`
   or `failed`, and the Benchmarks tab shows the new `Platform queue` run as soon as the cron
   picks it up (within a minute).
 - **Benchmarks tab, Decider Registry**: pending / running / ready / failed counts per queue,

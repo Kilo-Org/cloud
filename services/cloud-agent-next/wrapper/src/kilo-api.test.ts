@@ -1402,6 +1402,31 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       }
     });
 
+    it('fails the settle retryably when the permission update cannot be applied', async () => {
+      const sessionId = 'ses_record_permission_settle_refused';
+      const directory = temporaryDirectory('kilo-api-permission-settle-refused-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberOutstandingRuleset(sessionId, permission);
+      try {
+        const stub = startEnsureSessionStub(
+          sessionId,
+          { id: sessionId, directory },
+          { updateStatus: 503 }
+        );
+
+        const error = await createClient(stub.url)
+          .settleOutstandingRuleset(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+        expect(stub.updates).toHaveLength(1);
+        // The marker is intact, so a retried step reads it and applies again.
+        expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
+      } finally {
+        await forgetOutstandingRuleset(sessionId);
+      }
+    });
+
     it('keeps the marker when the settle finds no record under the route directory', async () => {
       const sessionId = 'ses_record_permission_settle_absent';
       const directory = temporaryDirectory('kilo-api-permission-settle-absent-');

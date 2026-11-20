@@ -1116,13 +1116,22 @@ export function createWrapperKiloClient(
       // update appends them; the marker is cleared instead. A marker that cannot
       // be cleared is retried by the next prepare, which then finds the stored
       // rules and does not duplicate them.
+      //
+      // A failed apply here fails retryably, because the marker is intact and
+      // the retried step reads the same marker and can apply it again; the
+      // record is left without the rules, so the create path's permanent class
+      // does not apply.
       if (stored === 'missing') {
-        const restoreTimeout = AbortSignal.timeout(8_000);
-        const restored = await v2Client.session.update(
-          { sessionID: sessionId, directory, permission: owed },
-          { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
-        );
-        requireSdkData(restored, `Session permission restore for ${sessionId}`);
+        try {
+          const restoreTimeout = AbortSignal.timeout(8_000);
+          const restored = await v2Client.session.update(
+            { sessionID: sessionId, directory, permission: owed },
+            { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
+          );
+          requireSdkData(restored, `Session permission restore for ${sessionId}`);
+        } catch (error) {
+          throw new SessionRulesetUnverifiedError(sessionId, error);
+        }
       }
       await forgetOutstandingRuleset(sessionId).catch(() => undefined);
     },

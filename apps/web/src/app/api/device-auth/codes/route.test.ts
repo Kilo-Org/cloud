@@ -75,6 +75,47 @@ describe('POST /api/device-auth/codes', () => {
     );
   });
 
+  test('keeps the plain flow for a payload a client serializes as literal null', async () => {
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body: 'null',
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requestingClient: expect.anything() })
+    );
+  });
+
+  test.each([
+    ['a JSON string', '"ABCD-EFGH"'],
+    ['an array', '[]'],
+    ['a number', '42'],
+  ])('refuses a body that is %s, which is not a pairing request', async (_label, body) => {
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('INVALID_REQUEST_BODY');
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   test.each([
     ['an empty token', ''],
     ['an oversized token', 'a'.repeat(513)],

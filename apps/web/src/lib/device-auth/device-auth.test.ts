@@ -119,9 +119,14 @@ describe('Device Auth', () => {
       ['A-B-C-D-E-F-G-H', 'ABCD-EFGH'],
       ['ABCD\u2013EFGH', 'ABCD-EFGH'],
       ['ABCD\u2014EFGH', 'ABCD-EFGH'],
-      ['ABCD_EFGH', 'ABCD_EFGH'],
     ])('canonicalizes %j to %j', (input, expected) => {
       expect(normalizeDeviceAuthUserCode(input)).toBe(expected);
+    });
+
+    test('keeps a non-dash separator, so an unusable entry is not silently rewritten', () => {
+      // Only dash punctuation is a separator here. An underscore is not one, so
+      // the value keeps it and cannot reach a stored code.
+      expect(normalizeDeviceAuthUserCode('ABCD_EFGH')).toBe('ABCD_EFGH');
     });
 
     test('returns a cleaned value that is not a whole code', () => {

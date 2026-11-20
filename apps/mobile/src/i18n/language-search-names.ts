@@ -3,19 +3,19 @@ import { type SupportedLanguage } from '@/i18n/languages';
 /* eslint-disable typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- Metro needs static require calls to bundle the generated name tables lazily. */
 
 /**
- * Each language's names in one UI language, as `scripts/
+ * Each language's name in one UI language, as `scripts/
  * generate-language-search-names.mjs` reported them and
  * `scripts/assert-language-search-names.mjs` keeps in sync. The table is
  * generated, not a runtime `Intl.DisplayNames` call: the answer must be the
  * same on every platform and OS version, and Hermes ships no
  * `Intl.DisplayNames` at all. The names are search-only — the picker never
- * renders them — so the table is left out of the startup path: one `require`
+ * renders them — so the table stays out of the startup path: one `require`
  * runs, like `@/lib/relative-time-locales`.
  */
 export type LanguageSearchNames = Readonly<Partial<Record<SupportedLanguage, string>>>;
 
 /**
- * One generated module's table record. `require` answers `any`, and reading the
+ * One generated module's record. `require` answers `any`, and reading the
  * export off it at the call site would be an unsafe member access; the cast
  * happens here once, on the value the generated module actually exports.
  */

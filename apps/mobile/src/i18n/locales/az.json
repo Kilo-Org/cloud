@@ -19,7 +19,9 @@
     "presenceStatus": "Hostlar: {{connection}}",
     "commandStatus": "Əmrin çatdırılması: {{status}}",
     "delivered": "Çatdırılıb",
-    "expired": "Müddəti bitib"
+    "expired": "Müddəti bitib",
+    "recoveryGaps_one": "Bu transkriptin {{displayCount}} hissəsi itib.",
+    "recoveryGaps_other": "Bu transkriptin {{displayCount}} hissəsi itib."
   },
   "common": {
     "manageOnWeb": "Vebdə idarə et",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
+      "managedOnWebTitle": "Vebdə idarə olunur",
+      "managedOnWebShort": "Bu bağlantı kompüterdən vebdə idarə olunur.",
+      "managedOnWebRepositories": "{{organization}} üçün repozitoriyaları kompüterdən vebdə seçin.",
       "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionOverview": "{{organization}} üçün iş sahəsi giriş tokeni yarat və növbəti ekranda yapışdır.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "Yoxlanılır…",
       "statusUnavailable": "Status əlçatan deyil",
+      "needsAttention": "Müdaxilə tələb olunur",
       "platforms": "Platformalar",
       "activity": "Fəaliyyət"
     },
@@ -2784,7 +2790,9 @@
     "modelPicker": {
       "title": "Model seç",
       "favorites": "Sevimlilər",
-      "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil."
+      "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil.",
+      "allUnavailableTitle": "Heç bir model istifadə edilə bilməz",
+      "allUnavailableDescription": "Provayder açarı əlavə et, sonra yenidən cəhd et."
     },
     "modelSelector": {
       "provider": "Təminatçı {{id}}",
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Provayder hazırda əlçatan deyil. Bir az sonra yenidən göndərin."
   },
   "settingsTools": {
-    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"
+    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?",
+    "guarded": {
+      "spendAlertsOff": "Xərc bildirişlərini söndürəsiniz? Xərc həddinin aşılması və saatlıq kəskin artımlar barədə bildirişlər almağı dayandırardınız.",
+      "balanceAlertsOff": "Balans bildirişlərini söndürəsiniz? Kreditləriniz azaldıqda bildirişlər almağı dayandırardınız.",
+      "securityFindingsOff": "Təhlükəsizlik tapıntılarını söndürəsiniz? Yeni təhlükəsizlik tapıntıları barədə bildirişlər almağı dayandırardınız.",
+      "hideBalanceOn": "Balanslarınızı gizlədirsiniz? Kredit balansları artıq profil ekranlarında və təşkilat mərkəzində görünməyəcək."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "Kilo-nun bu təşkilat üçün sorğuları provayderə yönləndirməsini dayandırmaq üçün onu söndürün.",
     "providersNeedCatalog": "Provayder açarları tam model kataloqu yüklənənə qədər yalnız oxunuş rejimində qalır. Onları redaktə etmək üçün yuxarıdakı Yenidən cəhd et düyməsinə toxunun.",
     "providersEmpty": "Bu axtarışa uyğun provayder yoxdur.",
+    "providersNone": "Bu təşkilat üçün heç bir provayder mövcud deyil.",
     "allowAllShown": "Göstərilənlərin hamısına icazə ver",
     "denyAllShown": "Göstərilənlərin hamısını qadağan et",
     "gatewaysDescription": "Kilo model sorğularını Vercel AI Gateway və ya OpenRouter vasitəsilə yönləndirir. Şlüz deaktiv edilərsə, həmin sorğular uğursuz olur.",

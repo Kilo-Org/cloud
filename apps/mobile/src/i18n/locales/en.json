@@ -111,7 +111,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Command delivery: {{status}}",
     "delivered": "Delivered",
-    "expired": "Expired"
+    "expired": "Expired",
+    "recoveryGaps_one": "{{displayCount}} part of this transcript is missing.",
+    "recoveryGaps_other": "{{displayCount}} parts of this transcript are missing."
   },
   "common": {
     "manageOnWeb": "Manage on the web",
@@ -1483,6 +1485,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
+      "managedOnWebTitle": "Managed on the web",
+      "managedOnWebShort": "This connection is managed on the web from a computer.",
+      "managedOnWebRepositories": "Choose repositories for {{organization}} on the web from a computer.",
       "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
       "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
       "descriptionOverview": "Create a Workspace Access Token for {{organization}}, then paste it on the next screen.",
@@ -1506,6 +1511,7 @@
     "platformList": {
       "checking": "Checking…",
       "statusUnavailable": "Status unavailable",
+      "needsAttention": "Needs attention",
       "platforms": "Platforms",
       "activity": "Activity"
     },
@@ -2895,6 +2901,8 @@
     "modelPicker": {
       "title": "Select model",
       "noModelsDescription": "No models are available to select.",
+      "allUnavailableTitle": "No models can be used",
+      "allUnavailableDescription": "Add a provider key, then try again.",
       "favorites": "Favorites"
     },
     "modelSelector": {
@@ -4169,7 +4177,13 @@
     "providerUnavailable": "The provider is unavailable right now. Send again shortly."
   },
   "settingsTools": {
-    "confirmTitle": "Confirm this change?"
+    "confirmTitle": "Confirm this change?",
+    "guarded": {
+      "spendAlertsOff": "Turn off spend alerts? You would stop getting notifications about spend threshold crossings and hourly spikes.",
+      "balanceAlertsOff": "Turn off balance alerts? You would stop getting notifications when your credits run low.",
+      "securityFindingsOff": "Turn off security findings? You would stop getting notifications about new security findings.",
+      "hideBalanceOn": "Hide your balances? Credit balances would no longer appear on the profile screens and the organization hub."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "Turn a provider off to stop Kilo routing to it for this organization.",
     "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
     "providersEmpty": "No providers match this search.",
+    "providersNone": "No providers are available for this organization.",
     "allowAllShown": "Allow all shown",
     "denyAllShown": "Deny all shown",
     "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",

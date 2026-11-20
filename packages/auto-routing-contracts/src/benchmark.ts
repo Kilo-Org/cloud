@@ -49,14 +49,8 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
 export const BENCHMARK_CONTAINER_BUDGET = 250;
 
 /** Scheduler limits an admin can override at runtime, without a deploy. */
-export const BENCHMARK_SCHEDULER_SETTING_KEYS = [
-  'slots',
-  'modelConcurrency',
-  'providerConcurrency',
-  'unknownProviderConcurrency',
-] as const;
-export const BenchmarkSchedulerSettingKeySchema = z.enum(BENCHMARK_SCHEDULER_SETTING_KEYS);
-export type BenchmarkSchedulerSettingKey = z.infer<typeof BenchmarkSchedulerSettingKeySchema>;
+export const BENCHMARK_SCHEDULER_SETTING_KEYS = ['slots', 'modelConcurrency'] as const;
+export type BenchmarkSchedulerSettingKey = (typeof BENCHMARK_SCHEDULER_SETTING_KEYS)[number];
 
 export const BenchmarkSchedulerLimitSchema = z
   .number()
@@ -93,8 +87,15 @@ export const BenchmarkSchedulerSettingSchema = z.object({
 });
 export type BenchmarkSchedulerSetting = z.infer<typeof BenchmarkSchedulerSettingSchema>;
 
+/**
+ * Unknown setting keys are stripped, so a client parses a worker that still serves
+ * a retired setting.
+ */
 export const BenchmarkSchedulerConfigResponseSchema = z.object({
-  settings: z.record(BenchmarkSchedulerSettingKeySchema, BenchmarkSchedulerSettingSchema),
+  settings: z.object({
+    slots: BenchmarkSchedulerSettingSchema,
+    modelConcurrency: BenchmarkSchedulerSettingSchema,
+  } satisfies Record<BenchmarkSchedulerSettingKey, typeof BenchmarkSchedulerSettingSchema>),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
@@ -297,13 +298,45 @@ export const BenchmarkRunSchema = z.object({
   completedAt: z.string().nullable(),
   error: z.string().nullable(),
   // Optional so run payloads persisted before the field existed still parse.
-  // Omitted for terminal runs, whose counts are already final in `summaries`.
+  // Omitted for terminal runs, whose counts are already final in their summaries.
   progress: BenchmarkRunProgressSchema.optional(),
-  summaries: z.array(BenchmarkModelSummarySchema),
 });
 export type BenchmarkRun = z.infer<typeof BenchmarkRunSchema>;
 
-export const BenchmarkRunsResponseSchema = z.object({ runs: z.array(BenchmarkRunSchema) });
+/**
+ * Field the previous web release still requires on each run of the admin run
+ * list. Production deploys this worker before the web promotion (ADR 0003
+ * invariant 7), so the list keeps an empty `summaries` array per run until that
+ * release is promoted; the per-run summaries route serves the rows. Remove this
+ * schema with the projection in the worker's admin routes.
+ */
+export const BenchmarkRunAdminLegacyFieldsSchema = z.object({ summaries: z.tuple([]) });
+export type BenchmarkRunAdminLegacyFields = z.infer<typeof BenchmarkRunAdminLegacyFieldsSchema>;
+
+/** Admin run list entry: the run plus the transitional fields. */
+export type BenchmarkRunAdminResponseRun = BenchmarkRun & BenchmarkRunAdminLegacyFields;
+
+export const BenchmarkRunsResponseSchema = z.object({
+  runs: z.array(BenchmarkRunSchema),
+  // Whether any run of the requested router is running, whatever the list
+  // filter, so one request per poll both lists runs and decides whether to
+  // keep polling. Absent from workers that predate it; readers then fall back
+  // to the listed runs.
+  hasRunningRun: z.boolean().optional(),
+});
+export type BenchmarkRunsResponse = z.infer<typeof BenchmarkRunsResponseSchema>;
+export const BenchmarkRunSummariesResponseSchema = z.object({
+  summaries: z.array(BenchmarkModelSummarySchema),
+});
+export type BenchmarkRunSummariesResponse = z.infer<typeof BenchmarkRunSummariesResponseSchema>;
+// A config save persists the config first, then syncs the platform registry and
+// republishes the routing table. Either step can fail after the save; the save
+// still succeeds and reports what did not happen.
+export const BenchmarkConfigSaveWarningSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('registry_sync_failed'), message: z.string() }),
+  z.object({ kind: z.literal('routing_table_publish_failed'), message: z.string() }),
+]);
+export type BenchmarkConfigSaveWarning = z.infer<typeof BenchmarkConfigSaveWarningSchema>;
 // config is null until an admin saves one — the worker never fabricates a
 // default config, and runs cannot start without a saved one.
 export const BenchmarkConfigResponseSchema = z.object({
@@ -311,6 +344,8 @@ export const BenchmarkConfigResponseSchema = z.object({
   // Per-setting effective/computed/override resolution. Null when no config is
   // saved; optional so PUT responses from an older worker still parse.
   policySettings: PolicySettingsStateSchema.nullable().optional(),
+  // PUT only. Optional so GET responses and older workers still parse.
+  warnings: z.array(BenchmarkConfigSaveWarningSchema).optional(),
 });
 export const StartBenchmarkRunRequestSchema = z.object({
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),

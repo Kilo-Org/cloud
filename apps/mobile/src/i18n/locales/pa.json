@@ -19,7 +19,9 @@
     "presenceStatus": "ਹੋਸਟ: {{connection}}",
     "commandStatus": "ਕਮਾਂਡ ਦੀ ਡਿਲਿਵਰੀ: {{status}}",
     "delivered": "ਪਹੁੰਚਾਇਆ ਗਿਆ",
-    "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ"
+    "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ",
+    "recoveryGaps_one": "ਇਸ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦਾ {{displayCount}} ਹਿੱਸਾ ਗੁੰਮ ਹੈ।",
+    "recoveryGaps_other": "ਇਸ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦੇ {{displayCount}} ਹਿੱਸੇ ਗੁੰਮ ਹਨ।"
   },
   "common": {
     "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਪ੍ਰਬੰਧਿਤ ਕਰੋ",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} ਦਾ Bitbucket ਕਨੈਕਸ਼ਨ ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "managedOnWebTitle": "ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ",
+      "managedOnWebShort": "ਇਹ ਕਨੈਕਸ਼ਨ ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "managedOnWebRepositories": "ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ {{organization}} ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ।",
       "description": "{{organization}} ਲਈ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਹੇਠਾਂ ਪੇਸਟ ਕਰੋ।",
       "descriptionReconnect": "{{organization}} ਲਈ ਨਵਾਂ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਹੇਠਾਂ ਪੇਸਟ ਕਰੋ।",
       "descriptionOverview": "{{organization}} ਲਈ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਅਗਲੀ ਸਕ੍ਰੀਨ 'ਤੇ ਪੇਸਟ ਕਰੋ।",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
       "statusUnavailable": "ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ",
+      "needsAttention": "ਧਿਆਨ ਦੀ ਲੋੜ",
       "platforms": "ਪਲੇਟਫਾਰਮ",
       "activity": "ਗਤੀਵਿਧੀ"
     },
@@ -2784,7 +2790,9 @@
     "modelPicker": {
       "title": "ਮਾਡਲ ਚੁਣੋ",
       "favorites": "ਪਸੰਦੀਦਾ",
-      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "allUnavailableTitle": "ਕੋਈ ਵੀ ਮਾਡਲ ਵਰਤਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ",
+      "allUnavailableDescription": "ਪ੍ਰਦਾਤਾ ਦੀ ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "modelSelector": {
       "provider": "ਪ੍ਰਦਾਤਾ {{id}}",
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "ਪ੍ਰਦਾਤਾ ਇਸ ਵੇਲੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਭੇਜੋ।"
   },
   "settingsTools": {
-    "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?"
+    "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?",
+    "guarded": {
+      "spendAlertsOff": "ਕੀ ਖਰਚ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਤੁਹਾਨੂੰ ਖਰਚ ਸੀਮਾ ਪਾਰ ਹੋਣ ਅਤੇ ਪ੍ਰਤੀ ਘੰਟਾ ਉਛਾਲਾਂ ਬਾਰੇ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "balanceAlertsOff": "ਕੀ ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਜਦੋਂ ਤੁਹਾਡੇ ਕ੍ਰੈਡਿਟ ਘੱਟ ਹੋ ਜਾਣਗੇ ਤਾਂ ਤੁਹਾਨੂੰ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "securityFindingsOff": "ਕੀ ਸੁਰੱਖਿਆ ਖੋਜਾਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਖੋਜਾਂ ਬਾਰੇ ਤੁਹਾਨੂੰ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "hideBalanceOn": "ਕੀ ਤੁਹਾਡੇ ਬੈਲੰਸ ਲੁਕਾਉਣੇ ਹਨ? ਕ੍ਰੈਡਿਟ ਬੈਲੰਸ ਹੁਣ ਪ੍ਰੋਫਾਈਲ ਸਕ੍ਰੀਨਾਂ ਅਤੇ ਸੰਸਥਾ ਹੱਬ 'ਤੇ ਨਹੀਂ ਦਿਸਣਗੇ।"
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "ਇਸ ਸੰਗਠਨ ਲਈ Kilo ਦਾ ਕਿਸੇ ਪ੍ਰਦਾਤਾ ਵੱਲ ਰੂਟਿੰਗ ਰੋਕਣ ਲਈ ਉਸ ਪ੍ਰਦਾਤਾ ਨੂੰ ਬੰਦ ਕਰੋ।",
     "providersNeedCatalog": "ਪੂਰਾ ਮਾਡਲ ਕੈਟਾਲਾਗ ਲੋਡ ਹੋਣ ਤੱਕ ਪ੍ਰਦਾਤਾ ਸਵਿੱਚ ਸਿਰਫ਼-ਪੜ੍ਹਨਯੋਗ ਰਹਿੰਦੇ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਸੰਪਾਦਿਤ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ ਉੱਤੇ ਟੈਪ ਕਰੋ।",
     "providersEmpty": "ਇਸ ਖੋਜ ਨਾਲ ਕੋਈ ਪ੍ਰਦਾਤਾ ਨਹੀਂ ਮਿਲਦਾ।",
+    "providersNone": "ਇਸ ਸੰਗਠਨ ਲਈ ਕੋਈ ਪ੍ਰਦਾਤਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "allowAllShown": "ਦਿਖਾਏ ਗਏ ਸਾਰੇ ਮਨਜ਼ੂਰ ਕਰੋ",
     "denyAllShown": "ਦਿਖਾਏ ਗਏ ਸਾਰਿਆਂ ਨੂੰ ਮਨਾਹੀ ਕਰੋ",
     "gatewaysDescription": "Kilo ਮਾਡਲ ਬੇਨਤੀਆਂ ਨੂੰ Vercel AI Gateway ਜਾਂ OpenRouter ਰਾਹੀਂ ਰੂਟ ਕਰਦਾ ਹੈ। ਬੰਦ ਕੀਤਾ ਗੇਟਵੇ ਉਨ੍ਹਾਂ ਬੇਨਤੀਆਂ ਨੂੰ ਫੇਲ੍ਹ ਕਰਦਾ ਹੈ।",

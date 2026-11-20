@@ -1,6 +1,8 @@
 import { Effect } from 'effect';
 import { useSyncExternalStore } from 'react';
 
+import { i18n } from '@/i18n';
+
 /** One confirmation the mounted host has still to show. */
 export type SettingsConfirmRequest = {
   id: number;
@@ -168,13 +170,75 @@ export function settleAllSettingsConfirms(confirmed: boolean): void {
   }
 }
 
+/** One entry of the guarded set: a setting, the value that asks, and its copy. */
+type GuardedChange = Readonly<{
+  name: string;
+  /** The boolean value that asks first; the opposite value is written at once. */
+  direction: 'on' | 'off';
+  summaryKey: string;
+}>;
+
 /**
- * Asks the person to confirm a destructive settings change. Resolves true when
- * they choose Save and false on Cancel, on Android Back, on a backdrop tap,
- * when the host tears down, and when no host is mounted.
+ * The settings where one direction of the change needs the person's ok, and the
+ * dialog body that asks for it. The table is the single source of truth for the
+ * guarded set: the catalog entries read it through `guardedChangeSummary`, and
+ * the test suite iterates this same list rather than repeating the names.
+ */
+export const GUARDED_CHANGES: readonly GuardedChange[] = [
+  {
+    name: 'notifications.spendAlerts',
+    direction: 'off',
+    summaryKey: 'settingsTools.guarded.spendAlertsOff',
+  },
+  {
+    name: 'notifications.balanceAlerts',
+    direction: 'off',
+    summaryKey: 'settingsTools.guarded.balanceAlertsOff',
+  },
+  {
+    name: 'notifications.securityFindings',
+    direction: 'off',
+    summaryKey: 'settingsTools.guarded.securityFindingsOff',
+  },
+  {
+    name: 'hideBalance',
+    direction: 'on',
+    summaryKey: 'settingsTools.guarded.hideBalanceOn',
+  },
+] as const satisfies readonly GuardedChange[];
+
+/** The guarded entry for a setting name, or nothing when that setting is not guarded. */
+export function guardedChangeFor(name: string): GuardedChange | undefined {
+  return GUARDED_CHANGES.find(change => change.name === name);
+}
+
+/**
+ * The dialog body to show before writing this change, or nothing when the
+ * change does not need one. Value-triggered: only the guarded direction of a
+ * guarded setting returns a summary.
  *
- * An agent's tool call never reaches the store until this resolves true, so a
- * destructive setting (the trusted-host list) is never changed in silence.
+ * The body is the reader's own language throughout: the translated sentence
+ * carries the ask, and the setting name and value follow as the same
+ * `name = value` tokens the tool call used, so a reader can match the sheet to
+ * the change without an English sentence inside translated copy.
+ */
+export function guardedChangeSummary(name: string, value: unknown): string | undefined {
+  const guarded = guardedChangeFor(name);
+  if (guarded === undefined || value !== (guarded.direction === 'on')) {
+    return undefined;
+  }
+  return `${i18n.t(guarded.summaryKey)} (${name} = ${String(value)})`;
+}
+
+/**
+ * Asks the person to confirm a settings change that needs their word. Resolves
+ * true when they choose Save and false on Cancel, on Android Back, on a
+ * backdrop tap, when the host tears down, and when no host is mounted.
+ *
+ * Used for the destructive trusted-host list, and for the value-triggered
+ * guarded settings named in `GUARDED_CHANGES` above: an agent's tool call never
+ * reaches the store until this resolves true, so those settings never change in
+ * silence.
  */
 export function confirmSettingChange(summary: string): Effect.Effect<boolean> {
   return Effect.callback<boolean>(resume => {

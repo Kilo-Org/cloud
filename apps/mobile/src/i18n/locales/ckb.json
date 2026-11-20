@@ -965,6 +965,8 @@
       "pendingComment": "بۆچوونی نەنێردراو",
       "pendingComment_other": "بۆچوونی نەنێردراو",
       "submitCountOfTotal": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
+      "submitCountOfTotal_one": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
+      "submitCountOfTotal_other": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
       "submitReview": "ناردنی پێداچوونەوە",
       "partialPostedFresh": "{{displayFreshCount}} بۆچوون بڵاو کرایەوە. ",
       "partialPostedFresh_one": "{{displayFreshCount}} بۆچوون بڵاو کرایەوە. ",

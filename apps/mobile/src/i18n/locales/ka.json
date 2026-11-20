@@ -965,6 +965,8 @@
       "pendingComment": "გაუგზავნელი კომენტარი",
       "pendingComment_other": "გაუგზავნელი კომენტარი",
       "submitCountOfTotal": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
+      "submitCountOfTotal_one": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
+      "submitCountOfTotal_other": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
       "submitReview": "შემოწმების შედეგის გაგზავნა",
       "partialPostedFresh": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",
       "partialPostedFresh_one": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",

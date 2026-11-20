@@ -3238,6 +3238,8 @@
       "partialPostedStale_one": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
       "partialPostedStale_other": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
       "submitCountOfTotal": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
+      "submitCountOfTotal_one": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
+      "submitCountOfTotal_other": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
       "submitReview": "리뷰 제출",
       "blockedRequestChanges": "변경을 요청하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요.",
       "blockedComment": "댓글 리뷰를 게시하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요."

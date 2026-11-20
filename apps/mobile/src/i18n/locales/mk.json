@@ -965,6 +965,8 @@
       "pendingComment": "неиспратени коментари",
       "pendingComment_other": "неиспратени коментари",
       "submitCountOfTotal": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
+      "submitCountOfTotal_one": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
+      "submitCountOfTotal_other": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
       "submitReview": "Испрати преглед",
       "partialPostedFresh": "Објавени коментари: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Објавени коментари: {{displayFreshCount}}. ",

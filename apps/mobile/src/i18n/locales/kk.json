@@ -965,6 +965,8 @@
       "pendingComment": "жіберілмеген пікір",
       "pendingComment_other": "жіберілмеген пікір",
       "submitCountOfTotal": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
+      "submitCountOfTotal_one": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
+      "submitCountOfTotal_other": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
       "submitReview": "Тексеру нәтижесін жіберу",
       "partialPostedFresh": "{{displayFreshCount}} пікір жарияланды. ",
       "partialPostedFresh_one": "{{displayFreshCount}} пікір жарияланды. ",

@@ -965,6 +965,8 @@
       "pendingComment": "په تمه تبصرې",
       "pendingComment_other": "په تمه تبصرې",
       "submitCountOfTotal": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
+      "submitCountOfTotal_one": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
+      "submitCountOfTotal_other": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
       "submitReview": "بیاکتنه وسپارئ",
       "partialPostedFresh": "{{displayFreshCount}} تبصرې خپرې شوې. ",
       "partialPostedFresh_one": "{{displayFreshCount}} تبصره خپره شوه. ",

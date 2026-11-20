@@ -75,10 +75,9 @@ function NoMatch({ label }: Readonly<{ label: string }>) {
  * route to. An empty allow list would block every model, so the switch row
  * reads the draft's own membership rather than a separate flag.
  *
- * A row is titled with the provider's display name and shows the slug under it,
- * the way the deny list titles a model and puts its id beneath. A provider whose
- * name the gateway does not answer for keeps the slug as its title, with no
- * subtitle; an empty name counts as no answer.
+ * A row is titled with the provider's display name, one line per provider. A
+ * provider whose name the gateway does not answer for keeps the slug as its
+ * title, with no second line; an empty name counts as no answer.
  */
 export function ProviderAllowList({
   providers,
@@ -118,7 +117,6 @@ export function ProviderAllowList({
         >
           <PreferenceRow
             title={name ?? item}
-            subtitle={name === undefined ? undefined : item}
             value={draft.providerAllowList.includes(item)}
             disabled={disabled}
             onValueChange={next => {

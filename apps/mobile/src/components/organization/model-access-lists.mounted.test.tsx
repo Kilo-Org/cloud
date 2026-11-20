@@ -162,12 +162,12 @@ describe('ProviderAllowList empty state', () => {
 });
 
 describe('ProviderAllowList rows', () => {
-  it('titles a named row with its display name and puts the slug under it', async () => {
+  it('titles a named row with its display name and draws no second line', async () => {
     const root = await mount(['anthropic', 'openrouter'], { openrouter: 'OpenRouter Gateway' });
 
     expect(rows(root)).toEqual([
       { title: 'anthropic', subtitle: undefined },
-      { title: 'OpenRouter Gateway', subtitle: 'openrouter' },
+      { title: 'OpenRouter Gateway', subtitle: undefined },
     ]);
   });
 
@@ -184,7 +184,7 @@ describe('ProviderAllowList rows', () => {
 
     typeQuery(root, 'aggreg');
 
-    expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: 'openrouter' }]);
+    expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: undefined }]);
   });
 
   it('still finds a row by its slug', async () => {
@@ -192,6 +192,6 @@ describe('ProviderAllowList rows', () => {
 
     typeQuery(root, 'router');
 
-    expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: 'openrouter' }]);
+    expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: undefined }]);
   });
 });

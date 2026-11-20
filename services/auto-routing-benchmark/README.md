@@ -1208,9 +1208,9 @@ per exact `(model, variant)` pair under the live engine identity and repetitions
 
 | Entry path | Who starts it | Code |
 |---|---|---|
-| Admin Policy tab → **Save config** | an admin, in the console | `apps/web/src/app/admin/api/auto-routing/benchmark-config/route.ts` → `PUT /admin/config` (`src/admin.ts:267`), then `syncRegistryAfterConfigSave` → `syncPlatformRegistry` (`src/run.ts:465`) |
-| Owner custom router save (gateway entries) | the router's owner, in their own console | `apps/web/src/lib/auto-routing-custom-routers.ts` → `POST /admin/profiles/register` (`src/admin.ts:565`) → `registerProfiles` (`src/profiles.ts:537`) |
-| Alias target moves (e.g. `~openai/gpt-sol-latest` → a new concrete id) | nobody — the daily cron | `dailyReconcileSubscriptions` (`src/subscriptions.ts:685`) at `0 5 * * *` |
+| Admin Policy tab → **Save config** | an admin, in the console | `apps/web/src/app/admin/api/auto-routing/benchmark-config/route.ts` → `PUT /admin/config` (`registerAdminRoutes`, `src/admin.ts`), then `syncRegistryAfterConfigSave` → `syncPlatformRegistry` (`src/run.ts`) |
+| Owner custom router save (gateway entries) | the router's owner, in their own console | `apps/web/src/lib/auto-routing-custom-routers.ts` → `POST /admin/profiles/register` (`registerAdminRoutes`, `src/admin.ts`) → `registerProfiles` (`src/profiles.ts`) |
+| Alias target moves (e.g. `~openai/gpt-sol-latest` → a new concrete id) | nobody — the daily cron | `dailyReconcileSubscriptions` (`src/subscriptions.ts`) at `0 5 * * *`, resumed on the next ticks by `continueDailyReconcile` (`src/index.ts`) |
 
 ### Steps, with what is manual and what is a wait
 
@@ -1219,17 +1219,17 @@ everything else is automatic. **Wait** is the delay the flow itself imposes.
 
 | # | Step | Manual / automatic | Wait | Code |
 |---|---|---|---|---|
-| 1 | Pick the model and save the router config | **manual** (console Policy tab → Save config) | none; the save returns the saved config, its `warnings`, and the `drain` outcome | `src/admin.ts:267`, `src/admin.ts:196` (`syncRegistryAfterConfigSave`) |
-| 2 | Registry sync: expand the model through the live catalog into every supported effort, insert `pending` rows | automatic, inside the save request | none — runs before the response | `src/run.ts:465`, `src/db.ts:1751` (`syncPlatformRegistryRows`), `src/db.ts:1778` |
-| 3 | Routing table republish (the save also flushes an unchanged table) | automatic, inside the save request | none | `src/admin.ts:196`, `src/run.ts:516` |
-| 4 | Queue drain: claim the pending rows into a run | automatic. The save drains the **platform** queue itself right after the publish; the per-minute cron still drains both queues for owner registrations, and a decider run reaching a terminal state drains immediately | **none for the platform queue** on a save (bounded at 5 s, then deferred to the cron). Owner registrations still wait **up to 60 s**; the queue's run slot must be free (see "several runs per queue" below) | `src/admin.ts:246` (`drainPlatformAfterConfigSave`); `src/index.ts:159` → `src/run.ts:382`, `src/run.ts:425` |
-| 5 | Run start: claim registry rows, insert the run row, copy reusable prior results | automatic, same drain pass | none | `src/run.ts:860` (`startRun`), `src/db.ts:1136` |
-| 6 | Initialization: materialize one scheduler chunk per case per lane | automatic, on the next dispatch pass | **bounded 20 s per pass**; a large run needs several passes (one pass writes 50 chunks per batch) | `src/scheduler.ts:232` (`scheduleRunChunks`), `src/run.ts:1191`, `src/run.ts:1310` |
-| 7 | Dispatch: claim chunks that fit the scheduler caps and enqueue them | automatic | none once initialized | `src/scheduler.ts:488`, `src/run.ts:1310` |
-| 8 | Cases execute in the runner container; each result posts to `/container/case-result` | automatic | **the measurement itself** — this dominates: minutes to hours depending on the entry count and model latency | `src/scheduler.ts:863` (`beginPaidCase`), `src/run.ts:1674` |
-| 9 | Finalization: aggregate summaries, flip entries ready/failed, mark the run completed | automatic, on the dispatch pass that sees the run settled | none | `src/run.ts:2641` (`finalizeRunIfComplete`) |
-| 10 | Profile ready: the registry row carries `run_id` provenance | automatic, same pass | none | `src/db.ts:1319` (`markProfilesReadyForRun`), `src/profile-failure.ts` |
-| 11 | Routing table publish with the new pair | automatic, same pass (and any save) | refuses until **every** serving pair has a ready current-engine row | `src/run.ts:516`, `src/run.ts:2641` |
+| 1 | Pick the model and save the router config | **manual** (console Policy tab → Save config) | none; the save returns the saved config, its `warnings`, and the `drain` outcome | `registerAdminRoutes` (PUT /admin/config), `syncRegistryAfterConfigSave` (`src/admin.ts`) |
+| 2 | Registry sync: expand the model through the live catalog into every supported effort, insert `pending` rows | automatic, inside the save request | none — runs before the response | `syncPlatformRegistry` (`src/run.ts`), `syncPlatformRegistryRows` (`src/db.ts`) |
+| 3 | Routing table republish (the save also flushes an unchanged table) | automatic, inside the save request | none | `syncRegistryAfterConfigSave` → `publishPlatformRoutingTable` (`src/run.ts`) |
+| 4 | Queue drain: claim the pending rows into a run | automatic. The save drains the **platform** queue itself right after the publish; the per-minute cron still drains both queues for owner registrations, and a decider run reaching a terminal state drains immediately | **none for the platform queue** on a save (bounded at 5 s, then deferred to the cron). Owner registrations still wait **up to 60 s**; the queue's run slot must be free (see "several runs per queue" below) | `drainPlatformAfterConfigSave` (`src/admin.ts`); the scheduled handler (`src/index.ts`) → `sweepStaleRunsAndDrain` → `drainQueues` (`src/run.ts`) |
+| 5 | Run start: claim registry rows, insert the run row, copy reusable prior results | automatic, same drain pass | none | `startRun` (`src/run.ts`), `markProfilesRunningForRun` (`src/db.ts`), `reuseDeciderCaseResults` (`src/db.ts`, in the dispatcher's initialization) |
+| 6 | Initialization: materialize one scheduler chunk per case per lane | automatic, on the next dispatch pass | **bounded 20 s per pass**; a large run needs several passes (one pass writes 50 chunks per batch) | `scheduleRunChunks` (`src/scheduler.ts`), `initializeScheduledRun` (`src/run.ts`) |
+| 7 | Dispatch: claim chunks that fit the scheduler caps and enqueue them | automatic | none once initialized | `claimScheduledChunks` (`src/scheduler.ts`), `dispatchScheduler` (`src/run.ts`) |
+| 8 | Cases execute in the runner container; each result posts to `/container/case-result` | automatic | **the measurement itself** — this dominates: minutes to hours depending on the entry count and model latency | `beginPaidCase` (`src/scheduler.ts`), `acceptContainerCaseResult` (`src/run.ts`) |
+| 9 | Finalization: aggregate summaries, flip entries ready/failed, mark the run completed | automatic, on the dispatch pass that sees the run settled | none | `finalizeRunIfComplete` (`src/run.ts`) |
+| 10 | Profile ready: the registry row carries `run_id` provenance | automatic, same pass | none | `markProfilesReadyForRun` (`src/db.ts`), `src/profile-failure.ts` |
+| 11 | Routing table publish with the new pair | automatic, same pass (and any save) | refuses until **every** serving pair has a ready current-engine row | `publishPlatformRoutingTable`, `finalizeRunIfComplete` (`src/run.ts`) |
 | 12 | Console: runs list, per-model cost table and routing table show the result | automatic on page load / refetch | none | `apps/web/src/app/admin/auto-routing/BenchmarksSection.tsx` |
 
 ### Expected time per step
@@ -1262,8 +1262,9 @@ before the 2026-11-20 fixes took hours longer: p50 admit→ready was 2.9 h (plat
   coverage line reads `N of M measured · <effort>: pending` for the sync's new rows. A save
   that could not sync shows a destructive banner naming why (`registry_sync_failed`,
   `routing_table_publish_failed`) plus "save again to retry now". A save whose platform drain
-  did not start a run is not an error: its `drain.skipped` says `active_run`, `timeout` or
-  `failed`, and the Benchmarks tab shows the new `Platform queue` run as soon as the cron
+  did not start a run is not an error: its `drain.skipped` says `active_run` (the queue's run
+  slot is taken), `nothing_pending` (every pair is already measured or in flight), `timeout`
+  or `failed`, and the Benchmarks tab shows the new `Platform queue` run as soon as the cron
   picks it up (within a minute).
 - **Benchmarks tab, Decider Registry**: pending / running / ready / failed counts per queue,
   and the per-entry status list under the current engine identity.
@@ -1307,8 +1308,10 @@ whose budget ran out.
   same request, so the run exists by the time the save answers — no **Run platform queue**
   click and no cron wait. The drain is bounded at 5 s; if it is slow, or the queue's slot is
   taken, the save still answers 200 with the saved config and reports why in `drain`:
-  `skipped: 'timeout' | 'failed' | 'active_run'`. The per-minute cron then starts it within a
-  minute, so nothing is lost.
+  `skipped: 'timeout' | 'failed' | 'active_run' | 'nothing_pending'`. A drain that outlives
+  the deadline is not abandoned: the save hands its promise to the request's
+  `ctx.waitUntil`, so a claim that already started a run still records it, and the
+  per-minute cron starts anything it did not reach within a minute. Nothing is lost.
 - **Up to 60 s for an owner registration.** A custom router save admits its rows through
   `POST /admin/profiles/register`, which is not a benchmark config save and does not drain;
   the cron tick starts it. It stays because owner registrations arrive at arbitrary times

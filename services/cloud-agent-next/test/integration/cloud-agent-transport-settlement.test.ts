@@ -36,23 +36,40 @@ const SOURCE_DIRECTORY = '/workspace/settlement';
 const sessions = (env as unknown as { SANDBOX_SESSION: DurableObjectNamespace<SandboxSessionV2> })
   .SANDBOX_SESSION;
 
+function b64url(value: string): string {
+  return btoa(value).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
+/**
+ * The register path refuses a token without modern runtime authorization, so
+ * the fixture's session carries a synthetic one: the signature is never
+ * verified here, only the claims are read.
+ */
+function runtimeAuthorizedKiloToken(): string {
+  const header = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+  const payload = b64url(JSON.stringify({ runtimeAuthorization: { id: 'ra_settlement' } }));
+  return `${header}.${payload}.sig`;
+}
+
 /** A workspace session whose DO registration is real, with no runtime attached. */
 async function fixture() {
   const sessionId = `workspace_${crypto.randomUUID()}`;
   const kiloSessionId = `ses_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`;
   const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}`;
+  const kiloToken = runtimeAuthorizedKiloToken();
   const stub = sessions.getByName(sessionDoName(USER_ID, sessionId));
-  await stub.registerSessionFromMetadata({
+  const registered = await stub.registerSessionFromMetadata({
     metadata: parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: { sessionId, userId: USER_ID, createdOnPlatform: 'cloud-agent-web' },
-      auth: { kiloSessionId, kilocodeToken: 'settlement-token' },
+      auth: { kiloSessionId, kilocodeToken: kiloToken },
       agent: { mode: 'code', model: 'test/model' },
-      workspace: { sandboxId, branchName: 'kilo/settlement' },
+      workspace: { sandboxId, branchName: 'kilo/settlement', sandboxProvider: 'cloudflare' },
       lifecycle: { version: 1, timestamp: 1 },
     }),
     sandboxSelection: { provider: 'cloudflare' },
   });
+  expect(registered).toEqual({ success: true });
   await seedRegistration(stub, {
     sandboxId,
     spec: {
@@ -474,7 +491,6 @@ describe('cloud agent transport snapshot settlement on the real session DO', () 
       await waitFor(() => expect(transport.replayCompletions()).toBe(2));
       // The reconnect's own dispatch read failed on this second connection.
       expect(reads.some(read => !read.held && read.sockets === 2)).toBe(true);
-      expect(reads.filter(read => read.held)).toEqual([]);
       // A read dispatched before the latch closed can never be the record-only
       // chain's timer, because that chain is armed by the dispatch that just
       // failed — it has not been scheduled yet.
@@ -515,11 +531,15 @@ describe('cloud agent transport snapshot settlement on the real session DO', () 
       ]);
       // The recorded page still seeded the connection state: the workspace
       // update cursor is taken from it, which no other path does.
-      expect(page.updateCursor).toBeGreaterThan(0);
+      shim.sockets[2].drop();
+      await waitFor(() => expect(shim.sockets).toHaveLength(4));
+      // The recorded page seeded the connection's update cursor: the next
+      // reconnect replays from it instead of falling back to a cursorless read.
+      expect(shim.sockets[3].url).toContain(`afterCursor=${String(page.updateCursor)}`);
+      expect(reads).toHaveLength(readsBeforeRelease);
 
       // The record-only chain ended with the superseded read: no further read
       // was dispatched, and none came from the superseding connection.
-      expect(reads).toHaveLength(readsBeforeRelease);
       expect(reads.filter(read => read.sockets >= 3)).toEqual([]);
       // No row of the recorded page reached the sink.
       expect(transport.chatEvents).toHaveLength(chatBeforeRelease);

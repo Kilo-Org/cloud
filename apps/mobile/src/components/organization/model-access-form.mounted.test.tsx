@@ -650,9 +650,51 @@ describe('ModelAccessForm with no provider rows', () => {
     selectTab(root, 'providers');
 
     expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic']);
-    expect(root.findAllByType('Text' as never).map(node => node.props.children)).not.toContain(
+    // A saved slug is the only row and covers no provider the catalog left out,
+    // so the tab says the provider list did not load instead of passing the row
+    // off as the whole universe.
+    expect(root.findAllByType('Text' as never).map(node => node.props.children)).toContain(
       i18n.t('organizationModelAccess.providersUnavailable')
     );
+  });
+});
+
+describe('ModelAccessForm with a catalog that names no provider', () => {
+  // The catalog's own provider slugs are the phone's only provider evidence. A
+  // saved slug gives the tab a row to hold, but it says nothing about the
+  // providers a policy filter dropped, so the rows are not the whole universe:
+  // the tab stays read-only and a save leaves the stored list alone.
+  const UNNAMED = [model('anthropic/claude', []), model('openai/gpt', [])];
+
+  it('keeps the saved rows visible and locked until the catalog names providers', () => {
+    const root = render(['anthropic', 'openai'], { catalog: UNNAMED });
+
+    selectTab(root, 'providers');
+    expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic', 'openai']);
+    expect(list(root, 'ProviderAllowList').props.disabled).toBe(true);
+    expect(root.findAllByType('Text' as never).map(node => node.props.children)).toContain(
+      i18n.t('organizationModelAccess.providersNeedCatalog')
+    );
+    // The caption sends the reader to the retry above, so the notice tile that
+    // carries the Retry button shows here even though the saved list gave the
+    // tab rows.
+    expect(root.findAllByType('Text' as never).map(node => node.props.children)).toContain(
+      i18n.t('organizationModelAccess.providersUnavailable')
+    );
+  });
+
+  it('writes no provider list from a provider toggle made on those rows', async () => {
+    const root = render(['anthropic', 'openai'], { catalog: UNNAMED });
+
+    selectTab(root, 'providers');
+    const draft = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    changeProviders(root, toggleProvider(draft, 'openai', false));
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      model_deny_list: [],
+    });
   });
 });
 

@@ -19,6 +19,7 @@ import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import {
   type AvailableModel,
   type CatalogModel,
+  catalogProviderSlugs,
   denyListModels,
   draftsEqual,
   initialDraft,
@@ -106,11 +107,10 @@ export function ModelAccessForm({
   // gateway catalog, because the organization's own model list omits every model
   // of a provider it may not use: a provider turned off would otherwise lose its
   // row and could never be turned back on.
-  const providers = providerRows({
-    catalog,
-    available: models,
-    savedAllowList: providerAllowList,
-  });
+  const providers = providerRows({ catalog, available: models, savedAllowList: providerAllowList });
+  // The providers the gateway catalog itself names: the phone's only provider
+  // evidence, so a saved slug is a value to keep, never proof the rest arrived.
+  const catalogProviders = catalogProviderSlugs(catalog);
   // Rows come from the catalog plus the saved list: an empty set is missing data.
   const providersEmpty = providers.length === 0;
   const serverDraft = initialDraft(
@@ -118,8 +118,12 @@ export function ModelAccessForm({
     providers
   );
   const serverKey = `${serverDraft.providerAllowList.join(',')}|${serverDraft.modelDenyList.join(',')}`;
-  // Missing rows make the draft's provider list provisional: it rebases on arrival.
-  const providerRowsIncomplete = catalogUnavailable || providersEmpty;
+  // The rows stand for the whole provider universe only when the catalog names a
+  // provider itself: a saved slug holds one row, not the ones a policy filter
+  // dropped. So the draft's provider list stays provisional and rebases on
+  // arrival, and no save writes the rows as the organization's whole list.
+  const catalogProvidersEmpty = catalogProviders.length === 0;
+  const providerRowsIncomplete = catalogUnavailable || catalogProvidersEmpty;
   const [form, setForm] = useState<FormState>(() => ({
     syncedKey: serverKey,
     baseline: serverDraft,
@@ -191,14 +195,15 @@ export function ModelAccessForm({
     savedAllowList: providerAllowList,
     baseline,
     draft,
-    // Missing provider data is not a policy of no providers.
-    providerCatalogLoaded: !catalogUnavailable && !providersEmpty,
+    // A provider list the rows cannot stand for is not a policy of no providers.
+    providerCatalogLoaded: !providerRowsIncomplete,
     models: [...catalog, ...models],
   });
   const blockingIssue =
     savePayload.kind === 'ready' ? null : t(BLOCKING_ISSUE_KEYS[savePayload.kind]);
   const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
-  const noticeKey = providerDataNotice({ catalogUnavailable, providersEmpty });
+  const noticeFacts = { catalogUnavailable, catalogProvidersEmpty, providersEmpty };
+  const noticeKey = providerDataNotice(noticeFacts);
   const notice = noticeKey === null ? null : t(noticeKey);
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
@@ -345,7 +350,7 @@ export function ModelAccessForm({
           whose only row would be a misleading empty-policy message. */}
       {tab === 'providers' && !providersEmpty ? (
         <View className="flex-1">
-          {catalogUnavailable ? (
+          {providerRowsIncomplete ? (
             <Text variant="caption" className="px-4 pb-2">
               {t('organizationModelAccess.providersNeedCatalog')}
             </Text>
@@ -354,7 +359,7 @@ export function ModelAccessForm({
             providers={providers}
             draft={draft}
             onChange={onDraftChange}
-            disabled={!canEdit || saving || catalogUnavailable}
+            disabled={!canEdit || saving || providerRowsIncomplete}
           />
         </View>
       ) : null}

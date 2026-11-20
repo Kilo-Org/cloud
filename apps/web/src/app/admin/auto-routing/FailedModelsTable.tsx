@@ -34,7 +34,14 @@ function failedEntryKey(entry: BenchmarkPair): string {
 
 function formatFailedAt(iso: string): string {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+  return Number.isNaN(date.getTime())
+    ? iso
+    : date.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 }
 
 function nextRetryText(failure: BenchmarkRegistryFailedEntry['failure'], now: Date): string {
@@ -65,18 +72,13 @@ export function FailedModelsTable({
   }
   return (
     <div className="overflow-x-auto rounded-md border">
-      <Table className="min-w-max">
+      <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Model</TableHead>
-            <TableHead>Variant</TableHead>
-            <TableHead>Queues</TableHead>
-            <TableHead>Kind</TableHead>
-            <TableHead>Class</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Reason</TableHead>
-            <TableHead className="text-right">Attempts</TableHead>
-            <TableHead>First failed</TableHead>
-            <TableHead>Last failed</TableHead>
+            <TableHead>Failed</TableHead>
             <TableHead>Next retry</TableHead>
             <TableHead>
               <span className="sr-only">Action</span>
@@ -87,29 +89,39 @@ export function FailedModelsTable({
           {entries.map(entry => {
             const key = failedEntryKey(entry);
             const { failure } = entry;
+            const reason = failure.reason ?? 'No reason recorded';
             return (
               <TableRow key={key}>
-                <TableCell className="font-mono text-xs">{entry.model}</TableCell>
-                <TableCell className="font-mono text-xs">{entry.variant ?? 'default'}</TableCell>
-                <TableCell className="text-sm">
-                  {entry.queues.map(queue => QUEUE_LABELS[queue]).join(', ')}
+                <TableCell className="max-w-64">
+                  <div className="font-mono text-xs break-all">{entry.model}</div>
+                  <div className="text-muted-foreground text-xs">
+                    <span className="font-mono">{entry.variant ?? 'default'}</span> ·{' '}
+                    {entry.queues.map(queue => QUEUE_LABELS[queue]).join(', ')}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={failure.kind === 'permanent' ? 'destructive' : 'secondary'}>
                     {failure.kind === 'permanent' ? 'Permanent' : 'Retryable'}
                   </Badge>
+                  <div className="text-muted-foreground mt-1 font-mono text-xs">
+                    {failure.failureClass}
+                  </div>
                 </TableCell>
-                <TableCell className="font-mono text-xs">{failure.failureClass}</TableCell>
-                <TableCell className="max-w-md text-xs whitespace-normal">
-                  {failure.reason ?? 'No reason recorded'}
+                <TableCell className="min-w-48 text-xs">
+                  <p className="line-clamp-2" title={reason}>
+                    {reason}
+                  </p>
                 </TableCell>
-                <TableCell className="text-right tabular-nums text-sm">
-                  {failure.attempts}
+                <TableCell className="text-xs whitespace-nowrap">
+                  <div>{`First ${formatFailedAt(failure.firstFailedAt)}`}</div>
+                  <div className="text-muted-foreground">
+                    {`Last ${formatFailedAt(failure.lastFailedAt)} · ${failure.attempts} ${failure.attempts === 1 ? 'attempt' : 'attempts'}`}
+                  </div>
                 </TableCell>
-                <TableCell className="text-xs">{formatFailedAt(failure.firstFailedAt)}</TableCell>
-                <TableCell className="text-xs">{formatFailedAt(failure.lastFailedAt)}</TableCell>
-                <TableCell className="text-xs">{nextRetryText(failure, now)}</TableCell>
-                <TableCell>
+                <TableCell className="text-xs whitespace-nowrap">
+                  {nextRetryText(failure, now)}
+                </TableCell>
+                <TableCell className="text-right">
                   <Button
                     type="button"
                     variant="outline"

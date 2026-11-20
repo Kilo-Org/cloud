@@ -65,6 +65,11 @@ describe('failed models table', () => {
     expect(html).toContain('Retryable');
     expect(html).toContain('provider_unavailable');
     expect(html).toContain('No reason recorded');
+    expect(html).toContain('1 attempt<');
+    expect(html).toContain('2 attempts<');
+    expect(html).toContain(
+      'title="Model or variant is unavailable in the executable benchmark catalog."'
+    );
     expect(html).toContain('Eligible now');
     expect(html).toContain('aria-label="Re-admit vendor/absent high"');
     expect(html).toContain('aria-label="Re-admit vendor/flaky default"');
@@ -73,7 +78,14 @@ describe('failed models table', () => {
   it('shows a future retry window instead of eligibility', () => {
     const html = render([retryable('2026-11-20T14:00:00.000Z')]);
     expect(html).not.toContain('Eligible now');
-    expect(html).toContain(new Date('2026-11-20T14:00:00.000Z').toLocaleString());
+    expect(html).toContain(
+      new Date('2026-11-20T14:00:00.000Z').toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    );
   });
 
   it('marks the row being re-admitted and disables every re-admit', () => {

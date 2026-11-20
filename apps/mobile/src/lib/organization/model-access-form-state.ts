@@ -14,7 +14,7 @@ export type FormState = Readonly<{
   baseline: ModelAccessDraft;
   draft: ModelAccessDraft;
   providerRowsProvisional: boolean;
-  /** Whether the admin moved a provider switch, so an arrival keeps that list. */
+  /** Whether the draft's provider list differs from the baseline, so an arrival keeps it. */
   providerListEdited: boolean;
 }>;
 

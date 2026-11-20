@@ -148,6 +148,16 @@ function changeDraft(root: ReactTestInstance, next: ModelAccessDraft) {
   });
 }
 
+function changeProviders(root: ReactTestInstance, next: ModelAccessDraft) {
+  act(() => {
+    (
+      root.findByType('ProviderAllowList' as never).props.onChange as (
+        draft: ModelAccessDraft
+      ) => void
+    )(next);
+  });
+}
+
 async function pressSave(root: ReactTestInstance) {
   const buttons = root.findAllByType('Button' as never);
   const save = buttons.at(-1);
@@ -513,6 +523,33 @@ describe('ModelAccessForm with no provider rows', () => {
       provider_allow_list: ['anthropic'],
       model_deny_list: [],
     });
+  });
+
+  it('takes the arriving catalog after a reverted provider toggle', () => {
+    // A switch turned off and back on leaves no choice behind, so a later row
+    // gap must not keep the pre-gap list against the arriving catalog.
+    const root = render(undefined);
+    selectTab(root, 'providers');
+    const start = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    changeProviders(root, toggleProvider(start, 'openai', false));
+    const off = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    expect(off.providerAllowList).toEqual(['anthropic']);
+    changeProviders(root, toggleProvider(off, 'openai', true));
+    const reverted = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    expect(reverted.providerAllowList).toEqual(['anthropic', 'openai']);
+    selectTab(root, 'models');
+    // A model edit keeps the form dirty, so the draft itself survives the gap.
+    changeDraft(root, toggleModel(reverted, 'anthropic/claude', false));
+
+    renderWithCatalog(undefined, {
+      catalog: [model('openai/gpt', []), model('anthropic/claude', [])],
+    });
+    renderWithCatalog(undefined, { catalog: WIDE_CATALOG });
+
+    selectTab(root, 'providers');
+    const arrived = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+
+    expect(arrived.providerAllowList).toEqual(['anthropic', 'google', 'openai']);
   });
 
   it('shows the retry as loading while the catalog request runs', () => {

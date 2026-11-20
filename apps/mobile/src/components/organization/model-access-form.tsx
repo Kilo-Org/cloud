@@ -137,9 +137,9 @@ export function ModelAccessForm({
     setForm(previous => ({
       ...previous,
       draft: next,
+      // Derived, not latched: putting a switch back leaves no choice to keep.
       providerListEdited:
-        previous.providerListEdited ||
-        next.providerAllowList.join('\n') !== previous.draft.providerAllowList.join('\n'),
+        next.providerAllowList.join('\n') !== previous.baseline.providerAllowList.join('\n'),
     }));
   };
 

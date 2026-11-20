@@ -11,11 +11,16 @@ export type LanguageActivation = 'loaded' | 'recovered' | 'failed';
 /**
  * Apply `language` and report whether its catalog is actually active.
  *
- * `changeLanguage` never rejects: the lazy backend hands its error to i18next,
- * which records the failed entry as `-1` and skips it on every later load — so
- * a failed read would otherwise leave the process in English for the whole
- * process, with no signal and no retry. The store is the check that matters,
- * and the one case i18next will not retry is loaded here directly.
+ * A backend read failure never rejects: the lazy backend hands its error to
+ * i18next, which records the failed entry as `-1` and skips it on every later
+ * load — so a failed read would otherwise leave the process in English for the
+ * whole process, with no signal and no retry. The store is the check that
+ * matters, and the one case i18next will not retry is loaded here directly.
+ *
+ * A `languageChanged` listener can still reject `changeLanguage`, because
+ * i18next emits that event synchronously after it has stored the new bundle.
+ * The catch below therefore reads the store instead of trusting the
+ * rejection: a listener that throws is not a catalog that failed.
  *
  * The second parameter is for tests, which need a backend that can fail;
  * production always uses the app's singleton.

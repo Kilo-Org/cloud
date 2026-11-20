@@ -101,7 +101,6 @@ export async function checkDomainSignInEligibility(
 
   const domainToCheck = getLowerDomainFromEmail(existingUser?.google_user_email ?? email);
 
-  // we don't need to check gmail domains for SSO for now.
   // This is mostly an optimization so we don't hit the DB on every gmail login since they defacto aren't using SSO
   if (domainToCheck && domainToCheck !== 'gmail.com') {
     const ssoAuthority = await resolveSsoAuthorityForDomain(domainToCheck);

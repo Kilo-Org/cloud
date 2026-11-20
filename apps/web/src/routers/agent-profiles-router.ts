@@ -714,8 +714,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return repoBindingService.listBindings(db, owner);
     }),
 
-  // ============ MCP SERVERS ============
-
   /**
    * Create an MCP server on a profile from a CLI-native input (local or remote).
    * Each env/header value is encrypted at-rest with the agent env vars public key
@@ -840,8 +838,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
       return { success: true };
     }),
-
-  // ============ SKILLS ============
 
   /**
    * Create a custom skill by pasting SKILL.md directly (optionally with
@@ -986,8 +982,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // ============ AGENTS ============
-
   /**
    * Create an agent on a profile. The agent config is injected into
    * `KILO_CONFIG_CONTENT.agent.<slug>` at session preparation time.
@@ -1085,8 +1079,6 @@ export const agentProfilesRouter = createTRPCRouter({
       await profileAgentsService.deleteAgent(db, input.profileId, input.agentId, owner);
       return { success: true };
     }),
-
-  // ============ KILO COMMANDS ============
 
   createKiloCommand: baseProcedure
     .input(
@@ -1235,8 +1227,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // ============ INSTRUCTIONS ============
-
   /**
    * Create an instruction file on a profile. Each enabled instruction is
    * materialized as `.kilocode/rules/<name>.md` at session preparation time.
@@ -1338,8 +1328,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
       return { success: true };
     }),
-
-  // ============ CONFIG IMPORT ============
 
   /**
    * Decode and map an uploaded local config archive and diff it against the

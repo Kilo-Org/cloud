@@ -355,7 +355,6 @@ export function useSignInFlow({
   }, [tier, params.org]);
 
   const inviteOrgName = useMemo(() => {
-    // Could be enhanced to fetch org name, but for now just use org ID
     return inviteOrgId;
   }, [inviteOrgId]);
 

@@ -23,10 +23,6 @@ type ScheduleBuilderProps = {
   disabled?: boolean;
 };
 
-// ============================================================================
-// Simple schedule types
-// ============================================================================
-
 type Frequency = 'every-n-minutes' | 'hourly' | 'daily' | 'weekdays' | 'weekly' | 'monthly';
 
 type SimpleSchedule = {
@@ -58,10 +54,6 @@ const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
   { value: 'weekly', label: 'Weekly on specific days' },
   { value: 'monthly', label: 'Monthly' },
 ];
-
-// ============================================================================
-// Cron <-> Simple conversion
-// ============================================================================
 
 function scheduleToCron(s: SimpleSchedule): string {
   switch (s.frequency) {
@@ -165,10 +157,6 @@ function formatTime12h(hour: number, minute: number): string {
   const m = minute.toString().padStart(2, '0');
   return `${h}:${m} ${period}`;
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export const ScheduleBuilder = memo(function ScheduleBuilder({
   cronExpression,

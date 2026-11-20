@@ -1302,7 +1302,6 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        // we don't need to check gmail domains for SSO for now.
         // This is mostly an optimization so we don't hit the DB on every gmail login since they defacto aren't using SSO
         //
         // Account linking is not a sign-in: the person is already

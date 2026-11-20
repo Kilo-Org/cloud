@@ -387,8 +387,6 @@ describe('normalizeRepositoryReviewInstructions', () => {
   });
 });
 
-// --- Incremental review ---
-
 const existingReviewStateWithSummary: ExistingReviewState = {
   summaryComment: {
     commentId: 123,

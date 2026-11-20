@@ -7,8 +7,6 @@ import {
 import { eq } from 'drizzle-orm';
 import type { FindingSeverity } from './schemas';
 
-// --- In-memory content types ---
-
 /** One row in the check catalog — server-authoritative copy for a known checkId. */
 export type CatalogCheck = {
   severity: FindingSeverity;
@@ -40,8 +38,6 @@ export type LoadedShellSecurityContent = {
   kiloclawCoverage: KiloClawCoverageArea[];
   content: Map<string, string>;
 };
-
-// --- TTL cache ---
 
 // 5 minutes in prod; 0 in dev so content changes are visible immediately.
 // A 0-TTL doesn't disable caching entirely — requests within the same event

@@ -418,10 +418,6 @@ export function VarsTab({
   );
 }
 
-// -------------------------------------------------------------------
-// .env paste parsing
-// -------------------------------------------------------------------
-
 function stripEnvQuotes(value: string): string {
   if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
     return value.slice(1, -1).replace(/\\(["\\n])/g, (_m, ch: string) => (ch === 'n' ? '\n' : ch));

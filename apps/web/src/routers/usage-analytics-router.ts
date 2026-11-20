@@ -74,10 +74,6 @@ export type {
   UsageAnalyticsFilters,
 } from '@/routers/usage-analytics-schemas';
 
-// ---------------------------------------------------------------------------
-// Table / tier resolution
-// ---------------------------------------------------------------------------
-
 type GranularityTier = 'hourly' | 'daily' | 'monthly';
 
 type TableMeta = {
@@ -129,10 +125,6 @@ function getTimeColumn(tier: GranularityTier): string {
   return tier === 'hourly' ? 'usage_hour' : 'usage_date';
 }
 
-// ---------------------------------------------------------------------------
-// Date helpers
-// ---------------------------------------------------------------------------
-
 function ceilIsoToUtcDayExclusive(iso: string): string {
   const d = new Date(iso);
   const dayStartMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
@@ -155,10 +147,6 @@ function ceilIsoToUtcMonthExclusive(iso: string): string {
   const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
   return next.toISOString().slice(0, 10);
 }
-
-// ---------------------------------------------------------------------------
-// SQL WHERE clause builder
-// ---------------------------------------------------------------------------
 
 /**
  * Accumulates SQL WHERE clauses with positional `?` bindings.
@@ -226,10 +214,6 @@ export class WhereBuilder {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Authorization
-// ---------------------------------------------------------------------------
-
 /** True when the filters target one or more organizations (vs personal usage). */
 function isOrgScope(filters: UsageAnalyticsFilters): boolean {
   return Boolean(filters.organizationId) || (filters.organizationIds?.length ?? 0) > 0;
@@ -273,10 +257,6 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
     });
   }
 }
-
-// ---------------------------------------------------------------------------
-// WHERE clause helpers
-// ---------------------------------------------------------------------------
 
 function buildDateConditions(
   where: WhereBuilder,
@@ -388,10 +368,6 @@ function buildWhereClause(
   return where;
 }
 
-// ---------------------------------------------------------------------------
-// Metric SQL expression
-// ---------------------------------------------------------------------------
-
 export function costColumnFor(costSource: CostSource): string {
   switch (costSource) {
     case 'cost':
@@ -447,10 +423,6 @@ function generationTimeCountExprSql(tier: GranularityTier): string {
   return 'IFF(total_generation_time_ms IS NOT NULL AND usage_date >= DATEADD(day, -7, CURRENT_DATE), 1, 0)';
 }
 
-// ---------------------------------------------------------------------------
-// Bucket expression for timeseries / table grouping
-// ---------------------------------------------------------------------------
-
 /**
  * Returns a SQL expression that formats the time column as a string bucket,
  * matching the granularity the caller requested.
@@ -477,10 +449,6 @@ function bucketExprSql(effectiveGranularity: Granularity, tier: GranularityTier)
   return `TO_VARCHAR(${timeCol}, 'YYYY-MM-DD')`;
 }
 
-// ---------------------------------------------------------------------------
-// Dimension column name
-// ---------------------------------------------------------------------------
-
 export function dimensionColumn(dimension: BreakdownDimension): string {
   switch (dimension) {
     case 'feature':
@@ -503,10 +471,6 @@ export function dimensionColumn(dimension: BreakdownDimension): string {
       return 'organization_id';
   }
 }
-
-// ---------------------------------------------------------------------------
-// Timed query wrapper
-// ---------------------------------------------------------------------------
 
 function parseTimeoutEnv(envKey: string, fallback: number): number {
   const raw = getEnvVariable(envKey);
@@ -581,10 +545,6 @@ async function timedSnowflakeQuery<T>(
   }
 }
 
-// ---------------------------------------------------------------------------
-// getSummary
-// ---------------------------------------------------------------------------
-
 function ratioSafe(numerator: number, denominator: number): number {
   if (denominator === 0) return 0;
   return numerator / denominator;
@@ -606,10 +566,6 @@ function toSafeNumber(value: unknown): number {
   return n;
 }
 
-// ---------------------------------------------------------------------------
-// User list (for org context)
-// ---------------------------------------------------------------------------
-
 const MAX_USER_LABEL_LOOKUP_IDS = 1_000;
 
 const UserListInputSchema = z.object({
@@ -626,10 +582,6 @@ const UserListOutputSchema = z.object({
     })
   ),
 });
-
-// ---------------------------------------------------------------------------
-// Scope organizations (org usage page Scope selector)
-// ---------------------------------------------------------------------------
 
 const ScopeOrganizationsInputSchema = z.object({
   organizationId: z.uuid(),
@@ -691,10 +643,6 @@ function requireSnowflakeConfig() {
   }
   return config;
 }
-
-// ---------------------------------------------------------------------------
-// Router definition
-// ---------------------------------------------------------------------------
 
 export const usageAnalyticsRouter = createTRPCRouter({
   getSummary: baseProcedure

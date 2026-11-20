@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { stripQueryString, trpcProcedureText } from '@/lib/telemetry/request-target';
+import { stripQueryString, TRPC_PATH, trpcProcedureText } from '@/lib/telemetry/request-target';
 
 // Assembled from parts so the fixture reads as a plain URL value.
 const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
@@ -71,8 +71,45 @@ describe('stripQueryString', () => {
     expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
   });
 
-  it('reduces the text after the last at-sign when the run before a delimiter holds a colon', () => {
-    expect(stripQueryString(`https://${HOST}:8443/api/${MEMBER}/x`)).toBe(`https://${HOST}/x`);
+  it('keeps a host with a port unchanged when its path carries an at-sign', () => {
+    expect(stripQueryString(`https://${HOST}:8443/api/${MEMBER}/x`)).toBe(
+      `https://${HOST}:8443/api/${MEMBER}/x`
+    );
+  });
+
+  it('keeps origin and path for a numeric-leading run that spans several separators', () => {
+    const segment = ['12345', 'abcdefghij', 'klmnopqrst'].join('/');
+    const url = `https://user:${segment}@${HOST}${TRPC_PATH_FIXTURE}`;
+
+    expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
+  });
+
+  it('keeps origin and path when a numeric-looking run precedes the at-sign segment', () => {
+    const segment = ['12345', 'abc'].join('/');
+    const url = `https://user:${segment}@${HOST}${TRPC_PATH_FIXTURE}`;
+
+    expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
+  });
+
+  it('keeps a loopback host with a port and drops a query value carrying an at-sign', () => {
+    const procedure = ['x', 'y'].join('.');
+    const url = `http://localhost:3000${TRPC_PATH}${procedure}?email=${MEMBER}`;
+
+    expect(stripQueryString(url)).toBe(`http://localhost:3000${TRPC_PATH}${procedure}`);
+    expect(trpcProcedureText(url)).toBe(procedure);
+  });
+
+  it('keeps a bracketed IPv6 authority and drops a query value carrying an at-sign', () => {
+    const literal = `[${['2001', 'db8', '', '1'].join(':')}]`;
+    const url = `https://${literal}${TRPC_PATH_FIXTURE}?x=${MEMBER}`;
+
+    expect(stripQueryString(url)).toBe(`https://${literal}${TRPC_PATH_FIXTURE}`);
+  });
+
+  it('drops the query string of a bare host when its value contains @', () => {
+    expect(stripQueryString(`https://host${TRPC_PATH_FIXTURE}?user=${MEMBER}`)).toBe(
+      `https://host${TRPC_PATH_FIXTURE}`
+    );
   });
 
   it('leaves a host with @ in its path unchanged', () => {

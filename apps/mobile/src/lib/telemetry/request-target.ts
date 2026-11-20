@@ -20,6 +20,62 @@ function cutAtQueryOrFragment(text: string): string {
   return cut === -1 ? text : text.slice(0, cut);
 }
 
+/** A bracketed IPv6 literal, with an optional `:port`. */
+const IPV6_LITERAL = /^\[[\da-f:.]+\](?::\d{1,5})?$/iu;
+
+/** `localhost`, with an optional `:port`. */
+const LOCALHOST = /^localhost(?::\d{1,5})?$/iu;
+
+/** A dotted-quad IPv4 literal, with an optional `:port`. */
+const IPV4_LITERAL = /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/u;
+
+/** A registered name, with at least one dot and an optional `:port`. */
+const REGISTERED_NAME =
+  /^(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+[a-z\d](?:[a-z\d-]*[a-z\d])?(?::\d{1,5})?$/iu;
+
+/**
+ * Whether an authority segment reads as a host: a bracketed IPv6 literal, an
+ * IPv4 literal, `localhost`, or a dotted registered name, each with an optional
+ * port. A single label is not a host here: it reads as a userinfo pair just as
+ * easily, and the value that reaches telemetry must not depend on that guess.
+ */
+function isHostLike(text: string): boolean {
+  return (
+    IPV6_LITERAL.test(text) ||
+    IPV4_LITERAL.test(text) ||
+    LOCALHOST.test(text) ||
+    REGISTERED_NAME.test(text)
+  );
+}
+
+/**
+ * Whether an `@` sits after `position` and before the next `/`, `?`, `#` or the
+ * end of the text.
+ */
+function atSignBeforeDelimiter(text: string, position: number): boolean {
+  for (let i = position + 1; i < text.length; i += 1) {
+    const c = text[i];
+    if (c === '@') {
+      return true;
+    }
+    if (c === '/' || c === '?' || c === '#') {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether a delimiter at `delimiterIndex` closes the authority: the run before
+ * it reads as a host, and — for `/` — no `@` follows in that path segment.
+ */
+function closesAuthority(url: string, delimiterIndex: number, schemeEnd: number): boolean {
+  if (!isHostLike(url.slice(schemeEnd, delimiterIndex))) {
+    return false;
+  }
+  return url[delimiterIndex] !== '/' || !atSignBeforeDelimiter(url, delimiterIndex);
+}
+
 /**
  * Reduce a URL to its origin and path: drop the query string, the fragment and
  * any authority userinfo, which ends at its last `@` whatever characters it
@@ -35,23 +91,26 @@ export function stripQueryString(url: string): string {
     }
     const schemeEnd = scheme[0].length;
     // A delimiter ends the authority once the userinfo is terminated, or when
-    // the run since the scheme cannot be userinfo (it holds no ':'); otherwise
-    // the delimiter sits inside the userinfo and the authority continues.
+    // the run since the scheme carries no ':' and so cannot be userinfo: then
+    // the text is a plain origin and path.
     //
-    // One reading covers both shapes by design: a run before a delimiter that
-    // already holds a ':' is read as userinfo, so a path after such a run
-    // reduces to the text following its last `@`. This is the intended form of
-    // the origin-and-path contract, not a reading to narrow toward a stricter
-    // authority grammar.
+    // A run that carries a ':' may be either userinfo or an authority with a
+    // port, so the delimiter is read against the run's shape. Once the run
+    // reads as a host, the delimiter closes the authority; otherwise the
+    // userinfo continues past it, and only an `@` before the following
+    // delimiter closes it.
     let lastAt = -1;
-    let runHoldsColon = false;
+    let colonBefore = false;
     for (let i = schemeEnd; i < url.length; i += 1) {
       const c = url[i];
       if (c === '@') {
         lastAt = i;
       } else if (c === ':') {
-        runHoldsColon = true;
-      } else if ((c === '/' || c === '?' || c === '#') && (lastAt !== -1 || !runHoldsColon)) {
+        colonBefore = true;
+      } else if (
+        (c === '/' || c === '?' || c === '#') &&
+        (lastAt !== -1 || !colonBefore || closesAuthority(url, i, schemeEnd))
+      ) {
         break;
       }
     }

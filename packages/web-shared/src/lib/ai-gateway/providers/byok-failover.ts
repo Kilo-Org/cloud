@@ -170,10 +170,6 @@ type PendingAttempt = Omit<ByokFailoverAttempt, 'error_code' | 'error_summary'> 
   details: Promise<ErrorDetails>;
 };
 
-function customLlmFields(route: ProviderRoute) {
-  return route.customLlmPublicId ? { custom_llm_public_id: route.customLlmPublicId } : {};
-}
-
 /** Reads the failure off the request path. A custom LLM route's summary is also logged, once read,
  * because the failover warning cannot wait for the body. */
 function readFailureDetails(route: ProviderRoute, failed: Response): Promise<ErrorDetails> {
@@ -271,7 +267,6 @@ export async function sendUpstreamAttemptWithByokFailover(
     pending.push({
       provider_type: providerContext.provider.type,
       byok_provider_ids: byokProviderIds(providerContext),
-      ...customLlmFields(providerContext),
       status: failed.status,
       details: readFailureDetails(providerContext, failed),
       duration_ms: attemptDurationMs,
@@ -296,7 +291,6 @@ export async function sendUpstreamAttemptWithByokFailover(
   pending.push({
     provider_type: providerContext.provider.type,
     byok_provider_ids: byokProviderIds(providerContext),
-    ...customLlmFields(providerContext),
     status: attemptStatus(attempt),
     // The client still reads the failure, so the details come from a copy.
     details: failed ? readFailureDetails(providerContext, failed.clone()) : Promise.resolve({}),

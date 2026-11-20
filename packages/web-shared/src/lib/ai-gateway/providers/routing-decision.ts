@@ -244,8 +244,6 @@ export type FailoverErrorSummary = z.infer<typeof FailoverErrorSummarySchema>;
 const ByokFailoverAttemptSchema = z.object({
   provider_type: ProviderTypeSchema,
   byok_provider_ids: z.array(UserByokProviderIdSchema),
-  /** The `public_id` of the custom LLM, set on a partner attempt. */
-  custom_llm_public_id: z.string().optional(),
   status: z.number().int(),
   /** A machine-readable code from the error body, such as `rate_limit_error`; never its message. */
   error_code: z.string().optional(),

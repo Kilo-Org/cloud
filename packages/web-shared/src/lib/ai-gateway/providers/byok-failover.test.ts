@@ -738,19 +738,17 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
 
     const promptEcho = 'secret prompt text: my password is hunter2';
 
-    it('records the custom LLM id and logs it with the failover', async () => {
-      const [partnerAttempt, servedByKilo] = await failOverFromPartner(
+    it('logs the custom LLM id with the failover', async () => {
+      const [partnerAttempt] = await failOverFromPartner(
         upstreamJsonFailure(503, { error: { code: 'overloaded' } })
       );
 
       expect(partnerAttempt).toMatchObject({
         provider_type: 'partner',
-        custom_llm_public_id: 'acme/partner-model',
         status: 503,
         error_code: 'overloaded',
       });
       expect(partnerAttempt).not.toHaveProperty('error_summary');
-      expect(servedByKilo).not.toHaveProperty('custom_llm_public_id');
       expect(console.warn).toHaveBeenCalledWith(
         '[byok-failover] Upstream failed, trying the next route',
         expect.objectContaining({
@@ -903,7 +901,6 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
 
       const attempts = await failoverAttemptsOf(result);
       expect(attempts.at(-1)).toMatchObject({
-        custom_llm_public_id: 'acme/partner-model',
         outcome: 'failed',
         error_summary: { issues: [{ type: 'extra_forbidden', loc: 'body.user' }] },
       });

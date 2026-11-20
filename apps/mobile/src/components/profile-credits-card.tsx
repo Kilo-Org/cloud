@@ -10,12 +10,11 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
-import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
+import { CreditsNoteSlot } from '@/components/credits/credits-note-slot';
 import { PersonalCreditsLinks } from '@/components/credits/credits-links';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SectionHeader } from '@/components/ui/section-header';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
@@ -63,18 +62,6 @@ type CreditsCardProps = {
  */
 const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
 
-/**
- * One `caption` line at font scale 1. `text-xs` lays out at 14.1 dp on the
- * standard Android cell (measured on the Profile gate target), and the card's
- * nearest spacing class is `h-4` (14 dp).
- */
-const CAPTION_LINE_DP = 14.1;
-/**
- * The funded note's line count at font scale 1: the sentence wraps to two
- * `caption` lines in this card's column (gate-measured at 28.19 dp), one line
- * for the empty message and one for the loading bar.
- */
-const FUNDED_NOTE_LINES = 2;
 
 /**
  * The sentence each failure kind paints: the connection's own wording, the
@@ -314,69 +301,24 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
       </Text>
     ) : null;
 
-  // The note slot: the member's scope caption, then the expiry note, under the
-  // amount. No entrance fade — the caption holds a row of this block, so a fade
-  // that paints it late leaves it empty. A failing identity read joins the
-  // failure state: its credits can never load, and a money role's amount still
-  // paints from the membership row, so its exit lives here instead of over the
-  // amount.
-  const creditsNoteFailed = creditsFailed || identityReadBlocked;
-  // Only the painting branch needs this exit: everywhere else the identity
-  // failure owns the whole block, whose own retry already re-reads it.
-  const identityNoteExit = identityReadBlocked && paintsOrgListBalance;
-  // The expiry slot is a fixed box in every state: a funded account's sentence
-  // ("… in credits expires … Credits with the earliest expiry are used first.")
-  // wraps to two `caption` lines at this card's width and scale 1, the empty
-  // message is one line and the loading bar is one. A one-line slot grew the
-  // card by about 14 dp when funded credits landed and moved every row below it
-  // (Profile held-loading gate target, 2026-11-20).
-  //
-  // Both the line's height and the sentence's line count grow with the font
-  // scale, and the count grows faster than the scale: the column keeps its
-  // width in dp while every glyph widens, so a sentence that takes two lines at
-  // scale 1 takes about four at Android's largest scale. Reserving only
-  // `2 × scale` lines left the box one line short from about scale 1.5 and grew
-  // the card when a funded note landed — the shift this slot exists to prevent.
-  const noteLines = Math.ceil(FUNDED_NOTE_LINES * fontScale);
+  // A failing identity read joins the note: its credits can never load, and a
+  // money role's amount still paints from the membership row, so its exit lives
+  // in this slot instead of over the amount. Only the painting branch carries
+  // that exit: everywhere else the identity failure owns the whole block, whose
+  // own retry already re-reads it.
+  const creditsNoteShown = !creditsFailed && !identityReadBlocked && !creditsPending;
   const noteSlot = (
-    <>
-      {organizationScopeNote}
-      <View
-        testID="credits-expiry-slot"
-        style={{ minHeight: CAPTION_LINE_DP * fontScale * noteLines }}
-      >
-        {creditsNoteFailed &&
-          (identityNoteExit ? (
-            <View>
-              <AccessibleStatus message={t('credits.expiryUnavailable')} className="text-sm" />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('common.retry')}
-                accessibilityHint={t('credits.expiryUnavailable')}
-                onPress={retryBalance}
-                className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
-              >
-                <Text className="text-sm text-primary">{t('common.retry')}</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
-          ))}
-        {!creditsNoteFailed && creditsPending && (
-          // The bar stands in for one `caption` line (14.1pt tall), so it takes
-          // that line's height: a shorter bar lifted the value column, and the
-          // row's centering moved the amount itself when the note landed.
-          <Skeleton className="h-4 w-40 max-w-full rounded bg-muted-soft" />
-        )}
-        {!creditsNoteFailed && !creditsPending && (
-          <CreditExpiryNote
-            creditBlocks={creditData.creditBlocks}
-            hiddenAmount={hideBalance || !hideBalanceLoaded ? HIDDEN_BALANCE : undefined}
-            emptyMessage={t('credits.noExpiringCredits')}
-          />
-        )}
-      </View>
-    </>
+    <CreditsNoteSlot
+      scope={organizationScopeNote}
+      failed={creditsFailed || identityReadBlocked}
+      retryable={identityReadBlocked && paintsOrgListBalance}
+      pending={creditsPending}
+      creditBlocks={creditsNoteShown ? creditData.creditBlocks : undefined}
+      hiddenAmount={hideBalance || !hideBalanceLoaded ? HIDDEN_BALANCE : undefined}
+      emptyMessage={t('credits.noExpiringCredits')}
+      onRetry={retryBalance}
+      fontScale={fontScale}
+    />
   );
 
   // `shrink-0 grow-0` keeps the amount at its text height: a horizontal

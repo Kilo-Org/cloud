@@ -75,14 +75,14 @@ describe('createSubscriptionCheckout', () => {
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
     });
     await expect(caller.kiloclaw.switchPlan({ toPlan: 'commit' })).rejects.toThrow(
-      'Commit is no longer available'
+      'KiloClaw plans can no longer be switched'
     );
     await expect(
       caller.kiloclaw.switchPlanAtInstance({
         instanceId: switchInstance.id,
         toPlan: 'commit',
       })
-    ).rejects.toThrow('Commit is no longer available');
+    ).rejects.toThrow('KiloClaw plans can no longer be switched');
 
     const [row] = await db
       .select()

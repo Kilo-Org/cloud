@@ -2504,6 +2504,9 @@ async function acceptKiloclawConversionForRow(params: {
 const KILOCLAW_REACTIVATION_UNAVAILABLE_MESSAGE =
   'KiloClaw subscriptions can no longer be reactivated. Hosting runs until the end of the current paid period.';
 
+const KILOCLAW_PLAN_SWITCH_UNAVAILABLE_MESSAGE =
+  'KiloClaw plans can no longer be switched. Hosting runs until the end of the current paid period.';
+
 const KILOCLAW_COMMIT_CONTINUATION_UNAVAILABLE_MESSAGE =
   'KiloClaw Commit terms can no longer continue month-to-month. Hosting runs until the end of the final Commit term.';
 
@@ -2592,6 +2595,7 @@ async function reactivateKiloclawSubscriptionForRow(params: {
   });
 }
 
+// oxlint-disable-next-line no-unused-vars -- plan switching is disabled; helper removal is deferred to the KiloClaw end-of-life cleanup
 async function switchKiloclawPlanForRow(params: {
   subscription: typeof kiloclaw_subscriptions.$inferSelect;
   userId: string;
@@ -4890,17 +4894,11 @@ export const kiloclawRouter = createTRPCRouter({
   switchPlanAtInstance: baseProcedure
     .input(KiloclawInstanceSwitchPlanInputSchema)
     .output(KiloclawMutationResultSchema)
-    .mutation(async ({ ctx, input }) => {
-      const row = await getKiloclawPersonalSubscriptionRow({
-        userId: ctx.user.id,
-        instanceId: input.instanceId,
+    .mutation(() => {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: KILOCLAW_PLAN_SWITCH_UNAVAILABLE_MESSAGE,
       });
-      await switchKiloclawPlanForRow({
-        subscription: row.subscription,
-        userId: ctx.user.id,
-        toPlan: input.toPlan,
-      });
-      return { success: true };
     }),
 
   cancelPlanSwitchAtInstance: baseProcedure
@@ -5562,273 +5560,11 @@ export const kiloclawRouter = createTRPCRouter({
 
   switchPlan: baseProcedure
     .input(z.object({ toPlan: z.enum(['commit', 'standard']) }))
-    .mutation(async ({ ctx, input }) => {
-      const requestedAt = new Date();
-      assertKiloClawCommitAdmission(input.toPlan, 'legacy_switch_plan', requestedAt);
-      const { subscription: sub } = await getDisplayedPersonalKiloclawSubscription({
-        userId: ctx.user.id,
+    .mutation(() => {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: KILOCLAW_PLAN_SWITCH_UNAVAILABLE_MESSAGE,
       });
-
-      if (!sub || sub.status !== 'active') {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'No active subscription to switch.',
-        });
-      }
-
-      if (sub.plan === input.toPlan) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Already on this plan.',
-        });
-      }
-
-      if (sub.plan !== 'commit' && sub.plan !== 'standard') {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Cannot switch from a trial plan.',
-        });
-      }
-
-      if (sub.stripe_subscription_id) {
-        // Stripe-funded path (legacy Stripe or hybrid)
-
-        // Reconcile hidden-schedule state: Stripe may have an attached schedule
-        // that the DB doesn't know about.
-        const liveSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
-        const effectiveScheduleId = sub.stripe_schedule_id ?? resolveScheduleId(liveSub.schedule);
-
-        let effectiveScheduledBy = sub.scheduled_by;
-        if (!sub.stripe_schedule_id && effectiveScheduleId) {
-          const hiddenSchedule = await stripe.subscriptionSchedules.retrieve(effectiveScheduleId);
-          if (hiddenSchedule.metadata?.origin === 'auto-intro') {
-            effectiveScheduledBy = 'auto';
-          } else {
-            // Hidden non-auto schedule — must release before creating a fresh one,
-            // otherwise Stripe rejects the create because the subscription is still
-            // attached to the old schedule.
-            const released = await releaseScheduleIfActive(effectiveScheduleId);
-            if (!released) {
-              throw new TRPCError({
-                code: 'INTERNAL_SERVER_ERROR',
-                message:
-                  'Unable to switch plan: failed to release existing schedule. Please try again.',
-              });
-            }
-            effectiveScheduledBy = null;
-          }
-        }
-
-        if (effectiveScheduledBy === 'user') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'A plan switch is already pending. Cancel it before requesting a new one.',
-          });
-        }
-
-        const targetPriceId = getStripePriceIdForClawPlan(input.toPlan, {
-          priceVersion: sub.kiloclaw_price_version,
-        });
-
-        // If an auto schedule exists, update it in place for the user's plan switch.
-        if (effectiveScheduledBy === 'auto' && effectiveScheduleId) {
-          try {
-            const existingSchedule =
-              await stripe.subscriptionSchedules.retrieve(effectiveScheduleId);
-            const autoCurrentPhase = existingSchedule.phases[0];
-            const phase1Price = autoCurrentPhase ? resolvePhasePrice(autoCurrentPhase) : null;
-
-            if (!autoCurrentPhase || !phase1Price) {
-              throw new TRPCError({
-                code: 'INTERNAL_SERVER_ERROR',
-                message: 'Cannot determine current phase price from schedule.',
-              });
-            }
-
-            await stripe.subscriptionSchedules.update(effectiveScheduleId, {
-              end_behavior: 'release',
-              phases: [
-                {
-                  items: [{ price: phase1Price }],
-                  start_date: autoCurrentPhase.start_date,
-                  end_date: autoCurrentPhase.end_date,
-                },
-                { items: [{ price: targetPriceId }] },
-              ],
-            });
-
-            await mutateUserSubscriptionWithChangeLog({
-              subscriptionId: sub.id,
-              userId: ctx.user.id,
-              action: 'schedule_changed',
-              reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
-              mutate: async tx => {
-                const [after] = await tx
-                  .update(kiloclaw_subscriptions)
-                  .set({
-                    stripe_schedule_id: effectiveScheduleId,
-                    scheduled_plan: input.toPlan,
-                    scheduled_by: 'user',
-                  })
-                  .where(eq(kiloclaw_subscriptions.id, sub.id))
-                  .returning();
-
-                return after ?? null;
-              },
-            });
-
-            return { success: true };
-          } catch (err) {
-            // Stale schedule — clear pointer and fall through to fresh creation
-            if (!isScheduleAlreadyInactive(err)) throw err;
-
-            await db
-              .update(kiloclaw_subscriptions)
-              .set({
-                stripe_schedule_id: null,
-                scheduled_plan: null,
-                scheduled_by: null,
-              })
-              .where(eq(kiloclaw_subscriptions.id, sub.id));
-          }
-        }
-
-        // Fresh schedule creation: no existing schedule (or stale one was cleared above).
-        // from_subscription mirrors the subscription's current state at create-time,
-        // so the phase price reflects the actual current price even if a schedule
-        // released at a billing boundary since our earlier subscriptions.retrieve().
-        let stripeScheduleId: string | null = null;
-        try {
-          const schedule = await stripe.subscriptionSchedules.create({
-            from_subscription: sub.stripe_subscription_id,
-          });
-          stripeScheduleId = schedule.id;
-
-          const currentPhase = schedule.phases[0];
-          if (!currentPhase) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Stripe schedule has no current phase.',
-            });
-          }
-
-          const freshPhase1Price = resolvePhasePrice(currentPhase);
-          if (!freshPhase1Price) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Cannot determine current subscription price from schedule.',
-            });
-          }
-
-          await stripe.subscriptionSchedules.update(schedule.id, {
-            metadata: { origin: 'user-switch' },
-            end_behavior: 'release',
-            phases: [
-              {
-                items: [{ price: freshPhase1Price }],
-                start_date: currentPhase.start_date,
-                end_date: currentPhase.end_date,
-              },
-              { items: [{ price: targetPriceId }] },
-            ],
-          });
-
-          // Optimistic concurrency: only write if no other request wrote a schedule first.
-          const scheduleLog = await mutateUserSubscriptionWithChangeLog({
-            subscriptionId: sub.id,
-            userId: ctx.user.id,
-            action: 'schedule_changed',
-            reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
-            mutate: async tx => {
-              const [after] = await tx
-                .update(kiloclaw_subscriptions)
-                .set({
-                  stripe_schedule_id: schedule.id,
-                  scheduled_plan: input.toPlan,
-                  scheduled_by: 'user',
-                })
-                .where(
-                  and(
-                    eq(kiloclaw_subscriptions.id, sub.id),
-                    isNull(kiloclaw_subscriptions.stripe_schedule_id)
-                  )
-                )
-                .returning();
-
-              return after ?? null;
-            },
-          });
-
-          if (!scheduleLog) {
-            // A concurrent request already wrote a schedule — release ours.
-            await stripe.subscriptionSchedules.release(schedule.id);
-            stripeScheduleId = null; // Already cleaned up; skip catch-block cleanup.
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'A plan switch is already pending. Cancel it before requesting a new one.',
-            });
-          }
-
-          return { success: true };
-        } catch (error) {
-          // Best-effort cleanup: if we created a schedule on Stripe but something
-          // failed afterward, release it so it doesn't become orphaned.
-          if (stripeScheduleId) {
-            try {
-              await stripe.subscriptionSchedules.release(stripeScheduleId);
-            } catch {
-              // Swallow cleanup errors — the original error is more important.
-            }
-          }
-          throw error;
-        }
-      } else if (sub.payment_source === 'credits') {
-        // Pure credit path — record scheduled plan locally, applied at next
-        // period boundary by the credit renewal sweep (spec Plan Switching rule 9).
-
-        if (sub.scheduled_plan && sub.scheduled_by === 'user') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'A plan switch is already pending. Cancel it before requesting a new one.',
-          });
-        }
-
-        await db.transaction(async tx => {
-          const [before] = await tx
-            .select()
-            .from(kiloclaw_subscriptions)
-            .where(eq(kiloclaw_subscriptions.id, sub.id))
-            .limit(1);
-
-          const [after] = await tx
-            .update(kiloclaw_subscriptions)
-            .set({
-              scheduled_plan: input.toPlan,
-              scheduled_by: 'user',
-            })
-            .where(eq(kiloclaw_subscriptions.id, sub.id))
-            .returning();
-
-          if (before && after) {
-            await insertUserSubscriptionChangeLog(tx, {
-              subscriptionId: sub.id,
-              userId: ctx.user.id,
-              action: 'schedule_changed',
-              reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
-              before,
-              after,
-            });
-          }
-        });
-
-        return { success: true };
-      } else {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message:
-            'Subscription is in an invalid state: no Stripe subscription and not credit-funded.',
-        });
-      }
     }),
 
   cancelPlanSwitch: baseProcedure.mutation(async ({ ctx }) => {

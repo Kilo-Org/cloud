@@ -148,7 +148,7 @@ function ActiveSubscriptionCard({
     plan: otherPlan,
     priceVersion: sub.priceVersion,
   });
-  const canSwitchPlan = otherPlan !== 'commit' || billing.commitPlanAvailable === true;
+  const canSwitchPlan = false;
 
   const hasUserRequestedSwitch = sub.scheduledBy === 'user';
   const isCreditFunded = !sub.hasStripeFunding && sub.paymentSource === 'credits';

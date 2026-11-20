@@ -894,15 +894,16 @@ rows renew.
 
 ### Plan Switching
 
-1. The system MUST allow plan switching only for active subscriptions. At or
-   after the Commit sales cutoff, no switch involving a final Commit term is
-   permitted, including continuation into Standard.
-2. The system MUST reject a switch if the user is already on the requested
-   plan.
-3. Before the cutoff, a Standard-to-Commit request MAY schedule one Commit
-   phase using the subscription's price version. The request MUST capture
-   authoritative qualification evidence, and the Commit phase MUST be the
-   final Commit term rather than open-ended.
+1. The system MUST reject every user plan-switch request, in either
+   direction and including continuation of a final Commit term into Standard,
+   before any payment provider call or local database write. KiloClaw
+   surfaces MUST NOT offer a plan-switch action.
+2. Rules 4-7, 9, and 12 describe how plan switches recorded before rule 1
+   took effect are carried out; they do not authorize new switches.
+3. A Standard-to-Commit switch recorded before the cutoff schedules one Commit
+   phase using the subscription's price version, with authoritative
+   qualification evidence, and that Commit phase is the final Commit term
+   rather than open-ended.
 4. For Stripe-funded final Commit subscriptions, explicit Standard
    continuation MUST create or reconcile a payment-provider schedule with the
    current Commit phase until the final boundary and lineage-priced Standard
@@ -1530,6 +1531,7 @@ rows renew.
 #### 2026-11-19 -- Remove subscription reactivation
 
 - Rejected user reactivation of subscriptions pending cancellation and removed reactivation actions from KiloClaw surfaces; hosting runs until the end of the current paid period.
+- Rejected every user plan-switch request and removed plan-switch actions. Already recorded switches and their cancellation are unchanged.
 - Rejected new Standard continuation of a final Commit term, including through Stripe-to-credits conversion, and removed the `Continue month-to-month` action. Already recorded continuation and its undo are unchanged.
 
 #### 2026-08-05 -- Close fresh KiloClaw instance provisioning

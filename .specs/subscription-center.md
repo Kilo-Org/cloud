@@ -252,6 +252,8 @@ future, the system MUST redirect from the old path to the new one.
     - Cancel subscription
     - Switch payment source (Stripe / credits) where applicable; not
       available for a final Commit term
+    - Plan switching MUST NOT be offered; canceling an already scheduled
+      plan switch remains available
 
 26. Each KiloClaw detail page MUST display:
     - Instance identifier and status
@@ -522,6 +524,7 @@ not yet enforced in the current codebase:
 ### 2026-11-19 -- KiloClaw final Commit continuation removed
 
 - Removed the `Continue month-to-month` action and final Commit Stripe-to-credits conversion; final Commit surfaces state that hosting ends on the final date. Canceling an already scheduled continuation remains available.
+- Removed the KiloClaw plan-switch action; canceling an already scheduled switch remains available.
 
 ### 2026-08-11 -- BytePlus Enterprise Coding Plan catalog copy
 

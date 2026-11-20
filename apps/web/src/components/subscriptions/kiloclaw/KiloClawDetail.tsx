@@ -69,7 +69,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
     useState<SubscriptionConfirmationAction | null>(null);
 
   const detailQuery = useQuery(trpc.kiloclaw.getSubscriptionDetail.queryOptions({ instanceId }));
-  const summaryQuery = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
   const billingQuery = useQuery(trpc.kiloclaw.getBillingHistory.queryOptions({ instanceId }));
 
   const fetchMoreBilling = (cursor: string) =>
@@ -120,7 +119,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
     'At your next renewal'
   );
   const hasUserRequestedSwitch = subscription.scheduledBy === 'user';
-  const canSwitchPlan = otherPlan !== 'commit' || summaryQuery.data?.commitPlanAvailable === true;
+  const canSwitchPlan = false;
   const targetPlanLabel = capitalize(otherPlan);
   const targetPlanDetails =
     otherPlan === 'commit'

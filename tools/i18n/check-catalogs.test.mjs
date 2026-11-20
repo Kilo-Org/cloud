@@ -448,6 +448,18 @@ test('ignores a mounted-harness helper while a source file still reports its key
   }
 });
 
+test('folds a Devanagari danda as sentence-final punctuation', () => {
+  // The Hindi imperative and its error-message twin differ only by the danda,
+  // so the shared-wording rule must read them as one wording.
+  const found = run({
+    language: 'hi',
+    english: { label: 'Choose a model', error: 'Choose a model.' },
+    translated: { label: 'मॉडल चुनें', error: 'मॉडल चुनें।' },
+    source: "t('label'); t('error');",
+  });
+  assert.deepEqual(found, []);
+});
+
 for (const [language, title, badge] of [
   ['tr', 'Çalışıyor', 'ÇALIŞIYOR'],
   ['az', 'İşləyir', 'İŞLƏYİR'],

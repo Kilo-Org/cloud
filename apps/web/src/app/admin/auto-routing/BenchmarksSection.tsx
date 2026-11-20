@@ -1217,6 +1217,20 @@ export function modelTotalsFromSummaries(
     .toSorted((a, b) => b.accuracy - a.accuracy || a.model.localeCompare(b.model));
 }
 
+/**
+ * Totals for the Models table. The worker's aggregate wins, but an empty array
+ * means it had no case rows to aggregate — a classifier run whose models were
+ * all carried finalizes with only `carried` summaries — so an empty array is
+ * treated as absent and the route rows are folded instead of hiding them.
+ */
+export function resolveModelTotals(
+  summaries: readonly BenchmarkModelSummary[],
+  modelTotals: readonly BenchmarkModelTotals[] | undefined
+): BenchmarkModelTotals[] {
+  if (modelTotals !== undefined && modelTotals.length > 0) return [...modelTotals];
+  return summaries.length > 0 ? modelTotalsFromSummaries(summaries) : [];
+}
+
 function RunTotalsLine({ run }: { run: BenchmarkRun }) {
   const totals = run.totals;
   if (!totals) return null;
@@ -1228,7 +1242,7 @@ function RunTotalsLine({ run }: { run: BenchmarkRun }) {
   );
 }
 
-function RunSummariesTable({
+export function RunSummariesTable({
   run,
   router,
   id,
@@ -1249,9 +1263,7 @@ function RunSummariesTable({
     refetchInterval: running ? RUNS_POLL_INTERVAL_MS : false,
   });
   const summaries = summariesQuery.data?.summaries ?? [];
-  const modelTotals =
-    summariesQuery.data?.modelTotals ??
-    (summaries.length > 0 ? modelTotalsFromSummaries(summaries) : []);
+  const modelTotals = resolveModelTotals(summaries, summariesQuery.data?.modelTotals);
 
   const sortedSummaries: BenchmarkModelSummary[] = isDecider
     ? [...summaries].sort((a, b) => {
@@ -1302,6 +1314,7 @@ function RunSummariesTable({
                     <TableHead className="w-28 text-right text-xs">Total cost</TableHead>
                     <TableHead className="w-20 text-right text-xs">Cases</TableHead>
                     <TableHead className="w-20 text-right text-xs">Errors</TableHead>
+                    <TableHead className="w-20 text-right text-xs">Timeouts</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1339,6 +1352,9 @@ function RunSummariesTable({
                       <TableCell className="text-right tabular-nums text-xs">
                         {totals.errors}
                       </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {totals.timeouts}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1357,64 +1373,91 @@ function RunSummariesTable({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <Table className="w-full table-fixed">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Model</TableHead>
-                      {isDecider ? <TableHead className="w-40 text-xs">Route</TableHead> : null}
-                      <TableHead className="w-20 text-right text-xs">Accuracy</TableHead>
-                      {isDecider ? null : (
-                        <TableHead className="w-24 text-right text-xs">Route accuracy</TableHead>
-                      )}
-                      <TableHead className="w-24 text-right text-xs">Avg cost</TableHead>
-                      <TableHead className="w-24 text-right text-xs">Avg latency</TableHead>
-                      <TableHead className="w-16 text-right text-xs">Cases</TableHead>
-                      <TableHead className="w-16 text-right text-xs">Errors</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedSummaries.map((s, i) => (
-                      <TableRow key={`${s.model}-${s.routeKey}-${i}`}>
-                        <TableCell className="max-w-0 font-mono text-xs">
-                          <span className="block truncate" title={s.model}>
-                            {s.model}
-                          </span>
-                        </TableCell>
-                        {isDecider ? (
-                          <TableCell className="max-w-0 font-mono text-xs">
-                            <span className="block truncate" title={s.routeKey}>
-                              {s.routeKey}
-                            </span>
-                          </TableCell>
-                        ) : null}
-                        <TableCell className="text-right tabular-nums text-xs">
-                          {formatAccuracy(s.accuracy)}
-                        </TableCell>
-                        {isDecider ? null : (
-                          <TableCell className="text-right tabular-nums text-xs">
-                            {s.routeAccuracy !== null ? formatAccuracy(s.routeAccuracy) : '—'}
-                          </TableCell>
-                        )}
-                        <TableCell className="text-right tabular-nums text-xs">
-                          {formatUsd(s.avgCostUsd)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">
-                          {s.avgLatencyMs.toFixed(0)} ms
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">
-                          {s.errors}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <RunRouteTable summaries={sortedSummaries} isDecider={isDecider} />
               </CollapsibleContent>
             </Collapsible>
           </div>
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+/**
+ * Route rows of one run: what each pair scored, cost and waited per route. The
+ * latency tail and the timeout count are the columns that explain a slow or
+ * incomplete run, so they stay here even though the Models table summarizes.
+ */
+export function RunRouteTable({
+  summaries,
+  isDecider,
+}: {
+  summaries: readonly BenchmarkModelSummary[];
+  isDecider: boolean;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <Table className="w-full table-fixed">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xs">Model</TableHead>
+            {isDecider ? <TableHead className="w-40 text-xs">Route</TableHead> : null}
+            <TableHead className="w-20 text-right text-xs">Accuracy</TableHead>
+            {isDecider ? null : (
+              <TableHead className="w-24 text-right text-xs">Route accuracy</TableHead>
+            )}
+            <TableHead className="w-24 text-right text-xs">Avg cost</TableHead>
+            <TableHead className="w-24 text-right text-xs">Avg latency</TableHead>
+            <TableHead className="w-20 text-right text-xs">p50 latency</TableHead>
+            <TableHead className="w-20 text-right text-xs">p95 latency</TableHead>
+            <TableHead className="w-16 text-right text-xs">Cases</TableHead>
+            <TableHead className="w-16 text-right text-xs">Errors</TableHead>
+            <TableHead className="w-16 text-right text-xs">Timeouts</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {summaries.map((s, i) => (
+            <TableRow key={`${s.model}-${s.routeKey}-${i}`}>
+              <TableCell className="max-w-0 font-mono text-xs">
+                <span className="block truncate" title={s.model}>
+                  {s.model}
+                </span>
+              </TableCell>
+              {isDecider ? (
+                <TableCell className="max-w-0 font-mono text-xs">
+                  <span className="block truncate" title={s.routeKey}>
+                    {s.routeKey}
+                  </span>
+                </TableCell>
+              ) : null}
+              <TableCell className="text-right tabular-nums text-xs">
+                {formatAccuracy(s.accuracy)}
+              </TableCell>
+              {isDecider ? null : (
+                <TableCell className="text-right tabular-nums text-xs">
+                  {s.routeAccuracy !== null ? formatAccuracy(s.routeAccuracy) : '—'}
+                </TableCell>
+              )}
+              <TableCell className="text-right tabular-nums text-xs">
+                {formatUsd(s.avgCostUsd)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-xs">
+                {s.avgLatencyMs.toFixed(0)} ms
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-xs">
+                {s.p50LatencyMs !== null ? `${s.p50LatencyMs.toFixed(0)} ms` : '—'}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-xs">
+                {s.p95LatencyMs !== null ? `${s.p95LatencyMs.toFixed(0)} ms` : '—'}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
+              <TableCell className="text-right tabular-nums text-xs">{s.errors}</TableCell>
+              <TableCell className="text-right tabular-nums text-xs">{s.timeouts}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import type {
   BenchmarkConfig,
   BenchmarkModelSummary,
+  BenchmarkModelTotals,
   BenchmarkRoutingTableResponse,
   BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
@@ -16,10 +17,25 @@ import {
   BenchmarkRunsTable,
   formatTotalUsd,
   modelTotalsFromSummaries,
+  resolveModelTotals,
   RoutingTableView,
+  RunRouteTable,
+  RunSummariesTable,
   toBenchmarkModelOptions,
 } from './BenchmarksSection';
 import { formatAdminTime, relativeAge, runMentionsModel } from './admin-time';
+
+// The expanded row is the only hook-using component rendered here; the query
+// result is the fixture each test sets.
+const mockSummariesQuery: {
+  data: { summaries: BenchmarkModelSummary[]; modelTotals?: BenchmarkModelTotals[] } | undefined;
+} = { data: { summaries: [], modelTotals: [] } };
+
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: () => ({ data: mockSummariesQuery.data, isLoading: false, error: null }),
+  useMutation: () => ({ mutate: () => {}, isPending: false }),
+  useQueryClient: () => ({ invalidateQueries: () => {} }),
+}));
 
 const baseConfig: BenchmarkConfig = {
   ...formStateToConfig(configToFormState(null), null),
@@ -429,6 +445,31 @@ describe('per-model totals from route rows', () => {
     ]);
     expect(totals.map(t => t.model)).toEqual(['vendor/high', 'vendor/low']);
   });
+
+  it('treats an empty worker aggregate as absent instead of hiding the route rows', () => {
+    const rows = [summary('vendor/alpha', 'debugging/bug_fixing', 0.8, 0.01, 5)];
+    const fromWorker: BenchmarkModelTotals[] = [
+      {
+        model: 'vendor/zeta',
+        variant: null,
+        accuracy: 0.9,
+        routeAccuracy: null,
+        costPerCaseUsd: null,
+        totalCostUsd: null,
+        cases: 2,
+        errors: 0,
+        timeouts: 0,
+      },
+    ];
+
+    // Absent and present-but-empty both fall back to folding the route rows.
+    expect(resolveModelTotals(rows, undefined).map(t => t.model)).toEqual(['vendor/alpha']);
+    expect(resolveModelTotals(rows, []).map(t => t.model)).toEqual(['vendor/alpha']);
+    // A non-empty aggregate is the worker's own answer and wins.
+    expect(resolveModelTotals(rows, fromWorker)).toEqual(fromWorker);
+    // Nothing measured either way stays empty.
+    expect(resolveModelTotals([], [])).toEqual([]);
+  });
 });
 
 describe('readable admin times', () => {
@@ -542,5 +583,138 @@ describe('runs table cost column', () => {
 
     const none = render([completedRun], new Set(['some-other-run']));
     expect(none).toContain('No run of this list measured that model');
+  });
+});
+
+describe('expanded run summaries', () => {
+  const run: BenchmarkRun = {
+    id: 'decider-1',
+    router: 'efficient',
+    kind: 'decider',
+    purpose: 'platform',
+    status: 'completed',
+    startedAt: '2026-11-20T10:00:00.000Z',
+    completedAt: '2026-11-20T10:30:00.000Z',
+    error: null,
+    totals: { totalCostUsd: 0.43, measuredCases: 60, erroredCases: 3 },
+    models: ['vendor/alpha'],
+  };
+  const summary: BenchmarkModelSummary = {
+    model: 'vendor/alpha',
+    variant: null,
+    routeKey: 'debugging/bug_fixing' as BenchmarkModelSummary['routeKey'],
+    accuracy: 0.75,
+    avgCostUsd: 0.02,
+    avgLatencyMs: 210,
+    p50LatencyMs: 180,
+    p95LatencyMs: 640,
+    cases: 3,
+    errors: 1,
+    timeouts: 7,
+    routeAccuracy: null,
+    avgInputTokens: null,
+    avgCachedInputTokens: null,
+    avgOutputTokens: null,
+    avgReasoningTokens: null,
+  };
+
+  function renderExpanded() {
+    return renderToStaticMarkup(
+      React.createElement(
+        'table',
+        null,
+        React.createElement(
+          'tbody',
+          null,
+          React.createElement(RunSummariesTable, {
+            run,
+            router: 'efficient',
+            id: 'run-summaries-1',
+          })
+        )
+      )
+    );
+  }
+
+  it('keeps the latency tail and timeout counts in the per-route detail', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(
+        'table',
+        null,
+        React.createElement(
+          'tbody',
+          null,
+          React.createElement(RunRouteTable, { summaries: [summary], isDecider: true })
+        )
+      )
+    );
+
+    expect(html).toContain('p50 latency');
+    expect(html).toContain('p95 latency');
+    expect(html).toContain('180 ms');
+    expect(html).toContain('640 ms');
+    // Timeouts are inspectable per pair, which errors alone do not show.
+    expect(html).toContain('Timeouts');
+    expect(html).toContain('>7</td>');
+    // The route rows are a scroll container, so the extra columns cannot widen
+    // the card at a narrow viewport.
+    expect(html).toContain('overflow-x-auto');
+  });
+
+  it('shows a dash when a latency percentile is null rather than NaN', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(
+        'table',
+        null,
+        React.createElement(
+          'tbody',
+          null,
+          React.createElement(RunRouteTable, {
+            summaries: [{ ...summary, p50LatencyMs: null, p95LatencyMs: null }],
+            isDecider: true,
+          })
+        )
+      )
+    );
+
+    expect(html).not.toContain('NaN');
+    expect(html).toContain('—');
+  });
+
+  it('shows the route rows when the worker sends an empty model aggregate', () => {
+    // A classifier run whose models were all carried finalizes with `summaries`
+    // but no case rows, so the aggregate is present and empty.
+    mockSummariesQuery.data = { summaries: [summary], modelTotals: [] };
+
+    const html = renderExpanded();
+
+    expect(html).not.toContain('No summaries');
+    expect(html).toContain('vendor/alpha');
+    expect(html).toContain('75.0%');
+  });
+
+  it('prefers the worker aggregate over folding the route rows', () => {
+    mockSummariesQuery.data = {
+      summaries: [summary],
+      modelTotals: [
+        {
+          model: 'vendor/zeta',
+          variant: 'high',
+          accuracy: 0.9,
+          routeAccuracy: null,
+          costPerCaseUsd: 0.01,
+          totalCostUsd: 1.5,
+          cases: 150,
+          errors: 2,
+          timeouts: 1,
+        },
+      ],
+    };
+
+    const html = renderExpanded();
+
+    expect(html).toContain('vendor/zeta');
+    expect(html).toContain('$1.50');
+    expect(html).toContain('150');
   });
 });

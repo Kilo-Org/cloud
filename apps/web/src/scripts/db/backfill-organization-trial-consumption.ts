@@ -49,9 +49,11 @@ export async function run(): Promise<void> {
   // One transaction, so `SET LOCAL` reaches the same connection as the UPDATE and the
   // row locks are released when it commits. The server's default statement timeout is
   // sized for interactive queries and would cancel a write of this size on the
-  // production table, exactly as in the migration.
+  // production table, and the default lock timeout would abort the run on a transient
+  // wait for a creator row a live creation transaction holds. Mirrors the migration.
   const stamped = await db.transaction(async tx => {
     await tx.execute(sql`SET LOCAL statement_timeout = 0`);
+    await tx.execute(sql`SET LOCAL lock_timeout = 0`);
     return stampOrganizationTrialConsumption(tx);
   });
 

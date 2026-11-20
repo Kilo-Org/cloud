@@ -25,6 +25,7 @@ import {
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { Section } from '@/components/ui/section';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 /**
  * The briefing that replaces the live card inside the shared adaptive frame.
@@ -42,7 +43,8 @@ export function AgentSessionsSection({
   const { t } = useTranslation();
   const { reducedMotion } = useMotionPolicy();
   const handleRowPress = useSessionRowPress();
-  const content = liveSessionContent(context, sessions);
+  const connectivity = useCommittedConnectivityStatus();
+  const content = liveSessionContent(context, sessions, connectivity);
   const failureLabel = t('agents.sessionList.couldNotLoadActive');
   const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
   const showBriefing = briefing?.visible === true;

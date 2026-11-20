@@ -57,6 +57,11 @@ export type ChatList = {
   readonly chats: readonly ChatSummary[];
   readonly isLoading: boolean;
   readonly isError: boolean;
+  /**
+   * The read answered with a list. Only an answered list can say there are no
+   * chats; a pending, paused or failed read says nothing about the rows.
+   */
+  readonly isSuccess: boolean;
   readonly refetch: () => void;
   readonly remove: (sessionId: string) => Promise<void>;
   readonly rename: (sessionId: string, title: string) => Promise<void>;
@@ -110,6 +115,7 @@ export function useChatList(place: ChatPlace | null): ChatList {
     chats: query.data ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
+    isSuccess: query.isSuccess,
     refetch: () => {
       void query.refetch();
     },

@@ -339,8 +339,7 @@ describe('targeted benchmark refresh', () => {
         { model: 'vendor/selected', variant: null },
         { model: 'vendor/other', variant: null },
       ],
-      skipOldCaseIds: [],
-      promptRevision: 2,
+      minimumRevisions: {},
     });
     expect(
       sqlite.prepare(`SELECT model FROM case_results WHERE run_id='destination'`).all()
@@ -362,8 +361,7 @@ describe('targeted benchmark refresh', () => {
         ...current,
         runId: 'later',
         entries: [{ model: 'vendor/selected', variant: null }],
-        skipOldCaseIds: [],
-        promptRevision: 2,
+        minimumRevisions: {},
       })
     ).toBe(1);
   });

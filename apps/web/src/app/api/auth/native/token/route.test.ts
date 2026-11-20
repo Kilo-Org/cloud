@@ -2460,6 +2460,11 @@ describe('POST /api/auth/native/token', () => {
     });
 
     it('writes nothing for a non-mobile caller', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
       const response = await POST(
         new NextRequest('http://localhost:3000/api/auth/native/token', {
           method: 'POST',

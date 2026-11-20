@@ -5,6 +5,7 @@ import { getAuthPageProps } from '@/lib/auth/auth-page-wrapper';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';
 import { allow_fake_login } from '@kilocode/web-shared/lib/constants';
+import { userHasOrganizationTrialEligibility } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 import { SlackGetStartedFlow } from './_components/SlackGetStartedFlow';
 
 export default async function GetStartedSlackPage({
@@ -41,5 +42,9 @@ export default async function GetStartedSlackPage({
     redirect('/account-verification?callbackPath=/get-started/slack');
   }
 
-  return <SlackGetStartedFlow />;
+  return (
+    <SlackGetStartedFlow
+      showFirstOrganizationTrialOffer={userHasOrganizationTrialEligibility(user)}
+    />
+  );
 }

@@ -9,7 +9,11 @@ import type { WorkspaceSelection } from './types';
 
 type FlowStep = 'workspace-selection' | 'slack-connect';
 
-export function SlackGetStartedFlow() {
+export function SlackGetStartedFlow({
+  showFirstOrganizationTrialOffer,
+}: {
+  showFirstOrganizationTrialOffer: boolean;
+}) {
   const [currentStep, setCurrentStep] = useState<FlowStep>('workspace-selection');
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceSelection | null>(null);
 
@@ -34,7 +38,10 @@ export function SlackGetStartedFlow() {
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.2 }}
           >
-            <WorkspaceSelector onSelect={handleWorkspaceSelect} />
+            <WorkspaceSelector
+              onSelect={handleWorkspaceSelect}
+              showFirstOrganizationTrialOffer={showFirstOrganizationTrialOffer}
+            />
           </motion.div>
         )}
 

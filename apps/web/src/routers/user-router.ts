@@ -83,6 +83,7 @@ import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
+import { userHasOrganizationTrialEligibility } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
@@ -694,6 +695,9 @@ export const userRouter = createTRPCRouter({
       id: ctx.user.id,
       email: ctx.user.google_user_email,
       isAdmin: ctx.user.is_admin,
+      // Read from the row this procedure already holds: the create screen
+      // states the offer only when the create procedure will grant it.
+      organizationTrialEligible: userHasOrganizationTrialEligibility(ctx.user),
     });
   }),
 

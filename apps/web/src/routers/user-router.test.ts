@@ -123,6 +123,7 @@ describe('user router - getMe', () => {
       id: admin.id,
       email: admin.google_user_email,
       isAdmin: true,
+      organizationTrialEligible: true,
     });
   });
 
@@ -135,6 +136,24 @@ describe('user router - getMe', () => {
       id: user.id,
       email: user.google_user_email,
       isAdmin: false,
+      organizationTrialEligible: true,
+    });
+  });
+
+  // The create screen states the trial window only on this answer, so it must
+  // follow the same rule the create procedure applies: an account that already
+  // received one is not offered another.
+  it('getMe reports no trial eligibility once the account consumed the offer', async () => {
+    const consumedAt = new Date().toISOString();
+    const user = await insertTestUser({ organization_trial_consumed_at: consumedAt });
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: user.id,
+      email: user.google_user_email,
+      isAdmin: false,
+      organizationTrialEligible: false,
     });
   });
 });

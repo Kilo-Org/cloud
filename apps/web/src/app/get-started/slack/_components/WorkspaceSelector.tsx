@@ -14,9 +14,13 @@ import type { WorkspaceSelection } from './types';
 
 type WorkspaceSelectorProps = {
   onSelect: (selection: WorkspaceSelection) => void;
+  showFirstOrganizationTrialOffer: boolean;
 };
 
-export function WorkspaceSelector({ onSelect }: WorkspaceSelectorProps) {
+export function WorkspaceSelector({
+  onSelect,
+  showFirstOrganizationTrialOffer,
+}: WorkspaceSelectorProps) {
   const trpc = useTRPC();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
@@ -174,9 +178,12 @@ export function WorkspaceSelector({ onSelect }: WorkspaceSelectorProps) {
                     <CardTitle className="text-muted-foreground text-base">
                       Create New Organization
                     </CardTitle>
-                    <CardDescription className="text-sm">
-                      {FIRST_ORGANIZATION_TRIAL_OFFER}
-                    </CardDescription>
+                    {/* Same rule as the organizations pages: userHasOrganizationTrialEligibility decides. */}
+                    {showFirstOrganizationTrialOffer && (
+                      <CardDescription className="text-sm">
+                        {FIRST_ORGANIZATION_TRIAL_OFFER}
+                      </CardDescription>
+                    )}
                   </div>
                 </CardContent>
               </Card>

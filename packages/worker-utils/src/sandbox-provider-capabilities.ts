@@ -52,7 +52,7 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
     preview: true,
     workspaceSnapshots: false,
     environmentSnapshots: true,
-    egressProxy: false,
+    egressProxy: true,
     egressProxySeesAll: false,
     scmCliTools: true,
     meteredBilling: false,

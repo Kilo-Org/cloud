@@ -172,6 +172,7 @@
     "generating": "બનાવી રહ્યું છે…",
     "working": "કામ ચાલુ છે",
     "yourOwnRepositories": "તમારી પોતાની રિપોઝિટરીઓ",
+    "organizationRepositories": "સંસ્થાની રિપોઝિટરીઓ",
     "dismissed": "ખારિજ કરેલું",
     "agent": "એજન્ટ",
     "durationMinuteShort": "min",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "ઝાંખી",
       "files": "ફાઇલો",
-      "discussion": "ચર્ચા"
+      "discussion": "ચર્ચા",
+      "discussionAccessibility_one": "{{title}}: 1 ટિપ્પણી",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ટિપ્પણીઓ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ટિપ્પણીઓ"
     },
     "fileStatus": {
       "modified": "ફેરફાર કરેલી",
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "પોતાની સૂચનાઓ",
-      "deprecation": "કસ્ટમ સૂચનાઓની સુવિધા બંધ કરવાની યોજના છે. તેના બદલે આ માર્ગદર્શિકા તમારી રિપોઝિટરીની REVIEW.md ફાઇલમાં મૂકો.",
+      "deprecation": "કસ્ટમ સૂચનાઓની સુવિધા દૂર કરવામાં આવશે. તેના બદલે આ માર્ગદર્શિકા તમારી રિપોઝિટરીની REVIEW.md ફાઇલમાં મૂકો.",
       "placeholder": "દા.ત. ભૂલો સંભાળવાના અમારા નિયમોનું પાલન…",
       "clearTitle": "શું પોતાની સૂચનાઓ દૂર કરવી છે?",
       "clearMessage": "ખાલી ફીલ્ડ સાચવવાથી આ રિવ્યુઅર માટે સંગ્રહિત પોતાની સૂચનાઓ કાઢી નાખાય છે."
@@ -1389,6 +1393,7 @@
       "managedOnWeb": "{{organization}} નું Bitbucket કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
       "description": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
       "descriptionReconnect": "{{organization}} માટે નવો વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
+      "descriptionOverview": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને પછીની સ્ક્રીન પર પેસ્ટ કરો.",
       "scopes": "એકાઉન્ટ: વાંચવાની · રિપોઝિટરીઓ: વાંચવાની/લખવાની · પુલ રિક્વેસ્ટ: વાંચવાની · વેબહુક: વાંચવાની/લખવાની પરવાનગી.",
       "tokenPlaceholder": "વર્કસ્પેસ ઍક્સેસ ટોકન",
       "tokenRefused": "Bitbucket એ આ વર્કસ્પેસ ઍક્સેસ ટોકન સ્વીકાર્યું નથી. ચકાસો કે તેમાં ઉપરની પરવાનગીઓ છે, પછી ફરી પ્રયાસ કરો."
@@ -3183,6 +3188,8 @@
     "retryHint": "Kilo Pass ની સ્થિતિ ફરી મેળવવાનો પ્રયાસ કરે છે.",
     "endedOn": "{{date}}ના રોજ સમાપ્ત થયું",
     "notAvailableInApp": "Kilo Pass એપમાં ઉપલબ્ધ નથી.",
+    "notAvailableTitle": "Kilo Pass એપમાં નથી",
+    "noPassDescription": "આ એકાઉન્ટમાં કોઈ Kilo Pass નથી.",
     "statusActive": "સક્રિય",
     "statusTrialing": "ટ્રાયલ ચાલુ",
     "statusPastDue": "ચુકવણી મુદતવીતી",
@@ -3465,7 +3472,7 @@
       "retentionLimit": "સૌથી તાજેતરના ઇનવોઇસ દર્શાવવામાં આવે છે."
     },
     "lowBalanceAlert": {
-      "enableA11y": "બેલેન્સ ઓછું થાય ત્યારે ચેતવણી ચાલુ કરો",
+      "subtitle": "આ સંસ્થાનું બેલેન્સ તમે નક્કી કરેલી રકમથી નીચે જાય ત્યારે તમે આપેલાં ઇમેઇલ સરનામાં પર ચેતવણી ઇમેઇલ મોકલો.",
       "notifyEmailsLabel": "ચેતવણી મેળવવાનાં ઇમેઇલ સરનામાં",
       "permissionDenied": "તમને બિલિંગની ચેતવણીઓનું સંચાલન કરવાની પરવાનગી નથી.",
       "separateEmailsHint": "એકથી વધુ ઇમેઇલ સરનામાં હોય, તો તેમને અલ્પવિરામથી અલગ કરો.",
@@ -3612,8 +3619,7 @@
       "renameTitle": "સંસ્થાનું નામ બદલો",
       "renamePlaceholder": "સંસ્થાનું નામ",
       "balance": "બેલેન્સ",
-      "organizationSeats": "સંસ્થાની સીટો",
-      "plan": "સંસ્થાનો પ્લાન",
+      "plan": "પ્લાન",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · સમાપ્ત",
@@ -3647,7 +3653,8 @@
     "signupStepUp": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.moreSignInOptions)' વાપરો.",
     "signupStepUpApple": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.signInWithApple)' વાપરો.",
     "signupStepUpGoogle": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે '$t(login.signInWithGoogle)' વાપરો.",
-    "invalidCode": "આ કોડ ખોટો છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
+    "signupStepUpBack": "તમારું એકાઉન્ટ બનાવવાનું પૂર્ણ કરવા માટે પાછા જાઓ અને '$t(login.moreSignInOptions)' વાપરો.",
+    "invalidCode": "આ કોડ ખોટો છે અથવા તેની સમયમર્યાદા પૂરી થઈ ગઈ છે. કૃપા કરીને ફરી પ્રયત્ન કરો અથવા '$t(login.resendCode)' વાપરો.",
     "codeInProgress": "તમારા કોડ પર પ્રક્રિયા ચાલી રહી છે. થોડી રાહ જુઓ અને ફરી પ્રયત્ન કરો.",
     "tooManyAttempts": "ઘણા બધા પ્રયત્નો થયા છે. કૃપા કરીને નવો કોડ માંગો.",
     "invalidToken": "સાઇન ઇન કરી શકાયું નહીં. કૃપા કરીને ફરી પ્રયત્ન કરો.",
@@ -3916,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) પસંદ કરેલા પ્રોટોકોલ અને મોડેલનો ઉપયોગ કરીને આ એન્ડપોઇન્ટને ટૂંકી અનુમાન વિનંતી મોકલે છે. પ્રદાતા તેના માટે શુલ્ક લઈ શકે છે.",
       "connectionSucceeded": "મોડેલે આ પ્રોટોકોલનો ઉપયોગ કરીને વિનંતી પૂર્ણ કરી.",
       "connectionFailed": "મોડેલ વિનંતી પૂર્ણ કરી શક્યું નહીં. API મૂળ, પ્રોટોકોલ, ઓળખપ્રમાણો અને મોડેલ ID તપાસો.",
+      "requestTimedOut": "એન્ડપોઇન્ટે સમયસર જવાબ આપ્યો નથી. API મૂળ અને તમારું કનેક્શન તપાસો, પછી ફરી પ્રયાસ કરો.",
+      "requestUnauthorized": "એન્ડપોઇન્ટે ઓળખપ્રમાણો નકાર્યાં. API કી અને કસ્ટમ હેડર્સ તપાસો, પછી ફરી પ્રયાસ કરો.",
+      "requestNotFound": "એન્ડપોઇન્ટ કે મોડેલ મળ્યું નથી. API મૂળ અને મોડેલ ID તપાસો.",
+      "requestRateLimited": "એન્ડપોઇન્ટ વિનંતીઓ મર્યાદિત કરી રહ્યું છે. થોડી વાર રાહ જુઓ અને ફરી પ્રયાસ કરો.",
+      "requestUnavailable": "એન્ડપોઇન્ટ હમણાં ઉપલબ્ધ નથી. થોડી વારમાં ફરી પ્રયાસ કરો.",
+      "requestUnreachable": "એન્ડપોઇન્ટ સુધી પહોંચી શકાયું નથી. API મૂળ અને તમારું કનેક્શન તપાસો.",
+      "requestInvalidResponse": "એન્ડપોઇન્ટે અપેક્ષિત ફોર્મેટમાં જવાબ આપ્યો નથી. ચકાસો કે API મૂળ અને પ્રોટોકોલ સર્વર સાથે મેળ ખાય છે, પછી ફરી પ્રયાસ કરો.",
+      "discoveryNoModels": "એન્ડપોઇન્ટમાં કોઈ મોડેલ સૂચિબદ્ધ નથી. મોડેલો જાતે દાખલ કરો.",
+      "connectionIncomplete": "મોડેલે જવાબ આપ્યો પણ પૂરો કર્યો નથી. ફરી પ્રયાસ કરો, અથવા મોડેલ ID અને પ્રોટોકોલ તપાસો.",
       "invalidInput": "બૅકએન્ડનું નામ, માન્ય હેડર્સ અને અનન્ય ID તથા નામ ધરાવતું ઓછામાં ઓછું એક મોડેલ દાખલ કરો. ટોકનની મર્યાદાઓ ધન પૂર્ણાંક હોવી જોઈએ.",
       "invalidUrl": "ઓળખપ્રમાણો, ક્વેરી કે ફ્રૅગમેન્ટ વગરનું HTTP અથવા HTTPS API મૂળ દાખલ કરો.",
       "publicHttp": "જાહેર HTTP એન્ડપોઇન્ટ્સની મંજૂરી નથી. HTTPS અથવા ખાનગી સ્થાનિક એન્ડપોઇન્ટ વાપરો.",
@@ -4054,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "આ મોડેલ વિચારના સ્તરને સપોર્ટ કરે છે"
     },
-    "creditsRequired": "આ સંદેશ મોકલવા માટે પૂરતા ક્રેડિટ નથી."
+    "creditsRequired": "આ સંદેશ મોકલવા માટે પૂરતા ક્રેડિટ નથી.",
+    "providerKeyRefused": "પ્રદાતાએ ઓળખપ્રમાણો નકાર્યાં. તેની API કી તપાસો, પછી ફરી મોકલો.",
+    "providerModelMissing": "આ બૅકએન્ડ હવે આ મોડેલ પ્રદાન કરતું નથી. બીજું પસંદ કરો.",
+    "providerRateLimited": "પ્રદાતા વિનંતીઓ મર્યાદિત કરી રહ્યો છે. થોડી વાર રાહ જુઓ અને ફરી મોકલો.",
+    "providerUnavailable": "પ્રદાતા હમણાં ઉપલબ્ધ નથી. થોડી વારમાં ફરી મોકલો."
   },
   "settingsTools": {
     "confirmTitle": "આ ફેરફારની પુષ્ટિ કરવી?"
@@ -4429,6 +4449,7 @@
     "pickPackToBuyAgain": "નવી ખરીદી શરૂ કરવા માટે ઉપરથી એક પૅક પસંદ કરો.",
     "purchasePending": "સ્ટોર હજી આ ચુકવણી પર પ્રક્રિયા કરી રહ્યો છે. તે ચાર્જ મંજૂર કરે પછી તમારા ક્રેડિટ મળી જશે.",
     "buyAgain": "ફરી ખરીદો",
+    "checkPurchase": "ખરીદી તપાસો",
     "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
   },
@@ -4522,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "યાદીમાં સાચવો",
-      "saved": "{{list}} માં સાચવ્યું"
+      "saved": "{{list}} માં સાચવ્યું",
+      "saveFailed": "કાર્ય સાચવી શકાયું નહીં. તમારું કનેક્શન ચેક કરો અને ફરી પ્રયાસ કરો.",
+      "saveRefused": "આ યાદીમાં કાર્ય સાચવી શકાયું નહીં. બીજી યાદી પસંદ કરો."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4557,7 @@
     "empty": "આ રિપોર્ટ વિન્ડોમાં કોઈ પ્રવૃત્તિ નથી",
     "emptyHint": "તમારા ક્લાઉડ અને CLI કોડિંગ સત્રો અહીં ત્યારે દેખાશે જ્યારે શેડ્યૂલ કરેલા રિપોર્ટમાં પ્રવૃત્તિ હોય.",
     "loadError": "રિપોર્ટ લોડ થઈ શક્યા નહીં",
+    "estimateLoadError": "અંદાજ લોડ થઈ શક્યો નહીં.",
     "view": "રિપોર્ટ વાંચો",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4801,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સ",
-    "permissionDenied": "ફક્ત સંસ્થાના માલિકો અને એડમિન જ કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સનું સંચાલન કરી શકે છે.",
+    "permissionDenied": "ફક્ત સંસ્થાના માલિકો અને એડમિન જ કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સનું સંચાલન કરી શકે છે. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સ સક્ષમ કરેલા નથી",
     "unavailable": "Kilo વિનંતી પર સંસ્થા માટે કૃત્રિમ બુદ્ધિ ગાર્ડરેલ્સ સક્ષમ કરે છે. {{supportEmail}} નો સંપર્ક કરો, અને Kilo ટીમ તમારી સંસ્થા માટે તેને ચાલુ કરશે.",
     "contactSupport": "સહાય ટીમનો સંપર્ક કરો",
@@ -4939,7 +4963,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "એન્ટરપ્રાઇઝ સુવિધા",
-    "enterpriseOnly": "આ ફક્ત એન્ટરપ્રાઇઝ માટેની સુવિધા છે.",
+    "enterpriseOnly": "પ્રદાતાઓ અને મોડેલો એન્ટરપ્રાઇઝ પ્લાન પર ઉપલબ્ધ છે.",
     "readOnly": "ફક્ત સંસ્થાના માલિકો અને એડમિન જ આ સેટિંગ્સ બદલી શકે છે.",
     "loadError": "પ્રદાતાઓ અને મોડેલો લોડ થઈ શક્યા નથી",
     "tabModels": "મોડેલો",

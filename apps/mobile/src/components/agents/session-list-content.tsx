@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
@@ -141,7 +141,7 @@ export function AgentSessionListContent({
 
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { left, right } = useSafeAreaInsets();
+  const { left, right } = useStyleSideInsets();
   // The tabs layout's width-aware label decision rides along, so the list
   // clearance tracks the bar height the layout actually renders.
   const tabBarHeight = useEffectiveTabBarHeight();

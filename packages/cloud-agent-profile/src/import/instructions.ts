@@ -40,10 +40,8 @@ export const instructionImportSchema = z.object({
 });
 
 /**
- * Stable 32-bit digest of an archive path, as lowercase hex. Several distinct
- * paths can fold onto one ASCII base, so the digest keeps their derived names
- * apart. It uses UTF-16 code units, so a browser and the server agree without
- * an encoding library.
+ * Stable 32-bit digest of an archive path, as lowercase hex. It uses UTF-16
+ * code units, so a browser and the server agree without an encoding library.
  */
 function pathDigest(path: string): string {
   let digest = 0x811c9dc5;

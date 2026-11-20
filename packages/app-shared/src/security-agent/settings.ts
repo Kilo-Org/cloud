@@ -35,7 +35,7 @@ export function isSecurityConfigPatchDirty<T extends Record<string, unknown>>(
 
 type SecurityRepository = { id: number };
 
-type SecurityRepositoryScopeConfig = {
+export type SecurityRepositoryScopeConfig = {
   repositorySelectionMode: 'all' | 'selected';
   selectedRepositoryIds: readonly number[];
 };
@@ -57,7 +57,7 @@ export function getSecurityRepositoriesInScope<T extends SecurityRepository>(
  * (e.g. an empty repository selection, an out-of-range SLA day count) — the
  * screen supplies `valid` since only it knows its own validation rule.
  */
-type SettingsDirtyState = 'clean' | 'dirty-valid' | 'dirty-invalid';
+export type SettingsDirtyState = 'clean' | 'dirty-valid' | 'dirty-invalid';
 
 const MIN_SLA_DAYS = 1;
 const MAX_SLA_DAYS = 365;
@@ -103,7 +103,7 @@ export function getSettingsDirtyState<T extends Record<string, unknown>>(
   return valid ? 'dirty-valid' : 'dirty-invalid';
 }
 
-type SettingsBackGuardOption = 'save' | 'discard' | 'keep-editing';
+export type SettingsBackGuardOption = 'save' | 'discard' | 'keep-editing';
 
 /**
  * Which buttons a back-navigation confirmation alert should offer. A clean

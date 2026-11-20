@@ -1,7 +1,6 @@
-import {
-  formatGitUrlProject,
-  type ProjectFilterOption,
-} from '@/components/agents/session-list-helpers';
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
+import { type ProjectFilterOption } from '@/components/agents/session-list-helpers';
 
 /**
  * Platform rows the sheet offers: every platform the caller supplies, plus any

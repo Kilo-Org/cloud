@@ -19,13 +19,13 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
-  catalogEntryKind,
+  catalogEntryNames,
   catalogTags,
   countPlaceholderBases,
   flattenCatalog,
@@ -93,6 +93,9 @@ function catalogsOf(root) {
  * The value records why the split is real. Adding an entry claims the call sites
  * mean different things; removing one promises the copy means the same thing
  * everywhere it appears.
+ *
+ * Each key is the copy compared through `wording()`, so it is trimmed, case
+ * folded and stripped of trailing sentence punctuation.
  */
 const TWO_SENSE_COPY = new Map([
   [
@@ -200,6 +203,7 @@ const WORDED_COUNTS = new Set([
   'agentChat.contextUsage.stepsCount:two:ar',
   'agentChat.contextUsage.modelsCount:two:ar',
   'prReview.discussion.comment:two:ar',
+  'prReview.tabs.discussionAccessibility:two:ar',
   'prReview.hunkRows.fileLoadedCount:two:ar',
   'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
   'organization.kiloPass.paidSeat:one:ar',
@@ -1170,6 +1174,18 @@ function holdsLabel(values, run) {
   return false;
 }
 
+/**
+ * The catalog key a node names as a plain string: unwrapped from its
+ * TypeScript-only wrappers, a `Literal` string, and non-empty. Any other node,
+ * including a template literal and an empty string, names no key here.
+ */
+function staticStringKey(node) {
+  const value = unwrap(node);
+  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
+    ? value.value
+    : null;
+}
+
 /** The catalog key a property's value translates, when it is `t('literal')`. */
 function propertyTranslation(property) {
   const value = unwrap(property.value);
@@ -1180,10 +1196,7 @@ function propertyTranslation(property) {
   if (first === undefined) {
     return null;
   }
-  const key = unwrap(first);
-  return key.type === 'Literal' && typeof key.value === 'string' && key.value !== ''
-    ? key.value
-    : null;
+  return staticStringKey(first);
 }
 
 /**
@@ -1312,10 +1325,12 @@ function scanSource(catalog, root) {
   }
   // A key the source builds from the catalog has no literal of its own, so the
   // literals beside it stand in for it: `generic.body.` plus `chatMessage` is
-  // `generic.body.chatMessage`. The set is copied because the expansion grows
-  // it while it runs.
+  // `generic.body.chatMessage`. The literals are snapshotted once: a second
+  // head must not prefix a key an earlier head already synthesized, since
+  // `a.` then `b.` over the literal `c` would also yield `b.a.c`.
+  const literals = [...referenced];
   for (const prefix of keyPrefixes) {
-    for (const value of [...referenced]) {
+    for (const value of literals) {
       referenced.add(`${prefix}${value}`);
     }
   }
@@ -1341,13 +1356,7 @@ function mobileCalledKey(call, file) {
     problems.push(`${file}: t() called with a template literal; the key check cannot see it`);
     return { key: null, problems };
   }
-  return {
-    key:
-      key.type === 'Literal' && typeof key.value === 'string' && key.value !== ''
-        ? key.value
-        : null,
-    problems,
-  };
+  return { key: staticStringKey(first), problems };
 }
 
 /**
@@ -1390,9 +1399,7 @@ function pushCalledKey(call) {
   if (value === null) {
     return null;
   }
-  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
-    ? value.value
-    : null;
+  return staticStringKey(value);
 }
 
 /**
@@ -1823,28 +1830,14 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
   }
   // `catalogTags` counts only regular files, so a directory named like a
   // catalog would vanish from `present` and from this rule without a trace.
-  // Naming it here keeps the stray entry a reported problem instead.
-  for (const name of nonFileCatalogEntries(dir)) {
+  // Naming it here keeps the stray entry a reported problem instead, which is
+  // why this reader rejects the other kind.
+  for (const name of catalogEntryNames(dir, 'file')) {
     problems.push(
       `${catalogName}: catalog "${name}.json" is not a regular file; remove it or make it a catalog`
     );
   }
   return problems;
-}
-
-/**
- * The `.json`-named entries of `dir` that are not regular files, sorted.
- *
- * Deliberately different from the tag set `catalogTags` builds: this names
- * 'unreadable' and 'other' entries, while the tag set keeps 'file' and
- * 'unreadable'. So a directory named like a catalog is reported here instead
- * of vanishing from `present` without a trace.
- */
-function nonFileCatalogEntries(dir) {
-  return readdirSync(dir, { withFileTypes: true })
-    .filter(entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== 'file')
-    .map(entry => entry.name.replace(/\.json$/, ''))
-    .sort();
 }
 
 function checkEnglishCopies({ catalogName, english }) {
@@ -1872,15 +1865,21 @@ function checkEnglishCopies({ catalogName, english }) {
   // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
   // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
-    if (
-      keys.length < 2 ||
-      TWO_SENSE_COPY.has(wording(value)) ||
-      keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
-    ) {
+    if (keys.length < 2 || keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))) {
       continue;
     }
+    const folded = wording(value);
+    if (TWO_SENSE_COPY.has(folded)) {
+      continue;
+    }
+    // The remedy prints the folded form, because that is the one the exemption
+    // lookup compares; adding the raw copy would not exempt it.
+    const foldNote =
+      folded === value
+        ? ''
+        : ' (entries are compared after trimming, case folding and dropping trailing sentence punctuation)';
     problems.push(
-      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add the string to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs with the two senses it carries.`
+      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add "${folded}" to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs${foldNote} with the two senses it carries.`
     );
   }
   return problems;

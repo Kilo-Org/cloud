@@ -2,7 +2,7 @@ import { X } from '@/components/ui/icons';
 import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { useTranslation } from 'react-i18next';
 
 import { statusFilterLabelKey } from '@/components/agents/live-session-status-filter';
@@ -43,7 +43,7 @@ export function SessionStatusFilterBar({
   const { t } = useTranslation();
   // Landscape side insets keep the chip clear of the sensor housing; portrait
   // insets are 0, keeping the fixed gutter unchanged.
-  const { left, right } = useSafeAreaInsets();
+  const { left, right } = useStyleSideInsets();
   const margins = useMemo(() => ({ marginLeft: left, marginRight: right }), [left, right]);
 
   return (

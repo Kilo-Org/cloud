@@ -660,6 +660,30 @@ describe('agent browser calls', () => {
     expect(originChangedResultOf(outcome)).toBeDefined();
   });
 
+  it('completes a redirect that lands on an origin the call was granted', async () => {
+    const { cdp, runtime } = await createHarness();
+    const destination = 'https://other.example.com';
+
+    cdp.setFrameUrl('https://accounts.example.org/login');
+
+    const outcome = await runtime.runTool({
+      agent: {
+        authorized: [
+          readGrant,
+          actGrant,
+          { class: 'navigate', origin: destination },
+          { class: 'read', origin: 'https://accounts.example.org' },
+        ],
+      },
+      arguments: { url: `${destination}/home` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    expect(outcome.kind).toBe('result');
+  });
+
   it('needs a step token for a password field and accepts the retry that carries it', async () => {
     const { cdp, runtime } = await createHarness();
 
@@ -2381,6 +2405,7 @@ describe('agent browser calls', () => {
           arguments: {},
           caller: panel(),
           tabId: TAB_ID,
+          takeOver: true,
           toolName: 'browser_snapshot',
         }),
         0
@@ -2394,6 +2419,12 @@ describe('agent browser calls', () => {
       await vi.advanceTimersByTimeAsync(0);
 
       expect(downloads.cancelled).toStrictEqual([141]);
+
+      // The session's first call after the take-over re-reads the page; the report waits for the call after it.
+      await expect(runTimed(shot(), 0)).resolves.toStrictEqual({
+        kind: 'result',
+        result: { error: TAB_TAKEN_ERROR, ok: false },
+      });
 
       const reported = await runTimed(shot(), 0);
 
@@ -4037,6 +4068,7 @@ describe('agent browser calls', () => {
       arguments: { function: '() => 1' },
       caller: panel(),
       tabId: fixture.newTab,
+      takeOver: true,
       toolName: 'browser_evaluate',
     });
 
@@ -4134,6 +4166,7 @@ describe('agent browser calls', () => {
         arguments: {},
         caller: panel(),
         tabId: fixture.newTab,
+        takeOver: true,
         toolName: 'browser_snapshot',
       });
 
@@ -4839,10 +4872,8 @@ describe('agent browser calls', () => {
     let announced = 0;
 
     for (const sessionHandle of ['session-1', 'session-2']) {
-      // eslint-disable-next-line no-await-in-loop -- one session per share, in order
+      // eslint-disable-next-line no-await-in-loop -- one session per open, in order
       await runtime.openSession({ controllerId: 'controller-1', sessionHandle, title: 'Work' });
-      // eslint-disable-next-line no-await-in-loop -- see above
-      await runtime.shareActiveTab({ sessionHandle, tabId: TAB_ID });
     }
 
     cdp.setHandlers({
@@ -4860,6 +4891,9 @@ describe('agent browser calls', () => {
 
     const click = async (sessionHandle: string, sensitive: readonly string[] = []) => {
       const caller = { controllerId: 'controller-1', kind: 'agent' as const, sessionHandle };
+
+      // A tab sits in one session's group at a time: the calling session shares it into its own group first.
+      await runtime.shareActiveTab({ sessionHandle, tabId: TAB_ID });
 
       try {
         return await runtime.runTool({
@@ -5250,6 +5284,7 @@ describe('agent browser calls', () => {
       arguments: {},
       caller: { conversationId: 'conversation-a', kind: 'panel', panelId: 'panel-1' },
       tabId: 88,
+      takeOver: true,
       toolName: 'browser_snapshot',
     });
 
@@ -5291,6 +5326,7 @@ describe('agent browser calls', () => {
 
     await expect(runtime.shareActiveTab({ sessionHandle: 'session-1' })).resolves.toStrictEqual({
       groupId: 42,
+      kind: 'shared',
       tabId: TAB_ID,
     });
 
@@ -5456,7 +5492,7 @@ describe('agent browser calls', () => {
   });
 
   it('keeps the panel caller unfiltered: its snapshot includes the iframe content', async () => {
-    const { runtime } = await createHarness();
+    const { runtime } = await createHarness({ share: false });
 
     const outcome = await runtime.runTool({
       arguments: {},

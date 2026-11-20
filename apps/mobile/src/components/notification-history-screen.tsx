@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one screen: the paged list, its state scroller with the refresh band, the chip filter and the push banner share the read state */
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
@@ -12,6 +13,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { BellOff } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -34,6 +36,7 @@ import { isRetiredPushType } from '@/lib/retired-push-types';
 import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
@@ -77,6 +80,7 @@ export function NotificationHistoryScreen() {
   const now = useRelativeTimeNow();
   const queryClient = useQueryClient();
   const paddingBottom = useTabBarBottomPadding();
+  const sideInsetStyle = useSideInsetStyle();
   const [category, setCategory] = useState<NotificationHistoryFilter['category']>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -250,7 +254,7 @@ export function NotificationHistoryScreen() {
         showBackButton
         backFallback={PROFILE_TAB_HREF}
       />
-      <View className="flex-1">
+      <View className="flex-1" style={sideInsetStyle}>
         {gate.settled && gate.answered && !gate.pushEnabled ? (
           <View className="px-4 pb-3">
             <Card>
@@ -316,39 +320,44 @@ export function NotificationHistoryScreen() {
             </View>
           ) : null}
 
-          {failure ? (
-            <QueryError
-              placement="top"
-              inset="gutter"
-              message={t('notifications.history.loadError')}
-              onRetry={() => {
-                void query.refetch();
-              }}
-              isRetrying={query.isFetching}
+          {failure || (!loading && !hasListContent) ? (
+            // A state's stack outgrows a landscape body, so it scrolls like the
+            // list, ends clear of the tab bar, and draws its own refresh band
+            // (the app control hides the native spinner under reduced motion).
+            <ScrollView
               refreshControl={refreshControl}
-            />
-          ) : null}
-
-          {!loading && !failure && !hasListContent ? (
-            <EmptyState
-              placement="top"
-              inset="gutter"
-              icon={BellOff}
-              refreshControl={refreshControl}
-              title={t(
-                category === null
-                  ? 'notifications.history.emptyTitle'
-                  : 'notifications.history.emptyCategoryTitle'
+              contentContainerStyle={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}
+            >
+              <RefreshProgress refreshControl={refreshControl} />
+              {failure ? (
+                <QueryError
+                  placement="top"
+                  inset="gutter"
+                  message={t('notifications.history.loadError')}
+                  onRetry={() => void query.refetch()}
+                  isRetrying={query.isFetching}
+                />
+              ) : (
+                <EmptyState
+                  placement="top"
+                  inset="gutter"
+                  icon={BellOff}
+                  title={t(
+                    category === null
+                      ? 'notifications.history.emptyTitle'
+                      : 'notifications.history.emptyCategoryTitle'
+                  )}
+                  // The retention window describes the whole list, not one category.
+                  description={
+                    category === null
+                      ? t('notifications.history.emptyBody', {
+                          days: NOTIFICATION_HISTORY_RETENTION_DAYS,
+                        })
+                      : undefined
+                  }
+                />
               )}
-              // The retention window describes the whole list, not one category.
-              description={
-                category === null
-                  ? t('notifications.history.emptyBody', {
-                      days: NOTIFICATION_HISTORY_RETENTION_DAYS,
-                    })
-                  : undefined
-              }
-            />
+            </ScrollView>
           ) : null}
 
           {!loading && !failure && hasListContent ? (

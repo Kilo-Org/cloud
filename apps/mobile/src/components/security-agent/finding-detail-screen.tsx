@@ -32,6 +32,7 @@ import { getSecurityAgentPath } from '@/lib/security-agent';
 import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
@@ -63,6 +64,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const pushOnce = useSinglePushRoute();
   const navigation = useNavigation();
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
@@ -217,11 +219,13 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         {pendingHeader}
-        <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
-          <Skeleton className="h-6 w-2/3 rounded" />
-          <Skeleton className="h-4 w-1/3 rounded" />
-          <Skeleton className="h-10 w-full rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-xl" />
+        <View className="flex-1" style={sideInsetStyle}>
+          <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
+            <Skeleton className="h-6 w-2/3 rounded" />
+            <Skeleton className="h-4 w-1/3 rounded" />
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </View>
         </View>
       </View>
     );
@@ -263,41 +267,47 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           ) : undefined
         }
       />
-      {findingQuery.isError ? (
-        <View className="px-4 pb-2">
-          <SettingsRecoveryStatus
-            message={t('securityAgent.dismiss.couldNotLoad')}
-            isRetrying={findingQuery.isFetching}
-            onRetry={() => void findingQuery.refetch()}
+      {/* The status rows and the view switch sit beside the side insets that
+          the header and the panels' scroll views clear. */}
+      <View style={sideInsetStyle}>
+        {findingQuery.isError ? (
+          <View className="px-4 pb-2">
+            <SettingsRecoveryStatus
+              message={t('securityAgent.dismiss.couldNotLoad')}
+              isRetrying={findingQuery.isFetching}
+              onRetry={() => void findingQuery.refetch()}
+            />
+          </View>
+        ) : null}
+        {draft?.lastError != null ? (
+          <View className="px-4 pb-2">
+            <SecurityCommandRetryCard
+              lastError={securityDismissFailureCopy(draft, canManageBilling)}
+              retryable={draft.retryable === true}
+              action={isSecurityTrialRefusalCopyKey(draft.lastErrorKey) ? billingAction : undefined}
+              onRetry={() => {
+                pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
+              }}
+              onDiscard={() => {
+                dismissDraft.clear();
+              }}
+            />
+          </View>
+        ) : null}
+        {/* The three views are the app's one view switch: the shared segmented
+            control, which owns the track, the selected pill, the 48pt floor and
+            the selection tick. Each view swaps the body below it, so the strip
+            reads as tabs. Its accessible name is the screen's own, so a reader
+            hears the finding's views, not an unnamed tab list. */}
+        <View className="px-4 pb-2 pt-1">
+          <SegmentedControl
+            options={viewOptions}
+            value={tab}
+            semantics="tabs"
+            accessibilityLabel={t('securityAgent.findingDetail.title')}
+            onChange={setTab}
           />
         </View>
-      ) : null}
-      {draft?.lastError != null ? (
-        <View className="px-4 pb-2">
-          <SecurityCommandRetryCard
-            lastError={securityDismissFailureCopy(draft, canManageBilling)}
-            retryable={draft.retryable === true}
-            action={isSecurityTrialRefusalCopyKey(draft.lastErrorKey) ? billingAction : undefined}
-            onRetry={() => {
-              pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
-            }}
-            onDiscard={() => {
-              dismissDraft.clear();
-            }}
-          />
-        </View>
-      ) : null}
-      {/* The three views are the app's one view switch: the shared segmented
-          control, which owns the track, the selected pill, the 48pt floor and
-          the selection tick. Its accessible name is the screen's own, so a
-          reader hears the finding's views, not an unnamed radio group. */}
-      <View className="px-4 pb-2 pt-1">
-        <SegmentedControl
-          options={viewOptions}
-          value={tab}
-          accessibilityLabel={t('securityAgent.findingDetail.title')}
-          onChange={setTab}
-        />
       </View>
       {tab === 'details' && (
         <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>

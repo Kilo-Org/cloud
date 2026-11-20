@@ -21,10 +21,10 @@ import {
   DrainSessionError,
   isKiloServerUnreachableError,
   forgetOutstandingRuleset,
-  hasOutstandingRuleset,
   readOutstandingRuleset,
   rememberOutstandingRuleset,
   SessionRulesetNotAppliedError,
+  SessionRulesetUnverifiedError,
   type WrapperKiloClient,
 } from './kilo-api';
 
@@ -946,12 +946,14 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         failUpdates?: number;
         updateStatus?: number;
         metadataUpdateStatus?: number;
+        getFailures?: number;
         onImport?: () => void;
       } = {}
     ): { url: string; imports: EnsureSessionImport[]; updates: EnsureSessionUpdate[] } {
       const imports: EnsureSessionImport[] = [];
       const updates: EnsureSessionUpdate[] = [];
       let updatesToFail = options.failUpdates ?? 0;
+      let getsToFail = options.getFailures ?? 0;
       // The native import replaces the row, cannot carry a ruleset or metadata,
       // and the update appends rules instead of replacing them while replacing
       // metadata wholesale.
@@ -971,6 +973,10 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
             });
           }
           if (request.method === 'GET' && url.pathname === `/session/${sessionId}`) {
+            if (getsToFail > 0) {
+              getsToFail -= 1;
+              return Response.json({ error: { message: 'get unavailable' } }, { status: 500 });
+            }
             return record
               ? Response.json({
                   ...record,
@@ -1229,7 +1235,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       } finally {
         await forgetOutstandingRuleset(sessionId);
       }
-      expect(await hasOutstandingRuleset(sessionId)).toBe(false);
+      expect(await readOutstandingRuleset(sessionId)).toBeUndefined();
     });
 
     it('applies the owed ruleset on the next call instead of reusing an incomplete record', async () => {
@@ -1277,7 +1283,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
         expect(stub.imports).toHaveLength(0);
         expect(stub.updates).toHaveLength(0);
-        expect(await hasOutstandingRuleset(sessionId)).toBe(false);
+        expect(await readOutstandingRuleset(sessionId)).toBeUndefined();
       } finally {
         await forgetOutstandingRuleset(sessionId);
       }
@@ -1295,7 +1301,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
         expect(stub.updates).toHaveLength(1);
         expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
-        expect(await hasOutstandingRuleset(sessionId)).toBe(false);
+        expect(await readOutstandingRuleset(sessionId)).toBeUndefined();
       } finally {
         await forgetOutstandingRuleset(sessionId);
       }
@@ -1316,7 +1322,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         await createClient(stub.url).settleOutstandingRuleset(sessionId, directory);
 
         expect(stub.updates).toHaveLength(0);
-        expect(await hasOutstandingRuleset(sessionId)).toBe(false);
+        expect(await readOutstandingRuleset(sessionId)).toBeUndefined();
       } finally {
         await forgetOutstandingRuleset(sessionId);
       }
@@ -1334,7 +1340,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
         expect(stub.updates).toHaveLength(1);
         expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
-        expect(await hasOutstandingRuleset(sessionId)).toBe(false);
+        expect(await readOutstandingRuleset(sessionId)).toBeUndefined();
       } finally {
         await forgetOutstandingRuleset(sessionId);
       }
@@ -1446,7 +1452,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         expect(stub.imports).toHaveLength(1);
         expect(stub.updates).toHaveLength(1);
         expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
-        expect(await hasOutstandingRuleset(sessionId)).toBe(false);
+        expect(await readOutstandingRuleset(sessionId)).toBeUndefined();
       } finally {
         await forgetOutstandingRuleset(sessionId);
       }
@@ -1622,6 +1628,102 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         await forgetOutstandingRuleset(sessionId).catch(() => undefined);
         if (originalHome === undefined) delete process.env.HOME;
         else process.env.HOME = originalHome;
+      }
+    });
+
+    it.skipIf(process.getuid?.() === 0)(
+      'fails retryably when the marker exists but cannot be read',
+      async () => {
+        const sessionId = 'ses_record_permission_marker_unreadable';
+        const home = temporaryDirectory('kilo-api-permission-unreadable-home-');
+        const marker = join(
+          home,
+          '.kilo-control',
+          'rulesets',
+          `${encodeURIComponent(sessionId)}.json`
+        );
+        const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+        const originalHome = process.env.HOME;
+        process.env.HOME = home;
+        let locked = false;
+        try {
+          await rememberOutstandingRuleset(sessionId, permission);
+          // A file mode of 0000 makes the read itself fail, while the bytes
+          // stay in place for the next attempt to read.
+          chmodSync(marker, 0o000);
+          locked = true;
+
+          const error = await readOutstandingRuleset(sessionId).catch((error: unknown) => error);
+
+          // The marker may be readable on the retry, so the step may run again.
+          expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+          expect((error as SessionRulesetUnverifiedError).retryable).toBe(true);
+          expect((error as SessionRulesetUnverifiedError).sessionId).toBe(sessionId);
+        } finally {
+          if (locked) chmodSync(marker, 0o600);
+          await forgetOutstandingRuleset(sessionId).catch(() => undefined);
+          if (originalHome === undefined) delete process.env.HOME;
+          else process.env.HOME = originalHome;
+        }
+      }
+    );
+
+    it('fails retryably when the marker cannot be written before the import', async () => {
+      const sessionId = 'ses_record_permission_marker_unwritable';
+      const home = temporaryDirectory('kilo-api-permission-unwritable-home-');
+      const control = join(home, '.kilo-control');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      let readOnly = false;
+      try {
+        mkdirSync(control, { recursive: true });
+        chmodSync(control, 0o500);
+        readOnly = true;
+
+        const error = await rememberOutstandingRuleset(sessionId, permission).catch(
+          (error: unknown) => error
+        );
+
+        // The marker goes down before the import, so no record is committed and
+        // a retried step can store the marker and import.
+        expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+        expect((error as SessionRulesetUnverifiedError).retryable).toBe(true);
+        expect((error as SessionRulesetUnverifiedError).sessionId).toBe(sessionId);
+      } finally {
+        if (readOnly) chmodSync(control, 0o700);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('fails the settle retryably and sends no update when the session read cannot answer', async () => {
+      const sessionId = 'ses_record_permission_get_unverified';
+      const directory = temporaryDirectory('kilo-api-permission-get-unverified-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberOutstandingRuleset(sessionId, permission);
+      try {
+        const failing = startEnsureSessionStub(sessionId, undefined, { getFailures: 1 });
+
+        const error = await createClient(failing.url)
+          .settleOutstandingRuleset(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        // A read that cannot answer must not report "the record lacks these
+        // rules": the update appends, so a second copy would stay.
+        expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+        expect((error as SessionRulesetUnverifiedError).retryable).toBe(true);
+        expect(failing.updates).toHaveLength(0);
+        expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
+
+        // The retry reads the record again and applies the rules exactly once.
+        const healthy = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+        await createClient(healthy.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(healthy.updates).toEqual([{ queryDirectory: directory, body: { permission } }]);
+        expect(await readOutstandingRuleset(sessionId)).toBeUndefined();
+      } finally {
+        await forgetOutstandingRuleset(sessionId);
       }
     });
 

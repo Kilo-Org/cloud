@@ -13,7 +13,7 @@ import {
 } from '../control/delete-worktree.js';
 import {
   forgetOutstandingRuleset,
-  hasOutstandingRuleset,
+  readOutstandingRuleset,
   rememberOutstandingRuleset,
 } from '../kilo-api.js';
 import { resetSessionDirectoryState } from '../control/session-directories.js';
@@ -559,7 +559,7 @@ describe('worktree deletion clears the session ruleset marker', () => {
     stub.sessions.set(id, directory);
     try {
       await rememberOutstandingRuleset(id, permission);
-      expect(await hasOutstandingRuleset(id)).toBe(true);
+      expect(await readOutstandingRuleset(id)).toEqual(permission);
 
       await deleteWorktree(
         { worktreeId, directory, sessionIds: [id] },
@@ -567,7 +567,7 @@ describe('worktree deletion clears the session ruleset marker', () => {
       );
 
       expect(stub.deleted.has(id)).toBe(true);
-      expect(await hasOutstandingRuleset(id)).toBe(false);
+      expect(await readOutstandingRuleset(id)).toBeUndefined();
     } finally {
       await stub.server.stop(true);
       await forgetOutstandingRuleset(id).catch(() => undefined);
@@ -599,7 +599,7 @@ describe('worktree deletion clears the session ruleset marker', () => {
 
       expect(result).toEqual({ deleted: true, sessionIds: [id] });
       expect(stub.deleted.has(id)).toBe(true);
-      expect(await hasOutstandingRuleset(id)).toBe(true);
+      expect(await readOutstandingRuleset(id)).toEqual(permission);
     } finally {
       if (readOnly) chmodSync(rulesets, 0o700);
       await stub.server.stop(true);

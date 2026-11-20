@@ -833,6 +833,11 @@ keep environment snapshots and existing history/worktree recovery.
   unchanged, and fails the prepare. A record under another directory is still treated as absent, so
   the marker simply waits for the import to re-point it. Both entry points therefore refuse, rather
   than prepare a route whose record lacks the rules it owes.
+  A marker or session read that cannot answer fails the prepare as retryable and sends no permission
+  update, because the retried step reads the same durable state and the native update appends. A
+  marker that cannot be written before the import fails as retryable too, because no record is
+  committed yet; a marker that reads but is not a ruleset, and a record whose permission is not a
+  ruleset, fail as the permanent session-import reason.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

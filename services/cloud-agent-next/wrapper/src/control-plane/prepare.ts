@@ -25,7 +25,7 @@ import {
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import type { Harness } from './harness.js';
-import { SessionRulesetNotAppliedError } from '../kilo-api.js';
+import { isPermanentRulesetFailure, SessionRulesetError } from '../kilo-api.js';
 import {
   git,
   runProcess,
@@ -372,10 +372,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
 
   function emitFailure(sessionId: string, step: ControlPlanePreparationStep, error: unknown): void {
     // The ruleset apply runs inside the same session step that commits the
-    // import, and the failure is permanent, so it reports the session-import
-    // reason instead of the generic workspace one.
+    // import, so both ruleset failures report the session-import reason instead
+    // of the generic workspace one.
     const subtype =
-      error instanceof SessionRulesetNotAppliedError
+      error instanceof SessionRulesetError
         ? 'kilo_import_failed'
         : error instanceof WrapperBootstrapError
           ? error.subtype
@@ -457,9 +457,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation(attempt);
       } catch (error) {
-        // A session whose record is already in place cannot gain its ruleset
-        // from a second attempt: the retry finds the record and returns first.
-        if (!isCurrent() || error instanceof SessionRulesetNotAppliedError) throw error;
+        // A permanent ruleset failure cannot gain its ruleset from a second
+        // attempt, because a retry re-reads the same durable state. A retryable
+        // one reads state that can answer on the next attempt.
+        if (!isCurrent() || isPermanentRulesetFailure(error)) throw error;
         lastError = error;
       }
     }
@@ -1367,7 +1368,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               });
             } catch (error) {
               failed = true;
-              final = error instanceof SessionRulesetNotAppliedError;
+              final = isPermanentRulesetFailure(error);
               throw error;
             } finally {
               if (snapshotRestore.startedAt !== undefined) {

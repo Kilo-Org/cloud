@@ -191,21 +191,59 @@ function requireSdkData<T>(
 }
 
 /**
- * The import committed the record but its ruleset could not be applied. The
- * record is in place, so retrying the session step would reuse it and return
- * without applying the ruleset; this error marks the failure as one a retry
- * cannot improve.
+ * The rules a session record owes could not be settled.
+ *
+ * `retryable` states the commit invariant of a retry. A retryable failure is
+ * raised only while the durable marker still holds the obligation, or before
+ * anything was committed, so a retried step reads the same durable state and
+ * can succeed. A permanent failure means that state cannot be interpreted, so
+ * a retry repeats the same failure.
  */
-export class SessionRulesetNotAppliedError extends Error {
+export abstract class SessionRulesetError extends Error {
   readonly sessionId: string;
-  readonly retryable = false;
+  abstract readonly retryable: boolean;
 
-  constructor(sessionId: string, cause: unknown) {
-    super(`Session ruleset not applied for ${sessionId}`, { cause });
-    this.name = 'SessionRulesetNotAppliedError';
+  protected constructor(sessionId: string, message: string, cause: unknown) {
+    super(message, { cause });
     this.sessionId = sessionId;
   }
 }
+
+/**
+ * The durable state says the ruleset is owed and the wrapper cannot apply it.
+ * The record is in place without its rules, and the marker or the record bytes
+ * cannot be interpreted, so retrying the session step repeats the same failure.
+ */
+export class SessionRulesetNotAppliedError extends SessionRulesetError {
+  readonly retryable = false;
+
+  constructor(sessionId: string, cause: unknown) {
+    super(sessionId, `Session ruleset not applied for ${sessionId}`, cause);
+    this.name = 'SessionRulesetNotAppliedError';
+  }
+}
+
+/**
+ * The wrapper could not establish whether the session owes a ruleset, and it
+ * wrote nothing. The marker or the record read can answer on the next attempt,
+ * so a retried step re-reads the same durable state and can succeed.
+ */
+export class SessionRulesetUnverifiedError extends SessionRulesetError {
+  readonly retryable = true;
+
+  constructor(sessionId: string, cause: unknown) {
+    super(sessionId, `Session owed ruleset could not be established for ${sessionId}`, cause);
+    this.name = 'SessionRulesetUnverifiedError';
+  }
+}
+
+/**
+ * True when a ruleset failure is permanent for the session step. A failure that
+ * is not a `SessionRulesetError` is not permanent: it follows the retry policy
+ * of every other failure.
+ */
+export const isPermanentRulesetFailure = (error: unknown): boolean =>
+  error instanceof SessionRulesetError && !error.retryable;
 
 /**
  * The native session update appends rules instead of replacing them, so a
@@ -272,9 +310,9 @@ export async function rememberOutstandingRuleset(
     await fsp.rename(temporary, file);
   } catch (error) {
     await fsp.rm(temporary, { force: true }).catch(() => undefined);
-    // The record is already committed, so a marker that cannot be stored is
-    // the same failure as a ruleset that could not be applied.
-    throw new SessionRulesetNotAppliedError(sessionId, error);
+    // The marker goes down before the import, so a write that fails leaves no
+    // committed record, and a retried step can store the marker and import.
+    throw new SessionRulesetUnverifiedError(sessionId, error);
   }
 }
 
@@ -285,26 +323,30 @@ export async function forgetOutstandingRuleset(sessionId: string): Promise<void>
 export async function readOutstandingRuleset(
   sessionId: string
 ): Promise<PermissionRuleset | undefined> {
+  let raw: string;
   try {
-    const raw = await fsp.readFile(outstandingRulesetPath(sessionId), 'utf8');
-    const parsed: unknown = JSON.parse(raw);
-    // Present but unreadable is still owed: never treat a damaged marker as
-    // permission to accept the record. A marker that is present but not a
-    // ruleset fails the route instead of reading as nothing owed, because
-    // reading it as nothing owed would drop a ruleset that is still owed.
-    const ruleset = parseRuleset(parsed);
-    if (ruleset !== undefined) return ruleset;
-    throw new Error(`Outstanding ruleset for ${sessionId} is malformed`);
+    raw = await fsp.readFile(outstandingRulesetPath(sessionId), 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    // A marker that exists but cannot be read reports the same final failure,
-    // so the route does not prepare on an assumption about its ruleset.
+    // A marker that exists but cannot be read may be readable on the retry, so
+    // the step fails retryably and writes nothing.
+    throw new SessionRulesetUnverifiedError(sessionId, error);
+  }
+  // The bytes are there, so a retry reads the same bytes: a marker that is not
+  // JSON, or is JSON that is not a ruleset, fails permanently instead of
+  // reading as nothing owed, because that would drop a ruleset still owed.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
     throw new SessionRulesetNotAppliedError(sessionId, error);
   }
-}
-
-export async function hasOutstandingRuleset(sessionId: string): Promise<boolean> {
-  return (await readOutstandingRuleset(sessionId)) !== undefined;
+  const ruleset = parseRuleset(parsed);
+  if (ruleset !== undefined) return ruleset;
+  throw new SessionRulesetNotAppliedError(
+    sessionId,
+    new Error(`Outstanding ruleset for ${sessionId} is malformed`)
+  );
 }
 
 /**
@@ -352,8 +394,11 @@ function invalidRecordRuleset(sessionId: string): SessionRulesetNotAppliedError 
 }
 
 /**
- * A record that does not exist, and a read that cannot answer, leave the caller
- * free to update: the update reports the real failure itself.
+ * A record that does not exist, and a read that answers 404, leave the caller
+ * free to update: the update reports the real failure itself. A read that
+ * cannot answer fails retryably instead, because reporting it as "the record
+ * does not hold these rules" would send a second copy of an unmatched ruleset:
+ * the native update appends rules, so a duplicate grant stays.
  */
 async function storedRulesetFor(
   sessionId: string,
@@ -381,8 +426,10 @@ async function storedRulesetFor(
     const ruleset = parseRuleset(stored);
     if (ruleset === undefined) return 'invalid';
     return rulesetCovers(ruleset, permission) ? 'holds' : 'missing';
-  } catch {
-    return 'missing';
+  } catch (error) {
+    // The caller sends no update, so a retry reads the record again instead of
+    // appending a second copy of the rules.
+    throw new SessionRulesetUnverifiedError(sessionId, error);
   }
 }
 

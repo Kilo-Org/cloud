@@ -21,10 +21,7 @@ import { MenuSheet } from '@/components/ui/menu-sheet';
 import { Text } from '@/components/ui/text';
 import { selectionHaptic } from '@/lib/haptics';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_HIT_SLOP_DP,
-} from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import {
   GUARDRAILS_LIMITS,

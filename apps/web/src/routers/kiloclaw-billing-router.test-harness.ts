@@ -34,6 +34,10 @@ type KiloclawInternalClientMockShape = {
 
 jest.setTimeout(15_000);
 
+jest.mock('@kilocode/db/kiloclaw-paid-hosting', () => ({
+  isKiloClawPaidHostingAvailable: jest.fn(() => true),
+}));
+
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => {

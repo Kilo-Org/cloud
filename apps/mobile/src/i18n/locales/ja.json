@@ -19,7 +19,9 @@
     "presenceStatus": "ホスト：{{connection}}",
     "commandStatus": "コマンドの配信：{{status}}",
     "delivered": "配信済み",
-    "expired": "期限切れ"
+    "expired": "期限切れ",
+    "recoveryGaps_one": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。",
+    "recoveryGaps_other": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。"
   },
   "common": {
     "manageOnWeb": "Webで管理",
@@ -2231,6 +2233,8 @@
     "modelPicker": {
       "title": "モデルの選択",
       "noModelsDescription": "選択できるモデルはありません。",
+      "allUnavailableTitle": "使用できるモデルはありません",
+      "allUnavailableDescription": "プロバイダーキーを追加してから、もう一度お試しください。",
       "favorites": "お気に入り"
     },
     "modelSelector": {
@@ -3234,6 +3238,8 @@
       "partialPostedStale_one": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "partialPostedStale_other": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitCountOfTotal_one": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitCountOfTotal_other": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信",
       "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",
       "blockedComment": "コメントとしてレビューを投稿するには、総評を入力するか、コメントを1件以上追加してください。"
@@ -3443,7 +3449,7 @@
       "planStatusLapsed": " · 終了",
       "planEnded": "組織のトライアルは終了し、有効なプランがありません。",
       "manageBilling": "請求を管理",
-      "renamePlaceholder": "組織名",
+      "renamePlaceholder": "組織名を入力してください",
       "renameTitle": "組織名を変更"
     },
     "inviteMember": {
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "プロバイダーは現在利用できません。しばらくしてから再送信してください。"
   },
   "settingsTools": {
-    "confirmTitle": "この変更を確認しますか？"
+    "confirmTitle": "この変更を確認しますか？",
+    "guarded": {
+      "spendAlertsOff": "支出アラートをオフにしますか？支出しきい値の超過や1時間あたりの急増に関する通知が届かなくなります。",
+      "balanceAlertsOff": "残高アラートをオフにしますか？クレジットが少なくなったときの通知が届かなくなります。",
+      "securityFindingsOff": "セキュリティ検出をオフにしますか？新しいセキュリティ検出に関する通知が届かなくなります。",
+      "hideBalanceOn": "残高を非表示にしますか？クレジット残高がプロフィール画面と組織ハブに表示されなくなります。"
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "プロバイダーをオフにすると、この組織でKiloがそのプロバイダーへルーティングするのを停止します。",
     "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
     "providersEmpty": "この検索に一致するプロバイダーはありません。",
+    "providersNone": "この組織で利用できるプロバイダーはありません。",
     "allowAllShown": "表示されているすべてを許可",
     "denyAllShown": "表示されているすべてを拒否",
     "gatewaysDescription": "KiloはモデルリクエストをVercel AI GatewayまたはOpenRouter経由でルーティングします。無効なゲートウェイはそれらのリクエストを失敗させます。",

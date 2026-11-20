@@ -19,7 +19,9 @@
     "presenceStatus": "Vizio: {{connection}}",
     "commandStatus": "Uwasilishaji wa amri: {{status}}",
     "delivered": "Imewasilishwa",
-    "expired": "Muda wake umeisha"
+    "expired": "Muda wake umeisha",
+    "recoveryGaps_one": "Sehemu {{displayCount}} ya nakala hii haipo.",
+    "recoveryGaps_other": "Sehemu {{displayCount}} za nakala hii hazipo."
   },
   "common": {
     "manageOnWeb": "Dhibiti kwenye wavuti",
@@ -963,6 +965,8 @@
       "pendingComment": "maoni yanayosubiri kutumwa",
       "pendingComment_other": "maoni yanayosubiri kutumwa",
       "submitCountOfTotal": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
       "submitReview": "Wasilisha ukaguzi",
       "partialPostedFresh": "Maoni {{displayFreshCount}} yamechapishwa. ",
       "partialPostedFresh_one": "Maoni {{displayFreshCount}} yamechapishwa. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Chagua modeli",
       "noModelsDescription": "Hakuna modeli zinazopatikana za kuchagua.",
+      "allUnavailableTitle": "Hakuna modeli zinazoweza kutumika",
+      "allUnavailableDescription": "Ongeza ufunguo wa mtoa huduma na ujaribu tena.",
       "favorites": "Vipendwa"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Badilisha jina la shirika",
-      "renamePlaceholder": "Jina la shirika",
+      "renamePlaceholder": "Weka jina la shirika",
       "balance": "Salio",
       "plan": "Mpango",
       "planTeams": "Teams",
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "Mtoa huduma hapatikani kwa sasa. Tuma tena baada ya muda mfupi."
   },
   "settingsTools": {
-    "confirmTitle": "Thibitisha mabadiliko haya?"
+    "confirmTitle": "Thibitisha mabadiliko haya?",
+    "guarded": {
+      "spendAlertsOff": "Zima arifa za matumizi? Utaacha kupokea arifa kuhusu kuvuka vizingiti vya matumizi na miongezeko ya ghafla ya kila saa.",
+      "balanceAlertsOff": "Zima arifa za salio? Utaacha kupokea arifa salio lako la krediti linapopungua.",
+      "securityFindingsOff": "Zima matokeo ya usalama? Utaacha kupokea arifa kuhusu matokeo mapya ya usalama.",
+      "hideBalanceOn": "Ficha salio lako? Salio la krediti halitaonekana tena kwenye skrini za wasifu na kitovu cha shirika."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "Zima mtoa huduma ili kuzuia Kilo kupeleka maombi kwake kwa shirika hili.",
     "providersNeedCatalog": "Swichi za watoa huduma zitabaki za kusoma tu hadi orodha kamili ya miundo ipakie. Gusa Jaribu tena hapo juu ili kuzihariri.",
     "providersEmpty": "Hakuna watoa huduma wanaolingana na utafutaji huu.",
+    "providersNone": "Hakuna watoa huduma wanaopatikana kwa shirika hili.",
     "allowAllShown": "Ruhusu vitu vyote vinavyoonyeshwa",
     "denyAllShown": "Kataza vitu vyote vinavyoonyeshwa",
     "gatewaysDescription": "Kilo hupeleka maombi ya modeli kupitia Vercel AI Gateway au OpenRouter. Lango lililozimwa hufanya maombi hayo kushindwa.",

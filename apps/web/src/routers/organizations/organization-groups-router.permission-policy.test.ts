@@ -15,7 +15,7 @@ import { createOrganizationGroup } from '@kilocode/web-shared/lib/organizations/
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { rootRouter } from '@/routers/root-router';
 import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { collectCatalogLeaves, isDenylistedPath } from '@/scripts/mcp-catalog/catalog';
@@ -25,10 +25,10 @@ const policy = {
   type: 'agent_permissions',
   data: { schema_version: 1, tools: { websearch: 'deny' } },
 } satisfies OrganizationPermissionPolicy;
-const clientPolicy = {
+const retiredClientPolicy = {
   type: 'client_access',
   data: { schema_version: 1, mode: 'blocklist', clients: [] },
-} satisfies OrganizationPermissionPolicy;
+};
 const modelPolicy = { type: 'model_access', data: { mode: 'none' } } as const;
 const originalWriteSwitch = process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
 
@@ -139,7 +139,7 @@ describe('organization groups permission-policy administration', () => {
 
     const defaultWrite = await groups.adminPermissionPolicy.set({
       organizationId,
-      policy: clientPolicy,
+      policy,
     });
     const groupWrite = await adminPolicy.set({ organizationId, groupId, policy });
     const groupRemove = await adminPolicy.remove({
@@ -149,10 +149,10 @@ describe('organization groups permission-policy administration', () => {
     });
     const defaultRemove = await groups.adminPermissionPolicy.remove({
       organizationId,
-      policyType: clientPolicy.type,
+      policyType: policy.type,
     });
 
-    expect(defaultWrite).toEqual({ result: [clientPolicy], policyRevision: previousRevision + 1 });
+    expect(defaultWrite).toEqual({ result: [policy], policyRevision: previousRevision + 1 });
     expect(groupWrite).toEqual({ result: [policy], policyRevision: previousRevision + 2 });
     expect(groupRemove).toEqual({ result: [], policyRevision: previousRevision + 3 });
     expect(defaultRemove).toEqual({ result: [], policyRevision: previousRevision + 4 });
@@ -169,7 +169,7 @@ describe('organization groups permission-policy administration', () => {
         expect.objectContaining({
           action: 'organization.group.default_policy.set',
           actor_id: owner.id,
-          message: `Set default client_access group policy at revision ${defaultWrite.policyRevision}`,
+          message: `Set default agent_permissions group policy at revision ${defaultWrite.policyRevision}`,
         }),
         expect.objectContaining({
           action: 'organization.group.policy.set',
@@ -184,10 +184,65 @@ describe('organization groups permission-policy administration', () => {
         expect.objectContaining({
           action: 'organization.group.default_policy.remove',
           actor_id: owner.id,
-          message: `Removed default client_access group policy at revision ${defaultRemove.policyRevision}`,
+          message: `Removed default agent_permissions group policy at revision ${defaultRemove.policyRevision}`,
         }),
       ])
     );
+  });
+
+  it('rejects new client-access writes and omits legacy entries without losing active policies', async () => {
+    const { groups, organizationId, groupId } = await fixture();
+    const adminPolicy = groups.adminPermissionPolicy;
+    await enableFor(organizationId);
+    await adminPolicy.set({ organizationId, policy });
+    await groups.setMembers({ organizationId, groupId, userIds: [owner.id] });
+    await db
+      .update(organization_group_policy_settings)
+      .set({
+        default_policies: sql`default_policies || ${JSON.stringify([retiredClientPolicy])}::jsonb`,
+      })
+      .where(eq(organization_group_policy_settings.organization_id, organizationId));
+    await db
+      .update(organization_groups)
+      .set({ policies: sql`${JSON.stringify([modelPolicy, retiredClientPolicy])}::jsonb` })
+      .where(eq(organization_groups.id, groupId));
+    const previous = await policyState(organizationId);
+
+    for (const target of [{ organizationId }, { organizationId, groupId }]) {
+      await expect(
+        adminPolicy.set({ ...target, policy: retiredClientPolicy as never })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+      await expect(
+        adminPolicy.remove({ ...target, policyType: retiredClientPolicy.type as never })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+    }
+    expect(await policyState(organizationId)).toEqual(previous);
+    await expect(adminPolicy.settings({ organizationId })).resolves.toMatchObject({
+      policies: [policy],
+    });
+    await expect(adminPolicy.settings({ organizationId, groupId })).resolves.toMatchObject({
+      policies: [],
+    });
+    await expect(
+      adminPolicy.diagnostics({ organizationId, userId: owner.id })
+    ).resolves.toMatchObject({
+      response: { managed: true, policy: { agent_permissions: { layers: [policy.data] } } },
+      sources: { defaultPolicies: [policy], groups: [] },
+    });
+    await expect(groups.get({ organizationId, groupId })).resolves.toMatchObject({
+      group: { policies: [modelPolicy] },
+    });
+
+    await expect(adminPolicy.set({ organizationId, groupId, policy })).resolves.toMatchObject({
+      result: [policy],
+    });
+    expect((await policyState(organizationId)).groups).toEqual([
+      expect.objectContaining({ policies: [modelPolicy, policy] }),
+    ]);
   });
 
   it('leaves the policy, revision and audit untouched when either rollout gate rejects a write', async () => {
@@ -233,7 +288,7 @@ describe('organization groups permission-policy administration', () => {
       policies: [],
     });
     await enableFor(organizationId);
-    await groups.adminPermissionPolicy.set({ organizationId, policy: clientPolicy });
+    await groups.adminPermissionPolicy.set({ organizationId, policy });
     const { policyRevision } = await groups.adminPermissionPolicy.set({
       organizationId,
       groupId,
@@ -242,7 +297,7 @@ describe('organization groups permission-policy administration', () => {
     await expect(groups.adminPermissionPolicy.settings({ organizationId })).resolves.toEqual({
       managed: true,
       writesEnabled: true,
-      policies: [clientPolicy],
+      policies: [policy],
       policyRevision,
     });
     await expect(

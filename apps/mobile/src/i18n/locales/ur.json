@@ -7,7 +7,7 @@
     "directory": "ورکنگ ڈائریکٹری",
     "createSession": "نیٹو سیشن بنائیں",
     "queueIfOffline": "ہوسٹ آف لائن ہو تو پرامپٹ قطار میں رکھیں",
-    "prompt": "پرامپٹ یا /command",
+    "prompt": "پرامپٹ یا \u2066/command\u2069",
     "localClear": "مقامی منظر صاف کریں",
     "abort": "ٹرن منسوخ کریں",
     "failed": "نیٹو ریموٹ کارروائی ناکام ہو گئی",
@@ -19,7 +19,9 @@
     "presenceStatus": "ہوسٹس: {{connection}}",
     "commandStatus": "کمانڈ کی ترسیل: {{status}}",
     "delivered": "پہنچا دیا گیا",
-    "expired": "میعاد ختم ہو گئی"
+    "expired": "میعاد ختم ہو گئی",
+    "recoveryGaps_one": "اس ٹرانسکرپٹ کا {{displayCount}} حصہ غائب ہے۔",
+    "recoveryGaps_other": "اس ٹرانسکرپٹ کے {{displayCount}} حصے غائب ہیں۔"
   },
   "common": {
     "manageOnWeb": "ویب پر منظم کریں",
@@ -963,6 +965,8 @@
       "pendingComment": "زیر التوا تبصرے",
       "pendingComment_other": "زیر التوا تبصرے",
       "submitCountOfTotal": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
+      "submitCountOfTotal_one": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
+      "submitCountOfTotal_other": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
       "submitReview": "جائزہ جمع کریں",
       "partialPostedFresh": "پوسٹ کیے گئے تبصروں کی تعداد: {{displayFreshCount}}۔ ",
       "partialPostedFresh_one": "پوسٹ کیے گئے تبصروں کی تعداد: {{displayFreshCount}}۔ ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "ماڈل منتخب کریں",
       "noModelsDescription": "منتخب کرنے کے لیے کوئی ماڈل دستیاب نہیں ہے۔",
+      "allUnavailableTitle": "کوئی بھی ماڈل استعمال نہیں کیا جا سکتا",
+      "allUnavailableDescription": "فراہم کنندہ کی کلید شامل کریں اور دوبارہ کوشش کریں۔",
       "favorites": "پسندیدہ"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "تنظیم کا نام تبدیل کریں",
-      "renamePlaceholder": "تنظیم کا نام",
+      "renamePlaceholder": "تنظیم کا نام درج کریں",
       "balance": "بیلنس",
       "plan": "پلان",
       "planTeams": "Teams",
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "فراہم کنندہ اس وقت دستیاب نہیں ہے۔ تھوڑی دیر بعد دوبارہ بھیجیں۔"
   },
   "settingsTools": {
-    "confirmTitle": "اس تبدیلی کی تصدیق کریں؟"
+    "confirmTitle": "اس تبدیلی کی تصدیق کریں؟",
+    "guarded": {
+      "spendAlertsOff": "اخراجات کے الرٹس بند کریں؟ آپ کو اخراجات کی حد سے تجاوز اور فی گھنٹہ اضافے کے بارے میں اطلاعات ملنا بند ہو جائیں گی۔",
+      "balanceAlertsOff": "بیلنس کے الرٹس بند کریں؟ جب آپ کے کریڈٹس کم ہوں تو آپ کو اطلاعات ملنا بند ہو جائیں گی۔",
+      "securityFindingsOff": "سیکیورٹی فائنڈنگز کے الرٹس بند کریں؟ آپ کو نئی سیکیورٹی فائنڈنگز کے بارے میں اطلاعات ملنا بند ہو جائیں گی۔",
+      "hideBalanceOn": "اپنے بیلنس چھپائیں؟ کریڈٹ بیلنس اب پروفائل اسکرینوں اور آرگنائزیشن ہب پر نظر نہیں آئیں گے۔"
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "پرووائیڈر کو بند کریں تاکہ Kilo اس تنظیم کے لیے اس کی طرف روٹنگ بند کر دے۔",
     "providersNeedCatalog": "مکمل ماڈل کیٹلاگ لوڈ ہونے تک پرووائیڈر سوئچز صرف پڑھنے کے لیے رہیں گے۔ انہیں تبدیل کرنے کے لیے اوپر دوبارہ کوشش کریں پر ٹیپ کریں۔",
     "providersEmpty": "اس تلاش سے کوئی پرووائیڈر مطابقت نہیں رکھتا۔",
+    "providersNone": "اس تنظیم کے لیے کوئی پرووائیڈر دستیاب نہیں ہے۔",
     "allowAllShown": "دکھائے گئے سب کی اجازت دیں",
     "denyAllShown": "دکھائے گئے سب کو مسترد کریں",
     "gatewaysDescription": "Kilo ماڈل کی درخواستیں Vercel AI Gateway یا OpenRouter کے ذریعے روٹ کرتا ہے۔ غیر فعال گیٹ وے ان درخواستوں کو ناکام کر دیتا ہے۔",

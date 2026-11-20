@@ -93,7 +93,7 @@ describe('a paid case whose queue invocation is canceled (production migrations 
     }
     await scheduleRunChunks(env.BENCH_DB, {
       runId: RUN_ID,
-      entries: models.map(model => ({ model, variant: null, providers: ['deepinfra'] })),
+      entries: models.map(model => ({ model, variant: null })),
       repetitions: 1,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,

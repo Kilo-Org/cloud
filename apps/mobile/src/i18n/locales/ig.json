@@ -19,7 +19,9 @@
     "presenceStatus": "Igwe: {{connection}}",
     "commandStatus": "Nbufe iwu: {{status}}",
     "delivered": "Ebufela",
-    "expired": "Oge agwụla"
+    "expired": "Oge agwụla",
+    "recoveryGaps_one": "{{displayCount}} akụkụ nke ndekọ a na-efu.",
+    "recoveryGaps_other": "{{displayCount}} akụkụ nke ndekọ a na-efu."
   },
   "common": {
     "manageOnWeb": "Jikwaa na weebụ",
@@ -963,6 +965,8 @@
       "pendingComment": "okwu a na-ezigabeghị",
       "pendingComment_other": "okwu a na-ezigabeghị",
       "submitCountOfTotal": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",
       "submitReview": "Nyefee nyocha",
       "partialPostedFresh": "Ebipụtala okwu {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Ebipụtala okwu {{displayFreshCount}}. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Họrọ ihe nlereanya",
       "noModelsDescription": "Enweghị ihe nlereanya dị ịhọrọ.",
+      "allUnavailableTitle": "Enweghị ihe nlereanya a pụrụ iji mee ihe",
+      "allUnavailableDescription": "Tinye igodo onye na-enye ọrụ, ma nwaa ọzọ.",
       "favorites": "Ihe kacha amasị gị"
     },
     "modelSelector": {
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "Onye na-enye ọrụ adịghị ugbu a. Ziga ọzọ n'oge na-adịghị anya."
   },
   "settingsTools": {
-    "confirmTitle": "Kwenye mgbanwe a?"
+    "confirmTitle": "Kwenye mgbanwe a?",
+    "guarded": {
+      "spendAlertsOff": "Gbanyụọ ọkwa mmefu? Ị ga-akwụsị ịnata ọkwa gbasara ịgafe oke mmefu na mmụba mberede kwa elekere.",
+      "balanceAlertsOff": "Gbanyụọ ọkwa ego fọdụrụ? Ị ga-akwụsị ịnata ọkwa mgbe kredit gị fọrọ ntakịrị.",
+      "securityFindingsOff": "Gbanyụọ nchọpụta nchebe? Ị ga-akwụsị ịnata ọkwa gbasara nchọpụta nchebe ọhụrụ.",
+      "hideBalanceOn": "Zoo ego fọdụrụ gị? Ego kredit agaghịzi apụta na ihuenyo profaịlụ na ebe nzukọ."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "Gbanyụọ onye na-enye ọrụ iji kwụsị Kilo ịga na ya maka nzukọ a.",
     "providersNeedCatalog": "Mgba ọkụ ndị na-enye ọrụ ga-anọgide naanị maka ịgụ ruo mgbe katalọgụ ụdị niile ebudatara. Nwaa ọzọ n'elu iji dezie ha.",
     "providersEmpty": "Ọnweghị onye na-enye ọrụ dabara na nchọta a.",
+    "providersNone": "Ọnweghị onye na-enye ọrụ dị maka nzukọ a.",
     "allowAllShown": "Kwe ka ihe niile egosiri",
     "denyAllShown": "Jụ ihe niile egosiri",
     "gatewaysDescription": "Kilo na-eziga arịrịọ ihe nlere site na Vercel AI Gateway ma ọ bụ OpenRouter. Ọnụ ụzọ agbanyụrụ na-eme ka arịrịọ ndị ahụ daa.",

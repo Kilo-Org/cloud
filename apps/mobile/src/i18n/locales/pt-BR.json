@@ -19,7 +19,11 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregue",
-    "expired": "Expirado"
+    "expired": "Expirado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrição.",
+    "recoveryGaps_many": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_other": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_zero": "Faltam {{displayCount}} partes desta transcrição."
   },
   "common": {
     "manageOnWeb": "Gerenciar na web",
@@ -2250,7 +2254,9 @@
     "modelPicker": {
       "title": "Modelo",
       "favorites": "Favoritos",
-      "noModelsDescription": "Não há modelos disponíveis para escolher."
+      "noModelsDescription": "Não há modelos disponíveis para escolher.",
+      "allUnavailableTitle": "Nenhum modelo pode ser usado",
+      "allUnavailableDescription": "Adicione uma chave de provedor e tente novamente."
     },
     "modelSelector": {
       "provider": "Provedor {{id}}",
@@ -3347,6 +3353,10 @@
       "partialPostedStale_other": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
       "partialPostedStale_zero": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
       "pendingComment_many": "comentários pendentes",
       "blockedRequestChanges": "Adicione um resumo ou pelo menos um comentário para solicitar alterações.",
@@ -3561,7 +3571,7 @@
       "planStatusLapsed": " · Expirado",
       "planEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo.",
       "manageBilling": "Gerenciar cobrança",
-      "renamePlaceholder": "Nome da organização",
+      "renamePlaceholder": "Insira um nome para a organização",
       "renameTitle": "Renomear organização"
     },
     "inviteMember": {
@@ -4205,7 +4215,13 @@
     "providerUnavailable": "O provedor está indisponível no momento. Envie novamente em instantes."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmar esta alteração?"
+    "confirmTitle": "Confirmar esta alteração?",
+    "guarded": {
+      "spendAlertsOff": "Desativar alertas de gastos? Você deixaria de receber notificações sobre ultrapassagens de limites de gastos e picos horários.",
+      "balanceAlertsOff": "Desativar alertas de saldo? Você deixaria de receber notificações quando seus créditos estiverem acabando.",
+      "securityFindingsOff": "Desativar achados de segurança? Você deixaria de receber notificações sobre novos achados de segurança.",
+      "hideBalanceOn": "Ocultar seus saldos? Os saldos de créditos não apareceriam mais nas telas de perfil e no hub da organização."
+    }
   },
   "appActions": {
     "start": {
@@ -5133,6 +5149,7 @@
     "providersDescription": "Desative um provedor para impedir que o Kilo encaminhe solicitações para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos provedores ficam somente leitura até que o catálogo completo de modelos seja carregado. Toque em Tentar novamente acima para editá-los.",
     "providersEmpty": "Nenhum provedor corresponde a esta pesquisa.",
+    "providersNone": "Não há provedores disponíveis para esta organização.",
     "allowAllShown": "Permitir todos os exibidos",
     "denyAllShown": "Negar todos os exibidos",
     "gatewaysDescription": "O Kilo encaminha solicitações de modelos por meio do Vercel AI Gateway ou do OpenRouter. Um portal de acesso desativado faz essas solicitações falharem.",

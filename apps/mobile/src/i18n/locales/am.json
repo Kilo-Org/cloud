@@ -19,7 +19,9 @@
     "presenceStatus": "አስተናጋጆች፦ {{connection}}",
     "commandStatus": "የትዕዛዝ መድረስ፦ {{status}}",
     "delivered": "ደርሷል",
-    "expired": "ጊዜው አልፏል"
+    "expired": "ጊዜው አልፏል",
+    "recoveryGaps_one": "{{displayCount}} ክፍል ከዚህ የውይይት መዝገብ ጠፍቷል።",
+    "recoveryGaps_other": "{{displayCount}} ክፍሎች ከዚህ የውይይት መዝገብ ጠፍተዋል።"
   },
   "common": {
     "manageOnWeb": "በድር ላይ ያስተዳድሩ",
@@ -963,6 +965,8 @@
       "pendingComment": "ያልተላኩ አስተያየቶች",
       "pendingComment_other": "ያልተላኩ አስተያየቶች",
       "submitCountOfTotal": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_one": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_other": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
       "submitReview": "ግምገማውን አስገባ",
       "partialPostedFresh": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
       "partialPostedFresh_one": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
@@ -2788,7 +2792,9 @@
     "modelPicker": {
       "title": "የሞዴል ምርጫ",
       "favorites": "ተወዳጆች",
-      "noModelsDescription": "ለመምረጥ ምንም ሞዴሎች የሉም።"
+      "noModelsDescription": "ለመምረጥ ምንም ሞዴሎች የሉም።",
+      "allUnavailableTitle": "ምንም ሞዴል መጠቀም አይቻልም",
+      "allUnavailableDescription": "የአቅራቢ ቁልፍ ጨምረው እንደገና ይሞክሩ።"
     },
     "modelSelector": {
       "provider": "አቅራቢ {{id}}",
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "የድርጅቱን ስም ይቀይሩ",
-      "renamePlaceholder": "የድርጅት ስም",
+      "renamePlaceholder": "የድርጅት ስም ያስገቡ",
       "balance": "ቀሪ ሂሳብ",
       "plan": "ዕቅድ",
       "planTeams": "Teams",
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "አቅራቢው አሁን አይገኝም። በአጭር ጊዜ ውስጥ በድጋሚ ይላኩ።"
   },
   "settingsTools": {
-    "confirmTitle": "ይህን ለውጥ ያረጋግጡ?"
+    "confirmTitle": "ይህን ለውጥ ያረጋግጡ?",
+    "guarded": {
+      "spendAlertsOff": "የወጪ ማንቂያዎችን ያጥፉ? ስለ ወጪ ጣሪያ መሻገር እና ስለ በየሰዓቱ ጭማሪዎች ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "balanceAlertsOff": "የቀሪ ሂሳብ ማንቂያዎችን ያጥፉ? ክሬዲቶችዎ ሲያንሱ ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "securityFindingsOff": "የደህንነት ግኝቶችን ያጥፉ? ስለ አዳዲስ የደህንነት ግኝቶች ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "hideBalanceOn": "ቀሪ ሂሳቦችዎን ይደብቁ? የክሬዲት ቀሪ ሂሳቦች በመገለጫ ገጾች እና በድርጅት ማዕከል ላይ ከእንግዲህ አይታዩም።"
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "Kilo ለዚህ ድርጅት ወደ አንድ አቅራቢ ማዘዋወሩን እንዲያቆም አቅራቢውን ያጥፉት።",
     "providersNeedCatalog": "ሙሉው የሞዴል ካታሎግ እስኪጫን ድረስ የአቅራቢ ማብሪያ/ማጥፊያዎች ሊቀየሩ አይችሉም። እነሱን ለማርትዕ ከላይ ያለውን እንደገና ሞክር ይንኩ።",
     "providersEmpty": "ከዚህ ፍለጋ ጋር የሚዛመዱ አቅራቢዎች የሉም።",
+    "providersNone": "ለዚህ ድርጅት የሚገኙ አቅራቢዎች የሉም።",
     "allowAllShown": "የሚታዩትን ሁሉ ፍቀድ",
     "denyAllShown": "የሚታዩትን ሁሉ ከልክል",
     "gatewaysDescription": "Kilo የሞዴል ጥያቄዎችን በVercel AI Gateway ወይም በOpenRouter በኩል ያዘዋውራል። የተሰናከለ ጌትዌይ እነዚያን ጥያቄዎች ያከሽፋል።",

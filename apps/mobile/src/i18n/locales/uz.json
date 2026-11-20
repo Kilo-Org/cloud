@@ -19,7 +19,9 @@
     "presenceStatus": "Xostlar: {{connection}}",
     "commandStatus": "Buyruq yetkazilishi: {{status}}",
     "delivered": "Yetkazildi",
-    "expired": "Muddati tugagan"
+    "expired": "Muddati tugagan",
+    "recoveryGaps_one": "Ushbu transkriptning {{displayCount}} qismi yo'q.",
+    "recoveryGaps_other": "Ushbu transkriptning {{displayCount}} qismi yo'q."
   },
   "common": {
     "manageOnWeb": "Vebda boshqarish",
@@ -963,6 +965,8 @@
       "pendingComment": "yuborilmagan izoh",
       "pendingComment_other": "yuborilmagan izoh",
       "submitCountOfTotal": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
       "submitReview": "Ko‘rib chiqish natijasini yuborish",
       "partialPostedFresh": "{{displayFreshCount}} ta izoh yuborildi. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ta izoh yuborildi. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Modelni tanlash",
       "noModelsDescription": "Tanlash uchun modellar mavjud emas.",
+      "allUnavailableTitle": "Hech qanday modeldan foydalanib bo'lmaydi",
+      "allUnavailableDescription": "Provayder kalitini qo'shing, so'ng qayta urinib ko'ring.",
       "favorites": "Sevimlilar"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Tashkilot nomini o'zgartirish",
-      "renamePlaceholder": "Tashkilot nomi",
+      "renamePlaceholder": "Tashkilot nomini kiriting",
       "balance": "Balans",
       "plan": "Tarif",
       "planTeams": "Teams",
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "Xizmat koʻrsatuvchi hozir mavjud emas. Birozdan soʻng qaytadan yuboring."
   },
   "settingsTools": {
-    "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?"
+    "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?",
+    "guarded": {
+      "spendAlertsOff": "Xarajat ogohlantirishlarini o'chirasizmi? Xarajat chegarasidan o'tishlar va soatlik keskin ko'tarilishlar haqida bildirishnomalar olishni to'xtatasiz.",
+      "balanceAlertsOff": "Balans ogohlantirishlarini o'chirasizmi? Kreditlaringiz kam qolganda bildirishnomalar olishni to'xtatasiz.",
+      "securityFindingsOff": "Xavfsizlik topilmalarini o'chirasizmi? Yangi xavfsizlik topilmalari haqida bildirishnomalar olishni to'xtatasiz.",
+      "hideBalanceOn": "Balanslaringizni yashirasizmi? Kredit balanslari endi profil ekranlarida va tashkilot markazida ko'rinmaydi."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "Provayderni o'chirish orqali Kilo bu tashkilot uchun unga yo'naltirishni to'xtatadi.",
     "providersNeedCatalog": "To'liq modellar katalogi yuklanmaguncha provayder kalitlari faqat o'qish uchun bo'ladi. Ularni tahrirlash uchun yuqoridagi Qayta urinish tugmasini bosing.",
     "providersEmpty": "Bu qidiruvga mos provayder topilmadi.",
+    "providersNone": "Bu tashkilot uchun hech qanday provayder mavjud emas.",
     "allowAllShown": "Ko'rsatilganlarning barchasiga ruxsat berish",
     "denyAllShown": "Ko'rsatilganlarning barchasini taqiqlash",
     "gatewaysDescription": "Kilo model so'rovlarini Vercel AI Gateway yoki OpenRouter orqali yo'naltiradi. O'chirilgan shlyuz bu so'rovlarni muvaffaqiyatsiz qiladi.",

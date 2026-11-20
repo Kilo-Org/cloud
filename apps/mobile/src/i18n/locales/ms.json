@@ -19,7 +19,9 @@
     "presenceStatus": "Hos: {{connection}}",
     "commandStatus": "Penghantaran arahan: {{status}}",
     "delivered": "Dihantar",
-    "expired": "Tamat tempoh"
+    "expired": "Tamat tempoh",
+    "recoveryGaps_one": "{{displayCount}} bahagian transkrip ini tiada.",
+    "recoveryGaps_other": "{{displayCount}} bahagian transkrip ini tiada."
   },
   "common": {
     "manageOnWeb": "Urus di web",
@@ -963,6 +965,8 @@
       "pendingComment": "komen belum dihantar",
       "pendingComment_other": "komen belum dihantar",
       "submitCountOfTotal": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
+      "submitCountOfTotal_one": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
+      "submitCountOfTotal_other": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
       "submitReview": "Hantar semakan",
       "partialPostedFresh": "{{displayFreshCount}} komen telah disiarkan. ",
       "partialPostedFresh_one": "{{displayFreshCount}} komen telah disiarkan. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Pilih model",
       "noModelsDescription": "Tiada model tersedia untuk dipilih.",
+      "allUnavailableTitle": "Tiada model yang boleh digunakan",
+      "allUnavailableDescription": "Tambah kunci pembekal dan cuba semula.",
       "favorites": "Kegemaran"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Namakan semula organisasi",
-      "renamePlaceholder": "Nama organisasi",
+      "renamePlaceholder": "Masukkan nama organisasi",
       "balance": "Baki",
       "plan": "Pelan",
       "planTeams": "Teams",
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "Penyedia tidak tersedia buat masa ini. Hantar semula sebentar lagi."
   },
   "settingsTools": {
-    "confirmTitle": "Sahkan perubahan ini?"
+    "confirmTitle": "Sahkan perubahan ini?",
+    "guarded": {
+      "spendAlertsOff": "Matikan makluman perbelanjaan? Anda tidak lagi akan menerima pemberitahuan tentang melepasi ambang perbelanjaan dan lonjakan setiap jam.",
+      "balanceAlertsOff": "Matikan makluman baki? Anda tidak lagi akan menerima pemberitahuan apabila kredit anda hampir habis.",
+      "securityFindingsOff": "Matikan penemuan keselamatan? Anda tidak lagi akan menerima pemberitahuan tentang penemuan keselamatan baharu.",
+      "hideBalanceOn": "Sembunyikan baki anda? Baki kredit tidak lagi akan dipaparkan pada skrin profil dan hab organisasi."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "Matikan pembekal untuk menghentikan Kilo daripada menghalakan permintaan kepadanya bagi organisasi ini.",
     "providersNeedCatalog": "Suis pembekal kekal baca sahaja sehingga katalog model penuh dimuatkan. Ketik Cuba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tiada pembekal sepadan dengan carian ini.",
+    "providersNone": "Tiada pembekal tersedia untuk organisasi ini.",
     "allowAllShown": "Benarkan semua yang dipaparkan",
     "denyAllShown": "Tolak semua yang dipaparkan",
     "gatewaysDescription": "Kilo menghalakan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dimatikan menggagalkan permintaan tersebut.",

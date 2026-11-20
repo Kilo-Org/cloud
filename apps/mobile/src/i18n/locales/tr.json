@@ -19,7 +19,9 @@
     "presenceStatus": "Ana makineler: {{connection}}",
     "commandStatus": "Komut iletimi: {{status}}",
     "delivered": "İletildi",
-    "expired": "Süresi doldu"
+    "expired": "Süresi doldu",
+    "recoveryGaps_one": "Bu dökümün {{displayCount}} bölümü eksik.",
+    "recoveryGaps_other": "Bu dökümün {{displayCount}} bölümü eksik."
   },
   "common": {
     "manageOnWeb": "Web'de yönet",
@@ -2231,6 +2233,8 @@
     "modelPicker": {
       "title": "Model seçimi",
       "noModelsDescription": "Seçilebilecek model yok.",
+      "allUnavailableTitle": "Hiçbir model kullanılamıyor",
+      "allUnavailableDescription": "Bir sağlayıcı anahtarı ekle, sonra tekrar dene.",
       "favorites": "Favoriler"
     },
     "modelSelector": {
@@ -3234,6 +3238,8 @@
       "partialPostedStale_one": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "partialPostedStale_other": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_one": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_other": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
       "submitReview": "İncelemeyi gönder",
       "blockedRequestChanges": "Değişiklik istemek için bir özet veya en az bir yorum ekle.",
       "blockedComment": "İncelemeni yorum olarak göndermek için bir özet veya en az bir yorum ekle."
@@ -3443,7 +3449,7 @@
       "planStatusLapsed": " · Sona erdi",
       "planEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok.",
       "manageBilling": "Faturalandırmayı yönet",
-      "renamePlaceholder": "Kuruluş adı",
+      "renamePlaceholder": "Bir kuruluş adı girin",
       "renameTitle": "Kuruluşu yeniden adlandır"
     },
     "inviteMember": {
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "Sağlayıcı şu anda kullanılamıyor. Kısa süre sonra tekrar gönderin."
   },
   "settingsTools": {
-    "confirmTitle": "Bu değişiklik onaylansın mı?"
+    "confirmTitle": "Bu değişiklik onaylansın mı?",
+    "guarded": {
+      "spendAlertsOff": "Harcama uyarıları kapatılsın mı? Harcama eşiği aşımları ve saatlik ani artışlar hakkında bildirim almayı bırakırsınız.",
+      "balanceAlertsOff": "Bakiye uyarıları kapatılsın mı? Kredileriniz azaldığında bildirim almayı bırakırsınız.",
+      "securityFindingsOff": "Güvenlik bulguları kapatılsın mı? Yeni güvenlik bulguları hakkında bildirim almayı bırakırsınız.",
+      "hideBalanceOn": "Bakiyeleriniz gizlensin mi? Kredi bakiyeleri artık profil ekranlarında ve kuruluş merkezinde görünmeyecek."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "Kilo'nun bu kuruluş için o sağlayıcıya yönlendirme yapmasını durdurmak üzere bir sağlayıcıyı kapatın.",
     "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
     "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",
+    "providersNone": "Bu kuruluş için kullanılabilir sağlayıcı yok.",
     "allowAllShown": "Gösterilenlerin tümüne izin ver",
     "denyAllShown": "Gösterilenlerin tümünü reddet",
     "gatewaysDescription": "Kilo, model isteklerini Vercel AI Gateway veya OpenRouter üzerinden yönlendirir. Devre dışı bırakılan bir ağ geçidi bu istekleri başarısız kılar.",

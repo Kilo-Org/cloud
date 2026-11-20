@@ -19,7 +19,9 @@
     "presenceStatus": "Хостови: {{connection}}",
     "commandStatus": "Испорака на командата: {{status}}",
     "delivered": "Испорачано",
-    "expired": "Истечено"
+    "expired": "Истечено",
+    "recoveryGaps_one": "Недостасува {{displayCount}} дел од овој транскрипт.",
+    "recoveryGaps_other": "Недостасуваат {{displayCount}} делови од овој транскрипт."
   },
   "common": {
     "manageOnWeb": "Управувај на веб",
@@ -963,6 +965,8 @@
       "pendingComment": "неиспратени коментари",
       "pendingComment_other": "неиспратени коментари",
       "submitCountOfTotal": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
+      "submitCountOfTotal_one": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
+      "submitCountOfTotal_other": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
       "submitReview": "Испрати преглед",
       "partialPostedFresh": "Објавени коментари: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Објавени коментари: {{displayFreshCount}}. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Избор на модел",
       "noModelsDescription": "Нема достапни модели за избор.",
+      "allUnavailableTitle": "Ниту еден модел не може да се користи",
+      "allUnavailableDescription": "Додај клуч за давател и обиди се повторно.",
       "favorites": "Омилени"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Преименувај организација",
-      "renamePlaceholder": "Име на организацијата",
+      "renamePlaceholder": "Внесете име на организацијата",
       "balance": "Состојба",
       "plan": "План",
       "planTeams": "Teams",
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "Давателот е недостапен во моментов. Испратете повторно наскоро."
   },
   "settingsTools": {
-    "confirmTitle": "Да се потврди оваа промена?"
+    "confirmTitle": "Да се потврди оваа промена?",
+    "guarded": {
+      "spendAlertsOff": "Да се исклучат предупредувањата за трошење? Ќе престанете да добивате известувања за преминување на праговите на трошење и часовни пикови.",
+      "balanceAlertsOff": "Да се исклучат предупредувањата за салдо? Ќе престанете да добивате известувања кога ќе ви останат малку кредити.",
+      "securityFindingsOff": "Да се исклучат безбедносните наоди? Ќе престанете да добивате известувања за нови безбедносни наоди.",
+      "hideBalanceOn": "Да го скриете салдото? Салдата на кредити повеќе нема да се прикажуваат на екраните на профилот и во организацискиот центар."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "Исклучете добавувач за да спречите Kilo да насочува кон него за оваа организација.",
     "providersNeedCatalog": "Прекинувачите за добавувачи остануваат само за читање додека не се вчита целиот каталог на модели. Допрете Обиди се повторно погоре за да ги уредите.",
     "providersEmpty": "Нема добавувачи што одговараат на ова пребарување.",
+    "providersNone": "Нема достапни добавувачи за оваа организација.",
     "allowAllShown": "Дозволи ги сите прикажани",
     "denyAllShown": "Забрани ги сите прикажани",
     "gatewaysDescription": "Kilo ги насочува барањата за моделите преку Vercel AI Gateway или OpenRouter. Исклучен портал ги отфрла тие барања.",

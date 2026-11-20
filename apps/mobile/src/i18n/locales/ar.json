@@ -7,7 +7,7 @@
     "directory": "دليل العمل",
     "createSession": "إنشاء جلسة ببروتوكول CLI الأصلي",
     "queueIfOffline": "إضافة المطالبة إلى قائمة الانتظار إذا كان المضيف غير متصل",
-    "prompt": "مطالبة أو /command",
+    "prompt": "مطالبة أو \u2066/command\u2069",
     "localClear": "مسح العرض المحلي",
     "abort": "إيقاف الدور",
     "failed": "فشل إجراء التحكم عن بُعد ببروتوكول CLI الأصلي",
@@ -19,7 +19,13 @@
     "presenceStatus": "المضيفون: {{connection}}",
     "commandStatus": "تسليم الأمر: {{status}}",
     "delivered": "تم التسليم",
-    "expired": "انتهت الصلاحية"
+    "expired": "انتهت الصلاحية",
+    "recoveryGaps_zero": "لا توجد أجزاء مفقودة من هذا السجل.",
+    "recoveryGaps_one": "الجزء {{displayCount}} من هذا السجل مفقود.",
+    "recoveryGaps_two": "جزآن من هذا السجل مفقودان.",
+    "recoveryGaps_few": "{{displayCount}} أجزاء من هذا السجل مفقودة.",
+    "recoveryGaps_many": "{{displayCount}} جزءًا من هذا السجل مفقود.",
+    "recoveryGaps_other": "{{displayCount}} جزء من هذا السجل مفقود."
   },
   "common": {
     "manageOnWeb": "الإدارة عبر الويب",
@@ -2335,7 +2341,9 @@
     "modelPicker": {
       "title": "اختيار النموذج",
       "favorites": "المفضلة",
-      "noModelsDescription": "لا توجد نماذج متاحة للاختيار."
+      "noModelsDescription": "لا توجد نماذج متاحة للاختيار.",
+      "allUnavailableTitle": "لا يمكن استخدام أي نموذج",
+      "allUnavailableDescription": "أضف مفتاح مزوّد، ثم أعد المحاولة."
     },
     "modelSelector": {
       "provider": "المزود {{id}}",
@@ -3458,6 +3466,12 @@
       "partialPostedStale_many": "بقيت في قائمة الانتظار تعليقات مرتبطة بإيداع أقدم، وعددها {{displayStaleCount}}.",
       "partialPostedStale_other": "بقيت في قائمة الانتظار تعليقات مرتبطة بإيداع أقدم، وعددها {{displayStaleCount}}.",
       "submitCountOfTotal": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_zero": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_one": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_two": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_few": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_many": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_other": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
       "submitReview": "إرسال المراجعة",
       "pendingComment_zero": "تعليق معلّق",
       "pendingComment_two": "تعليقان معلّقان",
@@ -3679,7 +3693,7 @@
       "planStatusLapsed": " · منتهية",
       "planEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة.",
       "manageBilling": "إدارة الفوترة",
-      "renamePlaceholder": "اسم المؤسسة",
+      "renamePlaceholder": "أدخل اسم المؤسسة",
       "renameTitle": "إعادة تسمية المؤسسة"
     },
     "inviteMember": {
@@ -4329,7 +4343,13 @@
     "providerUnavailable": "المزوّد غير متاح الآن. أعد الإرسال بعد قليل."
   },
   "settingsTools": {
-    "confirmTitle": "تأكيد هذا التغيير؟"
+    "confirmTitle": "تأكيد هذا التغيير؟",
+    "guarded": {
+      "spendAlertsOff": "هل تريد إيقاف تنبيهات الإنفاق؟ لن تصلك إشعارات عند تجاوز حدود الإنفاق أو الارتفاعات الساعية.",
+      "balanceAlertsOff": "هل تريد إيقاف تنبيهات الرصيد؟ لن تصلك إشعارات عند انخفاض رصيدك.",
+      "securityFindingsOff": "هل تريد إيقاف النتائج الأمنية؟ لن تصلك إشعارات حول النتائج الأمنية الجديدة.",
+      "hideBalanceOn": "هل تريد إخفاء أرصدتك؟ لن تظهر أرصدة الاعتمادات بعد الآن على شاشات الملف الشخصي ومركز المؤسسة."
+    }
   },
   "appActions": {
     "start": {
@@ -5285,6 +5305,7 @@
     "providersDescription": "عطّل مزوّدًا ليتوقف Kilo عن توجيه الطلبات إليه في هذه المؤسسة.",
     "providersNeedCatalog": "تبقى مفاتيح المزوّدين للقراءة فقط حتى يكتمل تحميل كتالوج النماذج بالكامل. اضغط على إعادة المحاولة في الأعلى لتعديلها.",
     "providersEmpty": "لا يوجد مزوّدون يطابقون هذا البحث.",
+    "providersNone": "لا يوجد أي مزوّد متاح لهذه المؤسسة.",
     "allowAllShown": "السماح بكل المعروض",
     "denyAllShown": "رفض كل المعروض",
     "gatewaysDescription": "يوجّه Kilo طلبات النماذج عبر Vercel AI Gateway أو OpenRouter. تفشل هذه الطلبات إذا كانت البوابة معطّلة.",

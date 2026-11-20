@@ -1735,18 +1735,9 @@ export type OrganizationGroupAgentPermissionsPolicy = {
   };
 };
 
-export type OrganizationGroupClientAccessPolicy = {
-  type: 'client_access';
-  data: { schema_version: 1 } & (
-    | { mode: 'allowlist'; clients: { feature: string; min_version?: string }[] }
-    | { mode: 'blocklist'; clients: { feature: string }[] }
-  );
-};
-
 export type OrganizationGroupPolicy =
   | OrganizationGroupModelAccessPolicy
-  | OrganizationGroupAgentPermissionsPolicy
-  | OrganizationGroupClientAccessPolicy;
+  | OrganizationGroupAgentPermissionsPolicy;
 export type OrganizationGroupPolicyType = OrganizationGroupPolicy['type'];
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
 

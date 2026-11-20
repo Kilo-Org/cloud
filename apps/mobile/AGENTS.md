@@ -16,15 +16,16 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Commands
 
-Run from `apps/mobile/`: `pnpm typecheck`, `pnpm lint`, `pnpm format` (or `format:check`), `pnpm check:unused`, `pnpm test`.
+Run from `apps/mobile/`: `pnpm typecheck`, `pnpm lint`, `pnpm format` (or `format:check`), `pnpm check:unused`, `pnpm assert:config`, `pnpm test`.
 
 Before pushing:
 
 ```bash
-pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused
+pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused && pnpm assert:config
 git diff --check
 ```
 
+- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `pnpm test` runs it too.
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
@@ -98,6 +99,15 @@ above another native sheet, and a dialog rendered through `@rn-primitives/portal
 tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a portal card. A `DialogCard`
 is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
 needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
+
+A toast raised while a native sheet is open must be visible over it, and must not cover the sheet's actions.
+On iOS the root Toaster's `FullWindowOverlay` already draws above every presented sheet. On Android the
+app's one Toaster (`AppToaster`) renders into the top open sheet's toast host instead of the main tree the
+sheet covers: `Sheet` and every focused presented route (a `formSheet` or `modal` scene, through the shared
+scene layout) wrap their content in `SheetToastScope` (`@/components/sheet-toast-host`). Inside a sheet the
+toast is compact (its text capped at 1.4x the font scale) and starts below the sheet's `SheetHeader` and the
+status bar, read from both views' window rects, so the header's actions stay above it and the bottom actions
+of a short sheet stay clear below it; call sites keep calling `toast.error`.
 
 Markdown images reach `react-native-enriched-markdown` only from HTTPS hosts the reader trusted or confirmed;
 `markdown-image-gate` rewrites every other image into a "Load" link before the native view can fetch it.
@@ -356,7 +366,7 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
-- The gate disables LogBox's UI in the app runtime at every readiness wait, through each module that exposes `setDisabled`, so a warning toast does not paint over a capture. It never wraps `console.*`: the app already has wrappers there, and a replacement breaks them. A React "state update on a component that hasn't mounted yet" toast painted over a screen anyway is a `dev-overlay` warning, not a screen defect: it means disabling failed in that runtime, an environment problem the run log names. Dev warnings are not graded by the gate — developers see them in Metro and LogBox in normal use.
+- The gate disables LogBox's UI in the app runtime at every readiness wait, through each module that exposes `setDisabled`, so a toast does not paint over a capture. It never wraps `console.*`: the app already has wrappers there, and a replacement breaks them. A toast painted over a screen anyway is a `dev-overlay` finding at the level LogBox painted: an error-level one fails the run and has to be cleared before the screen is judged, a warning-level one is reported without failing the run, and when the dump carries no level chrome the toast's message text classifies it. React logs "state update on a component that hasn't mounted yet" through `console.error`, so LogBox paints that toast at error level and the run fails until the toast is cleared; the run log names the runtime whose disable pass failed.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
 - For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.

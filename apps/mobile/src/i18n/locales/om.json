@@ -19,7 +19,9 @@
     "presenceStatus": "Hoostota: {{connection}}",
     "commandStatus": "Ergaa ajajaa: {{status}}",
     "delivered": "Ga'eera",
-    "expired": "Yeroon isaa darbeera"
+    "expired": "Yeroon isaa darbeera",
+    "recoveryGaps_one": "{{displayCount}} kutaa barreeffama kanaa hin argamne.",
+    "recoveryGaps_other": "{{displayCount}} kutaan barreeffama kanaa hin argamne."
   },
   "common": {
     "manageOnWeb": "Weebii irratti bulchi",
@@ -963,6 +965,8 @@
       "pendingComment": "yaadota erguu eeggatan",
       "pendingComment_other": "yaadota erguu eeggatan",
       "submitCountOfTotal": "Yaadota {{displayTotalCount}} keessaa {{displayFreshCount}} dhiheessi",
+      "submitCountOfTotal_one": "Yaadota {{displayTotalCount}} keessaa {{displayFreshCount}} dhiheessi",
+      "submitCountOfTotal_other": "Yaadota {{displayTotalCount}} keessaa {{displayFreshCount}} dhiheessi",
       "submitReview": "Sakatta'a ergi",
       "partialPostedFresh": "Yaadonni {{displayFreshCount}} maxxanfamaniiru. ",
       "partialPostedFresh_one": "Yaadonni {{displayFreshCount}} maxxanfamaniiru. ",
@@ -2788,7 +2792,9 @@
     "modelPicker": {
       "title": "Moodela filadhu",
       "favorites": "Kan jaallatte",
-      "noModelsDescription": "Moodeloonni filatamuu danda'an hin jiran."
+      "noModelsDescription": "Moodeloonni filatamuu danda'an hin jiran.",
+      "allUnavailableTitle": "Moodeelli tokkollee fayyadamuu hin danda'u",
+      "allUnavailableDescription": "Furtuu dhiyeessaa dabaliitii deebi'ii yaali."
     },
     "modelSelector": {
       "provider": "Dhiyeessaa {{id}}",
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Maqaa dhaabbataa jijjiiri",
-      "renamePlaceholder": "Maqaa dhaabbataa",
+      "renamePlaceholder": "Maqaa dhaabbataa galchi",
       "balance": "Haftee",
       "plan": "Karoora",
       "planTeams": "Teams",
@@ -4081,7 +4087,13 @@
     "providerUnavailable": "Dhiyeessaan amma argamuu hin danda'u. Yeroo gabaabaa keessatti irra deebi'ii ergi."
   },
   "settingsTools": {
-    "confirmTitle": "Jijjiirama kana mirkaneessuu?"
+    "confirmTitle": "Jijjiirama kana mirkaneessuu?",
+    "guarded": {
+      "spendAlertsOff": "Akeekkii baasii dhaabuu barbaadda? Waa'ee daangaa baasii darbuu fi ol-ka'ii sa'aatii beeksisa argachuu ni dhiifta.",
+      "balanceAlertsOff": "Akeekkii hafeena dhaabuu barbaadda? Kireediitiin kee yeroo xiqqaatu beeksisa argachuu ni dhiifta.",
+      "securityFindingsOff": "Argannoowwan nageenyaa dhaabuu barbaadda? Waa'ee argannoowwan nageenyaa haaraa beeksisa argachuu ni dhiifta.",
+      "hideBalanceOn": "Hafeena kee dhoksuu barbaadda? Hafeenni kireeditii ammas fuulota piroofaayilii fi giddugala dhaabbataa irratti hin mul'atu."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4993,7 @@
     "providersDescription": "Dhiyeessaa dhaabi dhaabbata kanaaf Kilo gara isaa akka hin geessineef.",
     "providersNeedCatalog": "Furtuuwwan dhiyeessaa hanga kaataalogiin moodeelaa guutuun fe'amutti dubbisuuf qofa ta'anii turu. Isaan gulaaluuf Irra deebi'ii yaali armaan olii tuqi.",
     "providersEmpty": "Dhiyeessaan barbaacha kanaaf hin jiru.",
+    "providersNone": "Dhiyeessaan dhaabbata kanaaf hin argamu.",
     "allowAllShown": "Kan mul'atan hunda hayyami",
     "denyAllShown": "Kan mul'atan hunda dhorki",
     "gatewaysDescription": "Kilo gaaffiiwwan moodelaa Vercel AI Gateway yookaan OpenRouter keessa geessa. Kallattiin cufame gaaffiiwwan sana ni kasaasa.",

@@ -39,6 +39,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { getCodeReviewStatusIcon } from './code-review-status-icons';
+import { getManualJobUrlError } from './manual-job-url-error';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -82,9 +83,9 @@ import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-rea
 import {
   CODE_REVIEW_STATUS_LABELS,
   MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+  canRetriggerReview,
   hasInFlightReview,
   isCancellableReviewStatus,
-  isRetriggerableReviewStatus,
   type CodeReviewStatus,
 } from '@kilocode/app-shared/code-review';
 
@@ -102,50 +103,6 @@ type CodeReviewJobsCardProps = {
 
 const PAGE_SIZE = 10;
 const DEFAULT_THINKING_EFFORT_VALUE = '__default__';
-
-function getManualJobUrlError(
-  value: string,
-  platform: Platform,
-  localCodeReviewDevelopmentEnabled: boolean
-): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return platform === 'gitlab'
-      ? 'Enter a GitLab merge request URL.'
-      : 'Enter a GitHub pull request URL.';
-  }
-
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(trimmed);
-  } catch {
-    return 'Enter a valid URL.';
-  }
-
-  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-    return 'URL must use http or https.';
-  }
-
-  if (platform === 'github') {
-    const isGitHubPullRequest =
-      parsedUrl.hostname === 'github.com' &&
-      /^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/\d+\/?$/.test(parsedUrl.pathname);
-    return isGitHubPullRequest
-      ? null
-      : 'Enter a GitHub pull request URL like https://github.com/owner/repo/pull/123.';
-  }
-
-  const isGitLabMergeRequest = /\/-\/merge_requests\/\d+\/?$/.test(parsedUrl.pathname);
-  if (!isGitLabMergeRequest) {
-    return 'Enter a GitLab merge request URL like https://gitlab.com/group/project/-/merge_requests/123.';
-  }
-
-  if (localCodeReviewDevelopmentEnabled && parsedUrl.hostname !== 'gitlab.com') {
-    return 'Local GitLab jobs require a public gitlab.com merge request URL.';
-  }
-
-  return null;
-}
 
 function selectInitialManualJobModel(params: {
   configuredModelSlug?: string | null;
@@ -1005,8 +962,8 @@ export function CodeReviewJobsCard({
                           </Button>
                         )}
 
-                        {/* Retry Button for failed/cancelled/interrupted reviews */}
-                        {isRetriggerableReviewStatus(review.status) &&
+                        {/* Retry Button for failed/cancelled/interrupted reviews, except one a newer commit replaced */}
+                        {canRetriggerReview(review) &&
                           actionRequiredCopy &&
                           actionRequiredRecoveryHref && (
                             <Button variant="outline" size="sm" asChild className="gap-2">
@@ -1023,7 +980,7 @@ export function CodeReviewJobsCard({
                               )}
                             </Button>
                           )}
-                        {isRetriggerableReviewStatus(review.status) && !actionRequiredReason && (
+                        {canRetriggerReview(review) && !actionRequiredReason && (
                           <Button
                             variant="outline"
                             size="sm"

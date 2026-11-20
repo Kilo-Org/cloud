@@ -184,7 +184,9 @@
     "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
     "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
     "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy.",
-    "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray."
+    "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray.",
+    "organizationTrialEndedBillingAtKiloAi": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ao amin'ny kilo.ai ianao, ary hanandrana indray.",
+    "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "Tsy tafiditra ny hevitra fanampiny.",
       "retryLoadingMore": "Andramo ampidirina indray ny hevitra fanampiny",
       "loadMoreComments": "Ampidiro ny hevitra fanampiny",
+      "conversationTruncated": "Ny fanehoan-kevitra {{displayCount}} voalohany ihany no aseho.",
+      "conversationTruncated_one": "Ny fanehoan-kevitra {{displayCount}} voalohany ihany no aseho.",
+      "conversationTruncated_other": "Ny fanehoan-kevitra {{displayCount}} voalohany ihany no aseho.",
       "addReaction": "Ampio fanehoan-kevitra",
       "reactionPill": "fanehoan-kevitra {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "fanehoan-kevitra",
@@ -882,7 +887,6 @@
       "noAccess": "Tsy manana alalana hijery ny fanamarinana ho an'ity tahirin-kaody ity ianao.",
       "couldNotLoad": "Tsy tafiditra ny fanamarinana.",
       "retryChecks": "Andramo indray ny fanamarinana",
-      "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR",
       "noChecksReported": "Tsy misy fanamarinana notaterina",
       "passed": "{{displayCount}} nahomby",
       "passed_one": "{{displayCount}} nahomby",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Araho ny REVIEW.md",
     "followReviewMdSubtitle": "Araho ny torolalana ao amin'ny rakitra REVIEW.md isaky ny tahirin-kaody",
     "bitbucket": {
-      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
       "notConnectedReadOnlyPlan": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana, ka tsy maintsy manavao ny faktiora ao amin'ny kilo.ai ny tompony."
     },
     "bitbucketConnect": {
@@ -1402,7 +1405,7 @@
       "managedOnWebRepositories": "Safidio ny fitahirizana kaody ho an'ny {{organization}} amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
       "descriptionReconnect": "Mamoròna mari-pidirana vaovao ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
-      "descriptionOverview": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho amin'ny efijery manaraka.",
+      "descriptionOverview": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ary apetaho amin'ny efijery manaraka.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
       "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana",
       "tokenRefused": "Tsy nanaiky io mari-pidirana ho an'ny sehatra fiasana io i Bitbucket. Hamarinio fa manana ny alalana etsy ambony izy, dia andramo indray."

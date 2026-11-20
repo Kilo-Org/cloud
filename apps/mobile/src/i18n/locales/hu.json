@@ -184,7 +184,9 @@
     "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
     "privateRepositoryA11y": "{{name}}, magán adattár",
     "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el.",
-    "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra."
+    "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra.",
+    "organizationTrialEndedBillingAtKiloAi": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
+    "viewOnGitHub": "PR megtekintése a GitHubon"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -749,6 +751,9 @@
       "comment_one": "1 hozzászólás",
       "comment": "{{displayCount}} hozzászólás",
       "comment_other": "{{displayCount}} hozzászólás",
+      "conversationTruncated": "Csak az első {{displayCount}} hozzászólás látható.",
+      "conversationTruncated_one": "Csak az első {{displayCount}} hozzászólás látható.",
+      "conversationTruncated_other": "Csak az első {{displayCount}} hozzászólás látható.",
       "startedRelative": " · kezdődött: {{relative}}",
       "couldNotLoadMore": "Nem sikerült betölteni a további hozzászólásokat.",
       "retryLoadingMore": "További hozzászólások betöltésének megismétlése",
@@ -882,7 +887,6 @@
       "noAccess": "Nincs hozzáférésed a tároló ellenőrzéseihez.",
       "couldNotLoad": "Nem sikerült betölteni az ellenőrzéseket.",
       "retryChecks": "Ellenőrzések betöltésének megismétlése",
-      "viewOnGitHub": "PR megtekintése a GitHubon",
       "noChecksReported": "Még nincs ellenőrzési eredmény",
       "passed": "{{displayCount}} sikeres",
       "passed_one": "{{displayCount}} sikeres",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "Az adattárankénti REVIEW.md utasításfájlok követése",
     "bitbucket": {
-      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "notConnectedReadOnlyPlan": "A szervezet próbaidőszaka lejárt, ezért a tulajdonosnak frissítenie kell a számlázást a kilo.ai oldalon."
     },
     "bitbucketConnect": {
@@ -1402,7 +1405,7 @@
       "managedOnWebRepositories": "Válassza ki {{organization}} tárolóit a weben, számítógépről.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
-      "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, majd illeszd be a következő képernyőn.",
+      "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez, majd illeszd be a következő képernyőn.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
       "tokenPlaceholder": "Munkaterület-hozzáférési token",
       "tokenRefused": "A Bitbucket nem fogadta el ezt a munkaterület-hozzáférési tokent. Ellenőrizd, hogy rendelkezik-e a fenti jogosultságokkal, majd próbáld újra."

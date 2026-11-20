@@ -184,7 +184,9 @@
     "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
     "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe",
     "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee.",
-    "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ."
+    "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ.",
+    "organizationTrialEndedBillingAtKiloAi": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
+    "viewOnGitHub": "Lelee PR na GitHub"
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -749,6 +751,9 @@
       "comment_one": "okwu 1",
       "comment": "okwu {{displayCount}}",
       "comment_other": "okwu {{displayCount}}",
+      "conversationTruncated": "A na-egosi naanị okwu {{displayCount}} mbụ.",
+      "conversationTruncated_other": "A na-egosi naanị okwu {{displayCount}} mbụ.",
+      "conversationTruncated_one": "A na-egosi naanị okwu {{displayCount}} mbụ.",
       "startedRelative": " · malitere {{relative}}",
       "couldNotLoadMore": "Enweghị ike ibudata okwu ndị ọzọ.",
       "retryLoadingMore": "Nwaa ọzọ ibudata okwu ndị ọzọ",
@@ -882,7 +887,6 @@
       "noAccess": "Ị nweghị ikike ilele nnwale maka ebe nchekwa a.",
       "couldNotLoad": "Enweghị ike ibudata nnwale.",
       "retryChecks": "Nwaa nnwale ọzọ",
-      "viewOnGitHub": "Lelee PR na GitHub",
       "noChecksReported": "Enweghị nnwale akọọrọ",
       "passed": "{{displayCount}} gafere",
       "passed_one": "{{displayCount}} gafere",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Soro REVIEW.md",
     "followReviewMdSubtitle": "Soro ntụziaka faịlụ REVIEW.md dị n'ebe nchekwa ọ bụla",
     "bitbucket": {
-      "notConnectedReadOnly": "E jikọghị Bitbucket. Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
       "notConnectedReadOnlyPlan": "Oge nnwale nke òtù ahụ agwụla, ya mere onye nwe òtù ga-emelite nhazi ụgwọ na kilo.ai."
     },
     "bitbucketConnect": {
@@ -1402,7 +1405,7 @@
       "managedOnWebRepositories": "Họrọ ebe nchekwa maka {{organization}} na weebụ site na kọmputa.",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
       "descriptionReconnect": "Mepụta akara ikike ọhụrụ ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
-      "descriptionOverview": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya na ihuenyo na-esote.",
+      "descriptionOverview": "Mepụta akara ikike ịnweta oghere ọrụ, wee mado ya na ihuenyo na-esote.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ ijikọ koodu: ịgụ · Njikọ ngosi: ịgụ/ide",
       "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
       "tokenRefused": "Bitbucket anabataghị akara ikike ịnweta oghere ọrụ a. Lelee na o nwere ikike ndị dị n'elu, wee gbalịa ọzọ."

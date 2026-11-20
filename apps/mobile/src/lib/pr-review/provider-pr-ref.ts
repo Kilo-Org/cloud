@@ -25,8 +25,10 @@ import {
   type ProviderReviewCapabilities,
 } from '@kilocode/app-shared/provider-review';
 import { type Href } from 'expo-router';
+import { type TFunction } from 'i18next';
 import { createContext, createElement, type ReactNode, useContext, useMemo } from 'react';
 
+import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { isGitLabPathSegment, splitHttpUrl } from '@/lib/pr-review/provider-pr-url';
 import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
@@ -54,6 +56,17 @@ export function providerPrTermKey(
   return providerPrTerm(platform) === 'merge request'
     ? 'prReview.terms.mergeRequest'
     : 'prReview.terms.pullRequest';
+}
+
+/**
+ * The `View PR on <provider>` label for a link that opens the change on the
+ * provider's own site: GitHub keeps its own string, every other provider
+ * names itself.
+ */
+export function providerViewOnLabel(t: TFunction, platform: ProviderPrPlatform): string {
+  return platform === 'github'
+    ? t('common.viewOnGitHub')
+    : t('prReview.terms.viewOnProvider', { provider: reviewerPlatformLabel(platform) });
 }
 
 /** The number a provider gives this change: a PR number, an MR iid, a PR id. */

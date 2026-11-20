@@ -145,6 +145,7 @@
     "online": "Ku-inthanethi",
     "open": "Vula {{name}}",
     "openPullRequest": "Vula i-PR",
+    "viewOnGitHub": "Buka i-PR ku-GitHub",
     "completed": "Kuqediwe",
     "pending": "Kulindile",
     "running": "Kuyasebenza",
@@ -184,7 +185,8 @@
     "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi.",
     "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo",
     "legalDocumentEnglishOnly": "Leli dokhumenti litholakala ngesiNgisi kuphela.",
-    "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi."
+    "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi.",
+    "organizationTrialEndedBillingAtKiloAi": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela ku-kilo.ai, bese uzama futhi."
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "Asikwazanga ukulayisha amanye amazwana.",
       "retryLoadingMore": "Zama futhi ukulayisha amanye amazwana",
       "loadMoreComments": "Layisha amanye amazwana",
+      "conversationTruncated": "Kuboniswa kuphela amazwana okuqala angu-{{displayCount}}.",
+      "conversationTruncated_one": "Kuboniswa kuphela amazwana okuqala angu-{{displayCount}}.",
+      "conversationTruncated_other": "Kuboniswa kuphela amazwana okuqala angu-{{displayCount}}.",
       "addReaction": "Engeza ukusabela",
       "reactionPill": "ukusabela okuthi {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "ukusabela",
@@ -882,7 +887,6 @@
       "noAccess": "Awunayo imvume yokubuka izihlolo zale nqolobane yekhodi.",
       "couldNotLoad": "Asikwazanga ukulayisha izihlolo.",
       "retryChecks": "Zama izihlolo futhi",
-      "viewOnGitHub": "Buka i-PR ku-GitHub",
       "noChecksReported": "Azikho izihlolo ezibikiwe",
       "passed": "{{displayCount}} ziphumelele",
       "passed_one": "{{displayCount}} ziphumelele",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Landela i-REVIEW.md",
     "followReviewMdSubtitle": "Landela imiyalo yamafayela e-REVIEW.md enqolobaneni ngayinye yekhodi",
     "bitbucket": {
-      "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
       "notConnectedReadOnlyPlan": "Isilingo senhlangano siphelile, ngakho umnikazi kufanele abuyekeze ukukhokhela ku-kilo.ai."
     },
     "bitbucketConnect": {
@@ -1402,7 +1405,7 @@
       "managedOnWebRepositories": "Khetha amarekhodi ka-{{organization}} kuwebhu ngekhompyutha.",
       "description": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "descriptionReconnect": "Dala ithokheni entsha yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
-      "descriptionOverview": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela esikrinini esilandelayo.",
+      "descriptionOverview": "Dala ithokheni yokufinyelela endaweni yokusebenza, bese uyinamathisela esikrinini esilandelayo.",
       "scopes": "I-akhawunti: ukufunda · Izinqolobane zekhodi: ukufunda/ukubhala · Izicelo zokuhlanganisa ikhodi: ukufunda · Ama-webhook: ukufunda/ukubhala",
       "tokenPlaceholder": "Ithokheni yokufinyelela endaweni yokusebenza",
       "tokenRefused": "I-Bitbucket ayikwamukelanga le thokheni yokufinyelela endaweni yokusebenza. Hlola ukuthi inazo izimvume ezingenhla, bese uzama futhi."

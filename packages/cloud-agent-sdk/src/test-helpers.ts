@@ -74,6 +74,18 @@ function makeSnapshot(
   return { info: stubSessionInfo(info), messages };
 }
 
+/** ES2022-safe deferred: this package's `lib` target predates `Promise.withResolvers`. */
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>(res => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 export {
   createTestSession,
   kiloId,
@@ -82,4 +94,5 @@ export {
   stubUserMessage,
   stubTextPart,
   makeSnapshot,
+  deferred,
 };

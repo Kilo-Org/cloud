@@ -184,7 +184,9 @@
     "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي.",
     "privateRepositoryA11y": "{{name}}، شخصي زېرمتون",
     "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی.",
-    "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ."
+    "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
+    "organizationTrialEndedBillingAtKiloAi": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ په kilo.ai کې بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
+    "viewOnGitHub": "PR په GitHub کې وګورئ"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "نورې تبصرې بار نه شوې.",
       "retryLoadingMore": "د نورو تبصرو د بارولو بیا هڅه وکړئ",
       "loadMoreComments": "نورې تبصرې بار کړئ",
+      "conversationTruncated": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
+      "conversationTruncated_one": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
+      "conversationTruncated_other": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
       "addReaction": "غبرګون ورزیات کړئ",
       "reactionPill": "{{emoji}} غبرګون، {{displayCount}} {{countLabel}}",
       "reaction_one": "غبرګون",
@@ -882,7 +887,6 @@
       "noAccess": "تاسو د دې زېرمتون ازموینو ته لاسرسی نه لرئ.",
       "couldNotLoad": "ازموینې بار نه شوې.",
       "retryChecks": "ازموینې بیا هڅه کړئ",
-      "viewOnGitHub": "PR په GitHub کې وګورئ",
       "noChecksReported": "د هېڅ ازموینې راپور نشته",
       "passed": "{{displayCount}} بریالۍ",
       "passed_one": "{{displayCount}} بریالۍ",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "د REVIEW.md لارښوونې تعقیب کړئ",
     "followReviewMdSubtitle": "د هر زېرمتون د REVIEW.md فایل لارښوونې تعقیب کړئ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "notConnectedReadOnlyPlan": "د سازمان آزموینه پای ته رسېدلې ده، نو مالک باید په ⁨kilo.ai⁩ کې بیلینګ تازه کړي."
     },
     "bitbucketConnect": {
@@ -1402,7 +1405,7 @@
       "managedOnWebRepositories": "له کمپیوټر څخه په وېب کې د {{organization}} لپاره مخزنونه وټاکئ.",
       "description": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
       "descriptionReconnect": "د کاري چاپېریال د لاسرسي یو نوی ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
-      "descriptionOverview": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او بیا یې په راتلونکې پاڼه کې پیسټ کړئ.",
+      "descriptionOverview": "د کاري چاپېریال د لاسرسي ټوکن جوړ کړئ او بیا یې په راتلونکې پاڼه کې پیسټ کړئ.",
       "scopes": "حساب: لوستل · زېرمتونونه: لوستل/لیکل · PR: لوستل · وېب هوکونه: لوستل/لیکل",
       "tokenPlaceholder": "د کاري چاپېریال د لاسرسي ټوکن",
       "tokenRefused": "Bitbucket دا د کاري چاپېریال د لاسرسي ټوکن ونه منل. وګورئ چې پورتنۍ اجازې لري، بیاځلي هڅه وکړئ."

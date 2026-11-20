@@ -6,6 +6,12 @@
     "src/lib/chat/remote-mcp-pkce.ts"
   ],
   "project": ["src/**/*.{ts,tsx}"],
+  // The name tables are generated and read through `require`, which knip cannot
+  // follow, so every one of their exports reads as unused. One generator run
+  // rewrites the whole directory; see scripts/generate-language-search-names.mjs.
+  "ignoreIssues": {
+    "src/i18n/language-search-name-tables/*.ts": ["exports", "files"]
+  },
   "ignoreDependencies": [
     "@expo/plist",
     "expo-updates",

@@ -6,6 +6,7 @@ import {
   CLASSIFIER_WINNER_KV_KEY,
   routingTableKvKey,
   AUTO_ROUTERS,
+  BenchmarkRunPurposeSchema,
   type AutoRouter,
   type BenchmarkIdentity,
   BenchmarkIdentityError,
@@ -43,6 +44,7 @@ import {
   releaseDeciderGrading,
   getLatestSummariesByModel,
   getLiveContainerLanes,
+  getQueueRunOccupancy,
   getRunningRun,
   getRunWithModels,
   getLatestRoutingTable,
@@ -389,9 +391,9 @@ export type StartedQueueRun = {
 };
 
 /**
- * Drain the selected registry queues. 'both' starts at most one run per queue —
- * they hold independent slots and share the container budget. Drain failures
- * are logged per queue, never thrown, so one wedged queue cannot block the other.
+ * Drain the selected registry queues. Each drain starts at most one run; a queue
+ * may hold several active runs. Drain failures are logged per queue, never
+ * thrown, so one wedged queue cannot block the other.
  */
 export async function drainQueues(
   env: Env,
@@ -704,8 +706,8 @@ export function buildClassifierMessages(
   );
 }
 
-// Thrown when a run of the same kind is already active. The admin route maps
-// it to HTTP 409 so automated callers can distinguish it from a 5xx fault.
+// Thrown when a classifier run is already active. The admin route maps it to
+// HTTP 409 so automated callers can distinguish it from a 5xx fault.
 export class RunAlreadyActiveError extends Error {
   constructor(
     readonly kind: BenchmarkKind,
@@ -717,8 +719,8 @@ export class RunAlreadyActiveError extends Error {
 }
 
 /**
- * Thrown when every entry of a batch was already claimed by the other queue's
- * run. Not a fault: the pairs are being measured, just not by this run.
+ * Thrown when every entry of a batch was already claimed by another run. Not a
+ * fault: the pairs are being measured, just not by this run.
  */
 export class NoEntriesClaimedError extends Error {
   constructor(readonly runId: string) {
@@ -784,13 +786,15 @@ export async function startRun(
   const benchmarkIdentity = resolveRunIdentity(config);
   const policy = resolveEffectivePolicy(config);
 
-  // One active run per (kind, purpose). The unique partial index is the atomic
-  // backstop; this pre-check turns the common case (a run already going) into a
+  // One active classifier run: it derives a single winner. The unique partial
+  // index is the atomic backstop; this pre-check turns the common case into a
   // clean RunAlreadyActiveError instead of an insert-constraint failure.
-  // The platform and user queues hold independent slots and can run at once.
-  const activeRun = await getRunningRun(env.BENCH_DB, kind, purpose, router);
-  if (activeRun) {
-    throw new RunAlreadyActiveError(kind, activeRun.id);
+  // Decider queues admit several runs; drainQueue bounds them.
+  if (kind === 'classifier') {
+    const activeRun = await getRunningRun(env.BENCH_DB, kind, purpose, router);
+    if (activeRun) {
+      throw new RunAlreadyActiveError(kind, activeRun.id);
+    }
   }
   const repetitions =
     kind === 'classifier' ? policy.classifierRepetitions : policy.deciderRepetitions;
@@ -934,9 +938,13 @@ export async function startRun(
         );
       });
     }
-    const winner = await getRunningRun(env.BENCH_DB, kind, purpose, router).catch(() => undefined);
-    if (winner && winner.id !== runId) {
-      throw new RunAlreadyActiveError(kind, winner.id);
+    if (kind === 'classifier') {
+      const winner = await getRunningRun(env.BENCH_DB, kind, purpose, router).catch(
+        () => undefined
+      );
+      if (winner && winner.id !== runId) {
+        throw new RunAlreadyActiveError(kind, winner.id);
+      }
     }
     throw error;
   }
@@ -1021,6 +1029,11 @@ export async function startRun(
   return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
 }
 
+/** Active decider runs one (router, queue) may hold at once. */
+export const MAX_RUNNING_RUNS_PER_QUEUE = 4;
+/** drainQueue lets one run per (router, queue) be starting at a time. */
+const MAX_STARTING_RUNS = AUTO_ROUTERS.length * BenchmarkRunPurposeSchema.options.length;
+
 export async function drainQueue(
   env: Env,
   queue: BenchmarkRunPurpose,
@@ -1029,13 +1042,27 @@ export async function drainQueue(
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return null;
 
-  const active = await getRunningRun(env.BENCH_DB, 'decider', queue, router);
-  if (active) {
+  const occupancy = await getQueueRunOccupancy(env.BENCH_DB, router, queue);
+  // One run per queue materializes at a time, so the costly start step (reuse
+  // copies and chunk creation) stays serial.
+  if (occupancy.startingRunId !== null) {
     console.log(
       JSON.stringify({
-        event: 'benchmark_queue_drain_skipped_slot_occupied',
+        event: 'benchmark_queue_drain_skipped_run_starting',
+        router,
         queue,
-        activeRunId: active.id,
+        startingRunId: occupancy.startingRunId,
+      })
+    );
+    return null;
+  }
+  if (occupancy.activeRuns >= MAX_RUNNING_RUNS_PER_QUEUE) {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_queue_drain_skipped_queue_full',
+        router,
+        queue,
+        activeRuns: occupancy.activeRuns,
       })
     );
     return null;
@@ -1106,22 +1133,12 @@ export async function drainQueue(
         models: entries.map(e => e.model),
       })
     );
-    // The claimed count, not the requested one — the other queue may have taken
-    // part of this batch between the read and the claim.
+    // The claimed count, not the requested one — a concurrent drain of either
+    // queue may have claimed part of this batch between the read and the claim.
     return { runId: result.runId, entryCount: result.enqueuedModels };
   } catch (error) {
-    if (error instanceof RunAlreadyActiveError) {
-      console.log(
-        JSON.stringify({
-          event: 'benchmark_queue_drain_skipped_slot_occupied',
-          queue,
-          activeRunId: error.activeRunId,
-        })
-      );
-      return null;
-    }
     if (error instanceof NoEntriesClaimedError) {
-      // The other queue claimed this whole batch between our read and our
+      // Concurrent drains claimed this whole batch between our read and our
       // claim. The pairs are being measured; nothing to do.
       console.log(JSON.stringify({ event: 'benchmark_queue_drain_batch_already_claimed', queue }));
       return null;
@@ -1173,7 +1190,8 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
 async function initializeScheduledRuns(env: Env): Promise<boolean> {
   const uninitialized = await env.BENCH_DB.prepare(`
     SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
-      AND NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id) LIMIT 3
+      AND NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
+    ORDER BY started_at LIMIT ${MAX_STARTING_RUNS}
   `).all<{ id: string }>();
   if (uninitialized.results.length === 0) return false;
   const token = crypto.randomUUID();
@@ -2546,8 +2564,8 @@ async function finalizeRunIfComplete(
         })
       );
     });
-    // Both queues: this run's slot just freed, and a pair it just measured may
-    // have been the only pending work the other queue was waiting on.
+    // Both queues: this queue may have been full, and a pair this run just
+    // measured may have been the only pending work the other queue was waiting on.
     await drainQueues(env, 'both', undefined, state.router);
     return;
   }

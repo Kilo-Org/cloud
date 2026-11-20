@@ -17,7 +17,7 @@ import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { computeEngineIdentity } from './run';
+import { computeEngineIdentity, MAX_RUNNING_RUNS_PER_QUEUE } from './run';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
@@ -119,6 +119,7 @@ vi.mock('./db', async importOriginal => {
     markProfilesFailedForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
+    getQueueRunOccupancy: vi.fn(),
     getRunningRun: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
@@ -139,6 +140,7 @@ import {
   getClassifierWinner,
   getLatestRoutingTable,
   getLatestSummariesByModel,
+  getQueueRunOccupancy,
   getRunningRun,
   getLiveContainerLanes,
   existsNewerCompletedRun,
@@ -267,7 +269,7 @@ beforeEach(() => {
       provider_concurrency INTEGER, unknown_provider_concurrency INTEGER,
       updated_at TEXT, updated_by TEXT
     );
-    CREATE TABLE benchmark_runs (id TEXT, kind TEXT, status TEXT);
+    CREATE TABLE benchmark_runs (id TEXT, kind TEXT, status TEXT, started_at TEXT);
     CREATE TABLE scheduler_runs (run_id TEXT);
     CREATE TABLE scheduler_chunks (run_id TEXT, model TEXT, variant TEXT, rep INTEGER, status TEXT);
     CREATE TABLE run_lane_failures (run_id TEXT, model TEXT, variant TEXT, rep INTEGER);
@@ -350,6 +352,7 @@ beforeEach(() => {
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getQueueRunOccupancy).mockResolvedValue({ activeRuns: 0, startingRunId: null });
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(registerProfiles).mockReset();
@@ -823,7 +826,7 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('returns 409 when a run of the same kind is already in progress', async () => {
+  it('returns 409 when a classifier run is already in progress', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(getRunningRun).mockResolvedValue({
       id: 'classifier-2026-06-15T00-00-00-000Z',
@@ -963,6 +966,27 @@ describe('POST /admin/runs', () => {
       chunkSize: 1,
     });
     expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('answers a full user queue with no started run instead of a conflict', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(getQueueRunOccupancy).mockResolvedValue({
+      activeRuns: MAX_RUNNING_RUNS_PER_QUEUE,
+      startingRunId: null,
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      runId: null,
+      startedRuns: [],
+      drainErrors: [],
+    });
+    expect(insertRun).not.toHaveBeenCalled();
   });
 
   it('starts one run per queue for queue=both', async () => {

@@ -69,6 +69,7 @@ vi.mock('./db', async importOriginal => {
     ...actual,
     getConfigRows: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
+    getQueueRunOccupancy: vi.fn(),
     getRunningRun: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     insertRun: vi.fn(),
@@ -115,6 +116,7 @@ import {
   getExistingCaseResultIds,
   reuseDeciderCaseResults,
   getLatestSummariesByModel,
+  getQueueRunOccupancy,
   getRunningRun,
   getLiveContainerLanes,
   getRunWithModels,
@@ -145,6 +147,7 @@ import {
   syncPlatformRegistryRows,
 } from './db';
 import {
+  MAX_RUNNING_RUNS_PER_QUEUE,
   NoEntriesClaimedError,
   drainQueue,
   drainQueues,
@@ -300,6 +303,7 @@ beforeEach(() => {
       };
     });
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getQueueRunOccupancy).mockResolvedValue({ activeRuns: 0, startingRunId: null });
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockReset().mockResolvedValue(undefined);
@@ -1240,20 +1244,45 @@ describe('drainQueue', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('skips only the queue whose own slot is occupied', async () => {
-    // A running user-queue run must not block the platform queue: the two hold
-    // independent slots.
-    vi.mocked(getRunningRun).mockImplementation(async (_db, _kind, purpose) =>
-      purpose === 'user' ? runningRun('user-busy', 'user') : undefined
+  it('starts another run while initialized runs of the queue are active', async () => {
+    vi.mocked(getQueueRunOccupancy).mockResolvedValue({
+      activeRuns: MAX_RUNNING_RUNS_PER_QUEUE - 1,
+      startingRunId: null,
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/new', variant: 'a', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const started = await drainQueue(env, 'user');
+
+    expect(started).toMatchObject({ entryCount: 1 });
+    expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual(['user']);
+  });
+
+  it.each([
+    {
+      occupancy: { activeRuns: 1, startingRunId: 'user-starting' },
+      event: 'benchmark_queue_drain_skipped_run_starting',
+    },
+    {
+      occupancy: { activeRuns: MAX_RUNNING_RUNS_PER_QUEUE, startingRunId: null },
+      event: 'benchmark_queue_drain_skipped_queue_full',
+    },
+  ])('skips only the queue that reports $event', async ({ occupancy, event }) => {
+    vi.mocked(getQueueRunOccupancy).mockImplementation(async (_db, _router, purpose) =>
+      purpose === 'user' ? occupancy : { activeRuns: 0, startingRunId: null }
     );
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/pending', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     expect(await drainQueue(env, 'user')).toBeNull();
-    const platformRun = await drainQueue(env, 'platform');
-    expect(platformRun).not.toBeNull();
-    expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('platform');
+    expect(log.mock.calls.map(([line]) => JSON.parse(String(line)).event)).toContain(event);
+    expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+    expect(await drainQueue(env, 'platform')).not.toBeNull();
+    expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual(['platform']);
+    log.mockRestore();
   });
 
   it('plans all entries and repetitions in a large owner batch without fixed shards', async () => {
@@ -1376,8 +1405,11 @@ describe('sweepStaleRunsAndDrain', () => {
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
   });
 
-  it('does not throw when a queue slot is still occupied after the sweep', async () => {
-    vi.mocked(getRunningRun).mockResolvedValue(runningRun('still-running', 'user'));
+  it('does not throw when a queue is still starting a run after the sweep', async () => {
+    vi.mocked(getQueueRunOccupancy).mockResolvedValue({
+      activeRuns: 1,
+      startingRunId: 'still-starting',
+    });
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/p', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);

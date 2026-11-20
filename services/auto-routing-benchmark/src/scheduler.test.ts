@@ -48,6 +48,7 @@ type RunOptions = {
   router?: 'efficient' | 'frontier';
   purpose?: 'platform' | 'user';
   kind?: 'classifier' | 'decider';
+  startedAt?: string;
 };
 
 function insertRun(sqlite: DatabaseSync, id: string, options: RunOptions = {}) {
@@ -63,7 +64,7 @@ function insertRun(sqlite: DatabaseSync, id: string, options: RunOptions = {}) {
       options.router ?? 'efficient',
       options.kind ?? 'decider',
       options.purpose ?? 'platform',
-      new Date(NOW).toISOString()
+      options.startedAt ?? new Date(NOW).toISOString()
     );
 }
 
@@ -643,6 +644,45 @@ describe('scheduler (production migrations and real SQLite)', () => {
     await claimMany(db, config, 12, 'custom-shares');
     expect(liveChunks(sqlite).filter(row => row.run_id === 'platform')).toHaveLength(2);
     expect(liveChunks(sqlite).filter(row => row.run_id === 'user')).toHaveLength(6);
+  });
+
+  it("claims a newer same-share run's idle model before models that already hold slots", async () => {
+    insertRun(sqlite, 'user-large', { purpose: 'user' });
+    await scheduleRunChunks(db, {
+      runId: 'user-large',
+      entries: independentEntries(3),
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+    });
+    const held = await claimMany(
+      db,
+      schedulerConfig('{"slots":3,"providerConcurrency":250}'),
+      3,
+      'large'
+    );
+    expect(new Set(held.map(claim => claim.model)).size).toBe(3);
+    insertRun(sqlite, 'user-small', {
+      purpose: 'user',
+      startedAt: new Date(NOW + 60_000).toISOString(),
+    });
+    await scheduleRunChunks(db, {
+      runId: 'user-small',
+      entries: [{ model: 'new/model', variant: '', providers: ['deepinfra'] }],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+    });
+
+    const next = await claimScheduledChunks(
+      db,
+      schedulerConfig('{"slots":4,"providerConcurrency":250}'),
+      NOW,
+      'small'
+    );
+
+    expect(next).toHaveLength(1);
+    expect(next[0]).toMatchObject({ run_id: 'user-small', model: 'new/model', chunk: 0 });
   });
 
   it('applies the default provider cap and conservative unknown cap across unrelated models', async () => {

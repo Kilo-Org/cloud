@@ -1,0 +1,281 @@
+import { DatabaseSync } from 'node:sqlite';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveEffectivePolicy, type AutoRouter } from '@kilocode/auto-routing-contracts';
+import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
+import { saveBenchmarkConfig } from './config';
+import { DECIDER_CASES } from './datasets/decider-cases';
+import {
+  computeEngineIdentity,
+  dispatchScheduler,
+  drainQueue,
+  MAX_RUNNING_RUNS_PER_QUEUE,
+  type BenchmarkJobMessage,
+} from './run';
+import { claimScheduledChunks, scheduleRunChunks, schedulerConfig } from './scheduler';
+
+const NOW = Date.parse('2026-11-20T12:00:00.000Z');
+const BENCHMARK_USER = 'bot-internal-queue-admission';
+const BENCHMARK_ORG = 'queue-admission-org';
+const NEW_MODEL = 'vendor/new-model';
+
+describe('decider queue admission (production migrations and real SQLite)', () => {
+  let sqlite: DatabaseSync;
+  let env: Env;
+  let sent: BenchmarkJobMessage[];
+  let repetitions: number;
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (url.href === 'https://app.test/api/internal/bot-token') {
+        return Response.json({
+          token: 'queue-admission-token',
+          expiresAt: new Date(NOW + 3600_000).toISOString(),
+        });
+      }
+      if (url.href === `https://api.test/api/organizations/${BENCHMARK_ORG}/models`) {
+        const models = sqlite
+          .prepare('SELECT model FROM run_models UNION SELECT model FROM benchmark_profiles')
+          .all()
+          .map(row => String(row.model));
+        return Response.json({
+          data: models.map(id => ({ id, supported_parameters: ['tools'] })),
+        });
+      }
+      throw new Error(`Unexpected fixture request: ${url.href}`);
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    sent = [];
+    env = {
+      BENCH_DB: sqliteD1(sqlite),
+      BENCH_QUEUE: {
+        send: async (message: BenchmarkJobMessage) => {
+          sent.push(message);
+        },
+      },
+      BENCHMARK_SCHEDULER_CONFIG: '{}',
+      KILO_WEB_API_BASE_URL: 'https://app.test',
+      KILO_CLI_API_URL: 'https://api.test',
+      BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-test-secret' },
+    } as unknown as Env;
+    for (const router of ['efficient', 'frontier'] as const) {
+      const saved = await saveBenchmarkConfig(
+        env.BENCH_DB,
+        {
+          router,
+          accuracyNoiseBand: 0.05,
+          classifierModels: ['classifier/model'],
+          deciderModels: [{ id: 'platform/model' }],
+          minAccuracy: 0.7,
+          productionTokenProfile: null,
+          switchHorizonTurns: null,
+          benchmarkUserId: BENCHMARK_USER,
+          benchmarkOrgId: BENCHMARK_ORG,
+          updatedAt: null,
+          updatedBy: null,
+        },
+        'test'
+      );
+      repetitions = resolveEffectivePolicy(saved).deciderRepetitions;
+    }
+  });
+
+  afterEach(() => {
+    sqlite.close();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function insertRun(
+    id: string,
+    models: readonly string[],
+    router: AutoRouter = 'efficient',
+    purpose: 'platform' | 'user' = 'user'
+  ) {
+    sqlite
+      .prepare(`
+      INSERT INTO benchmark_runs (
+        id, router, kind, purpose, status, started_at, min_accuracy, switch_cost_factor,
+        max_concurrency, repetitions, engine_identity, benchmark_user_id, benchmark_org_id
+      ) VALUES (?, ?, 'decider', ?, 'running', ?, 0.7, 3, 0, ?, ?, ?, ?)
+    `)
+      .run(
+        id,
+        router,
+        purpose,
+        new Date(Date.now()).toISOString(),
+        repetitions,
+        computeEngineIdentity('decider', router),
+        BENCHMARK_USER,
+        BENCHMARK_ORG
+      );
+    for (const model of models) {
+      sqlite
+        .prepare("INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)")
+        .run(id, model);
+      insertProfile(model, 'running', id, router);
+    }
+  }
+
+  function insertProfile(
+    model: string,
+    status: 'pending' | 'running',
+    runId: string | null,
+    router: AutoRouter = 'efficient'
+  ) {
+    sqlite
+      .prepare(`
+      INSERT INTO benchmark_profiles (
+        router, model, variant, engine_identity, repetitions, status, run_id,
+        requested_at, updated_at, platform_requested, user_requested
+      ) VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, 0, 1)
+    `)
+      .run(
+        router,
+        model,
+        computeEngineIdentity('decider', router),
+        repetitions,
+        status,
+        runId,
+        new Date(Date.now()).toISOString(),
+        new Date(Date.now()).toISOString()
+      );
+  }
+
+  async function initialize(runId: string, models: readonly string[]) {
+    expect(
+      await scheduleRunChunks(env.BENCH_DB, {
+        runId,
+        entries: models.map((model, index) => ({
+          model,
+          variant: null,
+          providers: [`provider-${index}`],
+        })),
+        repetitions,
+        caseIds: DECIDER_CASES.slice(0, 3).map(benchCase => benchCase.id),
+        chunkSize: 1,
+      })
+    ).toBe(true);
+  }
+
+  function runningUserRuns(): string[] {
+    return sqlite
+      .prepare(
+        "SELECT id FROM benchmark_runs WHERE purpose = 'user' AND status = 'running' ORDER BY started_at, id"
+      )
+      .all()
+      .map(row => String(row.id));
+  }
+
+  function profile(model: string) {
+    return sqlite
+      .prepare('SELECT status, run_id FROM benchmark_profiles WHERE model = ?')
+      .get(model);
+  }
+
+  function initialized(runId: string): boolean {
+    return sqlite.prepare('SELECT 1 FROM scheduler_runs WHERE run_id = ?').get(runId) !== undefined;
+  }
+
+  it('starts a second run for a new entry beside an active 100-entry run and claims its first chunk in the same pass', async () => {
+    const large = Array.from({ length: 100 }, (_, index) => `vendor/large-${index}`);
+    insertRun('user-large', large);
+    await initialize('user-large', large);
+    const held = await claimScheduledChunks(
+      env.BENCH_DB,
+      schedulerConfig('{"slots":100,"modelConcurrency":1}'),
+      Date.now(),
+      'large-held'
+    );
+    expect(held).toHaveLength(100);
+    vi.setSystemTime(NOW + 60_000);
+    insertProfile(NEW_MODEL, 'pending', null);
+
+    const started = await drainQueue(env, 'user');
+
+    if (!started) throw new Error('Expected the drain to start a run');
+    const { runId } = started;
+    expect(started.entryCount).toBe(1);
+    expect(runningUserRuns()).toEqual(['user-large', runId]);
+    expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: runId });
+    expect(initialized(runId)).toBe(true);
+    expect(sent).toContainEqual(
+      expect.objectContaining({ runId, model: NEW_MODEL, kind: 'decider' })
+    );
+    expect(
+      sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM scheduler_chunks WHERE run_id = ? AND status = 'queued' AND chunk = 0"
+        )
+        .get(runId)
+    ).toEqual({ n: 1 });
+  });
+
+  it('waits while a run of the queue is still starting, then starts once it is initialized', async () => {
+    insertRun('user-starting', ['vendor/starting']);
+    vi.setSystemTime(NOW + 60_000);
+    insertProfile(NEW_MODEL, 'pending', null);
+
+    expect(await drainQueue(env, 'user')).toBeNull();
+    expect(profile(NEW_MODEL)).toEqual({ status: 'pending', run_id: null });
+    expect(runningUserRuns()).toEqual(['user-starting']);
+
+    await dispatchScheduler(env);
+    expect(initialized('user-starting')).toBe(true);
+
+    const started = await drainQueue(env, 'user');
+    expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: started?.runId });
+  });
+
+  it('does not let a starting run of another queue or router hold this queue back', async () => {
+    insertRun('platform-starting', ['vendor/platform-starting'], 'efficient', 'platform');
+    insertRun('frontier-user-starting', ['vendor/frontier-starting'], 'frontier');
+    insertProfile(NEW_MODEL, 'pending', null);
+
+    const started = await drainQueue(env, 'user');
+
+    expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: started?.runId });
+  });
+
+  it('holds new entries while the queue has its maximum of active runs', async () => {
+    const active = Array.from({ length: MAX_RUNNING_RUNS_PER_QUEUE }, (_, index) => ({
+      id: `user-active-${index}`,
+      model: `vendor/active-${index}`,
+    }));
+    for (const run of active) {
+      insertRun(run.id, [run.model]);
+      await initialize(run.id, [run.model]);
+    }
+    insertProfile(NEW_MODEL, 'pending', null);
+
+    expect(await drainQueue(env, 'user')).toBeNull();
+    expect(profile(NEW_MODEL)).toEqual({ status: 'pending', run_id: null });
+
+    sqlite
+      .prepare("UPDATE benchmark_runs SET status = 'completed' WHERE id = 'user-active-0'")
+      .run();
+    const started = await drainQueue(env, 'user');
+    expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: started?.runId });
+  });
+
+  it('initializes a starting run of every router and queue in one dispatch pass', async () => {
+    const starting = [
+      { id: 'efficient-platform-starting', router: 'efficient', purpose: 'platform' },
+      { id: 'efficient-user-starting', router: 'efficient', purpose: 'user' },
+      { id: 'frontier-platform-starting', router: 'frontier', purpose: 'platform' },
+      { id: 'frontier-user-starting', router: 'frontier', purpose: 'user' },
+    ] as const;
+    for (const [index, run] of starting.entries()) {
+      vi.setSystemTime(NOW + index * 1000);
+      insertRun(run.id, [`vendor/${run.id}`], run.router, run.purpose);
+    }
+
+    await dispatchScheduler(env);
+
+    expect(starting.filter(run => !initialized(run.id))).toEqual([]);
+  });
+});

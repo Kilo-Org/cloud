@@ -1040,9 +1040,10 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
     );
 }
 
-// The currently-running run of a (kind, purpose), if any (used for the
-// one-active-run-per-slot admission pre-check). Platform and profile hold
-// independent slots. Stale runs are swept to 'failed' before this is consulted.
+// The running run of a (kind, purpose), if any. Classifier admission relies on
+// it: a classifier run derives one winner, so only one may run at a time.
+// Decider queues hold several runs; their drain reads getQueueRunOccupancy.
+// Stale runs are swept to 'failed' before this is consulted.
 export async function getRunningRun(
   db: D1Database,
   kind: BenchmarkKind,
@@ -1061,6 +1062,35 @@ export async function getRunningRun(
       )
     )
     .get();
+}
+
+/**
+ * Running decider runs of one (router, queue), and the oldest of them that has
+ * not finished materializing its chunks (no `scheduler_runs` marker yet).
+ */
+export async function getQueueRunOccupancy(
+  db: D1Database,
+  router: AutoRouter,
+  purpose: BenchmarkRunPurpose
+): Promise<{ activeRuns: number; startingRunId: string | null }> {
+  const row = await drizzle(db)
+    .select({
+      activeRuns: count(),
+      startingRunId: sql<string | null>`MIN(CASE WHEN NOT EXISTS (
+        SELECT 1 FROM scheduler_runs WHERE run_id = ${benchmarkRuns.id}
+      ) THEN ${benchmarkRuns.id} END)`,
+    })
+    .from(benchmarkRuns)
+    .where(
+      and(
+        eq(benchmarkRuns.router, router),
+        eq(benchmarkRuns.kind, 'decider'),
+        eq(benchmarkRuns.purpose, purpose),
+        eq(benchmarkRuns.status, 'running')
+      )
+    )
+    .get();
+  return { activeRuns: row?.activeRuns ?? 0, startingRunId: row?.startingRunId ?? null };
 }
 
 // True when a run of the same kind started later than this one has already
@@ -1123,8 +1153,8 @@ export async function markProfilesRunningForRun(
   if (entries.length === 0) return [];
   const orm = drizzle(db);
   // Returns the entries this run actually claimed. An entry already claimed by
-  // the other queue's run updates 0 rows and is dropped, so the pair is
-  // measured once instead of being benchmarked (and billed) twice.
+  // another run updates 0 rows and is dropped, so the pair is measured once
+  // instead of being benchmarked (and billed) twice.
   const claimed: BenchmarkPair[] = [];
   for (const entry of entries) {
     const result = await orm

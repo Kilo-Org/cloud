@@ -223,6 +223,7 @@ It retains the full comparison when a focus crop would not help.
 Add `--pixel-diff-explain-shift` to report vertical row moves separately from the fixed-coordinate counts.
 
 Keep the original status bar pixels. The report counts changes in system inset bands separately.
+`changedPixels` includes those bands. A change inside a band still reports `changed`.
 App content can overlap those bands, so inspect the full comparison for safe-area defects.
 An unavailable pixel comparison is inconclusive. The pixel report does not change the gate verdict.
 Inspect the original device screenshots for assertions about what the app shows.

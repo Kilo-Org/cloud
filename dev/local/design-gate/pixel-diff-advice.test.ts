@@ -1065,6 +1065,43 @@ test('a run-wide readiness failure blocks every cell; a cell-wide one keeps sibl
   assert.equal(fs.existsSync(path.join(out2, 'pixel-diff')), false);
 });
 
+test('a target neither run captured blocks no sibling and is stated once', async t => {
+  const root = rootDir(t);
+  const out = path.join(root, 'comparison');
+  fs.mkdirSync(out);
+  const base = runDir(root, 'base-run');
+  const head = runDir(root, 'head-run');
+  bindScreen(base, 'dark', 'card');
+  bindScreen(head, 'dark', 'card');
+  const { compare, calls } = stub(async input => {
+    fs.mkdirSync(input.out, { recursive: true });
+    return report();
+  });
+  // The shape a cell the runner never started produces: `targetReadiness` names
+  // the skipped target, and neither run has a CellRun for that cell. The other
+  // cells are complete captures and must still compare.
+  const skip = 'compact/card: target could not be read (InfraError: no debugger page)';
+  head.revision.readiness = [skip];
+  const summary = await runPixelDiffAdvisory({
+    out,
+    base: base.revision,
+    head: head.revision,
+    explainShift: false,
+    compare,
+  });
+  const byCell = new Map(summary.cells.map(cell => [cell.cell, cell]));
+  assert.equal(byCell.get('base')?.status, 'unchanged');
+  assert.equal(byCell.get('dark')?.status, 'unchanged');
+  assert.equal(summary.status, 'compared');
+  // One comparison per captured cell: the missing cell blocked neither.
+  assert.equal(calls.length, 2);
+  // The gap stays visible, and is stated exactly once.
+  assert.deepEqual(
+    summary.reasons.filter(reason => reason.includes('compact/card')),
+    [skip]
+  );
+});
+
 test('pngSize reads the declared size and refuses non-PNG bytes', () => {
   assert.deepEqual(pngSize(pngBytes(400, 800)), { width: 400, height: 800 });
   assert.equal(pngSize(Buffer.from('synthetic-image')), undefined);

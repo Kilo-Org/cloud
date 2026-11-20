@@ -254,6 +254,10 @@ function safeSegment(name: string, kind: string): string {
  *
  * An entry whose scope cannot be read is treated as run-level: the pass never
  * infers a valid readiness from a key it did not recognise.
+ *
+ * A scoped entry naming a cell neither run captured is a missing capture, not a
+ * verdict on a compared screen: it is stated once in the summary reasons and
+ * blocks nothing.
  */
 type ReadinessBlocks = {
   run: string[];
@@ -523,18 +527,22 @@ async function collect(
     base: readinessReasons(options.base.readiness),
     head: readinessReasons(options.head.readiness),
   };
-  // A `<cell>` or `<cell>/<target>` entry naming a cell neither run captured
-  // cannot be attached to any comparison, so it is not dropped: the pair has no
-  // evidence that cell was ever ready.
+  // A `<cell>` or `<cell>/<target>` entry naming a cell neither run captured is
+  // how `targetReadiness` reports a target the probe never read — a cell that
+  // never started has no CellRun, so no screen of it exists to compare. That is
+  // a missing capture, not evidence about any screen this pass does compare, so
+  // it is stated once in the summary and blocks no sibling.
   const captured = new Set([...options.base.cells, ...options.head.cells].map(cell => cell.id));
+  const unrepresented = new Set<string>();
   for (const scope of [scopes.base, scopes.head]) {
     for (const [key, reason] of [...scope.cells.entries(), ...scope.targets.entries()]) {
       if (captured.has(key.split('/')[0])) continue;
-      scope.run.push(`${key}: ${reason}`);
+      unrepresented.add(`${key}: ${reason}`);
       scope.cells.delete(key);
       scope.targets.delete(key);
     }
   }
+  reasons.push(...unrepresented);
   // A run-level failure (duplicate matrix cells, findings outside the matrix)
   // means no cell of that run describes its screens, so nothing is compared and
   // every cell says why. A per-cell failure never takes this path: its siblings

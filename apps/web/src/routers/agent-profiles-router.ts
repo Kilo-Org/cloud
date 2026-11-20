@@ -63,8 +63,11 @@ const VarSchema = z.object({
   networkSecret: networkSecretPolicySchema.optional(),
 });
 
-// Whitespace-only rows are dropped by the service before it writes, so the
-// schema stays permissive and a stored list can always be re-sent as-is.
+// The service drops whitespace-only rows before it writes and then applies the
+// cap to what is left, so a stored list can always be re-sent unchanged. This
+// schema still counts the raw array against the cap: every client sends either
+// the rows it read back or a list it already filtered, so a payload of blank
+// rows on top of a full list is not a shape any of them produces.
 const CommandsSchema = z.object({
   commands: z
     .array(z.string().max(profileCommandsService.MAX_PROFILE_COMMAND_LENGTH))

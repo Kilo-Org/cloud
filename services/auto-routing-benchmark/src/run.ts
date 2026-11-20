@@ -520,7 +520,12 @@ export async function publishPlatformRoutingTable(
   options: { flushUnchangedTable?: boolean } = {}
 ): Promise<{ version: string } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
-  if (!config) return null;
+  if (!config) {
+    console.warn(
+      JSON.stringify({ event: 'routing_table_publish_skipped_unconfigured', router })
+    );
+    return null;
+  }
 
   const current = {
     router,
@@ -533,21 +538,45 @@ export async function publishPlatformRoutingTable(
     config,
     PLATFORM_SUBSCRIPTION_OWNER
   );
-  if (
-    snapshot.some(
-      entry =>
-        entry.model.startsWith('~') &&
-        entry.servingPairs.length > 0 &&
-        (entry.resolutionError ||
-          entry.servingPairs.some(
-            serving =>
-              !entry.pairs.some(
-                target => target.model === serving.model && target.variant === serving.variant
-              )
-          ))
-    )
-  )
+  // A serving pair the current target set no longer contains means the alias moved and
+  // its replacement is not ready yet (or resolution failed). The table keeps the pair
+  // that is still serving, so the rebuild would drop a live model: hold, and say why.
+  type StaleServing = {
+    model: string;
+    reason: 'resolution_error' | 'replacement_pending';
+    error?: string;
+    held?: { model: string; variant: string | null }[];
+  };
+  const staleServing: StaleServing[] = [];
+  for (const entry of snapshot) {
+    if (!entry.model.startsWith('~') || entry.servingPairs.length === 0) continue;
+    if (entry.resolutionError) {
+      staleServing.push({
+        model: entry.model,
+        reason: 'resolution_error',
+        error: entry.resolutionError,
+      });
+      continue;
+    }
+    const movedAway = entry.servingPairs.filter(
+      serving =>
+        !entry.pairs.some(
+          target => target.model === serving.model && target.variant === serving.variant
+        )
+    );
+    if (movedAway.length > 0)
+      staleServing.push({ model: entry.model, reason: 'replacement_pending', held: movedAway });
+  }
+  if (staleServing.length > 0) {
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_publish_skipped_serving_target_pending',
+        router,
+        held: staleServing,
+      })
+    );
     return null;
+  }
   const desired = snapshotPairs(snapshot, true);
   const targets = new Set(
     snapshotPairs(snapshot, false).map(pair => exactPairKey(pair.model, pair.variant))

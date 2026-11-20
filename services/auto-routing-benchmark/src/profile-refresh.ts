@@ -1,8 +1,7 @@
 import type { AutoRouter, BenchmarkPair } from '@kilocode/auto-routing-contracts';
-import { getReasoningVariantKeys } from '@kilocode/auto-routing-contracts';
 import type { z } from 'zod';
 import { isExactModelUnavailableResult } from './cli-runner';
-import type { BenchmarkModelCatalogSchema } from './platform-models';
+import { benchmarkPairUnavailability, type BenchmarkModelCatalogSchema } from './platform-models';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
 type RefreshInput = {
@@ -42,16 +41,14 @@ export async function refreshCurrentProfiles(
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   nowIso = new Date().toISOString()
 ): Promise<{ refreshed: BenchmarkPair[]; unavailable: BenchmarkPair[]; skipped: BenchmarkPair[] }> {
-  const models = new Map(catalog.data.map(model => [model.id, model]));
   const entries = input.entries.map(entry => {
-    const model = models.get(entry.model);
-    const variants = getReasoningVariantKeys(model?.opencode?.variants);
+    const failure = benchmarkPairUnavailability(catalog, entry);
     return {
       model: entry.model,
       variant: variantToStorage(entry.variant),
-      available:
-        Boolean(model) &&
-        (variants.length > 0 ? variants.includes(entry.variant ?? '') : entry.variant === null),
+      available: failure === null,
+      failureClass: failure?.failureClass ?? null,
+      failureReason: failure?.reason ?? null,
     };
   });
   const selection = JSON.stringify(entries);
@@ -105,45 +102,48 @@ export async function refreshCurrentProfiles(
           )
           .map(row => ({ run_id: row.run_id, model: row.model, variant: row.variant }))
       : [];
-  const availableSql = `SELECT json_extract(requested.value, '$.available')
+  const requestedSql = (field: string) => `SELECT json_extract(requested.value, '$.${field}')
     FROM json_each(?4) AS requested
     WHERE json_extract(requested.value, '$.model') = benchmark_profiles.model
       AND json_extract(requested.value, '$.variant') = benchmark_profiles.variant`;
-  // Re-admitting clears the failure history, so the retry budgets start over. A pair the
-  // catalog cannot run is refused: an already failed row keeps its status and failure
-  // history, and any other row fails permanently here, before any paid call.
+  const availableSql = requestedSql('available');
   const failedSql = `status IN ('failed', 'unavailable')`;
-  const result = await db
-    .prepare(`UPDATE benchmark_profiles SET
-      status = CASE WHEN (${availableSql}) THEN 'pending'
-        WHEN ${failedSql} THEN status ELSE 'unavailable' END,
-      failure_reason = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN failure_reason
-        ELSE 'Model or variant is unavailable to the benchmark CLI.' END,
-      failure_class = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN failure_class
-        ELSE 'catalog_absent' END,
-      failure_attempts = CASE WHEN (${availableSql}) THEN 0 WHEN ${failedSql} THEN failure_attempts
-        ELSE 1 END,
-      model_failure_attempts = CASE WHEN (${availableSql}) THEN 0 ELSE model_failure_attempts END,
-      first_failed_at = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN first_failed_at
-        ELSE ?5 END,
-      retry_after = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN retry_after
-        ELSE NULL END,
-      run_id = CASE WHEN NOT (${availableSql}) AND ${failedSql} THEN run_id ELSE NULL END,
-      completed_at = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN completed_at
-        ELSE ?5 END,
-      requested_at = ?5, updated_at = ?5, invalidated_at = ?5
-    WHERE router = ?1 AND engine_identity = ?2 AND repetitions = ?3
+  const selectedSql = `router = ?1 AND engine_identity = ?2 AND repetitions = ?3
       AND EXISTS (${availableSql}) AND status != 'running'
       AND NOT EXISTS (${runningSql})
-      AND (?6 = 'refresh' OR EXISTS (
-        SELECT 1 FROM json_each(?7) AS repairable
+      AND (?5 = 'refresh' OR EXISTS (
+        SELECT 1 FROM json_each(?6) AS repairable
         WHERE json_extract(repairable.value, '$.run_id') = benchmark_profiles.run_id
           AND json_extract(repairable.value, '$.model') = benchmark_profiles.model
           AND json_extract(repairable.value, '$.variant') = benchmark_profiles.variant
-      ))
-    RETURNING model, variant, status`)
-    .bind(...bindings, nowIso, input.mode, JSON.stringify(repairable))
+      ))`;
+  const selectionBindings = [...bindings, input.mode, JSON.stringify(repairable)] as const;
+  // A pair the drain could not run is refused. An already failed row is left exactly as it
+  // is, so its failure history and its previous results stay; any other row fails
+  // permanently with the drain's reason, before any paid call. Re-admitting a runnable pair
+  // clears the failure history, so the retry budgets start over.
+  const refused = await db
+    .prepare(`SELECT model, variant, status FROM benchmark_profiles
+      WHERE ${selectedSql} AND NOT (${availableSql}) AND ${failedSql}`)
+    .bind(...selectionBindings)
     .all<RefreshedRow>();
+  const updated = await db
+    .prepare(`UPDATE benchmark_profiles SET
+      status = CASE WHEN (${availableSql}) THEN 'pending' ELSE 'unavailable' END,
+      failure_reason = CASE WHEN (${availableSql}) THEN NULL ELSE (${requestedSql('failureReason')}) END,
+      failure_class = CASE WHEN (${availableSql}) THEN NULL ELSE (${requestedSql('failureClass')}) END,
+      failure_attempts = CASE WHEN (${availableSql}) THEN 0 ELSE 1 END,
+      model_failure_attempts = 0,
+      first_failed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?7 END,
+      retry_after = NULL,
+      run_id = NULL,
+      completed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?7 END,
+      requested_at = ?7, updated_at = ?7, invalidated_at = ?7
+    WHERE ${selectedSql} AND ((${availableSql}) OR NOT ${failedSql})
+    RETURNING model, variant, status`)
+    .bind(...selectionBindings, nowIso)
+    .all<RefreshedRow>();
+  const result = { results: [...updated.results, ...refused.results] };
   if (
     result.results.length === 0 &&
     (await db

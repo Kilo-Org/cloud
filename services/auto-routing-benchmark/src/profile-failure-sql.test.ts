@@ -279,41 +279,54 @@ describe('profile failure transitions (production migrations and real SQLite)', 
     });
   });
 
-  it.each<ProfileFailure>([
-    { failureClass: 'model_not_found', reason: 'gone' },
-    { failureClass: 'catalog_absent', reason: 'Not in the catalog.' },
-    providerDown,
-  ])(
-    'keeps the $failureClass failure history when the catalog refuses a re-admit',
-    async failure => {
+  const tooSmallCatalog = { data: [{ id: pair.model, context_length: 16_384 }] };
+
+  function wholeRow() {
+    return sqlite.prepare('SELECT * FROM benchmark_profiles WHERE model = ?').get(pair.model);
+  }
+
+  it.each([
+    { failure: { failureClass: 'model_not_found', reason: 'gone' }, catalog: { data: [] } },
+    { failure: { failureClass: 'catalog_absent', reason: 'Not in the catalog.' }, catalog: { data: [] } },
+    { failure: providerDown, catalog: { data: [] } },
+    { failure: providerDown, catalog: tooSmallCatalog },
+  ] satisfies { failure: ProfileFailure; catalog: unknown }[])(
+    'leaves a $failure.failureClass row untouched when the drain rule refuses its re-admit',
+    async ({ failure, catalog }) => {
       await failedRun('run-1', failure, T0);
       if ((await requeue(T0 + HOUR)) === 1) await failedRun('run-2', failure, T0 + 2 * HOUR);
-      const before = stored();
+      const before = wholeRow();
       const [listedBefore] = await listCurrentFailedProfiles(db, current);
-      expect(await refresh({ data: [] }, T0 + 5 * HOUR)).toEqual({
+      expect(await refresh(catalog, T0 + 5 * HOUR)).toEqual({
         refreshed: [],
         unavailable: [pair],
         skipped: [],
       });
-      expect(stored()).toEqual(before);
-      expect(before.first_failed_at).toBe(iso(T0));
+      expect(wholeRow()).toEqual(before);
+      expect(stored().first_failed_at).toBe(iso(T0));
       expect((await listCurrentFailedProfiles(db, current))[0]).toEqual(listedBefore);
     }
   );
 
-  it('fails a never-failed pair permanently when the catalog refuses a re-admit', async () => {
-    expect(await refresh({ data: [] }, T0 + HOUR)).toEqual({
-      refreshed: [],
-      unavailable: [pair],
-      skipped: [],
-    });
-    expect(stored()).toMatchObject({
-      status: 'unavailable',
-      failure_class: 'catalog_absent',
-      failure_attempts: 1,
-      first_failed_at: iso(T0 + HOUR),
-    });
-  });
+  it.each([
+    { catalog: { data: [] }, failureClass: 'catalog_absent' },
+    { catalog: tooSmallCatalog, failureClass: 'context_too_small' },
+  ])(
+    'fails a never-failed pair permanently as $failureClass when the drain rule refuses a re-admit',
+    async ({ catalog, failureClass }) => {
+      expect(await refresh(catalog, T0 + HOUR)).toEqual({
+        refreshed: [],
+        unavailable: [pair],
+        skipped: [],
+      });
+      expect(stored()).toMatchObject({
+        status: 'unavailable',
+        failure_class: failureClass,
+        failure_attempts: 1,
+        first_failed_at: iso(T0 + HOUR),
+      });
+    }
+  );
 
   it('lists only failed rows a queue still wants, with their queues', async () => {
     await failedRun('run-1', providerDown, T0);
@@ -495,6 +508,36 @@ describe('unsupported provider rejection', () => {
     { name: 'no cases', input: [] },
   ])('keeps $name as a measurement', ({ input }) => {
     expect(unsupportedRejection(input)).toBeNull();
+  });
+});
+
+describe('a throttled or failing provider is never unsupported', () => {
+  const toolUse = "Error: This model doesn't support tool use in streaming mode.";
+  it.each([
+    'Error: Upstream error from Provider: HTTP 429',
+    'Error: Provider returned 429',
+    'Error: Rate limit exceeded for this model, retry later',
+    'Error: rate-limited by upstream',
+    'Error: Too Many Requests',
+    'Error: Upstream error: HTTP 503 Service Unavailable',
+    'Error: Provider returned error status: 502',
+    'Error: Internal Server Error',
+  ])('%s', error => {
+    const failing = Array.from({ length: 100 }, () => ({ error, timed_out: 0 }));
+    expect(unsupportedRejection(failing)).toBeNull();
+    const mostlyThrottled = [
+      ...failing.slice(0, 50),
+      ...Array.from({ length: 50 }, () => ({ error: toolUse, timed_out: 0 })),
+    ];
+    expect(unsupportedRejection(mostlyThrottled)).toBeNull();
+  });
+
+  it('still fails a capability rejection that mentions a number', () => {
+    const rows = Array.from({ length: 100 }, (_, index) => ({
+      error: `Error: This endpoint's maximum context length is 131072 tokens. However, you requested about ${183_000 + index} tokens`,
+      timed_out: 0,
+    }));
+    expect(unsupportedRejection(rows)?.failureClass).toBe('unsupported');
   });
 });
 

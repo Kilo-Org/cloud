@@ -571,7 +571,7 @@ export function ScreenHeader({
   // title's readable minimum (see `headerRightWidth`).
   const stackActions =
     allowHeaderRightStacking &&
-    headerRight != null &&
+    Boolean(headerRight) &&
     shouldStackHeaderActions(windowWidth, fontScale, {
       headerRightWidth: headerRightWidth ?? 0,
       titleMinWidth,
@@ -612,7 +612,7 @@ export function ScreenHeader({
   // "Notific…ngs lab" and the title to "Past sessi…". On its own row the
   // cluster has the header's full width and the title keeps the row it heads.
   const stackInlineActions =
-    inlineActions != null &&
+    Boolean(inlineActions) &&
     (largeFont ||
       titleOverflows ||
       (allowInlineActionsStacking &&

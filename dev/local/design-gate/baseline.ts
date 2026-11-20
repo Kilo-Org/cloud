@@ -53,11 +53,13 @@ const SourcePath = z
 const SAVE_ELEMENT = 'save-cluster' as const;
 const ElementDescriptorSchema = z.object({ $element: z.literal(SAVE_ELEMENT) }).strict();
 /**
- * The slots that render inside a `View` and therefore refuse a string: React
- * Native's `Text strings must be rendered within a <Text> component.` invariant
- * is what the diagnostic's bare strings produced in the LogBox capture. The
- * header's own string slots (`title`, `eyebrow`, `subtitle`) render inside a
- * `Text` and stay strings; only the node slots are checked below.
+ * The prop names that render inside a `View` and therefore refuse a string:
+ * React Native's `Text strings must be rendered within a <Text> component.`
+ * invariant is what the diagnostic's bare strings produced in the LogBox
+ * capture. The header's own string slots (`title`, `eyebrow`, `subtitle`)
+ * render inside a `Text` and stay strings; only these node-slot props are
+ * checked below. The check is keyed on the prop name alone, so it covers any
+ * diagnostic component that declares one of them, not only ScreenHeader.
  */
 const SCREEN_HEADER_NODE_SLOT_NAMES = [
   'headerRight',
@@ -70,7 +72,7 @@ const SCREEN_HEADER_NODE_SLOT_NAMES = [
 const descriptorMessage =
   'must be { "$element": "save-cluster" }, an array of those, or null/false, because only an element (or nothing) can be a child of the slot\'s View';
 const descriptorSlotMessage =
-  'is not a ScreenHeader node slot; a { "$element" } descriptor belongs in one of headerRight, inlineActions, titleContent, titleAccessory, subtitlePlaceholder, eyebrowPlaceholder';
+  'is not a node-slot prop name; the diagnostic rule matches these prop names on any component, and a { "$element" } descriptor belongs in one of headerRight, inlineActions, titleContent, titleAccessory, subtitlePlaceholder, eyebrowPlaceholder';
 
 /** A diagnostic prop value: plain JSON, which is all a manifest can carry. */
 type DiagnosticProp =

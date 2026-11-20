@@ -141,6 +141,19 @@ function isStackedActionsRow(node: TestInstance): boolean {
   );
 }
 
+/**
+ * The hidden copy the fit check lays out at the title's natural width. It is
+ * the only invisible node in the header that still reports a layout.
+ */
+function isHiddenTitleCopy(node: TestInstance): boolean {
+  return (
+    typeof node.type === 'string' &&
+    (node.type as string) === 'View' &&
+    String(node.props.className ?? '').includes('opacity-0') &&
+    node.props.pointerEvents === 'none'
+  );
+}
+
 function findIcon(back: TestInstance, type: string): TestInstance {
   const icons = back.findAll(node => typeof node.type === 'string' && node.type === type);
   const icon = icons[0];
@@ -2052,6 +2065,25 @@ describe('header actions row', () => {
     const renderer = renderHeader({ title: 'Detail', headerRight: false });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
+
+  it('treats a false inlineActions as absent instead of stacking an empty slot', () => {
+    // Same slot contract on the other trailing slot: a guarded picker can be
+    // `false`, which paints nothing, so neither a stacked `mt-2` row nor the
+    // hidden title-fit copy for that slot may exist. At a large font scale the
+    // inline cluster always takes its own row, which is the case the `!= null`
+    // check read as present for a slot that renders nothing.
+    layout.width = 160;
+    layout.fontScale = 2;
+    const renderer = renderHeader({
+      title: 'Agents',
+      size: 'large',
+      inlineActions: false,
+      inlineActionsWidth: 92,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    expect(renderer.root.findAll(isHiddenTitleCopy)).toHaveLength(0);
   });
 
   it('drops a declared trailing cluster to its own row before it squeezes the title', () => {

@@ -85,9 +85,25 @@ test('a descriptor is legal only under a documented node slot', () => {
     assert.equal(result.success, false, JSON.stringify(props));
     assert.match(
       result.error.issues.map(issue => issue.message).join('\n'),
-      /is not a ScreenHeader node slot/u
+      /is not a node-slot prop name; the diagnostic rule matches these prop names on any component/u
     );
   }
+  // The rule is keyed on the prop name, not on the component: a descriptor on
+  // a non-slot prop of a component other than ScreenHeader is refused the same
+  // way, and the message names the prop-name scope rather than one component.
+  const foreign = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...SLOT_TARGET,
+        diagnostic: { component: PRODUCT, props: { trailing: { $element: 'save-cluster' } } },
+      },
+    ],
+  });
+  assert.equal(foreign.success, false);
+  const foreignMessage = foreign.error.issues.map(issue => issue.message).join('\n');
+  assert.match(foreignMessage, /"trailing" is not a node-slot prop name/u);
+  assert.match(foreignMessage, /matches these prop names on any component/u);
   // Nested under a slot the same descriptor stays legal, and the walker still
   // decides per value, not per shell.
   assert.equal(

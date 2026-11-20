@@ -4,7 +4,13 @@ import {
   createOrganization,
   addUserToOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getAgentInteractionsPerDay,
+  getCloudAgentSessionsPerDay,
+  getCodeReviewsPerDay,
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readCachedAIAdoption, writeCachedAIAdoption } from '@/lib/organizations/ai-adoption-cache';
 import {
   agent_configs,
   agent_environment_profiles,
@@ -16,6 +22,25 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
+
+jest.mock('@/lib/organizations/posthog-autocomplete-queries', () => ({
+  getAutocompleteAcceptedSuggestionsPerDay: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('@/lib/organizations/ai-adoption-cache', () => ({
+  readCachedAIAdoption: jest.fn().mockResolvedValue(null),
+  writeCachedAIAdoption: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/organizations/organization-usage');
+  return {
+    ...actual,
+    getAgentInteractionsPerDay: jest.fn(actual.getAgentInteractionsPerDay),
+    getCloudAgentSessionsPerDay: jest.fn(actual.getCloudAgentSessionsPerDay),
+    getCodeReviewsPerDay: jest.fn(actual.getCodeReviewsPerDay),
+  };
+});
 
 // Test users and organization will be created dynamically
 let regularUser: User;
@@ -452,6 +477,144 @@ describe('organizations usage details trpc router', () => {
           organizationId: testOrganization.id,
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+  });
+
+  describe('getAIAdoptionTimeseries procedure', () => {
+    const input = () => ({
+      organizationId: testOrganization.id,
+      startDate: '2026-10-21T10:05:03.123Z',
+      endDate: '2026-11-20T10:05:03.123Z',
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+      jest.mocked(readCachedAIAdoption).mockResolvedValue(null);
+    });
+
+    it('reads usage through replica transactions that receive a transaction handle', async () => {
+      const transaction = jest.spyOn(readDb, 'transaction');
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries(input());
+
+      expect(result.unavailable).toBe(false);
+      // Members plus the three per-day reads each run in their own bounded transaction.
+      expect(transaction).toHaveBeenCalledTimes(4);
+      for (const read of [
+        getAgentInteractionsPerDay,
+        getCloudAgentSessionsPerDay,
+        getCodeReviewsPerDay,
+      ]) {
+        const lastArgument = jest.mocked(read).mock.calls.at(-1)?.[3];
+        expect(lastArgument).toBeDefined();
+        expect(lastArgument).not.toBe(db);
+      }
+    });
+
+    it('rounds the range for the queries and the cache key, and caches the result', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries(input());
+
+      const key = {
+        organizationId: testOrganization.id,
+        startDate: '2026-10-21T10:00:00.000Z',
+        endDate: '2026-11-20T11:00:00.000Z',
+      };
+      expect(readCachedAIAdoption).toHaveBeenCalledWith(key, expect.anything());
+      expect(writeCachedAIAdoption).toHaveBeenCalledWith(key, result);
+      expect(getAgentInteractionsPerDay).toHaveBeenLastCalledWith(
+        testOrganization.id,
+        '2026-10-07T10:00:00.000Z',
+        '2026-11-20T11:00:00.000Z',
+        expect.anything()
+      );
+    });
+
+    it('returns a cached result without querying', async () => {
+      const cached = {
+        timeseries: [],
+        weeklyTrends: null,
+        userScores: [],
+        isNewOrganization: true,
+        unavailable: false,
+      };
+      jest.mocked(readCachedAIAdoption).mockResolvedValueOnce(cached);
+      const transaction = jest.spyOn(readDb, 'transaction');
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries(input());
+
+      expect(result).toEqual(cached);
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['statement timeout', { code: '57014' }],
+      ['lock timeout', { code: '55P03' }],
+      ['replica recovery conflict', { code: '40001' }],
+    ])('degrades instead of failing on %s, including a wrapped error', async (_name, cause) => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      jest
+        .mocked(getAgentInteractionsPerDay)
+        .mockRejectedValueOnce(new Error('Failed query', { cause }));
+      jest.mocked(writeCachedAIAdoption).mockClear();
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries(input());
+
+      expect(result).toEqual({
+        timeseries: [],
+        weeklyTrends: null,
+        userScores: [],
+        isNewOrganization: false,
+        unavailable: true,
+      });
+      expect(writeCachedAIAdoption).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'AI adoption reads exceeded the replica bounds',
+        expect.objectContaining({ organizationId: testOrganization.id })
+      );
+    });
+
+    it('does not add a day that has not started when the end rounds up to midnight', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-20T23:30:00.000Z'));
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries({
+        organizationId: testOrganization.id,
+        startDate: '2026-11-20T00:00:00.000Z',
+        endDate: '2026-11-20T23:30:00.000Z',
+      });
+
+      expect(result.timeseries.map(point => point.datetime.slice(0, 10))).toEqual(['2026-11-20']);
+    });
+
+    it.each([
+      ['an end before the start', '2026-11-20T00:00:00.000Z', '2026-11-19T00:00:00.000Z'],
+      ['a span over 400 days', '2025-01-01T00:00:00.000Z', '2026-11-20T00:00:00.000Z'],
+    ])('rejects %s', async (_name, startDate, endDate) => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.usageDetails.getAIAdoptionTimeseries({
+          organizationId: testOrganization.id,
+          startDate,
+          endDate,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('still fails on errors that are not replica bounds', async () => {
+      jest
+        .mocked(getCodeReviewsPerDay)
+        .mockRejectedValueOnce(new Error('Failed query', { cause: { code: '23505' } }));
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.usageDetails.getAIAdoptionTimeseries(input())
+      ).rejects.toThrow();
     });
   });
 });

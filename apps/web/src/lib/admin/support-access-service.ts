@@ -700,6 +700,11 @@ export async function listMySupportGrants(actorKiloUserId: string): Promise<Supp
  *
  * A request outside its window is left out of this queue on purpose; its
  * requester still sees it, marked expired, in `listMySupportGrants`.
+ *
+ * A pending row always carries `request_expires_at`: `requestSupportGrant` is the
+ * only writer that creates one, it stamps the deadline on every write request,
+ * and an approved, denied or cancelled grant leaves `pending` rather than losing
+ * the deadline. So this predicate cannot hide a request that is still open.
  */
 export async function listPendingSupportGrants(): Promise<SupportAccessGrant[]> {
   return db

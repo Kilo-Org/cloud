@@ -10,7 +10,8 @@
  * replaying none of its message rows. A record-only retry chain's timer read is
  * the case the timer path used to drop.
  */
-import { env, reset, SELF } from 'cloudflare:test';
+import { env, reset, runInDurableObject, SELF } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createCloudAgentTransport } from '../../../../packages/cloud-agent-sdk/src/cloud-agent-transport.js';
 import type {
@@ -22,6 +23,7 @@ import type {
   KiloSessionId,
   SessionSnapshotPage,
 } from '../../../../packages/cloud-agent-sdk/src/types.js';
+import { createSessionEventQueries } from '../../src/control-plane/session/event-queries.js';
 import type { SessionMessagesPage } from '../../src/control-plane/session/history.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
@@ -210,11 +212,11 @@ function installSocketShim(options: { sessionId: string }) {
       const target = new URL('http://worker.test/stream');
       target.searchParams.set('sessionId', options.sessionId);
       target.searchParams.set('userId', USER_ID);
-      // Only the filters the transport varies matter to the DO; the ticket it
-      // mints is never read by this route.
-      for (const key of ['afterCursor', 'fromId', 'replay', 'bootstrap'])
-        for (const value of requested.searchParams.getAll(key))
-          target.searchParams.append(key, value);
+      // Every parameter the transport sent is forwarded to the worker route,
+      // so a new or renamed stream parameter cannot be dropped silently by
+      // this shim. Only the ticket is dropped: the route here does not read it.
+      for (const [key, value] of requested.searchParams)
+        if (key !== 'ticket') target.searchParams.append(key, value);
       try {
         const response = await SELF.fetch(target.toString(), {
           headers: { Upgrade: 'websocket' },
@@ -516,6 +518,15 @@ describe('cloud agent transport snapshot settlement on the real session DO', () 
       // instead of passing on 0 == 0.
       expect(chatBeforeRelease).toBeGreaterThan(0);
 
+      // The live replays advanced the transport's cursor to the mutation cursor
+      // of every event they delivered. Bump the stored cursor once more with no
+      // event row: the released page then carries a cursor strictly ahead of
+      // anything the sockets saw, so only the recorded page can seed it.
+      const seededCursor = await runInDurableObject(stub, (_instance, state) =>
+        createSessionEventQueries(drizzle(state.storage), state.storage).advanceCursor()
+      );
+      expect(seededCursor).toBeGreaterThan(0);
+
       // The superseded read settles with a real page from the DO. Its rows must
       // stay out of the newer socket's live state, but the page still seeds the
       // connection: metadata, cursor and queued turns have no other source.
@@ -525,17 +536,16 @@ describe('cloud agent transport snapshot settlement on the real session DO', () 
       const page = pages[0];
       expect(page.sourceVersion).toBe('v2');
       expect('source' in page).toBe(false);
+      expect(page.updateCursor).toBe(seededCursor);
       expect(page.messages.map(message => message.info.id)).toEqual([
         seeded.userId,
         seeded.replyId,
       ]);
-      // The recorded page still seeded the connection state: the workspace
-      // update cursor is taken from it, which no other path does.
-      shim.sockets[2].drop();
-      await waitFor(() => expect(shim.sockets).toHaveLength(4));
       // The recorded page seeded the connection's update cursor: the next
       // reconnect replays from it instead of falling back to a cursorless read.
-      expect(shim.sockets[3].url).toContain(`afterCursor=${String(page.updateCursor)}`);
+      shim.sockets[2].drop();
+      await waitFor(() => expect(shim.sockets).toHaveLength(4));
+      expect(shim.sockets[3].url).toContain(`afterCursor=${String(seededCursor)}`);
       expect(reads).toHaveLength(readsBeforeRelease);
 
       // The record-only chain ended with the superseded read: no further read

@@ -655,13 +655,16 @@ describe('createWrapperKiloClient session initialization', () => {
       )
       .mockResolvedValueOnce(Response.json({ id: nativeProjectId }))
       .mockResolvedValueOnce(Response.json({ ok: true, id: 'kilo_sess' }))
+      // The import replaced the row, so the record no longer carries a ruleset
+      // and the apply reads it before updating.
+      .mockResolvedValueOnce(Response.json({ id: 'kilo_sess', directory: workspacePath }))
       .mockResolvedValueOnce(Response.json({ id: 'kilo_sess' }));
     vi.stubGlobal('fetch', fetchMock);
     const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
     await client.ensureSession('kilo_sess', workspacePath);
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
     const imported = fetchMock.mock.calls[2]?.[0] as Request;
     expect(new URL(imported.url).pathname).toBe('/kilocode/session-import/session');
     expect(await imported.json()).toMatchObject({
@@ -679,7 +682,7 @@ describe('createWrapperKiloClient session initialization', () => {
       timeCompacting: payload.time.compacting,
       timeArchived: payload.time.archived,
     });
-    const restored = fetchMock.mock.calls[3]?.[0] as Request;
+    const restored = fetchMock.mock.calls[4]?.[0] as Request;
     expect(restored.method).toBe('PATCH');
     expect(new URL(restored.url).pathname).toBe('/session/kilo_sess');
     expect(new URL(restored.url).searchParams.get('directory')).toBe(workspacePath);

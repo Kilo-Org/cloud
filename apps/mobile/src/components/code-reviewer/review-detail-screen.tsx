@@ -283,35 +283,34 @@ export function ReviewDetailScreen({
               author: review.pr_author,
             })}
           </Text>
+          {/* The conclusion's reason belongs to the title it describes. As its
+              own block at the body's section gap it floated equidistant from
+              the PR title above it and FINDINGS below. The outcome word rides
+              the header's badge, so this block carries only the reason. */}
+          {reviewMessage ? (
+            // A failure keeps the danger tile under it: the red ink alone on
+            // the card surface read as ordinary copy, and the tint is the
+            // palette's own danger token, not a hand-built card fill.
+            <Card className={cn('mt-2', cancellationLabel ? undefined : 'bg-danger-tile-bg')}>
+              <Text
+                variant={cancellationLabel ? 'muted' : undefined}
+                className={cn('text-xs', !cancellationLabel && 'text-destructive')}
+                numberOfLines={4}
+              >
+                {reviewMessage}
+              </Text>
+            </Card>
+          ) : null}
         </Animated.View>
-
-        {/* The outcome: a settled review states its status in the header badge
-            beside the title, so this block carries only the reason it ended.
-            The findings, council and gate sections below never repeat it. */}
-        {reviewMessage ? (
-          // A failure keeps the danger tile under it: the red ink alone on
-          // the card surface read as ordinary copy, and the tint is the
-          // palette's own danger token, not a hand-built card fill.
-          <Card className={cancellationLabel ? undefined : 'bg-danger-tile-bg'}>
-            <Text
-              variant={cancellationLabel ? 'muted' : undefined}
-              className={cn('text-xs', !cancellationLabel && 'text-destructive')}
-              numberOfLines={4}
-            >
-              {reviewMessage}
-            </Text>
-          </Card>
-        ) : null}
 
         {/* Findings: flattened from the council result, paginated in memory. */}
         <Section label={t('common.findings')}>
           {visibleFindings.length === 0 ? (
             // The empty result sits in the same card as every other section's
             // body, so an ended review reads as a filled section, not a caption.
+            // Its line takes the muted body size the GATE card's rows read at.
             <Card>
-              <Text variant="muted" className="text-xs">
-                {t(findingsEmptyCopyKey(review.status))}
-              </Text>
+              <Text variant="muted">{t(findingsEmptyCopyKey(review.status))}</Text>
             </Card>
           ) : (
             <View className="gap-3">

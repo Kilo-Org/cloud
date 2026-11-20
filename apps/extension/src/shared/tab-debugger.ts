@@ -1446,11 +1446,14 @@ export const evaluateTabCode = async ({
 
 export const evalInTabWithScripting = async ({
   code,
+  frameId,
   scriptingApi,
   tabId,
   timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
 }: {
   readonly code: string;
+  /** One frame of the tab; absent runs in the top-level document. */
+  readonly frameId?: number;
   readonly scriptingApi: BrowserScriptingApi;
   readonly tabId: number;
   readonly timeoutMs?: number;
@@ -1467,7 +1470,7 @@ export const evalInTabWithScripting = async ({
         scriptingApi.executeScript({
           args: [code],
           func: runInjectedEval,
-          target: { tabId },
+          target: frameId === undefined ? { tabId } : { frameIds: [frameId], tabId },
           world: 'MAIN',
         })
       ),

@@ -41,7 +41,9 @@
  * may never exceed its baseline count, and an entry the file is now below is
  * reported with the line to lower or delete, so the baseline only shrinks and
  * at the end of the migration it is empty. Regenerate it with
- * `--write-layout-baseline` only after the violations themselves are gone.
+ * `--write-layout-baseline` only after the violations themselves are gone, and
+ * the rewrite refuses a run that could not read the theme or could not read or
+ * parse a walked file: those counts are short by what the run never saw.
  *
  * Usage: node tools/nativewind/check-classes.mjs [--write-layout-baseline]
  */
@@ -366,8 +368,6 @@ function isScrollContainer(name) {
   return SCROLL_CONTAINERS.has(name.replace(/^Animated\./, ''));
 }
 
-const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
-
 /**
  * Every string chunk one syntax tree holds, with where each chunk starts in
  * the source text and the two readings of its content. These are the only
@@ -485,9 +485,7 @@ export function checkScrollPadding(relative, elements, chunks, text, lineOf) {
     if (!isScrollContainer(name)) {
       continue;
     }
-    const { tokens: padding } = classTokens(chunks, node, 'className', classes =>
-      HORIZONTAL_PADDING.test(classes)
-    );
+    const { tokens: padding } = classTokens(chunks, node, 'className', anyPadding);
     if (padding.length > 0) {
       const line = lineOf(node.start);
       problems.push(
@@ -718,10 +716,14 @@ const CENTERED_BODIES = new Set(['CenteredState']);
 const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
 
 /**
- * The utility part of one class token, with any variant prefix removed. A
- * variant (`md:`, `landscape:`, `ios:`) selects when the utility applies, not
- * what it does, so the inset rules read the same padding a bare token writes —
+ * The utility part of one class token, with any variant prefix and the token's
+ * leading `!` removed. A variant (`md:`, `landscape:`, `ios:`) selects when the
+ * utility applies and `!` only raises its specificity, so neither changes what
+ * the utility does: the inset rules read the same padding a bare token writes —
  * the same way L12's lookbehind sees a variant-prefixed `px-6`.
+ * `checkScrollPadding` reads `anyPadding` here for the same reason the L2
+ * gutter rule does: a prefixed `ios:px-4` insets the content exactly as a bare
+ * `px-4` does.
  */
 function utilityOf(token) {
   const segments = token.split(':');
@@ -1558,23 +1560,45 @@ function compareLayoutBaseline(findings, baseline) {
   return [...reported, ...overCount, ...stale];
 }
 
-/** The whole audit: every source file, then the compiler pins, then the report. */
-function run() {
+/**
+ * The whole audit: every source file, then the compiler pins, then the report.
+ *
+ * `read` and `writeBaseline` exist so a test can drive one run without the
+ * process's own arguments: `read` is handed to the walk in place of the
+ * filesystem, and `writeBaseline` stands in for `--write-layout-baseline`.
+ */
+export function run({
+  read = readFileSync,
+  writeBaseline = process.argv.includes('--write-layout-baseline'),
+} = {}) {
   const problems = [];
+  // The walk's own per-file lines — a refused read, a parse error — kept apart
+  // from the rules' findings: no rule can report what it never read, so a run
+  // holding one of these has not audited the tree it walked.
+  const unaudited = [];
   const { failure: themeFailure } = themeTokens();
   for (const dir of SOURCE_DIRS) {
-    for (const entry of parseSourceTree(dir, ROOT, isTestArtifact)) {
+    for (const entry of parseSourceTree(dir, ROOT, isTestArtifact, read)) {
+      unaudited.push(...entry.problems);
       problems.push(...checkParsedFile(entry));
     }
   }
   const findings = layoutFindings(problems);
 
-  if (process.argv.includes('--write-layout-baseline')) {
-    // A run that could not read the theme must not rewrite the baseline as if
-    // it had audited the tree.
-    if (themeFailure !== null) {
-      console.error(themeFailure);
-      console.error('\ncheck-classes: 1 problem(s)');
+  if (writeBaseline) {
+    // A run that could not read the theme, or a walked file it could not read
+    // or parse, has not audited the tree: rewriting the baseline from it would
+    // record counts short by every file the run never saw, and the migration's
+    // floor would rise instead of shrink.
+    if (themeFailure !== null || unaudited.length > 0) {
+      if (themeFailure !== null) {
+        console.error(themeFailure);
+      }
+      for (const problem of unaudited) {
+        console.error(problem);
+      }
+      const count = unaudited.length + (themeFailure === null ? 0 : 1);
+      console.error(`\ncheck-classes: ${count} problem(s)`);
       process.exitCode = 1;
       return;
     }

@@ -442,7 +442,6 @@ export function parseLocalConfigArchive(zipBytes: Uint8Array): ImportPreview {
   }
 
   const sections = configFiles.length === 1 ? readConfigSections(configFiles[0], state) : null;
-  // Compiled once, then reused for every candidate path.
   const compiledGlobs = (sections?.instructionGlobs ?? [])
     .filter(glob => !REMOTE_INSTRUCTION_PATTERN.test(glob))
     .map(toArchiveGlob)

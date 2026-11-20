@@ -15,6 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 import { LAYOUT_RULES, checkParsedFile } from './check-classes.mjs';
 import { parseSourceEntry } from '../lib/source-files.mjs';
@@ -238,6 +239,23 @@ test('accepts all-side padding moved to contentContainerClassName', () => {
       'export const a = <ScrollView contentContainerClassName="p-4" />;\n'
     ),
     []
+  );
+});
+
+test('flags a variant-prefixed padding on a scroll container own className', () => {
+  // A variant selects when the padding applies and `!` only raises its
+  // specificity, so each of these insets the scroll view itself exactly as a
+  // bare `px-4` does. The tokens come back deduped and sorted, one diagnostic
+  // for the element, and the content container's own classes stay out of it.
+  assert.deepEqual(
+    screenProblems(
+      screen(
+        '<ScrollView className="ios:px-4 ios:px-4 android:pe-3 !pl-2 ios:!pr-2 flex-1" contentContainerClassName="gap-3" />'
+      )
+    ),
+    [
+      'apps/mobile/src/screen.tsx:3: <ScrollView> carries "!pl-2 android:pe-3 ios:!pr-2 ios:px-4" on its own className; move it to contentContainerClassName or the RTL layout offsets by it',
+    ]
   );
 });
 
@@ -988,6 +1006,30 @@ test('accepts px-4 and vertical padding on a scroll body', () => {
   );
 });
 
+test('flags a variant-prefixed page inset on a scroll body', () => {
+  // The gutter rule reads a token's utility part, so a prefixed or important
+  // inset is the same page inset the bare spelling writes, and the two RTL
+  // rules stay pinned to one spelling.
+  for (const classes of ['ios:px-6', '!ps-8']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    ).filter(problem => problem.includes('[L2]'));
+    assert.equal(found.length, 1, classes);
+    assert.match(
+      found[0],
+      new RegExp(`\\[L2\\] "${classes} on <DetailScreenScrollView> contentContainerClassName"`)
+    );
+  }
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<DetailScreenScrollView contentContainerClassName="px-4" />')
+    ),
+    []
+  );
+});
+
 test('reads every scroll container in both RTL rules', () => {
   // The two rules read one inventory, so a container the gutter rule used to
   // miss is judged on its content container and one the className rule used to
@@ -1691,4 +1733,70 @@ test('reports an @theme inline block holding no colour token as the theme failur
   // The rule has no token to build its pattern from, so it must not run.
   assert.doesNotMatch(result.stderr, /bg-primary\/50/);
   assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+});
+
+test('--write-layout-baseline refuses when a walked file cannot be read', async context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />'),
+  });
+  const unreadable = join(root, 'apps/mobile/src/screen.tsx');
+  // The fixture's own copy of the checker, so the run it exposes walks the
+  // fixture and would write there: one file's read fails, every other read is
+  // the filesystem's.
+  const { run } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const errors = [];
+  const originalError = console.error;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.error = message => {
+    errors.push(String(message));
+  };
+  let exitCode;
+  try {
+    run({
+      read: (file, ...rest) => {
+        if (file === unreadable) {
+          throw new Error('EACCES: permission denied');
+        }
+        return readFileSync(file, ...rest);
+      },
+      writeBaseline: true,
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.error = originalError;
+    process.exitCode = previousExitCode;
+  }
+  assert.equal(exitCode, 1, errors.join('\n'));
+  const report = errors.join('\n');
+  assert.match(report, /apps\/mobile\/src\/screen\.tsx: cannot read: EACCES: permission denied/);
+  assert.match(report, /check-classes: 1 problem\(s\)/);
+  // A baseline written here would record a tree the audit never checked.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('--write-layout-baseline refuses when a fixture source does not parse', context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/broken.tsx': 'export const a = <View className=; />;\n',
+  });
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'tools/nativewind/check-classes.mjs'), '--write-layout-baseline'],
+    { cwd: root, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stderr, /broken\.tsx:\d+: cannot parse: /);
+  assert.match(result.stderr, /check-classes: [1-9]\d* problem\(s\)/);
+  assert.doesNotMatch(result.stdout, /wrote/);
+  // The refused file may hold any number of violations, so no count is safe.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
 });

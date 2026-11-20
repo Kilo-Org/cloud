@@ -140,6 +140,20 @@ describe('DestructiveConfirmDialog', () => {
     ).toHaveLength(1);
   });
 
+  it('keeps the header spaced the same above and below its title', () => {
+    const root = mount();
+
+    // The card draws no handle and no page chrome, so the header's own padding
+    // is the whole band over the title: the body's `pt-3` there matches the
+    // divider's `pb-3` under it, instead of the default `pt-4` that left the
+    // title top-heavy.
+    const header = root.find(node => isType(node, 'View') && node.props.collapsable === false);
+    const classes = classNameOf(header).split(' ');
+    expect(classes).toContain('pt-3');
+    expect(classes).toContain('pb-3');
+    expect(classes).not.toContain('pt-4');
+  });
+
   it('labels the confirm action with the sign-out copy', () => {
     const root = mount();
 

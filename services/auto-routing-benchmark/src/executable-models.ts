@@ -6,10 +6,13 @@ import { BenchmarkModelCatalogSchema, catalogModelSupportsTools } from './platfo
 export async function fetchExecutableBenchmarkModelCatalog(
   env: Env,
   identity: BenchmarkIdentity,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  /** A token the caller already minted, so one queue message mints at most once. */
+  mintedToken?: string
 ): Promise<z.infer<typeof BenchmarkModelCatalogSchema>> {
   const { benchmarkUserId, benchmarkOrgId } = identity;
-  const token = await fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId, fetchImpl);
+  const token =
+    mintedToken ?? (await fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId, fetchImpl));
   const path = `/api/organizations/${encodeURIComponent(benchmarkOrgId)}/models`;
   const response = await fetchImpl(new URL(path, env.KILO_CLI_API_URL), {
     headers: {

@@ -1040,7 +1040,7 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 | `GET /admin/registry` | Queue counts, exact platform entry statuses and the failed entries of both queues (retryable and permanent, with class, attempts and retry window) under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put retryable failed registry rows whose retry window has passed back to `pending` (`{scope}`); permanent rows are skipped; charges no owner quota |
 | `POST /admin/registry/refresh` | Re-admit exact pairs (`{router, mode, entries}`), clearing their failure history; the console's per-row Re-admit uses `mode: 'refresh'` |
-| `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
+| `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action, pairs?}`; `pairs` limits the plan to an explicit `[{model, variant}]` list) |
 | `GET /admin/routing-table` | Latest published **platform** routing table. Served from `AUTO_ROUTING_CONFIG` key `benchmark_routing_table_response_v1:<router>` only while its version matches the pointer `benchmark_routing_table_version_v1:<router>`. Every publish writes the pointer after its D1 write; a read that finds the pointer missing or different from D1 rewrites it. Every pointer writer re-reads D1 after its write and corrects it, and a body is cached only at the confirmed version. A publish that cannot write the pointer logs it, deletes the cached body and still flushes the gateway key, so the next read goes to D1 and repairs the pointer. The cached body expires after 10 minutes, so even a failed pointer write plus a failed body delete serves the previous table for at most that long. A location's KV edge cache can keep serving the previous pointer for up to about 60 seconds after a publish |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
@@ -1219,6 +1219,121 @@ Runbook, after the whole stack is merged and deployed (the migration applies on 
    `GET /admin/routing-table` shows a new version.
 4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
    its run.
+
+### Measurement revision 3: agentic probes (defined, inactive)
+
+Every run records the revision it started under (`benchmark_runs.measurement_revision`),
+and every result stores the revision that measured it in `prompt_revision`, with the CLI's
+tool evidence (`tool_calls`, `tool_names`, `step_count`, `final_finish_reason`). Tool
+evidence is recorded at every revision. `src/measurement-revision.ts` separates two
+constants: `MEASUREMENT_REVISION` (3) is the newest defined revision, and
+`ACTIVE_MEASUREMENT_REVISION` (2) is the revision every new run starts under. `startRun`,
+`insertRun`'s default, case reuse and the `remeasure-prompt-transport` planner all use
+the active revision, so revision 3 is defined but nothing measures it until someone raises
+`ACTIVE_MEASUREMENT_REVISION` to 3.
+
+The CLI benchmark cannot see the production problem this revision measures: a CLI case is
+one prompt to a fresh session, so a model that ends a tool-offering turn with narration
+looks like any other wrong answer, and the revision-2 tool-required cases only check that
+the final answer is right. Revision 3 asks production's question: given a session that is
+mid-task and whose last message is a tool result, does the model continue with a tool call,
+state the correct final answer, or stop?
+
+**Probe cases.** `src/datasets/probe-cases.ts` replays the recorded sessions in
+`src/datasets/probe-transcripts.ts` — the nine agentic transcripts the continuation pilot
+captured, kept as data with their verification test — and cuts each after a completed step,
+so every request's history ends on a tool result with no further user message. `PROBE_CUTS`
+is the cut set: `{transcriptId, cutAfterStep}` pairs (21 today, one per tool-result step
+end, 1-3 per transcript), so a cut can be dropped or added as a data change. Each cut
+becomes a case with the transcript's agentic route (`taskType`/`subtaskType`), the
+transcript's answer check and a `probe` field carrying the cut and the transcript; a probe
+case has no CLI prompt. Ids are `probe-<transcript-id>-step-<n>`.
+
+**Grading.** A probe reply scores 1 when it carries a tool call (the model continued the
+task) or when its text is the case's correct final answer; narration, a wrong answer or an
+empty reply scores 0. The check is exact or `json_equal`, so no judge is involved;
+`gradeProbeOutput` (src/grading.ts) implements it.
+
+**Templates.** `src/probe/family.ts` picks the family the way the pinned CLI does: the
+catalog's `opencode.prompt`, else the model id, picks the system prompt, and
+`opencode.ai_sdk_provider` picks the SDK and so the endpoint.
+`src/datasets/probe-templates.json` holds one minimal template per family captured from CLI
+7.8.27 against a local fake gateway that logs the request: `default/chat`
+(`deepseek/deepseek-v4.1-flash-1017`), `ling/chat` (`inclusionai/ling-3.1-flash`, thinking),
+`kimi/chat` (`moonshotai/kimi-k3`), `gpt/responses` (`openai/gpt-6-luna`),
+`default/responses` (`x-ai/grok-4.7`), `meta/responses` (`meta/muse-ember`) and
+`anthropic/anthropic` (`anthropic/claude-haiku-5.5`, the Messages API at
+`POST /api/gateway/v1/messages`). A template pins the endpoint, the system prompt with its
+cache breakpoints, the tool schemas, the fixed params, the static header values, how a
+reasoning variant maps to the wire, and how history is encoded; `src/datasets/probe-captures`
+keeps the captured requests and `src/probe/request.test.ts` rebuilds each of them from its
+template, minus per-call ids and timestamps. On a CLI bump, regenerate both from this
+package with Docker running and the workspace installed (needs `pnpm install` at the repo
+root):
+
+```
+pnpm exec tsx scripts/capture-probe-templates.ts --pool /tmp/efficient-pool.json
+```
+
+It starts `scripts/probe-gateway.mjs`, builds the pinned CLI into `probe-capture:7.8.27`,
+drives it through every family in the pool file and writes the fixtures, with no paid calls.
+The pool file is the live Router pool as a JSON array of
+`{ "model": string, "variant": string | null }`; `--only <family>` recaptures one family and
+merges it into `probe-templates.json`, keeping every other family and the rest of the
+bookkeeping. A model whose family has no template fails its probe lane with
+`BenchmarkProbeFamilyError` (a permanent entry failure), never with a score of 0.
+
+**Executor.** `src/probe/executor.ts` builds the request — template, the history up to the
+cut, the pair's variant and catalog entry — and POSTs it with streaming to
+`${KILO_CLI_API_URL}/api/gateway/v1/{responses|chat/completions|messages}` with the
+short-lived bot token the worker mints once per queue message and the run's org. It parses
+the SSE stream with zod into the CLI result shape (text, cost, tokens including reasoning,
+tool calls, `finalFinishReason`, exit 0) inside the same paid ledger: `beginPaidCase`,
+pending output, `recordDeciderOutput`. Cost comes from `usage.cost`; when the gateway omits
+it the executor prices the reported tokens at the run's catalog rates
+(`catalogUsageCostUsd`, src/platform-models.ts). A probe never touches the container, and
+`latency_ms` is the whole reply, from the request to the end of its stream. The error policy
+matches the CLI path: 429 and unbilled 5xx defer (throttle, no result), 400/404/422 marks the
+exact model unavailable, a request or stream that runs into `DECIDER_CLI_TIMEOUT_MS` is a
+timed-out result, a stream cut after the gateway billed for output is an ambiguous execution,
+a terminal provider error that reported usage is a billed failure with its cost and tokens,
+and a catalog read that fails after `beginPaidCase` clears the case and defers the chunk.
+
+**Route-scoped eligibility.** After activation (`ACTIVE_MEASUREMENT_REVISION >= 3`) a ready
+pair whose provenance run lacks complete probe results is ineligible on the three agentic
+routes only: the platform table drops its results for those routes and keeps every other
+route's measurement (`src/probe/eligibility.ts`). An agentic route with no eligible pair
+keeps the candidates the live table already serves instead of emptying. Measuring a pair's
+probes later, through the normal queue or an admin re-measure, makes it eligible again.
+`supp-agent-term-pwd-base` is the one revision-2 case that changes: revision 3 keeps it
+tool-required and accepts only `other`, the answer its isolated workspace produces.
+
+Raising `ACTIVE_MEASUREMENT_REVISION` to 3 is a spending decision and an explicit step after
+this deploys. From the next deploy:
+
+- Every efficient decider run the system starts on its own runs at revision 3: the
+  per-minute cron drain and the 05:00Z platform sync drain every `pending` profile, and each
+  run completion drains again. Such a run reuses the pair's other results and measures the
+  21 probe cuts plus `supp-agent-term-pwd-base` per repetition; nothing else changes.
+- Ready pairs re-run nothing until the `remeasure-prompt-transport` `request` action queues
+  them. Its body accepts `pairs: [{model, variant}, ...]` to measure an explicit set; the
+  activation scope is the 29 pairs that serve the agentic routes, and the dry run projects
+  the spend. At 3 repetitions and catalog prices those 29 pairs cost $21.30 / $21.50 /
+  $22.22 without cache (low/mid/high); the full 52-pair pool $113.87 / $115.05 / $119.15,
+  $68.41 of it with half the input read from cache.
+- The platform table keeps publishing every route; only the agentic routes narrow as
+  described above.
+
+`minimumCaseRevisions(router, revision)` maps each case to the oldest result revision a run
+may reuse: 2 for the argv-affected cases, 3 for every probe case and
+`supp-agent-term-pwd-base`. Prior-case reuse and the re-measure baseline copy skip results
+below their case's minimum; the same `remeasure-prompt-transport` endpoint queues them, and
+its dry run also reports `unmeasuredResults`, the current cases a provenance run never
+measured, which the spend projection leaves out because they have no measured cost.
+
+In the container, a case that requires a tool call runs with `isolated: true`: the CLI's
+working directory (`PWD`) is a fresh temp workspace instead of the shared `/app`.
+
 ## Custom routers and client measurements
 
 ADR 0005 custom routers rank a pool of gateway and client entries against one base

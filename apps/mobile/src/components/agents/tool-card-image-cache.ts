@@ -19,10 +19,6 @@ const pendingPartIds = new Set<string>();
 
 /** Reactive map of partId → file:// URI, updated only after a successful write. */
 const urisByPartId = new Map<string, string>();
-/** Per-part snapshot counter, so a subscriber re-renders on every state change
- *  of its own part (a landed URI, or a pending write turning into a failure)
- *  and is never woken by another part. */
-const versionByPartId = new Map<string, number>();
 const subscriptions = createPartSubscriptions();
 /** Bumped by every reset; a write that started before a reset mutates nothing
  *  into the next generation — no URI, no pending or dedupe marks, no failure
@@ -31,9 +27,27 @@ let cacheGeneration = 0;
 
 let cacheDirectory: Directory | undefined = undefined;
 
+/**
+ * The external-store snapshot of one part, encoded as a string so React can
+ * compare two reads by value: `''` when nothing is cached, `'pending'` while a
+ * write is in flight, and `'u:<uri>'` once a URI is recorded. It carries every
+ * value the cards render, so a subscriber re-renders on a landed URI and on a
+ * pending write turning into a failure, and is never woken by another part.
+ */
+const SNAPSHOT_NONE = '';
+const SNAPSHOT_PENDING = 'pending';
+const SNAPSHOT_URI_PREFIX = 'u:';
+
+function snapshotForPart(partId: string): string {
+  const uri = urisByPartId.get(partId);
+  if (uri !== undefined) {
+    return `${SNAPSHOT_URI_PREFIX}${uri}`;
+  }
+  return pendingPartIds.has(partId) ? SNAPSHOT_PENDING : SNAPSHOT_NONE;
+}
+
 /** Wake the subscribers of one part whose state changed. */
 function emitChange(partId: string): void {
-  versionByPartId.set(partId, (versionByPartId.get(partId) ?? 0) + 1);
   subscriptions.notify(partId);
 }
 
@@ -291,15 +305,25 @@ export function isToolCardImagePending(partId: string): boolean {
  * Returns `undefined` until a successful write (or a pre-existing file) is
  * recorded for `partId`. Each hook subscribes to its own part, so a change to
  * one attachment's state re-renders only the cards mounted for that part.
+ *
+ * The snapshot is the URI itself, never a counter that a reader turns into a
+ * map lookup afterwards: the app compiles this module with the React Compiler,
+ * which caches a `urisByPartId.get(partId)` expression inside the hook on
+ * `partId` alone. It does not know that expression depends on the external
+ * store, so a read beside the subscription returns the value from the first
+ * render forever and a card mounted before its write lands never shows the
+ * image.
  */
 export function useToolCardImageUri(partId: string): string | undefined {
   const subscribe = useCallback(
     (listener: () => void) => subscriptions.subscribe(partId, listener),
     [partId]
   );
-  const getSnapshot = useCallback(() => versionByPartId.get(partId) ?? 0, [partId]);
-  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  return urisByPartId.get(partId);
+  const getSnapshot = useCallback(() => snapshotForPart(partId), [partId]);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  return snapshot.startsWith(SNAPSHOT_URI_PREFIX)
+    ? snapshot.slice(SNAPSHOT_URI_PREFIX.length)
+    : undefined;
 }
 
 /**
@@ -326,7 +350,6 @@ export function clearToolCardImageCache(): void {
   // `tempWriteCounter` stays process-monotonic: temp names are unique per
   // attempt, so a leftover temp can never collide with a later one.
   urisByPartId.clear();
-  versionByPartId.clear();
   cacheDirectory = undefined;
   subscriptions.notifyAll();
 }
@@ -338,7 +361,6 @@ export function __resetToolCardImageCacheForTests(): void {
   pendingPartIds.clear();
   failedPartIds.clear();
   urisByPartId.clear();
-  versionByPartId.clear();
   cacheDirectory = undefined;
   subscriptions.notifyAll();
 }

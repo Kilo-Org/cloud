@@ -505,7 +505,7 @@
     "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
       "signIn": "Kirjautuminen",
-      "profileOrganizations": "Profiili ja organisaatiot"
+      "profileOrganizations": "Profiili & organisaatiot"
     }
   },
   "preferences": {

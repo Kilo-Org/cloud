@@ -3065,6 +3065,12 @@ test('rejects the English source label that carries "and"', () => {
     source: CHANGELOG_AREAS_SOURCE,
   });
   const text = found.join('\n');
-  assert.match(text, /^mobile\/en: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "and"/m);
-  assert.match(text, /^mobile\/ru: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "и"/m);
+  assert.match(
+    text,
+    /^mobile\/en: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "and"/m
+  );
+  assert.match(
+    text,
+    /^mobile\/ru: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "и"/m
+  );
 });

@@ -60,8 +60,12 @@ describe('Hindi permission card', () => {
 describe('Hindi pull-request badge', () => {
   it('names the pull request state instead of asking the reader to open it', () => {
     expect(
-      describePrBadge({ state: 'open', number: 42, reviewDecision: null, reviewDecisionPending: false })
-        .accessibilityLabel
+      describePrBadge({
+        state: 'open',
+        number: 42,
+        reviewDecision: null,
+        reviewDecisionPending: false,
+      }).accessibilityLabel
     ).toBe('खुली पुल रिक्वेस्ट संख्या 42');
   });
 });

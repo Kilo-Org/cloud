@@ -505,7 +505,7 @@
     "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
       "signIn": "Innlogging",
-      "profileOrganizations": "Profil og organisasjoner"
+      "profileOrganizations": "Profil & organisasjoner"
     }
   },
   "preferences": {

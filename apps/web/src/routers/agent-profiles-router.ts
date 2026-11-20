@@ -64,14 +64,21 @@ const VarSchema = z.object({
 });
 
 // The service drops whitespace-only rows before it writes and then applies the
-// cap to what is left, so a stored list can always be re-sent unchanged. This
-// schema still counts the raw array against the cap: every client sends either
-// the rows it read back or a list it already filtered, so a payload of blank
-// rows on top of a full list is not a shape any of them produces.
+// cap to what is left, so a stored list can always be re-sent unchanged. The
+// schema counts only the rows that would survive that drop, which is the same
+// list the service caps; a legacy profile at the cap that still holds a blank
+// row therefore stays editable instead of failing the request shape.
 const CommandsSchema = z.object({
   commands: z
     .array(z.string().max(profileCommandsService.MAX_PROFILE_COMMAND_LENGTH))
-    .max(profileCommandsService.MAX_PROFILE_COMMANDS),
+    .refine(
+      commands =>
+        commands.filter(command => command.trim().length > 0).length <=
+        profileCommandsService.MAX_PROFILE_COMMANDS,
+      {
+        message: `Profiles are limited to ${profileCommandsService.MAX_PROFILE_COMMANDS} setup commands`,
+      }
+    ),
 });
 
 // Owner type schema

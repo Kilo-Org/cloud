@@ -1604,6 +1604,19 @@ describe('Agent Profiles Router', () => {
         const result = await caller.agentProfiles.get({ profileId });
         expect(result.commands.map(row => row.command)).toEqual(['keep me']);
       });
+
+      test('accepts a full list that also carries a blank row', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Blank At Cap Test' });
+
+        // A stored list can hold a row from before the service dropped blanks,
+        // so the widest shape a client can re-send is the cap plus that row.
+        const atCap = Array.from({ length: MAX_PROFILE_COMMANDS }, (_, index) => `cmd ${index}`);
+        await caller.agentProfiles.setCommands({ profileId, commands: [...atCap, ''] });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.commands.map(row => row.command)).toEqual(atCap);
+      });
     });
 
     describe('reorderKiloCommands', () => {

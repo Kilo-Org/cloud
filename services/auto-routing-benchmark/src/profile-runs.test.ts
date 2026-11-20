@@ -10,6 +10,7 @@ import type {
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
+import { ACTIVE_MEASUREMENT_REVISION, deciderCasesForRouter } from './measurement-revision';
 import type { BenchmarkJobMessage } from './run';
 import {
   CATALOG_CONTEXT_TOO_SMALL_REASON,
@@ -354,6 +355,7 @@ beforeEach(() => {
           purpose: run.purpose ?? 'platform',
           accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
           frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
+          measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
           status: 'running',
           completed_at: null,
           error: null,
@@ -403,6 +405,11 @@ beforeEach(() => {
   kvDelete.mockResolvedValue(undefined);
 });
 
+const CURRENT_EFFICIENT_CASE_IDS = deciderCasesForRouter(
+  'efficient',
+  ACTIVE_MEASUREMENT_REVISION
+).map(benchCase => benchCase.id);
+
 const RUN_ROW_BASE = {
   router: 'efficient' as const,
   accuracy_noise_band: 0.05,
@@ -421,6 +428,7 @@ const RUN_ROW_BASE = {
   repetitions: 1,
   classifier_max_p95_latency_ms: null,
   engine_identity: 'v1:test',
+  measurement_revision: 2,
 };
 
 function runningRun(id: string, purpose: 'platform' | 'user') {
@@ -468,7 +476,7 @@ describe('all-effort platform scheduling', () => {
       runId: expect.any(String),
       entries: variants.map(variant => ({ model: 'platform/a', variant })),
       repetitions: 3,
-      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      caseIds: CURRENT_EFFICIENT_CASE_IDS,
       chunkSize: 1,
     });
   });
@@ -515,7 +523,7 @@ describe('startRun — registry-backed decider runs', () => {
       runId: result.runId,
       entries,
       repetitions: 3,
-      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      caseIds: CURRENT_EFFICIENT_CASE_IDS,
       chunkSize: 1,
     });
     expect(queueSendBatch).not.toHaveBeenCalled();
@@ -694,6 +702,10 @@ describe('decider run completion', () => {
       rep: 0,
       timed_out: 0,
       prompt_revision: 2,
+      tool_calls: null,
+      tool_names: null,
+      step_count: null,
+      final_finish_reason: null,
     }));
   }
 
@@ -1020,7 +1032,7 @@ describe('decider run completion', () => {
     expect(saveRoutingTable).not.toHaveBeenCalled();
   });
 
-  it('publishes without a live pair whose re-measurement failed', async () => {
+  it('drops a settled failed target and publishes the rest of the table', async () => {
     vi.mocked(getLatestRoutingTable).mockResolvedValue(
       liveRoutingTable([
         { model: 'platform/a', variant: null },
@@ -1055,14 +1067,21 @@ describe('decider run completion', () => {
         avgReasoningTokens: null,
       }))
     );
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
 
     expect(saveRoutingTable).toHaveBeenCalledOnce();
-    const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
+    expect(events).toContainEqual({
+      event: 'routing_table_publish_dropped_failed_pairs',
+      router: 'efficient',
+      dropped: [{ model: 'platform/b', variant: 'high', status: 'failed' }],
+    });
     expect(
-      table.routes['implementation/code_generation'].map(candidate => candidate.model)
-    ).toEqual(['platform/a']);
+      events.some(entry => entry.event === 'routing_table_publish_skipped_serving_pair_unready')
+    ).toBe(false);
   });
 
   it('does not publish a thin table as an engine bump re-measures the live pairs', async () => {
@@ -1153,6 +1172,132 @@ describe('decider run completion', () => {
     expect(
       table.routes['implementation/code_generation'].map(candidate => candidate.model)
     ).toEqual(['platform/a', 'platform/b']);
+  });
+
+  it('publishes every route while the probe revision is not active', async () => {
+    vi.mocked(getLatestRoutingTable).mockResolvedValue(
+      liveRoutingTable([
+        { model: 'platform/a', variant: null },
+        { model: 'platform/b', variant: 'high' },
+      ])
+    );
+    const summariesFor = (model: string, variant: string | null, runId: string) =>
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model,
+        variant,
+        runId,
+        routeKey,
+        accuracy: 0.9,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
+      }));
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: 'platform/a',
+        pairs: [{ model: 'platform/a', variant: null }],
+        servingPairs: [{ model: 'platform/a', variant: null }],
+        resolutionError: null,
+      },
+      {
+        model: 'platform/b',
+        pairs: [{ model: 'platform/b', variant: 'high' }],
+        servingPairs: [{ model: 'platform/b', variant: 'high' }],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
+      { model: 'platform/a', variant: null, status: 'ready' },
+      { model: 'platform/b', variant: 'high', status: 'ready' },
+    ]);
+    // `a` finished its tool-evidence re-measure; `b` still serves its older measurement.
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'revision-3-a' },
+      { model: 'platform/b', variant: 'high', run_id: 'revision-2-b' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue([
+      ...summariesFor('platform/a', null, 'revision-3-a'),
+      ...summariesFor('platform/b', 'high', 'revision-2-b'),
+    ]);
+
+    await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
+
+    // `ACTIVE_MEASUREMENT_REVISION` is below the probe revision, so mixed gradings neither
+    // hold the table nor narrow a route: probe route eligibility starts with activation.
+    const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
+    expect(table.routes['agentic_execution/tool_usage'].map(candidate => candidate.model)).toEqual([
+      'platform/a',
+      'platform/b',
+    ]);
+  });
+
+  it('does not hold the frontier table for an efficient-only grading revision', async () => {
+    mockConfig({ router: 'frontier' });
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: 'platform/a',
+        pairs: [{ model: 'platform/a', variant: null }],
+        servingPairs: [{ model: 'platform/a', variant: null }],
+        resolutionError: null,
+      },
+      {
+        model: 'platform/b',
+        pairs: [{ model: 'platform/b', variant: 'high' }],
+        servingPairs: [{ model: 'platform/b', variant: 'high' }],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
+      { model: 'platform/a', variant: null, status: 'ready' },
+      { model: 'platform/b', variant: 'high', status: 'ready' },
+    ]);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: 'platform/a', variant: '', run_id: 'frontier-revision-3' },
+      { model: 'platform/b', variant: 'high', run_id: 'frontier-revision-2' },
+    ]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      [
+        { model: 'platform/a', variant: null, runId: 'frontier-revision-3' },
+        { model: 'platform/b', variant: 'high', runId: 'frontier-revision-2' },
+      ].flatMap(pair =>
+        TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+          ...pair,
+          routeKey,
+          accuracy: 0.95,
+          avgCostUsd: 0.002,
+          avgLatencyMs: 100,
+          p50LatencyMs: 100,
+          p95LatencyMs: 150,
+          cases: 10,
+          errors: 0,
+          timeouts: 0,
+          routeAccuracy: null,
+          avgInputTokens: null,
+          avgCachedInputTokens: null,
+          avgOutputTokens: null,
+          avgReasoningTokens: null,
+        }))
+      )
+    );
+
+    await expect(
+      publishPlatformRoutingTable(env, catalogFetch, 'frontier')
+    ).resolves.not.toBeNull();
+    expect(saveRoutingTable).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      expect.any(String),
+      'frontier'
+    );
   });
 
   it('failRunAndDrain fails the claimed registry rows and drains both queues', async () => {
@@ -1319,7 +1464,7 @@ describe('drainQueue', () => {
       runId: result!.runId,
       entries: modelRows.map(row => ({ model: row.model, variant: null })),
       repetitions: 3,
-      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+      caseIds: CURRENT_EFFICIENT_CASE_IDS,
       chunkSize: 1,
     });
     expect(queueSendBatch).not.toHaveBeenCalled();
@@ -1968,7 +2113,7 @@ it('reuses prior cases in the initialization pass before delegating the complete
     runId: result.runId,
     entries: [{ model: 'platform/a', variant: null }],
     repetitions: 3,
-    caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
+    caseIds: CURRENT_EFFICIENT_CASE_IDS,
     chunkSize: 1,
   });
   expect(queueSendBatch).not.toHaveBeenCalled();

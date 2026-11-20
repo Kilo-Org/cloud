@@ -857,6 +857,70 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(state.announcements).toEqual(['Loading…']);
   });
 
+  it('names the offline state instead of a load that cannot start', async () => {
+    // A confirmed-offline device pauses the first read: pending never settles,
+    // so the screen owes the person the offline state with its own Retry, not a
+    // "Loading…" line and eight skeletons that would never land.
+    state.internet = 'offline';
+    state.connection.isConnected = false;
+    state.live.hasAcceptedSuccess = false;
+    state.live.isPaused = true;
+    await renderScreen();
+    expect(listSkeletons()).toHaveLength(0);
+    expect(text()).not.toContain('Loading…');
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    // One statement: the card already names the connection, so the inline line
+    // does not repeat it.
+    expect(text()).not.toContain('No internet connection');
+    expect(text()).not.toContain('Nothing running right now');
+
+    // The offline card takes no pull: a refresh there could not settle, and a
+    // failed one would paint "Couldn't refresh" over the list after reconnect.
+    expect(requireNode('CenteredState').props.refreshControl).toBeUndefined();
+
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    // The card's Retry asks the boundary read, which settles by failing; the
+    // paused live read is left to React Query's reconnect refetch, so the press
+    // cannot hold the lock for the whole outage.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
+    expect(state.refetch).not.toHaveBeenCalled();
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    // The lock released: the second press is not dropped.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(2);
+
+    // On an organization scope the same press leaves the boundary read failed,
+    // and that failure is the outage rather than a verdict on the organization:
+    // the card stays instead of "Couldn't load your organizations".
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    await renderScreen();
+    // The surface keeps the offline card; the header's context control may name
+    // the failed organizations read on its own, but the list never falls to the
+    // organization-unavailable state.
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    expect(text()).not.toContain(i18n.t('organization.boundary.unavailableSessionsDescription'));
+
+    // The connection returns: the paused read resumes by itself and the card
+    // gives way to the confirmed list. The boundary read answers again too.
+    state.organization.organizationId = null;
+    state.boundary.isError = false;
+    state.internet = 'online';
+    state.connection.isConnected = true;
+    state.live.isPaused = false;
+    state.live.hasAcceptedSuccess = true;
+    await renderScreen();
+    expect(text()).not.toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain('Nothing running right now');
+  });
+
   it('keeps list identity, row identity, navigation, run state, and scroll policy through reconnect and refresh failure', async () => {
     state.live.activeSessions = [row];
     await renderScreen();

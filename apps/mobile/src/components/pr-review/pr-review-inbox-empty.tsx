@@ -146,6 +146,21 @@ function InboxBody({
     );
   }
 
+  if (view.kind === 'offline') {
+    // The device has no network, so the copy names the connection and never
+    // the backend. Retry stays: a restored connection makes it useful.
+    return (
+      <QueryError
+        variant="offline"
+        title={t('queryError.offlineTitle')}
+        placement="top"
+        inset="gutter"
+        onRetry={onRetry}
+        isRetrying={isRetrying}
+      />
+    );
+  }
+
   // retryable / service-unavailable: a BAD_GATEWAY names its own cause (the
   // review service is temporarily unavailable); every other failure keeps the
   // generic could-not-load copy. Both offer Retry.

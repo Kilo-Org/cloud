@@ -40,10 +40,6 @@ export function getPlatformOAuthConnectPath(
   const path = `/api/integrations/${platform}/connect`;
   const { organizationId, returnTo } = options;
 
-  if (!organizationId && !returnTo) {
-    return path;
-  }
-
   const params = new URLSearchParams();
   if (organizationId) {
     params.set('organizationId', organizationId);
@@ -51,7 +47,8 @@ export function getPlatformOAuthConnectPath(
   if (returnTo) {
     params.set('returnTo', returnTo);
   }
-  return `${path}?${params.toString()}`;
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
 }
 
 export function getPlatformOAuthCallbackPath(platform: StandardOAuthPlatform): string {

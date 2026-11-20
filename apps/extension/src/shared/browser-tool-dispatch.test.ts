@@ -196,11 +196,11 @@ describe('runKiloBrowserTool on the scripting backend', () => {
   });
 });
 
-/** The user's tab (1) and the agent session's own tab (2), with every tabs call recorded. */
+/** The agent session's own tab (1) and the user's tab (2) behind it in browser order, with every tabs call recorded. */
 const createAgentTabs = () => {
   const tabs = [
-    { id: 1, title: 'Bank', url: 'https://bank.example.com/' },
-    { id: 2, title: 'Agent', url: 'https://agent.example.com/' },
+    { id: 1, title: 'Agent', url: 'https://agent.example.com/' },
+    { id: 2, title: 'Bank', url: 'https://bank.example.com/' },
   ];
   const removed: number[] = [];
   const activated: number[] = [];
@@ -221,11 +221,11 @@ const createAgentTabs = () => {
   const options = {
     agentAccess: {
       actOrigins: [],
-      groupTabs: [2],
+      groupTabs: [1],
       navigateOrigins: [],
       readableOrigins: ['https://agent.example.com'],
     },
-    tabId: 2,
+    tabId: 1,
     tabsApi,
   };
 
@@ -233,13 +233,14 @@ const createAgentTabs = () => {
 };
 
 describe('runKiloBrowserTool tab actions on the scripting backend', () => {
-  it('refuses to select the user’s tab for an agent', async () => {
+  it('refuses the browser index of the user’s tab for an agent', async () => {
     const session = createScriptingFakeSession();
     const tabs = createAgentTabs();
 
+    // The agent list holds one tab, so index 1 is past it and, in browser order, names the user's first tab.
     await expect(
       runKiloBrowserTool({
-        arguments: { action: 'select', index: 0 },
+        arguments: { action: 'select', index: 1 },
         options: tabs.options,
         session,
         toolName: 'browser_tabs',
@@ -249,13 +250,13 @@ describe('runKiloBrowserTool tab actions on the scripting backend', () => {
     expect(session.toolCalls).toStrictEqual([]);
   });
 
-  it('refuses to close the user’s tab for an agent', async () => {
+  it('refuses the browser index of the user’s tab for close', async () => {
     const session = createScriptingFakeSession();
     const tabs = createAgentTabs();
 
     await expect(
       runKiloBrowserTool({
-        arguments: { action: 'close', index: 0 },
+        arguments: { action: 'close', index: 1 },
         options: tabs.options,
         session,
         toolName: 'browser_tabs',
@@ -264,7 +265,7 @@ describe('runKiloBrowserTool tab actions on the scripting backend', () => {
     expect(tabs.removed).toStrictEqual([]);
   });
 
-  it('withholds the user’s tab from an agent’s tab list', async () => {
+  it('lists only the agent’s own tabs, with no user-tab entries', async () => {
     const session = createScriptingFakeSession();
     const tabs = createAgentTabs();
 
@@ -277,12 +278,7 @@ describe('runKiloBrowserTool tab actions on the scripting backend', () => {
       })
     ).resolves.toStrictEqual({
       ok: true,
-      value: {
-        tabs: [
-          { index: 0, selected: false, title: '', url: '[origin withheld]' },
-          { index: 1, selected: true, title: 'Agent', url: 'https://agent.example.com/' },
-        ],
-      },
+      value: '- 0: (current) [Agent](https://agent.example.com/)',
     });
   });
 
@@ -298,7 +294,7 @@ describe('runKiloBrowserTool tab actions on the scripting backend', () => {
         toolName: 'browser_close',
       })
     ).resolves.toStrictEqual({ ok: true, value: 'Closed the tab.' });
-    expect(tabs.removed).toStrictEqual([2]);
+    expect(tabs.removed).toStrictEqual([1]);
     expect(session.toolCalls).toStrictEqual([]);
   });
 });

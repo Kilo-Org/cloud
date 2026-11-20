@@ -83,8 +83,7 @@ function isJunkPath(path: string): boolean {
 
 /**
  * The sole top-level directory of `paths`, and only when every path is nested
- * inside it. Returns null for an empty list, for two or more top-level names,
- * and when a path sits at the root.
+ * inside it.
  */
 function soleTopLevelDirectory(paths: string[]): string | null {
   if (paths.length === 0) return null;

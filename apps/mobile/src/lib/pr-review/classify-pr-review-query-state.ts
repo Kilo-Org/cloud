@@ -9,10 +9,20 @@
 // the same decision tree. No React, no react-query, no expo modules —
 // that keeps it testable in plain Node.
 
-import { readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
+import { servedAnswer } from '@/lib/query/read-failure-variant';
+import { isControlPlaneTimeout, readTrpcErrorField } from '@/lib/trpc-error';
 
 export type PrReviewQueryState =
+  | {
+      /**
+       * The read never reached the server: the app has confirmed it is offline,
+       * or the request failed before any server answer. The caller paints the
+       * connection's own wording with Retry — never the server's copy, which
+       * would blame the backend for the device's missing network.
+       */
+      kind: 'offline';
+    }
   | {
       /**
        * The fetch failed with a transient error (network, 5xx, etc.). The
@@ -60,6 +70,23 @@ export type PrReviewQueryState =
 
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   const code = readTrpcErrorField(error, 'code');
+  // A client-side deadline is a slow but reachable server: it carries no code
+  // and no status, so the connection rule below would blame the network for a
+  // read the app itself gave up on. Retryable is what a second attempt fixes.
+  if (isControlPlaneTimeout(error)) {
+    return { kind: 'retryable' };
+  }
+  // A read that never reached the server is the connection, not the backend.
+  // `servedAnswer` is the rule the rest of the app classifies with: a tRPC
+  // envelope carrying a code, or an HTTP status, proves the server answered —
+  // and a `TRPCClientError` wrapped around a failed fetch has neither. A bare
+  // top-level `code` still carries a verdict (`{ code: 'FORBIDDEN' }`), so the
+  // code is read first and only a code-less, answer-less error is the
+  // connection. Checked before the code table so an offline inbox never reads
+  // "Something went wrong on our end".
+  if (code === undefined && !servedAnswer(error)) {
+    return { kind: 'offline' };
+  }
   if (code === 'PRECONDITION_FAILED') {
     return { kind: 'reconnect' };
   }

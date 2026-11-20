@@ -78,11 +78,16 @@ function leavePhase({
  * Discard replays the intercepted navigation action from an effect, after the
  * render that disarms the guard: the replay dispatches the action again, and a
  * listener still armed would intercept it a second time.
+ *
+ * `onDiscard` drops the form's durable draft once the person confirms Discard.
+ * It runs only for that confirmation — a cancelled prompt keeps the draft — and
+ * omitting it leaves the guard's behavior unchanged.
  */
 export function useMetadataLeaveGuard({
   enabled,
   isDirty,
   saving,
+  onDiscard,
 }: Readonly<{
   /** False for a read-only viewer, who cannot have edited the form. */
   enabled: boolean;
@@ -93,6 +98,8 @@ export function useMetadataLeaveGuard({
   isDirty?: () => boolean;
   /** The form's create, update or delete is in flight. */
   saving: boolean;
+  /** Drops the form's durable draft once the person confirms Discard. */
+  onDiscard?: () => void;
 }>): MetadataLeaveGuard {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -131,6 +138,10 @@ export function useMetadataLeaveGuard({
   // that had the guard on still runs for a removal dispatched before the next
   // commit, and it must classify that removal by the phase the person sees.
   stateRef.current = state;
+  // Same reason: the prompt is opened from that handler, so its `onConfirm`
+  // must clear the draft through the newest `onDiscard` the form passed.
+  const onDiscardRef = useRef(onDiscard);
+  onDiscardRef.current = onDiscard;
 
   const handleDirtyChange = useCallback((next: boolean) => {
     // A route that stayed mounted after a caller-driven leave — a save whose pop
@@ -226,6 +237,9 @@ export function useMetadataLeaveGuard({
           // drained: a screen that survives the replay (its retire was refused)
           // is guarded again on its next edit.
           setDirty(false);
+          // The person confirmed Discard, so the draft they no longer want goes
+          // with the screen. Cancel keeps it.
+          onDiscardRef.current?.();
           pending();
         },
         onCancel: () => {

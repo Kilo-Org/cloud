@@ -467,6 +467,10 @@ export const handleTabDebuggerRequest = async ({
         };
       }
 
+      if (outcome.kind === 'unsupported') {
+        return { ok: true, result: outcome.result, type: BROWSER_TOOL_MESSAGE };
+      }
+
       return {
         ok: true,
         result: outcome.result,

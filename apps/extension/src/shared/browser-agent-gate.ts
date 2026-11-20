@@ -2,6 +2,8 @@
 import { z } from 'zod';
 import {
   ambiguousSelectorError,
+  looksLikeBrowserRef,
+  STALE_REF_ERROR,
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
@@ -25,6 +27,7 @@ import {
   readAgentFrameTree,
 } from './browser-agent-frames';
 import type { AgentFrameInventory, BrowserAgentFrame } from './browser-agent-frames';
+import { readIsolatedHostedFrame } from './browser-agent-isolated-probe';
 import {
   classifyFocusedElement,
   classifyTargetElement,
@@ -107,6 +110,8 @@ const OPAQUE_ORIGIN = 'opaque:null';
 interface TargetFrame {
   /** The target sits in a child frame, not the tab's top-level document. */
   readonly frame: boolean;
+  /** The id of the frame `origin` belongs to, when the gate found it. */
+  readonly frameId?: string;
   readonly origin: string;
   /**
    * The document holding a targeted frame element: a tool on an `<iframe>`
@@ -271,6 +276,37 @@ const targetFrameOf = async (
     return undefined;
   }
 
+  // Without a debugger protocol the probe names the frame a frame element hosts (Firefox).
+  if (session.isolatedProbe !== undefined && resolved.kind === 'selector') {
+    const hosted = await readIsolatedHostedFrame(
+      session.isolatedProbe,
+      resolved.selector,
+      resolved.frameId
+    );
+    const frame =
+      hosted === undefined ? undefined : frames.find(candidate => candidate.id === hosted.frameId);
+
+    // The document holding the element: the tab's own, or the spliced child frame a ref came from.
+    const holder =
+      resolved.frameId === undefined
+        ? mainFrameOf(frames)
+        : frames.find(candidate => candidate.id === String(resolved.frameId));
+    const holderFrame: TargetFrame =
+      holder === undefined
+        ? { frame: true, origin: OPAQUE_ORIGIN }
+        : { frame: resolved.frameId !== undefined, frameId: holder.id, origin: holder.origin };
+
+    // A browser that cannot name the hosted frame leaves the element judged by the document that holds it, below.
+    if (frame !== undefined) {
+      return { frame: true, frameId: frame.id, origin: frame.origin, owner: holderFrame };
+    }
+
+    // A ref from a spliced child frame acts in that frame's document, so it needs that frame's grant.
+    if (resolved.frameId !== undefined) {
+      return holderFrame;
+    }
+  }
+
   let node: z.infer<typeof describeNodeSchema>['node'] = undefined;
 
   try {
@@ -301,6 +337,7 @@ const targetFrameOf = async (
     // A frame owner whose frame this tab cannot see (an out-of-process iframe, a frame still loading) has no origin the gate can judge.
     return {
       frame: true,
+      ...(hosted === undefined ? {} : { frameId: hosted.id }),
       origin: hosted?.origin ?? OPAQUE_ORIGIN,
       owner:
         owning === undefined
@@ -322,7 +359,7 @@ const targetFrameOf = async (
 
   return owning === undefined
     ? { frame: true, origin: OPAQUE_ORIGIN }
-    : { frame: owning.parentId !== undefined, origin: owning.origin };
+    : { frame: owning.parentId !== undefined, frameId: owning.id, origin: owning.origin };
 };
 
 const frameOwnerSchema = z.object({ backendNodeId: z.number().optional() });
@@ -536,7 +573,7 @@ const sensitiveStepFor = async (input: {
  * a frame this read cannot place has no page instead of the top page's.
  */
 const pageUrlFor = async (
-  frame: { readonly frame: boolean; readonly origin: string } | undefined,
+  frame: TargetFrame | undefined,
   readFrames: () => Promise<AgentFrameInventory>
 ): Promise<string | undefined> => {
   const { frames } = await readFrames();
@@ -545,7 +582,10 @@ const pageUrlFor = async (
     return mainFrameOf(frames)?.url;
   }
 
-  return frames.find(candidate => candidate.origin === frame.origin)?.url;
+  // The frame itself when the gate found it: another document may share its origin.
+  return frames.find(candidate =>
+    frame.frameId === undefined ? candidate.origin === frame.origin : candidate.id === frame.frameId
+  )?.url;
 };
 
 export interface AgentPreflightInput {
@@ -622,10 +662,16 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
 
   const destinationOrigin = destination?.kind === 'origin' ? destination.origin : undefined;
   const [primaryTargetFrame] = targetFrames;
-  const targetFrame =
+  const targetFrame: TargetFrame | undefined =
     primaryTargetFrame === undefined
       ? undefined
-      : { frame: primaryTargetFrame.frame, origin: primaryTargetFrame.origin };
+      : {
+          frame: primaryTargetFrame.frame,
+          ...(primaryTargetFrame.frameId === undefined
+            ? {}
+            : { frameId: primaryTargetFrame.frameId }),
+          origin: primaryTargetFrame.origin,
+        };
   const origin = destinationOrigin ?? targetFrame?.origin ?? mainOrigin;
   const targetOriginFrame = grantClass !== 'navigate' && targetFrame?.frame === true;
   // Every named target's frame needs the grant, not only the tab's top-level origin, and so does the document a tool on a frame element runs in.
@@ -658,7 +704,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     return { failure: { items, kind: 'needs_permission' }, ok: false };
   }
 
-  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements cannot run, so it is refused plainly before any sensitive-step ask instead of prompting for a call that would fail.
+  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements, or a ref no snapshot holds any more, cannot run, so it is refused plainly with the tool's own error before any sensitive-step ask instead of prompting for a call that would fail.
   for (const text of targetReferencesOf(input.args)) {
     // eslint-disable-next-line no-await-in-loop -- one resolution per reference, in argument order
     const resolved = await input.session.resolveTarget(text);
@@ -668,6 +714,10 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
         failure: { error: ambiguousSelectorError(resolved.matches), kind: 'blocked' },
         ok: false,
       };
+    }
+
+    if (resolved === undefined && looksLikeBrowserRef(text)) {
+      return { failure: { error: STALE_REF_ERROR, kind: 'blocked' }, ok: false };
     }
   }
 

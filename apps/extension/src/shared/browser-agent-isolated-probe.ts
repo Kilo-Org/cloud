@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- every probe answer the Firefox gate reads is parsed here against one payload set: frames, targets, focus, presence and mask boxes */
 import { z } from 'zod';
 import { originPatternMatches, toBrowserOrigin } from './browser-agent-checks';
 import { maskScreenshotDataUrl } from './browser-screenshot-masking';
@@ -13,7 +14,7 @@ import type { EvalTabResult } from './tab-debugger';
 
 /** What one probe run asks the page; `selector` names a `target` probe's element. */
 export interface IsolatedProbeRequest {
-  readonly kind: 'boxes' | 'focused' | 'frame' | 'presence' | 'target';
+  readonly kind: 'boxes' | 'focused' | 'frame' | 'hosted' | 'presence' | 'target';
   readonly selector?: string;
 }
 
@@ -43,11 +44,13 @@ export interface IsolatedTargetProbe {
   readonly paymentFormSubmit: boolean;
 }
 
-const MAIN_FRAME_ID = 0;
+/** The WebExtension frame id of a tab's top-level document. */
+export const MAIN_FRAME_ID = 0;
 
 const probeTextSchema = z.string();
 const framePayloadSchema = z.object({
   origin: z.string(),
+  owners: z.array(z.number().nullable()).optional(),
   parentFrameId: z.number().nullable(),
   url: z.string(),
 });
@@ -101,16 +104,23 @@ const runProbe = async (
   }
 };
 
+/** The tab's frames, and per frame the frame id each of its `<iframe>`/`<frame>` elements hosts, in document order. */
+export interface IsolatedFrameTree {
+  readonly complete: boolean;
+  readonly frames: readonly IsolatedAgentFrame[];
+  /** Frame id → the hosted frame id per owner element; `undefined` where the browser named none. */
+  readonly owners: ReadonlyMap<string, readonly (string | undefined)[]>;
+}
+
 /**
  * The tab's frames, main frame first, from one injection per frame. A frame
  * the extension cannot inject into is missing from the list, so every decision
  * that needs it fails closed; without the main frame nothing is complete.
  */
-export const readIsolatedFrames = async (
-  probe: IsolatedAgentProbe
-): Promise<{ readonly complete: boolean; readonly frames: readonly IsolatedAgentFrame[] }> => {
+export const readIsolatedFrames = async (probe: IsolatedAgentProbe): Promise<IsolatedFrameTree> => {
   const main: IsolatedAgentFrame[] = [];
   const children: IsolatedAgentFrame[] = [];
+  const owners = new Map<string, readonly (string | undefined)[]>();
 
   for (const { frameId, result } of await runProbe(probe, { kind: 'frame' })) {
     const payload = parsePayload(result, framePayloadSchema);
@@ -124,6 +134,11 @@ export const readIsolatedFrames = async (
         url: payload.url,
       };
 
+      owners.set(
+        frame.id,
+        (payload.owners ?? []).map(owner => (owner === null ? undefined : String(owner)))
+      );
+
       if (frameId === MAIN_FRAME_ID) {
         main.push(frame);
       } else {
@@ -132,17 +147,40 @@ export const readIsolatedFrames = async (
     }
   }
 
-  return { complete: main.length > 0, frames: [...main, ...children] };
+  return { complete: main.length > 0, frames: [...main, ...children], owners };
 };
 
-/** The classification of the one element a selector names, or nothing when it names none or several. */
+/** The classification of the one element a selector names in frame `frameId`, or nothing when it names none or several. */
 export const readIsolatedTargetProbe = async (
   probe: IsolatedAgentProbe,
-  selector: string
+  selector: string,
+  frameId: number = MAIN_FRAME_ID
 ): Promise<IsolatedTargetProbe | undefined> => {
-  const [answer] = await runProbe(probe, { kind: 'target', selector }, [MAIN_FRAME_ID]);
+  const [answer] = await runProbe(probe, { kind: 'target', selector }, [frameId]);
 
   return parsePayload(answer?.result, targetPayloadSchema)?.probe;
+};
+
+const hostedPayloadSchema = z.object({ frameId: z.number().nullable().optional() });
+
+/**
+ * Whether a selector names one `<iframe>`/`<frame>` of frame `frameId`'s
+ * document, and the frame it hosts: `undefined` for any other element,
+ * `{ frameId: undefined }` for a frame element whose frame the browser cannot name.
+ */
+export const readIsolatedHostedFrame = async (
+  probe: IsolatedAgentProbe,
+  selector: string,
+  frameId: number = MAIN_FRAME_ID
+): Promise<{ readonly frameId: string | undefined } | undefined> => {
+  const [answer] = await runProbe(probe, { kind: 'hosted', selector }, [frameId]);
+  const payload = parsePayload(answer?.result, hostedPayloadSchema);
+
+  if (payload === undefined || !('frameId' in payload)) {
+    return undefined;
+  }
+
+  return { frameId: payload.frameId === null ? undefined : String(payload.frameId) };
 };
 
 /**

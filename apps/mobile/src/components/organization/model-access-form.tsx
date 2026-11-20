@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -9,6 +9,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type OrgGatewaySettings,
   useSaveOrgModelAccess,
@@ -21,11 +22,20 @@ import {
   denyListModels,
   draftsEqual,
   initialDraft,
+  isModelAccessFormDraft,
   type ModelAccessDraft,
   modelAccessSave,
   providerRows,
 } from '@/lib/organization/model-access';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
+import {
+  type FormState,
+  providerDataNotice,
+  providerListEditedBy,
+  syncedFormState,
+} from '@/lib/organization/model-access-form-state';
+import { orgModelAccessFormDraftKey } from '@/lib/persist/drafts';
+import { useFormDraft } from '@/lib/persist/use-form-draft';
 
 type Tab = 'models' | 'providers' | 'gateways';
 
@@ -34,77 +44,6 @@ const BLOCKING_ISSUE_KEYS = {
   'empty-provider-list': 'organizationModelAccess.emptyProviderList',
   'empty-model-list': 'organizationModelAccess.emptyModelList',
 } as const;
-
-/**
- * The form's own state: the saved lists it is synced to, the baseline a cancel
- * returns to, the draft on screen, and whether the provider rows came from the
- * policy-filtered list while the catalog was unavailable. It is one object
- * because one render can move both the saved lists and the provider rows, and
- * two setters rebasing from that render's values would let the second write back
- * the deny list the first had just synced.
- */
-type FormState = Readonly<{
-  /** The `serverKey` the form's baseline was last synced to. */
-  syncedKey: string;
-  baseline: ModelAccessDraft;
-  draft: ModelAccessDraft;
-  providerRowsProvisional: boolean;
-}>;
-
-/**
- * Rebases the form onto the lists the server answered.
- *
- * A refetch that moved the saved lists rebases the baseline, and the draft too
- * unless the admin holds edits of its own: those win, and the next save replaces
- * the newer policy.
- *
- * The provider rows are provisional while the catalog is unavailable: they hold
- * only the providers the organization's own models name, and no provider edit is
- * possible in that state (the tab is read-only). When the catalog arrives they
- * rebase to the whole gateway catalog and keep only the edits the deny list
- * holds. Without this the first toggle after a retry would write the provisional
- * rows as the organization's whole allow list.
- *
- * Both rebases compose here, so a catalog that arrives in the same render as a
- * newer deny list keeps that deny list instead of restoring the values the
- * render started from.
- */
-function syncedFormState(params: {
-  state: FormState;
-  serverKey: string;
-  serverDraft: ModelAccessDraft;
-  catalogUnavailable: boolean;
-}): FormState {
-  const { state } = params;
-  const savedListsMoved = params.serverKey !== state.syncedKey;
-  const catalogArrived = state.providerRowsProvisional && !params.catalogUnavailable;
-  if (
-    !savedListsMoved &&
-    !catalogArrived &&
-    state.providerRowsProvisional === params.catalogUnavailable
-  ) {
-    return state;
-  }
-  const clean = draftsEqual(state.draft, state.baseline);
-  let baseline = savedListsMoved ? params.serverDraft : state.baseline;
-  let draft = savedListsMoved && clean ? params.serverDraft : state.draft;
-  if (catalogArrived) {
-    baseline = {
-      providerAllowList: params.serverDraft.providerAllowList,
-      modelDenyList: baseline.modelDenyList,
-    };
-    draft = {
-      providerAllowList: params.serverDraft.providerAllowList,
-      modelDenyList: draft.modelDenyList,
-    };
-  }
-  return {
-    syncedKey: savedListsMoved ? params.serverKey : state.syncedKey,
-    baseline,
-    draft,
-    providerRowsProvisional: params.catalogUnavailable,
-  };
-}
 
 /**
  * The two lists the organization's routing policy is: which providers may
@@ -172,22 +111,61 @@ export function ModelAccessForm({
     available: models,
     savedAllowList: providerAllowList,
   });
+  // Rows come from the catalog plus the saved list: an empty set is missing data.
+  const providersEmpty = providers.length === 0;
   const serverDraft = initialDraft(
     { provider_allow_list: providerAllowList, model_deny_list: modelDenyList },
     providers
   );
   const serverKey = `${serverDraft.providerAllowList.join(',')}|${serverDraft.modelDenyList.join(',')}`;
+  // Missing rows make the draft's provider list provisional: it rebases on arrival.
+  const providerRowsIncomplete = catalogUnavailable || providersEmpty;
   const [form, setForm] = useState<FormState>(() => ({
     syncedKey: serverKey,
     baseline: serverDraft,
     draft: serverDraft,
-    providerRowsProvisional: catalogUnavailable,
+    providerRowsProvisional: providerRowsIncomplete,
+    providerListEdited: false,
   }));
-  const synced = syncedFormState({ state: form, serverKey, serverDraft, catalogUnavailable });
+  const synced = syncedFormState({ state: form, serverKey, serverDraft, providerRowsIncomplete });
   if (synced !== form) {
     setForm(synced);
   }
   const { baseline, draft } = form;
+
+  // The lists also live in the account-scoped encrypted store: a device language
+  // change that flips the text direction reloads the bundle, which kills this
+  // tree without running its cleanup, and the toggles would come back as the
+  // server's. The form has the saved lists to show, so it renders from them at
+  // once and applies a restored draft once, only while the person has moved
+  // nothing.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const formDraft = useFormDraft<ModelAccessDraft>({
+    userId,
+    isIdentityLoading,
+    entityKey: orgModelAccessFormDraftKey(organizationId),
+    validate: isModelAccessFormDraft,
+  });
+  // An edit or a tab change owns the form: a stored draft that lands later never
+  // replaces what the person already moved, and a restore runs once per mount.
+  const touchedRef = useRef(false);
+  const restoredRef = useRef(false);
+  const restoredDraft = formDraft.kind === 'ready' ? formDraft.value : null;
+  useEffect(() => {
+    if (restoredDraft === null || touchedRef.current || restoredRef.current) {
+      return;
+    }
+    restoredRef.current = true;
+    // Both lists move together, so the restored draft replaces the pair;
+    // `dirty` recomputes against the baseline, which is what enables Save. A
+    // restored provider list is the person's own, so a catalog that arrives
+    // afterwards must not overwrite it with the saved list.
+    setForm(previous => ({
+      ...previous,
+      draft: restoredDraft,
+      providerListEdited: providerListEditedBy(previous, restoredDraft),
+    }));
+  }, [restoredDraft]);
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
@@ -204,20 +182,35 @@ export function ModelAccessForm({
     enabled: canEdit,
     isDirty: () => dirty,
     saving,
+    // A confirmed Discard is the person dropping the edits on purpose, so the
+    // stored draft goes with them; Cancel drops it the same way. Without this
+    // the next mount would restore exactly what they threw away.
+    onDiscard: formDraft.clear,
   });
   const savePayload = modelAccessSave({
     savedAllowList: providerAllowList,
     baseline,
     draft,
-    providerCatalogLoaded: !catalogUnavailable,
+    // Missing provider data is not a policy of no providers.
+    providerCatalogLoaded: !catalogUnavailable && !providersEmpty,
     models: [...catalog, ...models],
   });
   const blockingIssue =
     savePayload.kind === 'ready' ? null : t(BLOCKING_ISSUE_KEYS[savePayload.kind]);
   const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
+  const noticeKey = providerDataNotice({ catalogUnavailable, providersEmpty });
+  const notice = noticeKey === null ? null : t(noticeKey);
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
-    setForm(previous => ({ ...previous, draft: next }));
+    touchedRef.current = true;
+    setForm(previous => ({
+      ...previous,
+      draft: next,
+      providerListEdited: providerListEditedBy(previous, next),
+    }));
+    // The whole draft, on every edit: a reload may follow any of them, and the
+    // hook writes through while it still reports `loading`.
+    formDraft.save(next);
   };
 
   const onSave = async () => {
@@ -244,6 +237,9 @@ export function ModelAccessForm({
         syncedKey: serverKey,
         baseline: previous.draft,
       }));
+      // The draft became the saved policy; nothing is left to restore.
+      restoredRef.current = true;
+      formDraft.clear();
       attempt.succeed();
     } catch (error) {
       attempt.fail({
@@ -274,11 +270,11 @@ export function ModelAccessForm({
   return (
     <View className="flex-1">
       <View className="gap-3 px-4 pt-3">
-        {catalogUnavailable ? (
-          <View className="flex-row items-center gap-3 rounded-md bg-muted-soft px-3 py-2">
-            <Text variant="caption" className="flex-1">
-              {t('organizationModelAccess.catalogUnavailable')}
-            </Text>
+        {/* The warning tile marks missing data; the message takes the body
+            ink, because the muted neutral fails body-text contrast on it. */}
+        {notice === null ? null : (
+          <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
+            <Text className="flex-1 text-foreground">{notice}</Text>
             <Button
               variant="outline"
               size="sm"
@@ -288,7 +284,7 @@ export function ModelAccessForm({
               <Text>{t('common.retry')}</Text>
             </Button>
           </View>
-        ) : null}
+        )}
         <SegmentedControl
           options={[
             { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
@@ -296,7 +292,12 @@ export function ModelAccessForm({
             { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
           ]}
           value={tab}
-          onChange={setTab}
+          onChange={nextTab => {
+            // A tab change is the person looking elsewhere: a draft that lands
+            // after it must not move the lists under the tab they chose.
+            touchedRef.current = true;
+            setTab(nextTab);
+          }}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
         />
         {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
@@ -316,6 +317,11 @@ export function ModelAccessForm({
             disabled={!dirty || saving}
             onPress={() => {
               clearWhere(() => true);
+              // Cancel is a deliberate discard: the stored copy goes with the
+              // screen's, or a language-direction reload would restore exactly
+              // the edits the person just threw away.
+              touchedRef.current = true;
+              formDraft.clear();
               setForm(previous => ({ ...previous, draft: previous.baseline }));
             }}
           >
@@ -335,7 +341,9 @@ export function ModelAccessForm({
           disabled={!canEdit || saving}
         />
       ) : null}
-      {tab === 'providers' ? (
+      {/* An empty row set shows the screen-level notice above instead of a list
+          whose only row would be a misleading empty-policy message. */}
+      {tab === 'providers' && !providersEmpty ? (
         <View className="flex-1">
           {catalogUnavailable ? (
             <Text variant="caption" className="px-4 pb-2">

@@ -23,6 +23,7 @@ import {
   type CaptureContext,
   type Clock,
   type Device,
+  type HoldRelease,
   type RunOutcome,
 } from './capture';
 import type { ProbeClient, ProbeSample } from './cdp';
@@ -1492,4 +1493,259 @@ test('an unconfirmed reset on the last target skips the next cell and fails the 
   assert.match(result.restoreError ?? '', /forced left a forced state.*still unconfirmed/);
   // Two sends after the capture, two at the next cell, two in the restore.
   assert.equal(sends.filter(url => url === CLEAR).length, 6);
+});
+
+test('a held target is judged by the loading rules, an ordinary target is not', () => {
+  const blank: ProbeDump = {
+    version: 1,
+    env: {
+      platform: 'android',
+      osVersion: '15',
+      route: '/agents',
+      screen: '(app)/(tabs)/(2_agents)',
+      window: { width: 400, height: 800 },
+      pixelRatio: 2,
+      fontScale: 1,
+      colorScheme: 'light',
+      isRTL: false,
+      language: 'en',
+      languagePreference: 'system',
+      safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+      tapTarget: { min: 28, touch: 44 },
+    },
+    nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+  };
+  const args = { cell: 'base', target: 'held', dump: blank, tree: normalize(blank) };
+  assert.ok(
+    !screenFindings(args).some(finding => finding.rule === 'loading-placeholder'),
+    'the loading rules are opt-in: a capture of a loaded screen is not judged as a wait'
+  );
+  const findings = screenFindings({ ...args, held: true });
+  assert.ok(findings.some(finding => finding.rule === 'loading-placeholder'));
+  // A held capture is settled: the placeholder is the state the target names, so
+  // the unsettled warning that a placeholder normally raises must not fire.
+  const settled = screenFindings({
+    ...args,
+    held: true,
+    sampled: { dump: blank, timeline: [blank], settled: true, elapsedMs: 0 },
+  });
+  assert.ok(!settled.some(finding => finding.rule === 'unsettled'));
+});
+
+/** A held frame: a screen painting its own spinner while its data is pending. */
+function spinnerDump(options: { route?: string; label?: string } = {}): ProbeDump {
+  const base = dumpWith({ route: options.route ?? '/held', text: 'Loading' });
+  return {
+    ...base,
+    nodes: [
+      ...base.nodes,
+      {
+        parent: 0,
+        tag: 'ActivityIndicator',
+        rect: [40, 100, 20, 20],
+        ...(options.label === undefined ? {} : { label: options.label }),
+      },
+    ],
+  };
+}
+
+test('a held frame that is still moving is still judged by the loading rules', () => {
+  const frame = spinnerDump();
+  const moving = { dump: frame, timeline: [frame, frame], settled: false, elapsedMs: 10_800 };
+  const judged = screenFindings({
+    cell: 'base',
+    target: 'held',
+    dump: frame,
+    tree: normalize(frame),
+    sampled: moving,
+    held: true,
+  });
+  // The geometry rules still skip a frame whose rects describe more than one layout…
+  assert.ok(judged.some(finding => finding.rule === 'unsettled'));
+  // …and the loading rules judge it anyway: this is the frame the hold exists for,
+  // and they read one node's own name rather than comparing two rects.
+  assert.ok(
+    judged.some(finding => finding.rule === 'loading-unlabelled'),
+    'an unsettled held frame is still the frame the loading rules measure'
+  );
+  // The same frame without a hold is not judged as a wait.
+  const ordinary = screenFindings({
+    cell: 'base',
+    target: 'ordinary',
+    dump: frame,
+    tree: normalize(frame),
+    sampled: moving,
+  });
+  assert.ok(!ordinary.some(finding => finding.rule.startsWith('loading-')));
+});
+
+const LANDED: HoldRelease = {
+  confirmed: true,
+  cleared: true,
+  settled: true,
+  clearMs: 400,
+  landedMs: 900,
+};
+
+function releaseFindingsFor(release: HoldRelease, held = true) {
+  const frame = spinnerDump();
+  return screenFindings({
+    cell: 'base',
+    target: 'held',
+    dump: frame,
+    tree: normalize(frame),
+    held,
+    sampled: { dump: frame, timeline: [frame], settled: true, elapsedMs: 0, release },
+  }).filter(finding => finding.rule === 'loading-release');
+}
+
+test('a release the app never confirmed is reported, not passed', () => {
+  const findings = releaseFindingsFor({
+    ...LANDED,
+    confirmed: false,
+    failure: 'openLink kiloapp:///dev/force-state/clear: pending',
+    cleared: false,
+    settled: false,
+  });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.severity, 'warning');
+  assert.match(
+    findings[0]?.message ?? '',
+    /was not released \(openLink .* pending\).*loading frame only/u
+  );
+  // A capture that is not held has no landing to report on.
+  assert.deepEqual(releaseFindingsFor({ ...LANDED, confirmed: false }, false), []);
+});
+
+test('a placeholder that outlives the release is reported as an unmeasured landing', () => {
+  const findings = releaseFindingsFor({ ...LANDED, cleared: false, clearMs: 30_100 });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.measured, 30_100);
+  assert.match(findings[0]?.message ?? '', /still painted 30100 ms after the release/u);
+});
+
+test('a landing that never stops moving is reported as an unsettled landing', () => {
+  const findings = releaseFindingsFor({ ...LANDED, settled: false, landedMs: 8_240 });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.measured, 8_240);
+  assert.match(findings[0]?.message ?? '', /kept changing for 8240 ms/u);
+});
+
+test('a release that lands on content reports nothing', () => {
+  assert.deepEqual(releaseFindingsFor(LANDED), []);
+});
+
+const HELD_LINK = 'kiloapp://held';
+const RELEASE_LINK = 'kiloapp:///dev/force-state/clear?next=%2Fcontent';
+
+/** A held frame: the screen's own skeleton, painted while its data is pending. */
+function skeletonDump(route: string, text: string): ProbeDump {
+  const base = dumpWith({ route, text });
+  return {
+    ...base,
+    nodes: [
+      ...base.nodes,
+      { parent: 0, tag: 'View', rect: [0, 100, 100, 20], testID: 'screen-skeleton' },
+    ],
+  };
+}
+
+/** A probe whose held frame stays until the release link opens. */
+function heldProbe(state: ProbeState): ProbeClient {
+  const content = dumpWith({ route: '/content', text: screenTextFor('/content') });
+  const probe: ProbeClient & { released: boolean } = {
+    ...fakeProbe(state),
+    released: false,
+    dump: async () => (probe.released ? content : skeletonDump(state.route, state.text)),
+    openLink: async url => {
+      if (url === RELEASE_LINK) {
+        probe.released = true;
+        state.route = '/content';
+        state.text = screenTextFor('/content');
+        return;
+      }
+      state.open?.(url);
+    },
+    lastOutcome: async () => `openLink ${RELEASE_LINK}: opened`,
+  };
+  return probe;
+}
+
+const HELD_TARGET = { id: 'held', link: HELD_LINK, after: RELEASE_LINK, hold: true };
+
+test('a held capture releases onto its content and keeps the landed frame', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const ctx = context(
+    fakeDevice(calls, state, {
+      routes: { [HELD_LINK]: '/held' },
+      texts: { [HELD_LINK]: 'Loading' },
+    }),
+    heldProbe(state)
+  );
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [HELD_TARGET]);
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.landing, 'the landed frame is kept as evidence');
+  const landing = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.landing), 'utf8'));
+  assert.equal(landing.env.route, '/content');
+  assert.ok(logs.some(line => line.includes('releasing the loading hold')));
+  assert.equal(
+    outcome.findings.filter(finding => finding.rule === 'loading-release').length,
+    0,
+    'a confirmed release onto content has nothing to report'
+  );
+  assert.equal(outcome.restoreError, undefined);
+});
+
+test('a held capture whose release never lands reports the unmeasured landing', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe: ProbeClient = {
+    ...heldProbe(state),
+    // The hold stays on: the app never reports the release it was sent.
+    lastOutcome: async () => `openLink ${RELEASE_LINK}: pending`,
+  };
+  const ctx = context(
+    fakeDevice(calls, state, {
+      routes: { [HELD_LINK]: '/held' },
+      texts: { [HELD_LINK]: 'Loading' },
+    }),
+    probe
+  );
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [HELD_TARGET]);
+  const release = outcome.findings.filter(finding => finding.rule === 'loading-release');
+  assert.equal(release.length, 1);
+  assert.match(release[0]?.message ?? '', /was not released/u);
+  assert.ok(logs.some(line => line.includes('release link not confirmed')));
+  // A release that never landed cannot clear the placeholder the hold keeps
+  // painting, so the release path must not spend the wait's budget on it.
+  assert.ok(!logs.some(line => line.includes('still paints its placeholder')));
+});
+
+test('a held retry does not wait for a placeholder that cannot clear', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const ctx = context(
+    fakeDevice(calls, state, {
+      routes: { [HELD_LINK]: '/held' },
+      // The first open reports the route without painting the screen; the retry
+      // paints it, and that paint is the held frame.
+      texts: { [HELD_LINK]: ['Screen /', 'Loading'] },
+    }),
+    heldProbe(state)
+  );
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [HELD_TARGET]);
+  assert.equal(outcome.cells[0]?.screens.length, 1);
+  assert.ok(logs.some(line => line.includes('did not change the screen; opening the link again')));
+  assert.ok(
+    !logs.some(line => line.includes('still paints its loading placeholder')),
+    'the retry must not wait on the placeholder the hold keeps painting'
+  );
+  assert.ok(ctx.clock.now() < 30_000, 'the retry costs no placeholder wait');
 });

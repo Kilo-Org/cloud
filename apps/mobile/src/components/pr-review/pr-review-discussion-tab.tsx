@@ -107,7 +107,10 @@ import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding, useStyleSideInsets } from '@/lib/screen-insets';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
+import {
+  connectionRefusesWrites,
+  useCommittedConnectivityStatus,
+} from '@/lib/hooks/use-offline-banner-state';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -181,6 +184,7 @@ export function PrReviewDiscussionTab({
   // alone rather than forking the tab per provider.
   const { ref } = useProviderPrScope({ owner, repo, number });
   const isMergeRequest = ref.platform === 'gitlab';
+  const connectivity = useCommittedConnectivityStatus();
   const router = useRouter();
 
   // s4: the tab is the only place that owns the own-comment writes. Edit pushes
@@ -331,20 +335,23 @@ export function PrReviewDiscussionTab({
 
   // ── First-page error / terminal states ─────────────────────────────
   const isEmpty = isDiscussionEmpty(threads, conversation);
-  // A retryable gateway-class failure (retryable or service-unavailable)
-  // with already-loaded rows keeps them: the error renders as a later-page
-  // retry footer, not a tab-level blank.
+  // A recoverable first-page failure (retryable, a gateway failure, or a read
+  // that never reached the server) with already-loaded rows keeps them: the
+  // error renders as a later-page retry footer, not a tab-level blank. Losing
+  // the connection is not a reason to drop what the reader already had.
   const retainedContentError =
     !isEmpty &&
     (firstPageErrorState?.kind === 'retryable' ||
-      firstPageErrorState?.kind === 'service-unavailable');
+      firstPageErrorState?.kind === 'service-unavailable' ||
+      firstPageErrorState?.kind === 'offline');
   const view = selectDiscussionTabView({
     firstPageErrorState: retainedContentError ? null : firstPageErrorState,
     isPending: query.isPending && isEmpty,
     // A pending page whose fetch is paused (offline, or a fetch that will
-    // never start) has no end — the retryable state, not the skeleton (spot
-    // check e7).
+    // never start) has no end — a failure state, not the skeleton (spot check
+    // e7), and the connection's own when it is the cause.
     isPaused: query.isPaused,
+    isOffline: connectivity === 'offline',
     isEmpty,
   });
 
@@ -502,6 +509,23 @@ export function PrReviewDiscussionTab({
         <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
           <PrReviewReconnectNotice />
         </CenteredState>
+        {dialog}
+      </>
+    );
+  }
+  if (view.kind === 'offline') {
+    // The read never reached the server (or the device is offline before the
+    // first page started): name the connection, not the backend, and keep the
+    // Retry a restored network makes useful.
+    return (
+      <>
+        <QueryError
+          variant="offline"
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
         {dialog}
       </>
     );

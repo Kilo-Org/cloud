@@ -8,7 +8,6 @@ import {
   type BenchmarkSchedulerSettingKey,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
-import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 export type PaidExecutionKey = {
   runId: string;
@@ -869,7 +868,8 @@ export async function beginPaidCase(
     .prepare(`
     INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at,
       prompt_revision)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (
+    SELECT ?, ?, ?, ?, ?, ?, ?, (SELECT measurement_revision FROM benchmark_runs WHERE id = ?)
+    WHERE EXISTS (
       SELECT 1 FROM scheduler_chunks WHERE run_id = ? AND model = ? AND variant = ? AND rep = ?
         AND token = ? AND status = 'active' AND lease_until > ?
         AND EXISTS (SELECT 1 FROM json_each(case_ids) WHERE value = ?)
@@ -889,7 +889,7 @@ export async function beginPaidCase(
       key.caseId,
       key.token,
       now,
-      PROMPT_TRANSPORT_REVISION,
+      key.runId,
       key.runId,
       key.model,
       key.variant,

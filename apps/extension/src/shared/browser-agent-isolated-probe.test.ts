@@ -10,7 +10,9 @@ import type { IsolatedAgentProbe, IsolatedProbeResult } from './browser-agent-is
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
 import { classifyFocusedElement, classifyTargetElement } from './browser-agent-probes';
 import { readAgentFrames } from './browser-agent-frames';
+import { preflightAgentCall } from './browser-agent-gate';
 import { SENSITIVE_REASON } from './browser-agent-checks';
+import type { BrowserGrant } from './browser-agent-checks';
 
 /** Runs the probe's own serialized source in a jsdom page, the way `scripting.executeScript` ships it. */
 const runInPage = (
@@ -228,12 +230,16 @@ describe('isolated agent probe in the page', () => {
     });
   });
 
-  it('reports its own url and origin', () => {
+  it('reports its own url and origin, and the frame each frame element hosts', () => {
     expect(runInPage('<p>x</p>', 'frame')).toStrictEqual({
       origin: 'https://shop.example.com',
+      owners: [],
       parentFrameId: null,
       url: 'https://shop.example.com/cart',
     });
+    expect(
+      runInPage('<iframe></iframe><p><iframe></iframe></p>', 'frame', { frameIdOf: () => 3 })
+    ).toMatchObject({ owners: [3, 3] });
   });
 });
 
@@ -268,6 +274,10 @@ describe('isolated frame list', () => {
           url: 'https://pay.example.com/form',
         },
       ],
+      owners: new Map([
+        ['0', []],
+        ['12', []],
+      ]),
     });
   });
 
@@ -292,6 +302,137 @@ describe('isolated frame list', () => {
 
     await expect(readIsolatedFrames(probe)).resolves.toMatchObject({
       frames: [{ id: '0', origin: 'opaque:null' }],
+    });
+  });
+
+  it('names the frame a frame element hosts, and nothing for any other element', () => {
+    const page =
+      '<iframe id="pay" src="https://pay.example.com/"></iframe><button id="go">Go</button>';
+
+    expect(runInPage(page, 'hosted', { frameIdOf: () => 12, selector: '#pay' })).toStrictEqual({
+      frameId: 12,
+    });
+    expect(runInPage(page, 'hosted', { frameIdOf: () => 12, selector: '#go' })).toStrictEqual({});
+  });
+
+  it('asks for the hosted frame’s read grant when a call targets its frame element', async () => {
+    const probe = fakeProbe({
+      0: {
+        frame: {
+          origin: 'https://shop.example.com',
+          parentFrameId: null,
+          url: 'https://shop.example.com/',
+        },
+        hosted: { frameId: 12 },
+      },
+      12: {
+        frame: {
+          origin: 'https://pay.example.com',
+          parentFrameId: 0,
+          url: 'https://pay.example.com/form',
+        },
+      },
+    });
+
+    await expect(
+      preflightAgentCall({
+        args: { target: '#pay' },
+        authorized: [{ class: 'read', origin: 'https://shop.example.com' }],
+        consumeStepToken: () => false,
+        session: { ...sessionWith(probe), takeDownloads: () => [] },
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      failure: {
+        items: [{ class: 'read', frame: true, origin: 'https://pay.example.com' }],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    });
+  });
+
+  it('requires the owner document’s grant for a tool that runs on the frame element there', async () => {
+    const probe = fakeProbe({
+      0: {
+        frame: {
+          origin: 'https://shop.example.com',
+          parentFrameId: null,
+          url: 'https://shop.example.com/',
+        },
+        hosted: { frameId: 12 },
+      },
+      12: {
+        frame: {
+          origin: 'https://pay.example.com',
+          parentFrameId: 0,
+          url: 'https://pay.example.com/form',
+        },
+      },
+    });
+    const call = (toolName: string, authorized: readonly BrowserGrant[]) =>
+      preflightAgentCall({
+        args: { function: '(element) => element.ownerDocument.cookie', target: '#pay' },
+        authorized,
+        consumeStepToken: () => false,
+        session: { ...sessionWith(probe), takeDownloads: () => [] },
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName,
+      });
+
+    await expect(
+      call('browser_evaluate', [{ class: 'act', origin: 'https://pay.example.com' }])
+    ).resolves.toStrictEqual({
+      failure: {
+        items: [{ class: 'act', origin: 'https://shop.example.com' }],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    });
+    await expect(
+      call('browser_take_screenshot', [{ class: 'read', origin: 'https://pay.example.com' }])
+    ).resolves.toStrictEqual({
+      failure: {
+        items: [{ class: 'read', origin: 'https://shop.example.com' }],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    });
+  });
+
+  it('judges a frame element the browser cannot name by the document that holds it', async () => {
+    // A Firefox without runtime.getFrameId cannot name the hosted frame: the element is still the shop document’s.
+    const probe = fakeProbe({
+      0: {
+        frame: {
+          origin: 'https://shop.example.com',
+          parentFrameId: null,
+          url: 'https://shop.example.com/',
+        },
+        hosted: { frameId: null },
+      },
+    });
+
+    await expect(
+      preflightAgentCall({
+        args: { target: '#pay' },
+        authorized: [{ class: 'read', origin: 'https://shop.example.com' }],
+        consumeStepToken: () => false,
+        session: { ...sessionWith(probe), takeDownloads: () => [] },
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      class: 'read',
+      ok: true,
+      origin: 'https://shop.example.com',
+      targetOriginFrame: false,
     });
   });
 });
@@ -328,6 +469,197 @@ describe('isolated sensitive classification', () => {
     await expect(classifyFocusedElement(sessionWith(probe))).resolves.toMatchObject({
       frameId: '12',
       kind: 'sensitive',
+    });
+  });
+});
+
+describe('isolated refs inside a child frame', () => {
+  const SHOP = 'https://shop.example.com';
+  const PAY = 'https://pay.example.com';
+  const PASSWORD = { probe: { fields: [{ kind: 'password' }], paymentFormSubmit: false } };
+  const PLAIN = { probe: { fields: [], paymentFormSubmit: false } };
+
+  interface FrameTargets {
+    readonly pay: unknown;
+    readonly shop: unknown;
+  }
+
+  /** The shop page embeds the pay frame 4; `body > button` names a button in each document. */
+  const framedSession = (targets: FrameTargets) => ({
+    ...sessionWith(
+      fakeProbe({
+        0: {
+          frame: { origin: SHOP, owners: [4], parentFrameId: null, url: `${SHOP}/` },
+          hosted: {},
+          target: targets.shop,
+        },
+        4: {
+          frame: { origin: PAY, owners: [], parentFrameId: 0, url: `${PAY}/` },
+          hosted: {},
+          target: targets.pay,
+        },
+      })
+    ),
+    resolveTarget: () =>
+      Promise.resolve({
+        frameId: 4,
+        kind: 'selector' as const,
+        nodeId: 0,
+        selector: 'body > button',
+      }),
+    takeDownloads: () => [],
+  });
+
+  const clickFrameRef = (
+    targets: FrameTargets,
+    authorized: readonly { readonly class: 'act'; readonly origin: string }[]
+  ) =>
+    preflightAgentCall({
+      args: { target: 'e3' },
+      authorized,
+      consumeStepToken: () => false,
+      session: framedSession(targets),
+      sessionHandle: 'session-1',
+      stepTokens: [],
+      tabId: 7,
+      toolName: 'browser_click',
+    });
+
+  it('asks for act on the frame’s origin, which the tab’s act grant does not cover', async () => {
+    await expect(
+      clickFrameRef({ pay: PLAIN, shop: PLAIN }, [{ class: 'act', origin: SHOP }])
+    ).resolves.toStrictEqual({
+      failure: { items: [{ class: 'act', frame: true, origin: PAY }], kind: 'needs_permission' },
+      ok: false,
+    });
+  });
+
+  it('runs with act on the frame’s origin, classifying the element in that frame', async () => {
+    await expect(
+      clickFrameRef({ pay: PLAIN, shop: PASSWORD }, [{ class: 'act', origin: PAY }])
+    ).resolves.toStrictEqual({ class: 'act', ok: true, origin: PAY, targetOriginFrame: true });
+  });
+
+  it('classifies a frame ref by the element in its frame, not the top document’s', async () => {
+    await expect(
+      classifyTargetElement(framedSession({ pay: PASSWORD, shop: PLAIN }), 'e3')
+    ).resolves.toStrictEqual({ kind: 'sensitive', reason: SENSITIVE_REASON.password });
+  });
+
+  it('asks for the nested frame’s grant when a frame ref is itself an iframe', async () => {
+    const ADS = 'https://ads.example.com';
+    const session = {
+      ...framedSession({ pay: PLAIN, shop: PLAIN }),
+      isolatedProbe: fakeProbe({
+        0: {
+          frame: { origin: SHOP, owners: [4], parentFrameId: null, url: `${SHOP}/` },
+          hosted: {},
+        },
+        4: {
+          frame: { origin: PAY, owners: [6], parentFrameId: 0, url: `${PAY}/` },
+          hosted: { frameId: 6 },
+        },
+        6: { frame: { origin: ADS, owners: [], parentFrameId: 4, url: `${ADS}/` } },
+      }),
+    };
+
+    await expect(
+      preflightAgentCall({
+        args: { target: 'e3' },
+        authorized: [{ class: 'read', origin: PAY }],
+        consumeStepToken: () => false,
+        session,
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      failure: { items: [{ class: 'read', frame: true, origin: ADS }], kind: 'needs_permission' },
+      ok: false,
+    });
+  });
+
+  it('asks for both the holder frame’s and the nested frame’s grant for an iframe inside a child frame', async () => {
+    const ADS = 'https://ads.example.com';
+    const session = {
+      ...framedSession({ pay: PLAIN, shop: PLAIN }),
+      isolatedProbe: fakeProbe({
+        0: {
+          frame: { origin: SHOP, owners: [4], parentFrameId: null, url: `${SHOP}/` },
+          hosted: {},
+        },
+        4: {
+          frame: { origin: PAY, owners: [6], parentFrameId: 0, url: `${PAY}/` },
+          hosted: { frameId: 6 },
+        },
+        6: { frame: { origin: ADS, owners: [], parentFrameId: 4, url: `${ADS}/` } },
+      }),
+    };
+
+    await expect(
+      preflightAgentCall({
+        args: { target: 'e3' },
+        authorized: [{ class: 'read', origin: SHOP }],
+        consumeStepToken: () => false,
+        session,
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      failure: {
+        items: [
+          { class: 'read', frame: true, origin: PAY },
+          { class: 'read', frame: true, origin: ADS },
+        ],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    });
+  });
+
+  it('judges a frame ref by its own frame’s page, not another document of the same origin', async () => {
+    const GITHUB = 'https://github.com';
+    const session = {
+      ...framedSession({ pay: PLAIN, shop: PLAIN }),
+      isolatedProbe: fakeProbe({
+        0: {
+          frame: { origin: GITHUB, owners: [4], parentFrameId: null, url: `${GITHUB}/` },
+          hosted: {},
+          target: PLAIN,
+        },
+        4: {
+          frame: {
+            origin: GITHUB,
+            owners: [],
+            parentFrameId: 0,
+            url: `${GITHUB}/login/oauth/authorize?client_id=x`,
+          },
+          hosted: {},
+          target: PLAIN,
+        },
+      }),
+    };
+
+    await expect(
+      preflightAgentCall({
+        args: { target: 'e3' },
+        authorized: [{ class: 'act', origin: GITHUB }],
+        consumeStepToken: () => false,
+        session,
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_click',
+      })
+    ).resolves.toMatchObject({
+      failure: {
+        items: [{ class: 'sensitive', origin: GITHUB, reason: SENSITIVE_REASON.oauthConsent }],
+        kind: 'needs_permission',
+      },
+      ok: false,
     });
   });
 });

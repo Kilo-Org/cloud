@@ -1859,8 +1859,8 @@
       "updatedFileCount_other": "{{displayCount}}件のファイルを更新しました。"
     },
     "toolCard": {
-      "accessibility": "{{label}}ツール、{{status}}",
-      "accessibilityLabel": "{{name}}ツール、{{status}}",
+      "accessibility": "{{label}}、ツール、{{status}}",
+      "accessibilityLabel": "{{name}}、ツール、{{status}}",
       "noTasks": "タスクはありません。",
       "toolRead": "読み取り",
       "toolEdit": "編集",

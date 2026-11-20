@@ -25,7 +25,7 @@ import { parseSourceEntry } from '../lib/source-files.mjs';
 // they build one.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
-const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'fs-entries.mjs', 'source-files.mjs'];
 
 /**
  * The diagnostics of one file, straight from the checker's own export. A
@@ -959,6 +959,52 @@ test('accepts px-4 and vertical padding on a scroll body', () => {
     ),
     []
   );
+});
+
+test('reads every scroll container in both RTL rules', () => {
+  // The two rules read one inventory, so a container the gutter rule used to
+  // miss is judged on its content container and one the className rule used to
+  // miss is judged on its own className.
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<FlatList contentContainerClassName="px-6" />')).join('\n'),
+    /\[L2\] "px-6 on <FlatList> contentContainerClassName"/
+  );
+  assert.match(
+    screenProblems(screen('<FlatList className="px-3" />')).join('\n'),
+    /<FlatList> carries "px-3" on its own className/
+  );
+  for (const tag of ['DetailScreenScrollView', 'SheetScrollView']) {
+    assert.match(
+      layoutProblems(SCREEN_FILE, screen(`<${tag} contentContainerClassName="px-6" />`)).join('\n'),
+      new RegExp(`\\[L2\\] "px-6 on <${tag}> contentContainerClassName"`),
+      tag
+    );
+    assert.match(
+      screenProblems(screen(`<${tag} className="px-3" />`)).join('\n'),
+      new RegExp(`<${tag}> carries "px-3" on its own className`),
+      tag
+    );
+  }
+});
+
+test('accepts the px-4 gutter on every scroll container and its Animated form', () => {
+  for (const tag of [
+    'ScrollView',
+    'TabScreenScrollView',
+    'DetailScreenScrollView',
+    'SheetScrollView',
+    'FlatList',
+    'FlashList',
+    'KeyboardAwareScrollView',
+    'Animated.ScrollView',
+    'Animated.FlatList',
+  ]) {
+    assert.deepEqual(
+      layoutProblems(SCREEN_FILE, screen(`<${tag} contentContainerClassName="px-4" />`)),
+      [],
+      tag
+    );
+  }
 });
 
 test('flags a header className that writes the page gutter', () => {

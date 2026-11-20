@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "La conexión de Bitbucket con {{organization}} se gestiona en la web desde un ordenador.",
+      "managedOnWebTitle": "Se gestiona en la web",
+      "managedOnWebShort": "Esta conexión se gestiona en la web desde un ordenador.",
+      "managedOnWebRepositories": "Elige los repositorios para {{organization}} en la web desde un ordenador.",
       "description": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
       "descriptionReconnect": "Crea un nuevo token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
       "descriptionOverview": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo en la siguiente pantalla.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "Actividad",
       "checking": "Comprobando…",
+      "needsAttention": "Requiere atención",
       "platforms": "Plataformas",
       "statusUnavailable": "Estado no disponible"
     },
@@ -4139,7 +4143,13 @@
     "providerUnavailable": "El proveedor no está disponible en este momento. Vuelve a enviar el mensaje en breve."
   },
   "settingsTools": {
-    "confirmTitle": "¿Confirmar este cambio?"
+    "confirmTitle": "¿Confirmar este cambio?",
+    "guarded": {
+      "spendAlertsOff": "¿Desactivar las alertas de gasto? Dejarías de recibir notificaciones sobre los cruces de umbrales de gasto y los picos por hora.",
+      "balanceAlertsOff": "¿Desactivar las alertas de saldo? Dejarías de recibir notificaciones cuando tus créditos estén bajos.",
+      "securityFindingsOff": "¿Desactivar los hallazgos de seguridad? Dejarías de recibir notificaciones sobre nuevos hallazgos de seguridad.",
+      "hideBalanceOn": "¿Ocultar tus saldos? Los saldos de créditos dejarían de aparecer en las pantallas de perfil y el centro de la organización."
+    }
   },
   "appActions": {
     "start": {
@@ -4901,7 +4911,7 @@
   },
   "organizationGuardrails": {
     "title": "Barreras de seguridad de IA",
-    "permissionDenied": "Solo los propietarios y administradores de la organización pueden gestionar las barreras de seguridad de IA.",
+    "permissionDenied": "Solo los propietarios y administradores de la organización pueden gestionar las barreras de seguridad de IA. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Las barreras de seguridad de IA no están habilitadas",
     "unavailable": "Kilo habilita las barreras de seguridad de IA para una organización a petición. Contacta con {{supportEmail}} y el equipo de Kilo las activa para tu organización.",
     "contactSupport": "Contactar con soporte técnico",

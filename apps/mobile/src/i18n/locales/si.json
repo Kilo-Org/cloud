@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "managedOnWebTitle": "වෙබය හරහා කළමනාකරණය කෙරේ",
+      "managedOnWebShort": "මෙම සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "managedOnWebRepositories": "{{organization}} සඳහා පරිගණකයකින් වෙබය හරහා රෙපොසිටරි තෝරන්න.",
       "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionOverview": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා ඊළඟ තිරයේ අලවන්න.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "පරීක්ෂා කරමින්…",
       "statusUnavailable": "තත්ත්වය ලබා ගත නොහැක",
+      "needsAttention": "අවධානය අවශ්‍යයි",
       "platforms": "වේදිකා",
       "activity": "ක්‍රියාකාරකම්"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "සැපයුම්කරු දැනට ලබා ගත නොහැක. කෙටි වේලාවකින් නැවත යවන්න."
   },
   "settingsTools": {
-    "confirmTitle": "මෙම වෙනස තහවුරු කරන්නද?"
+    "confirmTitle": "මෙම වෙනස තහවුරු කරන්නද?",
+    "guarded": {
+      "spendAlertsOff": "වියදම් ඇඟවීම් ක්‍රියා විරහිත කරන්නද? වියදම් සීමා ඉක්මවීම් සහ පැයක තියුණු වැඩිවීම් පිළිබඳ දැනුම්දීම් ලැබීම නතර වේ.",
+      "balanceAlertsOff": "ශේෂ ඇඟවීම් ක්‍රියා විරහිත කරන්නද? ඔබගේ ක්‍රෙඩිට් අඩු වන විට දැනුම්දීම් ලැබීම නතර වේ.",
+      "securityFindingsOff": "ආරක්ෂක සොයාගැනීම් ක්‍රියා විරහිත කරන්නද? නව ආරක්ෂක සොයාගැනීම් පිළිබඳ දැනුම්දීම් ලැබීම නතර වේ.",
+      "hideBalanceOn": "ඔබගේ ශේෂ සඟවන්නද? ක්‍රෙඩිට් ශේෂ තවදුරටත් පැතිකඩ තිරවල සහ සංවිධාන කේන්ද්‍රයේ දිස් නොවේ."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "AI ආරක්ෂක වැටවල්",
-    "permissionDenied": "AI ආරක්ෂක වැටවල් කළමනාකරණය කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකයින්ට පමණයි.",
+    "permissionDenied": "AI ආරක්ෂක වැටවල් කළමනාකරණය කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකයින්ට පමණයි. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI ආරක්ෂක වැටවල් සබල කර නැත",
     "unavailable": "Kilo ඉල්ලීම මත සංවිධානයක් සඳහා AI ආරක්ෂක වැටවල් සබල කරයි. {{supportEmail}} අමතන්න, Kilo කණ්ඩායම එය ඔබේ සංවිධානය සඳහා සබල කරයි.",
     "contactSupport": "සහාය කණ්ඩායම අමතන්න",

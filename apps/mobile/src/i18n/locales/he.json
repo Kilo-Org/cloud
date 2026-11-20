@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
+      "managedOnWebTitle": "מנוהל באתר",
+      "managedOnWebShort": "החיבור הזה מנוהל באתר דרך מחשב.",
+      "managedOnWebRepositories": "בחר את המאגרים עבור {{organization}} באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "descriptionReconnect": "צור אסימון גישה חדש לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "descriptionOverview": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו במסך הבא.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "פעילות",
       "checking": "בבדיקה…",
+      "needsAttention": "נדרש טיפול",
       "platforms": "פלטפורמות",
       "statusUnavailable": "המצב אינו זמין"
     },
@@ -4139,7 +4143,13 @@
     "providerUnavailable": "הספק אינו זמין כרגע. שלחו שוב בקרוב."
   },
   "settingsTools": {
-    "confirmTitle": "לאשר את השינוי הזה?"
+    "confirmTitle": "לאשר את השינוי הזה?",
+    "guarded": {
+      "spendAlertsOff": "לכבות התראות הוצאה? תפסיקו לקבל התראות על חציית ספי הוצאה ועל קפיצות שעתיות.",
+      "balanceAlertsOff": "לכבות התראות יתרה? תפסיקו לקבל התראות כשהקרדיטים שלכם אוזלים.",
+      "securityFindingsOff": "לכבות ממצאי אבטחה? תפסיקו לקבל התראות על ממצאי אבטחה חדשים.",
+      "hideBalanceOn": "להסתיר את היתרות שלכם? יתרות הקרדיט לא יופיעו יותר במסכי הפרופיל ובמרכז הארגון."
+    }
   },
   "appActions": {
     "start": {
@@ -4901,7 +4911,7 @@
   },
   "organizationGuardrails": {
     "title": "מעקות בטיחות לבינה מלאכותית",
-    "permissionDenied": "רק בעלי הארגון והמנהלים יכולים לנהל מעקות בטיחות לבינה מלאכותית.",
+    "permissionDenied": "רק בעלי הארגון והמנהלים יכולים לנהל מעקות בטיחות לבינה מלאכותית. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "מעקות בטיחות לבינה מלאכותית אינם מופעלים",
     "unavailable": "Kilo מפעילה מעקות בטיחות לבינה מלאכותית עבור ארגון לפי בקשה. צרו קשר עם {{supportEmail}}, וצוות Kilo יפעיל אותם עבור הארגון שלך.",
     "contactSupport": "פנייה לתמיכה",

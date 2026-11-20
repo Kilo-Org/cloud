@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
+      "managedOnWebTitle": "Vebdə idarə olunur",
+      "managedOnWebShort": "Bu bağlantı kompüterdən vebdə idarə olunur.",
+      "managedOnWebRepositories": "{{organization}} üçün repozitoriyaları kompüterdən vebdə seçin.",
       "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionOverview": "{{organization}} üçün iş sahəsi giriş tokeni yarat və növbəti ekranda yapışdır.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Yoxlanılır…",
       "statusUnavailable": "Status əlçatan deyil",
+      "needsAttention": "Müdaxilə tələb olunur",
       "platforms": "Platformalar",
       "activity": "Fəaliyyət"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Provayder hazırda əlçatan deyil. Bir az sonra yenidən göndərin."
   },
   "settingsTools": {
-    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"
+    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?",
+    "guarded": {
+      "spendAlertsOff": "Xərc bildirişlərini söndürəsiniz? Xərc həddinin aşılması və saatlıq kəskin artımlar barədə bildirişlər almağı dayandırardınız.",
+      "balanceAlertsOff": "Balans bildirişlərini söndürəsiniz? Kreditləriniz azaldıqda bildirişlər almağı dayandırardınız.",
+      "securityFindingsOff": "Təhlükəsizlik tapıntılarını söndürəsiniz? Yeni təhlükəsizlik tapıntıları barədə bildirişlər almağı dayandırardınız.",
+      "hideBalanceOn": "Balanslarınızı gizlədirsiniz? Kredit balansları artıq profil ekranlarında və təşkilat mərkəzində görünməyəcək."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Süni intellekt qoruyucu qaydaları",
-    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər.",
+    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Süni intellekt qoruyucu qaydaları aktivləşdirilməyib",
     "unavailable": "Kilo təşkilat üçün Süni intellekt qoruyucu qaydalarını sorğu əsasında aktivləşdirir. {{supportEmail}} ilə əlaqə saxlayın və Kilo komandası onu təşkilatınız üçün aktivləşdirir.",
     "contactSupport": "Dəstək xidməti ilə əlaqə saxla",

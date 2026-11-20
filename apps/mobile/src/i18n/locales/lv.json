@@ -1415,6 +1415,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebTitle": "Pārvaldīts tīmeklī",
+      "managedOnWebShort": "Šis savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebRepositories": "Izvēlies repozitorijus priekš {{organization}} tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionReconnect": "Izveido jaunu darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionOverview": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to nākamajā ekrānā.",
@@ -1438,6 +1441,7 @@
     "platformList": {
       "checking": "Pārbauda…",
       "statusUnavailable": "Statuss nav pieejams",
+      "needsAttention": "Nepieciešama rīcība",
       "platforms": "Platformas",
       "activity": "Darbības"
     },
@@ -4139,7 +4143,13 @@
     "providerUnavailable": "Pakalpojumu sniedzējs šobrīd nav pieejams. Nosūti vēlreiz pēc brīža."
   },
   "settingsTools": {
-    "confirmTitle": "Apstiprināt šo izmaiņu?"
+    "confirmTitle": "Apstiprināt šo izmaiņu?",
+    "guarded": {
+      "spendAlertsOff": "Vai izslēgt tēriņu brīdinājumus? Jūs vairs nesaņemsit paziņojumus par tēriņu sliekšņu pārsniegšanu un pēkšņiem tēriņu kāpumiem stundas laikā.",
+      "balanceAlertsOff": "Vai izslēgt atlikuma brīdinājumus? Jūs vairs nesaņemsit paziņojumus, kad jūsu kredītu atlikums kļūs zems.",
+      "securityFindingsOff": "Vai izslēgt drošības atklājumus? Jūs vairs nesaņemsit paziņojumus par jauniem drošības atklājumiem.",
+      "hideBalanceOn": "Vai paslēpt savus atlikumus? Kredītu atlikumi vairs neparādīsies profila ekrānos un organizācijas centrā."
+    }
   },
   "appActions": {
     "start": {
@@ -4901,7 +4911,7 @@
   },
   "organizationGuardrails": {
     "title": "MI aizsargbarjeras",
-    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori.",
+    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "MI aizsargbarjeras nav iespējotas",
     "unavailable": "Kilo pēc pieprasījuma iespējo MI aizsargbarjeras organizācijai. Sazinieties ar {{supportEmail}}, un Kilo komanda tās ieslēdz jūsu organizācijai.",
     "contactSupport": "Sazināties ar atbalsta dienestu",

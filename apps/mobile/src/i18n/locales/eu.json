@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
+      "managedOnWebTitle": "Webean kudeatzen da",
+      "managedOnWebShort": "Konexio hau webean kudeatzen da, ordenagailu batetik.",
+      "managedOnWebRepositories": "Aukeratu {{organization}}-ren biltegiak webean, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi behean.",
       "descriptionReconnect": "Sortu lan-eremurako sarbide-token berri bat {{organization}}-rako eta itsatsi behean.",
       "descriptionOverview": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi hurrengo pantailan.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Egiaztatzen…",
       "statusUnavailable": "Egoera ez dago erabilgarri",
+      "needsAttention": "Esku-hartze beharra",
       "platforms": "Plataformak",
       "activity": "Jarduera"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Hornitzailea ez dago erabilgarri une honetan. Bidali berriro laster."
   },
   "settingsTools": {
-    "confirmTitle": "Aldaketa hau berretsi?"
+    "confirmTitle": "Aldaketa hau berretsi?",
+    "guarded": {
+      "spendAlertsOff": "Desaktibatu gastu-alertak? Gastu-atalaseak gainditzean eta orduko gorakadetan ez zenuke jakinarazpenik jasoko.",
+      "balanceAlertsOff": "Desaktibatu saldo-alertak? Zure kredituak gutxitzen direnean ez zenuke jakinarazpenik jasoko.",
+      "securityFindingsOff": "Desaktibatu segurtasun-aurkikuntzak? Segurtasun-aurkikuntza berriei buruzko jakinarazpenik ez zenuke jasoko.",
+      "hideBalanceOn": "Ezkutatu zure saldoak? Kreditu-saldoak jada ez lirateke agertuko profileko pantailetan eta erakundearen atarian."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "AA babes-mugak",
-    "permissionDenied": "Erakundearen jabeek eta administratzaileek soilik kudea ditzakete AA babes-mugak.",
+    "permissionDenied": "Erakundearen jabeek eta administratzaileek soilik kudea ditzakete AA babes-mugak. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AA babes-mugak ez daude gaituta",
     "unavailable": "Kilok eskaeraren arabera gaitzen dizkio AA babes-mugak erakunde bati. Jarri harremanetan {{supportEmail}}, eta Kilo taldeak zure erakundearentzako gaituko ditu.",
     "contactSupport": "Jarri harremanetan laguntza-taldearekin",

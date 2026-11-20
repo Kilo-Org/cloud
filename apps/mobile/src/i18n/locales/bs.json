@@ -1415,6 +1415,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računara.",
+      "managedOnWebTitle": "Upravlja se na webu",
+      "managedOnWebShort": "Ova veza se upravlja na webu s računara.",
+      "managedOnWebRepositories": "Odaberi repozitorije za {{organization}} na webu s računara.",
       "description": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "descriptionReconnect": "Kreiraj novi token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "descriptionOverview": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem ekranu.",
@@ -1438,6 +1441,7 @@
     "platformList": {
       "checking": "Provjera…",
       "statusUnavailable": "Status nedostupan",
+      "needsAttention": "Zahtijeva pažnju",
       "platforms": "Platforme",
       "activity": "Aktivnost"
     },
@@ -4139,7 +4143,13 @@
     "providerUnavailable": "Pružalac usluge trenutno nije dostupan. Pošalji ponovo uskoro."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrditi ovu promjenu?"
+    "confirmTitle": "Potvrditi ovu promjenu?",
+    "guarded": {
+      "spendAlertsOff": "Isključiti upozorenja o potrošnji? Prestali biste dobijati obavještenja o prekoračenjima pragova potrošnje i satnim skokovima.",
+      "balanceAlertsOff": "Isključiti upozorenja o stanju? Prestali biste dobijati obavještenja kada vam krediti budu pri kraju.",
+      "securityFindingsOff": "Isključiti sigurnosne nalaze? Prestali biste dobijati obavještenja o novim sigurnosnim nalazima.",
+      "hideBalanceOn": "Sakriti vaša stanja? Stanja kredita više se ne bi prikazivala na ekranima profila i u organizacijskom centru."
+    }
   },
   "appActions": {
     "start": {
@@ -4901,7 +4911,7 @@
   },
   "organizationGuardrails": {
     "title": "AI zaštitna ograničenja",
-    "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati AI zaštitnim ograničenjima.",
+    "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati AI zaštitnim ograničenjima. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI zaštitna ograničenja nisu omogućena",
     "unavailable": "Kilo omogućava AI zaštitna ograničenja za organizaciju na zahtjev. Kontaktirajte {{supportEmail}}, a Kilo tim ih uključuje za vašu organizaciju.",
     "contactSupport": "Kontaktiraj podršku",

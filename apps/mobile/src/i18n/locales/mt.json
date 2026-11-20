@@ -1463,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' {{organization}} tiġi ġestita fuq il-web minn kompjuter.",
+      "managedOnWebTitle": "Tiġi ġestita fuq il-web",
+      "managedOnWebShort": "Din il-konnessjoni tiġi ġestita fuq il-web minn kompjuter.",
+      "managedOnWebRepositories": "Agħżel ir-repożitorji għal {{organization}} fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
       "descriptionReconnect": "Oħloq token ta' aċċess ġdid għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
       "descriptionOverview": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}}, imbagħad waħħlu fl-iskrin li jmiss.",
@@ -1486,6 +1489,7 @@
     "platformList": {
       "checking": "Qed jiġi ċċekkjat…",
       "statusUnavailable": "Stat mhux disponibbli",
+      "needsAttention": "Attenzjoni meħtieġa",
       "platforms": "Pjattaformi",
       "activity": "Attività"
     },
@@ -4263,7 +4267,13 @@
     "providerUnavailable": "Il-fornitur mhux disponibbli bħalissa. Erġa' ibgħat fi ftit ħin."
   },
   "settingsTools": {
-    "confirmTitle": "Tikkonferma din il-bidla?"
+    "confirmTitle": "Tikkonferma din il-bidla?",
+    "guarded": {
+      "spendAlertsOff": "Titfi l-avviżi dwar in-nefqa? Ma tibqax tirċievi notifiki dwar qbiż tal-limiti tan-nefqa u żidiet fis-siegħa.",
+      "balanceAlertsOff": "Titfi l-avviżi dwar il-bilanċ? Ma tibqax tirċievi notifiki meta l-krediti tiegħek jonqsu.",
+      "securityFindingsOff": "Titfi s-sejbiet tas-sigurtà? Ma tibqax tirċievi notifiki dwar sejbiet ġodda tas-sigurtà.",
+      "hideBalanceOn": "Taħbi l-bilanċi tiegħek? Il-bilanċi tal-krediti ma jibqgħux jidhru fl-iskrins tal-profil u fl-hub tal-organizzazzjoni."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,7 +5063,7 @@
   },
   "organizationGuardrails": {
     "title": "Gwardjani tal-IA",
-    "permissionDenied": "Sidien u amministraturi tal-organizzazzjoni biss jistgħu jimmaniġġjaw il-Gwardjani tal-IA.",
+    "permissionDenied": "Sidien u amministraturi tal-organizzazzjoni biss jistgħu jimmaniġġjaw il-Gwardjani tal-IA. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Il-Gwardjani tal-IA mhumiex attivati",
     "unavailable": "Kilo jattiva l-Gwardjani tal-IA għal organizzazzjoni fuq talba. Ikkuntattja lil {{supportEmail}}, u t-tim ta' Kilo jattivahom għall-organizzazzjoni tiegħek.",
     "contactSupport": "Ikkuntattja l-appoġġ",

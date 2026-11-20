@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke {{organization}} na weebụ site na kọmputa.",
+      "managedOnWebTitle": "A na-elekọta na weebụ",
+      "managedOnWebShort": "A na-elekọta njikọ a na weebụ site na kọmputa.",
+      "managedOnWebRepositories": "Họrọ ebe nchekwa maka {{organization}} na weebụ site na kọmputa.",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
       "descriptionReconnect": "Mepụta akara ikike ọhụrụ ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
       "descriptionOverview": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya na ihuenyo na-esote.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Na-enyocha…",
       "statusUnavailable": "Ọnọdụ adịghị",
+      "needsAttention": "Chọrọ nlebara anya",
       "platforms": "Sistemụ",
       "activity": "Ihe omume"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Onye na-enye ọrụ adịghị ugbu a. Ziga ọzọ n'oge na-adịghị anya."
   },
   "settingsTools": {
-    "confirmTitle": "Kwenye mgbanwe a?"
+    "confirmTitle": "Kwenye mgbanwe a?",
+    "guarded": {
+      "spendAlertsOff": "Gbanyụọ ọkwa mmefu? Ị ga-akwụsị ịnata ọkwa gbasara ịgafe oke mmefu na mmụba mberede kwa elekere.",
+      "balanceAlertsOff": "Gbanyụọ ọkwa ego fọdụrụ? Ị ga-akwụsị ịnata ọkwa mgbe kredit gị fọrọ ntakịrị.",
+      "securityFindingsOff": "Gbanyụọ nchọpụta nchebe? Ị ga-akwụsị ịnata ọkwa gbasara nchọpụta nchebe ọhụrụ.",
+      "hideBalanceOn": "Zoo ego fọdụrụ gị? Ego kredit agaghịzi apụta na ihuenyo profaịlụ na ebe nzukọ."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Ihe nchebe AI",
-    "permissionDenied": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ijikwa Ihe nchebe AI.",
+    "permissionDenied": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ijikwa Ihe nchebe AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Ihe nchebe AI agbanyeghị",
     "unavailable": "Kilo na-agbanye Ihe nchebe AI maka nzukọ mgbe a rịọrọ ya. Kpọtụrụ {{supportEmail}}, ndị otu Kilo ga-agbanye ya maka nzukọ gị.",
     "contactSupport": "Kpọtụrụ ndị nkwado",

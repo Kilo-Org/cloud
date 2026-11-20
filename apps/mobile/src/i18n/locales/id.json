@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
+      "managedOnWebTitle": "Dikelola di web",
+      "managedOnWebShort": "Koneksi ini dikelola di web melalui komputer.",
+      "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web dari komputer.",
       "description": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionReconnect": "Buat token akses ruang kerja baru untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionOverview": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di layar berikutnya.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "Aktivitas",
       "checking": "Memeriksa…",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "statusUnavailable": "Status tidak tersedia"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Penyedia tidak tersedia saat ini. Kirim lagi sebentar lagi."
   },
   "settingsTools": {
-    "confirmTitle": "Konfirmasi perubahan ini?"
+    "confirmTitle": "Konfirmasi perubahan ini?",
+    "guarded": {
+      "spendAlertsOff": "Matikan peringatan pengeluaran? Anda tidak akan lagi menerima notifikasi saat melewati ambang batas pengeluaran dan saat terjadi lonjakan per jam.",
+      "balanceAlertsOff": "Matikan peringatan saldo? Anda tidak akan lagi menerima notifikasi saat kredit Anda menipis.",
+      "securityFindingsOff": "Matikan temuan keamanan? Anda tidak akan lagi menerima notifikasi tentang temuan keamanan baru.",
+      "hideBalanceOn": "Sembunyikan saldo Anda? Saldo kredit tidak akan lagi muncul di layar profil dan hub organisasi."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Pagar Pengaman Kecerdasan Artifisial",
-    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial.",
+    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Pagar Pengaman Kecerdasan Artifisial tidak diaktifkan",
     "unavailable": "Kilo mengaktifkan Pagar Pengaman Kecerdasan Artifisial untuk sebuah organisasi atas permintaan. Hubungi {{supportEmail}}, dan tim Kilo mengaktifkannya untuk organisasi Anda.",
     "contactSupport": "Hubungi tim dukungan",

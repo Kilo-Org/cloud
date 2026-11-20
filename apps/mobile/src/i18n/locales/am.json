@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
+      "managedOnWebTitle": "በድር ላይ ይተዳደራል",
+      "managedOnWebShort": "ይህ ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
+      "managedOnWebRepositories": "ለ{{organization}} ማከማቻዎችን ከኮምፒውተር በድር ላይ ይምረጡ።",
       "description": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "descriptionReconnect": "ለ{{organization}} አዲስ የሥራ ቦታ መዳረሻ ቶከን እንደገና ይፍጠሩና ከታች ይለጥፉት።",
       "descriptionOverview": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና በሚቀጥለው ማያ ገጽ ላይ ይለጥፉት።",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "በመፈተሽ ላይ…",
       "statusUnavailable": "ሁኔታ አይገኝም",
+      "needsAttention": "ትኩረት ይፈልጋል",
       "platforms": "መድረኮች",
       "activity": "እንቅስቃሴ"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "አቅራቢው አሁን አይገኝም። በአጭር ጊዜ ውስጥ በድጋሚ ይላኩ።"
   },
   "settingsTools": {
-    "confirmTitle": "ይህን ለውጥ ያረጋግጡ?"
+    "confirmTitle": "ይህን ለውጥ ያረጋግጡ?",
+    "guarded": {
+      "spendAlertsOff": "የወጪ ማንቂያዎችን ያጥፉ? ስለ ወጪ ጣሪያ መሻገር እና ስለ በየሰዓቱ ጭማሪዎች ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "balanceAlertsOff": "የቀሪ ሂሳብ ማንቂያዎችን ያጥፉ? ክሬዲቶችዎ ሲያንሱ ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "securityFindingsOff": "የደህንነት ግኝቶችን ያጥፉ? ስለ አዳዲስ የደህንነት ግኝቶች ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "hideBalanceOn": "ቀሪ ሂሳቦችዎን ይደብቁ? የክሬዲት ቀሪ ሂሳቦች በመገለጫ ገጾች እና በድርጅት ማዕከል ላይ ከእንግዲህ አይታዩም።"
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "የAI ጥበቃ ገደቦች",
-    "permissionDenied": "የAI ጥበቃ ገደቦችን ማስተዳደር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
+    "permissionDenied": "የAI ጥበቃ ገደቦችን ማስተዳደር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "የAI ጥበቃ ገደቦች አልነቁም",
     "unavailable": "Kilo የAI ጥበቃ ገደቦችን ለድርጅት በጥያቄ ላይ ያነቃል። {{supportEmail}} ያግኙ፣ እና የKilo ቡድን ለድርጅትዎ ያነቃዋል።",
     "contactSupport": "የድጋፍ ቡድኑን አግኝ",

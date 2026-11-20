@@ -1439,6 +1439,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "managedOnWebTitle": "Spravuje sa na webe",
+      "managedOnWebShort": "Toto pripojenie sa spravuje na webe z počítača.",
+      "managedOnWebRepositories": "Vyberte repozitáre pre {{organization}} na webe z počítača.",
       "description": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
       "descriptionReconnect": "Vytvorte nový prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
       "descriptionOverview": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho na ďalšej obrazovke.",
@@ -1462,6 +1465,7 @@
     "platformList": {
       "checking": "Kontroluje sa…",
       "statusUnavailable": "Stav nie je dostupný",
+      "needsAttention": "Vyžaduje pozornosť",
       "platforms": "Platformy",
       "activity": "Aktivita"
     },
@@ -4201,7 +4205,13 @@
     "providerUnavailable": "Poskytovateľ je teraz nedostupný. O chvíľu skúste odoslať znova."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrdiť túto zmenu?"
+    "confirmTitle": "Potvrdiť túto zmenu?",
+    "guarded": {
+      "spendAlertsOff": "Vypnúť upozornenia na výdavky? Prestanete dostávať oznámenia o prekročení prahov výdavkov a o hodinových špičkách.",
+      "balanceAlertsOff": "Vypnúť upozornenia na zostatok? Prestanete dostávať oznámenia, keď budete mať málo kreditov.",
+      "securityFindingsOff": "Vypnúť bezpečnostné zistenia? Prestanete dostávať oznámenia o nových bezpečnostných zisteniach.",
+      "hideBalanceOn": "Skryť zostatky? Zostatky kreditov sa už nebudú zobrazovať na obrazovkách profilu a v centre organizácie."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,7 +4987,7 @@
   },
   "organizationGuardrails": {
     "title": "AI ochranné mechanizmy",
-    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia.",
+    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI ochranné mechanizmy nie sú zapnuté",
     "unavailable": "Kilo zapína AI ochranné mechanizmy pre organizáciu na požiadanie. Kontaktujte {{supportEmail}} a tím Kilo ich zapne pre vašu organizáciu.",
     "contactSupport": "Kontaktovať podporu",

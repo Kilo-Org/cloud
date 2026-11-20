@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
+      "managedOnWebTitle": "在網頁版管理",
+      "managedOnWebShort": "此連線需在電腦上透過網頁版管理。",
+      "managedOnWebRepositories": "請在電腦上透過網頁版為 {{organization}} 選擇儲存庫。",
       "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
       "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
       "descriptionOverview": "為 {{organization}} 建立工作區存取權杖，然後在下一個畫面貼上。",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "活動",
       "checking": "正在檢查…",
+      "needsAttention": "需要處理",
       "platforms": "平台",
       "statusUnavailable": "無法取得狀態"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "供應商目前無法使用。請稍後再重新傳送。"
   },
   "settingsTools": {
-    "confirmTitle": "確認此變更？"
+    "confirmTitle": "確認此變更？",
+    "guarded": {
+      "spendAlertsOff": "要關閉支出警示嗎？你將不再收到支出超過門檻和每小時飆升的通知。",
+      "balanceAlertsOff": "要關閉餘額警示嗎？當你的額度偏低時，你將不再收到通知。",
+      "securityFindingsOff": "要關閉安全性發現嗎？你將不再收到有關新安全性發現的通知。",
+      "hideBalanceOn": "要隱藏你的餘額嗎？額度餘額將不再顯示於個人資料畫面和組織中心。"
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "AI 護欄",
-    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。",
+    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "未啟用 AI 護欄",
     "unavailable": "Kilo 可依請求為組織啟用 AI 護欄。請聯絡 {{supportEmail}}，Kilo 團隊會為你的組織開啟。",
     "contactSupport": "聯絡客服",

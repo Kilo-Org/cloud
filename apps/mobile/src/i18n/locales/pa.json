@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} ਦਾ Bitbucket ਕਨੈਕਸ਼ਨ ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "managedOnWebTitle": "ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ",
+      "managedOnWebShort": "ਇਹ ਕਨੈਕਸ਼ਨ ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "managedOnWebRepositories": "ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ {{organization}} ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ।",
       "description": "{{organization}} ਲਈ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਹੇਠਾਂ ਪੇਸਟ ਕਰੋ।",
       "descriptionReconnect": "{{organization}} ਲਈ ਨਵਾਂ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਹੇਠਾਂ ਪੇਸਟ ਕਰੋ।",
       "descriptionOverview": "{{organization}} ਲਈ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਅਗਲੀ ਸਕ੍ਰੀਨ 'ਤੇ ਪੇਸਟ ਕਰੋ।",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
       "statusUnavailable": "ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ",
+      "needsAttention": "ਧਿਆਨ ਦੀ ਲੋੜ",
       "platforms": "ਪਲੇਟਫਾਰਮ",
       "activity": "ਗਤੀਵਿਧੀ"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "ਪ੍ਰਦਾਤਾ ਇਸ ਵੇਲੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਭੇਜੋ।"
   },
   "settingsTools": {
-    "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?"
+    "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?",
+    "guarded": {
+      "spendAlertsOff": "ਕੀ ਖਰਚ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਤੁਹਾਨੂੰ ਖਰਚ ਸੀਮਾ ਪਾਰ ਹੋਣ ਅਤੇ ਪ੍ਰਤੀ ਘੰਟਾ ਉਛਾਲਾਂ ਬਾਰੇ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "balanceAlertsOff": "ਕੀ ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਜਦੋਂ ਤੁਹਾਡੇ ਕ੍ਰੈਡਿਟ ਘੱਟ ਹੋ ਜਾਣਗੇ ਤਾਂ ਤੁਹਾਨੂੰ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "securityFindingsOff": "ਕੀ ਸੁਰੱਖਿਆ ਖੋਜਾਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਖੋਜਾਂ ਬਾਰੇ ਤੁਹਾਨੂੰ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "hideBalanceOn": "ਕੀ ਤੁਹਾਡੇ ਬੈਲੰਸ ਲੁਕਾਉਣੇ ਹਨ? ਕ੍ਰੈਡਿਟ ਬੈਲੰਸ ਹੁਣ ਪ੍ਰੋਫਾਈਲ ਸਕ੍ਰੀਨਾਂ ਅਤੇ ਸੰਸਥਾ ਹੱਬ 'ਤੇ ਨਹੀਂ ਦਿਸਣਗੇ।"
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "ਏਆਈ ਗਾਰਡਰੇਲ",
-    "permissionDenied": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਅਤੇ ਪ੍ਰਬੰਧਕ ਹੀ ਏਆਈ ਗਾਰਡਰੇਲ ਦਾ ਪ੍ਰਬੰਧ ਕਰ ਸਕਦੇ ਹਨ।",
+    "permissionDenied": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਅਤੇ ਪ੍ਰਬੰਧਕ ਹੀ ਏਆਈ ਗਾਰਡਰੇਲ ਦਾ ਪ੍ਰਬੰਧ ਕਰ ਸਕਦੇ ਹਨ। $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ਏਆਈ ਗਾਰਡਰੇਲ ਸਮਰੱਥ ਨਹੀਂ ਹੈ",
     "unavailable": "ਕੀਲੋ ਬੇਨਤੀ 'ਤੇ ਕਿਸੇ ਸੰਗਠਨ ਲਈ ਏਆਈ ਗਾਰਡਰੇਲ ਸਮਰੱਥ ਕਰਦਾ ਹੈ। {{supportEmail}} ਨਾਲ ਸੰਪਰਕ ਕਰੋ, ਅਤੇ Kilo ਟੀਮ ਤੁਹਾਡੀ ਸੰਸਥਾ ਲਈ ਇਸਨੂੰ ਚਾਲੂ ਕਰੇਗੀ।",
     "contactSupport": "ਸਹਾਇਤਾ ਟੀਮ ਨਾਲ ਸੰਪਰਕ ਕਰੋ",

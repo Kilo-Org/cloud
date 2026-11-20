@@ -666,6 +666,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",
+      "managedOnWebTitle": "Gestito sul web",
+      "managedOnWebShort": "Questa connessione si gestisce sul web da un computer.",
+      "managedOnWebRepositories": "Scegli i repository per {{organization}} sul web da un computer.",
       "description": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
       "descriptionReconnect": "Crea un nuovo token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
       "descriptionOverview": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo nella schermata successiva.",
@@ -704,6 +707,7 @@
     "platformList": {
       "activity": "Attività",
       "checking": "Verifica in corso…",
+      "needsAttention": "Attenzione richiesta",
       "platforms": "Piattaforme",
       "statusUnavailable": "Stato non disponibile"
     },
@@ -4139,7 +4143,13 @@
     "providerUnavailable": "Il fornitore non è disponibile in questo momento. Invia di nuovo a breve."
   },
   "settingsTools": {
-    "confirmTitle": "Confermare questa modifica?"
+    "confirmTitle": "Confermare questa modifica?",
+    "guarded": {
+      "spendAlertsOff": "Disattivare gli avvisi di spesa? Non riceverai più notifiche sul superamento delle soglie di spesa e sui picchi orari.",
+      "balanceAlertsOff": "Disattivare gli avvisi di saldo? Non riceverai più notifiche quando i tuoi crediti stanno per esaurirsi.",
+      "securityFindingsOff": "Disattivare i risultati di sicurezza? Non riceverai più notifiche sui nuovi risultati di sicurezza.",
+      "hideBalanceOn": "Nascondere i tuoi saldi? I saldi dei crediti non appariranno più nelle schermate del profilo e nell'hub dell'organizzazione."
+    }
   },
   "appActions": {
     "start": {
@@ -4901,7 +4911,7 @@
   },
   "organizationGuardrails": {
     "title": "Protezioni AI",
-    "permissionDenied": "Solo i proprietari e gli amministratori dell'organizzazione possono gestire le Protezioni AI.",
+    "permissionDenied": "Solo i proprietari e gli amministratori dell'organizzazione possono gestire le Protezioni AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Protezioni AI non abilitate",
     "unavailable": "Kilo abilita le Protezioni AI per un'organizzazione su richiesta. Contatta {{supportEmail}} e il team Kilo le attiva per la tua organizzazione.",
     "contactSupport": "Contatta l'assistenza",

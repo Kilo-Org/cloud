@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
+      "managedOnWebTitle": "वेब पर प्रबंधित",
+      "managedOnWebShort": "यह कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है।",
+      "managedOnWebRepositories": "{{organization}} के लिए कंप्यूटर से वेब पर रिपॉज़िटरी चुनें।",
       "description": "{{organization}} के लिए एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "descriptionReconnect": "{{organization}} के लिए एक नया वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "descriptionOverview": "{{organization}} के लिए एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे अगली स्क्रीन पर पेस्ट करें।",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "गतिविधि",
       "checking": "जाँच हो रही है…",
+      "needsAttention": "ध्यान आवश्यक",
       "platforms": "प्लेटफ़ॉर्म",
       "statusUnavailable": "स्थिति अनुपलब्ध"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "प्रदाता अभी उपलब्ध नहीं है। थोड़ी देर में फिर से भेजें।"
   },
   "settingsTools": {
-    "confirmTitle": "यह बदलाव पुष्टि करें?"
+    "confirmTitle": "यह बदलाव पुष्टि करें?",
+    "guarded": {
+      "spendAlertsOff": "खर्च अलर्ट बंद करें? खर्च सीमा पार होने और प्रति घंटे होने वाली अचानक बढ़ोतरी के बारे में आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "balanceAlertsOff": "बैलेंस अलर्ट बंद करें? आपके क्रेडिट कम होने पर आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "securityFindingsOff": "सुरक्षा निष्कर्ष बंद करें? नए सुरक्षा निष्कर्षों के बारे में आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "hideBalanceOn": "अपने बैलेंस छिपाएँ? क्रेडिट बैलेंस अब प्रोफ़ाइल स्क्रीन और संगठन हब पर नहीं दिखेंगे।"
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "एआई गार्डरेल्स",
-    "permissionDenied": "केवल संगठन के स्वामी और व्यवस्थापक ही एआई गार्डरेल्स प्रबंधित कर सकते हैं।",
+    "permissionDenied": "केवल संगठन के स्वामी और व्यवस्थापक ही एआई गार्डरेल्स प्रबंधित कर सकते हैं। $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "एआई गार्डरेल्स सक्षम नहीं हैं",
     "unavailable": "Kilo अनुरोध पर किसी संगठन के लिए एआई गार्डरेल्स सक्षम करता है। {{supportEmail}} से संपर्क करें, और Kilo टीम आपके संगठन के लिए इसे चालू कर देगी।",
     "contactSupport": "सहायता टीम से संपर्क करें",

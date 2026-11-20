@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",
+      "managedOnWebTitle": "Ana sarrafa a yanar gizo",
+      "managedOnWebShort": "Ana sarrafa wannan haɗin a yanar gizo daga kwamfuta.",
+      "managedOnWebRepositories": "Zaɓi ma'ajiyoyi don {{organization}} a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionReconnect": "Ƙirƙiri sabuwar lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionOverview": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a shafi na gaba.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Ana duba…",
       "statusUnavailable": "Ba a iya samun halin da ake ciki",
+      "needsAttention": "Buƙatar kulawa",
       "platforms": "Dandalai",
       "activity": "Aiki"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Mai bayar da sabis ba ya samuwa a yanzu. Sake aikawa nan ba da daɗewa ba."
   },
   "settingsTools": {
-    "confirmTitle": "A tabbatar da wannan canji?"
+    "confirmTitle": "A tabbatar da wannan canji?",
+    "guarded": {
+      "spendAlertsOff": "Kashe faɗakarwar kashe kuɗi? Za ka daina samun sanarwa game da ƙetare iyakar kashe kuɗi da kuma haɓakar kashe kuɗi na kowace sa'a.",
+      "balanceAlertsOff": "Kashe faɗakarwar ma'auni? Za ka daina samun sanarwa lokacin da kuɗinka ya ragu.",
+      "securityFindingsOff": "Kashe abubuwan da aka gano na tsaro? Za ka daina samun sanarwa game da sabbin abubuwan da aka gano na tsaro.",
+      "hideBalanceOn": "Ɓoye ma'auninka? Ba za a ƙara nuna ma'aunin kuɗi a shafukan bayanan martaba da cibiyar ƙungiya ba."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Shingayen Tsaro na Basirar Wucin Gadi",
-    "permissionDenied": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi.",
+    "permissionDenied": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Ba a kunna Shingayen Tsaro na Basirar Wucin Gadi ba",
     "unavailable": "Kilo na kunna Shingayen Tsaro na Basirar Wucin Gadi ga ƙungiya bisa buƙata. Tuntuɓi {{supportEmail}}, sannan ƙungiyar Kilo za ta kunna ta ga kungiyarka.",
     "contactSupport": "Tuntuɓi masu tallafi",

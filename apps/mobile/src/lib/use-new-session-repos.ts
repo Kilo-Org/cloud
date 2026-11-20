@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import {
   bitbucketRowsUnlisted,
   dedupeRepositoriesByPlatformAndFullName,
@@ -17,7 +19,6 @@ import {
   resolveProviderStatus,
   resolveRepositoryGroups,
 } from '@/components/agents/new-session-repository-state';
-import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { isExpectedAuthFailure } from '@/lib/auth/trpc-unauthorized';

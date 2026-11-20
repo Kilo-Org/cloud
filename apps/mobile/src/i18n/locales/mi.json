@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o {{organization}} i runga ipurangi, mā tētahi rorohiko.",
+      "managedOnWebTitle": "Whakahaerehia i runga ipurangi",
+      "managedOnWebShort": "Ka whakahaerehia tēnei hononga i runga ipurangi, mā tētahi rorohiko.",
+      "managedOnWebRepositories": "Kōwhiria ngā pūranga mō {{organization}} i runga ipurangi, mā tētahi rorohiko.",
       "description": "Hangaia he tohu uru mokowāmahi mō {{organization}}, kātahi ka whakapiri ki raro nei.",
       "descriptionReconnect": "Hangaia he tohu uru mokowāmahi hōu mō {{organization}}, kātahi ka whakapiri ki raro nei.",
       "descriptionOverview": "Hangaia he tohu uru mokowāmahi mō {{organization}}, kātahi ka whakapiri ki te mata e whai ake nei.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Kei te tirotiro…",
       "statusUnavailable": "Kāore e wātea ana te tūnga",
+      "needsAttention": "Me aro",
       "platforms": "Ngā tūāpapa",
       "activity": "Ngā mahi"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Kāore te kaiwhakarato e wātea ana ināianei. Tuku anō ā tētahi wā poto."
   },
   "settingsTools": {
-    "confirmTitle": "Whakaū i tēnei huringa?"
+    "confirmTitle": "Whakaū i tēnei huringa?",
+    "guarded": {
+      "spendAlertsOff": "Whakawetohia ngā mataara whakapaunga? Ka kore koe e whiwhi whakamōhiotanga mō ngā whakawhitinga paepae whakapaunga me ngā pikinga ia hāora.",
+      "balanceAlertsOff": "Whakawetohia ngā mataara toenga? Ka kore koe e whiwhi whakamōhiotanga ina iti haere ō whiwhinga moni.",
+      "securityFindingsOff": "Whakawetohia ngā kitenga haumarutanga? Ka kore koe e whiwhi whakamōhiotanga mō ngā kitenga haumarutanga hou.",
+      "hideBalanceOn": "Hunaia ō toenga? Ka kore e whakaaturia ngā toenga whiwhinga moni i ngā mata kōtaha me te pokapū whakahaere."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Ara Tiaki Atamai",
-    "permissionDenied": "Ka taea e ngā kaipupuri me ngā kaiwhakahaere o te whakahaere anake te whakahaere i ngā Ara Tiaki Atamai.",
+    "permissionDenied": "Ka taea e ngā kaipupuri me ngā kaiwhakahaere o te whakahaere anake te whakahaere i ngā Ara Tiaki Atamai. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Kāore anō ngā Ara Tiaki Atamai kia whakahohea",
     "unavailable": "Ka taea e Kilo te whakahohe i ngā Ara Tiaki Atamai mō tētahi whakahaere ina tonohia. Whakapā atu ki {{supportEmail}}, ā, mā te rōpū Kilo e whakakā ana mō tō whakahaere.",
     "contactSupport": "Whakapā ki te rōpū tautoko",

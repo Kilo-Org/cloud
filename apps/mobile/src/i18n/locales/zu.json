@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
+      "managedOnWebTitle": "Iphathwa kuwebhu",
+      "managedOnWebShort": "Luxhumano luphathwa kuwebhu ngekhompyutha.",
+      "managedOnWebRepositories": "Khetha amarekhodi ka-{{organization}} kuwebhu ngekhompyutha.",
       "description": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "descriptionReconnect": "Dala ithokheni entsha yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "descriptionOverview": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela esikrinini esilandelayo.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Kuyahlolwa…",
       "statusUnavailable": "Isimo asitholakali",
+      "needsAttention": "Kudinga ukunakwa",
       "platforms": "Izinkundla",
       "activity": "Umsebenzi"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Umhlinzeki akatholakali okwamanje. Thumela futhi ngemva kwesikhashana."
   },
   "settingsTools": {
-    "confirmTitle": "Qinisekisa lolu shintsho?"
+    "confirmTitle": "Qinisekisa lolu shintsho?",
+    "guarded": {
+      "spendAlertsOff": "Vala izaziso zokusebenzisa imali? Uzoyeka ukuthola izaziso mayelana nokweqa imikhawulo yokusebenzisa imali kanye nokwenyuka kwemali ngehora.",
+      "balanceAlertsOff": "Vala izaziso zebhalansi? Uzoyeka ukuthola izaziso lapho amakhredithi akho encipha.",
+      "securityFindingsOff": "Vala okutholakele kwezokuphepha? Uzoyeka ukuthola izaziso mayelana nokutholakele okusha kwezokuphepha.",
+      "hideBalanceOn": "Fihla amabhalansi akho? Amabhalansi amakhredithi ngeke esabonakala ezikrinini zephrofayili kanye nesizinda senhlangano."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Izivikelo ze-AI",
-    "permissionDenied": "Abanikazi benhlangano nabaphathi kuphela abangaphatha izivikelo ze-AI.",
+    "permissionDenied": "Abanikazi benhlangano nabaphathi kuphela abangaphatha izivikelo ze-AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Izivikelo ze-AI azivuliwe",
     "unavailable": "I-Kilo ivula Izivikelo ze-AI zenhlangano uma ziceliwe. Xhumana ne-{{supportEmail}}, futhi iqembu le-Kilo lizizula kuzilungiselelo zenhlangano yakho.",
     "contactSupport": "Xhumana nethimba losizo",

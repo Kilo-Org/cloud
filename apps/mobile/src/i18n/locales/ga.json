@@ -1463,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
+      "managedOnWebTitle": "Bainistithe ar an ngréasán",
+      "managedOnWebShort": "Bainistítear an nasc seo ar an ngréasán ó ríomhaire.",
+      "managedOnWebRepositories": "Roghnaigh stórais do {{organization}} ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh thíos é.",
       "descriptionReconnect": "Cruthaigh comhartha rochtana nua don spás oibre do {{organization}} agus greamaigh thíos é.",
       "descriptionOverview": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh é ar an gcéad scáileán eile.",
@@ -1486,6 +1489,7 @@
     "platformList": {
       "checking": "Ag seiceáil…",
       "statusUnavailable": "Níl an stádas ar fáil",
+      "needsAttention": "Aird ag teastáil",
       "platforms": "Ardáin",
       "activity": "Gníomhaíocht"
     },
@@ -4263,7 +4267,13 @@
     "providerUnavailable": "Níl an soláthraí ar fáil faoi láthair. Seol arís go luath."
   },
   "settingsTools": {
-    "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?"
+    "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?",
+    "guarded": {
+      "spendAlertsOff": "Múch na foláirimh chaiteachais? Stopfá ag fáil fógraí faoi thrasnuithe tairsí chaiteachais agus faoi bhorrthaí in aghaidh na huaire.",
+      "balanceAlertsOff": "Múch na foláirimh iarmhéid? Stopfá ag fáil fógraí nuair a íslíonn do chreidmheasanna.",
+      "securityFindingsOff": "Múch na fionnachtana slándála? Stopfá ag fáil fógraí faoi fhionnachtana slándála nua.",
+      "hideBalanceOn": "Folaigh do iarmhéideanna? Ní bheidh iarmhéideanna creidmheasa le feiceáil a thuilleadh ar na scáileáin phróifíle ná ar mhol na heagraíochta."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,7 +5063,7 @@
   },
   "organizationGuardrails": {
     "title": "Ráillí Cosanta AI",
-    "permissionDenied": "Ní féidir ach le húinéirí agus riarthóirí na heagraíochta Ráillí Cosanta AI a bhainistiú.",
+    "permissionDenied": "Ní féidir ach le húinéirí agus riarthóirí na heagraíochta Ráillí Cosanta AI a bhainistiú. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Níl Ráillí Cosanta AI cumasaithe",
     "unavailable": "Cumasaíonn Kilo Ráillí Cosanta AI d'eagraíocht ar iarratas. Déan teagmháil le {{supportEmail}}, agus déanfaidh foireann Kilo iad a chur ar siúl d'eagraíocht.",
     "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta",

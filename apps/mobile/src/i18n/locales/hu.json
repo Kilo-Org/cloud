@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
+      "managedOnWebTitle": "A weben kezelve",
+      "managedOnWebShort": "Ezt a kapcsolatot a weben, számítógépről kezelheti.",
+      "managedOnWebRepositories": "Válassza ki {{organization}} tárolóit a weben, számítógépről.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, majd illeszd be a következő képernyőn.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Ellenőrzés…",
       "statusUnavailable": "Az állapot nem érhető el",
+      "needsAttention": "Beavatkozást igényel",
       "platforms": "Platformok",
       "activity": "Tevékenység"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "A szolgáltató jelenleg nem érhető el. Küldd el újra hamarosan."
   },
   "settingsTools": {
-    "confirmTitle": "Megerősíted ezt a módosítást?"
+    "confirmTitle": "Megerősíted ezt a módosítást?",
+    "guarded": {
+      "spendAlertsOff": "Kikapcsolja a költési riasztásokat? Ezután nem kap értesítéseket a költési küszöbértékek átlépéséről és az óránkénti kiugrásokról.",
+      "balanceAlertsOff": "Kikapcsolja az egyenlegriasztásokat? Ezután nem kap értesítéseket, amikor a kreditek alacsonyra csökkennek.",
+      "securityFindingsOff": "Kikapcsolja a biztonsági észleléseket? Ezután nem kap értesítéseket az új biztonsági észlelésekről.",
+      "hideBalanceOn": "Elrejti az egyenlegeit? A kreditegyenlegek többé nem jelennek meg a profilképernyőkön és a szervezeti központban."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-őrkorlátok",
-    "permissionDenied": "Csak a szervezet tulajdonosai és rendszergazdái kezelhetik az AI-őrkorlátokat.",
+    "permissionDenied": "Csak a szervezet tulajdonosai és rendszergazdái kezelhetik az AI-őrkorlátokat. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Az AI-őrkorlátok nincsenek engedélyezve",
     "unavailable": "A Kilo kérésre engedélyezi az AI-őrkorlátokat a szervezet számára. Írj a {{supportEmail}} címre, és a Kilo csapata bekapcsolja őket a szervezeted számára.",
     "contactSupport": "Kapcsolatfelvétel az ügyfélszolgálattal",

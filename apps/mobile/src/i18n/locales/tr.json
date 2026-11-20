@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
+      "managedOnWebTitle": "Web üzerinden yönetilir",
+      "managedOnWebShort": "Bu bağlantı bir bilgisayardan web üzerinden yönetilir.",
+      "managedOnWebRepositories": "{{organization}} için depoları bir bilgisayardan web üzerinden seç.",
       "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "descriptionOverview": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve sonraki ekranda yapıştır.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "Etkinlik",
       "checking": "Kontrol ediliyor…",
+      "needsAttention": "İşlem gerekiyor",
       "platforms": "Platformlar",
       "statusUnavailable": "Durum alınamıyor"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Sağlayıcı şu anda kullanılamıyor. Kısa süre sonra tekrar gönderin."
   },
   "settingsTools": {
-    "confirmTitle": "Bu değişiklik onaylansın mı?"
+    "confirmTitle": "Bu değişiklik onaylansın mı?",
+    "guarded": {
+      "spendAlertsOff": "Harcama uyarıları kapatılsın mı? Harcama eşiği aşımları ve saatlik ani artışlar hakkında bildirim almayı bırakırsınız.",
+      "balanceAlertsOff": "Bakiye uyarıları kapatılsın mı? Kredileriniz azaldığında bildirim almayı bırakırsınız.",
+      "securityFindingsOff": "Güvenlik bulguları kapatılsın mı? Yeni güvenlik bulguları hakkında bildirim almayı bırakırsınız.",
+      "hideBalanceOn": "Bakiyeleriniz gizlensin mi? Kredi bakiyeleri artık profil ekranlarında ve kuruluş merkezinde görünmeyecek."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Yapay Zeka Korkulukları",
-    "permissionDenied": "Yapay Zeka Korkuluklarını yalnızca kuruluş sahipleri ve yöneticileri yönetebilir.",
+    "permissionDenied": "Yapay Zeka Korkuluklarını yalnızca kuruluş sahipleri ve yöneticileri yönetebilir. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Yapay Zeka Korkulukları etkin değil",
     "unavailable": "Kilo, talep üzerine bir kuruluş için Yapay Zeka Korkuluklarını etkinleştirir. {{supportEmail}} ile iletişime geçin; Kilo ekibi bunları kuruluşunuz için açar.",
     "contactSupport": "Destekle iletişime geç",

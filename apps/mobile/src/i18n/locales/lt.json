@@ -1439,6 +1439,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
+      "managedOnWebTitle": "Valdoma žiniatinklyje",
+      "managedOnWebShort": "Šis ryšys valdomas žiniatinklyje naudojant kompiuterį.",
+      "managedOnWebRepositories": "Pasirinkite {{organization}} saugyklas žiniatinklyje naudodami kompiuterį.",
       "description": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "descriptionReconnect": "Sukurk naują {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "descriptionOverview": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį kitame ekrane.",
@@ -1462,6 +1465,7 @@
     "platformList": {
       "checking": "Tikrinama…",
       "statusUnavailable": "Būsena nepasiekiama",
+      "needsAttention": "Reikia dėmesio",
       "platforms": "Platformos",
       "activity": "Veikla"
     },
@@ -4201,7 +4205,13 @@
     "providerUnavailable": "Paslaugos teikėjas šiuo metu nepasiekiamas. Netrukus siųskite dar kartą."
   },
   "settingsTools": {
-    "confirmTitle": "Patvirtinti šį pakeitimą?"
+    "confirmTitle": "Patvirtinti šį pakeitimą?",
+    "guarded": {
+      "spendAlertsOff": "Išjungti išlaidų įspėjimus? Nustotumėte gauti pranešimus apie išlaidų slenksčio viršijimą ir valandinius šuolius.",
+      "balanceAlertsOff": "Išjungti likučio įspėjimus? Nustotumėte gauti pranešimus, kai kreditai artėja prie nulio.",
+      "securityFindingsOff": "Išjungti saugumo radinius? Nustotumėte gauti pranešimus apie naujus saugumo radinius.",
+      "hideBalanceOn": "Slėpti savo likučius? Kreditų likučiai neberodomi profilio ekranuose ir organizacijos centre."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,7 +4987,7 @@
   },
   "organizationGuardrails": {
     "title": "DI apsaugos priemonės",
-    "permissionDenied": "Tik organizacijos savininkai ir administratoriai gali valdyti DI apsaugos priemones.",
+    "permissionDenied": "Tik organizacijos savininkai ir administratoriai gali valdyti DI apsaugos priemones. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "DI apsaugos priemonės neįjungtos",
     "unavailable": "Kilo pagal užklausą įjungia DI apsaugos priemones organizacijai. Susisiekite su {{supportEmail}}, o Kilo komanda jas įjungia jūsų organizacijai.",
     "contactSupport": "Kreiptis į pagalbos tarnybą",

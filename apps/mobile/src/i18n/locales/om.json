@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Walqunnamtiin Bitbucket {{organization}}iif weebii irratti kompiitara irraa bulfama.",
+      "managedOnWebTitle": "Weebii irratti bulfama",
+      "managedOnWebShort": "Walqunnamtiin kun weebii irratti kompiitara irraa bulfama.",
+      "managedOnWebRepositories": "{{organization}}iif kuusaalee weebii irratti kompiitara irraa filadhu.",
       "description": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "descriptionReconnect": "{{organization}}iif tokanii haaraa hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "descriptionOverview": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii fuula itti aanu irratti maxxansi.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Mirkaneessaa jira…",
       "statusUnavailable": "Haalli hin argamu",
+      "needsAttention": "Xiyyeeffannoo barbaada",
       "platforms": "Waltajjiiwwan",
       "activity": "Sochii"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Dhiyeessaan amma argamuu hin danda'u. Yeroo gabaabaa keessatti irra deebi'ii ergi."
   },
   "settingsTools": {
-    "confirmTitle": "Jijjiirama kana mirkaneessuu?"
+    "confirmTitle": "Jijjiirama kana mirkaneessuu?",
+    "guarded": {
+      "spendAlertsOff": "Akeekkii baasii dhaabuu barbaadda? Waa'ee daangaa baasii darbuu fi ol-ka'ii sa'aatii beeksisa argachuu ni dhiifta.",
+      "balanceAlertsOff": "Akeekkii hafeena dhaabuu barbaadda? Kireediitiin kee yeroo xiqqaatu beeksisa argachuu ni dhiifta.",
+      "securityFindingsOff": "Argannoowwan nageenyaa dhaabuu barbaadda? Waa'ee argannoowwan nageenyaa haaraa beeksisa argachuu ni dhiifta.",
+      "hideBalanceOn": "Hafeena kee dhoksuu barbaadda? Hafeenni kireeditii ammas fuulota piroofaayilii fi giddugala dhaabbataa irratti hin mul'atu."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Daangoolee Eegumsaa AI",
-    "permissionDenied": "Abbootii fi bulchitoonni dhaabbataa qofti Daangoolee Eegumsaa AI bulchuu danda'u.",
+    "permissionDenied": "Abbootii fi bulchitoonni dhaabbataa qofti Daangoolee Eegumsaa AI bulchuu danda'u. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Daangooleen Eegumsaa AI hin hojiirra oolle",
     "unavailable": "Kilon gaaffii irratti dhaabbataaf Daangoolee Eegumsaa AI hojiirra oolcha. {{supportEmail}} qunnamaa, gareen Kilo isa dhaabbataa keeffiif ni bane.",
     "contactSupport": "Deeggarsa qunnami",

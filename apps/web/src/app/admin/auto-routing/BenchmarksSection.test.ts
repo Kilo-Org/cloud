@@ -14,22 +14,20 @@ import {
   configToFormState,
   effortCoverageForModel,
   formStateToConfig,
-  formatRunProgress,
   BenchmarkRunsTable,
   BenchmarkRunsCards,
   runRequesterLabel,
   runsListEmptyMessage,
   visibleRuns,
-  formatTotalUsd,
   modelTotalsFromSummaries,
   resolveModelTotals,
   responseRunningRunIds,
-  RoutingTableView,
   RunRouteTable,
   RunSummariesTable,
   runLeftRunningSet,
   toBenchmarkModelOptions,
 } from './BenchmarksSection';
+import { formatRunProgress, formatTotalUsd, RoutingTableView } from './benchmark-formatting';
 import { formatAdminTime, relativeAge, runMentionsModel } from './admin-time';
 
 // The expanded row is the only hook-using component rendered here; the query

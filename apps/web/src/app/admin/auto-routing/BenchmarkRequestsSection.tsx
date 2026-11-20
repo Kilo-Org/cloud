@@ -43,7 +43,7 @@ import { useConfirm } from '@/components/ui/confirm';
 import { cn } from '@/lib/utils';
 import { parseAdminResponse } from './admin-fetch';
 import { AdminTimeLabel } from './AdminTimeLabel';
-import { formatRunProgress, formatTotalUsd, RoutingTableView } from './BenchmarksSection';
+import { formatRunProgress, formatTotalUsd, RoutingTableView } from './benchmark-formatting';
 
 const REQUESTS_POLL_INTERVAL_MS = 30_000;
 

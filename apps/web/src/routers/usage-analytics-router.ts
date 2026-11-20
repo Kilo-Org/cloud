@@ -1089,9 +1089,14 @@ export const usageAnalyticsRouter = createTRPCRouter({
    * This is a narrowed view of the ordinary usage rows (same date window, same
    * access) rather than a second billing source: it reuses the Project and Model
    * dimensions the dashboard already reads, so a benchmark charge appears in one
-   * place with one set of numbers. Both queries bound their result: pools by
-   * `poolLimit`, and each pool's models by `MAX_BENCHMARK_MODELS_PER_POOL` with
-   * the remainder folded into `otherModels*`.
+   * place with one set of numbers.
+   *
+   * ONE statement. Pooling and its model split must come from one snapshot: two
+   * independent queries could aggregate different row sets (a load or retention
+   * change between them), which would make a pool's models exceed the pool total
+   * and put a negative number in `otherModels*`. A single statement with window
+   * aggregates makes that divergence impossible, and lets the transport cap stay
+   * inside the database instead of trimming numbers after they were summed.
    */
   getBenchmarkCharges: baseProcedure
     .input(BenchmarkChargesInputSchema)
@@ -1106,53 +1111,130 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const table = getTableName(meta.tier);
       const scope = isOrgScope(filters) ? 'org' : 'user';
       const costSumExpr = costSumExprSql(filters.costSource);
+      const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
 
-      // Read one row past the cap: a non-empty overflow row proves more pools
-      // exist, so the UI can say the list is partial instead of implying it is
-      // complete. Nothing beyond the cap is returned or counted.
-      const poolWhere = buildWhereClause(meta.tier, filters, ctx.user.id, true);
-      const poolStatement = `
+      // Layer 1 groups to one row per (pool, concrete model). Layer 2 adds each
+      // pool's totals as window sums, so a model row carries the pool total it
+      // was part of. Layer 3 ranks models within their pool and pools by total,
+      // both with a deterministic tie-break, and the outer WHERE applies the
+      // transport cap. Windows are computed before that WHERE, so a capped pool
+      // still reports its true total: `otherModels*` is a real remainder, never
+      // the result of clamping.
+      //
+      // SAFETY: `poolLimit` and `MAX_BENCHMARK_MODELS_PER_POOL` are Zod-bounded
+      // integers, never strings; Snowflake's SQL API does not bind LIMIT-style
+      // numeric literals (same constraint the other procedures document).
+      const statement = `
+        WITH per_model AS (
+          SELECT
+            project_id AS pool,
+            COALESCE(model, '') AS model,
+            ${costSumExpr} AS cost,
+            COALESCE(SUM(request_count), 0) AS request_count
+          FROM ${table}
+          WHERE ${where.sql()}
+          GROUP BY 1, 2
+        ), pooled AS (
+          SELECT
+            pool,
+            model,
+            cost,
+            request_count,
+            SUM(cost) OVER (PARTITION BY pool) AS pool_cost,
+            SUM(request_count) OVER (PARTITION BY pool) AS pool_request_count
+          FROM per_model
+        ), ranked AS (
+          SELECT
+            pool,
+            model,
+            cost,
+            request_count,
+            pool_cost,
+            pool_request_count,
+            ROW_NUMBER() OVER (PARTITION BY pool ORDER BY cost DESC, model ASC) AS model_rank,
+            DENSE_RANK() OVER (ORDER BY pool_cost DESC, pool ASC) AS pool_rank
+          FROM pooled
+        )
         SELECT
-          project_id AS pool,
-          ${costSumExpr},
-          COALESCE(SUM(request_count), 0)
-        FROM ${table}
-        WHERE ${poolWhere.sql()}
-        GROUP BY 1
-        ORDER BY 2 DESC
-        LIMIT ${Number(poolLimit) + 1}
+          pool,
+          model,
+          cost,
+          request_count,
+          pool_cost,
+          pool_request_count,
+          pool_rank
+        FROM ranked
+        WHERE pool_rank <= ${Number(poolLimit) + 1}
+          AND model_rank <= ${MAX_BENCHMARK_MODELS_PER_POOL}
+        ORDER BY pool_rank, model_rank
       `;
 
-      const poolRows = await timedSnowflakeQuery(
+      const rows = await timedSnowflakeQuery(
         {
           route: 'usageAnalytics.getBenchmarkCharges',
-          queryLabel: `benchmark_pools_${meta.tier}`,
+          queryLabel: `benchmark_charges_${meta.tier}`,
           scope,
           period: `${filters.startDate}/${filters.endDate}`,
         },
         signal =>
           executeSnowflakeStatement({
             config,
-            statement: poolStatement,
-            bindings: poolWhere.bindings,
+            statement,
+            bindings: where.bindings,
             timeoutSeconds: Math.ceil(defaultTimeoutForScope(scope) / 1000),
             signal,
           })
       );
 
-      const pools = poolRows.slice(0, Number(poolLimit)).flatMap(row => {
+      type PoolAccumulator = {
+        /** Stored identifier, echoed verbatim: it is the stable row key. */
+        projectId: string;
+        parts: NonNullable<ReturnType<typeof parseBenchmarkProjectId>>;
+        costMicrodollars: number;
+        requestCount: number;
+        models: { model: string; costMicrodollars: number; requestCount: number }[];
+      };
+
+      // Rows arrive ordered by pool_rank then model_rank, so a Map preserves the
+      // server's ranking and each pool's model order without re-sorting here.
+      const pools: PoolAccumulator[] = [];
+      const byPool = new Map<string, PoolAccumulator>();
+      let hasMorePools = false;
+
+      for (const row of rows) {
         const projectId = typeof row[0] === 'string' ? row[0] : '';
         const parts = parseBenchmarkProjectId(projectId);
-        if (!parts) return [];
-        return [
-          {
+        // A reserved value that is not a pool id (the platform id, or a
+        // malformed value) is not this view's: it is dropped whole, never
+        // partially rendered.
+        if (!parts) continue;
+
+        const poolRank = toSafeNumber(row[6]);
+        if (poolRank > Number(poolLimit)) {
+          hasMorePools = true;
+          continue;
+        }
+
+        let pool = byPool.get(projectId);
+        if (!pool) {
+          pool = {
             projectId,
             parts,
-            costMicrodollars: toSafeNumber(row[1]),
-            requestCount: toSafeNumber(row[2]),
-          },
-        ];
-      });
+            costMicrodollars: toSafeNumber(row[4]),
+            requestCount: toSafeNumber(row[5]),
+            models: [],
+          };
+          byPool.set(projectId, pool);
+          pools.push(pool);
+        }
+
+        const model = typeof row[1] === 'string' && row[1] !== '' ? row[1] : 'Unknown model';
+        pool.models.push({
+          model,
+          costMicrodollars: toSafeNumber(row[2]),
+          requestCount: toSafeNumber(row[3]),
+        });
+      }
 
       if (pools.length === 0) {
         return {
@@ -1164,85 +1246,26 @@ export const usageAnalyticsRouter = createTRPCRouter({
         };
       }
 
-      // One bounded follow-up groups each selected pool's concrete models. The
-      // pool ids come from the rows above, so they are bindings, never SQL text.
-      const modelWhere = buildWhereClause(meta.tier, filters, ctx.user.id, true);
-      modelWhere.addIn(
-        'project_id',
-        pools.map(p => p.projectId)
-      );
-      const modelStatement = `
-        SELECT
-          project_id AS pool,
-          model,
-          ${costSumExpr},
-          COALESCE(SUM(request_count), 0)
-        FROM ${table}
-        WHERE ${modelWhere.sql()}
-        GROUP BY 1, 2
-        ORDER BY 1, 3 DESC
-      `;
-
-      const modelRows = await timedSnowflakeQuery(
-        {
-          route: 'usageAnalytics.getBenchmarkCharges',
-          queryLabel: `benchmark_models_${meta.tier}`,
-          scope,
-          period: `${filters.startDate}/${filters.endDate}`,
-        },
-        signal =>
-          executeSnowflakeStatement({
-            config,
-            statement: modelStatement,
-            bindings: modelWhere.bindings,
-            timeoutSeconds: Math.ceil(defaultTimeoutForScope(scope) / 1000),
-            signal,
-          })
-      );
-
-      const modelsByPool = new Map<string, { model: string; cost: number; requests: number }[]>();
-      for (const row of modelRows) {
-        const projectId = typeof row[0] === 'string' ? row[0] : '';
-        const bucket = modelsByPool.get(projectId) ?? [];
-        bucket.push({
-          model: typeof row[1] === 'string' && row[1] !== '' ? row[1] : 'Unknown model',
-          cost: toSafeNumber(row[2]),
-          requests: toSafeNumber(row[3]),
-        });
-        modelsByPool.set(projectId, bucket);
-      }
-
-      const totalCostMicrodollars = pools.reduce((sum, p) => sum + p.costMicrodollars, 0);
-      const totalRequestCount = pools.reduce((sum, p) => sum + p.requestCount, 0);
-
       return {
         status: 'ok' as const,
-        totalCostMicrodollars,
-        totalRequestCount,
-        pools: pools.map(pool => {
-          const all = modelsByPool.get(pool.projectId) ?? [];
-          const listed = all.slice(0, MAX_BENCHMARK_MODELS_PER_POOL);
-          // Totals come from the pool row, so a pool whose models were folded
-          // still reconciles exactly with what the pool group reported.
-          return {
-            projectId: pool.projectId,
-            poolSlug: pool.parts.slug,
-            routerId: pool.parts.routerId,
-            poolScope: pool.parts.scope,
-            costMicrodollars: pool.costMicrodollars,
-            requestCount: pool.requestCount,
-            models: listed.map(m => ({
-              model: m.model,
-              costMicrodollars: m.cost,
-              requestCount: m.requests,
-            })),
-            otherModelsCostMicrodollars:
-              pool.costMicrodollars - listed.reduce((sum, m) => sum + m.cost, 0),
-            otherModelsRequestCount:
-              pool.requestCount - listed.reduce((sum, m) => sum + m.requests, 0),
-          };
-        }),
-        hasMorePools: poolRows.length > Number(poolLimit),
+        totalCostMicrodollars: pools.reduce((sum, p) => sum + p.costMicrodollars, 0),
+        totalRequestCount: pools.reduce((sum, p) => sum + p.requestCount, 0),
+        pools: pools.map(pool => ({
+          projectId: pool.projectId,
+          poolSlug: pool.parts.slug,
+          routerId: pool.parts.routerId,
+          poolScope: pool.parts.scope,
+          costMicrodollars: pool.costMicrodollars,
+          requestCount: pool.requestCount,
+          models: pool.models,
+          // The same snapshot's pool total minus its listed models. Both sides
+          // come from one statement, so this remainder is never negative.
+          otherModelsCostMicrodollars:
+            pool.costMicrodollars - pool.models.reduce((sum, m) => sum + m.costMicrodollars, 0),
+          otherModelsRequestCount:
+            pool.requestCount - pool.models.reduce((sum, m) => sum + m.requestCount, 0),
+        })),
+        hasMorePools,
       };
     }),
 

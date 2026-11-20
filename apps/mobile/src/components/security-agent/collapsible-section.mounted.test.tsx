@@ -60,7 +60,7 @@ vi.mock('react-native-reanimated', () => ({
 
 const BODY_CLASSES = 'gap-3 pt-3';
 const SURFACE_CLASSES = 'rounded-xl bg-secondary overflow-hidden';
-const SURFACE_BODY_CLASSES = 'gap-3 -mt-1.5 pb-3';
+const SURFACE_BODY_CLASSES = 'gap-3 pb-3';
 const SECTION_BODY = 'section body';
 
 let mounted: ReactTestRenderer | undefined = undefined;

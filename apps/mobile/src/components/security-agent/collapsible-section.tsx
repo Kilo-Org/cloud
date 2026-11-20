@@ -152,14 +152,11 @@ export function DisclosureChevron({
 /**
  * The body of a section whose body shares its header's surface.
  *
- * The header keeps the shared 48pt row frame, whose centring leaves about
- * 15.25pt under the title line. The body pulls up past that by `-mt-1.5`
- * (5.25pt, the app's 14pt rem) so its first line sits the body's own `gap-3`
- * (10.5pt) under the title instead of that inset plus a second gap; `pb-3`
- * closes the card the header opened. Measured on the new-session connect card,
- * 2026-11-20.
+ * The header row supplies the gap under the title (its bottom padding is zero
+ * for this variant), so the body brings no top gap of its own and only closes
+ * the card with `pb-3`. Measured on the new-session connect card, 2026-11-20.
  */
-const SURFACE_BODY_CLASS = '-mt-1.5 pb-3';
+const SURFACE_BODY_CLASS = 'pb-3';
 
 // Shared collapsible section for finding-details/-analysis/-remediation
 // panels (source record, technical report, attempt history) — the
@@ -207,6 +204,13 @@ export function CollapsibleSection({
       className={cn(
         ROW_TARGET_CLASS,
         'flex-row items-center justify-between gap-3 px-4 py-3',
+        // On a shared surface the header row owns the space under its title:
+        // it keeps the 48pt row frame (whose centring leaves ~10pt under the
+        // title line) and gives up its bottom padding, so the copy that
+        // belongs to it starts at the body's own `gap-3` rhythm. The padding
+        // is the same whether the body is open or closed, so the title never
+        // moves.
+        bodyOnSurface && 'pb-0',
         'active:opacity-70'
       )}
       onPress={() => {

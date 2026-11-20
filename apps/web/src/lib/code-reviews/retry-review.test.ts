@@ -229,6 +229,8 @@ describe('retryFailedCodeReview', () => {
 
   it('answers already_in_flight without recording or dispatching when the reset matches no row', async () => {
     mockedReset.mockResolvedValue(0);
+    // A concurrent retrigger (not a newer push) holds the review.
+    mockedGetReview.mockResolvedValue(makeReview({ status: 'pending', terminal_reason: null }));
 
     const result = await retryFailedCodeReview({
       review: makeReview(),
@@ -237,6 +239,37 @@ describe('retryFailedCodeReview', () => {
     });
 
     expect(result).toEqual({ outcome: 'already_in_flight' });
+    expect(mockedGetReview).toHaveBeenCalledWith('review-1');
+    expect(mockedCreateAttempt).not.toHaveBeenCalled();
+    expect(mockedDispatch).not.toHaveBeenCalled();
+  });
+
+  it('refuses a review a newer push replaced without resetting it', async () => {
+    const result = await retryFailedCodeReview({
+      review: makeReview({ terminal_reason: 'superseded' }),
+      owner: OWNER,
+      retryReason: 'automatic_recovery',
+    });
+
+    expect(result).toEqual({ outcome: 'refused', reason: 'superseded' });
+    expect(mockedReset).not.toHaveBeenCalled();
+    expect(mockedCreateAttempt).not.toHaveBeenCalled();
+    expect(mockedDispatch).not.toHaveBeenCalled();
+  });
+
+  it('answers refused/superseded when a newer push superseded the review before the reset', async () => {
+    mockedReset.mockResolvedValue(0);
+    mockedGetReview.mockResolvedValue(
+      makeReview({ status: 'cancelled', terminal_reason: 'superseded' })
+    );
+
+    const result = await retryFailedCodeReview({
+      review: makeReview({ terminal_reason: 'assistant_timeout' }),
+      owner: OWNER,
+      retryReason: 'manual_retrigger',
+    });
+
+    expect(result).toEqual({ outcome: 'refused', reason: 'superseded' });
     expect(mockedCreateAttempt).not.toHaveBeenCalled();
     expect(mockedDispatch).not.toHaveBeenCalled();
   });

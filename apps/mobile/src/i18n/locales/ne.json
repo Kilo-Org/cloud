@@ -965,6 +965,8 @@
       "pendingComment": "नपठाइएका टिप्पणीहरू",
       "pendingComment_other": "नपठाइएका टिप्पणीहरू",
       "submitCountOfTotal": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
+      "submitCountOfTotal_one": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
+      "submitCountOfTotal_other": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
       "submitReview": "समीक्षा पठाउनुहोस्",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
       "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "संस्थाको नाम बदल्नुहोस्",
-      "renamePlaceholder": "संस्थाको नाम",
+      "renamePlaceholder": "संस्थाको नाम लेख्नुहोस्",
       "balance": "मौज्दात",
       "plan": "प्लान",
       "planTeams": "Teams",

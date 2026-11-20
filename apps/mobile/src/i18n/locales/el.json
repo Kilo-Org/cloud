@@ -965,6 +965,8 @@
       "pendingComment": "εκκρεμή σχόλια",
       "pendingComment_other": "εκκρεμή σχόλια",
       "submitCountOfTotal": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
+      "submitCountOfTotal_one": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
+      "submitCountOfTotal_other": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
       "submitReview": "Υποβολή αξιολόγησης",
       "partialPostedFresh": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Μετονομασία οργανισμού",
-      "renamePlaceholder": "Όνομα οργανισμού",
+      "renamePlaceholder": "Εισαγάγετε όνομα οργανισμού",
       "balance": "Υπόλοιπο",
       "plan": "Πλάνο",
       "planTeams": "Teams",

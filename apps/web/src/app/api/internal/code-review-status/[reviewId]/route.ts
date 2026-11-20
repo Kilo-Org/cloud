@@ -20,7 +20,6 @@ import type { NextRequest } from 'next/server';
 import { NextResponse, after } from 'next/server';
 import * as z from 'zod';
 import {
-  updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
   backfillCodeReviewUsage,
   getCodeReviewById,
@@ -31,6 +30,7 @@ import {
   createInfraRetryAttemptIfMissing,
   recordCodeReviewAttemptPublicationStatus,
 } from '@/lib/code-reviews/db/code-reviews';
+import { isTerminalCodeReviewStatus } from '@/lib/code-reviews/dispatch/dispatch-constants';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
@@ -1355,6 +1355,25 @@ export async function POST(
             ? callbackCompletedAt
             : undefined,
       });
+      // The attempt update only claims a non-terminal attempt, so a late or
+      // redelivered callback for an attempt another terminalization already
+      // wrote (e.g. the cancelling caller) gets the stored attempt back. When
+      // a terminal request does not match that stored status, this callback
+      // did not claim its attempt and the winning caller owns the parent
+      // update and every side effect below: stop here before any of them ran.
+      // `running` requests keep their existing paths.
+      if (status !== 'running' && attempt.status !== status) {
+        logExceptInTest('[code-review-status] Stale callback for a terminal attempt', {
+          reviewId,
+          attemptId: attempt.id,
+          attemptStatus: attempt.status,
+          requestedStatus: status,
+        });
+        return NextResponse.json({
+          success: true,
+          message: 'Stale callback for a terminal attempt',
+        });
+      }
 
       latestAttempt = await getLatestCodeReviewAttempt(reviewId);
       const isStaleAttempt = !!latestAttempt && attempt.id !== latestAttempt.id;
@@ -1719,7 +1738,41 @@ export async function POST(
         triggerSource: review.trigger_source,
       });
     } else {
-      await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
+      const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
+        reviewId,
+        status,
+        parentStatusUpdates
+      );
+      if (!claimedTerminalUpdate) {
+        // The parent was terminalized by another caller between the read
+        // above and this write; its values stand. Nothing below may run for a
+        // terminal review, so stop before the gate check, reaction, summary
+        // comment or publication. Settle idempotently the way the other
+        // terminal short-circuits do, and answer like them.
+        const settledReview = await getCodeReviewById(reviewId);
+        const currentStatus = settledReview?.status ?? review.status;
+        const currentTerminalReason = settledReview?.terminal_reason ?? review.terminal_reason;
+        logExceptInTest('[code-review-status] Review already in terminal state, skipping update', {
+          reviewId,
+          currentStatus,
+          requestedStatus: status,
+        });
+        await settleCodeReviewLedgerRow({
+          reviewId,
+          status: currentStatus,
+          terminalReason: currentTerminalReason,
+          triggerSource: settledReview?.trigger_source ?? review.trigger_source,
+        });
+        return NextResponse.json({
+          success: true,
+          message: 'Review already in terminal state',
+          // The caller parses this into an enum of the three terminal values, so
+          // only a terminal row answers with one and a live row omits it.
+          ...(isTerminalCodeReviewStatus(currentStatus)
+            ? { currentStatus, terminalReason: currentTerminalReason }
+            : {}),
+        });
+      }
       // Settle idempotently: a cross-request redelivery of this terminal
       // callback settles through the terminal short-circuit above, where the
       // compare-and-set and the deterministic event uuid make the repeat a

@@ -983,6 +983,9 @@
       "pendingComment": "comentaris pendents",
       "pendingComment_other": "comentaris pendents",
       "submitCountOfTotal": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
+      "submitCountOfTotal_one": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
+      "submitCountOfTotal_many": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
+      "submitCountOfTotal_other": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
       "submitReview": "Envia la revisió",
       "partialPostedFresh": "Comentaris publicats: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentaris publicats: {{displayFreshCount}}. ",
@@ -3686,7 +3689,7 @@
     },
     "hub": {
       "renameTitle": "Reanomena l'organització",
-      "renamePlaceholder": "Nom de l'organització",
+      "renamePlaceholder": "Introdueix un nom per a l'organització",
       "balance": "Saldo",
       "plan": "Pla",
       "planTeams": "Teams",

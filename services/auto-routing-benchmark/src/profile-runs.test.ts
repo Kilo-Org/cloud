@@ -433,7 +433,7 @@ describe('all-effort platform scheduling', () => {
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: expect.any(String),
       entries: variants.map(variant => ({ model: 'platform/a', variant })),
-      repetitions: 1,
+      repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -473,12 +473,12 @@ describe('startRun — registry-backed decider runs', () => {
       env.BENCH_DB,
       result.runId,
       entries,
-      expect.objectContaining({ repetitions: 1 })
+      expect.objectContaining({ repetitions: 3 })
     );
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result.runId,
       entries,
-      repetitions: 1,
+      repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -498,7 +498,7 @@ describe('startRun — registry-backed decider runs', () => {
       env.BENCH_DB,
       result.runId,
       entries,
-      expect.objectContaining({ repetitions: 1 })
+      expect.objectContaining({ repetitions: 3 })
     );
     // Dedup is the registry's job, so no run-level carry lookup happens.
     expect(getLatestSummariesByModel).not.toHaveBeenCalled();
@@ -1325,7 +1325,7 @@ describe('drainQueue', () => {
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result!.runId,
       entries: modelRows.map(row => ({ model: row.model, variant: null })),
-      repetitions: 1,
+      repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -1933,7 +1933,7 @@ it('reuses prior cases before delegating the complete durable chunk plan', async
   expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
     runId: result.runId,
     entries: [{ model: 'platform/a', variant: null }],
-    repetitions: 1,
+    repetitions: 3,
     caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
     chunkSize: 1,
   });

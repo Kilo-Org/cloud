@@ -5318,6 +5318,7 @@
     "providersNeedCatalog": "Bydd switshis darparwyr yn aros yn ddarllen-yn-unig nes i'r catalog modelau llawn lwytho. Tapiwch Rhoi cynnig eto uchod i'w golygu.",
     "providersEmpty": "Does dim darparwyr yn cyfateb i'r chwiliad hwn.",
     "providersNone": "Nid oes darparwyr ar gael ar gyfer y sefydliad hwn.",
+    "providersUnavailable": "Methwyd llwytho'r rhestr darparwyr.",
     "allowAllShown": "Caniatáu pob un a ddangosir",
     "denyAllShown": "Gwrthod pob un a ddangosir",
     "gatewaysDescription": "Mae Kilo yn anfon ceisiadau model drwy Vercel AI Gateway neu OpenRouter. Bydd y ceisiadau hynny'n methu os yw'r porth wedi'i analluogi.",

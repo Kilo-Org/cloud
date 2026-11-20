@@ -5002,6 +5002,7 @@
     "providersNeedCatalog": "Àwọn ìyípadà olùpèsè yóò wà fún kíkà nìkan títí àkójọ àwòṣe kíkún yóò fi gbé wọlé tán. Tẹ Tún gbìyànjú lókè láti ṣàtúnṣe wọn.",
     "providersEmpty": "Kò sí olùpèsè tó bá ìwádìí yìí mu.",
     "providersNone": "Kò sí olùpèsè tó wà fún àjọ yìí.",
+    "providersUnavailable": "Àkójọ olùpèsè kò lè gbé wọlé.",
     "allowAllShown": "Gbà gbogbo èyí tí a fi hàn láàyè",
     "denyAllShown": "Kọ gbogbo èyí tí a fi hàn",
     "gatewaysDescription": "Kilo ń tọ́ àwọn ìbéèrè àwòṣe lọ sí Vercel AI Gateway tàbí OpenRouter. Ẹnu-ọ̀nà tí a pa dà yóò mú kí àwọn ìbéèrè yẹn kùnà.",

@@ -5002,6 +5002,7 @@
     "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
     "providersEmpty": "No providers match this search.",
     "providersNone": "No providers are available for this organization.",
+    "providersUnavailable": "Couldn't load the provider list.",
     "allowAllShown": "Allow all shown",
     "denyAllShown": "Deny all shown",
     "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",

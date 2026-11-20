@@ -5002,6 +5002,7 @@
     "providersNeedCatalog": "Udbyderkontakterne er skrivebeskyttede, indtil hele modelkataloget er indlæst. Tryk på Prøv igen ovenfor for at redigere dem.",
     "providersEmpty": "Ingen udbydere matcher denne søgning.",
     "providersNone": "Der er ingen udbydere tilgængelige for denne organisation.",
+    "providersUnavailable": "Udbyderlisten kunne ikke indlæses.",
     "allowAllShown": "Tillad alle viste",
     "denyAllShown": "Afvis alle viste",
     "gatewaysDescription": "Kilo dirigerer modelanmodninger gennem Vercel AI Gateway eller OpenRouter. En deaktiveret gateway får disse anmodninger til at mislykkes.",

@@ -5002,6 +5002,7 @@
     "providersNeedCatalog": "Verskafferskakelaars bly leesalleen totdat die volledige modelkatalogus gelaai het. Tik hierbo op Probeer weer om hulle te wysig.",
     "providersEmpty": "Geen verskaffers pas by hierdie soektog nie.",
     "providersNone": "Geen verskaffers is vir hierdie organisasie beskikbaar nie.",
+    "providersUnavailable": "Die verskafferslys kon nie laai nie.",
     "allowAllShown": "Laat almal wat gewys word toe",
     "denyAllShown": "Weier almal wat gewys word",
     "gatewaysDescription": "Kilo roeteer modelversoeke deur Vercel AI Gateway of OpenRouter. 'n Afgeskakelde gateway laat daardie versoeke misluk.",

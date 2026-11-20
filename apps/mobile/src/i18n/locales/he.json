@@ -5081,6 +5081,7 @@
     "providersNeedCatalog": "מתגי הספקים יישארו לקריאה בלבד עד שקטלוג המודלים המלא ייטען. לחץ על ניסיון חוזר למעלה כדי לערוך אותם.",
     "providersEmpty": "אין ספקים שמתאימים לחיפוש הזה.",
     "providersNone": "אין ספקים זמינים עבור הארגון הזה.",
+    "providersUnavailable": "לא ניתן היה לטעון את רשימת הספקים.",
     "allowAllShown": "אשר את כל המוצגים",
     "denyAllShown": "חסום את כל המוצגים",
     "gatewaysDescription": "Kilo מנתב בקשות מודל דרך Vercel AI Gateway או OpenRouter. שער מושבת מכשיל את הבקשות האלה.",

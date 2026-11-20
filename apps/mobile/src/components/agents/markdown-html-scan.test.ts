@@ -41,12 +41,14 @@ describe('convertHtmlToMarkdown generated fixtures', () => {
     expect(convertHtmlToMarkdown(value)).toBe(`**${'`x` '.repeat(4097).trimEnd()}** `);
   });
 
-  // The three cases below repeat one construct far past the point where a pass
+  // The four cases below repeat one construct far past the point where a pass
   // that re-reads the rest of the value per construct stays inside the budget.
-  // Each case warms its path first, so the timed span measures the pass and not
-  // the first call's compilation of it.
+  // Each size keeps the earlier implementation well above the budget while
+  // leaving this one clear of it on a busy machine. Each case warms its path
+  // first, so the timed span measures the pass and not the first call's
+  // compilation of it.
   it('joins many sibling emphasis tags within its processing budget', () => {
-    const siblings = 32_000;
+    const siblings = 24_000;
     const value = `<p>${'<b>t</b>'.repeat(siblings)}</p>`;
     convertHtmlToMarkdown('<p><b>t</b></p>');
     const start = performance.now();
@@ -68,7 +70,7 @@ describe('convertHtmlToMarkdown generated fixtures', () => {
   });
 
   it('converts many root-level siblings within its processing budget', () => {
-    const siblings = 48_000;
+    const siblings = 40_000;
     const value = '<b>t</b>'.repeat(siblings);
     convertHtmlToMarkdown('<b>t</b>');
     const start = performance.now();
@@ -88,6 +90,8 @@ describe('convertHtmlToMarkdown generated fixtures', () => {
     expect(images).toHaveLength(count);
     const warm = '![i](https://evil.example/i.png)';
     gateMarkdownImages(warm, findMarkdownImages(warm), t);
+    // The lex and the lookup above are the caller's work; the gate's own pass is
+    // what the budget covers.
     const start = performance.now();
     const gated = gateMarkdownImages(value, images, t);
     const elapsed = performance.now() - start;

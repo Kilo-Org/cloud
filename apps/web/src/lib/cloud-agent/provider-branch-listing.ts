@@ -651,6 +651,7 @@ async function getGitHubBranchHead(
     ];
     let lastError: unknown;
     let rateLimitError: unknown;
+    let credentialError: unknown;
     for (const integration of candidates) {
       try {
         return await call(integration);
@@ -659,11 +660,21 @@ async function getGitHubBranchHead(
           rateLimitError ??= error;
           continue;
         }
+        // A refused credential belongs to one installation; another may still
+        // resolve the branch, so the reconnect state wins only if none does.
+        if (refusalStatus(error) === 401) {
+          credentialError ??= error;
+          continue;
+        }
+        // The list walk classifies a 5xx as SERVICE_UNAVAILABLE and a 451 as
+        // FORBIDDEN; this walk classifies only the refusals above and rethrows
+        // anything else unchanged.
         if (!isRepositoryUnreachable(error)) throw error;
         lastError = error;
       }
     }
     if (rateLimitError) throw githubRateLimitTrpcError(rateLimitError);
+    if (credentialError) throw githubCredentialRefusedTrpcError(credentialError);
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: githubRepositoryNotFoundMessage,

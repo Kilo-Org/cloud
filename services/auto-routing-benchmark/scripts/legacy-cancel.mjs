@@ -501,6 +501,165 @@ export function stateSql() {
  */
 export const MONOTONE_FIELDS = new Set(['platform_requested_sum', 'user_requested_sum']);
 
+/**
+ * The live path never runs `stateSql()`: history-wide digests are what overloaded production
+ * D1. It reads only the literal deploy gate (indexed `running_runs` + chunk status counts), the
+ * CURRENT published artifact for the fixed router list, the runs being cancelled, and pool-sized
+ * dimension tables. Scope is sized and plan-checked before any payload read or write.
+ * `--local-file` keeps the exhaustive digest: an isolated copy is where byte comparison belongs.
+ */
+export const LEAN_MAX_RUNS = 50;
+export const LEAN_MAX_SCOPED_ROWS = 50_000;
+
+/** The routers whose published artifact is compared (`AUTO_ROUTERS` in the contracts package). */
+export const LEAN_ROUTERS = ['efficient', 'frontier'];
+
+/** Running runs, capped with LIMIT+1 so an overrun is detected without an unbounded read. */
+export function scopeRunsSql(limit = LEAN_MAX_RUNS) {
+  return `SELECT id FROM benchmark_runs WHERE status = 'running' ORDER BY id LIMIT ${limit + 1}`;
+}
+
+/**
+ * Current published artifact per router (newest `published_at`). `routing_tables` has no
+ * `(router, published_at)` index, so ask each known router for its newest row instead of
+ * scanning that history; the router list is fixed, so this is O(routers).
+ */
+export function scopePublishedSql(routers = LEAN_ROUTERS) {
+  return routers
+    .map(
+      router => `SELECT ${sqlString(router)} AS router, (
+      SELECT t.run_id FROM routing_tables AS t
+      WHERE t.router = ${sqlString(router)}
+      ORDER BY t.published_at DESC, t.rowid DESC
+      LIMIT 1) AS run_id`
+    )
+    .join('\n  UNION ALL\n  ');
+}
+
+const inList = ids => (ids.length === 0 ? 'IN (NULL)' : `IN (${ids.map(sqlString).join(', ')})`);
+
+/** Size probes: `LIMIT <cap+1>` stops at the cap; a missing field is an error, never zero. */
+export function leanScopeSizeSql(scope, cap = LEAN_MAX_SCOPED_ROWS) {
+  const runs = inList((scope.runIds ?? []).map(String));
+  const published = inList((scope.publishedRunIds ?? []).map(String));
+  const probe = (alias, from) => `(SELECT COUNT(*) FROM (
+      SELECT 1 AS hit FROM ${from} LIMIT ${cap + 1}) AS ${alias})`;
+  return `SELECT
+  ${probe('cancelled_case_results', `case_results AS row WHERE row.run_id ${runs}`)} AS cancelled_case_results,
+  ${probe('served_case_results', `case_results AS row WHERE row.run_id ${published}`)} AS served_case_results,
+  ${probe('cancelled_summaries', `model_summaries AS row WHERE row.run_id ${runs}`)} AS cancelled_summaries,
+  ${probe('served_summaries', `model_summaries AS row WHERE row.run_id ${published}`)} AS served_summaries,
+  ${probe('cancelled_chunks', `scheduler_chunks AS chunk WHERE chunk.run_id ${runs}`)} AS cancelled_chunks`;
+}
+
+/**
+ * Each CTE is an AGGREGATE (one row), so SQLite cannot inline it and each history table is read
+ * once; the final SELECT cross-joins the one-row results. The query plan proves it.
+ */
+export function leanStateSql(scope) {
+  const runs = inList((scope.runIds ?? []).map(String));
+  const published = inList((scope.publishedRunIds ?? []).map(String));
+  return `WITH
+  cancelled_case AS (SELECT
+      COUNT(*) AS n, COALESCE(TOTAL(score), 0) AS score,
+      COALESCE(SUM(COALESCE(timed_out, 0)), 0) AS timeouts
+    FROM case_results AS row WHERE row.run_id ${runs}),
+  served_case AS (SELECT
+      COUNT(*) AS n, COALESCE(TOTAL(score), 0) AS score,
+      COALESCE(TOTAL(cost_usd), 0) AS cost, COALESCE(TOTAL(latency_ms), 0) AS latency,
+      COALESCE(SUM(COALESCE(timed_out, 0)), 0) AS timeouts,
+      COALESCE(SUM(LENGTH(COALESCE(error, ''))), 0) AS error_length,
+      COALESCE(SUM(LENGTH(model || variant || case_id)), 0) AS key_length
+    FROM case_results AS row WHERE row.run_id ${published}),
+  cancelled_summary AS (SELECT COUNT(*) AS n
+    FROM model_summaries AS row WHERE row.run_id ${runs}),
+  served_summary AS (SELECT COUNT(*) AS n, COALESCE(TOTAL(accuracy), 0) AS accuracy,
+      COALESCE(SUM(cases), 0) AS cases
+    FROM model_summaries AS row WHERE row.run_id ${published}),
+  cancelled_chunk AS (SELECT COUNT(*) AS n, COALESCE(TOTAL(attempts), 0) AS attempts
+    FROM scheduler_chunks AS chunk WHERE chunk.run_id ${runs}),
+  served_routing AS (SELECT
+      COALESCE(GROUP_CONCAT(t.run_id || '@' || t.published_at || '@'
+        || t.generated_at || '@' || t.source, '|'), '') AS signature
+    FROM routing_tables AS t WHERE t.run_id ${published}),
+  served_candidate AS (SELECT COUNT(*) AS n, COALESCE(TOTAL(accuracy), 0) AS accuracy,
+      COALESCE(TOTAL(avg_cost_usd), 0) AS cost
+    FROM routing_table_candidates AS candidate WHERE candidate.run_id ${published}),
+  cancelled_lane AS (SELECT COUNT(*) AS n FROM run_lane_failures AS failure
+    WHERE failure.run_id ${runs}),
+  cancelled_execution AS (SELECT COUNT(*) AS n FROM scheduler_executions AS execution
+    WHERE execution.run_id ${runs}),
+  cancelled_pending AS (SELECT COUNT(*) AS n FROM pending_decider_outputs AS pending
+    WHERE pending.run_id ${runs})
+SELECT
+  (SELECT COUNT(*) FROM benchmark_runs AS run WHERE run.status = 'running') AS running_runs,
+  (SELECT COUNT(*) FROM scheduler_chunks AS chunk
+    WHERE chunk.status IN ('pending', 'queued', 'active')) AS unfinished_chunks,
+  (SELECT COUNT(*) FROM scheduler_chunks AS chunk WHERE chunk.status = 'pending') AS pending_chunks,
+  (SELECT COUNT(*) FROM scheduler_chunks AS chunk WHERE chunk.status = 'queued') AS queued_chunks,
+  (SELECT COUNT(*) FROM scheduler_chunks AS chunk WHERE chunk.status = 'active') AS active_chunks,
+  (SELECT COUNT(*) FROM benchmark_profiles AS profile WHERE profile.status = 'running') AS running_profiles,
+  (SELECT COUNT(*) FROM benchmark_profiles AS profile WHERE profile.status = 'pending') AS pending_profiles,
+  (SELECT COUNT(*) FROM benchmark_profiles AS profile WHERE profile.status = 'ready') AS ready_profiles,
+  (SELECT COUNT(*) FROM benchmark_profiles AS profile WHERE profile.status = 'failed') AS failed_profiles,
+  (SELECT COALESCE(SUM(profile.platform_requested), 0) FROM benchmark_profiles AS profile) AS platform_requested_sum,
+  (SELECT COALESCE(SUM(profile.user_requested), 0) FROM benchmark_profiles AS profile) AS user_requested_sum,
+  (SELECT COUNT(*) FROM profile_remeasures AS claim) AS remeasures_n,
+  (SELECT COUNT(*) FROM profile_remeasures AS claim WHERE claim.run_id IS NOT NULL) AS remeasure_claims_n,
+  (SELECT COUNT(*) FROM benchmark_subscriptions AS subscription) AS subscriptions_n,
+  (SELECT COUNT(*) FROM probe_activations AS activation) AS probe_activations_n,
+  served_case.n AS served_case_results_n,
+  served_case.score AS served_case_results_score,
+  served_case.cost AS served_case_results_cost,
+  served_case.latency AS served_case_results_latency,
+  served_case.timeouts AS served_case_results_timeouts,
+  served_case.error_length AS served_case_results_error_length,
+  served_case.key_length AS served_case_results_key_length,
+  served_summary.n AS served_summaries_n,
+  served_summary.accuracy AS served_summaries_accuracy,
+  served_summary.cases AS served_summaries_cases,
+  served_routing.signature AS served_routing_signature,
+  served_candidate.n AS served_candidates_n,
+  served_candidate.accuracy AS served_candidates_accuracy,
+  served_candidate.cost AS served_candidates_cost,
+  cancelled_case.n AS cancelled_case_results_n,
+  cancelled_case.score AS cancelled_case_results_score,
+  cancelled_case.timeouts AS cancelled_case_results_timeouts,
+  cancelled_summary.n AS cancelled_summaries_n,
+  cancelled_chunk.n AS cancelled_chunks_n,
+  cancelled_chunk.attempts AS cancelled_chunk_attempts,
+  cancelled_lane.n AS cancelled_lane_failures_n,
+  cancelled_execution.n AS cancelled_executions_n,
+  cancelled_pending.n AS cancelled_pending_outputs_n
+FROM cancelled_case, served_case, cancelled_summary, served_summary, cancelled_chunk,
+     served_routing, served_candidate, cancelled_lane, cancelled_execution, cancelled_pending;
+`;
+}
+
+/** Fields this operation changes on purpose in the bounded digest. */
+export const LEAN_CHANGED_BY_DESIGN = new Set([
+  'running_runs',
+  'unfinished_chunks',
+  'pending_chunks',
+  'queued_chunks',
+  'active_chunks',
+  'running_profiles',
+  'pending_profiles',
+]);
+
+/** Bounded-digest fields that may only grow (a late graded result legitimately adds a row). */
+export const LEAN_MONOTONE_FIELDS = new Set([
+  'platform_requested_sum',
+  'user_requested_sum',
+  'cancelled_case_results_n',
+  'cancelled_case_results_score',
+  'cancelled_case_results_timeouts',
+  'cancelled_summaries_n',
+  'cancelled_lane_failures_n',
+  'cancelled_executions_n',
+  'cancelled_pending_outputs_n',
+]);
+
 /** Fields this operation changes on purpose. Every other field must be byte-identical. */
 export const CHANGED_BY_DESIGN = new Set([
   'running_runs',
@@ -540,7 +699,23 @@ function readBaseline(path) {
   }
 }
 
-function compare(before, after, { requireZeroLive }) {
+function compare(
+  before,
+  after,
+  {
+    requireZeroLive,
+    changed = CHANGED_BY_DESIGN,
+    monotone = MONOTONE_FIELDS,
+    zeroLiveFields = [
+      'running_runs',
+      'unfinished_chunks',
+      'running_profiles',
+      'cancelled_running_profiles_n',
+      'cancelled_still_claimed_profiles_n',
+      'cancelled_unparked_claims_n',
+    ],
+  }
+) {
   const failures = [];
   const n = key => Number(after[key]);
   if (requireZeroLive) {
@@ -551,26 +726,17 @@ function compare(before, after, { requireZeroLive }) {
           `queued=${n('queued_chunks')} active=${n('active_chunks')})`
       );
     }
-    if (n('running_profiles') !== 0) failures.push(`running_profiles=${n('running_profiles')}`);
-    if (n('cancelled_running_profiles_n') !== 0) {
-      failures.push(`cancelled-run profiles still running=${n('cancelled_running_profiles_n')}`);
-    }
-    if (n('cancelled_still_claimed_profiles_n') !== 0) {
-      failures.push(
-        `profiles still claimed by a cancelled run=${n('cancelled_still_claimed_profiles_n')}`
-      );
-    }
-    if (n('cancelled_unparked_claims_n') !== 0) {
-      failures.push(
-        `remeasure claims of cancelled runs still claimable=${n('cancelled_unparked_claims_n')}`
-      );
+    for (const key of zeroLiveFields) {
+      if (key === 'running_runs' || key === 'unfinished_chunks') continue;
+      if (!(key in after)) continue;
+      if (n(key) !== 0) failures.push(`${key}=${n(key)}`);
     }
   }
   for (const key of Object.keys(before)) {
-    if (CHANGED_BY_DESIGN.has(key)) continue;
+    if (changed.has(key)) continue;
     const expected = before[key];
     const actual = after[key];
-    if (MONOTONE_FIELDS.has(key)) {
+    if (monotone.has(key)) {
       if (Number(actual) < Number(expected))
         failures.push(`${key} shrank: ${expected} -> ${actual}`);
       continue;
@@ -584,10 +750,215 @@ function compare(before, after, { requireZeroLive }) {
   return failures;
 }
 
+/** Compare two bounded digests: zero live work, monotone counters, everything else exact. */
+function compareLean(before, after) {
+  return compare(before, after, {
+    requireZeroLive: true,
+    changed: LEAN_CHANGED_BY_DESIGN,
+    monotone: LEAN_MONOTONE_FIELDS,
+    /**
+     * Blocking fields only. `pending_profiles` is NOT one: parking a cancelled run's claim moves
+     * rows TO `pending`, so it legitimately rises. `running_profiles` and `running_runs` are the
+     * live-work assertions; `unfinished_chunks` is the spend fence.
+     */
+    zeroLiveFields: ['running_runs', 'unfinished_chunks', 'running_profiles'],
+  });
+}
+
+/** Resolve and size the bounded scope, fail-closed; the identities go in the baseline. */
+async function resolveLeanScope(executor, previous = null) {
+  const runningRows = await executor.read(scopeRunsSql());
+  const liveRunIds = runningRows.map(row => String(row.id)).sort();
+  if (liveRunIds.length > LEAN_MAX_RUNS) {
+    throw new VerifyFailed(
+      `refusing a bounded verification over ${liveRunIds.length} running runs (limit ${LEAN_MAX_RUNS}); ` +
+        'this is a larger operator decision, not a routine cancel'
+    );
+  }
+  const publishedRows = await executor.read(scopePublishedSql());
+  // A router with no publication yet yields NULL; it is not a served artifact and is not
+  // compared. Only real run ids enter the scope.
+  const publishedRunIds = [
+    ...new Set(
+      publishedRows.flatMap(row =>
+        row.run_id === null || row.run_id === undefined ? [] : [String(row.run_id)]
+      )
+    ),
+  ].sort();
+  if (
+    previous !== null &&
+    (!Array.isArray(previous.runIds) || !Array.isArray(previous.publishedRunIds))
+  ) {
+    throw new VerifyFailed('the bounded baseline has no valid scope');
+  }
+  const runIds = previous?.runIds ?? liveRunIds;
+  if (runIds.length > LEAN_MAX_RUNS) {
+    throw new VerifyFailed('the bounded baseline exceeds the run limit');
+  }
+
+  // The cancelled runs become terminal. Keep their identities for comparison, and
+  // require the current published identities to match before reading any results.
+  if (previous) {
+    const expected = [...new Set((previous.publishedRunIds ?? []).map(String))].sort();
+    if (JSON.stringify(expected) !== JSON.stringify(publishedRunIds)) {
+      throw new VerifyFailed(
+        `the current published artifact changed since the baseline ` +
+          `(${expected.length} vs ${publishedRunIds.length} run(s)); refusing to compare a different artifact`
+      );
+    }
+  }
+
+  const sizeSql = leanScopeSizeSql({ runIds, publishedRunIds });
+  // The size probe is itself a live read: prove it is indexed before running it.
+  await assertLeanPlan(executor, sizeSql);
+  const [size] = await executor.read(sizeSql);
+  const sizeFields = [
+    'cancelled_case_results',
+    'served_case_results',
+    'cancelled_summaries',
+    'served_summaries',
+    'cancelled_chunks',
+  ];
+  let rows = 0;
+  for (const field of sizeFields) {
+    const raw = size?.[field];
+    // A missing, null, negative or non-integer count is a broken probe, never zero.
+    // `Number(null)` is 0, so null is rejected before the numeric check.
+    const value = typeof raw === 'number' ? raw : Number.NaN;
+    if (!Number.isInteger(value) || value < 0) {
+      throw new VerifyFailed(
+        `the scope size probe reported an invalid ${field} (${size?.[field]}); refusing an unsized read`
+      );
+    }
+    // LIMIT <cap+1> means any count above the cap is an overrun; the probe never reads further.
+    if (value > LEAN_MAX_SCOPED_ROWS) {
+      throw new VerifyFailed(
+        `the scope has more than ${LEAN_MAX_SCOPED_ROWS} ${field.replace(/_/g, ' ')}; ` +
+          'refusing a history-sized comparison on live D1 — use the isolated copy instead'
+      );
+    }
+    rows += value;
+  }
+  if (rows > LEAN_MAX_SCOPED_ROWS) {
+    throw new VerifyFailed(
+      `bounded verification would read ${rows} scoped rows (limit ${LEAN_MAX_SCOPED_ROWS}); ` +
+        'refusing to run a history-sized comparison on live D1 — use the isolated copy instead'
+    );
+  }
+  return { runIds, publishedRunIds, scopeRows: rows };
+}
+
+/** Reject a plan that scans a history table instead of reaching it by `run_id`. */
+const LEAN_PLAN_TABLES = [
+  'case_results',
+  'model_summaries',
+  'scheduler_chunks',
+  'run_lane_failures',
+  'scheduler_executions',
+  'pending_decider_outputs',
+];
+
+export async function assertLeanPlan(executor, sql) {
+  // A transport that cannot report a plan cannot prove the statement is indexed.
+  if (typeof executor.plan !== 'function') {
+    throw new VerifyFailed('the transport cannot report a query plan; refusing an unchecked read');
+  }
+  const plan = await executor.plan(sql);
+  if (!Array.isArray(plan) || plan.length === 0) {
+    throw new VerifyFailed('the query plan was empty; refusing an unchecked read');
+  }
+  /**
+   * Every history alias must be a `SEARCH` on `run_id`; a SCAN or a SEARCH on another key is an
+   * unbounded read and is refused. The two global status gates are allowlisted because their
+   * indexes are partial on `status` (`IX_benchmark_runs_running`,
+   * `IX_scheduler_chunks_pending`).
+   */
+  const runKeyed = [
+    'cancelled_case',
+    'served_case',
+    'cancelled_summary',
+    'served_summary',
+    'cancelled_chunk',
+    'served_routing',
+    'served',
+    'candidate',
+    'cancelled_lane',
+    'cancelled_execution',
+    'cancelled_pending',
+  ];
+  const statusGate = /(IX_benchmark_runs_running|IX_scheduler_chunks_pending)/;
+  const failures = [];
+  let sawKeyedHistory = false;
+  for (const line of plan) {
+    if (!/^(SEARCH|SCAN)\b/.test(line)) continue;
+    const alias = line.replace(/^(SEARCH|SCAN)\s+/, '').split(/\s+/)[0];
+    const table = LEAN_PLAN_TABLES.find(name => line.includes(name));
+    if (statusGate.test(line)) continue;
+    // Any SEARCH that is not `run_id=?` on a history alias is an unbounded read. Aliases are
+    // the only thing a plan is guaranteed to name, so check them directly.
+    if (/^SEARCH\b/.test(line) && runKeyed.includes(alias) && !/run_id=\?/.test(line)) {
+      failures.push(line);
+      continue;
+    }
+    // A scan of a MATERIALIZED one-row aggregate CTE is the intended shape: those CTEs each
+    // read their physical table once (verified by the SEARCH lines above).
+    if (
+      /SCAN\b/.test(line) &&
+      /^SCAN (cancelled_|served_routing|served_case|served_summary|served_candidate)/.test(line)
+    ) {
+      continue;
+    }
+    // Known history aliases must be keyed by run_id; any other SEARCH on a history table name
+    // must be too. The status gates are the only exception.
+    if (runKeyed.includes(alias) || table) {
+      if (/^SEARCH\b/.test(line) && /run_id=\?/.test(line)) {
+        sawKeyedHistory = true;
+        continue;
+      }
+      failures.push(line);
+    }
+    // An unrecognized access to a history table (by table name, any alias) is refused.
+    if (!runKeyed.includes(alias) && table && !/^SEARCH\b/.test(line)) {
+      failures.push(line);
+    }
+  }
+  if (failures.length > 0) {
+    throw new VerifyFailed(
+      `bounded verification plan was rejected (history access not keyed by run_id): ${failures[0]}`
+    );
+  }
+  if (!sawKeyedHistory) {
+    throw new VerifyFailed('the query plan does not prove indexed history access');
+  }
+  return plan;
+}
+
+/** Public proof is counts only: never emit run ids or row contents. */
+function scopeReport(scope) {
+  return {
+    runs: scope.runIds.length,
+    publishedRuns: scope.publishedRunIds.length,
+    scopedRows: scope.scopeRows,
+  };
+}
+
+/** Before/after snapshot: bounded + scope-checked on live, exhaustive on the isolated copy. */
+async function readState(executor, scope = null) {
+  if (!executor.lean) return { digest: (await executor.read(stateSql()))[0], scope: null };
+  const resolved = await resolveLeanScope(executor, scope);
+  const sql = leanStateSql(resolved);
+  await assertLeanPlan(executor, sql);
+  return { digest: (await executor.read(sql))[0], scope: resolved };
+}
+
 function report(sink, event, fields = {}) {
   sink(JSON.stringify({ event: `legacy_cancel_${event}`, ...fields }));
 }
 
+/**
+ * Parse and validate the real `wrangler d1 execute --json` envelope: rows in `results`, a
+ * write's affected count in `meta.changes`. Malformed or unsuccessful is an error, never zero.
+ */
 function parseD1Entries(stdout) {
   let parsed;
   try {
@@ -598,6 +969,10 @@ function parseD1Entries(stdout) {
   if (!Array.isArray(parsed) || parsed.length === 0) throw new D1Error('D1 returned no results');
   for (const entry of parsed) {
     if (entry?.success !== true) throw new D1Error('D1 reported an unsuccessful statement');
+    if (!Array.isArray(entry.results)) throw new D1Error('D1 entry has no results array');
+    if (entry.meta !== undefined && typeof entry.meta.changes !== 'number') {
+      throw new D1Error('D1 entry has a malformed meta envelope');
+    }
   }
   return parsed;
 }
@@ -611,7 +986,7 @@ function parseD1Entries(stdout) {
  */
 export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
   const binary = existsSync(localWrangler) ? localWrangler : 'wrangler';
-  const run = sql =>
+  const runEnvelope = sql =>
     new Promise((resolve, reject) => {
       const child = spawnImpl(
         binary,
@@ -652,7 +1027,7 @@ export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
           return;
         }
         try {
-          resolve(parseD1Entries(stdout).at(-1).results);
+          resolve(parseD1Entries(stdout));
         } catch (error) {
           reject(error);
         }
@@ -660,12 +1035,31 @@ export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
       if (signal) signal.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
     });
   return {
-    read: sql => run(sql),
+    // The live path is the bounded one; `lean: true` is what selects it.
+    lean: true,
+    read: sql => runEnvelope(sql).then(entries => entries.at(-1).results),
+    /** `EXPLAIN QUERY PLAN` rows, as the real transport reports them. */
+    plan: sql =>
+      runEnvelope(`EXPLAIN QUERY PLAN ${sql}`).then(entries =>
+        entries
+          .flatMap(entry => entry.results)
+          .map(row => {
+            if (row === null || typeof row !== 'object' || !('detail' in row)) {
+              throw new D1Error('D1 returned a malformed EXPLAIN QUERY PLAN row');
+            }
+            return String(row.detail);
+          })
+      ),
     write: async statements => {
       const changed = [];
       for (const statement of statements) {
-        const results = await run(statement);
-        changed.push(Number(results?.[0]?.changes ?? 0));
+        // The affected count lives in `meta.changes`; `results` is normally empty.
+        const entries = await runEnvelope(statement);
+        const entry = entries.at(-1);
+        if (!entry || entry.success !== true || typeof entry.meta?.changes !== 'number') {
+          throw new D1Error('D1 write did not report meta.changes');
+        }
+        changed.push(Number(entry.meta.changes));
       }
       return changed;
     },
@@ -680,6 +1074,13 @@ export function createLocalExecutor(path) {
     return db;
   };
   return {
+    lean: false,
+    // Exposed so the isolated proof can assert the bounded plan too.
+    plan: sql =>
+      open()
+        .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+        .all()
+        .map(row => String(row.detail)),
     read: sql => open().prepare(sql).all(),
     write: statements => {
       const sqlite = open();
@@ -782,7 +1183,8 @@ export async function runLegacyCancel({
     if (args.mode === 'dry-run') {
       const running = await executor.read(runningRunsSql());
       const ids = running.map(row => String(row.id));
-      const before = (await executor.read(stateSql()))[0];
+      const { digest: before, scope } = await readState(executor);
+      if (scope) report(log, 'lean_scope', scopeReport(scope));
       report(log, 'before', before);
       report(log, 'would_cancel', {
         runs: running.map(row => ({
@@ -811,13 +1213,31 @@ export async function runLegacyCancel({
     }
 
     if (args.mode === 'apply') {
-      const first = (await executor.read(runningRunsSql())).map(row => String(row.id));
-      const before = (await executor.read(stateSql()))[0];
+      // One resolve defines BOTH the digest and the runs that may be cancelled: a run that
+      // appears after it is a race overrun, not part of the reviewed baseline.
+      const beforeState = await readState(executor);
+      const before = beforeState.digest;
+      const scopedRunIds = beforeState.scope ? beforeState.scope.runIds : null;
+      const first = scopedRunIds
+        ? [...scopedRunIds]
+        : (await executor.read(runningRunsSql())).map(row => String(row.id));
+      if (beforeState.scope) report(log, 'lean_scope', scopeReport(beforeState.scope));
       report(log, 'before', before);
       const cancelled = new Set(first);
       let passes = 0;
       while (passes < MAX_PASSES) {
         const ids = (await executor.read(runningRunsSql())).map(row => String(row.id));
+        if (scopedRunIds) {
+          // A live run outside the sized baseline is a race overrun: abort before writing
+          // rather than cancelling a run nobody reviewed.
+          const outside = ids.filter(id => !scopedRunIds.includes(id));
+          if (outside.length > 0) {
+            throw new VerifyFailed(
+              `a live run (${outside.length}) appeared outside the sized baseline; ` +
+                'aborting before any write — re-run --dry-run to review the larger set'
+            );
+          }
+        }
         for (const id of ids) cancelled.add(id);
         // Terminal runs can still have unfinished chunks. Run the guarded sweep even
         // when there are no live runs to cancel.
@@ -841,10 +1261,15 @@ export async function runLegacyCancel({
           );
         }
       }
-      const after = (await executor.read(stateSql()))[0];
+      // Re-read with the SAME resolved scope; a scope that moved during the operation is
+      // reported rather than silently widened.
+      const afterState = await readState(executor, beforeState.scope);
+      const after = afterState.digest;
       const [relock] = await executor.read(lockSql());
       report(log, 'after', after);
-      const failures = compare(before, after, { requireZeroLive: true });
+      const failures = beforeState.scope
+        ? compareLean(before, after)
+        : compare(before, after, { requireZeroLive: true });
       if (
         relock?.token !== args.expectToken ||
         Number(relock?.lease_until) !== Number(lock.lease_until)
@@ -863,6 +1288,10 @@ export async function runLegacyCancel({
               token: args.expectToken,
               leaseUntil: Number(lock.lease_until),
               cancelledRunIds: [...cancelled],
+              // Exact identities this verification compared, so --verify re-reads the same
+              // rows and cannot quietly re-scope to a different artifact.
+              scope: beforeState.scope,
+              lean: Boolean(beforeState.scope),
               state: after,
             },
             null,
@@ -895,8 +1324,20 @@ export async function runLegacyCancel({
     if (Number(baseline.leaseUntil) !== Number(lock.lease_until)) {
       throw new VerifyFailed('the operator lease row changed since the baseline was taken');
     }
-    const current = (await executor.read(stateSql()))[0];
-    const failures = compare(baseline.state, current, { requireZeroLive: true });
+    // Recheck and resize the pinned scope before comparing the same rows.
+    const baselineScope = baseline.scope ?? null;
+    if (Boolean(baseline.lean) !== Boolean(executor.lean)) {
+      throw new VerifyFailed(
+        'the baseline was taken over a different transport than this run; refusing to compare'
+      );
+    }
+    if (executor.lean && baselineScope === null) {
+      throw new VerifyFailed('the bounded baseline has no scope');
+    }
+    const { digest: current } = await readState(executor, baselineScope);
+    const failures = baseline.lean
+      ? compareLean(baseline.state, current)
+      : compare(baseline.state, current, { requireZeroLive: true });
     if (failures.length > 0) {
       report(log, 'verify_failed', { failures });
       return EXIT.verifyFailed;

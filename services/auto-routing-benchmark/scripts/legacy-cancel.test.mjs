@@ -1540,3 +1540,595 @@ test('the pre-cutover fixture is unaffected: the guard does not fire on 0037', a
     f.close();
   }
 });
+
+// ---- bounded remote path: scope guards, chunkless live, closed current intact --------------
+//
+// The live path must never digest all history. These tests drive the bounded digest through the
+// same code the `--remote` transport uses, and prove every fail-closed guard.
+
+const leanArgs = (mode, path, extra = []) => [mode, ...BASE_ARGS, '--local-file', path, ...extra];
+
+/** An executor that behaves like the live transport (lean) over a local SQLite file. */
+async function leanRun(path, argv) {
+  const { createLocalExecutor } = await import('./legacy-cancel.mjs');
+  const inner = createLocalExecutor(path);
+  const lines = [];
+  const executor = {
+    lean: true,
+    plan: inner.plan,
+    read: inner.read,
+    write: inner.write,
+    close: inner.close,
+  };
+  const code = await runLegacyCancel({ argv, executor, log: line => lines.push(line) });
+  const events = lines
+    .filter(line => line.startsWith('{'))
+    .map(line => JSON.parse(line))
+    .map(event => ({ ...event, event: event.event.slice('legacy_cancel_'.length) }));
+  return { code, lines, events, last: name => events.filter(e => e.event === name).at(-1) };
+}
+
+function seedPublished(sqlite, { runId, publishedAt, tableRun = null }) {
+  sqlite
+    .prepare(
+      `INSERT INTO routing_tables (run_id, router, published_at, generated_at, min_accuracy,
+         switch_cost_factor, best_accuracy_switch_threshold, source)
+       VALUES (?, 'efficient', ?, ?, 0.9, 1, 0.05, 'platform')`
+    )
+    .run(tableRun ?? runId, publishedAt, publishedAt);
+  sqlite
+    .prepare(
+      `INSERT INTO routing_table_candidates (run_id, route_key, rank, model, accuracy,
+         avg_cost_usd, meets_threshold)
+       VALUES (?, 'route/a', 0, 'vendor/done', 0.81, 0.01, 1)`
+    )
+    .run(tableRun ?? runId);
+}
+
+test('bounded remote path never reads the full-history digest', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createLocalExecutor } = await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    const seen = [];
+    const executor = {
+      lean: true,
+      plan: inner.plan,
+      read: sql => {
+        seen.push(sql);
+        return inner.read(sql);
+      },
+      write: statements => {
+        seen.push(...statements);
+        return inner.write(statements);
+      },
+      close: inner.close,
+    };
+    const code = await runLegacyCancel({
+      argv: leanArgs('--apply', f.path),
+      executor,
+      log: () => {},
+    });
+    assert.equal(code, EXIT.ok);
+    assert.ok(seen.length > 3);
+    for (const sql of seen) {
+      // The exhaustive digest's tell is its whole-history correlated EXISTS over case_results.
+      assert.ok(
+        !/FROM case_results AS row WHERE EXISTS/.test(sql),
+        'the live path must never run the full-history artifact digest'
+      );
+      assert.ok(!/FROM scheduler_chunks AS chunk\) AS chunk_attempts/.test(sql));
+    }
+    // Every case_results / model_summaries reference is scoped by a run_id key.
+    for (const sql of seen.filter(s => /FROM case_results|FROM model_summaries/.test(s))) {
+      assert.match(sql, /run_id/, 'a history table must be reached through run_id');
+    }
+  } finally {
+    f.close();
+  }
+});
+
+test('a hostile number of running runs is refused before any write', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    // Overrun the documented cap.
+    const { LEAN_MAX_RUNS } = await import('./legacy-cancel.mjs');
+    for (let i = 0; i < LEAN_MAX_RUNS + 1; i += 1) {
+      insertDeciderRun(f.sqlite, {
+        id: `run-overrun-${i}`,
+        startedAt: `2026-11-1${i % 10}T00:00:00.000Z`,
+      });
+    }
+    const before = readAll(f.sqlite);
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(result.last('verify_failed').reason, /refusing a bounded verification over/);
+    assert.deepEqual(readAll(f.sqlite), before, 'a refused scope must not write');
+  } finally {
+    f.close();
+  }
+});
+
+test('a scope that would exceed the row envelope is refused before any write', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { LEAN_MAX_SCOPED_ROWS } = await import('./legacy-cancel.mjs');
+    // One live run carrying more scoped rows than the envelope allows.
+    const bulk = f.sqlite.prepare(
+      `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+         cost_usd, error, rep, timed_out, prompt_revision)
+       VALUES ('run-live-a', 'vendor/seed', 'high', ?, 'route/a', 1, 10, 0, NULL, 0, 0, 3)`
+    );
+    f.sqlite.exec('BEGIN');
+    for (let i = 0; i < LEAN_MAX_SCOPED_ROWS + 1; i += 1) bulk.run(`bulk-${i}`);
+    f.sqlite.exec('COMMIT');
+    const before = readAll(f.sqlite);
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(
+      result.last('verify_failed').reason,
+      /more than \d+ cancelled case results|scoped rows/
+    );
+    assert.deepEqual(readAll(f.sqlite), before);
+  } finally {
+    f.close();
+  }
+});
+
+test('a rejected plan fails closed instead of scanning history', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createLocalExecutor, leanStateSql, assertLeanPlan } =
+      await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    // A deliberately unbounded digest must be rejected by the guard.
+    const unbounded = `SELECT (SELECT COUNT(*) FROM case_results) AS n`;
+    await assert.rejects(
+      () => assertLeanPlan({ plan: sql => inner.plan(sql) }, unbounded),
+      error => /plan was rejected/.test(error.message)
+    );
+    // The real bounded digest passes the same guard.
+    const ok = await assertLeanPlan(
+      { plan: sql => inner.plan(sql) },
+      leanStateSql({ runIds: ['run-live-a'], publishedRunIds: ['run-done'] })
+    );
+    assert.ok(Array.isArray(ok));
+    inner.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('remote verify reuses the baseline scope and refuses a changed scope', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const baseline = join(f.directory, 'baseline.json');
+    const applied = await leanRun(
+      f.path,
+      leanArgs('--apply', f.path, ['--baseline-out', baseline])
+    );
+    assert.equal(applied.code, EXIT.ok, JSON.stringify(applied.events));
+    const saved = JSON.parse(readFileSync(baseline, 'utf8'));
+    assert.ok(saved.lean, 'a live baseline must be marked bounded');
+    assert.ok(saved.scope, 'a live baseline must persist its scope');
+    assert.deepEqual(saved.scope.runIds.sort(), ['run-live-a', 'run-live-b']);
+    assert.deepEqual(saved.scope.publishedRunIds, ['run-done']);
+
+    const clean = await leanRun(f.path, leanArgs('--verify', f.path, ['--baseline', baseline]));
+    assert.equal(clean.code, EXIT.ok, JSON.stringify(clean.events));
+
+    // Republish from a DIFFERENT run: the served scope can no longer be the same, so verify
+    // must refuse rather than compare a different artifact.
+    insertDeciderRun(f.sqlite, {
+      id: 'run-newer',
+      status: 'completed',
+      startedAt: '2026-11-24T00:00:00.000Z',
+    });
+    seedPublished(f.sqlite, { runId: 'run-newer', publishedAt: '2026-11-25T00:00:00.000Z' });
+    const moved = await leanRun(f.path, leanArgs('--verify', f.path, ['--baseline', baseline]));
+    assert.equal(moved.code, EXIT.verifyFailed);
+    assert.match(
+      JSON.stringify(moved.last('verify_failed')),
+      /published artifact changed|scope changed/
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('a live baseline cannot be verified against the isolated transport', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const baseline = join(f.directory, 'baseline.json');
+    assert.equal(
+      (await leanRun(f.path, leanArgs('--apply', f.path, ['--baseline-out', baseline]))).code,
+      EXIT.ok
+    );
+    // Same file, but the full-digest transport.
+    const result = await run(f.path, ['--verify', ...BASE_ARGS, '--baseline', baseline]);
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(result.last('verify_failed').reason, /different transport/);
+  } finally {
+    f.close();
+  }
+});
+
+test('bounded path keeps closed current results intact and still closes live work', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    // Snapshot the served artifact's rows as the operator's own pre-state.
+    const servedBefore = f.sqlite
+      .prepare(
+        `SELECT COUNT(*) n, COALESCE(TOTAL(score),0) s, COALESCE(TOTAL(cost_usd),0) c
+         FROM case_results WHERE run_id = 'run-done'`
+      )
+      .get();
+    const tableBefore = f.sqlite
+      .prepare("SELECT run_id, published_at FROM routing_tables WHERE run_id='run-done'")
+      .get();
+
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.ok, JSON.stringify(result.events));
+
+    const servedAfter = f.sqlite
+      .prepare(
+        `SELECT COUNT(*) n, COALESCE(TOTAL(score),0) s, COALESCE(TOTAL(cost_usd),0) c
+         FROM case_results WHERE run_id = 'run-done'`
+      )
+      .get();
+    assert.deepEqual({ ...servedAfter }, { ...servedBefore });
+    assert.deepEqual(
+      {
+        ...f.sqlite
+          .prepare("SELECT run_id, published_at FROM routing_tables WHERE run_id='run-done'")
+          .get(),
+      },
+      { ...tableBefore }
+    );
+    // Live work is closed, exactly as on the exhaustive path.
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_runs WHERE status='running'").get().n,
+      0
+    );
+    assert.equal(
+      f.sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM scheduler_chunks WHERE status IN ('pending','queued','active')"
+        )
+        .get().n,
+      0
+    );
+    assert.equal(result.last('apply_ok').failedProfilesUnchanged, true);
+  } finally {
+    f.close();
+  }
+});
+
+// Migrated-schema (through 0038) chunkless-live refusal, on the bounded path.
+test('post-cutover refuses a chunkless live run on the bounded path too', async () => {
+  const f = cutoverFixture();
+  try {
+    holdOperatorLease(f.sqlite);
+    // A running, marked paid run with ZERO chunks: only `running_runs` can catch it.
+    bindPaidRunNoChunks(f.sqlite, { id: 'paid-chunkless' });
+    const before = readAll(f.sqlite);
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed, JSON.stringify(result.events));
+    assert.match(result.last('verify_failed').reason, /post-cutover/);
+    assert.deepEqual(readAll(f.sqlite), before);
+    assert.equal(
+      f.sqlite.prepare('SELECT COUNT(*) n FROM scheduler_chunks').get().n,
+      0,
+      'the control really has no chunks'
+    );
+  } finally {
+    f.close();
+  }
+});
+
+function bindPaidRunNoChunks(sqlite, { id }) {
+  sqlite
+    .prepare(
+      `INSERT INTO benchmark_runs (id, router, kind, status, started_at, min_accuracy,
+         switch_cost_factor, best_accuracy_switch_threshold, max_concurrency, benchmark_user_id,
+         benchmark_org_id, repetitions, engine_identity, purpose, measurement_revision,
+         accuracy_noise_band, frontier_min_accuracy_delta, admission_marker)
+       VALUES (?, 'efficient', 'decider', 'running', '2026-11-20T16:00:00.000Z', 0.9, 1, 0.05, 250,
+         'bench-user', 'bench-org', 1, ?, 'user', 3, 0.05, 0, 'paid:req-x')`
+    )
+    .run(id, ENGINE);
+}
+
+// ---- real remote shell transport, recorded (no network, no credentials) --------------------
+//
+// The live path's bugs were invisible because nothing exercised `createRemoteExecutor`. This
+// drives it through an injected spawn that records argv and replays the exact JSON shape
+// `wrangler d1 execute --json` produces: rows in `results`, affected count in `meta.changes`.
+
+function fakeWrangler(handler) {
+  const calls = [];
+  const spawnImpl = (binary, args) => {
+    const sql = args[args.indexOf('--command') + 1];
+    calls.push({ binary, args: [...args], sql });
+    const stdout = JSON.stringify(handler(sql, calls.length));
+    const listeners = { stdout: [], stderr: [], close: [], error: [] };
+    const child = {
+      stdout: { setEncoding() {}, on: (_e, fn) => listeners.stdout.push(fn) },
+      stderr: { setEncoding() {}, on: (_e, fn) => listeners.stderr.push(fn) },
+      on(event, fn) {
+        if (event === 'close') listeners.close.push(fn);
+        else if (event === 'error') listeners.error.push(fn);
+        return child;
+      },
+      kill() {},
+    };
+    queueMicrotask(() => {
+      for (const fn of listeners.stdout) fn(stdout);
+      for (const fn of listeners.close) fn(0);
+    });
+    return child;
+  };
+  return { calls, spawnImpl };
+}
+
+/** A real wrangler write envelope: `results: []`, count in `meta.changes`. */
+const writeEnvelope = changes => [{ success: true, results: [], meta: { changes } }];
+const rowsEnvelope = rows => [{ success: true, results: rows, meta: { changes: 0 } }];
+
+test('the real remote transport reads write counts from meta.changes', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createRemoteExecutor } = await import('./legacy-cancel.mjs');
+    const { createLocalExecutor } = await import('./legacy-cancel.mjs');
+    const local = createLocalExecutor(f.path);
+    const { calls, spawnImpl } = fakeWrangler(sql => {
+      if (/^\s*EXPLAIN QUERY PLAN/i.test(sql)) {
+        return rowsEnvelope([{ detail: 'SEARCH row USING INDEX case_results (run_id=?)' }]);
+      }
+      if (/^\s*(SELECT|WITH)/i.test(sql)) return rowsEnvelope(local.read(sql));
+      // A write: apply it, then answer with the real envelope.
+      const changed = local.write([sql]);
+      return writeEnvelope(changed[0]);
+    });
+    const remote = createRemoteExecutor({ spawnImpl });
+    const lines = [];
+    const code = await runLegacyCancel({
+      argv: ['--apply', '--remote', '--expect-token', OPERATOR, '--min-remaining-ms', '600000'],
+      executor: remote,
+      log: line => lines.push(line),
+    });
+    const events = lines
+      .filter(l => l.startsWith('{'))
+      .map(l => JSON.parse(l))
+      .map(e => ({ ...e, event: e.event.slice('legacy_cancel_'.length) }));
+    assert.equal(code, EXIT.ok, lines.join('\n'));
+    // The whole cancellation really happened, which is only possible if meta.changes was read.
+    const applied = events.find(e => e.event === 'apply_ok');
+    assert.ok(applied, 'apply_ok must be reported');
+    assert.deepEqual(applied.cancelledRuns.sort(), ['run-live-a', 'run-live-b']);
+    assert.equal(applied.closedChunks, 6);
+    assert.equal(
+      local.read("SELECT COUNT(*) n FROM benchmark_runs WHERE status='running'")[0].n,
+      0
+    );
+    // Every invocation went through the real CLI shape.
+    for (const call of calls) {
+      assert.equal(call.binary.endsWith('wrangler') || call.binary === 'wrangler', true);
+      assert.ok(call.args.includes('--remote'));
+      assert.ok(call.args.includes('--json'));
+      assert.ok(call.args.includes('BENCH_DB'));
+    }
+    // The plan really was requested before the digest.
+    assert.ok(calls.some(c => /^\s*EXPLAIN QUERY PLAN/i.test(c.sql)));
+    local.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('a write envelope without meta.changes is a transport error, not a silent zero', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createRemoteExecutor } = await import('./legacy-cancel.mjs');
+    const { calls, spawnImpl } = fakeWrangler(sql => {
+      if (/^\s*EXPLAIN QUERY PLAN/i.test(sql)) {
+        return rowsEnvelope([{ detail: 'SEARCH row USING INDEX case_results (run_id=?)' }]);
+      }
+      if (/^\s*(SELECT|WITH)/i.test(sql)) {
+        return rowsEnvelope([]);
+      }
+      // The old bug shape: rows with a `changes` field and no meta.
+      return [{ success: true, results: [{ changes: 3 }] }];
+    });
+    const remote = createRemoteExecutor({ spawnImpl });
+    await assert.rejects(
+      () => remote.write(["UPDATE benchmark_runs SET status = 'failed' WHERE 0;"]),
+      error => /meta\.changes/.test(error.message)
+    );
+    assert.ok(calls.length > 0);
+  } finally {
+    f.close();
+  }
+});
+
+test('a missing or malformed plan refuses before any payload read or write', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createRemoteExecutor } = await import('./legacy-cancel.mjs');
+    // A plan row without `detail`, and an unsuccessful envelope, are both transport errors.
+    for (const handler of [
+      () => rowsEnvelope([{ notDetail: 'x' }]),
+      () => [{ success: false, results: [] }],
+    ]) {
+      const { calls, spawnImpl } = fakeWrangler(handler);
+      const remote = createRemoteExecutor({ spawnImpl });
+      await assert.rejects(() => remote.plan('SELECT 1'), /malformed|unsuccessful/);
+      assert.equal(calls.length, 1);
+      assert.match(calls[0].sql, /EXPLAIN QUERY PLAN/);
+    }
+    // An EMPTY plan is a *guard* refusal: the transport returns it, assertLeanPlan rejects it
+    // before any payload read or write.
+    const empty = fakeWrangler(() => rowsEnvelope([]));
+    const emptyRemote = createRemoteExecutor({ spawnImpl: empty.spawnImpl });
+    const { assertLeanPlan } = await import('./legacy-cancel.mjs');
+    await assert.rejects(
+      () => assertLeanPlan(emptyRemote, 'SELECT 1'),
+      error => /plan was empty/.test(error.message)
+    );
+    assert.equal(empty.calls.length, 1);
+    assert.match(empty.calls[0].sql, /EXPLAIN QUERY PLAN/);
+  } finally {
+    f.close();
+  }
+});
+
+test('assertLeanPlan refuses a transport with no plan capability', async () => {
+  const { assertLeanPlan } = await import('./legacy-cancel.mjs');
+  await assert.rejects(
+    () => assertLeanPlan({}, 'SELECT 1'),
+    error => /cannot report a query plan/.test(error.message)
+  );
+});
+
+test('a live run outside the sized baseline aborts before any write', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createLocalExecutor } = await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    let injected = false;
+    const executor = {
+      lean: true,
+      plan: inner.plan,
+      read: sql => {
+        const rows = inner.read(sql);
+        // Admit a run immediately AFTER the size probe — i.e. after sizing, before the write
+        // loop's validating read. This is exactly the race the guard must catch pre-write.
+        if (!injected && /AS cancelled_chunks/.test(sql)) {
+          injected = true;
+          insertDeciderRun(f.sqlite, { id: 'run-race', startedAt: '2026-11-20T17:00:00.000Z' });
+        }
+        return rows;
+      },
+      write: inner.write,
+      close: inner.close,
+    };
+    const chunksBefore = f.sqlite
+      .prepare("SELECT COUNT(*) AS n FROM scheduler_chunks WHERE status='completed'")
+      .get().n;
+    const lines = [];
+    const code = await runLegacyCancel({
+      argv: leanArgs('--apply', f.path),
+      executor,
+      log: line => lines.push(line),
+    });
+    assert.equal(code, EXIT.verifyFailed, lines.join('\n'));
+    assert.ok(injected, 'the race must actually have been injected');
+    assert.match(JSON.stringify(lines), /outside the sized baseline/);
+    // Nothing was written: the reviewed runs are still live and no chunk was closed.
+    assert.deepEqual(
+      f.sqlite
+        .prepare("SELECT id FROM benchmark_runs WHERE status='running' ORDER BY id")
+        .all()
+        .map(r => r.id),
+      ['run-live-a', 'run-live-b', 'run-race']
+    );
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) AS n FROM scheduler_chunks WHERE status='completed'").get()
+        .n,
+      chunksBefore
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('the plan guard requires run_id keying, not merely a SEARCH', async () => {
+  const { assertLeanPlan } = await import('./legacy-cancel.mjs');
+  // A SEARCH on a non-run_id key is still an unbounded read and must be rejected.
+  await assert.rejects(
+    () =>
+      assertLeanPlan(
+        { plan: async () => ['SEARCH cancelled_case USING INDEX idx_status (status=?)'] },
+        'SELECT 1'
+      ),
+    error => /not keyed by run_id/.test(error.message)
+  );
+  // A SCAN of a physical history table must be rejected.
+  await assert.rejects(
+    () => assertLeanPlan({ plan: async () => ['SCAN case_results'] }, 'SELECT 1'),
+    error => /not keyed by run_id/.test(error.message)
+  );
+  await assert.rejects(
+    () => assertLeanPlan({ plan: async () => ['SCAN unrelated'] }, 'SELECT 1'),
+    error => /does not prove indexed history access/.test(error.message)
+  );
+  // The two global status gates are the explicit exception.
+  const ok = await assertLeanPlan(
+    {
+      plan: async () => [
+        'SEARCH row USING INDEX sqlite_autoindex_case_results_1 (run_id=?)',
+        'SCAN benchmark_runs USING COVERING INDEX IX_benchmark_runs_running',
+        'SEARCH chunk USING COVERING INDEX IX_scheduler_chunks_pending (status=?)',
+      ],
+    },
+    'SELECT 1'
+  );
+  assert.ok(Array.isArray(ok));
+});
+
+test('the size probe rejects a missing, null or negative count', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createLocalExecutor } = await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    for (const bad of [{}, { cancelled_case_results: null }, { cancelled_case_results: -1 }]) {
+      const real = inner.read;
+      const executor = {
+        lean: true,
+        plan: inner.plan,
+        read: sql => {
+          // Substitute the size-probe row only; every other read is real.
+          if (sql.includes('AS cancelled_chunks')) {
+            const full = {
+              cancelled_case_results: 0,
+              served_case_results: 0,
+              cancelled_summaries: 0,
+              served_summaries: 0,
+              cancelled_chunks: 0,
+              ...bad,
+            };
+            // `{}` means "the probe omitted the field entirely".
+            if (Object.keys(bad).length === 0) delete full.cancelled_case_results;
+            return [full];
+          }
+          return real(sql);
+        },
+        write: inner.write,
+        close: () => {},
+      };
+      const lines = [];
+      const code = await runLegacyCancel({
+        argv: leanArgs('--apply', f.path),
+        executor,
+        log: line => lines.push(line),
+      });
+      assert.equal(code, EXIT.verifyFailed, JSON.stringify(bad) + ' ' + lines.join('\n'));
+      assert.match(JSON.stringify(lines), /invalid|did not report/);
+    }
+    inner.close();
+  } finally {
+    f.close();
+  }
+});

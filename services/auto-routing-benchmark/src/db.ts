@@ -267,6 +267,67 @@ export async function getLiveContainerLanes(db: D1Database): Promise<number> {
   return row?.lanes ?? 0;
 }
 
+/** Active decider runs one (router, queue) may hold at once. */
+export const MAX_RUNNING_RUNS_PER_QUEUE = 4;
+
+const QueueRunOccupancySchema = z.object({
+  activeRuns: z.number().int(),
+  startingRunId: z.string().nullable(),
+});
+export type QueueRunOccupancy = z.infer<typeof QueueRunOccupancySchema>;
+
+export type RunAdmission = { admitted: true } | { admitted: false; occupancy: QueueRunOccupancy };
+
+/**
+ * Running decider runs of one (router ?1, queue ?2), and the oldest of them that
+ * has not finished materializing its chunks (no `scheduler_runs` marker yet).
+ */
+const QUEUE_RUN_OCCUPANCY_SQL = `
+  SELECT COUNT(*) AS activeRuns,
+    MIN(CASE WHEN NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE scheduler_runs.run_id = run.id)
+      THEN run.id END) AS startingRunId
+  FROM benchmark_runs AS run
+  WHERE run.router = ?1 AND run.kind = 'decider' AND run.purpose = ?2 AND run.status = 'running'
+`;
+
+/**
+ * Inserts a decider run only while its (router ?2, queue ?15) has no starting run
+ * and fewer than ?16 active runs, so the check and the insert are one statement.
+ */
+const ADMIT_DECIDER_RUN_SQL = `
+  INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
+    kind, status, started_at, min_accuracy, switch_cost_factor, best_accuracy_switch_threshold,
+    max_concurrency, benchmark_user_id, benchmark_org_id, repetitions,
+    classifier_max_p95_latency_ms, engine_identity, purpose)
+  SELECT ?1, ?2, ?3, ?4, 'decider', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15
+  WHERE NOT EXISTS (
+    SELECT 1 FROM benchmark_runs AS active
+    WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
+      AND active.status = 'running'
+      AND NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE scheduler_runs.run_id = active.id)
+  ) AND (
+    SELECT COUNT(*) FROM benchmark_runs AS active
+    WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
+      AND active.status = 'running'
+  ) < ?16
+`;
+
+export async function getQueueRunOccupancy(
+  db: D1Database,
+  router: AutoRouter,
+  purpose: BenchmarkRunPurpose
+): Promise<QueueRunOccupancy> {
+  return QueueRunOccupancySchema.parse(
+    await db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(router, purpose).first()
+  );
+}
+
+/**
+ * Writes a run with its model rows and carried summaries in one batch. A decider
+ * run is admitted by the same statement that inserts it: only while no run of its
+ * (router, queue) is still starting and fewer than MAX_RUNNING_RUNS_PER_QUEUE are
+ * active, so overlapping drains cannot both start one. A refused run leaves no rows.
+ */
 export async function insertRun(
   db: D1Database,
   run: {
@@ -289,9 +350,9 @@ export async function insertRun(
   },
   models: RunModelRow[],
   carriedSummaries: BenchmarkModelSummary[]
-): Promise<void> {
+): Promise<RunAdmission> {
   const orm = drizzle(db);
-  const insertRunStmt = orm.insert(benchmarkRuns).values({
+  const row = {
     id: run.id,
     router: run.router ?? 'efficient',
     accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
@@ -309,24 +370,16 @@ export async function insertRun(
     classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
     engine_identity: run.engine_identity,
     purpose: run.purpose ?? 'platform',
-  });
+  } satisfies typeof benchmarkRuns.$inferInsert;
 
-  if (models.length === 0 && carriedSummaries.length === 0) {
-    await insertRunStmt;
-    return;
-  }
-
-  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [insertRunStmt];
-
-  if (models.length > 0) {
-    for (let i = 0; i < models.length; i += RUN_MODEL_INSERT_BATCH_SIZE) {
-      stmts.push(orm.insert(runModels).values(models.slice(i, i + RUN_MODEL_INSERT_BATCH_SIZE)));
-    }
+  const dependents = [];
+  for (let i = 0; i < models.length; i += RUN_MODEL_INSERT_BATCH_SIZE) {
+    dependents.push(orm.insert(runModels).values(models.slice(i, i + RUN_MODEL_INSERT_BATCH_SIZE)));
   }
 
   for (let i = 0; i < carriedSummaries.length; i += MODEL_SUMMARY_INSERT_BATCH_SIZE) {
     const summaryChunk = carriedSummaries.slice(i, i + MODEL_SUMMARY_INSERT_BATCH_SIZE);
-    stmts.push(
+    dependents.push(
       orm.insert(modelSummaries).values(
         summaryChunk.map(s => ({
           run_id: run.id,
@@ -352,7 +405,55 @@ export async function insertRun(
     );
   }
 
-  await orm.batch(stmts);
+  if (row.kind === 'classifier') {
+    await orm.batch([orm.insert(benchmarkRuns).values(row), ...dependents]);
+    return { admitted: true };
+  }
+
+  // D1 runs a batch as one transaction: a refused run's model and summary rows are
+  // written under its id and deleted again before the batch commits.
+  const [inserted, occupancy] = await db.batch([
+    db
+      .prepare(ADMIT_DECIDER_RUN_SQL)
+      .bind(
+        row.id,
+        row.router,
+        row.accuracy_noise_band,
+        row.frontier_min_accuracy_delta,
+        row.started_at,
+        row.min_accuracy,
+        row.switch_cost_factor,
+        row.best_accuracy_switch_threshold,
+        row.max_concurrency,
+        row.benchmark_user_id,
+        row.benchmark_org_id,
+        row.repetitions,
+        row.classifier_max_p95_latency_ms,
+        row.engine_identity,
+        row.purpose,
+        MAX_RUNNING_RUNS_PER_QUEUE
+      ),
+    db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(row.router, row.purpose),
+    ...dependents.map(query => {
+      const built = query.toSQL();
+      return db.prepare(built.sql).bind(...built.params);
+    }),
+    ...(dependents.length > 0
+      ? ['run_models', 'model_summaries'].map(table =>
+          db
+            .prepare(
+              `DELETE FROM ${table} WHERE run_id = ?1
+                AND NOT EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ?1)`
+            )
+            .bind(row.id)
+        )
+      : []),
+  ]);
+  if ((inserted.meta.changes ?? 0) > 0) return { admitted: true };
+  return {
+    admitted: false,
+    occupancy: QueueRunOccupancySchema.parse(occupancy.results[0]),
+  };
 }
 
 export async function getRunWithModels(
@@ -1062,35 +1163,6 @@ export async function getRunningRun(
       )
     )
     .get();
-}
-
-/**
- * Running decider runs of one (router, queue), and the oldest of them that has
- * not finished materializing its chunks (no `scheduler_runs` marker yet).
- */
-export async function getQueueRunOccupancy(
-  db: D1Database,
-  router: AutoRouter,
-  purpose: BenchmarkRunPurpose
-): Promise<{ activeRuns: number; startingRunId: string | null }> {
-  const row = await drizzle(db)
-    .select({
-      activeRuns: count(),
-      startingRunId: sql<string | null>`MIN(CASE WHEN NOT EXISTS (
-        SELECT 1 FROM scheduler_runs WHERE run_id = ${benchmarkRuns.id}
-      ) THEN ${benchmarkRuns.id} END)`,
-    })
-    .from(benchmarkRuns)
-    .where(
-      and(
-        eq(benchmarkRuns.router, router),
-        eq(benchmarkRuns.kind, 'decider'),
-        eq(benchmarkRuns.purpose, purpose),
-        eq(benchmarkRuns.status, 'running')
-      )
-    )
-    .get();
-  return { activeRuns: row?.activeRuns ?? 0, startingRunId: row?.startingRunId ?? null };
 }
 
 // True when a run of the same kind started later than this one has already

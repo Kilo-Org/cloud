@@ -4,11 +4,11 @@ import { resolveEffectivePolicy, type AutoRouter } from '@kilocode/auto-routing-
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { saveBenchmarkConfig } from './config';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import { MAX_RUNNING_RUNS_PER_QUEUE } from './db';
 import {
   computeEngineIdentity,
   dispatchScheduler,
   drainQueue,
-  MAX_RUNNING_RUNS_PER_QUEUE,
   type BenchmarkJobMessage,
 } from './run';
 import { claimScheduledChunks, scheduleRunChunks, schedulerConfig } from './scheduler';
@@ -17,6 +17,29 @@ const NOW = Date.parse('2026-11-20T12:00:00.000Z');
 const BENCHMARK_USER = 'bot-internal-queue-admission';
 const BENCHMARK_ORG = 'queue-admission-org';
 const NEW_MODEL = 'vendor/new-model';
+
+/** Holds a drain's run-insert batch, before or after it commits, until `hold` settles. */
+function holdingRunInsert(
+  db: D1Database,
+  hold: (phase: 'before' | 'after') => Promise<void>
+): D1Database {
+  let insertingRun = false;
+  return {
+    prepare(query: string) {
+      if (query.includes('INSERT INTO benchmark_runs')) insertingRun = true;
+      return db.prepare(query);
+    },
+    async batch(statements: D1PreparedStatement[]) {
+      if (!insertingRun) return db.batch(statements);
+      insertingRun = false;
+      await hold('before');
+      const results = await db.batch(statements);
+      await hold('after');
+      return results;
+    },
+    exec: (query: string) => db.exec(query),
+  } as D1Database;
+}
 
 describe('decider queue admission (production migrations and real SQLite)', () => {
   let sqlite: DatabaseSync;
@@ -277,5 +300,57 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     await dispatchScheduler(env);
 
     expect(starting.filter(run => !initialized(run.id))).toEqual([]);
+  });
+
+  it('lets exactly one of two overlapping drains start a run', async () => {
+    insertProfile('vendor/first', 'pending', null);
+    const firstAtInsert = Promise.withResolvers<void>();
+    const firstRelease = Promise.withResolvers<void>();
+    const secondInserted = Promise.withResolvers<void>();
+    const secondRelease = Promise.withResolvers<void>();
+
+    const first = drainQueue(
+      {
+        ...env,
+        BENCH_DB: holdingRunInsert(env.BENCH_DB, async phase => {
+          if (phase !== 'before') return;
+          firstAtInsert.resolve();
+          await firstRelease.promise;
+        }),
+      },
+      'user'
+    );
+    await firstAtInsert.promise;
+    insertProfile('vendor/second', 'pending', null);
+    const second = drainQueue(
+      {
+        ...env,
+        BENCH_DB: holdingRunInsert(env.BENCH_DB, async phase => {
+          if (phase !== 'after') return;
+          secondInserted.resolve();
+          await secondRelease.promise;
+        }),
+      },
+      'user'
+    );
+    await secondInserted.promise;
+    firstRelease.resolve();
+    const firstResult = await first;
+    secondRelease.resolve();
+    const secondResult = await second;
+
+    expect(firstResult).toBeNull();
+    if (!secondResult) throw new Error('Expected the second drain to start a run');
+    expect(runningUserRuns()).toEqual([secondResult.runId]);
+    expect(profile('vendor/first')).toEqual({ status: 'pending', run_id: null });
+    expect(profile('vendor/second')).toEqual({ status: 'running', run_id: secondResult.runId });
+    expect(
+      vi.mocked(console.log).mock.calls.map(([line]) => JSON.parse(String(line)))
+    ).toContainEqual(
+      expect.objectContaining({
+        event: 'benchmark_queue_drain_skipped_run_starting',
+        startingRunId: secondResult.runId,
+      })
+    );
   });
 });

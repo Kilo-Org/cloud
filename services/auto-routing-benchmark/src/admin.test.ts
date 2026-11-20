@@ -17,7 +17,7 @@ import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { computeEngineIdentity, MAX_RUNNING_RUNS_PER_QUEUE } from './run';
+import { computeEngineIdentity } from './run';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
@@ -145,6 +145,7 @@ import {
   getLiveContainerLanes,
   existsNewerCompletedRun,
   insertRun,
+  MAX_RUNNING_RUNS_PER_QUEUE,
   getRunWithModels,
   listPendingCurrentProfiles,
   markProfilesRunningForRun,
@@ -316,7 +317,7 @@ beforeEach(() => {
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
-  vi.mocked(insertRun).mockResolvedValue(undefined);
+  vi.mocked(insertRun).mockResolvedValue({ admitted: true });
   vi.mocked(getRunWithModels)
     .mockReset()
     .mockImplementation(async (_db, id) => {

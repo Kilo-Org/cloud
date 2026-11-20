@@ -1009,12 +1009,17 @@ active run to finish. The drain skips the queue while one of its runs is still s
 (it has no `scheduler_runs` marker yet: reuse copies and chunk creation are still in
 progress), logging `benchmark_queue_drain_skipped_run_starting`, and while
 `MAX_RUNNING_RUNS_PER_QUEUE` (4) runs are active, logging
-`benchmark_queue_drain_skipped_queue_full`. Concurrent drains claim disjoint pairs; a
-drain that finds every pair claimed logs `benchmark_queue_drain_batch_already_claimed`.
+`benchmark_queue_drain_skipped_queue_full`. The run row is inserted by one conditional
+statement that repeats both checks, so overlapping drains (the timer, a finishing run, an
+admin request) cannot start two runs that are both starting or a fifth active run: the
+refused drain hands its claimed pairs back to `pending` and logs the same skip event.
+Concurrent drains claim disjoint pairs; a drain that finds every pair claimed logs
+`benchmark_queue_drain_batch_already_claimed`.
 Runs of one router/queue share its execution share. Within the share the scheduler
 prefers the model with the fewest live chunks, then the older run, so a small new run
 gets its first chunks as soon as its models hold fewer slots than the earlier run's
-models. Classifier runs stay one at a time: `POST /admin/runs` answers 409 while one
+models. Each dispatch pass finalizes every settled run, up to the 16 that the four queues
+can hold. Classifier runs stay one at a time: `POST /admin/runs` answers 409 while one
 is active.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.

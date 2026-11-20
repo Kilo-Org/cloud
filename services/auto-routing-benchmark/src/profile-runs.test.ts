@@ -124,6 +124,7 @@ import {
   getSummariesForRuns,
   getRoutingCaseResultsForEntries,
   insertRun,
+  MAX_RUNNING_RUNS_PER_QUEUE,
   listLaneFailures,
   listPendingCurrentProfiles,
   countCurrentProfilesByStatus,
@@ -147,7 +148,6 @@ import {
   syncPlatformRegistryRows,
 } from './db';
 import {
-  MAX_RUNNING_RUNS_PER_QUEUE,
   NoEntriesClaimedError,
   drainQueue,
   drainQueues,
@@ -306,7 +306,7 @@ beforeEach(() => {
   vi.mocked(getQueueRunOccupancy).mockResolvedValue({ activeRuns: 0, startingRunId: null });
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
-  vi.mocked(insertRun).mockReset().mockResolvedValue(undefined);
+  vi.mocked(insertRun).mockReset().mockResolvedValue({ admitted: true });
   vi.mocked(getRunWithModels)
     .mockReset()
     .mockImplementation(async (_db, id) => {
@@ -1282,6 +1282,31 @@ describe('drainQueue', () => {
     expect(markProfilesRunningForRun).not.toHaveBeenCalled();
     expect(await drainQueue(env, 'platform')).not.toBeNull();
     expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual(['platform']);
+    log.mockRestore();
+  });
+
+  it('hands the claims back when the run insert refuses admission after the read passed', async () => {
+    vi.mocked(insertRun).mockResolvedValue({
+      admitted: false,
+      occupancy: { activeRuns: 2, startingRunId: 'user-raced' },
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/pending', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    expect(await drainQueue(env, 'user')).toBeNull();
+
+    const [, claimRunId] = vi.mocked(markProfilesRunningForRun).mock.calls[0] ?? [];
+    expect(releaseProfileClaims).toHaveBeenCalledWith(env.BENCH_DB, claimRunId);
+    expect(log.mock.calls.map(([line]) => JSON.parse(String(line)))).toContainEqual(
+      expect.objectContaining({
+        event: 'benchmark_queue_drain_skipped_run_starting',
+        startingRunId: 'user-raced',
+      })
+    );
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(reuseDeciderCaseResults).not.toHaveBeenCalled();
     log.mockRestore();
   });
 

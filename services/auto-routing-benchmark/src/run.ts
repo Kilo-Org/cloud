@@ -52,6 +52,7 @@ import {
   getSummariesForRuns,
   getRoutingCaseResultsForEntries,
   insertRun,
+  MAX_RUNNING_RUNS_PER_QUEUE,
   listLaneFailures,
   listPendingCurrentProfiles,
   listReadyCurrentProfilesForEntries,
@@ -77,6 +78,7 @@ import {
   type CaseResultRow,
   type PendingDeciderOutput,
   type PriorModelResult,
+  type QueueRunOccupancy,
 } from './db';
 import {
   gradeClassifierOutput,
@@ -729,6 +731,22 @@ export class NoEntriesClaimedError extends Error {
   }
 }
 
+/**
+ * Thrown when a decider queue refuses a new run because one of its runs is still
+ * starting or it already holds MAX_RUNNING_RUNS_PER_QUEUE runs. The claims are
+ * released; the next drain retries.
+ */
+export class QueueRunNotAdmittedError extends Error {
+  constructor(readonly occupancy: QueueRunOccupancy) {
+    super(
+      occupancy.startingRunId !== null
+        ? `run ${occupancy.startingRunId} of this queue is still starting`
+        : `this queue already has ${occupancy.activeRuns} active runs`
+    );
+    this.name = 'QueueRunNotAdmittedError';
+  }
+}
+
 // Thrown when the saved benchmark config would exceed a hard runtime limit.
 // The admin route maps it to HTTP 400 so operators can fix config instead of
 // starting a run that will immediately hit platform capacity.
@@ -899,7 +917,7 @@ export async function startRun(
   }));
 
   try {
-    await insertRun(
+    const admission = await insertRun(
       env.BENCH_DB,
       {
         id: runId,
@@ -923,6 +941,7 @@ export async function startRun(
       runModelRows,
       carriedSummaries
     );
+    if (!admission.admitted) throw new QueueRunNotAdmittedError(admission.occupancy);
   } catch (error) {
     // The claim is already made, so hand the rows back to the queue — otherwise
     // they sit `running` under a run that was never written and nothing can
@@ -1029,10 +1048,32 @@ export async function startRun(
   return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
 }
 
-/** Active decider runs one (router, queue) may hold at once. */
-export const MAX_RUNNING_RUNS_PER_QUEUE = 4;
-/** drainQueue lets one run per (router, queue) be starting at a time. */
-const MAX_STARTING_RUNS = AUTO_ROUTERS.length * BenchmarkRunPurposeSchema.options.length;
+/** Registry queues: one per router and run purpose. Each starts one run at a time. */
+const REGISTRY_QUEUES = AUTO_ROUTERS.length * BenchmarkRunPurposeSchema.options.length;
+
+function logQueueDrainSkipped(
+  router: AutoRouter,
+  queue: BenchmarkRunPurpose,
+  occupancy: QueueRunOccupancy
+): void {
+  console.log(
+    JSON.stringify(
+      occupancy.startingRunId !== null
+        ? {
+            event: 'benchmark_queue_drain_skipped_run_starting',
+            router,
+            queue,
+            startingRunId: occupancy.startingRunId,
+          }
+        : {
+            event: 'benchmark_queue_drain_skipped_queue_full',
+            router,
+            queue,
+            activeRuns: occupancy.activeRuns,
+          }
+    )
+  );
+}
 
 export async function drainQueue(
   env: Env,
@@ -1042,29 +1083,12 @@ export async function drainQueue(
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return null;
 
-  const occupancy = await getQueueRunOccupancy(env.BENCH_DB, router, queue);
   // One run per queue materializes at a time, so the costly start step (reuse
-  // copies and chunk creation) stays serial.
-  if (occupancy.startingRunId !== null) {
-    console.log(
-      JSON.stringify({
-        event: 'benchmark_queue_drain_skipped_run_starting',
-        router,
-        queue,
-        startingRunId: occupancy.startingRunId,
-      })
-    );
-    return null;
-  }
-  if (occupancy.activeRuns >= MAX_RUNNING_RUNS_PER_QUEUE) {
-    console.log(
-      JSON.stringify({
-        event: 'benchmark_queue_drain_skipped_queue_full',
-        router,
-        queue,
-        activeRuns: occupancy.activeRuns,
-      })
-    );
+  // copies and chunk creation) stays serial. insertRun enforces this atomically;
+  // this read skips the claim and catalog work while the queue cannot admit a run.
+  const occupancy = await getQueueRunOccupancy(env.BENCH_DB, router, queue);
+  if (occupancy.startingRunId !== null || occupancy.activeRuns >= MAX_RUNNING_RUNS_PER_QUEUE) {
+    logQueueDrainSkipped(router, queue, occupancy);
     return null;
   }
 
@@ -1137,6 +1161,10 @@ export async function drainQueue(
     // queue may have claimed part of this batch between the read and the claim.
     return { runId: result.runId, entryCount: result.enqueuedModels };
   } catch (error) {
+    if (error instanceof QueueRunNotAdmittedError) {
+      logQueueDrainSkipped(router, queue, error.occupancy);
+      return null;
+    }
     if (error instanceof NoEntriesClaimedError) {
       // Concurrent drains claimed this whole batch between our read and our
       // claim. The pairs are being measured; nothing to do.
@@ -1191,7 +1219,7 @@ async function initializeScheduledRuns(env: Env): Promise<boolean> {
   const uninitialized = await env.BENCH_DB.prepare(`
     SELECT id FROM benchmark_runs WHERE kind = 'decider' AND status = 'running'
       AND NOT EXISTS (SELECT 1 FROM scheduler_runs WHERE run_id = benchmark_runs.id)
-    ORDER BY started_at LIMIT ${MAX_STARTING_RUNS}
+    ORDER BY started_at LIMIT ${REGISTRY_QUEUES}
   `).all<{ id: string }>();
   if (uninitialized.results.length === 0) return false;
   const token = crypto.randomUUID();

@@ -1,8 +1,11 @@
 import type { AutoRouter } from '@kilocode/auto-routing-contracts';
-import { CONTINUATION_CASES } from './datasets/continuation-cases';
 import { DECIDER_CASES, FRONTIER_CASES, type DeciderCase } from './datasets/decider-cases';
+import { PROBE_CASES, type ProbeCase } from './datasets/probe-cases';
 import type { DeciderCheck } from './grading';
 import { argvAffectedCases, PROMPT_TRANSPORT_REVISION } from './prompt-transport';
+
+/** A case a decider run measures: one CLI prompt, or one cut of a captured history. */
+export type MeasuredCase = DeciderCase | ProbeCase;
 
 /**
  * Newest defined revision of the decider cases and grading. Every run records the revision it
@@ -11,8 +14,8 @@ import { argvAffectedCases, PROMPT_TRANSPORT_REVISION } from './prompt-transport
  *
  * 1. Prompt passed as an argv positional (see prompt-transport.ts).
  * 2. Prompt on stdin, long-context cases with their snapshot.
- * 3. Efficient agentic cases score 0 without a tool call, continuation cases resume a session
- *    in progress, and supp-agent-term-pwd-base accepts only its true answer.
+ * 3. Efficient agentic probes: tool-offering turns resume a captured session that ends on a
+ *    tool result, and `supp-agent-term-pwd-base` accepts only its true answer.
  *
  * The engine identity hashes the revision-2 cases. A later revision keeps that identity, so
  * every result it does not change stays reusable; {@link minimumCaseRevisions} names the
@@ -31,39 +34,37 @@ export const ACTIVE_MEASUREMENT_REVISION = 2;
 export const ENGINE_IDENTITY_REVISION = PROMPT_TRANSPORT_REVISION;
 
 // A client upload carries only the final text and runs a plain prompt, so client evals can
-// grade neither tool evidence nor a continuation.
+// grade neither tool evidence nor a probe.
 export const CLIENT_EVAL_REVISION = PROMPT_TRANSPORT_REVISION;
 
-const TOOL_EVIDENCE_REVISION = 3;
+/** The revision that added the efficient agentic probes. */
+export const PROBE_REVISION = 3;
 
 // The container runs each case in a fresh temp directory, so pwd never ends with /app.
 const PWD_BASE_CASE_ID = 'supp-agent-term-pwd-base';
 const PWD_BASE_CHECK: DeciderCheck = { kind: 'exact', value: 'other' };
 
-function withToolEvidence(benchCase: DeciderCase): DeciderCase {
-  if (benchCase.taskType !== 'agentic_execution') return benchCase;
-  return {
-    ...benchCase,
-    requiredToolCalls: 1,
-    ...(benchCase.id === PWD_BASE_CASE_ID ? { check: PWD_BASE_CHECK } : {}),
-  };
+// Only this one revision-2 case changes: it stays tool-required (and so runs in its own
+// workspace) and accepts only the answer that workspace produces.
+function pwdBaseCase(): DeciderCase {
+  const found = DECIDER_CASES.find(benchCase => benchCase.id === PWD_BASE_CASE_ID);
+  if (!found) throw new Error(`${PWD_BASE_CASE_ID} is missing from the decider dataset`);
+  return { ...found, requiredToolCalls: 1, check: PWD_BASE_CHECK };
 }
 
-const EFFICIENT_TOOL_EVIDENCE_CASES: readonly DeciderCase[] = [
-  ...DECIDER_CASES.map(withToolEvidence),
-  ...CONTINUATION_CASES,
+const EFFICIENT_PROBE_CASES: readonly MeasuredCase[] = [
+  ...DECIDER_CASES.map(benchCase =>
+    benchCase.id === PWD_BASE_CASE_ID ? pwdBaseCase() : benchCase
+  ),
+  ...PROBE_CASES,
 ];
-
-const TOOL_EVIDENCE_CASE_IDS = EFFICIENT_TOOL_EVIDENCE_CASES.filter(
-  benchCase => benchCase.taskType === 'agentic_execution'
-).map(benchCase => benchCase.id);
 
 export function deciderCasesForRouter(
   router: AutoRouter,
   revision: number
-): readonly DeciderCase[] {
+): readonly MeasuredCase[] {
   if (router === 'frontier') return FRONTIER_CASES;
-  return revision >= TOOL_EVIDENCE_REVISION ? EFFICIENT_TOOL_EVIDENCE_CASES : DECIDER_CASES;
+  return revision >= PROBE_REVISION ? EFFICIENT_PROBE_CASES : DECIDER_CASES;
 }
 
 /**
@@ -79,8 +80,9 @@ export function minimumCaseRevisions(
   for (const benchCase of argvAffectedCases(router, options)) {
     minimums[benchCase.id] = PROMPT_TRANSPORT_REVISION;
   }
-  if (router === 'efficient' && revision >= TOOL_EVIDENCE_REVISION) {
-    for (const caseId of TOOL_EVIDENCE_CASE_IDS) minimums[caseId] = TOOL_EVIDENCE_REVISION;
+  if (router === 'efficient' && revision >= PROBE_REVISION) {
+    minimums[PWD_BASE_CASE_ID] = PROBE_REVISION;
+    for (const probeCase of PROBE_CASES) minimums[probeCase.id] = PROBE_REVISION;
   }
   return minimums;
 }
@@ -90,7 +92,7 @@ export function minimumCaseRevisions(
  * introduced it. Two runs with equal grading revisions are comparable on every route.
  */
 export function gradingRevision(router: AutoRouter, revision: number): number {
-  return router === 'efficient' && revision >= TOOL_EVIDENCE_REVISION
-    ? TOOL_EVIDENCE_REVISION
+  return router === 'efficient' && revision >= PROBE_REVISION
+    ? PROBE_REVISION
     : ENGINE_IDENTITY_REVISION;
 }

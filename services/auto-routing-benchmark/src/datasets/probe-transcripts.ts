@@ -1,6 +1,33 @@
-import type { ContinuationToolCall, DeciderCase } from './decider-cases';
+import type { ClassifierSubtaskType, ClassifierTaskType } from '@kilocode/auto-routing-contracts';
+import type { ProbeAnswerCheck } from '../grading';
 
-// Agentic sessions resumed mid-task. Each case is the original user task, a
+/** One bash call an earlier assistant step made, with exactly what the tool returned. */
+export type ProbeToolCall = { tool: 'bash'; command: string; description: string; output: string };
+
+export type ProbeStep = { text?: string; calls: readonly ProbeToolCall[] };
+
+/** A session in progress: the task, the workspace it ran in, and the steps that already ran. */
+export type ProbeSession = {
+  files: Readonly<Record<string, string>>;
+  steps: readonly ProbeStep[];
+  message: string;
+};
+
+/**
+ * One captured agentic session. It is not a measured case: a probe case is a cut
+ * of its history, sent to the gateway as one request ending on a tool result.
+ */
+export type ProbeTranscript = {
+  id: string;
+  taskType: ClassifierTaskType;
+  subtaskType: ClassifierSubtaskType;
+  systemPrompt: string;
+  userPrompt: string;
+  check: ProbeAnswerCheck;
+  session: ProbeSession;
+};
+
+// Agentic sessions resumed mid-task. Each transcript is the original user task, a
 // workspace (`files`), and the read-only steps an earlier assistant turn already
 // ran (inspections, dry runs, failing tests), with exactly what the CLI bash tool
 // returned for them: merged stdout/stderr, unmodified, every output well below
@@ -71,7 +98,7 @@ class Rng {
   }
 }
 
-function bash(command: string, description: string, output: string): ContinuationToolCall {
+function bash(command: string, description: string, output: string): ProbeToolCall {
   return { tool: 'bash', command, description, output };
 }
 
@@ -175,7 +202,7 @@ const ROLLUP_JS = joinLines([
   '}',
 ]);
 
-function invoiceRollupCase(): DeciderCase {
+function invoiceRollupCase(): ProbeTranscript {
   const rng = new Rng(0x1d0c1);
   const currencies = ['EUR', 'EUR', 'EUR', 'USD', 'USD', 'GBP', 'CHF', 'SEK'] as const;
   const rows = ['invoice_id,customer,currency,amount_minor,status,issued_on'];
@@ -252,8 +279,7 @@ function invoiceRollupCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"customers":<number of entries in out/rollup.json>,"paidInvoices":<sum of invoices over all entries>,"eurMinor":<sum of eurMinor over all entries>,"sha256":"<lowercase hex SHA-256 of out/rollup.json>"}',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -365,7 +391,7 @@ function accessLog(seed: number, lineCount: number): { text: string; entries: Ac
 
 type AccessEntry = { line: string; method: string; path: string; status: number };
 
-function accessLatencyCase(): DeciderCase {
+function accessLatencyCase(): ProbeTranscript {
   const logs = [
     { name: 'logs/edge-01.log', ...accessLog(0xed6e01, 1200) },
     { name: 'logs/edge-02.log', ...accessLog(0xed6e02, 1200) },
@@ -411,8 +437,7 @@ function accessLatencyCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"routes":<number of data lines in out/latency.tsv>,"excluded5xx":<number of log lines skipped for status >= 500>,"slowestP95":"<route with the highest p95_ms; on a tie the first in file order>","sha256":"<lowercase hex SHA-256 of out/latency.tsv>"}',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -608,7 +633,7 @@ function i18nValue(leaf: string, column: number, words: readonly number[]): stri
     : capital;
 }
 
-function i18nSyncCase(): DeciderCase {
+function i18nSyncCase(): ProbeTranscript {
   const rng = new Rng(0x118a);
   const combos: string[] = [];
   for (const section of I18N_SECTIONS) {
@@ -693,8 +718,7 @@ function i18nSyncCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"added":{"de":<count>,"es":<count>,"fr":<count>},"removed":<count>,"sha256":"<lowercase hex SHA-256 from step 5>"}. Every <count> is an integer, not a list of keys: "added" is an object with one count per locale, in the order de, es, fr, giving the number of keys you added to that catalog; "removed" is the total number of keys you deleted across all three catalogs.',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -841,7 +865,7 @@ function envFile(rng: Rng, service: string, env: string, port: number): string {
   return joinLines(lines);
 }
 
-function envRolloutCase(): DeciderCase {
+function envRolloutCase(): ProbeTranscript {
   const rng = new Rng(0xe7e);
   const files: Record<string, string> = {};
   ENV_SERVICES.forEach((service, index) => {
@@ -886,8 +910,7 @@ function envRolloutCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"raised":<number of prod.env files whose DB_POOL_SIZE was raised to 20>,"timeoutAdded":<number of prod.env files that got the DB_POOL_TIMEOUT_MS=5000 line>,"manifestSha256":"<lowercase hex SHA-256 of deploy/MANIFEST.sha256>"}',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -1052,7 +1075,7 @@ function grepAfter(text: string, needle: string, after: number): string[] {
   return out;
 }
 
-function logSplitCase(): DeciderCase {
+function logSplitCase(): ProbeTranscript {
   const log = appLog();
   const files = {
     'var/log/app.log': log,
@@ -1090,8 +1113,7 @@ function logSplitCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"entries":{"ERROR":<entries>,"WARN":<entries>,"INFO":<entries>,"DEBUG":<entries>},"errorLines":<lines in out/ERROR.log>,"errorSha256":"<lowercase hex SHA-256 of out/ERROR.log>","warnSha256":"<lowercase hex SHA-256 of out/WARN.log>"}',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -1336,7 +1358,7 @@ const VERIFY_MIGRATIONS_JS = joinLines([
   '}',
 ]);
 
-function migrationRenumberCase(): DeciderCase {
+function migrationRenumberCase(): ProbeTranscript {
   const rng = new Rng(0xdb0113);
   const used = new Set<string>();
   const main: Migration[] = [];
@@ -1531,8 +1553,7 @@ function migrationRenumberCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"migrations":<count from the OK line>,"last":"<last file name from the OK line>","sha256":"<sha256 from the OK line>"}',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -1702,7 +1723,7 @@ function randomOrder(rng: Rng): PricedOrder {
   };
 }
 
-function pricingFixCase(): DeciderCase {
+function pricingFixCase(): ProbeTranscript {
   const rng = new Rng(0x9a1c);
   const named: [string, PricedOrder][] = [
     [
@@ -1801,8 +1822,7 @@ function pricingFixCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"passed":<passing tests in the last run>,"failed":<failing tests in the last run>,"orders":<data rows in out/quotes.csv>,"sha256":"<lowercase hex SHA-256 of out/quotes.csv>"}',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -1974,7 +1994,7 @@ const VALIDATE_V2_JS = joinLines([
   'process.exitCode = valid === lines.length ? 0 : 1;',
 ]);
 
-function userMigrationCase(): DeciderCase {
+function userMigrationCase(): ProbeTranscript {
   const rng = new Rng(0x05e7);
   const records: string[] = [];
   let id = 1000;
@@ -2042,8 +2062,7 @@ function userMigrationCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"records":<lines in fixtures/users-v2.jsonl>,"valid":<valid count reported by the validator>,"activeAdmins":<records with active true whose roles include "admin">,"sha256":"<lowercase hex SHA-256 of fixtures/users-v2.jsonl>"}',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -2321,7 +2340,7 @@ function etlEvents(): { files: Record<string, string>; byFile: EtlEvent[][] } {
   return { files, byFile };
 }
 
-function etlDedupeCase(): DeciderCase {
+function etlDedupeCase(): ProbeTranscript {
   const { files: rawFiles, byFile } = etlEvents();
   const files: Record<string, string> = {
     ...rawFiles,
@@ -2385,8 +2404,7 @@ function etlDedupeCase(): DeciderCase {
       '',
       'Final answer: compact JSON with exactly these keys in this order: {"rows":<rows from the check line>,"events":<events from the check line>,"amountMinor":<amount_minor from the check line>,"sha256":"<lowercase hex SHA-256 of out/daily.csv>"}',
     ].join('\n'),
-    requiredToolCalls: 1,
-    continuation: {
+    session: {
       files,
       steps: [
         {
@@ -2440,7 +2458,7 @@ function etlDedupeCase(): DeciderCase {
   };
 }
 
-export const CONTINUATION_CASES: readonly DeciderCase[] = [
+export const PROBE_TRANSCRIPTS: readonly ProbeTranscript[] = [
   invoiceRollupCase(),
   accessLatencyCase(),
   i18nSyncCase(),

@@ -4,9 +4,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runDeciderCheck } from '../grading';
-import { CONTINUATION_CASES } from './continuation-cases';
-import type { DeciderCase } from './decider-cases';
 import { DECIDER_CASES, FRONTIER_CASES } from './decider-cases';
+import { PROBE_TRANSCRIPTS, type ProbeTranscript } from './probe-transcripts';
 
 // The CLI bash tool (kilo v7.8.27, packages/opencode/src/tool/shell.ts) returns the
 // merged output unmodified unless it exceeds 2000 lines or 50 KiB.
@@ -368,7 +367,7 @@ EOF`,
 };
 
 function materialize(files: Readonly<Record<string, string>>): string {
-  const dir = mkdtempSync(join(tmpdir(), 'continuation-case-'));
+  const dir = mkdtempSync(join(tmpdir(), 'probe-transcript-'));
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
     writeFileSync(join(dir, path), content);
@@ -402,17 +401,17 @@ function firstDifference(actual: string, expected: string): string | null {
   return `differs at ${i}: actual ${JSON.stringify(actual.slice(Math.max(0, i - 80), i + 80))} expected ${JSON.stringify(expected.slice(Math.max(0, i - 80), i + 80))}`;
 }
 
-function transcriptChars(benchCase: DeciderCase): number {
+function transcriptChars(benchCase: ProbeTranscript): number {
   let total = benchCase.userPrompt.length;
-  for (const step of benchCase.continuation?.steps ?? []) {
+  for (const step of benchCase.session?.steps ?? []) {
     total += step.text?.length ?? 0;
     for (const call of step.calls) total += call.command.length + call.output.length;
   }
   return total;
 }
 
-function withWorkspace<T>(benchCase: DeciderCase, fn: (dir: string) => T): T {
-  const dir = materialize(benchCase.continuation!.files);
+function withWorkspace<T>(benchCase: ProbeTranscript, fn: (dir: string) => T): T {
+  const dir = materialize(benchCase.session!.files);
   try {
     return fn(dir);
   } finally {
@@ -420,10 +419,10 @@ function withWorkspace<T>(benchCase: DeciderCase, fn: (dir: string) => T): T {
   }
 }
 
-describe('CONTINUATION_CASES', () => {
-  it('has 9 agentic continuation cases, 3 per subtask, with unique new ids', () => {
-    expect(CONTINUATION_CASES).toHaveLength(9);
-    const ids = CONTINUATION_CASES.map(c => c.id);
+describe('PROBE_TRANSCRIPTS', () => {
+  it('has 9 agentic transcripts, 3 per subtask, with unique ids', () => {
+    expect(PROBE_TRANSCRIPTS).toHaveLength(9);
+    const ids = PROBE_TRANSCRIPTS.map(c => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     const existing = new Set([...DECIDER_CASES, ...FRONTIER_CASES].map(c => c.id));
     for (const id of ids) {
@@ -431,20 +430,19 @@ describe('CONTINUATION_CASES', () => {
       expect(existing.has(id)).toBe(false);
     }
     for (const subtask of ['tool_usage', 'terminal_operations', 'multi_step_execution']) {
-      expect(CONTINUATION_CASES.filter(c => c.subtaskType === subtask)).toHaveLength(3);
+      expect(PROBE_TRANSCRIPTS.filter(c => c.subtaskType === subtask)).toHaveLength(3);
     }
-    for (const c of CONTINUATION_CASES) {
+    for (const c of PROBE_TRANSCRIPTS) {
       expect(c.taskType).toBe('agentic_execution');
-      expect(c.requiredToolCalls).toBe(1);
       expect(c.check.kind).toBe('json_equal');
       expect(JSON.stringify(c.check)).not.toContain('PENDING');
-      expect(c.continuation?.message).toBe('Continue.');
+      expect(c.session.message).toBe('Continue.');
       expect(Object.keys(REFERENCES)).toContain(c.id);
     }
   });
 
   it('keeps every transcript between 10k and 45k tokens (40k-180k chars)', () => {
-    for (const c of CONTINUATION_CASES) {
+    for (const c of PROBE_TRANSCRIPTS) {
       const chars = transcriptChars(c);
       expect(chars, c.id).toBeGreaterThanOrEqual(40_000);
       expect(chars, c.id).toBeLessThanOrEqual(180_000);
@@ -452,8 +450,8 @@ describe('CONTINUATION_CASES', () => {
   });
 
   it('seeds at least 3 bash calls across at least 2 steps, each below the tool truncation limits', () => {
-    for (const c of CONTINUATION_CASES) {
-      const steps = c.continuation!.steps;
+    for (const c of PROBE_TRANSCRIPTS) {
+      const steps = c.session!.steps;
       expect(steps.length, c.id).toBeGreaterThanOrEqual(2);
       const calls = steps.flatMap(step => step.calls);
       expect(calls.length, c.id).toBeGreaterThanOrEqual(3);
@@ -471,10 +469,10 @@ describe('CONTINUATION_CASES', () => {
   });
 
   it('never shows a pinned hash in the transcript', () => {
-    for (const c of CONTINUATION_CASES) {
+    for (const c of PROBE_TRANSCRIPTS) {
       const transcript = [
         c.userPrompt,
-        ...c.continuation!.steps.flatMap(step => [
+        ...c.session!.steps.flatMap(step => [
           step.text ?? '',
           ...step.calls.map(call => call.output),
         ]),
@@ -485,7 +483,7 @@ describe('CONTINUATION_CASES', () => {
     }
   });
 
-  describe.each(CONTINUATION_CASES.map(c => [c.id, c] as const))('%s', (_id, benchCase) => {
+  describe.each(PROBE_TRANSCRIPTS.map(c => [c.id, c] as const))('%s', (_id, benchCase) => {
     const check = benchCase.check;
     if (check.kind !== 'json_equal')
       throw new Error(`${benchCase.id}: expected a json_equal check`);
@@ -493,12 +491,12 @@ describe('CONTINUATION_CASES', () => {
 
     it('reproduces every seeded output byte for byte without changing the workspace', () => {
       withWorkspace(benchCase, dir => {
-        for (const call of benchCase.continuation!.steps.flatMap(step => step.calls)) {
+        for (const call of benchCase.session!.steps.flatMap(step => step.calls)) {
           const result = runBash(dir, call.command);
           expect(result.stderr, call.command).toBe('');
           expect(firstDifference(result.stdout, call.output), call.command).toBeNull();
         }
-        expect(snapshot(dir)).toEqual(benchCase.continuation!.files);
+        expect(snapshot(dir)).toEqual(benchCase.session!.files);
       });
     }, 120_000);
 

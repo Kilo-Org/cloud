@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import type { Terminal } from '@xterm/xterm';
-import type { FitAddon } from '@xterm/addon-fit';
+import type { FitAddon, Terminal } from 'ghostty-web';
 import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
@@ -55,7 +54,7 @@ export function useCloudAgentTerminal({
   const [statusText, setStatusText] = useState('Disconnected');
   const terminalRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const xtermRef = useRef<Terminal | null>(null);
+  const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -419,14 +418,13 @@ export function useCloudAgentTerminal({
       const container = terminalRef.current;
       if (!container) return;
 
-      const [{ Terminal }, { FitAddon }, { WebLinksAddon }, { ClipboardAddon }] = await Promise.all(
-        [
-          import('@xterm/xterm'),
-          import('@xterm/addon-fit'),
-          import('@xterm/addon-web-links'),
-          import('@xterm/addon-clipboard'),
-        ]
-      );
+      const { init: initGhostty, Terminal, FitAddon } = await import('ghostty-web');
+      try {
+        await initGhostty();
+      } catch {
+        updateStatus('error', 'Terminal failed to load');
+        return;
+      }
 
       if (disposed) return;
 
@@ -434,7 +432,6 @@ export function useCloudAgentTerminal({
       const term = new Terminal({
         cursorBlink: true,
         fontSize: 13,
-        lineHeight: 1.25,
         fontFamily:
           '"JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
         theme: {
@@ -443,17 +440,14 @@ export function useCloudAgentTerminal({
           cursor: '#fafafa',
           selectionBackground: '#404040',
         },
-        allowProposedApi: true,
         scrollback: 5000,
       });
 
       term.loadAddon(fitAddon);
-      term.loadAddon(new WebLinksAddon());
-      term.loadAddon(new ClipboardAddon());
       term.open(container);
       fitAddon.fit();
 
-      xtermRef.current = term;
+      terminalInstanceRef.current = term;
       fitAddonRef.current = fitAddon;
       applySandboxStatusRef.current = status => {
         if (!disposed) applySandboxStatus(term, fitAddon, status);
@@ -495,8 +489,8 @@ export function useCloudAgentTerminal({
       }
       wsRef.current = null;
       ptyIdRef.current = null;
-      xtermRef.current?.dispose();
-      xtermRef.current = null;
+      terminalInstanceRef.current?.dispose();
+      terminalInstanceRef.current = null;
       fitAddonRef.current = null;
       resizeObserverRef.current = null;
       reconnectNowRef.current = () => {};

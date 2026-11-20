@@ -388,11 +388,12 @@ describe('BitbucketOverview not-connected state', () => {
     const root = await renderScreen();
     const text = JSON.stringify(root.toJSON());
 
-    expect(text).toContain(i18n.t('prReview.connect.adminOnlyConnectDescription'));
-    // The who-can-connect sentence is a substring of the read-only sentence that
-    // restates the title, so only the absence of that sentence proves the screen
-    // stopped repeating itself.
-    expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    const roleSentence = i18n.t('prReview.connect.adminOnlyConnectDescription');
+    expect(text).toContain(roleSentence);
+    // The who-can-connect sentence appears once, as the screen's own claim: a
+    // second occurrence would be a line restating the not-connected state the
+    // title already names.
+    expect(text.split(roleSentence).length - 1).toBe(1);
     expect(connectActions(root)).toHaveLength(0);
   });
 

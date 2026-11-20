@@ -188,9 +188,17 @@ materializes, and a second lease row keeps concurrent dispatchers from initializ
 same time; a pass that completes a run's initialization claims again so its chunks start at
 once.
 
+Starting a decider run writes the run row and returns; it reuses nothing and materializes
+nothing in the request. The first initialization pass copies every entry's compatible prior
+results before it writes any chunk, so a run's chunks exist only once its reuse is complete.
+A pass whose reuse fails writes no chunk, and the next pass repeats the reuse, which skips
+rows the run already holds. The reuse statement filters the prior runs first and then seeks
+each run's pair in `case_results`: D1 keeps no planner statistics, so the join order is
+pinned with `CROSS JOIN`.
+
 Initialization failures stay isolated to their run, so healthy runs can still dispatch.
 A run without its saved execution identity fails and releases its claimed profiles.
-Transient catalog failures leave the run eligible for another initialization attempt.
+Transient catalog or reuse failures leave the run eligible for another initialization attempt.
 
 Run completion accounting reads every case result of the run, so it does not run per
 completed chunk. A completion first asks whether the run still has scheduled work — an
@@ -200,8 +208,10 @@ count as unsettled, so a run with a dead lane still settles once its live lanes 
 runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
 sweep and the dead-letter path remain responsible for runs that settle without a train of
 completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
-completes only the runs that still hold unsettled chunks, and pruning is driven from the
-per-run scheduler markers instead of scanning the chunk, execution or run tables.
+completes only the runs that still hold unsettled chunks, the failed-lane check reads only
+running runs' failed chunks, execution and marker pruning start from the per-run scheduler
+markers, and chunk pruning walks the distinct run ids that still hold chunks, so a run that
+stopped before its marker was written is pruned too.
 
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger records when each paid case started and prevents automatic
@@ -248,9 +258,43 @@ Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark 
 completed case results, and pending outputs remain available for compatible reuse.
 
 Production benchmark deploys use `pnpm run deploy`. The wrapper holds the scheduler dispatch
-lease, waits until no queued or active chunks remain, applies D1 migrations, deploys, then
-releases the lease. It renews the lease throughout and fails closed when draining exceeds
-its limit. It never pauses or resumes operator-controlled queues.
+lease, waits until no active chunks and no queued chunks with an unexpired queue lease remain,
+applies D1 migrations, deploys, waits for the container rollout to finish, then releases the
+lease. A queued claim whose queue lease expired cannot start, so it does not hold the drain;
+`recoverChunks` returns it to pending. It renews the lease throughout and fails closed when
+draining exceeds its limit. It never pauses or resumes operator-controlled queues.
+
+Busy dispatch takes the lease back as soon as each pass releases it, so the wrapper first writes
+a deploy intent: `scheduler_dispatch_lock` row 3 with a `deploy-intent-` token and a lease that
+ends with the wrapper's lock wait (`BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS`, 60 seconds by default).
+While that lease is unexpired, no dispatch pass takes row 1, so the wrapper takes it when the
+current pass ends, at most one dispatch lease (20 seconds) later. It retries at the poll interval
+(`BENCHMARK_DEPLOY_POLL_INTERVAL_MS`, 5 seconds), or sooner when the holder's lease ends, and
+clears the intent once it holds row 1 or gives up; a dead wrapper's intent expires with its lock
+wait. A worker deployed before this change ignores the intent: if dispatch is busy, deploy it
+under an operator pause.
+
+Each deploy records a hash of the container inputs (the `containers` configuration, each local
+image's Dockerfile, and every file in its build context, even when the Dockerfile sits outside
+that context) as the Worker version message
+`container-inputs:<sha256>`. The rolled-out hash is the message of the Worker version that was
+live when the container application last changed, so a deploy whose image never reached the
+containers is not trusted. When the rolled-out hash matches, the wrapper deploys with
+`--containers-rollout none`, so running containers are not replaced. A different, missing or
+unreadable hash deploys with the configured rollout, and a failed deploy without a rollout is
+retried with it. After a rolling deploy the wrapper polls `wrangler containers info` until the
+application has no `active_rollout_id`, for at most `BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS`
+(15 minutes by default), and then releases the lease either way.
+
+When the rolled-out hash matches and every file in `migrations/` is recorded in
+`d1_migrations`, the wrapper deploys without the lease and without draining. In-flight
+invocations finish on the version that accepted them. Each `BenchRunnerContainer` keeps its old
+code until its deferred code update resets it (at most 5 minutes after the deploy); the reset
+drops the Durable Object's request to the container, but the container keeps the case running
+and posts the result to `/container/case-result`, and the chunk waits for that output. A drained
+deploy does not avoid that reset either: it lands after the lease is released, on work
+dispatched since. A pending or unreadable migration list, or an unknown hash, takes the full
+drained path.
 
 An operator pauses dispatch by holding `scheduler_dispatch_lock` row 1 with a token that starts
 with `operator-pause-` and an unexpired lease. The wrapper treats that row as the dispatch hold:
@@ -980,13 +1024,14 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them. `PUT` saves, then syncs the platform registry and republishes the routing table before responding. A failed step does not undo the save: the response is 200 with `warnings` (`registry_sync_failed`, which skips the publish, or `routing_table_publish_failed`), each naming the retry (the daily `0 5 * * *` platform sync, or saving again) |
 | `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots` and `modelConcurrency` (the retired provider limits are accepted and ignored for one web release) |
-| `GET /admin/runs` | List runs without their summaries (sweeps stale `running` runs to `failed` first). `hasRunningRun` reports whether any run of the router is running, whatever the `kind`/`purpose` filter. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
+| `GET /admin/runs` | List runs without their summaries. Read-only; the per-minute cron sweeps stale `running` runs. `hasRunningRun` reports whether any run of the router is running, whatever the `kind`/`purpose` filter. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
 | `GET /admin/runs/:runId/summaries` | One run's model summaries; 404 when the run does not exist or belongs to another router (classifier runs are shared) |
-| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
-| `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
-| `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
+| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`); `202` once a run row exists, with initialization left to the dispatcher |
+| `GET /admin/registry` | Queue counts, exact platform entry statuses and the failed entries of both queues (retryable and permanent, with class, attempts and retry window) under the current engine identity and repetitions |
+| `POST /admin/registry/requeue` | Put retryable failed registry rows whose retry window has passed back to `pending` (`{scope}`); permanent rows are skipped; charges no owner quota |
+| `POST /admin/registry/refresh` | Re-admit exact pairs (`{router, mode, entries}`), clearing their failure history; the console's per-row Re-admit uses `mode: 'refresh'` |
 | `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
-| `GET /admin/routing-table` | Latest published **platform** routing table |
+| `GET /admin/routing-table` | Latest published **platform** routing table. Served from `AUTO_ROUTING_CONFIG` key `benchmark_routing_table_response_v1:<router>` only while its version matches the pointer `benchmark_routing_table_version_v1:<router>`. Every publish writes the pointer after its D1 write; a read that finds the pointer missing or different from D1 rewrites it. Every pointer writer re-reads D1 after its write and corrects it, and a body is cached only at the confirmed version. A publish that cannot write the pointer logs it, deletes the cached body and still flushes the gateway key, so the next read goes to D1 and repairs the pointer. The cached body expires after 10 minutes, so even a failed pointer write plus a failed body delete serves the previous table for at most that long. A location's KV edge cache can keep serving the previous pointer for up to about 60 seconds after a publish |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
 | `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of a custom router's gateway models (quota 20 models per base router per 24h) |
@@ -1053,16 +1098,34 @@ profiles without charging quota twice.
 
 ```
 pending → running → ready
-                 ↘ failed (bounded failure_reason; Retry re-admits)
+                 ↘ failed (retryable) → pending only by an admin action or the owner's Retry
+                 ↘ unavailable (permanent; wire status `failed`) → pending only by a per-row re-admit or the owner's Retry
 ```
 
 - **running**: set when a decider run of either queue claims the entries at `startRun`.
 - **ready**: set when that run completes successfully (`run_id` provenance
-  points at the measuring run).
-- **failed**: set when the run fails (enqueue, timeout sweep, etc.) — or, at
-  profile-run completion, per entry whose lane dead-lettered while the run's
-  other entries become `ready`. Only rows still pointing at that `run_id`
-  transition — a newer pending/ready row is never clobbered.
+  points at the measuring run). Clears the failure history.
+- **failed / unavailable**: set when the run fails (enqueue, timeout sweep, etc.), per
+  entry whose lane died, or per entry whose cases nearly all failed with one provider
+  rejection. Only rows still pointing at that `run_id` transition — a newer pending/ready
+  row is never clobbered.
+
+`src/profile-failure.ts` owns the failure state: `parseProfileState` is the one reader of
+the row, and `profileFailureAssignments` is the one failed transition. Each failure has a
+class; the class decides whether the failure is permanent:
+
+| Tier | Classes | Rule |
+|---|---|---|
+| Terminal | `catalog_absent`, `context_too_small`, `model_not_found`, `unsupported` | Permanent at once |
+| Model | `provider_unavailable`, `model_resolution` | Permanent after 3 failed runs since the last ready measurement |
+| Infrastructure | `ambiguous_execution`, `container_capacity`, `catalog_load`, `grader`, `run_timed_out`, `orphaned_claim`, `run_init_failed`, `unknown` | Never counted against the model; any 5 consecutive failed runs are permanent |
+
+`unsupported`: at least 95% of an entry's measured cases failed with the same provider
+rejection (numbers ignored). Timeouts, content filters, throttles, empty output and wrong
+answers stay measurements.
+
+A retryable failure waits `2^(attempts-1)` hours, capped at a day, before
+`POST /admin/registry/requeue` takes it. Nothing re-admits a failed row automatically.
 
 Currency: a profile is current only when `engine_identity`, `repetitions`, and
 exact variant match the live decider engine. The platform table never uses a stale row.
@@ -1334,17 +1397,21 @@ can no longer arrive.
 Classifier dead-letter handling remains fail-fast.
 
 `run_lane_failures` preserves lane-aware finalization: a run settles once each
-(model, variant, repetition) lane has all its cases or a recorded infrastructure failure.
+(model, variant, repetition) lane has all its cases or a recorded failure, and each record
+carries the failure class of its cause.
 
 The periodic dispatch sweep ignores pending chunks in failed lanes when checking run completion.
 It retries finalization after a canceled completion handler without starting duplicate inference.
 
 - **Decider runs of either queue** complete per-entry: entries whose lanes all
-  finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did
-  not finish…"). A requeue re-admits them — the owner's Retry (quota-charged) or
-  the admin's `POST /admin/registry/requeue` (free). One failing model never
-  discards the results of the others, which matters because each one cost real
-  money to produce.
+  finished go `ready`; entries with a dead lane fail with the most severe class their
+  lanes recorded (terminal over model over infrastructure). The admin requeue, a
+  per-row re-admit or the owner's Retry (quota-charged) re-admits them. One failing
+  model never discards the results of the others, which matters because each one cost
+  real money to produce.
+- **Catalog load failures** refund the chunk's attempt and hold every dispatch for the
+  backoff, like provider throttles. After 24 catalog deferrals the chunk falls back to
+  ordinary attempts, so a catalog that never loads still ends the lane.
 - **Classifier runs** still fail fast on a dead lane: their models are not
   registry-tracked and the winner must come from one comparable set.
 - **Backstop**: the 6h stale sweep salvages legacy decider runs that never completed

@@ -75,6 +75,8 @@ type FormDraft<T> = Extract<FormDraftState<T>, { kind: 'ready' }>;
 
 export type ModeFormProps = Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   /** The mode being edited, or undefined to create one. */
   mode: OrgMode | undefined;
   /** Every mode in the organization, so the form can refuse a taken identifier. */
@@ -90,7 +92,12 @@ export type ModeFormProps = Readonly<{
  * refs. This wrapper owns that store: it loads the draft under the current
  * account and the mode's own key, and hands the body the loaded value.
  */
-export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps) {
+export function ModeForm({
+  organizationId,
+  canManageBilling = false,
+  mode,
+  existingModes,
+}: ModeFormProps) {
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
   const draft = useFormDraft<OrgModeFormDraft>({
     userId,
@@ -110,6 +117,7 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   return (
     <ModeFormBody
       organizationId={organizationId}
+      canManageBilling={canManageBilling}
       mode={mode}
       existingModes={existingModes}
       draft={{
@@ -144,6 +152,8 @@ function ModeFormSkeleton() {
 
 type ModeFormBodyProps = Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling: boolean;
   mode: OrgMode | undefined;
   existingModes: readonly OrgMode[];
   draft: FormDraft<OrgModeFormDraft>;
@@ -164,12 +174,18 @@ type ModeFormBodyProps = Readonly<{
  * cannot drop typed text silently; every edit also writes the whole form to the
  * durable draft, because a reload runs no cleanup.
  */
-function ModeFormBody({ organizationId, mode, existingModes, draft }: ModeFormBodyProps) {
+function ModeFormBody({
+  organizationId,
+  canManageBilling,
+  mode,
+  existingModes,
+  draft,
+}: ModeFormBodyProps) {
   const router = useRouter();
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
-  const mutations = useOrgModeMutations(organizationId);
+  const mutations = useOrgModeMutations(organizationId, canManageBilling);
   const initial = mode === undefined ? null : orgModeFormValues(mode);
   // The best content this body already has: the restored draft, else the mode it
   // edits, else an empty create form.

@@ -186,7 +186,9 @@
     "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
     "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
-    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie."
+    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
+    "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "viewOnGitHub": "Zobacz PR w serwisie GitHub"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -700,7 +702,6 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
       "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {
@@ -2865,7 +2866,6 @@
       "skipped_few": "pominięte: {{displayCount}}",
       "skipped_many": "pominięte: {{displayCount}}",
       "title": "Kontrole",
-      "viewOnGitHub": "Zobacz PR w serwisie GitHub",
       "checkDetails": "szczegóły kontroli"
     },
     "composer": {
@@ -2926,6 +2926,11 @@
       "commentActions": "Opcje komentarza",
       "comment": "{{displayCount}} komentarza",
       "comment_other": "{{displayCount}} komentarza",
+      "conversationTruncated": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_one": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_few": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_many": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_other": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
       "couldNotLoad": "Nie udało się wczytać dyskusji.",
       "couldNotLoadMore": "Nie udało się wczytać kolejnych komentarzy.",
       "loadMoreComments": "Wczytaj kolejne komentarze",

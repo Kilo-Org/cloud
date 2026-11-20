@@ -186,7 +186,9 @@
     "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
     "privateRepositoryA11y": "{{name}}, privati saugykla",
     "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba.",
-    "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą."
+    "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą.",
+    "organizationTrialEndedBillingAtKiloAi": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
+    "viewOnGitHub": "Peržiūrėti PR GitHub platformoje"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -775,6 +777,11 @@
       "couldNotLoadMore": "Nepavyko įkelti daugiau komentarų.",
       "retryLoadingMore": "Bandyti įkelti daugiau komentarų dar kartą",
       "loadMoreComments": "Įkelti daugiau komentarų",
+      "conversationTruncated": "Rodomi tik pirmieji {{displayCount}} komentarai.",
+      "conversationTruncated_one": "Rodomi tik pirmieji {{displayCount}} komentarai.",
+      "conversationTruncated_few": "Rodomi tik pirmieji {{displayCount}} komentarai.",
+      "conversationTruncated_many": "Rodomi tik pirmieji {{displayCount}} komentarai.",
+      "conversationTruncated_other": "Rodomi tik pirmieji {{displayCount}} komentarai.",
       "addReaction": "Pridėti reakciją",
       "reactionPill": "{{emoji}} reakcija, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
@@ -910,7 +917,6 @@
       "noAccess": "Neturi prieigos prie šios saugyklos patikrinimų.",
       "couldNotLoad": "Nepavyko įkelti patikrinimų.",
       "retryChecks": "Pakartoti patikrinimus",
-      "viewOnGitHub": "Peržiūrėti PR GitHub platformoje",
       "noChecksReported": "Patikrinimų duomenų nėra",
       "passed": "sėkminga: {{displayCount}}",
       "passed_one": "sėkminga: {{displayCount}}",
@@ -1444,7 +1450,6 @@
     "followReviewMd": "Laikytis REVIEW.md instrukcijų",
     "followReviewMdSubtitle": "Laikytis kiekvienos saugyklos REVIEW.md faile pateiktų instrukcijų",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "notConnectedReadOnlyPlan": "Organizacijos bandomasis laikotarpis baigėsi, todėl savininkas turi atnaujinti atsiskaitymą adresu kilo.ai."
     },
     "bitbucketConnect": {

@@ -145,6 +145,7 @@
     "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "打开拉取请求",
+    "viewOnGitHub": "在 GitHub 上查看 PR",
     "completed": "已完成",
     "pending": "待处理",
     "running": "运行中",
@@ -184,7 +185,8 @@
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
     "privateRepositoryA11y": "{{name}}，私有仓库",
     "legalDocumentEnglishOnly": "本文件仅提供英文版本。",
-    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。"
+    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。",
+    "organizationTrialEndedBillingAtKiloAi": "组织的试用期已结束，且没有生效的套餐。您可以在 kilo.ai 更新账单信息，然后重试。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -698,7 +700,6 @@
     },
     "autoReviews": "自动审查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。",
       "notConnectedReadOnlyPlan": "组织的试用期已结束，因此所有者必须前往 kilo.ai 更新账单信息。"
     },
     "bitbucketConnect": {
@@ -2785,7 +2786,6 @@
       "skipped_one": "{{displayCount}} 项已跳过",
       "skipped_other": "{{displayCount}} 项已跳过",
       "title": "检查",
-      "viewOnGitHub": "在 GitHub 上查看 PR",
       "checkDetails": "检查详情"
     },
     "composer": {
@@ -2849,6 +2849,9 @@
       "couldNotLoad": "无法加载讨论",
       "couldNotLoadMore": "无法加载更多评论。",
       "loadMoreComments": "加载更多评论",
+      "conversationTruncated": "仅显示前 {{displayCount}} 条评论。",
+      "conversationTruncated_one": "仅显示前 {{displayCount}} 条评论。",
+      "conversationTruncated_other": "仅显示前 {{displayCount}} 条评论。",
       "loading": "正在加载讨论",
       "moderation": {
         "block": {

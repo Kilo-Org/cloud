@@ -184,7 +184,9 @@
     "organizationTrialEnded": "Пробниот период на организацијата заврши и таа нема активен план. Сопственик на организација може да го ажурира наплатувањето на kilo.ai, а потоа да се обиде повторно.",
     "privateRepositoryA11y": "{{name}}, приватен репозиториум",
     "legalDocumentEnglishOnly": "Овој документ е достапен само на англиски јазик.",
-    "organizationTrialEndedBilling": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето, а потоа да се обидеш повторно."
+    "organizationTrialEndedBilling": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето, а потоа да се обидеш повторно.",
+    "organizationTrialEndedBillingAtKiloAi": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето на kilo.ai, а потоа да се обидеш повторно.",
+    "viewOnGitHub": "Прикажи PR на GitHub"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "Не успеа вчитувањето на дополнителни коментари.",
       "retryLoadingMore": "Повтори го вчитувањето на дополнителни коментари",
       "loadMoreComments": "Вчитај повеќе коментари",
+      "conversationTruncated": "Се прикажуваат само првите {{displayCount}} коментари.",
+      "conversationTruncated_one": "Се прикажуваат само првите {{displayCount}} коментари.",
+      "conversationTruncated_other": "Се прикажуваат само првите {{displayCount}} коментари.",
       "addReaction": "Додај реакција",
       "reactionPill": "реакција {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакција",
@@ -882,7 +887,6 @@
       "noAccess": "Немаш пристап до проверките за ова складиште.",
       "couldNotLoad": "Не успеа вчитувањето на проверките.",
       "retryChecks": "Обиди се повторно со проверките",
-      "viewOnGitHub": "Прикажи PR на GitHub",
       "noChecksReported": "Нема пријавени проверки",
       "passed": "{{displayCount}} успешни",
       "passed_one": "{{displayCount}} успешни",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Следи REVIEW.md",
     "followReviewMdSubtitle": "Почитувај ги упатствата во датотеката REVIEW.md во секое складиште",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
       "notConnectedReadOnlyPlan": "Пробниот период на организацијата заврши, затоа сопственикот мора да го ажурира наплатувањето на kilo.ai."
     },
     "bitbucketConnect": {

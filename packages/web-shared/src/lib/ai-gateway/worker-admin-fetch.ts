@@ -7,8 +7,15 @@ export type WorkerAdminResult<T> = {
   body: T;
 };
 
-export type ErrorBody = { error: string };
-export const ErrorBodySchema = z.object({ error: z.string() });
+export const ErrorBodySchema = z.object({ error: z.string(), message: z.string().optional() });
+export type ErrorBody = z.infer<typeof ErrorBodySchema>;
+
+/**
+ * Default deadline for a worker admin call without its own signal. The slowest admin
+ * route observed in production, starting a benchmark run, took up to 22 s before run
+ * initialization left the request.
+ */
+export const WORKER_ADMIN_TIMEOUT_MS = 30_000;
 
 type WorkerAdminRequestInit = Omit<RequestInit, 'headers'> & {
   headers?: Record<string, string>;
@@ -31,28 +38,34 @@ export function createWorkerAdminFetch(options: {
       };
     }
 
-    const response = await fetch(endpoint.toString(), {
-      ...init,
-      headers: {
-        authorization: `Bearer ${INTERNAL_API_SECRET}`,
-        ...init.headers,
-      },
-    });
-
-    const body: unknown = await response.json();
-    if (!response.ok) {
-      const parsedError = ErrorBodySchema.safeParse(body);
-      return {
-        status: response.status,
-        body: parsedError.success
-          ? parsedError.data
-          : { error: `Request failed: ${response.status}` },
-      };
+    const deadline = init.signal ? null : AbortSignal.timeout(WORKER_ADMIN_TIMEOUT_MS);
+    try {
+      const response = await fetch(endpoint.toString(), {
+        ...init,
+        signal: init.signal ?? deadline,
+        headers: {
+          authorization: `Bearer ${INTERNAL_API_SECRET}`,
+          ...init.headers,
+        },
+      });
+      if (!response.ok) {
+        const parsed = ErrorBodySchema.safeParse(
+          await response.json().catch((error: unknown) => {
+            if (deadline?.aborted) throw error;
+            return undefined;
+          })
+        );
+        return {
+          status: response.status,
+          body: parsed.success ? parsed.data : { error: `Request failed: ${response.status}` },
+        };
+      }
+      return { status: response.status, body: schema.parse(await response.json()) };
+    } catch (error) {
+      if (deadline?.aborted) {
+        return { status: 504, body: { error: 'Worker request timed out' } };
+      }
+      throw error;
     }
-
-    return {
-      status: response.status,
-      body: schema.parse(body),
-    };
   };
 }

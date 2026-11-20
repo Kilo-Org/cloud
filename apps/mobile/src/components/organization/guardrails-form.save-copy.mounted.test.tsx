@@ -268,7 +268,10 @@ async function mountForm(refusedMessage: string) {
     h.rerender = () => {
       setRevision(revision => revision + 1);
     };
-    return createElement(GuardrailsForm, { organizationId: 'org-1', data });
+    // The screen hands the form the reader's role; this harness passes the money
+    // role, because this surface's subject is the refusal copy a billing role
+    // reads and no billing step is rendered here.
+    return createElement(GuardrailsForm, { organizationId: 'org-1', canManageBilling: true, data });
   }
   const { renderer, unmount } = await renderWithProviders(createElement(Harness));
   openUnmounts.push(unmount);
@@ -297,7 +300,10 @@ describe('GuardrailsForm save copy', () => {
     const renderer = await mountForm(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
     await pressSave(renderer);
 
-    expect(statusText(renderer.root)).toBe(i18n.t('common.organizationTrialEnded'));
+    // The form renders no billing step beside the failure line, so even the
+    // role that can change the plan reads the sentence that names the
+    // destination instead of one that claims an owner must act.
+    expect(statusText(renderer.root)).toBe(i18n.t('common.organizationTrialEndedBillingAtKiloAi'));
   });
 
   it('falls back to the status-failed line for an unrecognized refusal', async () => {

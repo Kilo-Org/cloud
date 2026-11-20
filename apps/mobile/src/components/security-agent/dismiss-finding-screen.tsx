@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the sheet draws the whole-body load, permission, paused and terminal failure states beside the form from one draft */
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
@@ -44,7 +45,10 @@ import {
 } from '@/lib/hooks/use-security-findings';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
+import {
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+} from '@/lib/query/read-failure-variant';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 
@@ -161,10 +165,16 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   if (findingQuery.isError && !findingQuery.data) {
+    // The title names what failed; the variant supplies the cause and next step.
     return (
       <DismissSheetFrame>
         <QueryError
-          message={t('securityAgent.dismiss.couldNotLoad')}
+          variant={classifyReadFailureVariant({
+            errors: [findingQuery.error],
+            isPaused: findingQuery.fetchStatus === 'paused',
+            connectivity,
+          })}
+          title={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
       </DismissSheetFrame>

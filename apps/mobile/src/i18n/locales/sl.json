@@ -147,6 +147,7 @@
     "online": "Na spletu",
     "open": "Odpri {{name}}",
     "openPullRequest": "Odprta zahteva za združitev",
+    "viewOnGitHub": "Prikaži PR na GitHubu",
     "completed": "Dokončano",
     "pending": "Na čakanju",
     "running": "V teku",
@@ -186,7 +187,8 @@
     "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
     "privateRepositoryA11y": "{{name}}, zasebno skladišče",
     "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini.",
-    "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova."
+    "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova.",
+    "organizationTrialEndedBillingAtKiloAi": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš na kilo.ai, nato poskusi znova."
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -775,6 +777,11 @@
       "couldNotLoadMore": "Več komentarjev ni bilo mogoče naložiti.",
       "retryLoadingMore": "Poskusi znova naložiti več komentarjev",
       "loadMoreComments": "Naloži več komentarjev",
+      "conversationTruncated": "Prikazanih je le prvih {{displayCount}} komentarjev.",
+      "conversationTruncated_one": "Prikazanih je le prvih {{displayCount}} komentarjev.",
+      "conversationTruncated_other": "Prikazanih je le prvih {{displayCount}} komentarjev.",
+      "conversationTruncated_two": "Prikazanih je le prvih {{displayCount}} komentarjev.",
+      "conversationTruncated_few": "Prikazanih je le prvih {{displayCount}} komentarjev.",
       "addReaction": "Dodaj odziv",
       "reactionPill": "odziv {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "odziv",
@@ -910,7 +917,6 @@
       "noAccess": "Nimaš dostopa do preverjanj za ta repozitorij.",
       "couldNotLoad": "Preverjanj ni bilo mogoče naložiti.",
       "retryChecks": "Znova poskusi naložiti preverjanja",
-      "viewOnGitHub": "Prikaži PR na GitHubu",
       "noChecksReported": "Ni podatkov o preverjanjih",
       "passed": "uspešno: {{displayCount}}",
       "passed_one": "uspešno: {{displayCount}}",
@@ -1444,7 +1450,6 @@
     "followReviewMd": "Upoštevaj REVIEW.md",
     "followReviewMdSubtitle": "Upoštevaj navodila iz datotek REVIEW.md v posameznih skladiščih",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "notConnectedReadOnlyPlan": "Preizkusna doba organizacije se je končala, zato mora lastnik posodobiti obračun na kilo.ai."
     },
     "bitbucketConnect": {

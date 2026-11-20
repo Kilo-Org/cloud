@@ -47,10 +47,20 @@ import { knownServerErrorMessage } from '@/lib/server-error-copy';
  */
 export function GuardrailsForm({
   organizationId,
+  canManageBilling = false,
   data,
-}: Readonly<{ organizationId: string; data: OrgGuardrails }>) {
+}: Readonly<{
+  organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
+  data: OrgGuardrails;
+}>) {
   const { t } = useTranslation();
-  const save = useSaveOrgGuardrails(organizationId);
+  // The screen resolves the reader's role once and hands it down: this form
+  // renders no billing step beside the failure line, so a money role reads the
+  // sentence that names the destination instead of one that claims an owner
+  // must act.
+  const save = useSaveOrgGuardrails(organizationId, canManageBilling);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
   const outputAvailable = data.output_available;
   const { groups } = data;
@@ -170,7 +180,9 @@ export function GuardrailsForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
+        message:
+          knownServerErrorMessage(error, canManageBilling, 'absent') ??
+          t('organizationGuardrails.statusFailed'),
       });
     }
   };

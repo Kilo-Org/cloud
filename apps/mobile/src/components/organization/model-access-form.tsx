@@ -138,6 +138,7 @@ function syncedFormState(params: {
 export function ModelAccessForm({
   organizationId,
   canEdit,
+  canManageBilling = false,
   models,
   catalog,
   catalogUnavailable,
@@ -152,6 +153,8 @@ export function ModelAccessForm({
 }: Readonly<{
   organizationId: string;
   canEdit: boolean;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   models: readonly AvailableModel[];
   /** The gateway's whole catalog; empty while it is unavailable. */
   catalog: readonly CatalogModel[];
@@ -170,7 +173,11 @@ export function ModelAccessForm({
   onRetryGateway: () => void;
 }>) {
   const { t } = useTranslation();
-  const save = useSaveOrgModelAccess(organizationId);
+  // The screen resolves the reader's role once and hands it down: this form
+  // renders no billing step beside the failure line, so a money role reads the
+  // sentence that names the destination instead of one that claims an owner
+  // must act.
+  const save = useSaveOrgModelAccess(organizationId, canManageBilling);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
   const [tab, setTab] = useState<Tab>('models');
   // A provider saved in the allow list but no longer served by any catalog model
@@ -299,7 +306,9 @@ export function ModelAccessForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
+        message:
+          knownServerErrorMessage(error, canManageBilling, 'absent') ??
+          t('organizationGuardrails.statusFailed'),
       });
     }
   };
@@ -412,6 +421,7 @@ export function ModelAccessForm({
       {tab === 'gateways' ? (
         <GatewaySettingsSection
           organizationId={organizationId}
+          canManageBilling={canManageBilling}
           settings={gateway}
           isError={gatewayIsError}
           isFetching={gatewayIsFetching}

@@ -145,6 +145,7 @@
     "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
+    "viewOnGitHub": "GitHub پر PR دیکھیں",
     "completed": "مکمل",
     "pending": "زیر التوا",
     "running": "چل رہا ہے",
@@ -184,7 +185,8 @@
     "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔",
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
-    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
+    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "مزید تبصرے لوڈ نہیں ہو سکے۔",
       "retryLoadingMore": "مزید تبصرے لوڈ کرنے کی دوبارہ کوشش کریں",
       "loadMoreComments": "مزید تبصرے لوڈ کریں",
+      "conversationTruncated": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
+      "conversationTruncated_one": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
+      "conversationTruncated_other": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
       "addReaction": "ردعمل شامل کریں",
       "reactionPill": "{{emoji}} ردعمل، {{displayCount}} {{countLabel}}",
       "reaction_one": "ردعمل",
@@ -882,7 +887,6 @@
       "noAccess": "اس ریپوزٹری کی جانچوں تک آپ کی رسائی نہیں ہے۔",
       "couldNotLoad": "جانچیں لوڈ نہیں ہو سکیں۔",
       "retryChecks": "جانچیں لوڈ کرنے کی دوبارہ کوشش کریں",
-      "viewOnGitHub": "GitHub پر PR دیکھیں",
       "noChecksReported": "کوئی جانچ رپورٹ نہیں ہوئی",
       "passed": "{{displayCount}} کامیاب",
       "passed_one": "{{displayCount}} کامیاب",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
       "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے، اس لیے مالک کو ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کرنی ہوگی۔"
     },
     "bitbucketConnect": {

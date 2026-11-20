@@ -145,6 +145,7 @@
     "online": "Khadka ku jira",
     "open": "Fur {{name}}",
     "openPullRequest": "Codsi isku-darid oo furan",
+    "viewOnGitHub": "Ka eeg GitHub PR-ka",
     "completed": "La dhammeeyay",
     "pending": "Sugaya",
     "running": "Socda",
@@ -184,7 +185,8 @@
     "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale.",
     "privateRepositoryA11y": "{{name}}, kaydka gaar ah",
     "legalDocumentEnglishOnly": "Dukumeentigan waxaa laga heli karaa af Ingiriisi oo keliya.",
-    "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale."
+    "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale.",
+    "organizationTrialEndedBillingAtKiloAi": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha kilo.ai, ka dibna isku day mar kale."
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "Faallooyin dheeraad ah lama soo rari karin.",
       "retryLoadingMore": "Mar kale isku day soo rarista faallooyin dheeraad ah",
       "loadMoreComments": "Soo rar faallooyin dheeraad ah",
+      "conversationTruncated": "Waxaa la muujinayaa {{displayCount}}-ka ugu horreeya ee faallo.",
+      "conversationTruncated_one": "Waxaa la muujinayaa {{displayCount}}-ka ugu horreeya ee faallo.",
+      "conversationTruncated_other": "Waxaa la muujinayaa {{displayCount}}-ka ugu horreeya ee faallo.",
       "addReaction": "Ku dar falcelin",
       "reactionPill": "falcelinta {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "falcelin",
@@ -882,7 +887,6 @@
       "noAccess": "Ma haysatid oggolaansho aad ku aragto hubinnada kaydkan.",
       "couldNotLoad": "Hubinnada lama soo rari karin.",
       "retryChecks": "Mar kale isku day hubinnada",
-      "viewOnGitHub": "Ka eeg GitHub PR-ka",
       "noChecksReported": "Wax hubinno ah lama soo sheegin",
       "passed": "{{displayCount}} ayaa gudbay",
       "passed_one": "{{displayCount}} ayaa gudbay",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Raac REVIEW.md",
     "followReviewMdSubtitle": "Raac tilmaamaha ku jira faylka REVIEW.md ee kayd kasta",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
       "notConnectedReadOnlyPlan": "Tijaabadii ururku way dhamaatay, sidaas darteed milkiilaha waa inuu cusboonaysiiyaa biilasha kilo.ai."
     },
     "bitbucketConnect": {

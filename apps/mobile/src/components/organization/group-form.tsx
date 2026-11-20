@@ -64,6 +64,8 @@ type FormDraft<T> = Extract<FormDraftState<T>, { kind: 'ready' }>;
 
 type GroupFormProps = Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   /** The group being edited, or undefined to create one. */
   group: OrgGroup | undefined;
 }>;
@@ -78,7 +80,7 @@ type GroupFormProps = Readonly<{
  * under the current account and the group's own key, and hands the body the
  * loaded value.
  */
-export function GroupForm({ organizationId, group }: GroupFormProps) {
+export function GroupForm({ organizationId, canManageBilling = false, group }: GroupFormProps) {
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
   const draft = useFormDraft<OrgGroupFormDraft>({
     userId,
@@ -98,6 +100,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   return (
     <GroupFormBody
       organizationId={organizationId}
+      canManageBilling={canManageBilling}
       group={group}
       draft={{
         kind: 'ready',
@@ -129,6 +132,8 @@ function GroupFormSkeleton() {
 
 type GroupFormBodyProps = Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling: boolean;
   group: OrgGroup | undefined;
   draft: FormDraft<OrgGroupFormDraft>;
 }>;
@@ -145,13 +150,13 @@ type GroupFormBodyProps = Readonly<{
  * The route admits an owner or admin only — the mutations are
  * `organizationAdminMutationProcedure` — and hands this form the group it resolves.
  */
-function GroupFormBody({ organizationId, group, draft }: GroupFormBodyProps) {
+function GroupFormBody({ organizationId, canManageBilling, group, draft }: GroupFormBodyProps) {
   const router = useRouter();
   const navigation = useNavigation<StackNavigation>();
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
-  const mutations = useOrgGroupMutations(organizationId);
+  const mutations = useOrgGroupMutations(organizationId, canManageBilling);
   const orgWithMembers = useOrgWithMembers(organizationId);
   const initial =
     group === undefined

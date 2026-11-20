@@ -30,6 +30,8 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   Platform: platform,
   StatusBar: { currentHeight: 0 },
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   FlatList: <T,>(props: ListProps<T>) =>
     createElement(
       'FlatList',

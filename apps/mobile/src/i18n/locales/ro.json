@@ -146,6 +146,7 @@
     "online": "Conectat",
     "open": "Deschide {{name}}",
     "openPullRequest": "Deschidere PR",
+    "viewOnGitHub": "Vezi PR-ul pe GitHub",
     "completed": "Finalizat",
     "pending": "În așteptare",
     "running": "Rulează",
@@ -185,7 +186,8 @@
     "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou.",
     "privateRepositoryA11y": "{{name}}, repository privat",
     "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză.",
-    "organizationTrialEndedBilling": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea, apoi poți încerca din nou."
+    "organizationTrialEndedBilling": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea, apoi poți încerca din nou.",
+    "organizationTrialEndedBillingAtKiloAi": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea pe kilo.ai, apoi poți încerca din nou."
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -764,6 +766,10 @@
       "couldNotLoadMore": "Nu s-au putut încărca mai multe comentarii.",
       "retryLoadingMore": "Încearcă din nou să încarci mai multe comentarii",
       "loadMoreComments": "Încarcă mai multe comentarii",
+      "conversationTruncated": "Se afișează doar primele {{displayCount}} comentarii.",
+      "conversationTruncated_one": "Se afișează doar primele {{displayCount}} comentarii.",
+      "conversationTruncated_other": "Se afișează doar primele {{displayCount}} comentarii.",
+      "conversationTruncated_few": "Se afișează doar primele {{displayCount}} comentarii.",
       "addReaction": "Adaugă o reacție",
       "reactionPill": "reacție {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacție",
@@ -896,7 +902,6 @@
       "noAccess": "Nu ai acces la verificările acestui depozit.",
       "couldNotLoad": "Nu s-au putut încărca verificările.",
       "retryChecks": "Reîncearcă verificările",
-      "viewOnGitHub": "Vezi PR-ul pe GitHub",
       "noChecksReported": "Nicio verificare raportată",
       "passed": "{{displayCount}} reușite",
       "passed_one": "{{displayCount}} reușite",
@@ -1418,7 +1423,6 @@
     "followReviewMd": "Respectă REVIEW.md",
     "followReviewMdSubtitle": "Respectă instrucțiunile din fișierul REVIEW.md al fiecărui depozit",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "notConnectedReadOnlyPlan": "Perioada de probă a organizației s-a încheiat, așa că un proprietar trebuie să actualizeze facturarea pe kilo.ai."
     },
     "bitbucketConnect": {

@@ -184,7 +184,9 @@
     "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
     "privateRepositoryA11y": "{{name}}, pribadong repositoryo",
     "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
-    "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli."
+    "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli.",
+    "organizationTrialEndedBillingAtKiloAi": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing sa kilo.ai, pagkatapos ay subukan muli.",
+    "viewOnGitHub": "Tingnan ang PR sa GitHub"
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -753,6 +755,9 @@
       "couldNotLoadMore": "Hindi ma-load ang iba pang komento.",
       "retryLoadingMore": "Subukang i-load muli ang iba pang komento",
       "loadMoreComments": "I-load ang iba pang komento",
+      "conversationTruncated": "Ipinapakita lang ang unang {{displayCount}} komento.",
+      "conversationTruncated_one": "Ipinapakita lang ang unang {{displayCount}} komento.",
+      "conversationTruncated_other": "Ipinapakita lang ang unang {{displayCount}} komento.",
       "addReaction": "Magdagdag ng reaksiyon",
       "reactionPill": "reaksiyong {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiyon",
@@ -882,7 +887,6 @@
       "noAccess": "Wala kang access sa mga pagsusuri para sa repository na ito.",
       "couldNotLoad": "Hindi ma-load ang mga pagsusuri.",
       "retryChecks": "Subukang muli ang mga pagsusuri",
-      "viewOnGitHub": "Tingnan ang PR sa GitHub",
       "noChecksReported": "Walang naiulat na pagsusuri",
       "passed": "{{displayCount}} ang pumasa",
       "passed_one": "{{displayCount}} ang pumasa",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Sundin ang REVIEW.md",
     "followReviewMdSubtitle": "Sundin ang mga tagubilin sa REVIEW.md file ng bawat repository",
     "bitbucket": {
-      "notConnectedReadOnly": "Hindi nakakonekta ang Bitbucket. Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
       "notConnectedReadOnlyPlan": "Natapos na ang trial ng organisasyon, kaya kailangang i-update ng may-ari ang billing sa kilo.ai."
     },
     "bitbucketConnect": {

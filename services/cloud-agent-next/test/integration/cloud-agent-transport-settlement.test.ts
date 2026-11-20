@@ -28,6 +28,7 @@ import type { SessionMessagesPage } from '../../src/control-plane/session/histor
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { sessionDoName } from '../../src/session-identity.js';
+import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { seedRegistration } from './helpers/seed-registration.js';
 import { waitFor } from './wait-for.js';
 
@@ -174,8 +175,12 @@ type ShimSocket = {
  * no client transport back to the test Worker, so this shim forwards each
  * socket to the session's real `/stream` route through `SELF.fetch` and adapts
  * the upgraded half back to that property API.
+ *
+ * `open: false` leaves every socket connecting forever, so the transport never
+ * reaches its connect hooks and no frame ever crosses: a case that asserts what
+ * a snapshot page alone delivers uses it.
  */
-function installSocketShim(options: { sessionId: string }) {
+function installSocketShim(options: { sessionId: string; open?: boolean }) {
   const sockets: ShimSocket[] = [];
   const real = globalThis.WebSocket;
 
@@ -204,7 +209,7 @@ function installSocketShim(options: { sessionId: string }) {
         drop: () => this.drop(),
       };
       sockets.push(this.record);
-      void this.open();
+      if (options.open !== false) void this.open();
     }
 
     private async open(): Promise<void> {
@@ -556,6 +561,132 @@ describe('cloud agent transport snapshot settlement on the real session DO', () 
       expect(transport.sessionCreated()).toBe(0);
       // One error report per dropped episode, both identical transient failures.
       expect(new Set(transport.errors)).toEqual(new Set(['Connection lost.']));
+    } finally {
+      transport.transport.destroy();
+      shim.restore();
+    }
+  });
+
+  it('replays a queued page row as a pending entry when no socket frame carries it', async () => {
+    // A session whose runtime never reports ready: the turn stays `queued` on a
+    // route that is preparing, which is exactly the row the page carries and
+    // that no frame of this connection ever repeats.
+    const sessionId = `workspace_${crypto.randomUUID()}`;
+    const kiloSessionId = `ses_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`;
+    const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}`;
+    const kiloToken = runtimeAuthorizedKiloToken();
+    const stub = sessions.getByName(sessionDoName(USER_ID, sessionId));
+    // The provider is active: a retired one fails every pending message before
+    // the route is even asked to prepare, so the turn could never stay queued.
+    const registered = await stub.registerSessionFromMetadata({
+      metadata: parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId, userId: USER_ID, createdOnPlatform: 'cloud-agent-web' },
+        auth: { kiloSessionId, kilocodeToken: kiloToken },
+        agent: { mode: 'code', model: 'test/model' },
+        workspace: {
+          sandboxId,
+          branchName: 'kilo/settlement',
+          sandboxProvider: 'cloudflare-containers',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      }),
+      sandboxSelection: { provider: 'cloudflare-containers' },
+    });
+    expect(registered).toEqual({ success: true });
+    await seedRegistration(stub, {
+      sandboxId,
+      spec: {
+        sessionId,
+        kiloSessionId,
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-requested`,
+      },
+      credentials: {
+        userId: USER_ID,
+        kiloSessionId,
+        kiloToken,
+        scopeId: sessionId,
+      },
+    });
+    // The fake peer answers `prepare` with its default `preparing` view, so
+    // admission keeps the message queued instead of delivering it.
+    const peer = new FakeSandboxPeer();
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => peer;
+    });
+    const messageId = 'msg_settlement_queued';
+    await stub.send({
+      messageId,
+      turn: { type: 'prompt', prompt: 'Queued prompt' },
+      agent: { mode: 'code', model: 'test/model' },
+    });
+    expect(peer.prepareCalls.length).toBeGreaterThan(0);
+    expect(peer.deliverCalls).toEqual([]);
+
+    // The server really emits such a row: pending, with neither a completion
+    // nor a terminal failure, so nothing but its `delivery` marks it as not
+    // yet accepted.
+    const wire = await stub.getSessionMessagesPage();
+    expect(wire).not.toBeNull();
+    const row = wire?.queuedMessages?.find(message => message.messageId === messageId);
+    expect(row).toBeDefined();
+    expect(row?.completedAt).toBeUndefined();
+    expect(row?.terminalFailure).toBeUndefined();
+    expect(row?.delivery).toBeUndefined();
+    expect(row?.content).toBe('Queued prompt');
+
+    // The socket never opens, so the page is the only path this connection has
+    // to the pending turn: without it the sink would never learn the turn
+    // exists.
+    const shim = installSocketShim({ sessionId, open: false });
+    const pages: SessionSnapshotPage[] = [];
+    const transport = createSettlementTransport({
+      sessionId,
+      kiloSessionId,
+      fetchCloudSnapshotPage: async () => {
+        const page = await stub.getSessionMessagesPage();
+        if (page === null) throw new Error('Session not found');
+        return page;
+      },
+      onInitialPageLoaded: page => pages.push(page),
+    });
+    try {
+      transport.transport.connect();
+      await waitFor(() => expect(pages).toHaveLength(1));
+      // The page carries the pending row, and the transport opened a socket
+      // that delivered nothing.
+      expect(pages[0].queuedMessages).toEqual([
+        expect.objectContaining({ messageId, content: 'Queued prompt' }),
+      ]);
+      expect(shim.sockets).toHaveLength(1);
+      expect(shim.sockets[0].messageCount).toBe(0);
+
+      await waitFor(() =>
+        expect(
+          transport.serviceEvents.some(
+            event => event.type === 'cloud.message.queued' && event.messageId === messageId
+          )
+        ).toBe(true)
+      );
+      // A pending turn is not a decided one: nothing marks it sent or failed.
+      expect(
+        transport.serviceEvents.filter(
+          event =>
+            (event.type === 'cloud.message.sent' || event.type === 'cloud.message.failed') &&
+            event.messageId === messageId
+        )
+      ).toEqual([]);
+      // The transcript never carries the turn: it was never accepted, so it has
+      // no message row to project.
+      expect(
+        transport.chatEvents.some(
+          event =>
+            (event.type === 'message.updated' && event.info.id === messageId) ||
+            (event.type === 'message.part.updated' && event.part.messageID === messageId)
+        )
+      ).toBe(false);
+      expect(shim.sockets[0].messageCount).toBe(0);
     } finally {
       transport.transport.destroy();
       shim.restore();

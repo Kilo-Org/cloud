@@ -256,6 +256,7 @@ const PARTNER_SKIP_REASON_LABELS: Record<string, string> = {
   'openrouter-disabled': 'Excluded by the organization gateway settings.',
   'provider-settings': 'Excluded by provider settings.',
   'unsupported-reasoning-effort': 'The requested reasoning effort is not supported.',
+  'recent-upstream-error': 'It returned an error earlier in this session.',
 };
 
 function describePartnerSkip(step: RequestLogRoutingStep): string {

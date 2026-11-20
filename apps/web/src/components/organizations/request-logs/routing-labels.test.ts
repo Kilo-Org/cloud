@@ -50,6 +50,7 @@ describe('describeStep', () => {
     ['openrouter-disabled', 'excluded by the organization gateway settings.'],
     ['provider-settings', 'excluded by provider settings.'],
     ['unsupported-reasoning-effort', 'the requested reasoning effort is not supported.'],
+    ['recent-upstream-error', 'it returned an error earlier in this session.'],
   ])('explains a partner skipped for %s', (reason, detail) => {
     expect(
       describeStep({

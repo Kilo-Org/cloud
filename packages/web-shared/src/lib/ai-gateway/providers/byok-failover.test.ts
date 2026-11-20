@@ -461,6 +461,46 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     });
   });
 
+  it('reports each failed upstream to its route, even when no failover route can serve', async () => {
+    const onPrimaryFailure = jest.fn();
+    const onFailoverFailure = jest.fn();
+    answerAfter(100, upstreamJsonFailure(503, {}));
+    answerAfter(100, failedAttempt(500));
+
+    await sendUpstreamAttemptWithByokFailover(
+      input({ ...route('primary-key'), onUpstreamFailure: onPrimaryFailure }),
+      failoverTo({ ...route('failover-key', 'anthropic'), onUpstreamFailure: onFailoverFailure }, null)
+    );
+
+    expect(onPrimaryFailure).toHaveBeenCalledTimes(1);
+    expect(onFailoverFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not report a failure to a route that served or whose client disconnected', async () => {
+    const onServed = jest.fn();
+    answerAfter(100, servedAttempt());
+    await sendUpstreamAttemptWithByokFailover(
+      input({ ...route('primary-key'), onUpstreamFailure: onServed }),
+      failoverTo(route('failover-key', 'anthropic'))
+    );
+    expect(onServed).not.toHaveBeenCalled();
+
+    const onDisconnected = jest.fn();
+    const controller = new AbortController();
+    mockedSendUpstreamAttempt.mockImplementationOnce(async () => {
+      controller.abort();
+      return upstreamJsonFailure(500, {});
+    });
+    await sendUpstreamAttemptWithByokFailover(
+      {
+        ...input({ ...route('primary-key'), onUpstreamFailure: onDisconnected }),
+        signal: controller.signal,
+      },
+      failoverTo(route('failover-key', 'anthropic'))
+    );
+    expect(onDisconnected).not.toHaveBeenCalled();
+  });
+
   it('records nothing when the first key serves the request', async () => {
     answerAfter(100, servedAttempt());
     const failoverRoutes = failoverTo(route('failover-key', 'anthropic'));

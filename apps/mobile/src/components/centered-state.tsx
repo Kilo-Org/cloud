@@ -68,15 +68,16 @@ type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
  * the content back until the scroller reports its own frame. A surface whose
  * native geometry is still arriving is such a band too, for the same reason: any
  * placement built before the probe reports moves when the safe-area answer
- * lands, so the content waits one commit for the frame. The measurement answers
- * inside the commit that mounts the scroller, so the state paints placed rather
- * than at a position the measurement then corrects. It also paints at the
- * estimate whenever a measurement cannot place it at all, because a state that
- * never appears is worse than one placed by the estimate — except on a surface
- * whose native geometry never reports at all, where the content stays back
- * rather than paint a position the probe would contradict the moment it
- * answers; the probe failing is reported and visible, a silently misplaced
- * state is not.
+ * lands, so the content waits one commit for the frame. The scroller's own
+ * layout event starts the one measurement of that layout, so the state paints
+ * at the estimate and takes the measured placement as soon as the native answer
+ * arrives — for the bands above, the two placements are the same position. It
+ * also paints at the estimate whenever a measurement cannot place it at all,
+ * because a state that doesn't appear is worse than one placed by the estimate
+ * — except on a surface whose native geometry never reports at all, where the
+ * content stays back rather than paint a position the probe would contradict
+ * the moment it answers; the probe failing is reported and visible, a silently
+ * misplaced state is not.
  */
 export function CenteredState({
   children,

@@ -69,9 +69,9 @@ export function DetectorCard({
         disabled={disabled}
         accessibilityLabel={label}
       />
-      {choice === 'off' ? null : (
+      {choice !== 'off' && children ? (
         <View className={disabled ? 'pointer-events-none opacity-50' : undefined}>{children}</View>
-      )}
+      ) : null}
     </Card>
   );
 }

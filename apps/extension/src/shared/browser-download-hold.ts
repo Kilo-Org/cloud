@@ -363,6 +363,18 @@ type Attribution =
 type OpenAnnouncement = DownloadHoldAnnouncement & { claimed: boolean };
 
 /**
+ * A file this hold already decided on a tab, remembered by the page it came from. Chrome raises
+ * `downloadWillBegin` before the item for an attachment whose response is already in flight, but after it when the
+ * response only becomes a file later: that announcement names a download this tab has settled, never a new one.
+ */
+interface SettledFile {
+  /** The page identity of the file's url: the only identity an announcement and an item share. */
+  readonly page: string;
+  /** When the hold decided it, so only an announcement that arrives afterwards can be that late arrival. */
+  readonly since: number;
+}
+
+/**
  * A navigation the runtime itself sent on an agent tab, registered before it is
  * sent: the one tie an item needs when the browser reports no referrer and
  * announces nothing. A browser-initiated navigation of a top-level document —
@@ -414,6 +426,8 @@ export const createDownloadHold = ({
   const navigations = new Map<number, DownloadHoldNavigation>();
   /** The announcements a tripwire watches, so one announcement is reported at most once. */
   const watched = new Set<string>();
+  /** The files each tab has already had decided, by the page they came from: what a late announcement belongs to. */
+  const settledFiles = new Map<number, SettledFile[]>();
 
   const announcementKey = (download: DownloadHoldAnnouncement): string =>
     download.guid === undefined || download.guid === ''
@@ -439,6 +453,37 @@ export const createDownloadHold = ({
 
     owed.set(session, [...existing, next]);
     onReport?.(next, session);
+  };
+
+  /**
+   * Remembers a file this tab has decided, so a `downloadWillBegin` that names it afterwards is read as that
+   * download's own late announcement instead of a second, unobserved file. The page is the identity: the name is
+   * not enough, because a page that downloads `report.txt` twice has two files and the second is still unobserved.
+   */
+  const noteSettled = (tabId: number, url: string | undefined, since: number): void => {
+    const page = pageOf(url);
+
+    if (page === undefined) {
+      return;
+    }
+
+    const live = (settledFiles.get(tabId) ?? []).filter(
+      entry => entry.since + ANNOUNCEMENT_TTL_MS >= since
+    );
+
+    settledFiles.set(tabId, [...live, { page, since }]);
+  };
+
+  /** Whether this announcement names a download the tab settled already: an announcement that arrived after it. */
+  const settledBefore = (tabId: number, url: string | undefined, at: number): boolean => {
+    const page = pageOf(url);
+
+    return (
+      page !== undefined &&
+      (settledFiles.get(tabId) ?? []).some(
+        entry => entry.page === page && entry.since <= at && at - entry.since <= ANNOUNCEMENT_TTL_MS
+      )
+    );
   };
 
   /** The session's approval, dropped once its token's own lifetime is over. */
@@ -606,13 +651,17 @@ export const createDownloadHold = ({
     return spent;
   };
 
-  /** `held` → `escaped`: the hold cannot prove the file is gone, so the model is told it may exist. */
+  /**
+   * `held` → `escaped`: the hold cannot prove the file is gone, so the model is told it may exist. The state is
+   * returned rather than written: a settling download stays `held` until its report is queued, so a call's settle
+   * never reads a verdict the model has not been told yet.
+   */
   const escape = (state: TrackedDownload, reason: EscapedReason): TrackedDownload => {
     if (state.kind !== 'held' && state.kind !== 'blocked') {
       return state;
     }
 
-    const next: TrackedDownload = {
+    return {
       filename: state.filename,
       itemId: state.itemId,
       kind: 'escaped',
@@ -622,10 +671,6 @@ export const createDownloadHold = ({
       tabId: state.tabId,
       url: state.url,
     };
-
-    tracked.set(state.itemId, next);
-
-    return next;
   };
 
   /** `held` → `allowed`: the need is spent and `suggest` lets the file land under the browser's name. */
@@ -643,6 +688,7 @@ export const createDownloadHold = ({
       tabId: state.tabId,
       url: state.url,
     });
+    noteSettled(state.tabId, state.url, state.since);
     suggest();
   };
 
@@ -651,6 +697,9 @@ export const createDownloadHold = ({
    * history entry, then answer Chrome. A cancel that threw, an item the browser
    * had already completed, or one it cannot describe is `escaped` instead: the
    * file may exist, and the report says so.
+   *
+   * The verdict is written last, after its report is queued: a call's settle ends on a settled state, and the call
+   * that reads its reports must not find a verdict it was never told about.
    */
   const block = async (state: TrackedDownload, suggest: SuggestFilename): Promise<void> => {
     if (state.kind !== 'held') {
@@ -665,35 +714,8 @@ export const createDownloadHold = ({
       cancelled = false;
     }
 
-    if (!cancelled) {
-      report(escape(state, 'cancel-failed'));
-      suggest();
-
-      return;
-    }
-
-    const listed = await lookUp(state.itemId);
-    const blocked: TrackedDownload = {
-      filename: state.filename,
-      itemId: state.itemId,
-      kind: 'blocked',
-      need: state.need,
-      since: state.since,
-      tabId: state.tabId,
-      url: state.url,
-    };
-
-    tracked.set(state.itemId, blocked);
-
-    // The browser could not describe the item: the cancel landed, and its file is unproven.
-    // An item it says is complete was never stopped, so the report must say it may exist.
-    let settled: TrackedDownload = blocked;
-
-    if (listed.kind === 'unknown') {
-      settled = escape(blocked, 'unobserved');
-    } else if (listed.kind === 'found' && listed.item.state === 'complete') {
-      settled = escape(blocked, 'complete');
-    }
+    // The browser refused to cancel: the file may exist, and the model is told so before anything else.
+    const settled = cancelled ? await settledFor(state) : escape(state, 'cancel-failed');
 
     if (erase !== undefined) {
       try {
@@ -706,6 +728,32 @@ export const createDownloadHold = ({
     // Only after the cancel: `suggest` satisfies "exactly once", and no file can be renamed into place.
     suggest();
     report(settled);
+    tracked.set(state.itemId, settled);
+    noteSettled(state.tabId, state.url, state.since);
+  };
+
+  /** The state a cancelled item settled into: `blocked`, or `escaped` when the browser says otherwise. */
+  const settledFor = async (state: TrackedDownload): Promise<TrackedDownload> => {
+    const blocked: TrackedDownload = {
+      filename: state.filename,
+      itemId: state.itemId,
+      kind: 'blocked',
+      need: state.need,
+      since: state.since,
+      tabId: state.tabId,
+      url: state.url,
+    };
+    const listed = await lookUp(state.itemId);
+
+    // The browser could not describe the item: the cancel landed, and its file is unproven.
+    // An item it says is complete was never stopped, so the report must say it may exist.
+    if (listed.kind === 'unknown') {
+      return escape(blocked, 'unobserved');
+    }
+
+    return listed.kind === 'found' && listed.item.state === 'complete'
+      ? escape(blocked, 'complete')
+      : blocked;
   };
 
   /** The armed need a download of this tab and file spends. */
@@ -909,6 +957,14 @@ export const createDownloadHold = ({
       // A browser that names no time still named the file now: without a stamp the pruner
       // Would take it for an ancient announcement and drop it before its item could claim it.
       const entry = { ...download, claimed: false, startedAt: download.startedAt ?? now() };
+
+      // Chrome names an attachment's download before its item while the response is in flight, and after it when the
+      // Response only becomes a file later. An announcement that arrives after this tab settled a download of the
+      // Same page is that download's: it is nothing to watch, and the tripwire must not report a file the hold
+      // Already answered for. The name never decides this on its own — two downloads of one name are two files.
+      if (settledBefore(download.tabId, download.url, entry.startedAt)) {
+        return;
+      }
 
       // An announcement only says where a click's file is going: the item is the only
       // thing decided, so an announcement never spends a need by itself.

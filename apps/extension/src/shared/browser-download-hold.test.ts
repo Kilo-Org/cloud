@@ -641,6 +641,60 @@ describe('an unattributable download', () => {
   });
 });
 
+describe('a download announced after its own item', () => {
+  it('is that settled file’s own event, so the tripwire never reports the file a second time', async () => {
+    const downloads = makeDownloads();
+    const { hold } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    // The response only becomes a file after the call answered: the item is decided and reported first.
+    hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(hold.tracked(1)?.kind).toBe('blocked');
+    expect(hold.drain('session-1').map(one => one.filename)).toEqual(['q4.pdf']);
+
+    // Chrome names the very same download a moment later: an announcement that arrives after the item it names.
+    await vi.advanceTimersByTimeAsync(2000);
+    hold.announce({
+      guid: 'late',
+      suggestedFilename: 'q4.pdf',
+      tabId: 7,
+      url: 'https://app.example/reports/q4.pdf',
+    });
+    await vi.advanceTimersByTimeAsync(TRIPWIRE_MS + 20);
+
+    // The hold already answered for that file: no second, "may have been saved" report is owed for it.
+    expect(hold.drain('session-1')).toEqual([]);
+  });
+
+  it('is a new file when the tab settled a different page, even under the same name', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+    hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    hold.drain('session-1');
+
+    // Another url under the same file name: a second download, and its announcement is the only record of it.
+    hold.announce({
+      guid: 'other',
+      suggestedFilename: 'q4.pdf',
+      tabId: 7,
+      url: 'https://app.example/other/q4.pdf',
+    });
+    await vi.advanceTimersByTimeAsync(TRIPWIRE_MS + 20);
+
+    expect(reports).toEqual(['stopped:q4.pdf', 'may-have-saved:q4.pdf']);
+  });
+});
+
 describe('the recorded state', () => {
   const startHost = (downloads: FakeDownloads, storage: FakeStorage) =>
     startDownloadHold({

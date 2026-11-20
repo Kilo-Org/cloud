@@ -3,6 +3,7 @@ import { device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
+  RUNTIME_PROXY_ORIGIN_HEADER,
   SESSION_TRANSCRIPT_TOKEN_AUDIENCE,
   SESSION_TRANSCRIPT_TOKEN_ISSUER,
   SESSION_TRANSCRIPT_TOKEN_SCHEME,
@@ -306,7 +307,12 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (!token) return failure(401, 'unauthenticated', 'A Kilo bearer credential is required');
   const body = await readExchangeBody(request);
   if (body instanceof Response) return body;
-  const hosted = await exchangeCloudAgentUpload(token, body.organizationID, env);
+  const hosted = await exchangeCloudAgentUpload(
+    token,
+    body.organizationID,
+    env,
+    request.headers.get(RUNTIME_PROXY_ORIGIN_HEADER) ?? undefined
+  );
   if (hosted) return hosted;
 
   try {

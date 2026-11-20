@@ -46,6 +46,11 @@ on:
         required: false
         default: 'false'
         type: string
+      deploy_cloud_agent_after_session_sync:
+        description: 'Deploy session-sync before cloud-agent-next when both change'
+        required: false
+        default: 'false'
+        type: string
       source_sha:
         description: 'Exact tested commit to deploy (defaults to the caller SHA)'
         required: false
@@ -61,6 +66,8 @@ on:
         value: ${{ jobs.detect-changes.outputs.matrix }}
       deploy-cloud-agent-after-session-ingest:
         value: ${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest }}
+      deploy-cloud-agent-after-session-sync:
+        value: ${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-sync }}
 
 permissions:
   contents: read
@@ -234,6 +241,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       deploy-cloud-agent-after-session-ingest: ${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-ingest }}
+      deploy-cloud-agent-after-session-sync: ${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-sync }}
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -398,13 +406,23 @@ jobs:
           fi
           echo "deploy-cloud-agent-after-session-ingest=$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" >> "$GITHUB_OUTPUT"
 
-          # The ordered deployment path owns both workers: session-ingest runs as its
-          # own job and cloud-agent-next needs that job, so neither may also sit in
-          # the parallel matrix.
+          DEPLOY_CLOUD_AGENT_AFTER_SESSION_SYNC=false
+          if [[ " ${CHANGED[*]} " == *" services/session-sync "* \
+            && " ${CHANGED[*]} " == *" services/cloud-agent-next "* ]]; then
+            DEPLOY_CLOUD_AGENT_AFTER_SESSION_SYNC=true
+          fi
+          echo "deploy-cloud-agent-after-session-sync=$DEPLOY_CLOUD_AGENT_AFTER_SESSION_SYNC" >> "$GITHUB_OUTPUT"
+
+          # Selected prerequisites deploy in their own jobs. Cloud Agent waits for
+          # each prerequisite, so none may also run in the parallel matrix.
           FILTERED=()
           for dir in "${CHANGED[@]}"; do
             if [ "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" = true ] \
               && { [ "$dir" = services/session-ingest ] || [ "$dir" = services/cloud-agent-next ]; }; then
+              continue
+            fi
+            if [ "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_SYNC" = true ] \
+              && { [ "$dir" = services/session-sync ] || [ "$dir" = services/cloud-agent-next ]; }; then
               continue
             fi
             FILTERED+=("$dir")
@@ -647,18 +665,84 @@ jobs:
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
 
-  deploy-cloud-agent-after-session-ingest:
-    needs: deploy-session-ingest
-    # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
-    # deploys after an unsuccessful session-ingest deployment.
+  deploy-session-sync:
+    # Guard: this reusable workflow can be invoked from a fork, and the job
+    # deploys to the target environment with inherited repo secrets. Only the
+    # canonical repo may run it. The ordered path comes from the detection call,
+    # because a deploy call does not run detection.
+    if: github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_sync == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    environment: ${{ inputs.target_environment }}
+    name: Deploy session-sync before cloud-agent-next
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: services/session-sync
+        # Only the Worker's dependency closure plus the root project; a recursive
+        # workspace install links every unrelated package as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          # A registry download that fails on the runner leaves a lifecycle script
+          # (such as the workerd postinstall) failed; a plain rerun repeats it.
+          for attempt in 1 2 3; do
+            pnpm install --frozen-lockfile "${filters[@]}" && exit 0
+            echo "::warning::pnpm install failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
+
+      - name: Deploy to Cloudflare Workers
+        id: deploy
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/session-sync
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/session-sync
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+  deploy-cloud-agent-after-dependencies:
+    needs: [deploy-session-ingest, deploy-session-sync]
+    # A skipped, unselected prerequisite does not block deployment. A selected
+    # prerequisite must succeed before Cloud Agent can require its new contract.
     if: >-
+      !cancelled() &&
       github.repository == 'Kilo-Org/cloud' &&
-      inputs.deploy_cloud_agent_after_session_ingest == 'true' &&
-      needs.deploy-session-ingest.result == 'success'
+      (inputs.deploy_cloud_agent_after_session_ingest == 'true' || inputs.deploy_cloud_agent_after_session_sync == 'true') &&
+      (inputs.deploy_cloud_agent_after_session_ingest != 'true' || needs.deploy-session-ingest.result == 'success') &&
+      (inputs.deploy_cloud_agent_after_session_sync != 'true' || needs.deploy-session-sync.result == 'success')
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 75
     environment: ${{ inputs.target_environment }}
-    name: Deploy cloud-agent-next after session-ingest
+    name: Deploy cloud-agent-next after selected dependencies
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1

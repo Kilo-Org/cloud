@@ -59,6 +59,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     warn: '#9F6612',
+    foreground: '#1C1917',
     mutedForeground: '#6F6A61',
     primary: '#4F5A10',
   }),
@@ -189,19 +190,26 @@ describe('ModelPickerOptionRow unavailable row', () => {
     expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
   });
 
-  it('dims the selected check and leaves the badge copy readable', () => {
+  it('draws no check on a selected unavailable row and keeps the badge copy readable', () => {
     const renderer = renderRow(
       cliCatalogOption({ unavailable: true, hasUserByokAvailable: true, name: 'Minimax M2.5' }),
       { selected: true }
     );
 
     // A container opacity would re-multiply the badge copy, which is the
-    // defect this change removes; only the non-text check carries the dim.
+    // defect this change removes.
     const views = renderer.root.findAll(
       node => typeof node.type === 'string' && (node.type as string) === 'View'
     );
     expect(views.some(node => String(node.props.className).includes('opacity-50'))).toBe(false);
-    expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+    // A check claims the row is a valid selection, and the row refuses the pick.
+    expect(checkAccessories(renderer)).toHaveLength(0);
+  });
+
+  it('still draws the check on a selected available row', () => {
+    const renderer = renderRow(cliCatalogOption({ name: 'Minimax M2.5' }), { selected: true });
+
+    expect(checkAccessories(renderer)).toEqual([{ color: '#1C1917', size: 18 }]);
   });
 });
 

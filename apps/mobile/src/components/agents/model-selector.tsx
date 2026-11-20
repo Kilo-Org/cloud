@@ -523,9 +523,11 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
+        {/* An unavailable row draws no check: a check would claim the row is a
+         * valid selection. The column stays reserved so nothing moves. */}
         <View className="items-center justify-center" style={{ width: CHECK_COLUMN_DP }}>
-          {selected ? (
-            <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />
+          {selected && !option.unavailable ? (
+            <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors)} />
           ) : null}
         </View>
         <Pressable

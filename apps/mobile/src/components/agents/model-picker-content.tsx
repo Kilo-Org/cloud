@@ -327,9 +327,10 @@ export function ModelPickerContent() {
           ListHeaderComponent={
             allOptionsUnavailable ? (
               <EmptyState
-                // The sheet's sections sit 21pt apart; the state is the
-                // first block above them, so it ends at the same gap.
-                className="mb-6"
+                // The sheet's sections sit 21pt apart, and the state keeps
+                // one section gap on each side of itself: below the search
+                // field and above the first section header.
+                className="mt-3 mb-6"
                 icon={Info}
                 placement="top"
                 inset="gutter"

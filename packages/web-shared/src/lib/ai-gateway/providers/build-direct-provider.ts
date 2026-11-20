@@ -11,6 +11,7 @@ import {
 import { deleteAtPath } from '@kilocode/web-shared/lib/ai-gateway/providers/delete-at-path';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { applyReasoningEffortMap } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-effort-map';
 
 export type DirectUpstreamAuth =
   | { type: 'api_key'; apiKey: string; apiKeyHeader: 'x-api-key' | null }
@@ -58,6 +59,7 @@ export function buildDirectProvider(
     supportedChatApis,
     responseTransforms: upstream.reasoning_details_transform ?? null,
     async transformRequest(context) {
+      applyReasoningEffortMap(context.request, upstream.reasoning_effort_map);
       const body = context.request.body as Record<string, unknown>;
       if (upstream.remove_from_body) {
         for (const path of upstream.remove_from_body) {

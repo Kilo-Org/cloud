@@ -338,6 +338,107 @@ describe('custom LLM Gemini reasoning transform configuration', () => {
   });
 });
 
+describe('buildDirectProvider reasoning effort map', () => {
+  const reasoning_effort_map = { xhigh: 'high', max: 'high', minimal: 'low' } as const;
+
+  it('rejects an effort the map cannot name', () => {
+    expect(
+      CustomLlmApiConfigSchema.safeParse({
+        base_url: 'https://llm.example.com/v1',
+        reasoning_effort_map: { xhigh: 'extreme' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('maps chat reasoning.effort and reasoning_effort', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'public-model',
+        messages: [],
+        reasoning: { effort: 'xhigh' },
+        reasoning_effort: 'minimal',
+      },
+    };
+
+    await transformRequest(request, { reasoning_effort_map });
+
+    expect(request.body).toMatchObject({
+      reasoning: { effort: 'high' },
+      reasoning_effort: 'low',
+    });
+  });
+
+  it('maps before the reasoning-content transform forwards the effort', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'public-model', messages: [], reasoning: { effort: 'xhigh' } },
+    };
+
+    await transformRequest(request, {
+      reasoning_effort_map,
+      reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+    });
+
+    expect(request.body.reasoning).toBeUndefined();
+    expect(request.body.reasoning_effort).toBe('high');
+  });
+
+  it('maps responses reasoning.effort and messages output_config.effort', async () => {
+    const responses = {
+      kind: 'responses',
+      body: { model: 'public-model', input: 'hi', reasoning: { effort: 'xhigh' } },
+    } as GatewayRequest;
+    const messages = {
+      kind: 'messages',
+      body: {
+        model: 'public-model',
+        messages: [],
+        max_tokens: 1,
+        output_config: { effort: 'max' },
+      },
+    } as GatewayRequest;
+
+    await transformRequest(responses, { reasoning_effort_map });
+    await transformRequest(messages, { reasoning_effort_map });
+
+    expect(responses.body).toMatchObject({ reasoning: { effort: 'high' } });
+    expect(messages.body).toMatchObject({ output_config: { effort: 'high' } });
+  });
+
+  it('leaves unmapped efforts and requests without an effort unchanged', async () => {
+    const mapped: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'public-model', messages: [], reasoning: { effort: 'medium' } },
+    };
+    const withoutEffort: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'public-model', messages: [], reasoning: { enabled: false } },
+    };
+
+    await transformRequest(mapped, { reasoning_effort_map });
+    await transformRequest(withoutEffort, { reasoning_effort_map });
+
+    expect(mapped.body.reasoning).toEqual({ effort: 'medium' });
+    expect(withoutEffort.body.reasoning).toEqual({ enabled: false });
+    expect(withoutEffort.body.reasoning_effort).toBeUndefined();
+  });
+
+  it('lets extra_body override the mapped effort', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'public-model', messages: [], reasoning_effort: 'xhigh' },
+    };
+
+    await transformRequest(request, {
+      reasoning_effort_map,
+      extra_body: { reasoning_effort: 'medium' },
+    });
+
+    expect(request.body.reasoning_effort).toBe('medium');
+  });
+});
+
 describe('buildDirectProvider response transforms', () => {
   it('enables Gemini thought content rewriting when the transform is enabled', () => {
     const provider = buildDirectProvider(

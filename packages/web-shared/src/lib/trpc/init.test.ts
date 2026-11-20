@@ -102,6 +102,41 @@ describe('adminProcedure admin_access telemetry', () => {
     });
   });
 
+  // Regression: a `{ user }`-shaped context that omits the derived `credential`
+  // falls back to the same four-input derivation as the request boundary. A
+  // delegated Cloud Agent authority must not be mislabeled as a human bearer.
+  test('classifies a delegated authority in the credential fallback like the boundary does', async () => {
+    const delegatedUser = defineTestUser({ is_admin: true, is_super_admin: false });
+    const delegatedRouter = createTRPCRouter({
+      models: createTRPCRouter({
+        list: adminProcedure.query(() => 'ok'),
+      }),
+    });
+    const caller = createCallerFactory(delegatedRouter)(
+      ctxFor({
+        user: delegatedUser,
+        authViaToken: true,
+        tokenSource: null,
+        cloudAgentAuthority: {
+          version: 1,
+          ownerId: delegatedUser.id,
+          parentSessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          organizationId: null,
+          authorizationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        } as unknown as CloudAgentAuthority,
+      })
+    );
+
+    await caller.models.list();
+
+    expect(events[0]).toMatchObject({
+      kind: 'admin_guard',
+      credential: 'delegated_workload',
+      wouldBlock: true,
+    });
+  });
+
   test('emits denied, not succeeded, when a chained guard refuses the request', async () => {
     const caller = createCaller(
       ctxFor({

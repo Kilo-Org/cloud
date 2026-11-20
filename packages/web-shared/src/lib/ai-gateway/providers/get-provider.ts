@@ -454,9 +454,6 @@ async function resolvePartnerRoute(
   input: GetProviderInput
 ): Promise<ProviderRoute | PartnerSkipReason> {
   const { definition } = partner;
-  const session = getPartnerSession(input.request, input.user.id, partner.public_id);
-  // Started now so the Redis read overlaps the provider settings lookups. It never rejects.
-  const recentUpstreamError = session ? hasRecentPartnerUpstreamError(session) : null;
   if (!getCustomLlmApiKinds(definition).includes(input.request.kind)) {
     return 'unsupported-api-kind';
   }
@@ -465,6 +462,9 @@ async function resolvePartnerRoute(
   if (input.boundedSpending) return 'bounded-spending';
   // Implied by an inference region, which admits only Kilo's Vercel AI Gateway route.
   if (input.openRouterDisabled) return 'openrouter-disabled';
+  const session = getPartnerSession(input.request, input.user.id, partner.public_id);
+  // Started now so the Redis read overlaps the provider settings lookups. It never rejects.
+  const recentUpstreamError = session ? hasRecentPartnerUpstreamError(session) : null;
   const providerConfig = withIgnoredProviders(
     await input.getRoutingProviderConfig(),
     input.kiloIgnoredProviders ?? []

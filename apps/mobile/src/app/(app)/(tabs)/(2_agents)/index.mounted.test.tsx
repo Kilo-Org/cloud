@@ -243,6 +243,22 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
       buttons: [{ text: 'Back' }],
     });
   });
+
+  it('pending request state: explains the pending request and offers no retry', () => {
+    const onRetry = vi.fn<() => void>();
+    const alert = buildGitHubInstallOutcomeAlert(
+      { kind: 'error', code: 'pending_request_exists' },
+      onRetry
+    );
+    expect(alert).toEqual({
+      title: 'Cannot complete installation',
+      message:
+        'A pending GitHub installation request already exists for this account. Finish or cancel it in GitHub, then try again.',
+      buttons: [{ text: 'Back' }],
+    });
+    expect(alert?.buttons[0]?.onPress).toBeUndefined();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
 });
 
 describe('Agents tab return-outcome rendering', () => {

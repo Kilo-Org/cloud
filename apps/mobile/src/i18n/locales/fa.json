@@ -2147,6 +2147,7 @@
       "alreadyClaimedMessage": "این برنامهٔ نصب‌شده در GitHub از قبل به حساب Kilo دیگری متصل است. ابتدا اتصال آن را از همان حساب قطع کنید.",
       "installationUnavailableMessage": "این نصب GitHub App تعلیق شده یا دیگر در دسترس نیست. آن را در GitHub بازیابی یا دوباره نصب کنید، سپس دوباره شروع کنید.",
       "multipleInstallationsMessage": "سازمان Kilo شما در حال حاضر فقط می‌تواند به یک سازمان GitHub متصل شود.",
+      "pendingRequestMessage": "یک درخواست نصب GitHub از قبل برای این حساب در حالت انتظار وجود دارد. آن را در GitHub تکمیل یا لغو کنید، سپس دوباره تلاش کنید.",
       "didNotCompleteTitle": "نصب تکمیل نشد",
       "didNotCompleteMessage": "نصب برنامهٔ GitHub کامل نشد. از داخل برنامه دوباره تلاش کنید."
     },

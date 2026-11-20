@@ -1586,6 +1586,7 @@
       "alreadyClaimedMessage": "Diese GitHub-Installation ist bereits mit einem anderen Kilo-Konto verbunden. Trenne die Verbindung dort zuerst.",
       "installationUnavailableMessage": "Diese GitHub App-Installation ist ausgesetzt oder nicht mehr verfügbar. Stelle sie in GitHub wieder her oder installiere sie dort erneut, und starte dann erneut.",
       "multipleInstallationsMessage": "Diese Kilo-Organisation kann derzeit nur eine einzige GitHub-Organisation verbinden.",
+      "pendingRequestMessage": "Für dieses Konto besteht bereits eine ausstehende GitHub-Installationsanfrage. Schließe sie in GitHub ab oder brich sie ab, und versuche es dann erneut.",
       "didNotCompleteTitle": "Installation wurde nicht abgeschlossen",
       "didNotCompleteMessage": "Die Installation der GitHub-App wurde nicht abgeschlossen. Versuche es erneut in der App."
     },

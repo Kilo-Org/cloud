@@ -2147,6 +2147,7 @@
       "alreadyClaimedMessage": "Esa instalación de GitHub xa está conectada a outra conta de Kilo. Desconéctaa alí primeiro.",
       "installationUnavailableMessage": "Esta instalación da GitHub App está suspendida ou xa non está dispoñible. Restáuraa ou reinstálaa en GitHub e despois comeza de novo.",
       "multipleInstallationsMessage": "Esta organización de Kilo agora mesmo só pode conectar unha organización de GitHub.",
+      "pendingRequestMessage": "Xa existe unha solicitude de instalación de GitHub pendente para esta conta. Remátaa ou cancélaa en GitHub e despois téntao de novo.",
       "didNotCompleteTitle": "A instalación non se completou",
       "didNotCompleteMessage": "A instalación da aplicación de GitHub non se completou. Téntao de novo desde a aplicación."
     },

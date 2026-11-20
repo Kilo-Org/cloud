@@ -2147,6 +2147,7 @@
       "alreadyClaimedMessage": "Ejikọlarị ntinye GitHub ahụ na akaụntụ Kilo ọzọ. Buru ụzọ kwụsị njikọ ya n'ebe ahụ.",
       "installationUnavailableMessage": "Akwụsịtụrụ ntinye ngwa GitHub a ma ọ bụ na ọ dịghịzi. Weghachite ma ọ bụ tinyeghachi ya na GitHub, wee malite ọzọ.",
       "multipleInstallationsMessage": "Òtù Kilo a nwere ike ijikọ naanị otu òtù GitHub ugbu a.",
+      "pendingRequestMessage": "Arịrịọ ntinye GitHub na-echere adịlarị maka akaụntụ a. Mechaa ma ọ bụ kwụsị ya na GitHub, wee nwaa ọzọ.",
       "didNotCompleteTitle": "Ntinye agwụchaghị",
       "didNotCompleteMessage": "Emechaghị ntinye ngwa GitHub. Nwaa ọzọ site na ngwa a."
     },

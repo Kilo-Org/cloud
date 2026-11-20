@@ -2147,6 +2147,7 @@
       "alreadyClaimedMessage": "Usakinishaji huo wa GitHub tayari umeunganishwa na akaunti nyingine ya Kilo. Katisha muunganisho kwenye akaunti hiyo kwanza.",
       "installationUnavailableMessage": "Usakinishaji huu wa GitHub App umesimamishwa au haupatikani tena. Urejeshe au usakinishe upya kwenye GitHub, kisha anza tena.",
       "multipleInstallationsMessage": "Shirika hili la Kilo kwa sasa linaweza kuunganisha shirika moja tu la GitHub.",
+      "pendingRequestMessage": "Ombi la usakinishaji la GitHub tayari linasubiri kwa akaunti hii. Likamilishe au likatishe kwenye GitHub, kisha ujaribu tena.",
       "didNotCompleteTitle": "Usakinishaji haukukamilika",
       "didNotCompleteMessage": "Usakinishaji wa programu ya GitHub haukukamilika. Jaribu tena kwenye programu."
     },

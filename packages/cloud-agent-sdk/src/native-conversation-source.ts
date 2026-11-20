@@ -42,11 +42,13 @@ const questionSchema = z
     fields: z.array(fieldSchema),
   })
   .passthrough();
+// A card can only be answered for an identity the runner can match, so an entry
+// with an empty `requestID` falls through to the identity rule below.
 const inventoryPermissionSchema = z
-  .object({ requestID: z.string(), tool: z.string(), summary: z.string() })
+  .object({ requestID: z.string().min(1), tool: z.string(), summary: z.string() })
   .passthrough();
 const inventoryQuestionSchema = z
-  .object({ requestID: z.string(), fields: z.array(fieldSchema) })
+  .object({ requestID: z.string().min(1), fields: z.array(fieldSchema) })
   .passthrough();
 /** What an entry still says about itself when its scope cannot be read. */
 const inventoryIdentitySchema = z.object({ requestID: z.string().min(1) }).passthrough();

@@ -480,7 +480,7 @@ test('an unreadable inventory permission with no readable identity is dropped wi
           { tool: 'shell', summary: 'Run tests' },
           { requestID: '', tool: 'shell' },
         ],
-        questions: [],
+        questions: [{ requestID: '', fields: [{ type: 'string', key: 'q' }] }],
       },
     },
   });

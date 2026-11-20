@@ -455,6 +455,8 @@ const sensitiveStepFor = async (input: {
   readonly args: Record<string, unknown>;
   readonly authorized: readonly BrowserGrant[];
   readonly frames: readonly BrowserAgentFrame[];
+  /** The target is a frame whose own document this read could not place, so its page is unknown. */
+  readonly framePageUnknown?: boolean;
   readonly origin: string;
   readonly pageUrl: string | undefined;
   readonly session: GateSession;
@@ -466,6 +468,11 @@ const sensitiveStepFor = async (input: {
 
   if (isOAuthConsentUrl(input.pageUrl)) {
     return { origin: input.origin, reason: SENSITIVE_REASON.oauthConsent };
+  }
+
+  // The call acts in a frame this read cannot place, so no page can be ruled out: a consent screen inside it would go unnoticed.
+  if (input.framePageUnknown === true) {
+    return { origin: input.origin, reason: SENSITIVE_REASON.frameUnverified };
   }
 
   if (isScriptTool(input.toolName)) {
@@ -545,22 +552,22 @@ const sensitiveStepFor = async (input: {
   return undefined;
 };
 
+/**
+ * The document the call acts in, for the OAuth-consent check. A frame target
+ * judged by another document's page would hide a consent screen inside it, so
+ * a frame this read cannot place has no page instead of the top page's.
+ */
 const pageUrlFor = async (
   frame: { readonly frame: boolean; readonly origin: string } | undefined,
   readFrames: () => Promise<AgentFrameInventory>
 ): Promise<string | undefined> => {
   const { frames } = await readFrames();
-  const main = mainFrameOf(frames);
 
-  if (frame !== undefined && frame.frame) {
-    const match = frames.find(candidate => candidate.origin === frame.origin);
-
-    if (match !== undefined) {
-      return match.url;
-    }
+  if (frame === undefined || !frame.frame) {
+    return mainFrameOf(frames)?.url;
   }
 
-  return main?.url;
+  return frames.find(candidate => candidate.origin === frame.origin)?.url;
 };
 
 export interface AgentPreflightInput {
@@ -698,6 +705,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   const sensitive = await sensitiveStepFor({
     args: input.args,
     authorized: input.authorized,
+    ...(targetFrame?.frame === true && pageUrl === undefined ? { framePageUnknown: true } : {}),
     frames,
     origin,
     pageUrl,

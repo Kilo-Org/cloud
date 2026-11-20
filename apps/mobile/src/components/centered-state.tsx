@@ -179,16 +179,20 @@ export function CenteredState({
     setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
   }, []);
 
-  const capture = useCallback(
-    (node: ScrollViewInstance | null) => {
-      scrollRef.current = node;
-      measure();
-    },
-    [measure]
-  );
+  // Record the node and nothing else. A measurement started here would race the
+  // scroller's own layout event, which the same mount fires: both requests are
+  // started before either native answer arrives, so the token guard would
+  // discard one of them on every mount. The callback depends on nothing, so a
+  // window-height change cannot re-create it, detach the node and mark the
+  // state unplaceable on the way back.
+  const capture = useCallback((node: ScrollViewInstance | null) => {
+    scrollRef.current = node;
+  }, []);
 
+  // The change of band invalidates a measurement still in flight, and so does
+  // the unmount: a result that describes the previous band, or a component that
+  // is gone, must not publish over newer state.
   useLayoutEffect(() => {
-    measure();
     return () => {
       requestRef.current += 1;
     };

@@ -98,6 +98,8 @@ const dismissDraft = vi.hoisted(() => ({
 const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 const keyboard = vi.hoisted(() => ({ height: 0 }));
+// The whole-body load failure classifies its cause from committed connectivity.
+const connectivity = vi.hoisted(() => ({ status: 'online' as 'online' | 'offline' | 'unknown' }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -148,6 +150,9 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
   useDismissSecurityFinding: () => dismiss,
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.status,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
@@ -275,6 +280,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.error = null;
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
+    connectivity.status = 'online';
     dismissDraft.draft = null;
     dismissDraft.hydrated = true;
     dismissDraft.persist.mockClear();
@@ -402,6 +408,23 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       expect(query.refetch).toHaveBeenCalledOnce();
     }
   );
+
+  it.each<[string, unknown]>([
+    // A transport rejection never reached the server; a tRPC code proves it did.
+    ['offline', new TypeError('Network request failed')],
+    ['server', { data: { code: 'INTERNAL_SERVER_ERROR' } }],
+  ])('titles an uncached finding failure that reads as %s', (variant, error) => {
+    finding.isError = true;
+    finding.error = error;
+    finding.data = undefined;
+    const tree = renderScreen();
+    const body = tree.root.findByType(QueryError);
+    // The sheet's own failure keeps its screen title, and the description comes
+    // from the classified variant rather than a repeated message.
+    expect(body.props.title).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
+    expect(body.props.variant).toBe(variant);
+    expect(body.props.message).toBeUndefined();
+  });
 
   it.each([
     ['denied', 'open'],

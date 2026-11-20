@@ -155,15 +155,17 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   }));
 
   if (config.isError && !config.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <PlatformErrorScreen
         title={t('common.notifications')}
+        errorTitle={t('securityAgent.notifications.couldNotLoad')}
         variant={classifyReadFailureVariant({
           errors: [config.error],
           isPaused: config.fetchStatus === 'paused',
           connectivity,
         })}
-        message={t('securityAgent.notifications.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );

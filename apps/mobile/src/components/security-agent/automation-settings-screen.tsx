@@ -205,15 +205,17 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   });
 
   if (config.isError && !config.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <PlatformErrorScreen
         title={t('securityAgent.automation.title')}
+        errorTitle={t('securityAgent.automation.couldNotLoad')}
         variant={classifyReadFailureVariant({
           errors: [config.error],
           isPaused: config.fetchStatus === 'paused',
           connectivity,
         })}
-        message={t('securityAgent.automation.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );

@@ -13,6 +13,7 @@ const config = vi.hoisted(() => ({
   data: null as unknown,
   isLoading: false,
   isError: false,
+  error: null as unknown,
   refetch: vi.fn(),
 }));
 const capability = vi.hoisted(() => ({
@@ -43,6 +44,8 @@ const pillGroups = vi.hoisted(() => ({
 const saveButton = vi.hoisted(() => ({
   onSave: null as (() => Promise<void>) | null,
 }));
+// The load-failure state's copy lives in the props this mock receives.
+const platformError = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({
@@ -109,7 +112,12 @@ vi.mock('@/components/ui/preference-row', () => ({
     return null;
   },
 }));
-vi.mock('@/components/platform-error-screen', () => ({ PlatformErrorScreen: () => null }));
+vi.mock('@/components/platform-error-screen', () => ({
+  PlatformErrorScreen: (props: Record<string, unknown>) => {
+    platformError.props = props;
+    return null;
+  },
+}));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: unknown }) => props.headerRight ?? null,
 }));
@@ -169,6 +177,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.data = null;
     config.isLoading = false;
     config.isError = false;
+    config.error = null;
     capability.canManage = true;
     save.isPending = false;
     save.mutateAsync.mockReset();
@@ -327,5 +336,21 @@ describe('AutomationSettingsScreen approval gate', () => {
       // Label in name: the switch is named by the text the row shows.
       expect(row.accessibilityLabel).toBeUndefined();
     }
+  });
+});
+
+// A failed first config read has no cached data to fall back on: the state
+// hands the failure to PlatformErrorScreen with a screen-specific error title,
+// while the description stays the classified variant's. A message here would
+// repeat the failed action instead of naming a cause and a next step.
+describe('AutomationSettingsScreen load failure copy', () => {
+  it('titles the failure and leaves the description to the variant', () => {
+    config.isError = true;
+    config.data = null;
+    config.error = new TypeError('Network request failed');
+    platformError.props = {};
+    renderScreen();
+    expect(platformError.props.errorTitle).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(platformError.props.message).toBeUndefined();
   });
 });

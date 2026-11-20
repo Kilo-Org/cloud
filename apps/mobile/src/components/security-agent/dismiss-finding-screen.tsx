@@ -20,8 +20,10 @@ import {
   isDismissFailureRetryable,
   resolveDismissFailure,
 } from '@/components/security-agent/dismiss-finding-failure';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   isSecurityTrialRefusal,
   isSecurityTrialRefusalCopyKey,
@@ -97,6 +99,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   // reader while `useBillingAction` offers the step from the same predicate.
   const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
+  // The whole-body load failure below blames the connection or the server, so
+  // it reads the same committed connectivity the offline banner paints.
+  const connectivity = useCommittedConnectivityStatus();
 
   // Restore the reason and comment from the stored draft once, so a retry
   // reopens the form with the user's last intent. The form renders only after
@@ -183,10 +188,17 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   if (findingQuery.isError && !findingQuery.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <DismissSheetFrame>
         <QueryError
-          message={t('securityAgent.dismiss.couldNotLoad')}
+          variant={classifyReadFailureVariant({
+            errors: [findingQuery.error],
+            isPaused: findingQuery.fetchStatus === 'paused',
+            connectivity,
+          })}
+          title={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
       </DismissSheetFrame>

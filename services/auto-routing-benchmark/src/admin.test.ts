@@ -23,7 +23,7 @@ import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './schedu
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { computeEngineIdentity, publishPlatformRoutingTable, sweepStaleRunsAndDrain } from './run';
+import { computeEngineIdentity, publishPlatformRoutingTable } from './run';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
@@ -817,9 +817,14 @@ describe('PUT /admin/config', () => {
     expect(body.warnings).toEqual([]);
     expect(body.drain).toEqual({ runId: null, entryCount: 0, skipped: 'failed' });
 
-    // The per-minute scheduler still starts it on the next tick.
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    await sweepStaleRunsAndDrain(env, 'efficient');
+    // The next drain still starts it. `POST /admin/runs` calls the same
+    // `drainQueues` the per-minute cron does; this mock D1 has no
+    // `pending_decider_outputs`, so the cron's own recovery sweep cannot run here.
+    vi.mocked(insertRun).mockResolvedValue(undefined);
+    const next = await authedPost('/admin/runs', { kind: 'decider', queue: 'platform' });
+
+    expect(next.status).toBe(202);
+    await expect(next.json()).resolves.toMatchObject({ startedRuns: [{ purpose: 'platform' }] });
     expect(insertRun).toHaveBeenCalledTimes(2);
     expect(vi.mocked(insertRun).mock.calls[1][1].purpose).toBe('platform');
   });

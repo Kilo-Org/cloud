@@ -62,7 +62,7 @@ export interface ScriptingSplice {
    * path does: only a withheld frame's line keeps its ref, for a read request.
    */
   readonly readableFrameRefs: readonly string[];
-  /** The refs of every spliced child frame; the root document's own refs are the caller's. */
+  /** The refs of every spliced child frame, without its readable frame lines' refs; the root document's own refs are the caller's. */
   readonly refs: readonly ScriptingFrameRef[];
 }
 
@@ -180,6 +180,7 @@ export const spliceScriptingFrames = async (
   };
 
   const lines = await render(root, String(scope.rootFrameId), 0);
+  const dropped = new Set(readableFrameRefs);
 
   return {
     lines:
@@ -190,6 +191,6 @@ export const spliceScriptingFrames = async (
           ]
         : lines,
     readableFrameRefs,
-    refs,
+    refs: refs.filter(ref => !dropped.has(ref.ref)),
   };
 };

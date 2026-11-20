@@ -1,4 +1,4 @@
-/* eslint-disable require-await, typescript/require-await -- the fake frame reader is async by contract and answers at once */
+/* eslint-disable max-lines, require-await, typescript/require-await -- one suite pins every splice branch; the fake frame reader is async by contract and answers at once */
 import { describe, expect, it, vi } from 'vitest';
 import { readIsolatedFrames } from './browser-agent-isolated-probe';
 import type { IsolatedAgentProbe } from './browser-agent-isolated-probe';
@@ -114,6 +114,50 @@ describe('scripting snapshot frame splice', () => {
     });
     // The withheld frame's document is never read.
     expect(readFrame.mock.calls.map(([frameId]) => frameId)).toStrictEqual([4]);
+  });
+
+  it('returns no ref for a readable frame line inside a spliced frame', async () => {
+    const shopFrame: ScriptingSnapshotPart = {
+      frames: [{ depth: 0, line: 1, owner: 0, ref: 'e4' }],
+      lines: ['- textbox "Coupon" [ref=e3]', '- iframe [ref=e4]'],
+      refs: [
+        { ref: 'e3', selector: 'body > input' },
+        { ref: 'e4', selector: 'body > iframe' },
+      ],
+    };
+    const payFrame: ScriptingSnapshotPart = {
+      frames: [],
+      lines: ['- textbox "Card" [ref=e5]'],
+      refs: [{ ref: 'e5', selector: 'body > input' }],
+    };
+    const parts = new Map([
+      [4, shopFrame],
+      [6, payFrame],
+    ]);
+    const readFrame = vi.fn(async (frameId: number) => parts.get(frameId));
+    const spliced = await spliceScriptingFrames(
+      {
+        frames: [{ depth: 0, line: 0, owner: 0, ref: 'e1' }],
+        lines: ['- iframe [ref=e1]'],
+        refs: [{ ref: 'e1', selector: 'body > iframe' }],
+      },
+      undefined,
+      scopeOf(
+        probeOf({
+          0: { origin: 'https://shop.example.com', owners: [4] },
+          4: { origin: 'https://shop.example.com', owners: [6], parent: 0 },
+          6: { origin: 'https://pay.example.com', owners: [], parent: 4 },
+        }),
+        readFrame,
+        ['https://shop.example.com', 'https://pay.example.com']
+      )
+    );
+
+    expect(spliced.readableFrameRefs).toStrictEqual(['e1', 'e4']);
+    expect(spliced.refs).toStrictEqual([
+      { frameId: 4, ref: 'e3', selector: 'body > input' },
+      { frameId: 6, ref: 'e5', selector: 'body > input' },
+    ]);
   });
 
   it('withholds a frame the probe cannot map, and reads nothing without grants', async () => {

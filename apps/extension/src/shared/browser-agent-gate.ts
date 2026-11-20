@@ -110,6 +110,8 @@ const OPAQUE_ORIGIN = 'opaque:null';
 interface TargetFrame {
   /** The target sits in a child frame, not the tab's top-level document. */
   readonly frame: boolean;
+  /** The id of the frame `origin` belongs to, when the gate found it. */
+  readonly frameId?: string;
   readonly origin: string;
   /**
    * The document holding a targeted frame element: a tool on an `<iframe>`
@@ -287,15 +289,20 @@ const targetFrameOf = async (
       resolved.frameId === undefined
         ? mainFrameOf(frames)
         : frames.find(candidate => candidate.id === String(resolved.frameId));
-    const holderFrame =
+    const holderFrame: TargetFrame =
       holder === undefined
         ? { frame: true, origin: OPAQUE_ORIGIN }
-        : { frame: resolved.frameId !== undefined, origin: holder.origin };
+        : { frame: resolved.frameId !== undefined, frameId: holder.id, origin: holder.origin };
 
     if (hosted !== undefined) {
       const frame = frames.find(candidate => candidate.id === hosted.frameId);
 
-      return { frame: true, origin: frame?.origin ?? OPAQUE_ORIGIN, owner: holderFrame };
+      return {
+        frame: true,
+        ...(frame === undefined ? {} : { frameId: frame.id }),
+        origin: frame?.origin ?? OPAQUE_ORIGIN,
+        owner: holderFrame,
+      };
     }
 
     // A ref from a spliced child frame acts in that frame's document, so it needs that frame's grant.
@@ -334,6 +341,7 @@ const targetFrameOf = async (
     // A frame owner whose frame this tab cannot see (an out-of-process iframe, a frame still loading) has no origin the gate can judge.
     return {
       frame: true,
+      ...(hosted === undefined ? {} : { frameId: hosted.id }),
       origin: hosted?.origin ?? OPAQUE_ORIGIN,
       owner:
         owning === undefined
@@ -355,7 +363,7 @@ const targetFrameOf = async (
 
   return owning === undefined
     ? { frame: true, origin: OPAQUE_ORIGIN }
-    : { frame: owning.parentId !== undefined, origin: owning.origin };
+    : { frame: owning.parentId !== undefined, frameId: owning.id, origin: owning.origin };
 };
 
 const frameOwnerSchema = z.object({ backendNodeId: z.number().optional() });
@@ -557,14 +565,19 @@ const sensitiveStepFor = async (input: {
 };
 
 const pageUrlFor = async (
-  frame: { readonly frame: boolean; readonly origin: string } | undefined,
+  frame: TargetFrame | undefined,
   readFrames: () => Promise<AgentFrameInventory>
 ): Promise<string | undefined> => {
   const { frames } = await readFrames();
   const main = mainFrameOf(frames);
 
   if (frame !== undefined && frame.frame) {
-    const match = frames.find(candidate => candidate.origin === frame.origin);
+    // The frame itself when the gate found it: another frame may share its origin.
+    const match = frames.find(candidate =>
+      frame.frameId === undefined
+        ? candidate.origin === frame.origin
+        : candidate.id === frame.frameId
+    );
 
     if (match !== undefined) {
       return match.url;
@@ -648,10 +661,16 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
 
   const destinationOrigin = destination?.kind === 'origin' ? destination.origin : undefined;
   const [primaryTargetFrame] = targetFrames;
-  const targetFrame =
+  const targetFrame: TargetFrame | undefined =
     primaryTargetFrame === undefined
       ? undefined
-      : { frame: primaryTargetFrame.frame, origin: primaryTargetFrame.origin };
+      : {
+          frame: primaryTargetFrame.frame,
+          ...(primaryTargetFrame.frameId === undefined
+            ? {}
+            : { frameId: primaryTargetFrame.frameId }),
+          origin: primaryTargetFrame.origin,
+        };
   const origin = destinationOrigin ?? targetFrame?.origin ?? mainOrigin;
   const targetOriginFrame = grantClass !== 'navigate' && targetFrame?.frame === true;
   // Every named target's frame needs the grant, not only the tab's top-level origin, and so does the document a tool on a frame element runs in.

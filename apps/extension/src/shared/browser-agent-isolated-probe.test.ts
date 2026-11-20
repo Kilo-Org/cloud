@@ -547,6 +547,89 @@ describe('isolated refs inside a child frame', () => {
       ok: false,
     });
   });
+
+  it('asks for both the holder frame’s and the nested frame’s grant for an iframe inside a child frame', async () => {
+    const ADS = 'https://ads.example.com';
+    const session = {
+      ...framedSession({ pay: PLAIN, shop: PLAIN }),
+      isolatedProbe: fakeProbe({
+        0: {
+          frame: { origin: SHOP, owners: [4], parentFrameId: null, url: `${SHOP}/` },
+          hosted: {},
+        },
+        4: {
+          frame: { origin: PAY, owners: [6], parentFrameId: 0, url: `${PAY}/` },
+          hosted: { frameId: 6 },
+        },
+        6: { frame: { origin: ADS, owners: [], parentFrameId: 4, url: `${ADS}/` } },
+      }),
+    };
+
+    await expect(
+      preflightAgentCall({
+        args: { target: 'e3' },
+        authorized: [{ class: 'read', origin: SHOP }],
+        consumeStepToken: () => false,
+        session,
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      failure: {
+        items: [
+          { class: 'read', frame: true, origin: PAY },
+          { class: 'read', frame: true, origin: ADS },
+        ],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    });
+  });
+
+  it('judges a frame ref by its own frame’s page, not another document of the same origin', async () => {
+    const GITHUB = 'https://github.com';
+    const session = {
+      ...framedSession({ pay: PLAIN, shop: PLAIN }),
+      isolatedProbe: fakeProbe({
+        0: {
+          frame: { origin: GITHUB, owners: [4], parentFrameId: null, url: `${GITHUB}/` },
+          hosted: {},
+          target: PLAIN,
+        },
+        4: {
+          frame: {
+            origin: GITHUB,
+            owners: [],
+            parentFrameId: 0,
+            url: `${GITHUB}/login/oauth/authorize?client_id=x`,
+          },
+          hosted: {},
+          target: PLAIN,
+        },
+      }),
+    };
+
+    await expect(
+      preflightAgentCall({
+        args: { target: 'e3' },
+        authorized: [{ class: 'act', origin: GITHUB }],
+        consumeStepToken: () => false,
+        session,
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_click',
+      })
+    ).resolves.toMatchObject({
+      failure: {
+        items: [{ class: 'sensitive', origin: GITHUB, reason: SENSITIVE_REASON.oauthConsent }],
+        kind: 'needs_permission',
+      },
+      ok: false,
+    });
+  });
 });
 
 describe('isolated screenshot mask', () => {

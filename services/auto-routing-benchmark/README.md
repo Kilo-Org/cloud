@@ -264,8 +264,9 @@ clears the intent once it holds row 1 or gives up; a dead wrapper's intent expir
 wait. A worker deployed before this change ignores the intent: if dispatch is busy, deploy it
 under an operator pause.
 
-Each deploy records a hash of the container inputs (the `containers` configuration and every
-file in each local image's build context) as the Worker version message
+Each deploy records a hash of the container inputs (the `containers` configuration, each local
+image's Dockerfile, and every file in its build context, even when the Dockerfile sits outside
+that context) as the Worker version message
 `container-inputs:<sha256>`. The rolled-out hash is the message of the Worker version that was
 live when the container application last changed, so a deploy whose image never reached the
 containers is not trusted. When the rolled-out hash matches, the wrapper deploys with

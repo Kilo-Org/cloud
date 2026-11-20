@@ -108,6 +108,8 @@ export type CliArgs =
       baseRun: string;
       headRun: string;
       out: string;
+      pixelDiff: boolean;
+      pixelDiffExplainShift: boolean;
     });
 
 export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
@@ -122,6 +124,8 @@ export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
           run from that prepared worktree with its fresh Metro bundle connected
   compare --preparation <preparation.json> --base-run <dir> --head-run <dir> --out <new-dir>
           exit 2 when either target is unreachable or unready; atomic comparison.json contains introduced findings; never reuses output
+          --pixel-diff writes an advisory pixel-diff.json beside it (receipt-bound captures only); --pixel-diff-explain-shift also reports vertically moved content
+          the pixel diff never changes the status, findings or exit code; an unavailable cell is reported inconclusive with its reason
   help   print this text
   batches run|seed|expect|coverage   the committed end-to-end pass; \`batches help\` prints its flags
 Common: [--platform android|ios] [--device <serial|udid>] [--metro ${DEFAULT_METRO}] [--out <dir>]
@@ -142,7 +146,7 @@ const COMMAND_FLAGS: Record<CliArgs['command'], readonly string[]> = {
   scan: ['source', 'session'],
   motion: ['link', 'tap', 'seconds', 'observe-ms'],
   prepare: ['base', 'head', 'targets'],
-  compare: ['preparation', 'base-run', 'head-run'],
+  compare: ['preparation', 'base-run', 'head-run', 'pixel-diff', 'pixel-diff-explain-shift'],
 };
 const COMMON_FLAGS = ['platform', 'device', 'metro', 'out'];
 
@@ -187,6 +191,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         revision: { type: 'string' },
         'base-run': { type: 'string' },
         'head-run': { type: 'string' },
+        'pixel-diff': { type: 'boolean' },
+        'pixel-diff-explain-shift': { type: 'boolean' },
       },
     });
   } catch (error) {
@@ -253,6 +259,11 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ) {
         throw new UsageError('compare needs --preparation, --base-run, --head-run and --out');
       }
+      const pixelDiff = values['pixel-diff'] === true;
+      const explainShift = values['pixel-diff-explain-shift'] === true;
+      if (explainShift && !pixelDiff) {
+        throw new UsageError('--pixel-diff-explain-shift needs --pixel-diff');
+      }
       return {
         ...common,
         command,
@@ -260,6 +271,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         baseRun: values['base-run'],
         headRun: values['head-run'],
         out: values.out,
+        pixelDiff,
+        pixelDiffExplainShift: explainShift,
       };
     }
     case 'run': {
@@ -745,9 +758,20 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
           args.baseRun,
           args.headRun,
           args.out,
-          controller.signal
+          controller.signal,
+          args.pixelDiff ? { explainShift: args.pixelDiffExplainShift } : undefined
         );
         deps.log(`design-gate: ${path.resolve(args.out, 'comparison.json')}; ${result.status}`);
+        if (result.pixelDiff !== undefined) {
+          const counts = { changed: 0, unchanged: 0, inconclusive: 0 };
+          for (const cell of result.pixelDiff.cells) counts[cell.status] += 1;
+          deps.log(
+            `design-gate: advisory pixel diff ${result.pixelDiff.status}: ${counts.changed} changed, ${counts.unchanged} unchanged, ${counts.inconclusive} inconclusive; ${path.resolve(args.out, 'pixel-diff.json')}`
+          );
+          for (const reason of result.pixelDiff.reasons) {
+            deps.warn(`design-gate: advisory pixel diff: ${reason}`);
+          }
+        }
         if (result.status === 'inconclusive') return 2;
         return result.introduced.length > 0 ? 1 : 0;
       } catch (error) {

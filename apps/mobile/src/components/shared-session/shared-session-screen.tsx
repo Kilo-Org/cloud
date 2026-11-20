@@ -132,6 +132,9 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
         isError={false}
         error={undefined}
         onRetry={retry}
+        // The transcript is this screen's whole body, so an empty one centres
+        // in the band the header leaves instead of hugging the header.
+        emptyPlacement="center"
       />
     );
   }

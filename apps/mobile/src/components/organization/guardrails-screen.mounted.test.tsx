@@ -110,6 +110,7 @@ vi.mock('@/components/organization/guardrails-input-section', () => ({
 }));
 vi.mock('@/components/organization/guardrails-output-section', () => ({
   OutputGuardrailsSection: 'OutputGuardrailsSection',
+  OutputGuardrailsUnavailableSection: 'OutputGuardrailsUnavailableSection',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({

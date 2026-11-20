@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card';
 import { ChevronDown } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Pressable } from 'react-native';
@@ -46,8 +47,8 @@ type CollapsibleSectionProps = {
   titleClassName?: string;
   contentClassName?: string;
   /**
-   * Draws the body on the header's own surface, under a hairline, instead of
-   * on the page. For a body of plain copy and buttons that belongs to its
+   * Draws the body on the header's own surface, as one card with it, instead
+   * of on the page. For a body of plain copy and buttons that belongs to its
    * header (the new-session connect card): on the page, that copy sat apart
    * from a filled header bar. A body that brings its own surface must not use
    * it, or one card nests inside another.
@@ -148,6 +149,15 @@ export function DisclosureChevron({
   );
 }
 
+/**
+ * The body of a section whose body shares its header's surface.
+ *
+ * The header row supplies the gap under the title (its bottom padding is zero
+ * for this variant), so the body brings no top gap of its own and only closes
+ * the card with `pb-3`. Measured on the new-session connect card, 2026-11-20.
+ */
+const SURFACE_BODY_CLASS = 'pb-3';
+
 // Shared collapsible section for finding-details/-analysis/-remediation
 // panels (source record, technical report, attempt history) — the
 // transcript tool cards dropped this chevron-rotation pattern when they
@@ -176,7 +186,7 @@ export function CollapsibleSection({
   const body = resolvedExpanded ? (
     <Animated.View
       entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-      className={cn('gap-3 pt-3', bodyOnSurface && 'pb-3', contentClassName)}
+      className={cn('gap-3', bodyOnSurface ? SURFACE_BODY_CLASS : 'pt-3', contentClassName)}
     >
       {
         // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the children union has no non-typeof way to tell a body builder from a rendered node
@@ -185,40 +195,64 @@ export function CollapsibleSection({
     </Animated.View>
   ) : null;
 
+  const header = (
+    // The disclosure header is one row of the shared 48pt row frame: the
+    // title and the rotating carat. The carat is the section's own disclosure
+    // mark (`DisclosureChevron`'s sibling), not a navigation chevron, so it
+    // stays an icon.
+    <Pressable
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between gap-3 px-4 py-3',
+        // On a shared surface the header row owns the space under its title:
+        // it keeps the 48pt row frame (whose centring leaves ~10pt under the
+        // title line) and gives up its bottom padding, so the copy that
+        // belongs to it starts at the body's own `gap-3` rhythm. The padding
+        // is the same whether the body is open or closed, so the title never
+        // moves.
+        bodyOnSurface && 'pb-0',
+        'active:opacity-70'
+      )}
+      onPress={() => {
+        onToggle?.();
+        if (expanded === undefined) {
+          setInternalExpanded(current => !current);
+        }
+      }}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: resolvedExpanded }}
+      accessibilityLabel={title}
+    >
+      <Text className={cn('flex-1 text-sm font-medium', titleClassName)}>{title}</Text>
+      <Animated.View style={chevronStyle}>
+        <ChevronDown size={16} color={colors.mutedForeground} />
+      </Animated.View>
+    </Pressable>
+  );
+
+  // A body on the header's surface belongs to the header's own card, so the two
+  // share ONE surface with no hairline between them: a divider at the row's
+  // bottom edge would fall below the title's inset and above the copy, splitting
+  // a block the header owns. The header keeps its 48pt row frame and its
+  // padding in every state, so the title never moves when the body opens.
+  if (bodyOnSurface) {
+    return (
+      <DisclosureLayout className={className} animateLayout={animateLayout}>
+        <Card padding="none">
+          {header}
+          {body}
+        </Card>
+      </DisclosureLayout>
+    );
+  }
+
+  // By default the body sits on the page, not on the header's surface: children
+  // bring their own `Card` / `RowGroup` / flat rows, so a disclosure can never
+  // nest a card inside the group it opened.
   return (
     <DisclosureLayout className={className} animateLayout={animateLayout}>
-      <RowGroup>
-        {/* The disclosure header is the group's first row: the shared 48pt
-            row frame, the title and the rotating carat. The carat is the
-            section's own disclosure mark (`DisclosureChevron`'s sibling),
-            not a navigation chevron, so it stays an icon. */}
-        <Pressable
-          className={cn(
-            ROW_TARGET_CLASS,
-            'flex-row items-center justify-between gap-3 px-4 py-3',
-            'active:opacity-70'
-          )}
-          onPress={() => {
-            onToggle?.();
-            if (expanded === undefined) {
-              setInternalExpanded(current => !current);
-            }
-          }}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: resolvedExpanded }}
-          accessibilityLabel={title}
-        >
-          <Text className={cn('flex-1 text-sm font-medium', titleClassName)}>{title}</Text>
-          <Animated.View style={chevronStyle}>
-            <ChevronDown size={16} color={colors.mutedForeground} />
-          </Animated.View>
-        </Pressable>
-        {bodyOnSurface ? body : null}
-      </RowGroup>
-      {/* By default the body sits on the page, not on the header's surface:
-          children bring their own `Card` / `RowGroup` / flat rows, so a
-          disclosure can never nest a card inside the group it opened. */}
-      {bodyOnSurface ? null : body}
+      <RowGroup>{header}</RowGroup>
+      {body}
     </DisclosureLayout>
   );
 }

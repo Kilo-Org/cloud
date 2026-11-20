@@ -10,6 +10,7 @@ import {
   containsJoinedScript,
   contentTextDirection,
   hasRtlScript,
+  keepsLatinDisplay,
   NATURAL_LETTER_SPACING,
   pinsTextDirection,
   RTL_WRITING_DIRECTION,
@@ -165,7 +166,7 @@ function Text({
   const headingA11y = HEADING_A11Y.get(variant ?? 'default');
   const classes = cn(
     textVariants({ variant }),
-    variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
+    variant === 'eyebrow' && keepsLatinDisplay(isRtlScript) && EYEBROW_LATIN_DISPLAY,
     // `cn` merges last-wins, so the script's 13px replaces the variant's 10px
     // and a caller's own `text-*` still has the final word after it.
     variant === 'eyebrow' && isRtlScript && EYEBROW_RTL_SCRIPT_DISPLAY,

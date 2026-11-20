@@ -19,7 +19,12 @@ import type { User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { getOpenAiChatGptStoredConnection, saveOpenAiChatGptConnection } from './store';
+import {
+  disconnectOpenAiChatGptConnection,
+  getOpenAiChatGptStoredConnection,
+  openAiChatGptSharedServicesOwner,
+  saveOpenAiChatGptConnection,
+} from './store';
 import { getOpenAiChatGptByokModelIds, checkOpenAiChatGptByok } from './routing';
 import type { OpenAiChatGptConnection } from './types';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -130,6 +135,60 @@ describe('openai-chatgpt owner scope (real database)', () => {
     // The connection is personal, so the member owns the organization row too.
     expect(orgRow?.kilo_user_id).toBe(user.id);
     expect(orgRow?.created_by).toBe(user.id);
+    expect(orgRow?.chatgpt_account_fingerprint).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('retains the fingerprint after disconnect and matches it on another Kilo account', async () => {
+    const originalOwner = { kiloUserId: otherUser.id, organizationId: null };
+    const newOwner = openAiChatGptSharedServicesOwner(orgB.id);
+    const original = connection('original@example.com');
+    await saveOpenAiChatGptConnection(originalOwner, original, otherUser.id);
+    await disconnectOpenAiChatGptConnection(originalOwner);
+    await expect(getOpenAiChatGptStoredConnection(originalOwner)).resolves.toBeNull();
+
+    await saveOpenAiChatGptConnection(
+      newOwner,
+      { ...original, email: 'new@example.com', access_token: 'rotated-access-token' },
+      user.id
+    );
+
+    async function readSharedConnection() {
+      const [row] = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(eq(openai_chatgpt_connections.organization_id, orgB.id));
+      return row;
+    }
+
+    const shared = await readSharedConnection();
+    expect(shared?.chatgpt_account_fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    if (!shared?.chatgpt_account_fingerprint) throw new Error('Expected shared fingerprint');
+
+    const matching = await db
+      .select()
+      .from(openai_chatgpt_connections)
+      .where(
+        eq(
+          openai_chatgpt_connections.chatgpt_account_fingerprint,
+          shared.chatgpt_account_fingerprint
+        )
+      );
+    expect(matching).toHaveLength(2);
+    expect(matching).toContainEqual(
+      expect.objectContaining({
+        kilo_user_id: otherUser.id,
+        encrypted_connection: null,
+        is_enabled: false,
+      })
+    );
+
+    await saveOpenAiChatGptConnection(newOwner, connection('replacement@example.com'), user.id);
+    const replacement = await readSharedConnection();
+    expect(replacement?.id).toBe(shared.id);
+    expect(replacement?.chatgpt_account_fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(replacement?.chatgpt_account_fingerprint).not.toBe(shared.chatgpt_account_fingerprint);
+
+    await disconnectOpenAiChatGptConnection(newOwner);
   });
 
   it('reads each account its own connection', async () => {

@@ -286,6 +286,10 @@ function createOpenAiAccountInfo(
   };
 }
 
+function accountInfoForLogs(accountInfo: CreateOrUpdateUserArgs | undefined) {
+  return accountInfo?.provider === 'openai' ? { provider: accountInfo.provider } : accountInfo;
+}
+
 function createClaudeAccountInfo(
   account: Account,
   user: NextUser | AdapterUser
@@ -324,9 +328,11 @@ async function persistOpenAiChatGptConnection(
 ): Promise<void> {
   try {
     const accessToken = account.access_token;
-    const subject = (profile as { sub?: unknown } | undefined)?.sub;
-    if (!accessToken || typeof subject !== 'string' || subject.trim() === '') return;
-    if (!isOpenAiTokenSharingGrant(account)) return;
+    if (!accessToken || !isOpenAiTokenSharingGrant(account)) return;
+    const subject = profile?.sub;
+    if (typeof subject !== 'string' || subject.trim() === '') {
+      throw new Error('ChatGPT authorization is missing its OIDC subject');
+    }
 
     const email = (profile as { email?: unknown } | undefined)?.email;
     const extendedProfile = profile as ExtendedProfile | undefined;
@@ -1275,7 +1281,7 @@ export const authOptions: NextAuthOptions = {
         if (await isEmailBlacklisted(accountInfo.google_user_email)) {
           sentryLogger('auth', 'warning')(
             `SECURITY: Blacklisted: ${accountInfo.google_user_email}`,
-            accountInfo
+            accountInfoForLogs(accountInfo)
           );
 
           return redirectUrlForCode(`BLOCKED`);
@@ -1394,7 +1400,7 @@ export const authOptions: NextAuthOptions = {
             sentryLogger('turnstile-auth')(
               'SECURITY: Invalid Turnstile JWT : ' +
                 (error instanceof Error ? error.message : String(error)),
-              accountInfo
+              accountInfoForLogs(accountInfo)
             );
             return redirectUrlForCode('INVALID_VERIFICATION');
           }
@@ -1403,12 +1409,12 @@ export const authOptions: NextAuthOptions = {
           if (!currentIP || verifiedToken.ip !== currentIP) {
             sentryLogger('turnstile-auth')(
               `SECURITY: IP mismatch - JWT: ${verifiedToken.ip}, Current: ${currentIP ?? 'unresolved'}`,
-              accountInfo
+              accountInfoForLogs(accountInfo)
             );
             return redirectUrlForCode('IP_MISMATCH');
           }
 
-          console.log(`Turnstile verification validated`, accountInfo);
+          console.log(`Turnstile verification validated`, accountInfoForLogs(accountInfo));
         }
 
         // Check if this is an account linking operation
@@ -1534,14 +1540,16 @@ export const authOptions: NextAuthOptions = {
         return true;
       } catch (error) {
         const operation = isAccountLinking ? 'account_linking' : 'user_creation';
-        console.error(`[AUTH][${operation}] Unexpected error:`, error);
-        captureException(error, {
+        const reportedError =
+          account?.provider === 'openai' ? new Error('OpenAI sign-in failed') : error;
+        console.error(`[AUTH][${operation}] Unexpected error:`, reportedError);
+        captureException(reportedError, {
           tags: {
             operation,
             provider: accountInfo?.provider,
           },
           extra: {
-            ...accountInfo,
+            ...accountInfoForLogs(accountInfo),
             isAccountLinking,
             linkingSession,
           },
@@ -1551,7 +1559,7 @@ export const authOptions: NextAuthOptions = {
             distinctId: accountInfo.google_user_email,
             event: operation + '_failed',
             properties: {
-              error: error instanceof Error ? error.message : String(error),
+              error: reportedError instanceof Error ? reportedError.message : String(reportedError),
               email: accountInfo.google_user_email,
               name: accountInfo.google_user_name,
               hosted_domain: accountInfo.hosted_domain,
@@ -1621,16 +1629,18 @@ export const authOptions: NextAuthOptions = {
           );
         }
       } catch (error) {
-        captureException(error, {
+        const reportedError =
+          account?.provider === 'openai' ? new Error('OpenAI session creation failed') : error;
+        captureException(reportedError, {
           tags: {
             operation: 'user_sync_jwt',
             provider: accountInfo?.provider,
           },
-          extra: accountInfo,
+          extra: accountInfoForLogs(accountInfo),
         });
 
-        console.error('Failed to create or update user JWT:', error);
-        throw error;
+        console.error('Failed to create or update user JWT:', reportedError);
+        throw reportedError;
       }
       return token;
     },

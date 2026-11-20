@@ -1,9 +1,10 @@
 import 'server-only';
 
+import { createHmac } from 'node:crypto';
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { type IndexColumn } from 'drizzle-orm/pg-core';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
+import { db, pool, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptApiKey,
   encryptApiKey,
@@ -196,7 +197,10 @@ export async function readOpenAiChatGptConnectionRow(
     );
 
   const rows = options.forUpdate ? await query.for('update').limit(1) : await query.limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  return row?.encrypted_connection
+    ? { ...row, encrypted_connection: row.encrypted_connection }
+    : null;
 }
 
 /**
@@ -321,6 +325,18 @@ async function getStoredConnection(
   return connection ? { connection, isEnabled: row.is_enabled, createdBy: row.created_by } : null;
 }
 
+function openAiChatGptAccountFingerprint({ issuer, subject }: OpenAiChatGptConnection): string {
+  if (!subject.trim()) {
+    throw new Error('ChatGPT authorization is missing its OIDC subject');
+  }
+  if (!BYOK_ENCRYPTION_KEY) {
+    throw new Error('BYOK encryption is not configured');
+  }
+  return createHmac('sha256', BYOK_ENCRYPTION_KEY)
+    .update(JSON.stringify(['siwc-account-v1', issuer, subject]))
+    .digest('hex');
+}
+
 /**
  * Writes the owner's connection payload over the owner's row. The caller's
  * connection is used on purpose, so a refresh can write inside the transaction
@@ -352,17 +368,19 @@ export async function saveOpenAiChatGptConnection(
   createdBy: string
 ): Promise<void> {
   const columns = connectionWriteColumns(connection);
+  const chatgpt_account_fingerprint = openAiChatGptAccountFingerprint(connection);
   const shape = openAiChatGptOwnerShape(owner);
   // The shared-services row records the connecting person in `created_by`; its
   // reads never match on `kilo_user_id`.
   const values = {
     ...shape.identity(createdBy),
     ...columns,
+    chatgpt_account_fingerprint,
     created_by: createdBy,
     ...NO_USAGE_LIMIT,
   };
 
-  await db
+  const { sql: query, params } = db
     .insert(openai_chatgpt_connections)
     .values(values)
     // Each owner shape upserts through its own partial unique index.
@@ -377,14 +395,31 @@ export async function saveOpenAiChatGptConnection(
         kilo_user_id: values.kilo_user_id,
         created_by: values.created_by,
         encrypted_connection: columns.encrypted_connection,
+        chatgpt_account_fingerprint,
         is_enabled: true,
         ...NO_USAGE_LIMIT,
       },
-    });
+    })
+    .toSQL();
+
+  try {
+    // Do not send the fingerprint through Drizzle's query logger or parameter tracing.
+    await pool.query(query, params);
+  } catch {
+    throw new Error('Failed to save the ChatGPT connection');
+  }
 }
 
-export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
-  await db.delete(openai_chatgpt_connections).where(openAiChatGptOwnerWhere(owner));
+export async function disconnectOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
+  await db
+    .update(openai_chatgpt_connections)
+    .set({ encrypted_connection: null, is_enabled: false, ...NO_USAGE_LIMIT })
+    .where(
+      and(
+        openAiChatGptOwnerWhere(owner),
+        isNotNull(openai_chatgpt_connections.encrypted_connection)
+      )
+    );
 }
 
 /**

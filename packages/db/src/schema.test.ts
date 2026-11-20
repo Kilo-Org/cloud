@@ -26,6 +26,39 @@ afterAll(async () => {
   await schemaTestDb.pool.end();
 });
 
+it('applies the ChatGPT fingerprint migration without backfilling existing rows', async () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0378_tired_pixie.sql'),
+    'utf8'
+  );
+
+  await schemaTestDb.db.transaction(async tx => {
+    await tx.execute(sql`
+      CREATE TEMP TABLE openai_chatgpt_connections (encrypted_connection jsonb NOT NULL)
+        ON COMMIT DROP
+    `);
+    await tx.execute(sql`INSERT INTO openai_chatgpt_connections VALUES ('{}')`);
+    for (const statement of migration.split('--> statement-breakpoint')) {
+      await tx.execute(sql.raw(statement));
+    }
+
+    const existing = await tx.execute(sql`SELECT * FROM openai_chatgpt_connections`);
+    expect(existing.rows).toEqual([
+      { encrypted_connection: {}, chatgpt_account_fingerprint: null },
+    ]);
+
+    await tx.execute(sql`
+      INSERT INTO openai_chatgpt_connections VALUES (NULL, 'same-fingerprint'), (NULL, 'same-fingerprint')
+    `);
+    const indexes = await tx.execute(sql`
+      SELECT indisunique, indisvalid FROM pg_index
+      WHERE indrelid = 'pg_temp.openai_chatgpt_connections'::regclass
+      AND indexrelid = 'pg_temp."IDX_openai_chatgpt_connections_account_fingerprint"'::regclass
+    `);
+    expect(indexes.rows).toEqual([{ indisunique: false, indisvalid: true }]);
+  });
+});
+
 describe('cloud agent stacked workspace schema', () => {
   let userId: string;
   let otherUserId: string;

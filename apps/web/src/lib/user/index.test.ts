@@ -2689,7 +2689,9 @@ describe('User', () => {
         {
           kilo_user_id: user.id,
           organization_id: null,
-          encrypted_connection,
+          encrypted_connection: null,
+          is_enabled: false,
+          chatgpt_account_fingerprint: 'a'.repeat(64),
           created_by: user.id,
         },
         {
@@ -2822,14 +2824,12 @@ describe('User', () => {
         organization_id: organization.id,
         is_shared_services: true,
         encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        chatgpt_account_fingerprint: 'b'.repeat(64),
         created_by: connector.id,
       });
 
       await db.transaction(tx => anonymizeCloudUserData(tx, connector.id));
 
-      // The organization's connection belongs to the organization, so the
-      // deletion keeps it: only the reference to the deleted connector is
-      // cleared, and `created_by` keeps the record of who connected it.
       const rows = await db
         .select()
         .from(openai_chatgpt_connections)
@@ -2841,6 +2841,7 @@ describe('User', () => {
         );
       expect(rows).toHaveLength(1);
       expect(rows[0].kilo_user_id).toBeNull();
+      expect(rows[0].chatgpt_account_fingerprint).toBeNull();
       expect(rows[0].created_by).toBe(connector.id);
     });
 
@@ -8598,6 +8599,7 @@ describe('User', () => {
         kilo_user_id: userId,
         organization_id: null,
         encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        chatgpt_account_fingerprint: 'a'.repeat(64),
         created_by: userId,
       });
     }
@@ -8613,7 +8615,7 @@ describe('User', () => {
       });
     }
 
-    test('deletes the personal ChatGPT connection when unlinking openai', async () => {
+    test('removes personal ChatGPT credentials but keeps the fingerprint when unlinking OpenAI', async () => {
       const user = await seedUserWithOpenAiProvider();
       await seedOpenAiConnection(user.id);
 
@@ -8629,7 +8631,13 @@ describe('User', () => {
             isNull(openai_chatgpt_connections.organization_id)
           )
         );
-      expect(rows).toHaveLength(0);
+      expect(rows).toMatchObject([
+        {
+          encrypted_connection: null,
+          is_enabled: false,
+          chatgpt_account_fingerprint: 'a'.repeat(64),
+        },
+      ]);
     });
 
     test('keeps an organization ChatGPT connection created by the same person when unlinking openai', async () => {

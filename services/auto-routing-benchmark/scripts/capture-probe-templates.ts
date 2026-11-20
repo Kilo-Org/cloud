@@ -7,6 +7,7 @@ import * as z from 'zod';
 import { promptText } from '../src/decider-prompt';
 import type { ProbeTranscript } from '../src/datasets/probe-transcripts';
 import { probeFamily, type ProbeFamily } from '../src/probe/family';
+import { mergeProbeTemplates, ProbeTemplatesSchema } from '../src/probe/request';
 
 // Regenerates the probe fixtures from the pinned CLI: builds the runner image with that CLI,
 // drives it against scripts/probe-gateway.mjs (which serves the public catalog and needs no
@@ -18,6 +19,8 @@ import { probeFamily, type ProbeFamily } from '../src/probe/family';
 // `--pool` is a JSON array of `{ "model": string, "variant": string | null }` (the live
 // Router pool). Every family in it gets a template; a family whose endpoint the probe cannot
 // speak is recorded under `unsupportedFamilies` with the reason the worker reports.
+// `--only <family>` captures one family and merges it into the existing templates file,
+// keeping every other family and the rest of the bookkeeping.
 
 const CAPTURE_TASK = 'Run one command that prints two lines, then report what it printed.';
 const CAPTURE_SYSTEM_PROMPT =
@@ -657,11 +660,29 @@ function main() {
     sh('docker', ['rm', '-f', runner, gateway], { allowFailure: true });
   }
 
+  for (const key of args.only) {
+    if (!(key in families) && !(key in unsupportedFamilies)) {
+      throw new Error(`--only ${key} names a family the pool does not need`);
+    }
+  }
+  const templatesPath = join(args.out, 'probe-templates.json');
+  const captured = ProbeTemplatesSchema.parse({
+    cliVersion: args.cliVersion,
+    families,
+    unsupportedFamilies,
+  });
+  let written = captured;
+  if (args.only.length > 0) {
+    const existing = ProbeTemplatesSchema.parse(JSON.parse(readFileSync(templatesPath, 'utf8')));
+    written = mergeProbeTemplates(existing, captured, args.only);
+    if (existing.cliVersion !== args.cliVersion) {
+      console.warn(
+        `${templatesPath} now mixes CLI ${existing.cliVersion} templates with ${args.cliVersion} captures; recapture every family to align the version.`
+      );
+    }
+  }
   mkdirSync(join(args.out, 'probe-captures'), { recursive: true });
-  writeFileSync(
-    join(args.out, 'probe-templates.json'),
-    `${JSON.stringify({ cliVersion: args.cliVersion, families, unsupportedFamilies }, null, 2)}\n`
-  );
+  writeFileSync(templatesPath, `${JSON.stringify(written, null, 2)}\n`);
   for (const [key, capture] of Object.entries(captures)) {
     writeFileSync(
       join(args.out, 'probe-captures', `${key.replaceAll('/', '--')}.json`),
@@ -669,7 +690,7 @@ function main() {
     );
   }
   console.log(
-    `wrote ${Object.keys(families).length} families and ${Object.keys(captures).length} captures to ${args.out}`
+    `wrote ${Object.keys(written.families).length} families and ${Object.keys(captures).length} captures to ${args.out}`
   );
   // The pool coverage the worker will see: every pair's family and whether it can run.
   const byModel = new Map(catalog.data.map(model => [model.id, model]));

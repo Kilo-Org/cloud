@@ -8,6 +8,8 @@ import { probeEndpoint, probeFamily, probePromptId } from './family';
 import {
   PROBE_TEMPLATES,
   ProbeEffortSchema,
+  ProbeTemplatesSchema,
+  mergeProbeTemplates,
   probeRequestBody,
   probeTemplate,
   type ProbeTemplate,
@@ -180,5 +182,79 @@ describe('probe family selection', () => {
       probeFamily({ id: 'anthropic/claude-opus-5', opencode: { ai_sdk_provider: 'anthropic' } })
     );
     expect('template' in resolved && resolved.template.endpoint).toBe('anthropic');
+  });
+});
+
+describe('mergeProbeTemplates', () => {
+  const responsesTemplate = PROBE_TEMPLATES.families['gpt/responses'];
+  const chatTemplate = PROBE_TEMPLATES.families['default/chat'];
+  if (!responsesTemplate || !chatTemplate) throw new Error('fixtures lack the merged families');
+  const template = (representative: string): ProbeTemplate => ({
+    ...chatTemplate,
+    representative: { model: representative, variant: null, effort: null },
+  });
+  const existing = ProbeTemplatesSchema.parse({
+    cliVersion: '7.8.27',
+    families: {
+      'gpt/responses': responsesTemplate,
+      'default/chat': chatTemplate,
+      'openai/responses': template('openai/gpt-6-luna'),
+    },
+    unsupportedFamilies: { 'kimi/chat': 'no catalog member is served' },
+  });
+
+  it('replaces the captured family and keeps every other family and reason', () => {
+    const merged = mergeProbeTemplates(
+      existing,
+      ProbeTemplatesSchema.parse({
+        cliVersion: '7.8.28',
+        families: { 'default/chat': template('inclusionai/ling-3.1-flash') },
+      }),
+      ['default/chat']
+    );
+    expect(Object.keys(merged.families).toSorted()).toEqual([
+      'default/chat',
+      'gpt/responses',
+      'openai/responses',
+    ]);
+    expect(merged.families['default/chat']?.representative.model).toBe(
+      'inclusionai/ling-3.1-flash'
+    );
+    expect(merged.families['openai/responses']).toEqual(existing.families['openai/responses']);
+    expect(merged.unsupportedFamilies).toEqual({ 'kimi/chat': 'no catalog member is served' });
+    expect(merged.cliVersion).toBe('7.8.28');
+  });
+
+  it('drops a scoped template when that family captured as unsupported', () => {
+    const merged = mergeProbeTemplates(
+      existing,
+      ProbeTemplatesSchema.parse({
+        cliVersion: '7.8.27',
+        families: {},
+        unsupportedFamilies: {
+          'gpt/responses': 'no catalog member is served',
+          'kimi/chat': 'outside the scope of this run',
+        },
+      }),
+      ['gpt/responses']
+    );
+    expect(merged.families['gpt/responses']).toBeUndefined();
+    expect(merged.unsupportedFamilies).toEqual({
+      'gpt/responses': 'no catalog member is served',
+      'kimi/chat': 'no catalog member is served',
+    });
+  });
+
+  it('clears a scoped unsupported reason when the family captures again', () => {
+    const merged = mergeProbeTemplates(
+      existing,
+      ProbeTemplatesSchema.parse({
+        cliVersion: '7.8.27',
+        families: { 'kimi/chat': template('moonshotai/kimi-k4') },
+      }),
+      ['kimi/chat']
+    );
+    expect(merged.unsupportedFamilies).toEqual({});
+    expect(merged.families['kimi/chat']?.representative.model).toBe('moonshotai/kimi-k4');
   });
 });

@@ -55,6 +55,30 @@ export const ProbeTemplatesSchema = z.object({
 
 export type ProbeTemplates = z.infer<typeof ProbeTemplatesSchema>;
 
+/**
+ * A `--only` capture rewrites part of the templates file: every family in `scope` takes the
+ * freshly captured outcome (a template or an unsupported reason) and every other family,
+ * template or reason, is preserved from `existing`.
+ */
+export function mergeProbeTemplates(
+  existing: ProbeTemplates,
+  captured: ProbeTemplates,
+  scope: readonly string[]
+): ProbeTemplates {
+  const families = { ...existing.families };
+  const unsupportedFamilies = { ...existing.unsupportedFamilies };
+  const scoped = new Set(scope);
+  for (const key of scoped) {
+    delete families[key];
+    delete unsupportedFamilies[key];
+  }
+  for (const [key, template] of Object.entries(captured.families)) families[key] = template;
+  for (const [key, reason] of Object.entries(captured.unsupportedFamilies)) {
+    if (scoped.has(key) && !(key in families)) unsupportedFamilies[key] = reason;
+  }
+  return { cliVersion: captured.cliVersion, families, unsupportedFamilies };
+}
+
 export const PROBE_TEMPLATES: ProbeTemplates = ProbeTemplatesSchema.parse(templatesJson);
 
 export const PROBE_UNSUPPORTED_ENDPOINT_REASON = (family: ProbeFamily): string =>

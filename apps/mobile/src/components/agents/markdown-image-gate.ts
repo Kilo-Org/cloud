@@ -202,12 +202,24 @@ function crossesImageLoadScheme(href: string): boolean {
 /**
  * Whether the hrefs can share one left-to-right pass. Replacing them one at a
  * time differs whenever a pass changes what a later href still sees: one href
- * occurring inside another (or inside the load scheme), a copy that only exists
- * across an emitted scheme, or two hrefs matching the same characters. Those
- * keep the sequential loop; everything else is independent of the order.
+ * occurring inside another, a copy that only exists across an emitted scheme,
+ * or two hrefs matching the same characters. Those keep the sequential loop;
+ * everything else is independent of the order.
+ *
+ * A copy that only exists across an emitted scheme is any href that overlaps
+ * the scheme text: inside it, crossing either end of it, or spanning the whole
+ * of it — two adjacent replacements can spell out a href that holds the scheme
+ * twice.
  */
 function hrefsRewriteIndependently(hrefs: readonly string[]): boolean {
-  if (hrefs.some(href => IMAGE_LOAD_SCHEME.includes(href) || crossesImageLoadScheme(href))) {
+  if (
+    hrefs.some(
+      href =>
+        IMAGE_LOAD_SCHEME.includes(href) ||
+        href.includes(IMAGE_LOAD_SCHEME) ||
+        crossesImageLoadScheme(href)
+    )
+  ) {
     return false;
   }
   // One href inside another is a trie walk, not a rescan per pair: the trie

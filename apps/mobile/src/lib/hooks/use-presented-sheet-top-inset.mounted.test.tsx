@@ -56,7 +56,7 @@ const surfaceRef: RefObject<ViewInstance | null> = { current: surface as ViewIns
 async function mount(input: {
   topInset?: SheetHeaderTopInset | undefined;
   clearance?: number;
-}): Promise<{ read: () => Read; unmount: () => void }> {
+}): Promise<{ read: () => Read; rerender: () => Promise<void>; unmount: () => void }> {
   let latest: Read | undefined = undefined;
   function Probe() {
     latest = usePresentedSheetTopClearance({
@@ -73,6 +73,15 @@ async function mount(input: {
         throw new Error('hook did not render');
       }
       return latest;
+    },
+    // The harness reads the mocked safe-area provider at render, so a re-render
+    // is how a provider that answered late (0 before it measures) reaches the
+    // hook — the same way the real provider's update does.
+    rerender: async () => {
+      await act(async () => {
+        mounted.renderer.update(createElement(Probe));
+        await Promise.resolve();
+      });
     },
     unmount: mounted.unmount,
   };
@@ -205,21 +214,74 @@ describe('usePresentedSheetTopClearance', () => {
     mounted.unmount();
   });
 
-  it('adds nothing for a surface mode that cannot reach the window top', async () => {
+  it('does not sample at all for a surface mode that cannot reach the window top', async () => {
+    // The answer would be discarded, so the native read — one call per sample —
+    // must not run for `never`.
     native.origin = 0;
     const mounted = await mount({ topInset: 'never', clearance: 0 });
     await settleBurst();
 
+    expect(native.read).not.toHaveBeenCalled();
     expect(mounted.read().clearance).toBe(0);
     mounted.unmount();
   });
 
-  it('adds nothing for a header with no surface mode', async () => {
+  it('does not sample at all for an iOS page sheet, which pads its own content', async () => {
+    native.origin = 0;
+    const mounted = await mount({ topInset: 'ios-page-sheet', clearance: 0 });
+    await settleBurst();
+
+    expect(native.read).not.toHaveBeenCalled();
+    expect(mounted.read().clearance).toBe(0);
+    mounted.unmount();
+  });
+
+  it('does not sample at all for an always-inset header, whose mode already reserves it', async () => {
+    native.origin = 0;
+    const mounted = await mount({ topInset: 'always', clearance: 20 });
+    await settleBurst();
+
+    expect(native.read).not.toHaveBeenCalled();
+    expect(mounted.read().clearance).toBe(20);
+    mounted.unmount();
+  });
+
+  it('does not sample at all for a header with no surface mode', async () => {
     native.origin = 0;
     const mounted = await mount({ topInset: undefined, clearance: 0 });
     await settleBurst();
 
+    expect(native.read).not.toHaveBeenCalled();
     expect(mounted.read().clearance).toBe(0);
+    mounted.unmount();
+  });
+
+  it('does not sample at all in a window with no top inset to clear', async () => {
+    native.insetTop = 0;
+    native.origin = 0;
+    const mounted = await mount({ clearance: 0 });
+    await settleBurst();
+
+    expect(native.read).not.toHaveBeenCalled();
+    expect(mounted.read().clearance).toBe(0);
+    mounted.unmount();
+  });
+
+  it('starts sampling once the window reports an inset it can clear', async () => {
+    // A header can mount before the safe-area provider answers; the gate must
+    // then open, not latch closed for the rest of the mount.
+    native.insetTop = 0;
+    native.origin = 0;
+    const mounted = await mount({ clearance: 0 });
+    await settleBurst();
+    expect(native.read).not.toHaveBeenCalled();
+
+    native.insetTop = 20;
+    await mounted.rerender();
+    await settleBurst();
+
+    expect(native.read).toHaveBeenCalled();
+    expect(mounted.read().clearance).toBe(20);
     mounted.unmount();
   });
 

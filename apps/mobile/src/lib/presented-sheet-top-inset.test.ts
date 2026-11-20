@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { type SheetHeaderTopInset } from '@/lib/form-sheet';
-import { presentedSheetTopClearance } from '@/lib/presented-sheet-top-inset';
+import {
+  presentedSheetTopClearance,
+  presentsAboveWindowInset,
+} from '@/lib/presented-sheet-top-inset';
 
 const clearance = (input: {
   topInset?: SheetHeaderTopInset | undefined;
@@ -81,5 +84,61 @@ describe('presentedSheetTopClearance', () => {
 
   it('reserves nothing for an undefined mode, which is a header with no surface', () => {
     expect(clearance({ topInset: undefined, insetTop: 20, surfaceOriginTop: 0 })).toBe(0);
+  });
+});
+
+describe('presentsAboveWindowInset', () => {
+  const can = (topInset: SheetHeaderTopInset | undefined, platform = 'ios', insetTop = 20) =>
+    presentsAboveWindowInset({ topInset, platform, insetTop });
+
+  it('is true only for the iOS modes whose sheet can present at the window top', () => {
+    expect(can('bottom-form-sheet')).toBe(true);
+    expect(can('android-window-top')).toBe(true);
+  });
+
+  it('is false for every mode whose answer the header cannot use', () => {
+    // `never` promises the surface cannot reach the window top, `ios-page-sheet`
+    // presents below the inset and pads its own content, and `always` already
+    // reserves the inset — sampling an origin for any of them is wasted work.
+    expect(can('never')).toBe(false);
+    expect(can('ios-page-sheet')).toBe(false);
+    expect(can('always')).toBe(false);
+    expect(can(undefined)).toBe(false);
+  });
+
+  it('is false on Android, whose settled read owns that platform', () => {
+    expect(can('bottom-form-sheet', 'android')).toBe(false);
+    expect(can('android-window-top', 'android')).toBe(false);
+  });
+
+  it('is false in a window with no top inset to clear', () => {
+    expect(can('bottom-form-sheet', 'ios', 0)).toBe(false);
+    expect(can('bottom-form-sheet', 'ios', Number.NaN)).toBe(false);
+  });
+
+  it('agrees with the rule: a surface it excludes never moves the header', () => {
+    // The one property that matters between the predicate and the rule — the
+    // header samples exactly when the answer can change the clearance.
+    for (const topInset of [
+      'always',
+      'bottom-form-sheet',
+      'android-window-top',
+      'ios-page-sheet',
+      'never',
+      undefined,
+    ] as const) {
+      for (const platform of ['ios', 'android']) {
+        const adds = presentedSheetTopClearance({
+          topInset,
+          platform,
+          insetTop: 20,
+          surfaceOriginTop: 0,
+          clearance: 0,
+        });
+        if (!presentsAboveWindowInset({ topInset, platform, insetTop: 20 })) {
+          expect(adds, `${topInset}/${platform} excluded must add nothing`).toBe(0);
+        }
+      }
+    }
   });
 });

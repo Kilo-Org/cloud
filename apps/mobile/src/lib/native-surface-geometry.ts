@@ -1,4 +1,5 @@
 import { type NativeModule, requireOptionalNativeModule } from 'expo';
+import { Platform } from 'react-native';
 
 export type NativeSurfaceGeometry = Readonly<{
   tag: number;
@@ -68,13 +69,22 @@ export async function unobserveSurface(nativeViewTag: number): Promise<void> {
  * the runtime cannot answer.
  *
  * A presented sheet's offset is outside the React tree, so no JS read of its
- * content can see it. This is the native read that does: 0 for a surface at the
- * window top, the status-bar inset for one presented below it. A binary that
+ * content can see it. This is the iOS native read that does: 0 for a surface at
+ * the window top, the status-bar inset for one presented below it. A binary that
  * predates it, or a view whose window is gone, answers null — the caller then
  * keeps the clearance its surface mode already reserved rather than guessing a
  * band from an absent read.
+ *
+ * iOS only, and answered here rather than in the native module's own shape: the
+ * presentation offset comes from a `UISheetPresentationController`, and nothing
+ * on Android reads this. Android presents a `formSheet` at the detent's height
+ * and lays its content out itself, which the header's settled read already
+ * covers, so the Android module carries no counterpart to keep unexercised.
  */
 export async function presentedSurfaceOriginTop(nativeViewTag: number): Promise<number | null> {
+  if (Platform.OS !== 'ios') {
+    return null;
+  }
   const read = nativeModule?.presentedSurfaceOriginTop;
   if (read === undefined) {
     return null;

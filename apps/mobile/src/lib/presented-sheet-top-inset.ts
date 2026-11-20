@@ -19,6 +19,28 @@ const PRESENTED_SHEET_MODES = {
 } as const satisfies Record<SheetHeaderTopInset, boolean>;
 
 /**
+ * Whether this surface can produce a band at all: an iOS `formSheet` route in a
+ * mode whose sheet can present at the window top, inside a window that has a
+ * top inset to clear.
+ *
+ * Both the rule below and the header's sampling gate read this, so the header
+ * never samples the native origin for a surface whose answer it cannot use — a
+ * `never` or `ios-page-sheet` header, an Android surface (whose settled read
+ * owns that platform), or a window with no top inset of its own.
+ */
+export function presentsAboveWindowInset(input: {
+  topInset: SheetHeaderTopInset | undefined;
+  platform: string;
+  insetTop: number;
+}): boolean {
+  const { topInset, platform, insetTop } = input;
+  if (platform !== 'ios' || topInset === undefined || !PRESENTED_SHEET_MODES[topInset]) {
+    return false;
+  }
+  return Number.isFinite(insetTop) && insetTop > 0;
+}
+
+/**
  * The band a sheet header adds because the platform presented its sheet above
  * the status bar, in points.
  *
@@ -47,13 +69,10 @@ export function presentedSheetTopClearance(input: {
   clearance: number;
 }): number {
   const { topInset, platform, insetTop, surfaceOriginTop, clearance } = input;
-  if (platform !== 'ios' || surfaceOriginTop === null) {
+  if (surfaceOriginTop === null || !Number.isFinite(surfaceOriginTop)) {
     return clearance;
   }
-  if (topInset === undefined || !PRESENTED_SHEET_MODES[topInset]) {
-    return clearance;
-  }
-  if (!Number.isFinite(insetTop) || insetTop <= 0 || !Number.isFinite(surfaceOriginTop)) {
+  if (!presentsAboveWindowInset({ topInset, platform, insetTop })) {
     return clearance;
   }
   const uncovered = Math.min(insetTop, Math.max(0, insetTop - Math.max(0, surfaceOriginTop)));

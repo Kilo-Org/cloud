@@ -7,7 +7,10 @@ import {
   isNativeSurfaceGeometryAvailable,
   presentedSurfaceOriginTop,
 } from '@/lib/native-surface-geometry';
-import { presentedSheetTopClearance } from '@/lib/presented-sheet-top-inset';
+import {
+  presentedSheetTopClearance,
+  presentsAboveWindowInset,
+} from '@/lib/presented-sheet-top-inset';
 
 /**
  * When the header samples where the platform presented its surface, in ms after
@@ -81,7 +84,14 @@ export function usePresentedSheetTopClearance(input: {
   // The burst in flight: a newer one retires every sample of the older ones, so
   // a sheet that moves again is only measured by the burst that followed it.
   const burstRef = useRef(0);
-  const readable = Platform.OS === 'ios' && isNativeSurfaceGeometryAvailable;
+  // Whether this surface can use an origin at all. The rule reads the same
+  // predicate, so a mode whose answer would be discarded — `never`,
+  // `ios-page-sheet`, an Android surface, a window with no top inset — never
+  // runs a burst: the sampling costs a native call per sample and could not
+  // move the header.
+  const readable =
+    isNativeSurfaceGeometryAvailable &&
+    presentsAboveWindowInset({ topInset, platform: Platform.OS, insetTop });
 
   const sample = useCallback(
     async (burst: number) => {

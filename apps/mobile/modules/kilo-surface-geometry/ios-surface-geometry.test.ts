@@ -16,8 +16,9 @@ import { describe, expect, it } from 'vitest';
  * answers the negative sentinel instead of a guessed origin when the view or
  * its window is gone.
  *
- * The Kotlin counterpart's shape is guarded in `android-surface-geometry.test.ts`;
- * the JS contract both sides answer is `src/lib/native-surface-geometry.ts`.
+ * The JS contract for it is `src/lib/native-surface-geometry.ts`, which answers
+ * null on Android: nothing there reads a presented origin, so the Kotlin module
+ * carries no such function.
  */
 
 const SOURCE = readFileSync(

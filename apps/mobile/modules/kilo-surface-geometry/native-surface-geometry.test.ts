@@ -4,6 +4,7 @@ import { type NativeSurfaceGeometry } from '../../src/lib/native-surface-geometr
 
 const native = vi.hoisted(() => ({
   requireOptionalNativeModule: vi.fn(),
+  platform: 'ios' as string,
   addListener:
     vi.fn<
       (event: string, listener: (geometry: NativeSurfaceGeometry) => void) => { remove: () => void }
@@ -14,6 +15,13 @@ const native = vi.hoisted(() => ({
 }));
 
 vi.mock('expo', () => ({ requireOptionalNativeModule: native.requireOptionalNativeModule }));
+vi.mock('react-native', () => ({
+  Platform: {
+    get OS() {
+      return native.platform;
+    },
+  },
+}));
 
 const initial: NativeSurfaceGeometry = {
   tag: 42,
@@ -27,6 +35,7 @@ const initial: NativeSurfaceGeometry = {
 beforeEach(() => {
   vi.resetModules();
   vi.resetAllMocks();
+  native.platform = 'ios';
   native.requireOptionalNativeModule.mockReturnValue(native);
   native.observeSurface.mockResolvedValue(initial);
 });
@@ -153,6 +162,19 @@ describe('presentedSurfaceOriginTop', () => {
       expect(native.presentedSurfaceOriginTop).not.toHaveBeenCalled();
     }
   );
+
+  it('answers null on Android, which has no counterpart read', async () => {
+    // The presentation offset is a `UISheetPresentationController` property.
+    // Android presents a formSheet at the detent's height and lays its content
+    // out itself, and the header's settled read already covers that, so the
+    // Android module carries no counterpart and this must not call one.
+    native.platform = 'android';
+    native.presentedSurfaceOriginTop.mockResolvedValue(0);
+    const surface = await import('../../src/lib/native-surface-geometry');
+
+    await expect(surface.presentedSurfaceOriginTop(42)).resolves.toBeNull();
+    expect(native.presentedSurfaceOriginTop).not.toHaveBeenCalled();
+  });
 
   it('preserves native errors instead of inventing an origin', async () => {
     native.presentedSurfaceOriginTop.mockRejectedValue(new Error('The view is not mounted.'));

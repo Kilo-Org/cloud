@@ -999,6 +999,7 @@
       "pendingComment_zero": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",

@@ -3348,6 +3348,7 @@
       "partialPostedStale_zero": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",

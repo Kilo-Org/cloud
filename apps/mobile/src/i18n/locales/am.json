@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
+      "deniedManagedByOwner": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የ{{organization}} ባለቤትን ይጠይቁ።",
+      "deniedConnectRole": "ሊያገናኙት የሚችሉት የ{{organization}} ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "deniedReconnectRole": "የ{{organization}} ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "managedOnWebTitle": "በድር ላይ ይተዳደራል",
       "managedOnWebShort": "ይህ ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
       "managedOnWebRepositories": "ለ{{organization}} ማከማቻዎችን ከኮምፒውተር በድር ላይ ይምረጡ።",

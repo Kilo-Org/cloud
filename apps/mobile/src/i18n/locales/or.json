@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}ର Bitbucket ସଂଯୋଗ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
+      "deniedManagedByOwner": "ଆପଣ ଯେଉଁ ସଂଯୋଗ ପରିବର୍ତ୍ତନ କରିପାରିବେ ନାହିଁ, ସେହି ସଂଯୋଗ ପରିବର୍ତ୍ତନ କରିବାକୁ {{organization}}ର ଜଣେ ମାଲିକଙ୍କୁ କୁହନ୍ତୁ।",
+      "deniedConnectRole": "କେବଳ {{organization}}ର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
+      "deniedReconnectRole": "ଏହାକୁ ପୁଣି ସଂଯୋଗ କରିବା ପାଇଁ {{organization}}ର ଜଣେ ମାଲିକ, ପ୍ରଶାସକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ ଅନୁରୋଧ କରନ୍ତୁ।",
       "managedOnWebTitle": "ୱେବରେ ପରିଚାଳିତ",
       "managedOnWebShort": "ଏହି ସଂଯୋଗ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
       "managedOnWebRepositories": "{{organization}} ପାଇଁ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ରେପୋଜିଟୋରୀ ଚୟନ କରନ୍ତୁ।",

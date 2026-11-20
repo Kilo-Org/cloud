@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} యొక్క Bitbucket కనెక్షన్ కంప్యూటర్ నుండి వెబ్‌లో నిర్వహించబడుతుంది.",
+      "deniedManagedByOwner": "మీరు మార్చలేని కనెక్షన్‌ను మార్చడానికి {{organization}} యజమానిని అడగండి.",
+      "deniedConnectRole": "దానిని {{organization}} యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే కనెక్ట్ చేయగలరు.",
+      "deniedReconnectRole": "దానిని మళ్లీ కనెక్ట్ చేయమని {{organization}} యజమాని, నిర్వాహకుడు లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
       "managedOnWebTitle": "వెబ్‌లో నిర్వహించబడుతుంది",
       "managedOnWebShort": "ఈ కనెక్షన్ కంప్యూటర్ నుండి వెబ్‌లో నిర్వహించబడుతుంది.",
       "managedOnWebRepositories": "కంప్యూటర్ నుండి వెబ్‌లో {{organization}} కోసం రిపాజిటరీలను ఎంచుకోండి.",

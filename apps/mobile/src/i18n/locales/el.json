@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Η σύνδεση του Bitbucket για {{organization}} γίνεται από τον ιστότοπο, σε υπολογιστή.",
+      "deniedManagedByOwner": "Ζητήστε από έναν κάτοχο του {{organization}} να αλλάξει τη σύνδεση που δεν μπορείτε να αλλάξετε.",
+      "deniedConnectRole": "Μόνο οι κάτοχοι του {{organization}}, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν.",
+      "deniedReconnectRole": "Ζήτησε από έναν κάτοχο, διαχειριστή ή διαχειριστή χρέωσης του {{organization}} να το συνδέσει ξανά.",
       "managedOnWebTitle": "Γίνεται από τον ιστότοπο",
       "managedOnWebShort": "Αυτή η σύνδεση γίνεται από τον ιστότοπο, σε υπολογιστή.",
       "managedOnWebRepositories": "Επίλεξε τα αποθετήρια για {{organization}} στον ιστότοπο, σε υπολογιστή.",

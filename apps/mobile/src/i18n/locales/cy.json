@@ -1508,6 +1508,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
+      "deniedManagedByOwner": "Gofynnwch i berchennog {{organization}} newid cysylltiad na allwch ei newid.",
+      "deniedConnectRole": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio {{organization}} sy'n gallu ei gysylltu.",
+      "deniedReconnectRole": "Gofynnwch i berchennog {{organization}}, gweinyddwr neu reolwr bilio ei ailgysylltu.",
       "managedOnWebTitle": "Yn cael ei reoli ar y we",
       "managedOnWebShort": "Mae'r cysylltiad hwn yn cael ei reoli ar y we o gyfrifiadur.",
       "managedOnWebRepositories": "Dewiswch ystorfeydd ar gyfer {{organization}} ar y we o gyfrifiadur.",

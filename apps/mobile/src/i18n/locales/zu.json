@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
+      "deniedManagedByOwner": "Cela umnikazi we-{{organization}} ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",
+      "deniedConnectRole": "Abanikazi be-{{organization}}, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
+      "deniedReconnectRole": "Cela umnikazi, umlawuli, noma umphathi wokukhokha we-{{organization}} ukuxhuma kabusha.",
       "managedOnWebTitle": "Iphathwa kuwebhu",
       "managedOnWebShort": "Luxhumano luphathwa kuwebhu ngekhompyutha.",
       "managedOnWebRepositories": "Khetha amarekhodi ka-{{organization}} kuwebhu ngekhompyutha.",

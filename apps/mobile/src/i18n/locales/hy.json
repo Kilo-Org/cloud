@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ի Bitbucket միացումը կառավարվում է վեբում՝ համակարգչից։",
+      "deniedManagedByOwner": "Խնդրեք {{organization}}-ի սեփականատիրոջը փոխել միացումը, որը չեք կարող փոխել։",
+      "deniedConnectRole": "Միայն {{organization}}-ի սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
+      "deniedReconnectRole": "Խնդրիր {{organization}}-ի սեփականատերերին, ադմինիստրատորներին կամ վճարումների կառավարիչներին նորից միացնել այն։",
       "managedOnWebTitle": "Կառավարվում է վեբում",
       "managedOnWebShort": "Այս միացումը կառավարվում է վեբում՝ համակարգչից։",
       "managedOnWebRepositories": "Ընտրիր {{organization}}-ի ռեպոզիտորիաները վեբում՝ համակարգչից։",

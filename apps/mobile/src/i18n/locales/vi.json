@@ -704,6 +704,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
+      "deniedManagedByOwner": "Hãy yêu cầu chủ sở hữu của {{organization}} thay đổi kết nối mà bạn không thể thay đổi.",
+      "deniedConnectRole": "Chỉ chủ sở hữu, quản trị viên và người quản lý thanh toán của {{organization}} mới có thể kết nối.",
+      "deniedReconnectRole": "Hãy yêu cầu chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của {{organization}} kết nối lại.",
       "managedOnWebTitle": "Quản lý trên web",
       "managedOnWebShort": "Kết nối này được quản lý trên web từ máy tính.",
       "managedOnWebRepositories": "Chọn kho lưu trữ cho {{organization}} trên web từ máy tính.",

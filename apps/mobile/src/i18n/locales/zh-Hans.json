@@ -704,6 +704,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
+      "deniedManagedByOwner": "请联系 {{organization}} 的组织所有者更改你无法更改的连接。",
+      "deniedConnectRole": "只有 {{organization}} 的组织所有者、管理员和账单管理员可以完成连接。",
+      "deniedReconnectRole": "请让 {{organization}} 的组织所有者、管理员或账单管理员重新连接。",
       "managedOnWebTitle": "在网页版管理",
       "managedOnWebShort": "此连接需在电脑上通过网页版进行管理。",
       "managedOnWebRepositories": "请在电脑上通过网页版为 {{organization}} 选择仓库。",

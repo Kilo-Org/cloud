@@ -705,6 +705,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
+      "deniedManagedByOwner": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של {{organization}}.",
+      "deniedConnectRole": "רק בעלי {{organization}}, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
+      "deniedReconnectRole": "בקש מבעלים של {{organization}}, מנהל או מנהל חיובים לחבר אותו מחדש.",
       "managedOnWebTitle": "מנוהל באתר",
       "managedOnWebShort": "החיבור הזה מנוהל באתר דרך מחשב.",
       "managedOnWebRepositories": "בחר את המאגרים עבור {{organization}} באתר דרך מחשב.",

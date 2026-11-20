@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "اتصال Bitbucket به {{organization}} از طریق وب و با رایانه مدیریت می‌شود.",
+      "deniedManagedByOwner": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک {{organization}} درخواست کنید.",
+      "deniedConnectRole": "فقط مالکان {{organization}}، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "deniedReconnectRole": "از مالک، مدیر یا مدیر صورتحساب {{organization}} بخواهید آن را دوباره متصل کند.",
       "managedOnWebTitle": "از طریق وب مدیریت می‌شود",
       "managedOnWebShort": "این اتصال از طریق وب و با رایانه مدیریت می‌شود.",
       "managedOnWebRepositories": "مخزن‌های {{organization}} را از طریق وب و با رایانه انتخاب کنید.",

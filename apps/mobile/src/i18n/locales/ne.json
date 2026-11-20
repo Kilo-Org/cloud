@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} को Bitbucket जडान कम्प्युटरबाट वेबमा व्यवस्थापन गरिन्छ।",
+      "deniedManagedByOwner": "तपाईंले परिवर्तन गर्न नसक्ने जडान परिवर्तन गर्न {{organization}} का मालिकलाई अनुरोध गर्नुहोस्।",
+      "deniedConnectRole": "{{organization}} का मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।",
+      "deniedReconnectRole": "यसलाई फेरि जडान गर्न {{organization}} को मालिक, प्रशासक वा बिलिङ व्यवस्थापकलाई अनुरोध गर्नुहोस्।",
       "managedOnWebTitle": "वेबमा व्यवस्थापन गरिन्छ",
       "managedOnWebShort": "यो जडान कम्प्युटरबाट वेबमा व्यवस्थापन गरिन्छ।",
       "managedOnWebRepositories": "कम्प्युटरबाट वेबमा {{organization}} का लागि रिपोजिटरीहरू छान्नुहोस्।",

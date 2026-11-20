@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o {{organization}} i runga ipurangi, mā tētahi rorohiko.",
+      "deniedManagedByOwner": "Tonoa tētahi kaipupuri o {{organization}} kia whakarerekē i te hononga kāore e taea e koe te whakarerekē.",
+      "deniedConnectRole": "Ko ngā rangatira o {{organization}}, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono.",
+      "deniedReconnectRole": "Tonoa tētahi rangatira, kaiwhakahaere, kaiwhakahaere utu rānei o {{organization}} kia honoa anō ia.",
       "managedOnWebTitle": "Whakahaerehia i runga ipurangi",
       "managedOnWebShort": "Ka whakahaerehia tēnei hononga i runga ipurangi, mā tētahi rorohiko.",
       "managedOnWebRepositories": "Kōwhiria ngā pūranga mō {{organization}} i runga ipurangi, mā tētahi rorohiko.",

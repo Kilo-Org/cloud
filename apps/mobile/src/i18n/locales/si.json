@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "deniedManagedByOwner": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාව වෙනස් කිරීමට {{organization}} හි හිමිකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
+      "deniedConnectRole": "එය සම්බන්ධ කළ හැක්කේ {{organization}} හි හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
+      "deniedReconnectRole": "එය නැවත සම්බන්ධ කරන ලෙස {{organization}} හි හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "managedOnWebTitle": "වෙබය හරහා කළමනාකරණය කෙරේ",
       "managedOnWebShort": "මෙම සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
       "managedOnWebRepositories": "{{organization}} සඳහා පරිගණකයකින් වෙබය හරහා රෙපොසිටරි තෝරන්න.",

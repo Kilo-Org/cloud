@@ -1454,6 +1454,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "deniedManagedByOwner": "Požiadajte vlastníka {{organization}}, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+      "deniedConnectRole": "Pripojiť ho môžu iba vlastníci {{organization}}, správcovia a správcovia fakturácie.",
+      "deniedReconnectRole": "Požiadajte vlastníka, správcu alebo správcu fakturácie {{organization}}, aby ho znova pripojil.",
       "managedOnWebTitle": "Spravuje sa na webe",
       "managedOnWebShort": "Toto pripojenie sa spravuje na webe z počítača.",
       "managedOnWebRepositories": "Vyberte repozitáre pre {{organization}} na webe z počítača.",

@@ -1481,6 +1481,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
+      "deniedManagedByOwner": "Iarr ar úinéir {{organization}} an ceangal nach féidir leat a chur in eagar a athrú.",
+      "deniedConnectRole": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála {{organization}} é a cheangal.",
+      "deniedReconnectRole": "Iarr ar úinéir {{organization}}, riarthóir, nó bainisteoir billeála é a athnascadh.",
       "managedOnWebTitle": "Bainistithe ar an ngréasán",
       "managedOnWebShort": "Bainistítear an nasc seo ar an ngréasán ó ríomhaire.",
       "managedOnWebRepositories": "Roghnaigh stórais do {{organization}} ar an ngréasán ó ríomhaire.",

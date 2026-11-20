@@ -1427,6 +1427,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
+      "deniedManagedByOwner": "Lūdziet {{organization}} īpašniekam mainīt savienojumu, kuru nevarat mainīt.",
+      "deniedConnectRole": "To var pievienot tikai {{organization}} īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "deniedReconnectRole": "Lūdziet {{organization}} īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
       "managedOnWebTitle": "Pārvaldīts tīmeklī",
       "managedOnWebShort": "Šis savienojums tiek pārvaldīts tīmeklī no datora.",
       "managedOnWebRepositories": "Izvēlies repozitorijus priekš {{organization}} tīmeklī no datora.",

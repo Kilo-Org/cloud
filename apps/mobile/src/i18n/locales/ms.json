@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",
+      "deniedManagedByOwner": "Minta pemilik {{organization}} untuk menukar sambungan yang anda tidak boleh tukar.",
+      "deniedConnectRole": "Hanya pemilik, pentadbir dan pengurus pengebilan bagi {{organization}} boleh menyambungkannya.",
+      "deniedReconnectRole": "Minta pemilik, pentadbir atau pengurus pengebilan bagi {{organization}} untuk menyambungkannya semula.",
       "managedOnWebTitle": "Diurus di web",
       "managedOnWebShort": "Sambungan ini diurus di web melalui komputer.",
       "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web melalui komputer.",

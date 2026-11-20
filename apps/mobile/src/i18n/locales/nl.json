@@ -704,6 +704,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",
+      "deniedManagedByOwner": "Vraag een eigenaar van {{organization}} om de koppeling te wijzigen die je zelf niet kunt wijzigen.",
+      "deniedConnectRole": "Alleen eigenaren, beheerders en factuurbeheerders van {{organization}} kunnen de koppeling instellen.",
+      "deniedReconnectRole": "Vraag een eigenaar, beheerder of factuurbeheerder van {{organization}} om het opnieuw te koppelen.",
       "managedOnWebTitle": "Via het web beheerd",
       "managedOnWebShort": "Deze verbinding wordt via het web op een computer beheerd.",
       "managedOnWebRepositories": "Kies voor {{organization}} de repositories via het web op een computer.",

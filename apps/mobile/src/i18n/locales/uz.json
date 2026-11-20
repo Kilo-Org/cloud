@@ -1400,6 +1400,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
+      "deniedManagedByOwner": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun {{organization}} egasiga murojaat qiling.",
+      "deniedConnectRole": "Faqat {{organization}} egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
+      "deniedReconnectRole": "Uni qayta ulashni {{organization}} Egasi, Administrator yoki To'lov menejeridan so'rang.",
       "managedOnWebTitle": "Veb orqali boshqariladi",
       "managedOnWebShort": "Bu ulanish kompyuterdan veb orqali boshqariladi.",
       "managedOnWebRepositories": "{{organization}} uchun repozitoriylarni kompyuterdan veb orqali tanlang.",

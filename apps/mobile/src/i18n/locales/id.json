@@ -704,6 +704,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
+      "deniedManagedByOwner": "Minta pemilik {{organization}} untuk mengubah koneksi yang tidak dapat Anda ubah.",
+      "deniedConnectRole": "Hanya pemilik, admin, dan manajer penagihan {{organization}} yang dapat menghubungkannya.",
+      "deniedReconnectRole": "Minta pemilik, admin, atau manajer penagihan {{organization}} untuk menghubungkannya.",
       "managedOnWebTitle": "Dikelola di web",
       "managedOnWebShort": "Koneksi ini dikelola di web melalui komputer.",
       "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web dari komputer.",

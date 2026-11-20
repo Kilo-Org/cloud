@@ -25,6 +25,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_GUTTER_DP } from '@/lib/layout';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
@@ -51,10 +52,15 @@ const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
 /**
  * One `caption` line at font scale 1. `text-xs` lays out at 14.1 dp on the
  * standard Android cell (measured on the Profile gate target), and the card's
- * nearest spacing class is `h-4` (14 dp). The expiry note reserves two of these
- * lines: the gate measured the funded sentence at 28.19 dp.
+ * nearest spacing class is `h-4` (14 dp).
  */
 const CAPTION_LINE_DP = 14.1;
+/**
+ * The funded note's line count at font scale 1: the sentence wraps to two
+ * `caption` lines in this card's column (gate-measured at 28.19 dp), one line
+ * for the empty message and one for the loading bar.
+ */
+const FUNDED_NOTE_LINES = 2;
 
 /**
  * The sentence each failure kind paints: the connection's own wording, the
@@ -93,8 +99,16 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // `(3_profile)`). The body's width is the card's width here, so the first
   // frame reads it from the window and `onLayout` still owns the settled
   // answer for any container narrower than the body.
+  //
+  // The window is not quite the body: the tab scroller puts the safe-area side
+  // margins on its own frame (`TabScreenScrollView`), so a landscape cutout
+  // narrows the settled card by its inset on each side. Subtracting only the
+  // gutter would guess a wider card than `onLayout` reports and could pick the
+  // one-row arm where the settled width stacks — the first-frame arm switch
+  // this line exists to prevent.
   const window = useWindowDimensions();
-  const bodyWidth = window.width - SCREEN_GUTTER_DP * 2;
+  const sideInsets = useStyleSideInsets();
+  const bodyWidth = window.width - SCREEN_GUTTER_DP * 2 - sideInsets.left - sideInsets.right;
   const measuredWidth = availableWidth ?? bodyWidth;
   const stackBalance = measuredWidth / fontScale < 370;
   const { t, i18n } = useTranslation();
@@ -229,14 +243,25 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // The expiry note's slot: under the amount. No entrance fade — the caption
   // holds a row of this block, so a fade that paints it late leaves it empty.
   //
-  // The slot is a fixed two-line box in every state: a funded account's
-  // sentence ("… in credits expires … Credits with the earliest expiry are used
-  // first.") wraps to two `caption` lines at this card's width, the empty
-  // message is one line and the loading bar is one. A one-line slot grew the
-  // card by about 14 dp when funded credits landed and moved every row below it
+  // The slot is a fixed box in every state: a funded account's sentence ("… in
+  // credits expires … Credits with the earliest expiry are used first.") wraps
+  // to two `caption` lines at this card's width and scale 1, the empty message
+  // is one line and the loading bar is one. A one-line slot grew the card by
+  // about 14 dp when funded credits landed and moved every row below it
   // (Profile held-loading gate target, 2026-11-20).
+  //
+  // Both the line's height and the sentence's line count grow with the font
+  // scale, and the count grows faster than the scale: the column keeps its
+  // width in dp while every glyph widens, so a sentence that takes two lines at
+  // scale 1 takes about four at Android's largest scale. Reserving only
+  // `2 × scale` lines left the box one line short from about scale 1.5 and grew
+  // the card when a funded note landed — the shift this slot exists to prevent.
+  const noteLines = Math.ceil(FUNDED_NOTE_LINES * fontScale);
   const expirySlot = (
-    <View testID="credits-expiry-slot" style={{ minHeight: CAPTION_LINE_DP * 2 * fontScale }}>
+    <View
+      testID="credits-expiry-slot"
+      style={{ minHeight: CAPTION_LINE_DP * fontScale * noteLines }}
+    >
       {creditsFailed && (
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
       )}

@@ -26,6 +26,9 @@ import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/rend
 const readable = (text: string) =>
   text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
 
+/** One `caption` line at font scale 1, as the card reserves it (gate-measured). */
+const CAPTION_LINE_DP = 14.1;
+
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const getContextBalanceQueryFn = vi.hoisted(() => vi.fn());
@@ -38,6 +41,8 @@ const currentUser = vi.hoisted(() => ({
 }));
 /** Window the card lays out in; a narrow one must stack the credits header. */
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
+/** The safe-area side insets the scroller takes off the card's settled width. */
+const insets = vi.hoisted(() => ({ left: 0, right: 0 }));
 
 // The provider now announces the lost-membership recovery through the
 // toast adapter, whose module graph reaches react-native's Flow source
@@ -134,7 +139,7 @@ vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) 
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ bottom: 0, left: insets.left, right: insets.right, top: 0 }),
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -366,6 +371,9 @@ beforeEach(() => {
   Platform.OS = 'ios';
   balancePreference.loaded = true;
   windowDims.width = 390;
+  windowDims.fontScale = 1;
+  insets.left = 0;
+  insets.right = 0;
   // A test that simulates the app reporting offline must not leak that state.
   onlineManager.setOnline(true);
   savedMetadata.clear();
@@ -1372,6 +1380,67 @@ describe('CreditsCard balance row', () => {
     } finally {
       unmount();
       pending.resolve({ creditBlocks: [] });
+    }
+  });
+
+  it('reserves the wrapped note at a large font scale, not just a scaled two-line box', async () => {
+    // Android's largest scale (2.0) is the gate's `font-max` cell: the column
+    // keeps its dp width while every glyph widens, so the funded sentence takes
+    // about twice as many lines as at scale 1 and the box has to reserve them.
+    windowDims.fontScale = 2;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, renderer, unmount } = await mountCard();
+    try {
+      await waitFor(() => texts().some(text => text.includes('in credits expires')));
+      // Four lines at 28.2 dp each, not the two a scale-multiplied box holds.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(CAPTION_LINE_DP * 2 * 4, 5);
+      expect(slotHeight(noteSlot(renderer))).toBeGreaterThan(CAPTION_LINE_DP * 2 * 2);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the stacked arm on the first frame where the scroller takes landscape insets', async () => {
+    // The review's own case: the landscape insets (47/59) at font scale 2. The
+    // settled width is 800 - 28 - 47 - 59 = 666 card dp, and 666 / 2 = 333
+    // stacks; the window alone (800 - 28 = 772, 386 scaled) would pick the
+    // one-row arm and `onLayout` would flip it.
+    windowDims.width = 800;
+    windowDims.fontScale = 2;
+    insets.left = 47;
+    insets.right = 59;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockReturnValue(Promise.withResolvers<{ balance: number }>().promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, unmount } = await mountCard();
+    try {
+      // No layout event: this is the arm the first frame paints.
+      const shell = balanceBlock(renderer);
+      expect(classesOf(shell)).not.toContain('flex-row');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the one-row arm on the first frame where the insets leave room for it', async () => {
+    // The same window and scale without the cutout: 772 / 2 = 386 scaled dp
+    // keeps the note beside the amount, so the first frame must agree.
+    windowDims.width = 800;
+    windowDims.fontScale = 2;
+    insets.left = 0;
+    insets.right = 0;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockReturnValue(Promise.withResolvers<{ balance: number }>().promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, unmount } = await mountCard();
+    try {
+      expect(classesOf(balanceBlock(renderer))).toContain('flex-row');
+    } finally {
+      unmount();
     }
   });
 

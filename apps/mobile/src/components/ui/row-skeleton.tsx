@@ -10,14 +10,19 @@ const STRIP_CLASS = 'w-[3px] self-stretch rounded-[2px] bg-muted-soft';
 /** The bars hold the height of the lines they stand in for (`text-sm` 17.5pt, `text-xs` 14pt), so the swap to real rows never shifts the screen. */
 const TITLE_BAR_CLASS = 'h-5 w-40 max-w-full rounded bg-muted-soft';
 /**
- * The distance between a title and its subtitle. `RowFrame`'s subtitle carries
- * its own `mt-0.5` (1.75pt), not a one-step gap: a `gap-1` column stacked the
- * bars 1.75pt further apart than the loaded row, which made every placeholder
- * row with a subtitle 1.75pt taller than the row it becomes and moved the rows
- * below it when the read landed (measured on the Profile credits section,
- * 2026-11-20).
+ * The distance between a title and its subtitle for a placeholder that stands
+ * in for a `RowFrame` row: `RowFrame`'s subtitle carries its own `mt-0.5`
+ * (1.75pt), so a `gap-1` column stacks the bars 1.75pt further apart than the
+ * loaded row and makes every such placeholder taller than the row it becomes.
  */
-const LINE_GAP_CLASS = 'gap-0.5';
+const ROW_FRAME_LINE_GAP_CLASS = 'gap-0.5';
+/**
+ * The column gap of a placeholder that stands in for one of the hand-built rows
+ * (`SectionCardSkeleton`'s Act-first target, the credit-history, invoice and
+ * notification rows): they space their own title and subtitle by `gap-1`, so
+ * their placeholder keeps `gap-1` and the same height as the row it becomes.
+ */
+const PLAIN_LINE_GAP_CLASS = 'gap-1';
 const SUBTITLE_BAR_CLASS = 'h-4 w-56 max-w-full rounded bg-muted-soft';
 const SECOND_SUBTITLE_BAR_CLASS = 'h-4 w-32 max-w-full rounded bg-muted-soft';
 const EYEBROW_BAR_CLASS = 'h-2 w-24 max-w-full rounded bg-muted-soft';
@@ -79,6 +84,13 @@ type RowSkeletonProps = {
   variant?: 'row' | 'session';
   /** The last flat-list row draws no divider under it. */
   last?: boolean;
+  /**
+   * The placeholder stands in for a `RowFrame` row, whose subtitle carries its
+   * own `mt-0.5` instead of a one-step gap. Callers of the hand-built rows leave
+   * it off: those rows space their two lines by `gap-1`, and a placeholder that
+   * shortened the gap would be shorter than the row it becomes.
+   */
+  rowFrame?: boolean;
   className?: string;
 };
 
@@ -103,9 +115,11 @@ export function RowSkeleton({
   stack = false,
   variant = 'row',
   last = false,
+  rowFrame = false,
   className,
 }: Readonly<RowSkeletonProps>) {
   const lineCount = lines ?? (subtitle ? 2 : 1);
+  const lineGapClass = rowFrame ? ROW_FRAME_LINE_GAP_CLASS : PLAIN_LINE_GAP_CLASS;
 
   if (variant === 'session') {
     return (
@@ -141,7 +155,7 @@ export function RowSkeleton({
             <Skeleton className={cn(COMPACT_CONTROL_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
           ) : null}
         </View>
-        <View className={cn('min-w-0 w-full', LINE_GAP_CLASS)}>
+        <View className={cn('min-w-0 w-full', lineGapClass)}>
           <Skeleton className={TITLE_BAR_CLASS} />
           {lineCount > 1 ? <Skeleton className={SUBTITLE_BAR_CLASS} /> : null}
           {lineCount > 2 ? <Skeleton className={SECOND_SUBTITLE_BAR_CLASS} /> : null}
@@ -153,7 +167,7 @@ export function RowSkeleton({
   return (
     <View className={cn(ROW_FRAME_CLASS, className)}>
       {tile ? <Skeleton className={cn(ROW_TILE_CLASS, 'bg-muted-soft')} /> : null}
-      <View className={cn('min-w-0 flex-1', LINE_GAP_CLASS)}>
+      <View className={cn('min-w-0 flex-1', lineGapClass)}>
         <Skeleton className={TITLE_BAR_CLASS} />
         {lineCount > 1 ? <Skeleton className={SUBTITLE_BAR_CLASS} /> : null}
         {lineCount > 2 ? <Skeleton className={SECOND_SUBTITLE_BAR_CLASS} /> : null}

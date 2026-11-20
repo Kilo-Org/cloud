@@ -182,6 +182,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({
     fontScale: state.fontScale,
     width: state.windowWidth,

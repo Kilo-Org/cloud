@@ -89,16 +89,40 @@ const LOGBOX_COUNT_TEST_ID = 'logbox_notification_count_text';
  */
 const LOGBOX_LEVEL_TEST_ID = /^logbox_(?:open|dismiss)_button_(warn|error)$/;
 
-function notificationLevel(dump: ProbeDump): 'warn' | 'error' | undefined {
-  // A notification paints one level's buttons; error wins only because a dump
-  // holding both would be two notifications and the stricter reading is safe.
-  const levels = new Set(
-    dump.nodes.flatMap(node => {
-      const match = node.testID === undefined ? null : LOGBOX_LEVEL_TEST_ID.exec(node.testID);
-      return match === null ? [] : [match[1]];
-    })
-  );
-  return levels.has('error') ? 'error' : levels.has('warn') ? 'warn' : undefined;
+/** The toast root LogBox renders one notification under. */
+const LOGBOX_TOAST_TEST_ID = 'logbox_notification';
+
+/**
+ * The level the toast holding `index` painted, from that toast's own chrome.
+ *
+ * LogBox renders one toast per level, and the message, the count badge and the
+ * dismiss button all sit under the open button that carries the level, so the
+ * walk stops at the toast root and never reads a sibling toast's buttons. A
+ * dump-wide read would report a warn toast as an error whenever the same dump
+ * also holds an error toast, and the wording would then name a level that
+ * toast never painted.
+ */
+function notificationLevel(
+  nodes: readonly ProbeNode[],
+  index: number
+): 'warn' | 'error' | undefined {
+  const seen = new Set<number>();
+  let current = nodes[index]?.parent ?? -1;
+  let level: 'warn' | 'error' | undefined;
+  // A malformed chain stops the walk: a bad index or a cycle must not hang the
+  // rule, and a toast whose chrome the dump did not model falls back to its
+  // message text exactly as a toast with no chrome does.
+  while (current >= 0 && current < nodes.length && !seen.has(current)) {
+    seen.add(current);
+    const node = nodes[current];
+    const match = node.testID === undefined ? null : LOGBOX_LEVEL_TEST_ID.exec(node.testID);
+    if (match !== null) level ??= match[1] === 'error' ? 'error' : 'warn';
+    // The toast root bounds the walk: anything above it belongs to the overlay
+    // container, not to this notification.
+    if (node.testID === LOGBOX_TOAST_TEST_ID) break;
+    current = node.parent;
+  }
+  return level;
 }
 
 /**
@@ -180,9 +204,8 @@ export function checkDevLogOverlay(dump: ProbeDump): Finding[] {
     if (seen !== undefined && !better) return;
     messages.set(text, { node, index, text });
   });
-  const level = notificationLevel(dump);
   return [...messages.values()].map(({ node, index, text }) => {
-    const { severity, message } = overlayClassification(level, text);
+    const { severity, message } = overlayClassification(notificationLevel(dump.nodes, index), text);
     return finding({
       rule: 'dev-overlay',
       severity,

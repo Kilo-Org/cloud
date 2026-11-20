@@ -226,8 +226,12 @@ const ARBITRARY = 'Loaded 4 items';
 type Level = 'warn' | 'error' | undefined;
 
 /**
- * A dump holding the toast's message node, the chrome that repeats it and the
- * buttons LogBox paints its level into.
+ * A dump holding one LogBox toast in the hierarchy the runtime really paints:
+ * the `logbox_notification` root, the open button under it carrying the level
+ * test ID, and the message, the count badge, the dismiss button and the chrome
+ * that repeats the text all under that button (measured from an emulator dump;
+ * see `LogBoxNotification.js`). A toast whose chrome the dump does not model
+ * keeps the button but no level test ID, so the message text classifies it.
  */
 function toastDump(level: Level, ...texts: readonly string[]): ProbeDump {
   const dump = warningDump(texts[0] ?? '');
@@ -235,9 +239,15 @@ function toastDump(level: Level, ...texts: readonly string[]): ProbeDump {
   // notification chrome that renders it. One notification must read as one
   // finding, and the paragraph names the message, so it wins.
   const message = dump.nodes[7];
+  // The open button is the message's own container, under the one toast root
+  // the message belongs to: the level can only be read from this toast's
+  // chrome, never from a sibling toast's.
+  const button = dump.nodes[6];
+  if (level !== undefined) button.testID = `logbox_open_button_${level}`;
   dump.nodes.push(
+    // The chrome that repeats the message text, under the same toast.
     {
-      parent: 5,
+      parent: 6,
       tag: 'View',
       rect: [9.9, 556.19, 340.19, 48],
       testID: 'logbox',
@@ -245,7 +255,7 @@ function toastDump(level: Level, ...texts: readonly string[]): ProbeDump {
     },
     // The badge carries the count, never a message: it must not read as one.
     {
-      parent: 5,
+      parent: 6,
       tag: 'Paragraph',
       rect: [27.81, 832.38, 10.29, 18.29],
       testID: 'logbox_notification_count_text',
@@ -255,13 +265,7 @@ function toastDump(level: Level, ...texts: readonly string[]): ProbeDump {
       ? []
       : [
           {
-            parent: 5,
-            tag: 'View',
-            rect: [9.9, 817.52, 391.62, 48],
-            testID: `logbox_open_button_${level}`,
-          },
-          {
-            parent: 5,
+            parent: 6,
             tag: 'View',
             rect: [369.52, 831.62, 19.81, 19.81],
             testID: `logbox_dismiss_button_${level}`,
@@ -366,4 +370,101 @@ test('without level chrome each wording names the text as the fallback classifie
   assert.match(fallbackError.message, /no level chrome/);
   assert.match(fallbackError.message, /message text classifies it/);
   assert.match(fallbackError.message, /must be assumed to be/);
+});
+
+/**
+ * The two toasts a runtime paints when one warning and one error land together:
+ * LogBox stacks one notification per level, so the dump holds two toast roots,
+ * each with its own open button and level.
+ */
+function twoToastDump(warnText: string, errorText: string): ProbeDump {
+  const dump = toastDump('warn', warnText);
+  // The second toast hangs off the same notification container (node 4) as the
+  // first, with its own root, open button, message and chrome — the shape the
+  // runtime paints when one warning and one error land together.
+  const root = dump.nodes.length;
+  const open = root + 1;
+  const message = open + 1;
+  const chrome = message + 1;
+  const badge = message + 2;
+  const dismiss = message + 3;
+  dump.nodes.push(
+    {
+      parent: 4,
+      tag: 'View',
+      rect: [9.9, 606.86, 340.19, 48],
+      testID: 'logbox_notification',
+      owners: ['View', 'LogBoxNotification', 'View', 'LogBoxNotificationContainer', 'View'],
+    },
+    {
+      parent: root,
+      tag: 'View',
+      rect: [9.9, 606.86, 340.19, 48],
+      testID: 'logbox_open_button_error',
+      owners: ['View', 'LogBoxNotification', 'View', 'LogBoxNotificationContainer', 'View'],
+    },
+    {
+      parent: open,
+      tag: 'Paragraph',
+      rect: [60.95, 620.19, 252.19, 22.86],
+      testID: 'logbox_notification_message_text',
+      owners: ['Text', 'View', 'LogBoxNotificationMessage', 'View', 'LogBoxButton', 'View'],
+      text: errorText,
+    },
+    {
+      parent: open,
+      tag: 'View',
+      rect: [9.9, 620.19, 340.19, 48],
+      testID: 'logbox',
+      text: errorText,
+    },
+    {
+      parent: open,
+      tag: 'Paragraph',
+      rect: [27.81, 620.19, 10.29, 18.29],
+      testID: 'logbox_notification_count_text',
+      text: '!',
+    },
+    {
+      parent: open,
+      tag: 'View',
+      rect: [369.52, 620.19, 19.81, 19.81],
+      testID: 'logbox_dismiss_button_error',
+    }
+  );
+  return dump;
+}
+
+test('two toasts at different levels are classified by their own chrome, not the dump', () => {
+  // Reading the level once for the whole dump reported the warn toast as an
+  // error whose wording named a level it never painted: the defect kilobot
+  // found on this rule.
+  const findings = checkDevLogOverlay(twoToastDump(WARNING, RENDER_ERROR));
+  assert.equal(findings.length, 2);
+  const warn = findings.find(entry => entry.element.text === WARNING);
+  const error = findings.find(entry => entry.element.text === RENDER_ERROR);
+  assert.equal(warn?.severity, 'warning');
+  assert.match(warn?.message ?? '', /the level chrome LogBox painted says warn/);
+  assert.doesNotMatch(warn?.message ?? '', /says error/);
+  assert.equal(error?.severity, 'error');
+  assert.match(error?.message ?? '', /the level chrome LogBox painted says error/);
+  assert.doesNotMatch(error?.message ?? '', /says warn/);
+});
+
+test('a message whose parent chain is malformed falls back instead of hanging', () => {
+  // A dump the probe assembled badly must not hang the rule or invent a level.
+  const past = toastDump('error', RENDER_ERROR);
+  past.nodes[7].parent = 999;
+  assert.deepEqual(
+    checkDevLogOverlay(past).map(entry => entry.severity),
+    ['error']
+  );
+  // A two-node cycle: the walk stops and the message text decides.
+  const cycle = toastDump(undefined, WARNING);
+  cycle.nodes[7].parent = 8;
+  cycle.nodes[8].parent = 7;
+  assert.deepEqual(
+    checkDevLogOverlay(cycle).map(entry => entry.severity),
+    ['warning']
+  );
 });

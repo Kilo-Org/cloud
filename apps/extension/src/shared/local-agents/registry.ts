@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
+/* eslint-disable max-lines, typescript-eslint/consistent-type-definitions -- One storage record holds the controllers, the refused controllers and the stopped handles, and every write must keep all three; AGENTS.md prefers type over interface. */
 import { z } from 'zod';
 import type { LocalAgentTransport } from './envelope';
 import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
@@ -6,9 +6,10 @@ import { createSerialTaskQueue } from './storage';
 import type { LocalAgentStorageArea } from './storage';
 
 /*
- * Controller and session bookkeeping for the connected-agents list. Until the
- * browser runtime lands, this is the only state a `session.open` changes: it
- * records who is connected so the side panel can list and disconnect them.
+ * Controller and session bookkeeping for the connected-agents list, plus the
+ * handles the user stopped. It lives in `storage.session`, so a service-worker
+ * restart keeps both: a CLI's session survives the restart, and a session the
+ * user stopped stays stopped.
  */
 
 export const LOCAL_AGENT_CONTROLLERS_STORAGE_KEY = 'session:kiloLocalAgentControllers';
@@ -16,6 +17,8 @@ export const LOCAL_AGENT_CONTROLLERS_STORAGE_KEY = 'session:kiloLocalAgentContro
 const REVOKED_CONTROLLER_LIMIT = 64;
 /** What a disconnected controller's calls answer, with the `user_stopped` code. */
 export const LOCAL_AGENT_DISCONNECTED_MESSAGE = 'The user disconnected this agent.';
+/** Enough stopped handles to answer a CLI that raced its own revoke, and nothing more. */
+const STOPPED_SESSION_LIMIT = 256;
 
 export type LocalAgentSessionInput = {
   sessionId: string;
@@ -57,6 +60,8 @@ export const localAgentControllersSchema = z
     /* Controllers the user disconnected. The hub announces them again after every
        reconnect, so they stay refused until their CLI connection ends. */
     revoked: z.array(z.uuid()).default([]),
+    /** Handles a Stop all, a switch-off or a Disconnect ended, oldest first. */
+    stopped: z.array(z.string()).default([]),
   })
   .strip();
 
@@ -77,7 +82,10 @@ export type LocalAgentControllerRegistry = {
   }): Promise<boolean>;
   /** The controller's CLI connection ended: its row goes, and so does any refusal. */
   removeController(controllerId: string): Promise<LocalAgentController | null>;
-  /** The user disconnected the controller: its row goes and it is refused from now on. */
+  /**
+   * The user disconnected the controller: its row goes, it is refused from now
+   * on, and its sessions' handles are remembered as stopped by the user.
+   */
   revokeController(controllerId: string): Promise<LocalAgentController | null>;
   openSession(
     controllerId: string,
@@ -86,8 +94,13 @@ export type LocalAgentControllerRegistry = {
   closeSession(controllerId: string, sessionHandle: string): Promise<boolean>;
   /** The controller that opened a session; undefined when no row holds that handle. */
   sessionOwner(sessionHandle: string): Promise<string | undefined>;
-  /** Removes every session (and its controller) and reports what was revoked. */
+  /**
+   * Removes every session (and its controller), remembers their handles as
+   * stopped by the user, and reports what was revoked.
+   */
   takeAllSessions(): Promise<{ controllerId: string; sessionHandle: string }[]>;
+  /** Whether a Stop all, a switch-off or a Disconnect ended this handle; false when storage cannot be read. */
+  wasStopped(sessionHandle: string): Promise<boolean>;
 };
 
 const loadRegistryState = async (
@@ -97,8 +110,14 @@ const loadRegistryState = async (
     await storage.getItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY)
   );
 
-  return parsed.success ? parsed.data : { controllers: [], revoked: [] };
+  return parsed.success ? parsed.data : { controllers: [], revoked: [], stopped: [] };
 };
+
+const withStopped = (
+  stopped: readonly string[],
+  sessions: readonly { readonly sessionHandle: string }[]
+): string[] =>
+  [...stopped, ...sessions.map(session => session.sessionHandle)].slice(-STOPPED_SESSION_LIMIT);
 
 export const loadLocalAgentControllers = async (
   storage: LocalAgentStorageArea
@@ -152,18 +171,23 @@ export const createLocalAgentControllerRegistry = ({
     await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, state);
   };
 
-  /** Drops the controller's row; `refuse` keeps it out until its CLI connection ends. */
+  /**
+   * Drops the controller's row; `refuse` keeps it out until its CLI connection
+   * ends and remembers its sessions as stopped by the user.
+   */
   const dropController = (controllerId: string, refuse: boolean) =>
     runExclusive(async () => {
       const state = await loadRegistryState(storage);
+      const removed = state.controllers.find(entry => entry.controllerId === controllerId) ?? null;
       const revoked = state.revoked.filter(entry => entry !== controllerId);
 
       await writeState({
         controllers: state.controllers.filter(entry => entry.controllerId !== controllerId),
         revoked: refuse ? [...revoked, controllerId].slice(-REVOKED_CONTROLLER_LIMIT) : revoked,
+        stopped: refuse ? withStopped(state.stopped, removed?.sessions ?? []) : state.stopped,
       });
 
-      return state.controllers.find(entry => entry.controllerId === controllerId) ?? null;
+      return removed;
     });
 
   return {
@@ -281,9 +305,25 @@ export const createLocalAgentControllerRegistry = ({
           }))
         );
 
-        await writeState({ ...state, controllers: [] });
+        await writeState({
+          ...state,
+          controllers: [],
+          stopped: withStopped(state.stopped, revoked),
+        });
 
         return revoked;
+      }),
+
+    wasStopped: sessionHandle =>
+      runExclusive(async () => {
+        // Every request asks this first: storage trouble must not turn every agent call into an internal error.
+        try {
+          const { stopped } = await loadRegistryState(storage);
+
+          return stopped.includes(sessionHandle);
+        } catch {
+          return false;
+        }
       }),
   };
 };

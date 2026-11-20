@@ -8,6 +8,8 @@ import {
   BenchmarkRunSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
+  routingTableKvKey,
+  TAXONOMY_ROUTE_KEYS,
   type BenchmarkConfig,
   type BenchmarkRun,
   type RoutingTable,
@@ -21,7 +23,7 @@ import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './schedu
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { computeEngineIdentity } from './run';
+import { computeEngineIdentity, publishPlatformRoutingTable } from './run';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
@@ -127,6 +129,7 @@ vi.mock('./db', async importOriginal => {
     getRunningRun: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
+    saveRoutingTable: vi.fn(),
   };
 });
 
@@ -162,6 +165,7 @@ import {
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
   replaceConfig,
+  saveRoutingTable,
 } from './db';
 import { lookupProfileStatuses, ProfileQuotaExceededError, registerProfiles } from './profiles';
 
@@ -682,6 +686,63 @@ describe('PUT /admin/config', () => {
     ]);
     expect(body.warnings[0].message).toContain('save again to retry now');
     expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
+  });
+
+  it('flushes an unchanged routing table on save after an earlier flush failed', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    const pairs = TEST_CONFIG.deciderModels.map(model => ({ model: model.id, variant: null }));
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue(
+      pairs.map(pair => ({ ...pair, variant: '', run_id: 'run-a' }))
+    );
+    vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([]);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      pairs.flatMap(pair =>
+        TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+          ...pair,
+          runId: 'run-a',
+          routeKey,
+          accuracy: 0.9,
+          avgCostUsd: 0.001,
+          avgInputTokens: null,
+          avgCachedInputTokens: null,
+          avgOutputTokens: null,
+          avgReasoningTokens: null,
+          avgLatencyMs: 100,
+          p50LatencyMs: 90,
+          p95LatencyMs: 120,
+          cases: 5,
+          errors: 0,
+          timeouts: 0,
+          routeAccuracy: null,
+        }))
+      )
+    );
+    const kvDelete = vi.mocked(env.AUTO_ROUTING_CONFIG.delete);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // The table reaches D1, then the KV flush fails.
+    kvDelete.mockRejectedValueOnce(new Error('KV unavailable'));
+    const failed = await authedPut('/admin/config', TEST_CONFIG);
+    await expect(failed.json()).resolves.toMatchObject({
+      warnings: [{ kind: 'routing_table_publish_failed' }],
+    });
+    expect(saveRoutingTable).toHaveBeenCalledOnce();
+    const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
+    vi.mocked(getLatestRoutingTable).mockResolvedValue({ table, publishedAt: table.generatedAt });
+
+    // The cron and run-end paths skip an unchanged table entirely.
+    kvDelete.mockClear();
+    await expect(publishPlatformRoutingTable(env, fetch)).resolves.toEqual({
+      version: table.version,
+    });
+    expect(kvDelete).not.toHaveBeenCalled();
+
+    // Saving again flushes the same version and reports success.
+    const retried = await authedPut('/admin/config', TEST_CONFIG);
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toMatchObject({ warnings: [] });
+    expect(kvDelete).toHaveBeenCalledExactlyOnceWith(routingTableKvKey('efficient'));
+    expect(saveRoutingTable).toHaveBeenCalledOnce();
   });
 
   it('keeps the previous release’s admin config fields on the resolved policy values', async () => {

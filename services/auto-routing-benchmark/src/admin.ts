@@ -171,7 +171,9 @@ async function syncRegistryAfterConfigSave(
     ];
   }
   try {
-    await publishPlatformRoutingTable(env, fetch, router);
+    // A save also flushes an unchanged table: an earlier save may have written
+    // it but failed the flush, and the version check would otherwise skip it.
+    await publishPlatformRoutingTable(env, fetch, router, { flushUnchangedTable: true });
   } catch (error) {
     console.warn(
       JSON.stringify({

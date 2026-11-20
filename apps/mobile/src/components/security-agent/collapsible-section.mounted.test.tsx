@@ -258,13 +258,18 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
     expect(animatedView(pageSection, BODY_CLASSES)).toBeDefined();
 
     // A surface body belongs to the header's card: one surface holds both, so
-    // no row group and no hairline splits them, and the body pulls up to the
-    // header's own bottom inset under its title.
+    // no row group and no hairline splits them, and the body starts at the
+    // header row's own bottom edge at the body's inner gap.
     const surfaceSection = mountSection({ expanded: true, bodyOnSurface: true });
     expect(surfaceSection.root.findAllByType(RowGroup)).toHaveLength(0);
-    const [surface] = surfaceSection.root.findAll(
+    const surfaces = surfaceSection.root.findAll(
       node => node.type === ('View' as ElementType) && node.props.className === SURFACE_CLASSES
     );
+    expect(surfaces).toHaveLength(1);
+    const [surface] = surfaces;
+    if (!surface) {
+      throw new Error('the surface body did not render the header and its body in one card');
+    }
     expect(surface.findAllByType('Pressable' as ElementType)).toHaveLength(1);
     expect(surface.findAll(node => node.children.includes(SECTION_BODY)).length).toBeGreaterThan(0);
     expect(animatedView(surfaceSection, SURFACE_BODY_CLASSES)).toBeDefined();

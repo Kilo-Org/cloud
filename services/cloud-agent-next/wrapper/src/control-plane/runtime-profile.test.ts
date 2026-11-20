@@ -703,7 +703,9 @@ describe('legacy skill writing', () => {
       const skillDir = path.join(home, '.kilocode/skills/review');
       expect(await fs.readFile(path.join(skillDir, 'SKILL.md'), 'utf8')).toBe('# Review');
       expect(await fs.readFile(path.join(skillDir, 'A.md'), 'utf8')).toBe('first');
-      expect(existsSync(path.join(skillDir, 'a.md'))).toBe(false);
+      expect((await fs.readdir(skillDir)).filter(name => name.toLowerCase() === 'a.md')).toEqual([
+        'A.md',
+      ]);
       expect(await fs.readFile(path.join(skillDir, 'nested/guide.txt'), 'utf8')).toBe('safe');
       expect(await fs.readFile(path.join(skillDir, 'x'.repeat(200)), 'utf8')).toBe(
         'valid boundary'

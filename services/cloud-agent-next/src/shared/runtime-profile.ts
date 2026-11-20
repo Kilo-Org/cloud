@@ -74,7 +74,7 @@ export type AcceptedRuntimeSkillFiles = {
 export function acceptedRuntimeSkillFiles(
   files: Record<string, string>
 ): AcceptedRuntimeSkillFiles {
-  const accepted: Record<string, string> = {};
+  const accepted: Array<[string, string]> = [];
   const rejected: AcceptedRuntimeSkillFiles['rejected'] = [];
   const seen = new Set<string>();
   for (const [path, content] of Object.entries(files)) {
@@ -88,9 +88,9 @@ export function acceptedRuntimeSkillFiles(
       continue;
     }
     seen.add(folded);
-    accepted[path] = content;
+    accepted.push([path, content]);
   }
-  return { accepted, rejected };
+  return { accepted: Object.fromEntries(accepted), rejected };
 }
 
 /** Validate a map of companion files bundled with a skill. */

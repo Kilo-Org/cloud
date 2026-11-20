@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { RuntimeSkillSchema, RuntimeSkillsSchema } from './runtime-profile.js';
+import {
+  acceptedRuntimeSkillFiles,
+  RuntimeSkillSchema,
+  RuntimeSkillsSchema,
+} from './runtime-profile.js';
 
 describe('skills.sh runtime references', () => {
   it('accepts a qualified GitHub skill alongside a bundled skill', () => {
@@ -66,5 +70,13 @@ describe('runtime skill companion paths', () => {
   it('rejects companion keys that differ only by case', () => {
     expect(parseFiles({ 'A.md': 'a', 'a.md': 'b' }).success).toBe(false);
     expect(parseFiles({ 'a/b.md': 'a', 'A/B.md': 'b' }).success).toBe(false);
+  });
+
+  it('keeps a key spelled like an inherited property', () => {
+    const files = Object.fromEntries([['__proto__', 'keep']]);
+    expect(parseFiles(files).success).toBe(true);
+    expect(Object.entries(acceptedRuntimeSkillFiles(files).accepted)).toEqual([
+      ['__proto__', 'keep'],
+    ]);
   });
 });

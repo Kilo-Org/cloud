@@ -47,4 +47,9 @@ describe('acceptedSkillCompanionFiles', () => {
       'A.md': 'first',
     });
   });
+
+  test('keeps a key spelled like an inherited property', () => {
+    const accepted = acceptedSkillCompanionFiles(Object.fromEntries([['__proto__', 'keep']]));
+    expect(Object.entries(accepted)).toEqual([['__proto__', 'keep']]);
+  });
 });

@@ -35,7 +35,7 @@ export function skillCompanionFileSegments(path: string): string[] | null {
  * value.
  */
 export function acceptedSkillCompanionFiles(files: Record<string, string>): Record<string, string> {
-  const accepted: Record<string, string> = {};
+  const accepted: Array<[string, string]> = [];
   const seen = new Set<string>();
   for (const [path, content] of Object.entries(files)) {
     const segments = skillCompanionFileSegments(path);
@@ -44,9 +44,9 @@ export function acceptedSkillCompanionFiles(files: Record<string, string>): Reco
     const folded = joined.toLowerCase();
     if (folded === SKILL_MANIFEST_FILE_NAME || seen.has(folded)) continue;
     seen.add(folded);
-    accepted[joined] = content;
+    accepted.push([joined, content]);
   }
-  return accepted;
+  return Object.fromEntries(accepted);
 }
 
 /**

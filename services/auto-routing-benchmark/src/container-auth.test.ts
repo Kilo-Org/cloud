@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   serverOptions: undefined as undefined | ServerOptions,
   spawn: vi.fn(),
   mkdtemp: vi.fn(),
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
   rm: vi.fn(),
   close: vi.fn(),
   exit: vi.fn<typeof process.exit>(),
@@ -36,6 +38,8 @@ vi.mock('node:http', () => ({
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
 vi.mock('node:fs/promises', () => ({
   mkdtemp: mocks.mkdtemp,
+  mkdir: mocks.mkdir,
+  writeFile: mocks.writeFile,
   rm: mocks.rm,
 }));
 
@@ -145,6 +149,8 @@ beforeEach(() => {
   mocks.children = [];
   mocks.spawn.mockReset().mockImplementation(createChild);
   mocks.mkdtemp.mockReset().mockResolvedValue('/tmp/benchmark-auth-test');
+  mocks.mkdir.mockReset().mockResolvedValue(undefined);
+  mocks.writeFile.mockReset().mockResolvedValue(undefined);
   mocks.rm.mockReset().mockResolvedValue(undefined);
   mocks.close.mockReset();
   mocks.exit.mockReset();
@@ -201,6 +207,30 @@ it('/run sends the prompt on stdin and disables automatic ingest while preservin
   });
   mocks.children[0].emit('close', 0);
   expect((await pending.done).status).toBe(200);
+});
+
+it.each([
+  ['an ordinary case keeps the inherited working directory', {}, '/app'],
+  ['an isolated case runs in its own workspace', { isolated: true }, '/tmp/benchmark-auth-test'],
+])('/run: %s', async (_kind, isolation, pwd) => {
+  vi.stubEnv('PWD', '/app');
+  await loadServer();
+  const pending = request('/run', { ...runBody, ...isolation });
+  await flushServer();
+  const options = mocks.spawn.mock.calls[0][2];
+  expect(options.cwd).toBe('/tmp/benchmark-auth-test');
+  expect(options.env.PWD).toBe(pwd);
+  mocks.children[0].emit('close', 0);
+  expect((await pending.done).status).toBe(200);
+});
+
+it('/run rejects a non-boolean isolation flag', async () => {
+  await loadServer();
+  expect(await request('/run', { ...runBody, isolated: 'yes' }).done).toEqual({
+    status: 400,
+    body: { error: 'isolated must be a boolean when provided' },
+  });
+  expect(mocks.spawn).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -360,6 +390,102 @@ it('keeps local warmup and real cases in the same serialized CLI lane', async ()
   expect(mocks.spawn.mock.calls[1][1][0]).toBe('run');
   mocks.children[1].emit('close', 0);
   await run.done;
+});
+
+const seed = {
+  files: { 'src/sum.js': 'export const sum = (a, b) => a - b;\n', 'README.md': 'notes\n' },
+  session: { info: { id: 'ses_000000000000abcdefghijklmn' }, messages: [] },
+};
+
+it('/run imports a seeded session into the case workspace and resumes it', async () => {
+  await loadServer();
+  const pending = request('/run', { ...runBody, prompt: 'Continue.', seed });
+  await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledOnce());
+  expect(mocks.writeFile.mock.calls).toEqual([
+    ['/tmp/benchmark-auth-test/src/sum.js', seed.files['src/sum.js']],
+    ['/tmp/benchmark-auth-test/README.md', seed.files['README.md']],
+    ['/tmp/benchmark-auth-test.session.json', JSON.stringify(seed.session)],
+  ]);
+  expect(mocks.mkdir).toHaveBeenCalledWith('/tmp/benchmark-auth-test/src', { recursive: true });
+  const [command, importArgs, importOptions] = mocks.spawn.mock.calls[0];
+  expect([command, importArgs]).toEqual([
+    'kilo',
+    ['import', '/tmp/benchmark-auth-test.session.json'],
+  ]);
+  expect(importOptions.cwd).toBe('/tmp/benchmark-auth-test');
+  expect(importOptions.env.PWD).toBe('/tmp/benchmark-auth-test');
+  expect(importOptions.stdio).toEqual(['ignore', 'pipe', 'pipe']);
+  expect(importOptions.env.KILO_DISABLE_SESSION_INGEST).toBe('1');
+  expect(JSON.parse(importOptions.env.KILO_AUTH_CONTENT)).toEqual({
+    kilo: { type: 'api', key: 'test-benchmark-token', organizationId: 'test-org' },
+  });
+  mocks.children[0].emit('close', 0);
+  await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(2));
+  const [, runArgs, runOptions] = mocks.spawn.mock.calls[1];
+  expect(runArgs).toEqual([
+    'run',
+    '--format',
+    'json',
+    '--auto',
+    '-m',
+    'kilo/test-model',
+    '--variant',
+    'high',
+    '--session',
+    seed.session.info.id,
+  ]);
+  expect(runOptions.cwd).toBe('/tmp/benchmark-auth-test');
+  expect(runOptions.env).toEqual(importOptions.env);
+  expect(mocks.children[1].stdin.end).toHaveBeenCalledExactlyOnceWith('Continue.');
+  mocks.children[1].stdout.emit('data', Buffer.from('{"type":"text"}\n'));
+  mocks.children[1].emit('close', 0);
+  expect(await pending.done).toMatchObject({
+    status: 200,
+    body: { exitCode: 0, stdoutLines: ['{"type":"text"}'], timedOut: false },
+  });
+  expect(mocks.rm).toHaveBeenCalledWith('/tmp/benchmark-auth-test.session.json', { force: true });
+  expect(mocks.rm).toHaveBeenCalledWith('/tmp/benchmark-auth-test', {
+    recursive: true,
+    force: true,
+  });
+});
+
+it('completes a seeded case with the failed import instead of calling the model', async () => {
+  await loadServer();
+  const pending = request('/run', { ...runBody, seed });
+  await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledOnce());
+  mocks.children[0].stderr.emit('data', Buffer.from('SchemaError: Expected "msg"'));
+  mocks.children[0].emit('close', 1);
+  expect(await pending.done).toMatchObject({
+    status: 200,
+    body: {
+      exitCode: 1,
+      stdoutLines: [],
+      stderrTail: 'kilo import failed with exit code 1\nSchemaError: Expected "msg"',
+      timedOut: false,
+    },
+  });
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  expect(mocks.rm).toHaveBeenCalledWith('/tmp/benchmark-auth-test.session.json', { force: true });
+});
+
+it.each([
+  ['a parent segment', { ...seed, files: { '../escape.js': 'x' } }],
+  ['a nested parent segment', { ...seed, files: { 'src/../../escape.js': 'x' } }],
+  ['an absolute path', { ...seed, files: { '/etc/passwd': 'x' } }],
+  ['a Windows separator', { ...seed, files: { 'src\\..\\..\\escape.js': 'x' } }],
+  ['an empty segment', { ...seed, files: { 'src//sum.js': 'x' } }],
+  ['a non-string file', { ...seed, files: { 'src/sum.js': 1 } }],
+  ['a session id that is a flag', { ...seed, session: { info: { id: '--help' }, messages: [] } }],
+  ['a session without messages', { ...seed, session: { info: { id: 'ses_abc' } } }],
+  ['no files', { session: seed.session }],
+])('/run rejects a seed with %s before touching the workspace', async (_problem, invalid) => {
+  await loadServer();
+  const { status } = await request('/run', { ...runBody, seed: invalid }).done;
+  expect(status).toBe(400);
+  expect(mocks.mkdtemp).not.toHaveBeenCalled();
+  expect(mocks.writeFile).not.toHaveBeenCalled();
+  expect(mocks.spawn).not.toHaveBeenCalled();
 });
 
 it('exits cleanly on idle SIGTERM without registering a real signal listener', async () => {

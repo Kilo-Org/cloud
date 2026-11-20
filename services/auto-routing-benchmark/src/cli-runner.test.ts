@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import * as z from 'zod';
 import {
+  continuationSeed,
   destroyDeciderCliContainer,
   isCatalogLoadFailureResult,
   isExactModelUnavailableResult,
@@ -8,7 +10,7 @@ import {
   runDeciderCaseViaCli,
   warmUpCliContainer,
 } from './cli-runner';
-import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
+import { DECIDER_CASES, FRONTIER_CASES, type DeciderCase } from './datasets/decider-cases';
 import { materializeLongContext } from './datasets/long-context';
 
 const benchCase = {
@@ -100,6 +102,253 @@ describe('runDeciderCaseViaCli prompt', () => {
     );
     expect(prompt).toContain('BEGIN WORKSPACE SNAPSHOT');
     expect(prompt.length).toBeGreaterThan(longCase.userPrompt.length * 10);
+  });
+});
+
+const continuationCase: DeciderCase = {
+  id: 'continuation-fixture',
+  taskType: 'agentic_execution',
+  subtaskType: 'terminal_operations',
+  systemPrompt: 'system',
+  userPrompt: 'Make the tests pass.',
+  check: { kind: 'exact', value: 'PASS' },
+  requiredToolCalls: 1,
+  continuation: {
+    files: { 'src/sum.js': 'export const sum = (a, b) => a - b;\n', 'package.json': '{}\n' },
+    steps: [
+      {
+        text: 'Looking at the code first.',
+        calls: [
+          { tool: 'bash', command: 'ls src', description: 'List sources', output: 'sum.js\n' },
+          {
+            tool: 'bash',
+            command: 'cat src/sum.js',
+            description: 'Read sum',
+            output: 'export const sum = (a, b) => a - b;\n',
+          },
+        ],
+      },
+      { calls: [{ tool: 'bash', command: 'node -v', description: 'Node', output: 'v22.0.0\n' }] },
+    ],
+    message: 'Continue.',
+  },
+};
+
+// The fields `kilo import` 7.8.27 decodes (packages/schema/src/v1/session.ts).
+const cliId = (prefix: string) => z.string().regex(new RegExp(`^${prefix}_[0-9a-f]{12}\\w{14}$`));
+const nonNegativeInt = z.number().int().nonnegative();
+const tokens = z.object({
+  input: z.number(),
+  output: z.number(),
+  reasoning: z.number(),
+  cache: z.object({ read: z.number(), write: z.number() }),
+});
+const partBase = { id: cliId('prt'), sessionID: cliId('ses'), messageID: cliId('msg') };
+const cliPart = z.discriminatedUnion('type', [
+  z.object({ ...partBase, type: z.literal('text'), text: z.string() }),
+  z.object({ ...partBase, type: z.literal('step-start') }),
+  z.object({
+    ...partBase,
+    type: z.literal('tool'),
+    callID: z.string(),
+    tool: z.literal('bash'),
+    state: z.object({
+      status: z.literal('completed'),
+      input: z.object({ command: z.string(), description: z.string() }),
+      output: z.string(),
+      title: z.string(),
+      metadata: z.record(z.string(), z.unknown()),
+      time: z.object({ start: nonNegativeInt, end: nonNegativeInt }),
+    }),
+  }),
+  z.object({
+    ...partBase,
+    type: z.literal('step-finish'),
+    reason: z.string(),
+    cost: z.number(),
+    tokens,
+  }),
+]);
+const cliModel = { providerID: z.literal('kilo'), modelID: z.string() };
+const cliMessage = z.discriminatedUnion('role', [
+  z.object({
+    id: cliId('msg'),
+    sessionID: cliId('ses'),
+    role: z.literal('user'),
+    time: z.object({ created: nonNegativeInt }),
+    agent: z.string(),
+    model: z.object({ ...cliModel, variant: z.string().optional() }),
+  }),
+  z.object({
+    id: cliId('msg'),
+    sessionID: cliId('ses'),
+    role: z.literal('assistant'),
+    time: z.object({ created: nonNegativeInt, completed: nonNegativeInt }),
+    parentID: cliId('msg'),
+    ...cliModel,
+    mode: z.string(),
+    agent: z.string(),
+    path: z.object({ cwd: z.string(), root: z.string() }),
+    cost: z.number(),
+    tokens,
+    variant: z.string().optional(),
+  }),
+]);
+const cliExport = z.object({
+  info: z.object({
+    id: cliId('ses'),
+    slug: z.string(),
+    title: z.string(),
+    version: z.string(),
+    time: z.object({ created: nonNegativeInt, updated: nonNegativeInt }),
+    permission: z.array(
+      z.object({
+        permission: z.string(),
+        action: z.enum(['allow', 'deny', 'ask']),
+        pattern: z.string(),
+      })
+    ),
+  }),
+  messages: z.array(z.object({ info: cliMessage, parts: z.array(cliPart) })),
+});
+
+// The id the CLI generates for its first record of a run at `time`.
+function runtimeId(prefix: string, time: number) {
+  return `${prefix}_${(time * 0x1000 + 1).toString(16).padStart(12, '0')}00000000000000`;
+}
+
+describe('continuation seed', () => {
+  const seed = continuationSeed(continuationCase, 'vendor/model', 'high', 'abcdefghijklmn');
+  if (!seed) throw new Error('continuation case needs a seed');
+  const session = cliExport.parse(seed.session);
+
+  it('exports the task message and every taken step as a CLI session', () => {
+    expect(seed.files).toEqual(continuationCase.continuation?.files);
+    const [user, ...steps] = session.messages;
+    expect(user?.info).toMatchObject({
+      role: 'user',
+      agent: 'code',
+      model: { providerID: 'kilo', modelID: 'vendor/model', variant: 'high' },
+    });
+    expect(user?.parts).toEqual([
+      expect.objectContaining({
+        type: 'text',
+        text: `system\n\nMake the tests pass.${FINAL_ANSWER}`,
+      }),
+    ]);
+    expect(steps.map(step => step.parts.map(part => part.type))).toEqual([
+      ['step-start', 'text', 'tool', 'tool', 'step-finish'],
+      ['step-start', 'tool', 'step-finish'],
+    ]);
+    expect(
+      steps.flatMap(step =>
+        step.parts.flatMap(part =>
+          part.type === 'tool' ? [[part.state.input, part.state.output]] : []
+        )
+      )
+    ).toEqual([
+      [{ command: 'ls src', description: 'List sources' }, 'sum.js\n'],
+      [
+        { command: 'cat src/sum.js', description: 'Read sum' },
+        'export const sum = (a, b) => a - b;\n',
+      ],
+      [{ command: 'node -v', description: 'Node' }, 'v22.0.0\n'],
+    ]);
+    for (const step of steps) {
+      expect(step.info).toMatchObject({
+        role: 'assistant',
+        parentID: user?.info.id,
+        providerID: 'kilo',
+        modelID: 'vendor/model',
+        variant: 'high',
+      });
+    }
+    for (const message of session.messages) {
+      expect(message.info.sessionID).toBe(session.info.id);
+      for (const part of message.parts) {
+        expect(part).toMatchObject({ sessionID: session.info.id, messageID: message.info.id });
+      }
+    }
+  });
+
+  it('orders the seeded history before anything the resumed run creates', () => {
+    const messageIds = session.messages.map(message => message.info.id);
+    const partIds = session.messages.flatMap(message => message.parts.map(part => part.id));
+    expect(messageIds).toEqual([...messageIds].sort());
+    expect(partIds).toEqual([...partIds].sort());
+    const runStart = Date.UTC(2020, 0, 1);
+    expect(messageIds.every(id => id < runtimeId('msg', runStart))).toBe(true);
+    expect(partIds.every(id => id < runtimeId('prt', runStart))).toBe(true);
+  });
+
+  it('gives every run of the same case its own session', () => {
+    const other = continuationSeed(continuationCase, 'vendor/model', null, 'opqrstuvwxyz01');
+    if (!other) throw new Error('continuation case needs a seed');
+    const ids = (exported: typeof session) => [
+      exported.info.id,
+      ...exported.messages.flatMap(message => [
+        message.info.id,
+        ...message.parts.map(part => part.id),
+      ]),
+    ];
+    const otherSession = cliExport.parse(other.session);
+    expect(ids(otherSession).filter(id => ids(session).includes(id))).toEqual([]);
+    expect(otherSession.messages[0]?.info).not.toHaveProperty('model.variant');
+  });
+
+  it('has no seed for an ordinary case', () => {
+    expect(continuationSeed(benchCase, 'vendor/model', null, 'abcdefghijklmn')).toBeNull();
+  });
+});
+
+describe('runDeciderCaseViaCli continuation body', () => {
+  async function sentBody(benchCase: DeciderCase) {
+    const fetch = vi.fn(async (_request: Request) =>
+      Response.json({ exitCode: 0, durationMs: 1, stdoutLines: [], stderrTail: '' })
+    );
+    const { env } = createEnv(fetch);
+    await runDeciderCaseViaCli(env, {
+      instanceName: 'run:model:0',
+      model: 'vendor/model',
+      benchCase,
+      kiloToken: 'kilo-user-token',
+      kiloApiUrl: 'http://host.docker.internal:3000',
+      variant: 'high',
+    });
+    const request = fetch.mock.calls[0]?.[0];
+    if (!request) throw new Error('no container request');
+    return readJsonBody(request);
+  }
+
+  it('resumes a continuation case isolated, with its message and its imported session', async () => {
+    const body = await sentBody(continuationCase);
+    expect(body.prompt).toBe('Continue.');
+    expect(body.isolated).toBe(true);
+    const seed = z
+      .object({ files: z.record(z.string(), z.string()), session: cliExport })
+      .parse(body.seed);
+    expect(seed.files).toEqual(continuationCase.continuation?.files);
+    expect(seed.session.messages).toHaveLength(3);
+  });
+
+  it('isolates a tool-required case without seeding a session', async () => {
+    const body = await sentBody({ ...benchCase, requiredToolCalls: 1 });
+    expect(body.isolated).toBe(true);
+    expect(body).not.toHaveProperty('seed');
+  });
+
+  it('keeps the measured body of an ordinary case', async () => {
+    const body = await sentBody(benchCase);
+    expect(Object.keys(body)).toEqual([
+      'model',
+      'prompt',
+      'kiloToken',
+      'kiloApiUrl',
+      'orgId',
+      'timeoutMs',
+      'variant',
+      'resultCallback',
+    ]);
   });
 });
 describe('runDeciderCaseViaCli', () => {

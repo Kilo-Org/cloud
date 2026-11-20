@@ -252,7 +252,13 @@ function schedulerDatabase(): D1Database {
   };
   const db = {
     prepare: vi.fn(prepare),
-    batch: vi.fn().mockResolvedValue([]),
+    // D1 returns one result per statement, in order. An empty array made every caller's
+    // destructure (`[a, b] = await db.batch([...])`) silently `undefined`, which is why an
+    // initialization failure surfaced as `Cannot read properties of undefined (reading
+    // 'meta')` instead of the assertion it was meant to make.
+    batch: vi.fn(async (statements: unknown[]) =>
+      statements.map(() => ({ results: [], success: true, meta: { changes: 0 } }))
+    ),
   } as unknown as D1Database;
   return db;
 }

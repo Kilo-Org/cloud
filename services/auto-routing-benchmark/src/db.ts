@@ -1065,9 +1065,14 @@ export async function quarantineProfileClaimsForRuns(
     const [profiles, remeasures] = await db.batch([
       db
         .prepare(
+          // Only a live claim is parked. A run can still be pointed at by a `ready` row it
+          // measured (a partially measured legacy run, or an admin-cancelled run whose
+          // completed entries were published): that row keeps its measurement, its
+          // provenance and its place in the routing table. Parking it would strip a valid
+          // result from the pool and re-admit work nobody asked for again.
           `UPDATE benchmark_profiles
           SET status = 'pending', run_id = NULL, requested_at = ?, updated_at = ?
-          WHERE run_id IN (${placeholders})`
+          WHERE run_id IN (${placeholders}) AND status = 'running'`
         )
         .bind(PARKED_REQUESTED_AT, nowIso, ...ids),
       db
@@ -1240,7 +1245,13 @@ export function completePaidCaseStatements(
  * their request rows show `failed`. Without this the request would wait forever on a case
  * that can never be measured. Settled rows and their results are never touched.
  */
-export async function failPaidCasesForUnavailablePair(
+/**
+ * The paid-link terminalization statements, prepared so a caller can commit them in the same
+ * D1 batch as the scheduler transition that killed the lane (`failDeadLaneAndPaidLinks`,
+ * src/run.ts). Both commit or neither does: a paid link can never survive the lane failure
+ * that made it unmeasurable, and a lane can never die while its links wait forever.
+ */
+export function failPaidCasesForUnavailablePairStatements(
   db: D1Database,
   input: {
     engineIdentity: string;
@@ -1248,33 +1259,57 @@ export async function failPaidCasesForUnavailablePair(
     variant: string;
     reason: string;
     transitionId: string;
+    /**
+     * The exact scheduler claim that owns this lane, when the caller is a scheduler pass.
+     * Both statements then require that claim to still be `active` under its own id and
+     * token, so a stale claim that lost the lane writes nothing at all — not even the paid
+     * links. Omitted for a direct, non-scheduler caller, which is the only case allowed to
+     * terminalize without proving a live claim.
+     */
+    claim?: { id: string; token: string };
     now?: number;
   }
-): Promise<number> {
+): D1PreparedStatement[] {
   const at = new Date(input.now ?? Date.now()).toISOString();
   const pairPredicate = `engine_identity = ? AND model = ? AND variant = ?`;
   const pairBindings = [input.engineIdentity, input.model, input.variant];
+  const claimPredicate = input.claim
+    ? `EXISTS (
+        SELECT 1 FROM scheduler_chunks AS owner
+        WHERE owner.id = ? AND owner.token = ? AND owner.status = 'active'
+      )`
+    : '1 = 1';
+  const claimBindings: Array<string> = input.claim ? [input.claim.id, input.claim.token] : [];
   // Two independent fences, both required:
   // 1. the exact pair (`engine_identity`, `model`, `variant`) — a `rep`/`case_id` pair is
   //    shared by every model measured on the same cases, so correlating on those alone would
   //    fail a different model's rows;
   // 2. the transition id this call just wrote, so only rows whose own case run was failed by
   //    this batch move. Covered, settled, completed and later generations keep their state.
-  const [runs] = await db.batch([
+  // A scheduler caller additionally fences both writes on its own live claim, so a stale
+  // claim can never terminalize a link another pass is about to measure.
+  return [
     db
       .prepare(
         `UPDATE benchmark_case_runs
         SET status = 'failed', failure_reason = ?, settled_at = ?, settlement_id = ?,
           updated_at = ?
-        WHERE ${pairPredicate} AND status IN ('queued', 'running') AND platform_covered = 0`
+        WHERE ${pairPredicate} AND status IN ('queued', 'running') AND platform_covered = 0
+          AND ${claimPredicate}
+          -- Liveness comes from the owned claim and the live status, not from settlement
+          -- metadata: a reclaimed generation legitimately carries a *stale* settlement_id
+          -- (the store bumps generation without clearing it), and this statement overwrites
+          -- it with this batch's own id below. Idempotency is the status predicate: a repeat
+          -- pass finds the row already terminal and matches nothing.`
       )
-      .bind(input.reason, at, input.transitionId, at, ...pairBindings),
+      .bind(input.reason, at, input.transitionId, at, ...pairBindings, ...claimBindings),
     db
       .prepare(
         `UPDATE paid_benchmark_request_cases
         SET status = 'failed', reason = ?, updated_at = ?
         WHERE ${pairPredicate}
           AND status IN ('queued', 'running')
+          AND ${claimPredicate}
           AND EXISTS (
             SELECT 1 FROM benchmark_case_runs AS case_run
             WHERE case_run.engine_identity = paid_benchmark_request_cases.engine_identity
@@ -1286,8 +1321,22 @@ export async function failPaidCasesForUnavailablePair(
               AND case_run.settlement_id = ?
           )`
       )
-      .bind(input.reason, at, ...pairBindings, input.transitionId),
-  ]);
+      .bind(input.reason, at, ...pairBindings, ...claimBindings, input.transitionId),
+  ];
+}
+
+export async function failPaidCasesForUnavailablePair(
+  db: D1Database,
+  input: {
+    engineIdentity: string;
+    model: string;
+    variant: string;
+    reason: string;
+    transitionId: string;
+    now?: number;
+  }
+): Promise<number> {
+  const [runs] = await db.batch(failPaidCasesForUnavailablePairStatements(db, input));
   return runs.meta.changes ?? 0;
 }
 

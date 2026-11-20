@@ -90,7 +90,7 @@ import {
   releaseUncommittedRunClaimsStatement,
   releaseUnbilledPaidGenerationBatch,
   failOrphanedRunningProfiles,
-  failPaidCasesForUnavailablePair,
+  failPaidCasesForUnavailablePairStatements,
   recordLaneFailure,
   replaceModelSummaries,
   saveRoutingTable,
@@ -190,7 +190,7 @@ import {
   deferChunk,
   deferThrottledChunk,
   failChunk,
-  failScheduledEntry,
+  failScheduledEntryStatements,
   finishChunk,
   getChunk,
   getPaidCaseStartedAt,
@@ -2551,6 +2551,57 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
   return true;
 }
 
+/**
+ * Kill a lane that can never measure its pair, and terminalize the paid links waiting on it,
+ * in ONE D1 batch.
+ *
+ * `failScheduledEntry` used to commit on its own and the money-side write was best-effort
+ * afterwards: because the chunk's attempts are already spent at that point, a rejected second
+ * write stranded an active request on a case nobody could ever measure. Both write sets now
+ * carry the same owned-claim fence and commit together, so the two states can never disagree.
+ *
+ * On failure nothing is written: the chunk keeps its active lease, `recoverChunks` re-enters
+ * this same path on a later pass, and the metadata commit happens then. That retry only
+ * replays bookkeeping — the case's output is already durable, so no paid inference is issued
+ * again.
+ */
+async function failDeadLaneAndPaidLinks(
+  env: Env,
+  claim: SchedulerClaim,
+  failureClass: BenchmarkProfileFailureClass,
+  reason: string,
+  transitionPrefix: string
+): Promise<void> {
+  const state = await getRunState(env, claim.run_id);
+  // The transition id names the exact lane that writes it (claim id + token), so a different
+  // claim's terminal pass can never match this generation's rows even if it targets the same
+  // pair. Bounded: the claim id and token are short-lived identifiers the scheduler already
+  // stores verbatim.
+  const transitionId = [
+    transitionPrefix,
+    claim.run_id,
+    claim.model,
+    claim.variant,
+    claim.id,
+    claim.token,
+  ].join(':');
+  // The paid statements go FIRST and carry the same owned-claim fence, so a stale claim that
+  // lost the lane writes nothing at all: if `id`/`token` are no longer the active owner, both
+  // paid updates match zero rows, and the lane death that follows matches zero too. Ordering
+  // also means the link terminalization reads the live chunk state it is fenced on.
+  await env.BENCH_DB.batch([
+    ...failPaidCasesForUnavailablePairStatements(env.BENCH_DB, {
+      engineIdentity: state.engineIdentity,
+      model: claim.model,
+      variant: claim.variant,
+      reason,
+      transitionId,
+      claim: { id: claim.id, token: claim.token },
+    }),
+    ...failScheduledEntryStatements(env.BENCH_DB, claim, failureClass),
+  ]);
+}
+
 async function processScheduledChunk(env: Env, id: string, token: string): Promise<void> {
   const claim = await getChunk(env.BENCH_DB, id, token);
   if (!claim) return;
@@ -2634,16 +2685,15 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         [{ model: claim.model, variant: claim.variant }],
         { failureClass: 'model_not_found', reason: PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON }
       );
-      await failScheduledEntry(env.BENCH_DB, claim, 'model_not_found');
       // A permanently unavailable lane must not leave a paid request waiting on cases that
-      // can never be measured; they fail with the exact reason instead.
-      await failPaidCasesForUnavailablePair(env.BENCH_DB, {
-        engineIdentity: (await getRunState(env, claim.run_id)).engineIdentity,
-        model: claim.model,
-        variant: claim.variant,
-        reason: PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON,
-        transitionId: `unavailable:${claim.run_id}:${claim.model}:${claim.variant}`,
-      }).catch(() => {});
+      // can never be measured: the lane death and the link terminalization commit together.
+      await failDeadLaneAndPaidLinks(
+        env,
+        claim,
+        'model_not_found',
+        PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON,
+        'unavailable'
+      );
     } else if (error instanceof BenchmarkProbeFamilyError) {
       // No amount of retrying builds a request this worker can send, and the pair must not
       // reach `ready` with probe results missing: it fails with the exact reason.
@@ -2653,14 +2703,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         [{ model: claim.model, variant: claim.variant }],
         { failureClass: 'unsupported', reason: error.reason }
       );
-      await failScheduledEntry(env.BENCH_DB, claim, 'unsupported');
-      await failPaidCasesForUnavailablePair(env.BENCH_DB, {
-        engineIdentity: (await getRunState(env, claim.run_id)).engineIdentity,
-        model: claim.model,
-        variant: claim.variant,
-        reason: error.reason,
-        transitionId: `unsupported:${claim.run_id}:${claim.model}:${claim.variant}`,
-      }).catch(() => {});
+      await failDeadLaneAndPaidLinks(env, claim, 'unsupported', error.reason, 'unsupported');
     } else if (error instanceof ChunkClaimLostError) {
       await deferChunk(env.BENCH_DB, id, token, Date.now());
     } else if (error instanceof PaidCaseAttachedError) {

@@ -695,13 +695,18 @@ export async function failChunk(db: D1Database, id: string, token: string): Prom
     .run();
 }
 
-export async function failScheduledEntry(
+/**
+ * The terminal-lane statements, prepared so a caller can commit them in one batch with its
+ * own writes (`failDeadLaneAndPaidLinks`, src/run.ts). Both are fenced on the caller's own
+ * claim id + token being active, so a stale claim cannot fail a lane it does not own.
+ */
+export function failScheduledEntryStatements(
   db: D1Database,
   claim: SchedulerClaim,
   failureClass: BenchmarkProfileFailureClass,
   nowIso: string = new Date().toISOString()
-): Promise<void> {
-  await db.batch([
+): D1PreparedStatement[] {
+  return [
     db
       .prepare(`
         INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at, failure_class)
@@ -727,7 +732,16 @@ export async function failScheduledEntry(
           AND EXISTS (SELECT 1 FROM owned)
       `)
       .bind(claim.id, claim.token, claim.run_id, claim.model, claim.variant, claim.id, claim.token),
-  ]);
+  ];
+}
+
+export async function failScheduledEntry(
+  db: D1Database,
+  claim: SchedulerClaim,
+  failureClass: BenchmarkProfileFailureClass,
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  await db.batch(failScheduledEntryStatements(db, claim, failureClass, nowIso));
 }
 
 /**

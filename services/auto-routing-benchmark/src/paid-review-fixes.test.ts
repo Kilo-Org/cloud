@@ -1,7 +1,12 @@
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
-import { failPaidCasesForUnavailablePair, listPendingPaidCancellations } from './db';
+import {
+  failPaidCasesForUnavailablePair,
+  failPaidCasesForUnavailablePairStatements,
+  listPendingPaidCancellations,
+} from './db';
+import { failScheduledEntryStatements } from './scheduler';
 import { permanentFailureVetoes } from './case-inference';
 
 const NOW = Date.parse('2026-11-20T12:00:00.000Z');
@@ -206,6 +211,263 @@ describe('paid-benchmark review fixes (production migrations and real SQLite)', 
       { request_id: 'req-b', status: 'running' },
       { request_id: 'req-other', status: 'running' },
     ]);
+  });
+
+  it('commits the lane death and the paid-link fence atomically, then on retry', async () => {
+    // One batch carries the scheduler's terminal-lane writes and the paid-link
+    // terminalization. A rejected batch must leave BOTH states untouched, so the lane can be
+    // retried as pure metadata on a later pass; a committed batch applies both.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, min_accuracy,
+          switch_cost_factor, max_concurrency, repetitions, engine_identity, benchmark_user_id,
+          benchmark_org_id, admission_marker)
+        VALUES ('lane-run', 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 1, 1, ?,
+          'bot', 'org', ?)`
+      )
+      .run(new Date(NOW).toISOString(), ENGINE, crypto.randomUUID());
+    sqlite
+      .prepare(
+        `INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
+          case_ids, status, token, slot, lease_until, attempts)
+        VALUES ('lane-chunk', 'lane-run', 'vendor/m', '', '[]', 0, 0, '["case-dead"]', 'active',
+          'lane-token', 0, ?, 6)`
+      )
+      .run(NOW + 600_000);
+    caseRun({ caseId: 'case-dead' });
+    requestCase('req-dead', 'case-dead');
+
+    const claim = {
+      id: 'lane-chunk',
+      run_id: 'lane-run',
+      model: 'vendor/m',
+      variant: '',
+      rep: 0,
+      chunk: 0,
+      case_ids: '["case-dead"]',
+      slot: 0,
+      token: 'lane-token',
+      attempts: 6,
+      throttle_deferrals: 0,
+      catalog_deferrals: 0,
+    };
+    const batch = () => [
+      ...failScheduledEntryStatements(db, claim, 'model_not_found', new Date(NOW).toISOString()),
+      ...failPaidCasesForUnavailablePairStatements(db, {
+        engineIdentity: ENGINE,
+        model: 'vendor/m',
+        variant: '',
+        reason: 'unavailable',
+        transitionId: 'lane-fence',
+        now: NOW,
+      }),
+    ];
+    const state = () => ({
+      lane: sqlite
+        .prepare("SELECT COUNT(*) AS n FROM run_lane_failures WHERE run_id = 'lane-run'")
+        .get(),
+      chunk: sqlite.prepare("SELECT status FROM scheduler_chunks WHERE id = 'lane-chunk'").get(),
+      caseRun: sqlite
+        .prepare("SELECT status FROM benchmark_case_runs WHERE case_id = 'case-dead'")
+        .get(),
+      link: sqlite
+        .prepare("SELECT status FROM paid_benchmark_request_cases WHERE request_id = 'req-dead'")
+        .get(),
+    });
+
+    // Rejected batch: a trigger aborts the paid-link statement, so the whole batch rolls back.
+    sqlite.exec(`
+      CREATE TRIGGER block_link BEFORE UPDATE ON paid_benchmark_request_cases
+      BEGIN SELECT RAISE(ABORT, 'D1 overloaded'); END;
+    `);
+    await expect(db.batch(batch())).rejects.toThrow();
+    sqlite.exec('DROP TRIGGER block_link');
+    expect(state()).toEqual({
+      lane: { n: 0 },
+      chunk: { status: 'active' },
+      caseRun: { status: 'running' },
+      link: { status: 'running' },
+    });
+
+    // Retry, metadata only: both halves now commit together.
+    await db.batch(batch());
+    expect(state()).toEqual({
+      lane: { n: 1 },
+      chunk: { status: 'failed' },
+      caseRun: { status: 'failed' },
+      link: { status: 'failed' },
+    });
+  });
+
+  it('writes nothing at all from a stale claim, and never re-selects a later generation', async () => {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, min_accuracy,
+          switch_cost_factor, max_concurrency, repetitions, engine_identity, benchmark_user_id,
+          benchmark_org_id, admission_marker)
+        VALUES ('lane-run', 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 1, 1, ?,
+          'bot', 'org', ?)`
+      )
+      .run(new Date(NOW).toISOString(), ENGINE, crypto.randomUUID());
+    sqlite
+      .prepare(
+        `INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
+          case_ids, status, token, slot, lease_until, attempts)
+        VALUES ('lane-chunk', 'lane-run', 'vendor/m', '', '[]', 0, 0, '["case-dead"]', 'active',
+          'live-token', 0, ?, 6)`
+      )
+      .run(NOW + 600_000);
+    caseRun({ caseId: 'case-dead' });
+    requestCase('req-dead', 'case-dead');
+    const claim = (token: string) => ({
+      id: 'lane-chunk',
+      run_id: 'lane-run',
+      model: 'vendor/m',
+      variant: '',
+      rep: 0,
+      chunk: 0,
+      case_ids: '["case-dead"]',
+      slot: 0,
+      token,
+      attempts: 6,
+      throttle_deferrals: 0,
+      catalog_deferrals: 0,
+    });
+    const batch = (token: string) => [
+      ...failPaidCasesForUnavailablePairStatements(db, {
+        engineIdentity: ENGINE,
+        model: 'vendor/m',
+        variant: '',
+        reason: 'unavailable',
+        transitionId: 'lane-fence',
+        claim: { id: 'lane-chunk', token },
+        now: NOW,
+      }),
+      ...failScheduledEntryStatements(
+        db,
+        claim(token),
+        'model_not_found',
+        new Date(NOW).toISOString()
+      ),
+    ];
+    const state = () => ({
+      lane: sqlite
+        .prepare("SELECT COUNT(*) AS n FROM run_lane_failures WHERE run_id = 'lane-run'")
+        .get(),
+      chunk: sqlite.prepare("SELECT status FROM scheduler_chunks WHERE id = 'lane-chunk'").get(),
+      caseRun: sqlite
+        .prepare("SELECT status FROM benchmark_case_runs WHERE case_id = 'case-dead'")
+        .get(),
+      link: sqlite
+        .prepare("SELECT status FROM paid_benchmark_request_cases WHERE request_id = 'req-dead'")
+        .get(),
+    });
+
+    // A stale claim writes nothing: not the links, not the lane.
+    await db.batch(batch('stale-token'));
+    expect(state()).toEqual({
+      lane: { n: 0 },
+      chunk: { status: 'active' },
+      caseRun: { status: 'running' },
+      link: { status: 'running' },
+    });
+
+    // The exact live token commits both halves together.
+    await db.batch(batch('live-token'));
+    expect(state()).toEqual({
+      lane: { n: 1 },
+      chunk: { status: 'failed' },
+      caseRun: { status: 'failed' },
+      link: { status: 'failed' },
+    });
+
+    // Repeating the same metadata pass is a no-op: the settled generation is not
+    // re-transitioned and no later generation is selected.
+    await db.batch(batch('live-token'));
+    expect(state()).toEqual({
+      lane: { n: 1 },
+      chunk: { status: 'failed' },
+      caseRun: { status: 'failed' },
+      link: { status: 'failed' },
+    });
+  });
+
+  it('fences a reclaimed generation that still carries an old settlement id', async () => {
+    // The store bumps `generation` on reclaim and claim without clearing `settlement_id` and
+    // `settled_at`. A genuinely live generation therefore looks like this: status
+    // `running`, a *new* executor, and a stale settlement id from the cancelled attempt. The
+    // owned-claim fence must let its own lane terminalize it, and must still refuse a stale
+    // former claim.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, min_accuracy,
+          switch_cost_factor, max_concurrency, repetitions, engine_identity, benchmark_user_id,
+          benchmark_org_id, admission_marker)
+        VALUES ('lane-run', 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 1, 1, ?,
+          'bot', 'org', ?)`
+      )
+      .run(new Date(NOW).toISOString(), ENGINE, crypto.randomUUID());
+    sqlite
+      .prepare(
+        `INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
+          case_ids, status, token, slot, lease_until, attempts)
+        VALUES ('lane-chunk', 'lane-run', 'vendor/m', '', '[]', 0, 0, '["case-dead"]', 'active',
+          'new-token', 0, ?, 6)`
+      )
+      .run(NOW + 600_000);
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_case_runs (engine_identity, model, variant, rep, case_id, status,
+          generation, executor_run_id, executor_token, platform_covered, result_usable,
+          settlement_id, settled_at, created_at, updated_at)
+        VALUES (?, 'vendor/m', '', 0, 'case-dead', 'running', 5, 'lane-run', 'new-token', 0, 0,
+          'old-cancel-settlement', ?, ?, ?)`
+      )
+      .run(
+        ENGINE,
+        new Date(NOW - 60_000).toISOString(),
+        new Date(NOW).toISOString(),
+        new Date(NOW).toISOString()
+      );
+    requestCase('req-dead', 'case-dead');
+
+    const batch = (token: string) =>
+      failPaidCasesForUnavailablePairStatements(db, {
+        engineIdentity: ENGINE,
+        model: 'vendor/m',
+        variant: '',
+        reason: 'unavailable',
+        transitionId: `unavailable:lane-run:vendor/m::lane-chunk:${token}`,
+        claim: { id: 'lane-chunk', token },
+        now: NOW,
+      });
+    const state = () => ({
+      caseRun: sqlite
+        .prepare(
+          `SELECT status, settlement_id FROM benchmark_case_runs WHERE case_id = 'case-dead'`
+        )
+        .get(),
+      link: sqlite
+        .prepare("SELECT status FROM paid_benchmark_request_cases WHERE request_id = 'req-dead'")
+        .get(),
+    });
+
+    // The stale former claim writes nothing, even though the row is genuinely live.
+    await db.batch(batch('old-token'));
+    expect(state()).toEqual({
+      caseRun: { status: 'running', settlement_id: 'old-cancel-settlement' },
+      link: { status: 'running' },
+    });
+
+    // The exact current claim terminalizes both halves and replaces the stale metadata.
+    await db.batch(batch('new-token'));
+    expect(state()).toEqual({
+      caseRun: {
+        status: 'failed',
+        settlement_id: 'unavailable:lane-run:vendor/m::lane-chunk:new-token',
+      },
+      link: { status: 'failed' },
+    });
   });
 
   it('compares created_at as an integer epoch and excludes older intents', async () => {

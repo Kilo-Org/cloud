@@ -365,6 +365,45 @@ describe('paid cutover fences legacy measurement (production migrations and real
     ).toEqual({ status: 'running' });
   });
 
+  it('keeps a ready profile a retired run still points at', async () => {
+    // A partially measured or admin-cancelled run can still be the provenance of a `ready`
+    // row. Parking it would strip a valid, already-published measurement from the pool.
+    insertRun('legacy-platform', 'platform', LEGACY_STARTED, 'ready/model');
+    // The run claimed this pair and had already published it before it was retired.
+    sqlite
+      .prepare(
+        `UPDATE benchmark_profiles
+        SET status = 'ready', run_id = 'legacy-platform', completed_at = ?
+        WHERE model = 'ready/model'`
+      )
+      .run(LEGACY_STARTED);
+    // Its published measurement stays too.
+    sqlite
+      .prepare(
+        `INSERT INTO case_results (run_id, model, variant, case_id, score, latency_ms, exit_code,
+          timed_out, prompt_revision)
+        VALUES ('legacy-platform', 'ready/model', '', ?, 1, 10, 0, 0, 3)`
+      )
+      .run(DECIDER_CASES[0].id);
+
+    expect(await retireLegacyRunsAtCutover(env, CUTOVER)).toBeGreaterThan(0);
+
+    // The run is fenced, but the ready row keeps its status, provenance and measurement.
+    expect(
+      sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'legacy-platform'").get()
+    ).toEqual({ status: 'failed' });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT status, run_id, completed_at FROM benchmark_profiles WHERE model = 'ready/model'`
+        )
+        .get()
+    ).toEqual({ status: 'ready', run_id: 'legacy-platform', completed_at: LEGACY_STARTED });
+    expect(
+      sqlite.prepare("SELECT COUNT(*) AS n FROM case_results WHERE model = 'ready/model'").get()
+    ).toEqual({ n: 1 });
+  });
+
   it('retires a single run idempotently, leaving its measured rows alone', async () => {
     insertRun('legacy-platform', 'platform', LEGACY_STARTED);
     expect(await retireLegacyRunsAtCutover(env, CUTOVER)).toBe(1);

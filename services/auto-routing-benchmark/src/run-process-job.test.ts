@@ -38,6 +38,9 @@ vi.mock('./scheduler', async importOriginal => {
     deferThrottledChunk: vi.fn(),
     failChunk: vi.fn(),
     failScheduledEntry: vi.fn(),
+    // The terminal-lane and paid-link writes are prepared and committed as ONE batch, so the
+    // builders are the seam a test can see.
+
     finishChunk: vi.fn(),
     getChunk: vi.fn(),
     getPaidCaseStartedAt: vi.fn(),
@@ -90,6 +93,7 @@ vi.mock('./db', async importOriginal => {
   return {
     ...actual,
     countCaseResultsByLane: vi.fn(),
+
     readBenchmarkCutover: vi.fn(),
     readOwnedCaseGeneration: vi.fn(async () => null),
     copyRemeasureBaselines: vi.fn(),
@@ -539,6 +543,9 @@ beforeEach(async () => {
   vi.mocked(createDeciderJudge).mockReturnValue(async () => ({ probability: 0.8, costUsd: 0.001 }));
   vi.mocked(destroyDeciderCliContainer).mockResolvedValue(undefined);
   vi.mocked(warmUpCliContainer).mockResolvedValue(undefined);
+  // The dead-lane fencing helper is a spy per test; a rejection injected by one test must
+  // never leak into the next.
+
   vi.mocked(runDeciderCaseViaCli).mockResolvedValue(successfulCliResult);
   // These fixtures are platform runs, so admission needs no paid request. The claim batch is
   // the real shape: [fence insert, fence update, ledger insert, trailing row select]. The
@@ -2067,7 +2074,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
   ])(
     'fails unavailable exact entries immediately without scoring or retrying inference: %j',
     async unavailable => {
-      const claim = mockClaim({ variant: 'high', rep: 1 });
+      mockClaim({ variant: 'high', rep: 1 });
       mockRunSnapshot([
         { model, variant: 'high' },
         { model, variant: 'low' },
@@ -2096,12 +2103,59 @@ describe('processJob — scheduler waits and paid-call safety', () => {
           reason: expect.stringContaining('unavailable'),
         }
       );
-      expect(failScheduledEntry).toHaveBeenCalledWith(env.BENCH_DB, claim, 'model_not_found');
+      // One atomic batch: the lane transition and the paid-link terminalization commit
+      // together, so neither can be left stranded by the other failing.
+      const fence = dbBatch.mock.calls
+        .map(([statements]) => statements as FakeStatement[])
+        .find(statements =>
+          statements.some(statement => statement.sql.includes('run_lane_failures'))
+        );
+      expect(fence).toHaveLength(4);
+      // Both paid statements require the caller's own active claim.
+      for (const statement of (fence ?? []).slice(0, 2)) {
+        expect(statement.sql).toContain('scheduler_chunks');
+        expect(statement.sql).toContain("owner.status = 'active'");
+      }
+      // The paid statements come first and carry the same owned-claim fence, so a stale
+      // claim cannot terminalize a link the lane death would refuse.
+      const shapes = fence?.map(statement => statement.sql.replace(/\s+/g, ' ').trim()) ?? [];
+      expect(shapes[0]).toMatch(/^UPDATE benchmark_case_runs/);
+      expect(shapes[1]).toMatch(/^UPDATE paid_benchmark_request_cases/);
+      expect(shapes[2]).toMatch(/^INSERT INTO run_lane_failures/);
+      expect(shapes[3]).toMatch(/^WITH owned AS MATERIALIZED/);
       expect(markRunCompleted).not.toHaveBeenCalled();
       expect(deferChunk).not.toHaveBeenCalled();
       expect(queueSend).not.toHaveBeenCalled();
     }
   );
+
+  it('commits the lane death and its paid-link fence as one batch', async () => {
+    mockClaim({ variant: 'high', rep: 1 });
+    mockRunSnapshot([{ model, variant: 'high' }]);
+    vi.mocked(hasUnsettledChunks).mockResolvedValue(true);
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      costUsd: 0,
+      timedOut: false,
+      unavailableModelId: `kilo/${model}`,
+    });
+    const fenceBatches = () =>
+      dbBatch.mock.calls
+        .map(([statements]) => statements as FakeStatement[])
+        .filter(statements =>
+          statements.some(statement => statement.sql.includes('run_lane_failures'))
+        );
+
+    await processJob(env, deciderMessage());
+
+    // Four statements, one transaction: the two scheduler terminal-lane writes and the two
+    // paid-link terminalizations commit together, so neither half can strand the other.
+    expect(fenceBatches()).toHaveLength(1);
+    expect(fenceBatches()[0]).toHaveLength(4);
+    expect(failScheduledEntry).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+  });
 
   it.each([
     { stderrTail: 'Model not found: kilo/another/model', costUsd: null, timedOut: false },
@@ -2151,7 +2205,14 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     await processJob(env, deciderMessage());
 
     expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
-    expect(failScheduledEntry).toHaveBeenCalledTimes(1);
+    // The lane death and the paid-link fence are one batch, so neither can be left behind.
+    expect(
+      dbBatch.mock.calls.filter(([statements]) =>
+        (statements as FakeStatement[]).some(statement =>
+          statement.sql.includes('run_lane_failures')
+        )
+      )
+    ).toHaveLength(1);
     expect(upsertCaseResult).not.toHaveBeenCalled();
   });
 

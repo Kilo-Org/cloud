@@ -67,6 +67,26 @@ describe('GET /api/cron/db-replication-health', () => {
       expect.objectContaining({ healthy: true, problems: [] })
     );
     expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(console.log).not.toHaveBeenCalled();
+  });
+
+  it('logs disabled replicas without alerting', async () => {
+    const disabledReplicas = ['us-west', 'eu-central-2'];
+    const healthReport = report({ disabledReplicas });
+    mockCollect.mockResolvedValue(healthReport);
+
+    const response = await GET(createRequest({ authorization: 'Bearer cron-secret' }));
+
+    await expect(response.json()).resolves.toMatchObject({ healthy: true, disabledReplicas });
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(console.log).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'db_replication_disabled_replicas',
+        disabledReplicas,
+        timestamp: healthReport.timestamp,
+      })
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('alerts when a replica is lagging', async () => {

@@ -1,5 +1,8 @@
 import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
-import { readReplicaInventory } from '@kilocode/web-shared/lib/read-replicas';
+import {
+  KNOWN_READ_REPLICA_NAMES,
+  readReplicaInventory,
+} from '@kilocode/web-shared/lib/read-replicas';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
 import { computeDatabaseUrl } from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
@@ -71,7 +74,13 @@ export function selectReplicaUrl({
  * - Falls back to primary if no enabled replica is configured for the region
  */
 function getReplicaUrl(): string {
-  const { enabled } = readReplicaInventory();
+  const { enabled, unknownDisabled } = readReplicaInventory();
+  if (unknownDisabled.length > 0) {
+    console.warn(
+      `POSTGRES_REPLICAS_DISABLED names unknown replicas: ${JSON.stringify(unknownDisabled)}; ` +
+        `valid names: ${KNOWN_READ_REPLICA_NAMES.join(', ')}`
+    );
+  }
   return selectReplicaUrl({
     primaryUrl: postgresUrl,
     nodeEnv: NODE_ENV,

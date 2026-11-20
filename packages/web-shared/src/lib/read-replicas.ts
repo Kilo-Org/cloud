@@ -13,6 +13,9 @@ const KNOWN_READ_REPLICAS = [
 ] as const;
 
 export const KNOWN_READ_REPLICA_COUNT = KNOWN_READ_REPLICAS.length;
+export const KNOWN_READ_REPLICA_NAMES: readonly string[] = KNOWN_READ_REPLICAS.map(
+  replica => replica.name
+);
 
 export type ReadReplica = {
   name: string;
@@ -33,8 +36,7 @@ export type ReadReplicaInventory = {
  * Resolves the replica inventory from the environment. `POSTGRES_REPLICAS_DISABLED` is a
  * comma-separated list of replica names. A disabled replica keeps its URL variable, so it can be
  * enabled again by removing its name from the list. This never throws: drizzle.ts calls it at
- * module load, and a typo must not take down every instance. The health check reports
- * `unknownDisabled` instead.
+ * module load, and a typo must not take down every instance.
  */
 export function readReplicaInventory(getEnv = getEnvVariable): ReadReplicaInventory {
   const requested = new Set(
@@ -43,7 +45,6 @@ export function readReplicaInventory(getEnv = getEnvVariable): ReadReplicaInvent
       .map(name => name.trim())
       .filter(Boolean)
   );
-  const known = new Set<string>(KNOWN_READ_REPLICAS.map(replica => replica.name));
 
   const enabled: ReadReplica[] = [];
   for (const { name, side, urlVariable } of KNOWN_READ_REPLICAS) {
@@ -53,7 +54,7 @@ export function readReplicaInventory(getEnv = getEnvVariable): ReadReplicaInvent
 
   return {
     enabled,
-    disabled: [...requested].filter(name => known.has(name)),
-    unknownDisabled: [...requested].filter(name => !known.has(name)),
+    disabled: [...requested].filter(name => KNOWN_READ_REPLICA_NAMES.includes(name)),
+    unknownDisabled: [...requested].filter(name => !KNOWN_READ_REPLICA_NAMES.includes(name)),
   };
 }

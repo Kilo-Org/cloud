@@ -32,6 +32,15 @@ export async function GET(request: Request) {
       JSON.stringify({ type: 'db_replication_health', ...replica, timestamp: report.timestamp })
     );
   }
+  if (report.disabledReplicas.length > 0) {
+    console.log(
+      JSON.stringify({
+        type: 'db_replication_disabled_replicas',
+        disabledReplicas: report.disabledReplicas,
+        timestamp: report.timestamp,
+      })
+    );
+  }
   // The primary's view of each replica. Only the replica probe can see a replica
   // that stopped streaming, but only the primary can attribute lag to getting the
   // WAL there (write/flush) versus applying it (replay), which is what the

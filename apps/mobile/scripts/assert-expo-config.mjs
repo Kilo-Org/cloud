@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createContractFailures } from './contract-failures.mjs';
@@ -145,24 +146,72 @@ const PERMISSION_PROMPT_PLIST_KEYS = [
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+// The contract set has to be reproducible from the command line alone, so the
+// flags are parsed strictly and any deviation is refused: an ignored
+// `--profile production` would run the development-only set and still print OK.
+// Two exit codes keep the two failures apart for the caller — 2 means the config
+// could not be evaluated or read, so no contract was checked; 1 means the checks
+// ran and found drift.
+const USAGE = 'usage: assert-expo-config.mjs [--config <path>] [--profile <name>]';
+const args = {};
+const argv = process.argv.slice(2);
+for (let index = 0; index < argv.length; index += 2) {
+  const flag = argv[index];
+  const value = argv[index + 1];
+  if (flag !== '--config' && flag !== '--profile') {
+    console.error(`${USAGE}\nunexpected argument: ${flag}`);
+    process.exit(2);
+  }
+  if (value === undefined || value === '' || value.startsWith('--')) {
+    console.error(`${USAGE}\n${flag} needs a value`);
+    process.exit(2);
+  }
+  const name = flag.slice(2);
+  if (Object.hasOwn(args, name)) {
+    console.error(`${USAGE}\n${flag} was given more than once`);
+    process.exit(2);
+  }
+  args[name] = value;
+}
+
+// `--profile` selects the contract set; the environment is only the fallback,
+// so a release preflight that exports EAS_BUILD_PROFILE keeps its checks while a
+// local run can name the set without changing what the config evaluates to.
+const profile = args.profile ?? (process.env.EAS_BUILD_PROFILE || null);
+
+let configPath;
 let raw;
-try {
-  raw = execFileSync('npx', ['expo', 'config', '--json'], {
-    cwd: mobileDir,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'inherit'],
-  });
-} catch (error) {
-  console.error(`Failed to run "npx expo config --json" from ${mobileDir}: ${error.message}`);
-  process.exit(1);
+if (args.config !== undefined) {
+  configPath = resolve(mobileDir, args.config);
+  try {
+    raw = readFileSync(configPath, 'utf8');
+  } catch (error) {
+    console.error(`Failed to read Expo config ${configPath}: ${error.message}`);
+    process.exit(2);
+  }
+} else {
+  try {
+    raw = execFileSync('npx', ['expo', 'config', '--json'], {
+      cwd: mobileDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+  } catch (error) {
+    console.error(`Failed to run "npx expo config --json" from ${mobileDir}: ${error.message}`);
+    process.exit(2);
+  }
 }
 
 let config;
 try {
   config = JSON.parse(raw);
 } catch (error) {
-  console.error(`"npx expo config --json" returned invalid JSON: ${error.message}`);
-  process.exit(1);
+  console.error(
+    configPath === undefined
+      ? `"npx expo config --json" returned invalid JSON: ${error.message}`
+      : `Expo config ${configPath} is not valid JSON: ${error.message}`
+  );
+  process.exit(2);
 }
 
 const { check, report } = createContractFailures();
@@ -349,7 +398,7 @@ check(
 // and App Store review rejects the entitlement itself. The release build and
 // this assertion share one evaluation, so a production config that carried it
 // would fail here before Apple sees it.
-if (process.env.EAS_BUILD_PROFILE === 'production') {
+if (profile === 'production') {
   const FILE_PROVIDER_TESTING_MODE = 'com.apple.developer.fileprovider.testing-mode';
   const fileProviderExtension = appExtensions.find(
     extension => extension.targetName === 'ArtifactsFileProvider'
@@ -424,7 +473,7 @@ for (const key of Object.keys(ENV_KEYS)) {
 // Admission contract: the server issues native credentials only to an attested
 // device, and Play Integrity is the Android proof. An optional key would
 // otherwise bake an empty value into a release that then cannot sign in.
-if (process.env.EAS_BUILD_PROFILE === 'production') {
+if (profile === 'production') {
   check(
     typeof extra.playIntegrityProjectNumber === 'string' &&
       extra.playIntegrityProjectNumber.length > 0,
@@ -435,4 +484,4 @@ if (process.env.EAS_BUILD_PROFILE === 'production') {
 const exitCode = report('Expo config contract violations');
 if (exitCode !== 0) process.exit(exitCode);
 
-console.log('Expo config contract OK');
+console.log(`Expo config contract OK (profile: ${profile ?? 'none'})`);

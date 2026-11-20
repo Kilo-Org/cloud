@@ -25,7 +25,7 @@ pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused && pnpm assert:c
 git diff --check
 ```
 
-- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `pnpm test` runs it too.
+- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). It takes `--config <path>` to read an already-evaluated config, and `--profile <name>` to select the contract set, defaulting to `EAS_BUILD_PROFILE` (the release supplies `production`); the success line names the resolved profile. Exit 1 is contract drift; exit 2 is a config it could not evaluate or read. `--profile` selects the contract set only, so a local release-set run needs the production environment. `pnpm test` runs the live guard and the fixture cases for both profiles.
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.

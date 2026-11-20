@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "របាំងការពារ AI",
-    "permissionDenied": "មានតែម្ចាស់ និងអ្នកគ្រប់គ្រងអង្គការប៉ុណ្ណោះដែលអាចគ្រប់គ្រងរបាំងការពារ AI បាន។",
+    "permissionDenied": "មានតែម្ចាស់ និងអ្នកគ្រប់គ្រងអង្គការប៉ុណ្ណោះដែលអាចគ្រប់គ្រងរបាំងការពារ AI បាន។ $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "របាំងការពារ AI មិនត្រូវបានបើកទេ",
     "unavailable": "Kilo បើករបាំងការពារ AI សម្រាប់អង្គការមួយតាមការស្នើសុំ។ សូមទាក់ទង {{supportEmail}} ហើយក្រុម Kilo នឹងបើកវាសម្រាប់អង្គការរបស់អ្នក។",
     "contactSupport": "ទាក់ទងក្រុមជំនួយ",

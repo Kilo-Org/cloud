@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "مصنوعی ذہانت گارڈ ریلز",
-    "permissionDenied": "صرف تنظیم کے مالکان اور منتظمین مصنوعی ذہانت گارڈ ریلز کا انتظام کر سکتے ہیں۔",
+    "permissionDenied": "صرف تنظیم کے مالکان اور منتظمین مصنوعی ذہانت گارڈ ریلز کا انتظام کر سکتے ہیں۔ $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "مصنوعی ذہانت گارڈ ریلز فعال نہیں ہیں",
     "unavailable": "Kilo درخواست پر کسی تنظیم کے لیے مصنوعی ذہانت گارڈ ریلز فعال کرتا ہے۔ {{supportEmail}} سے رابطہ کریں، اور Kilo ٹیم آپ کی تنظیم کے لیے انہیں فعال کر دے گی۔",
     "contactSupport": "معاونت کی ٹیم سے رابطہ کریں",

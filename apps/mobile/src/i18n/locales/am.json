@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "የAI ጥበቃ ገደቦች",
-    "permissionDenied": "የAI ጥበቃ ገደቦችን ማስተዳደር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
+    "permissionDenied": "የAI ጥበቃ ገደቦችን ማስተዳደር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "የAI ጥበቃ ገደቦች አልነቁም",
     "unavailable": "Kilo የAI ጥበቃ ገደቦችን ለድርጅት በጥያቄ ላይ ያነቃል። {{supportEmail}} ያግኙ፣ እና የKilo ቡድን ለድርጅትዎ ያነቃዋል።",
     "contactSupport": "የድጋፍ ቡድኑን አግኝ",

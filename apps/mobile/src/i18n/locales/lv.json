@@ -4901,7 +4901,7 @@
   },
   "organizationGuardrails": {
     "title": "MI aizsargbarjeras",
-    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori.",
+    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "MI aizsargbarjeras nav iespējotas",
     "unavailable": "Kilo pēc pieprasījuma iespējo MI aizsargbarjeras organizācijai. Sazinieties ar {{supportEmail}}, un Kilo komanda tās ieslēdz jūsu organizācijai.",
     "contactSupport": "Sazināties ar atbalsta dienestu",

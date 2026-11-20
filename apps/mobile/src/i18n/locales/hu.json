@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-őrkorlátok",
-    "permissionDenied": "Csak a szervezet tulajdonosai és rendszergazdái kezelhetik az AI-őrkorlátokat.",
+    "permissionDenied": "Csak a szervezet tulajdonosai és rendszergazdái kezelhetik az AI-őrkorlátokat. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Az AI-őrkorlátok nincsenek engedélyezve",
     "unavailable": "A Kilo kérésre engedélyezi az AI-őrkorlátokat a szervezet számára. Írj a {{supportEmail}} címre, és a Kilo csapata bekapcsolja őket a szervezeted számára.",
     "contactSupport": "Kapcsolatfelvétel az ügyfélszolgálattal",

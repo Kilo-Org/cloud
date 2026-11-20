@@ -4901,7 +4901,7 @@
   },
   "organizationGuardrails": {
     "title": "AI zaštitna ograničenja",
-    "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati AI zaštitnim ograničenjima.",
+    "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati AI zaštitnim ograničenjima. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI zaštitna ograničenja nisu omogućena",
     "unavailable": "Kilo omogućava AI zaštitna ograničenja za organizaciju na zahtjev. Kontaktirajte {{supportEmail}}, a Kilo tim ih uključuje za vašu organizaciju.",
     "contactSupport": "Kontaktiraj podršku",

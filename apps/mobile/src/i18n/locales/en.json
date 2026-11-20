@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "AI Guardrails",
-    "permissionDenied": "Only organization owners and admins can manage AI Guardrails.",
+    "permissionDenied": "Only organization owners and admins can manage AI Guardrails. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI Guardrails is not enabled",
     "unavailable": "Kilo enables AI Guardrails for an organization on request. Contact {{supportEmail}}, and the Kilo team turns it on for your organization.",
     "contactSupport": "Contact support",

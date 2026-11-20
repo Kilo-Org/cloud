@@ -4977,7 +4977,7 @@
   },
   "organizationGuardrails": {
     "title": "Zabezpieczenia AI",
-    "permissionDenied": "Tylko właściciele i administratorzy organizacji mogą zarządzać Zabezpieczeniami AI.",
+    "permissionDenied": "Tylko właściciele i administratorzy organizacji mogą zarządzać Zabezpieczeniami AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Zabezpieczenia AI nie są włączone",
     "unavailable": "Kilo włącza Zabezpieczenia AI dla organizacji na życzenie. Skontaktuj się z {{supportEmail}}, a zespół Kilo włącza je dla Twojej organizacji.",
     "contactSupport": "Skontaktuj się z pomocą techniczną",

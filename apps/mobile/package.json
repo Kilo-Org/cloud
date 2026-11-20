@@ -15,7 +15,7 @@
     "assert:config": "node scripts/assert-expo-config.mjs",
     "eas-build-post-install": "pnpm --filter @kilocode/harness-sdk run build",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src",
+    "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src apps/mobile/modules",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
     "reusables": "cli",

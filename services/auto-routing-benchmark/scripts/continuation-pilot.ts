@@ -5,7 +5,7 @@ import { gradeDeciderOutput, lacksRequiredToolCalls } from '../src/grading';
 import { deciderCasesForRouter, MEASUREMENT_REVISION } from '../src/measurement-revision';
 
 const USAGE =
-  'Usage: KILO_TOKEN=<token> KILO_CLI_API_URL=<gateway url the container calls> [KILO_ORG_ID=<org>] tsx scripts/continuation-pilot.ts --container-url http://127.0.0.1:3000 --model vendor/model[:variant] [--model ...] --case <case id> [--case ...] [--reps 1] [--confirm-spend]';
+  'Usage: KILO_TOKEN=<token> KILO_CLI_API_URL=<gateway url the container calls> [KILO_ORG_ID=<org>] tsx scripts/continuation-pilot.ts --container-url http://127.0.0.1:3000 --model vendor/model[:variant] [--model ...] --case <case id> [--case ...] [--reps 1] [--max-cost-usd <n>] [--confirm-spend]';
 
 const containerResponseSchema = z.object({
   exitCode: z.number().int(),
@@ -27,7 +27,10 @@ type Totals = {
   runs: number;
   graded: number;
   score: number;
+  answerGraded: number;
+  answerCorrect: number;
   zeroToolCalls: number;
+  narrationStops: number;
   costUsd: number;
 };
 
@@ -38,6 +41,7 @@ async function main() {
       model: { type: 'string', multiple: true },
       case: { type: 'string', multiple: true },
       reps: { type: 'string', default: '1' },
+      'max-cost-usd': { type: 'string' },
       'confirm-spend': { type: 'boolean', default: false },
     },
   });
@@ -56,6 +60,7 @@ async function main() {
     );
   }
   const reps = z.coerce.number().int().positive().parse(values.reps);
+  const maxCostUsd = z.coerce.number().positive().optional().parse(values['max-cost-usd']);
   const cases = deciderCasesForRouter('efficient', MEASUREMENT_REVISION);
   const selected = values.case.map(caseId => {
     const benchCase = cases.find(candidate => candidate.id === caseId);
@@ -68,72 +73,91 @@ async function main() {
     return { model, variant: variant || null };
   });
 
+  const runs = entries.flatMap(entry =>
+    selected.flatMap(benchCase =>
+      Array.from({ length: reps }, (_, rep) => ({ ...entry, benchCase, rep }))
+    )
+  );
+
   const totals = new Map<string, Totals>();
-  for (const { model, variant } of entries) {
-    for (const benchCase of selected) {
-      for (let rep = 0; rep < reps; rep++) {
-        const startedAt = Date.now();
-        const response = await fetch(containerUrl, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(
-            containerRunBody({ model, benchCase, kiloToken, kiloApiUrl, orgId, variant })
-          ),
-        });
-        if (!response.ok) {
-          throw new Error(
-            `container /run failed: HTTP ${response.status} ${await response.text()}`
-          );
-        }
-        const result = parseContainerRunResponse(
-          containerResponseSchema.parse(await response.json()),
-          startedAt,
-          model
-        );
-        const score = lacksRequiredToolCalls(benchCase.requiredToolCalls, result.tools.calls)
-          ? 0
-          : result.exitCode === 0 && result.text.length > 0
-            ? (
-                await gradeDeciderOutput(benchCase.check, {
-                  userPrompt: benchCase.userPrompt,
-                  output: result.text,
-                  judge: null,
-                })
-              ).score
-            : 0;
-        console.log(
-          JSON.stringify({
-            model,
-            variant,
-            case: benchCase.id,
-            rep,
-            score,
-            exitCode: result.exitCode,
-            tools: result.tools,
-            finalFinishReason: result.tools.finalFinishReason,
-            outputTokens: result.outputTokens,
-            costUsd: result.costUsd,
-            text: result.text.slice(0, 200),
-          })
-        );
-        const key = `${model}:${variant ?? ''}`;
-        const total = totals.get(key) ?? {
-          runs: 0,
-          graded: 0,
-          score: 0,
-          zeroToolCalls: 0,
-          costUsd: 0,
-        };
-        total.runs += 1;
-        if (score !== null) {
-          total.graded += 1;
-          total.score += score;
-        }
-        if (result.tools.calls === 0) total.zeroToolCalls += 1;
-        total.costUsd += result.costUsd ?? 0;
-        totals.set(key, total);
-      }
+  let spentUsd = 0;
+  for (const { model, variant, benchCase, rep } of runs) {
+    if (maxCostUsd !== undefined && spentUsd >= maxCostUsd) {
+      console.log(JSON.stringify({ stopped: 'cost cap', spentUsd }));
+      break;
     }
+    const startedAt = Date.now();
+    const response = await fetch(containerUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(
+        containerRunBody({ model, benchCase, kiloToken, kiloApiUrl, orgId, variant })
+      ),
+    });
+    if (!response.ok) {
+      throw new Error(`container /run failed: HTTP ${response.status} ${await response.text()}`);
+    }
+    const result = parseContainerRunResponse(
+      containerResponseSchema.parse(await response.json()),
+      startedAt,
+      model
+    );
+    const answerScore =
+      result.exitCode === 0 && result.text.length > 0
+        ? (
+            await gradeDeciderOutput(benchCase.check, {
+              userPrompt: benchCase.userPrompt,
+              output: result.text,
+              judge: null,
+            })
+          ).score
+        : 0;
+    const answerCorrect = answerScore === null ? null : answerScore === 1;
+    const score = lacksRequiredToolCalls(benchCase.requiredToolCalls, result.tools.calls)
+      ? 0
+      : answerScore;
+    const narrationStop = result.tools.calls === 0 && result.tools.finalFinishReason === 'stop';
+    console.log(
+      JSON.stringify({
+        model,
+        variant,
+        case: benchCase.id,
+        rep,
+        score,
+        answerCorrect,
+        exitCode: result.exitCode,
+        tools: result.tools,
+        finalFinishReason: result.tools.finalFinishReason,
+        outputTokens: result.outputTokens,
+        costUsd: result.costUsd,
+        text: result.text.slice(0, 200),
+      })
+    );
+    const key = `${model}:${variant ?? ''}`;
+    const total = totals.get(key) ?? {
+      runs: 0,
+      graded: 0,
+      score: 0,
+      answerGraded: 0,
+      answerCorrect: 0,
+      zeroToolCalls: 0,
+      narrationStops: 0,
+      costUsd: 0,
+    };
+    total.runs += 1;
+    if (score !== null) {
+      total.graded += 1;
+      total.score += score;
+    }
+    if (answerCorrect !== null) {
+      total.answerGraded += 1;
+      if (answerCorrect) total.answerCorrect += 1;
+    }
+    if (result.tools.calls === 0) total.zeroToolCalls += 1;
+    if (narrationStop) total.narrationStops += 1;
+    total.costUsd += result.costUsd ?? 0;
+    spentUsd += result.costUsd ?? 0;
+    totals.set(key, total);
   }
   for (const [key, total] of totals) {
     console.log(
@@ -141,7 +165,9 @@ async function main() {
         total: key,
         runs: total.runs,
         passRate: total.graded > 0 ? total.score / total.graded : null,
+        oldPassRate: total.answerGraded > 0 ? total.answerCorrect / total.answerGraded : null,
         zeroToolCallRate: total.zeroToolCalls / total.runs,
+        narrationStops: total.narrationStops,
         costUsd: total.costUsd,
       })
     );

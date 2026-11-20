@@ -383,6 +383,12 @@ describe('htmlSanitizesToEmpty', () => {
       '</ab>',
       '<a->',
       '</a>',
+      // A closer name strictly longer than the open run. The backreference can
+      // only reach a closer's name when the common prefix spans that whole
+      // closer, and nothing shorter is reachable, so `<a></a-bc>` must keep its
+      // text; the scan's length guard is the line that enforces it, and this
+      // piece is what makes dropping that guard fail.
+      '<a></a-bc>',
       '<b>',
       '</b>',
       '<input',

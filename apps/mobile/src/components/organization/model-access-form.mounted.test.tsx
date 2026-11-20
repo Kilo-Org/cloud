@@ -489,6 +489,32 @@ describe('ModelAccessForm with no provider rows', () => {
     });
   });
 
+  it('keeps a provider toggle made while the rows were complete', async () => {
+    // The admin turns a provider off, the gateway's provider data disappears,
+    // and it comes back: the toggle was made against the whole catalog, so the
+    // arrival rebase must not discard it.
+    const root = render(undefined);
+    selectTab(root, 'providers');
+    const draft = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    (list(root, 'ProviderAllowList').props.onChange as (next: ModelAccessDraft) => void)(
+      toggleProvider(draft, 'openai', false)
+    );
+    selectTab(root, 'models');
+
+    renderWithCatalog(undefined, {
+      catalog: [model('openai/gpt', []), model('anthropic/claude', [])],
+    });
+    renderWithCatalog(undefined, { catalog: CATALOG });
+
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      provider_allow_list: ['anthropic'],
+      model_deny_list: [],
+    });
+  });
+
   it('shows the retry as loading while the catalog request runs', () => {
     const root = render(undefined, { catalog: [], catalogIsFetching: true });
 

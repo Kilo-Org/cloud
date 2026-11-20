@@ -93,10 +93,15 @@ function syncedFormState(params: {
       providerAllowList: params.serverDraft.providerAllowList,
       modelDenyList: baseline.modelDenyList,
     };
-    draft = {
-      providerAllowList: params.serverDraft.providerAllowList,
-      modelDenyList: draft.modelDenyList,
-    };
+    // An empty draft list came from the missing rows. A non-empty one is the
+    // admin's own choice from when the rows were complete, so it stays.
+    draft =
+      draft.providerAllowList.length === 0
+        ? {
+            providerAllowList: params.serverDraft.providerAllowList,
+            modelDenyList: draft.modelDenyList,
+          }
+        : draft;
   }
   return {
     syncedKey: savedListsMoved ? params.serverKey : state.syncedKey,

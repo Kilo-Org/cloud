@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀ",
     "legalDocumentEnglishOnly": "ଏହି ଦସ୍ତାବେଜଟି କେବଳ ଇଂରାଜୀରେ ଉପଲବ୍ଧ।",
     "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "organizationTrialEndedBillingAtKiloAi": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
     "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ"
   },
   "language": {

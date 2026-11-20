@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}، شخصي زېرمتون",
     "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی.",
     "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
+    "organizationTrialEndedBillingAtKiloAi": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ په kilo.ai کې بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
     "viewOnGitHub": "PR په GitHub کې وګورئ"
   },
   "language": {

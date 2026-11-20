@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, repositori persendirian",
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris.",
     "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi.",
+    "organizationTrialEndedBillingAtKiloAi": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
     "viewOnGitHub": "Lihat PR di GitHub"
   },
   "language": {

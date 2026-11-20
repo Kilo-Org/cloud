@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, repositorio privado",
     "legalDocumentEnglishOnly": "Este documento só está dispoñible en inglés.",
     "organizationTrialEndedBilling": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación e despois tentalo de novo.",
+    "organizationTrialEndedBillingAtKiloAi": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación en kilo.ai e despois tentalo de novo.",
     "viewOnGitHub": "Ver a PR en GitHub"
   },
   "language": {

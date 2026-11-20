@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, pribadong repositoryo",
     "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
     "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli.",
+    "organizationTrialEndedBillingAtKiloAi": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing sa kilo.ai, pagkatapos ay subukan muli.",
     "viewOnGitHub": "Tingnan ang PR sa GitHub"
   },
   "language": {

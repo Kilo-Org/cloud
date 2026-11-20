@@ -187,6 +187,7 @@
     "privateRepositoryA11y": "{{name}}, privati saugykla",
     "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba.",
     "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą.",
+    "organizationTrialEndedBillingAtKiloAi": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
     "viewOnGitHub": "Peržiūrėti PR GitHub platformoje"
   },
   "language": {

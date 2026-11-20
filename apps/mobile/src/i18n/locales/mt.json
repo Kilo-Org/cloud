@@ -188,6 +188,7 @@
     "privateRepositoryA11y": "{{name}}, repositorju privat",
     "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss.",
     "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova.",
+    "organizationTrialEndedBillingAtKiloAi": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni fuq kilo.ai, imbagħad terġa' tipprova.",
     "viewOnGitHub": "Ara l-PR fuq GitHub"
   },
   "language": {

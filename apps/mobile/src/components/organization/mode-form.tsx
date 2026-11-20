@@ -65,6 +65,8 @@ const EMPTY_VALUES: OrgModeFormValues = {
 
 export type ModeFormProps = Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   /** The mode being edited, or undefined to create one. */
   mode: OrgMode | undefined;
   /** Every mode in the organization, so the form can refuse a taken identifier. */
@@ -85,12 +87,17 @@ export type ModeFormProps = Readonly<{
  * through a ref on save (the iOS rule). One dirty flag drives the shared
  * keep-editing gate, so a Back press cannot drop typed text silently.
  */
-export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps) {
+export function ModeForm({
+  organizationId,
+  canManageBilling = false,
+  mode,
+  existingModes,
+}: ModeFormProps) {
   const router = useRouter();
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
-  const mutations = useOrgModeMutations(organizationId);
+  const mutations = useOrgModeMutations(organizationId, canManageBilling);
   const initial = mode === undefined ? null : orgModeFormValues(mode);
   const values = useRef<MutableModeValues>({ ...(initial ?? EMPTY_VALUES) }).current;
   const [groups, setGroups] = useState<readonly ModeToolGroup[]>(initial?.groups ?? []);

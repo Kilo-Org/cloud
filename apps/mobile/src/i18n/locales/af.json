@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
     "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar.",
     "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer.",
+    "organizationTrialEndedBillingAtKiloAi": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering by kilo.ai opdateer en dan weer probeer.",
     "viewOnGitHub": "Bekyk PR op GitHub"
   },
   "language": {

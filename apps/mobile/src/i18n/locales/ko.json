@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, 비공개 저장소",
     "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다.",
     "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
+    "organizationTrialEndedBillingAtKiloAi": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. kilo.ai에서 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
     "viewOnGitHub": "GitHub에서 PR 보기"
   },
   "language": {

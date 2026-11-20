@@ -186,6 +186,7 @@
     "privateRepositoryA11y": "{{name}}, privatni repozitorij",
     "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno.",
+    "organizationTrialEndedBillingAtKiloAi": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
     "viewOnGitHub": "Pogledaj PR na GitHubu"
   },
   "language": {

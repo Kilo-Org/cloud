@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, खाजगी रेपॉजिटरी",
     "legalDocumentEnglishOnly": "हा दस्तऐवज फक्त इंग्रजीत उपलब्ध आहे.",
     "organizationTrialEndedBilling": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
+    "organizationTrialEndedBillingAtKiloAi": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही kilo.ai वर बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
     "viewOnGitHub": "GitHub वर PR पहा"
   },
   "language": {

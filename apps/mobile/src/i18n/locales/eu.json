@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, biltegi pribatua",
     "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
     "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu.",
+    "organizationTrialEndedBillingAtKiloAi": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa kilo.ai-n egunera dezakezu, eta gero berriro saiatu.",
     "viewOnGitHub": "Ikusi PR-a GitHub-en"
   },
   "language": {

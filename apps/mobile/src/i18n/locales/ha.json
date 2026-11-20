@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri",
     "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
     "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa.",
+    "organizationTrialEndedBillingAtKiloAi": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi a kilo.ai, sannan ka sake gwadawa.",
     "viewOnGitHub": "Duba PR a GitHub"
   },
   "language": {

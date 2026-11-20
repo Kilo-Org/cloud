@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, ખાનગી રિપોઝિટરી",
     "legalDocumentEnglishOnly": "આ દસ્તાવેજ ફક્ત અંગ્રેજીમાં ઉપલબ્ધ છે.",
     "organizationTrialEndedBilling": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. તમે બિલિંગ અપડેટ કરી શકો છો, પછી ફરીથી પ્રયાસ કરો.",
+    "organizationTrialEndedBillingAtKiloAi": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. તમે બિલિંગ kilo.ai પર અપડેટ કરી શકો છો, પછી ફરીથી પ્રયાસ કરો.",
     "viewOnGitHub": "GitHub પર PR જુઓ"
   },
   "language": {

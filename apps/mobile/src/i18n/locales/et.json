@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, privaatne repositoorium",
     "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles.",
     "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
     "viewOnGitHub": "Vaata PR-i GitHubis"
   },
   "language": {

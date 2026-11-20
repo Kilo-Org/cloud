@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}، کۆگای تایبەت",
     "legalDocumentEnglishOnly": "ئەم بەڵگەنامەیە تەنها بە زمانی ئینگلیزی بەردەستە.",
     "organizationTrialEndedBilling": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. دەتوانیت پارەدان نوێ بکەیتەوە، پاشان دووبارە هەوڵ بدەیتەوە.",
+    "organizationTrialEndedBillingAtKiloAi": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. دەتوانیت لە kilo.ai پارەدان نوێ بکەیتەوە، پاشان دووبارە هەوڵ بدەیتەوە.",
     "viewOnGitHub": "PR لە GitHub ببینە"
   },
   "language": {

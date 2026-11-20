@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, ಖಾಸಗಿ ರೆಪೊಸಿಟರಿ",
     "legalDocumentEnglishOnly": "ಈ ದಾಖಲೆ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮಾತ್ರ ಲಭ್ಯವಿದೆ.",
     "organizationTrialEndedBilling": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ನೀವು ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "organizationTrialEndedBillingAtKiloAi": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ನೀವು kilo.ai ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "viewOnGitHub": "GitHubನಲ್ಲಿ PR ವೀಕ್ಷಿಸಿ"
   },
   "language": {

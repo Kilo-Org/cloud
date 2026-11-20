@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
     "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy.",
     "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray.",
+    "organizationTrialEndedBillingAtKiloAi": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ao amin'ny kilo.ai ianao, ary hanandrana indray.",
     "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR"
   },
   "language": {

@@ -188,6 +188,7 @@
     "privateRepositoryA11y": "{{name}}, stór príobháideach",
     "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin.",
     "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís.",
+    "organizationTrialEndedBillingAtKiloAi": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
     "viewOnGitHub": "Féach ar an PR ar GitHub"
   },
   "language": {

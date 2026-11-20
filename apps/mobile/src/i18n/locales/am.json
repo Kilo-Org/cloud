@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር",
     "legalDocumentEnglishOnly": "ይህ ሰነድ በእንግሊዝኛ ብቻ ይገኛል።",
     "organizationTrialEndedBilling": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
+    "organizationTrialEndedBillingAtKiloAi": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
     "viewOnGitHub": "PRን በGitHub እይ"
   },
   "language": {

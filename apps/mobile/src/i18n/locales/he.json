@@ -186,6 +186,7 @@
     "privateRepositoryA11y": "{{name}}, מאגר פרטי",
     "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד.",
     "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב.",
+    "organizationTrialEndedBillingAtKiloAi": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
     "viewOnGitHub": "הצגת ה-PR ב-GitHub"
   },
   "language": {

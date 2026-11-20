@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa",
     "legalDocumentEnglishOnly": "Dokumentiin kun Afaan Ingiliffaan qofa argama.",
     "organizationTrialEndedBilling": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
+    "organizationTrialEndedBillingAtKiloAi": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii kilo.ai irratti haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
     "viewOnGitHub": "PR GitHub irratti ilaali"
   },
   "language": {

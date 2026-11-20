@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
     "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
+    "organizationTrialEndedBillingAtKiloAi": "組織のトライアルは終了し、有効なプランがありません。kilo.ai で請求情報を更新してから、もう一度お試しください。",
     "viewOnGitHub": "GitHubでPRを表示"
   },
   "language": {

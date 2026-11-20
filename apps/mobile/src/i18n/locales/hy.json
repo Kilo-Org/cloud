@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, մասնավոր պահեստ",
     "legalDocumentEnglishOnly": "Այս փաստաթուղթը հասանելի է միայն անգլերեն։",
     "organizationTrialEndedBilling": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Դուք կարող եք թարմացնել վճարումները, ապա կրկին փորձել։",
+    "organizationTrialEndedBillingAtKiloAi": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Դուք կարող եք թարմացնել վճարումները kilo.ai-ում, ապա կրկին փորձել։",
     "viewOnGitHub": "Դիտել PR-ը GitHub-ում"
   },
   "language": {

@@ -277,6 +277,7 @@
     "privateRepositoryA11y": "{{name}}, private repository",
     "legalDocumentEnglishOnly": "This document is available in English only.",
     "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
+    "organizationTrialEndedBillingAtKiloAi": "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again.",
     "viewOnGitHub": "View PR on GitHub"
   },
   "language": {

@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, repòsitwa prive",
     "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman.",
     "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò.",
+    "organizationTrialEndedBillingAtKiloAi": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
     "viewOnGitHub": "Gade PR a sou GitHub"
   },
   "language": {

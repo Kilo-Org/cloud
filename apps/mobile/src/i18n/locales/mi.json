@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, pūranga waehere tūmataiti",
     "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake.",
     "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō.",
+    "organizationTrialEndedBillingAtKiloAi": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
     "viewOnGitHub": "Tirohia te PR i GitHub"
   },
   "language": {

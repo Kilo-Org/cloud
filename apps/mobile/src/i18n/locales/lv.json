@@ -186,6 +186,7 @@
     "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
     "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
+    "organizationTrialEndedBillingAtKiloAi": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
     "viewOnGitHub": "Skatīt PR GitHub"
   },
   "language": {

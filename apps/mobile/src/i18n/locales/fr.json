@@ -186,6 +186,7 @@
     "privateRepositoryA11y": "{{name}}, dépôt privé",
     "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
     "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer.",
+    "organizationTrialEndedBillingAtKiloAi": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation sur kilo.ai, puis réessayer.",
     "viewOnGitHub": "Voir la PR sur GitHub"
   },
   "language": {

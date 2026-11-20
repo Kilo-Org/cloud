@@ -166,6 +166,14 @@ describe('the trial refusal, read by role', () => {
     expect(organizationErrorMessage(inviteConflict, true)).toBe(
       i18n.t('organization.inviteMember.alreadyMember')
     );
+    // The surface's own answer rides with the role, so it must not reach a
+    // sentence whose explanation has nothing to do with the plan either.
+    expect(knownServerErrorMessage(inviteConflict, true, 'absent')).toBe(
+      i18n.t('organization.inviteMember.alreadyMember')
+    );
+    expect(knownServerErrorMessage(inviteConflict, false, 'absent')).toBe(
+      i18n.t('organization.inviteMember.alreadyMember')
+    );
   });
 
   it('does not let the role invent an explanation for an unknown sentence', () => {

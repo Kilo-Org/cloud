@@ -8,6 +8,7 @@ import type * as ConfigModule from './config';
 
 import type * as SchedulerModule from './scheduler';
 import type * as SubscriptionsModule from './subscriptions';
+import type * as EligibilityModule from './probe/eligibility';
 
 vi.mock('./subscriptions', () => ({
   PLATFORM_SUBSCRIPTION_OWNER: { ownerType: 'platform', ownerId: '' },
@@ -53,6 +54,16 @@ vi.mock('./probe/executor', () => ({
   runProbeCaseViaGateway: vi.fn(),
 }));
 vi.mock('./openrouter', () => ({ createSystemOneClient: vi.fn() }));
+
+// These suites publish a fully measured pool; the ineligible branch is covered by
+// `src/probe/eligibility.test.ts` and `src/probe/publish.test.ts`.
+const missingProbeResults = vi.hoisted(() =>
+  vi.fn<(db: unknown, params: unknown) => Promise<Set<string>>>(async () => new Set<string>())
+);
+vi.mock('./probe/eligibility', async importOriginal => ({
+  ...(await importOriginal<typeof EligibilityModule>()),
+  pairsMissingProbeResults: missingProbeResults,
+}));
 vi.mock('./config', async importOriginal => {
   const actual = await importOriginal<typeof ConfigModule>();
   return { ...actual, getBenchmarkConfig: vi.fn() };

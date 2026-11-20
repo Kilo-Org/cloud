@@ -1,0 +1,3 @@
+DROP INDEX `UQ_benchmark_runs_one_running_per_router_kind_purpose`;--> statement-breakpoint
+CREATE UNIQUE INDEX `UQ_benchmark_runs_one_running_classifier_per_router_purpose` ON `benchmark_runs` (`router`,`purpose`) WHERE "benchmark_runs"."status" = 'running' AND "benchmark_runs"."kind" = 'classifier';--> statement-breakpoint
+CREATE INDEX `IX_benchmark_runs_running` ON `benchmark_runs` (`router`,`kind`,`purpose`) WHERE "benchmark_runs"."status" = 'running';

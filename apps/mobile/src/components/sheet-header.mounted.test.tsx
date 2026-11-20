@@ -652,9 +652,16 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('adds no side inset inside a surface that clears the window sides on Android', async () => {
-    safeArea.left = 47;
-    safeArea.right = 59;
+  it('adds no side inset inside a surface that clears the window sides', async () => {
+    // Measured on the iOS simulator at 874x402 in landscape (62 pt insets):
+    // the app's imperative sheet hosts its content in a view that spans
+    // 62..812, so the window's side insets are already spent and the sheet's
+    // own 14 pt gutter is the only one left. Android's Material3 dialog clears
+    // them the same way. Content that added the window inset again sat a whole
+    // cutout width off that gutter: the sheet header read 76 pt inside a
+    // 750 pt surface while its body read 14 pt.
+    safeArea.left = 62;
+    safeArea.right = 62;
     const sheet = (os: string) => {
       rn.os = os;
       return createElement(
@@ -663,17 +670,27 @@ describe('SheetHeader', () => {
         createElement(SheetHeader, { title: 'Save as profile', onDone: () => undefined })
       );
     };
+    // Both platforms: the surface clears the sides, so the header adds nothing.
     const android = await mountElement(sheet('android'));
     expect(findSafeAreaWrapper(android.root).props.style).toBeUndefined();
     android.unmount();
-
-    // An iOS page sheet still spans the notch in landscape.
     const ios = await mountElement(sheet('ios'));
-    expect(findSafeAreaWrapper(ios.root).props.style).toEqual({
-      paddingLeft: 47,
-      paddingRight: 59,
-    });
+    expect(findSafeAreaWrapper(ios.root).props.style).toBeUndefined();
     ios.unmount();
+
+    // A page sheet is a route, not this surface: it spans the window in
+    // landscape and still pays the inset.
+    rn.os = 'ios';
+    const pageSheet = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+    expect(findSafeAreaWrapper(pageSheet.root).props.style).toEqual({
+      paddingLeft: 62,
+      paddingRight: 62,
+    });
+    pageSheet.unmount();
   });
 
   it('clears the status bar when the sheet reaches the top safe area', async () => {

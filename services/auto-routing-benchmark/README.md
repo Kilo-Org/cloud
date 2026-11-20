@@ -1220,17 +1220,151 @@ Runbook, after the whole stack is merged and deployed (the migration applies on 
 4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
    its run.
 
-### Measurement revision 3: agentic probes (defined, inactive)
+## Adding a model: the flow
+
+Three entry paths put a model into the benchmark, and all three converge on one registry row
+per exact `(model, variant)` pair under the live engine identity and repetitions.
+
+| Entry path | Who starts it | Code |
+|---|---|---|
+| Admin Policy tab → **Save config** | an admin, in the console | `apps/web/src/app/admin/api/auto-routing/benchmark-config/route.ts` → `PUT /admin/config` (`registerAdminRoutes`, `src/admin.ts`), then `syncRegistryAfterConfigSave` → `syncPlatformRegistry` (`src/run.ts`) |
+| Owner custom router save (gateway entries) | the router's owner, in their own console | `apps/web/src/lib/auto-routing-custom-routers.ts` → `POST /admin/profiles/register` (`registerAdminRoutes`, `src/admin.ts`) → `registerProfiles` (`src/profiles.ts`) |
+| Alias target moves (e.g. `~openai/gpt-sol-latest` → a new concrete id) | nobody — the daily cron | `dailyReconcileSubscriptions` (`src/subscriptions.ts`) at `0 5 * * *`, resumed on the next ticks by `continueDailyReconcile` (`src/index.ts`) |
+
+### Steps, with what is manual and what is a wait
+
+Each step names the code that performs it. **Manual** means a human click or API call;
+everything else is automatic. **Wait** is the delay the flow itself imposes.
+
+| # | Step | Manual / automatic | Wait | Code |
+|---|---|---|---|---|
+| 1 | Pick the model and save the router config | **manual** (console Policy tab → Save config) | none; the save returns the saved config, its `warnings`, and the `drain` outcome | `registerAdminRoutes` (PUT /admin/config), `syncRegistryAfterConfigSave` (`src/admin.ts`) |
+| 2 | Registry sync: expand the model through the live catalog into every supported effort, insert `pending` rows | automatic, inside the save request | none — runs before the response | `syncPlatformRegistry` (`src/run.ts`), `syncPlatformRegistryRows` (`src/db.ts`) |
+| 3 | Routing table republish (the save also flushes an unchanged table) | automatic, inside the save request | none | `syncRegistryAfterConfigSave` → `publishPlatformRoutingTable` (`src/run.ts`) |
+| 4 | Queue drain: claim the pending rows into a run | automatic. The save drains the **platform** queue itself right after the publish; the per-minute cron still drains both queues for owner registrations, and a decider run reaching a terminal state drains immediately | **none for the platform queue** on a save (bounded at 5 s, then deferred to the cron). Owner registrations still wait **up to 60 s**; the queue's run slot must be free (see "several runs per queue" below) | `drainPlatformAfterConfigSave` (`src/admin.ts`); the scheduled handler (`src/index.ts`) → `sweepStaleRunsAndDrain` → `drainQueues` (`src/run.ts`) |
+| 5 | Run start: claim registry rows, insert the run row, copy reusable prior results | automatic, same drain pass | none | `startRun` (`src/run.ts`), `markProfilesRunningForRun` (`src/db.ts`), `reuseDeciderCaseResults` (`src/db.ts`, in the dispatcher's initialization) |
+| 6 | Initialization: materialize one scheduler chunk per case per lane | automatic, on the next dispatch pass | **bounded 20 s per pass**; a large run needs several passes (one pass writes 50 chunks per batch) | `scheduleRunChunks` (`src/scheduler.ts`), `initializeScheduledRun` (`src/run.ts`) |
+| 7 | Dispatch: claim chunks that fit the scheduler caps and enqueue them | automatic | none once initialized | `claimScheduledChunks` (`src/scheduler.ts`), `dispatchScheduler` (`src/run.ts`) |
+| 8 | Cases execute in the runner container; each result posts to `/container/case-result` | automatic | **the measurement itself** — this dominates: minutes to hours depending on the entry count and model latency | `beginPaidCase` (`src/scheduler.ts`), `acceptContainerCaseResult` (`src/run.ts`) |
+| 9 | Finalization: aggregate summaries, flip entries ready/failed, mark the run completed | automatic, on the dispatch pass that sees the run settled | none | `finalizeRunIfComplete` (`src/run.ts`) |
+| 10 | Profile ready: the registry row carries `run_id` provenance | automatic, same pass | none | `markProfilesReadyForRun` (`src/db.ts`), `src/profile-failure.ts` |
+| 11 | Routing table publish with the new pair | automatic, same pass (and any save) | refuses while a serving pair's measurement is in flight (or it has no current-engine registry row yet); a settled failure leaves the table and is named in the publish log | `publishPlatformRoutingTable`, `finalizeRunIfComplete` (`src/run.ts`) |
+| 12 | Console: runs list, per-model cost table and routing table show the result | automatic on page load / refetch | none | `apps/web/src/app/admin/auto-routing/BenchmarksSection.tsx` |
+
+### Expected time per step
+
+Measured on the local stack with synthetic case results standing in for inference
+(`/tmp/ar-bench/flow/`, 1440 px captures) and on production since the 2026-11-20 fixes.
+
+| Step | Local stack | Production |
+|---|---|---|
+| 1–3 save (console click → 200 with `warnings: []`) | 0.4–1.1 s | same code path |
+| 1–3 save when the catalog mint fails | 0.3–0.4 s, `warnings: ["registry_sync_failed"]`, config still saved | — |
+| 4 drain | in the save response (0.6 s) for the platform queue; an owner registration still waits for the cron | 3–62 s measured, and no click |
+| 5 run row written | within the drain response | same |
+| 6 initialization | 22 s for 294 chunks / one lane; a 4426-chunk run took about 4 min of passes | 30–40 s before the first case on small platform runs; minutes on a 100-entry batch |
+| 7 → 8 first case started | 3 s after the run row | 13–40 s |
+| 8 first case result | 1–12 s (seeded) | 13–37 s |
+| 8 whole run | seeded instantly; not representative | p50 ≈ 38 min for 10 frontier pairs × 294 cases; ≈ 94 min for one efficient model × 576 cases × 3 reps |
+| 9–11 ready + published | 0.1 s (seeded → one dispatch tick) | 0.2–5 s after the run completes |
+
+End to end for one model through the admin path with a real measurement: allow **15 min to
+2 h** for an efficient model (576 cases × 3 reps at the current caps) and **10–50 min** for a
+frontier model, plus at most a minute of drain and a minute of initialization. Production
+before the 2026-11-20 fixes took hours longer: p50 admit→ready was 2.9 h (platform) and
+5.8 h (owner), and admit→published 46 h; after them the same measurements are 38 min
+(platform) and 56–94 min (owner), and publish lands within seconds of run completion.
+
+### What the console shows at each step
+
+- **Policy tab, right after the save**: the model row is in the decider list, and its effort
+  coverage line reads `N of M measured · <effort>: pending` for the sync's new rows. A save
+  that could not sync shows a destructive banner naming why (`registry_sync_failed`,
+  `routing_table_publish_failed`) plus "save again to retry now". A save whose platform drain
+  did not start a run is not an error: its `drain.skipped` says `active_run` (the queue's run
+  slot is taken), `nothing_pending` (every pair is already measured or in flight), `timeout`
+  or `failed`, and the Benchmarks tab shows the new `Platform queue` run as soon as the cron
+  picks it up (within a minute).
+- **Benchmarks tab, Decider Registry**: pending / running / ready / failed counts per queue,
+  and the per-entry status list under the current engine identity.
+- **Benchmarks tab, runs list**: a `Platform queue` or `User queue` run row with its status
+  (`running` with a progress bar, then `completed` or `failed`), its total cost, cases and
+  errored count. Expand a run for a per-model table of **Accuracy, Cost / case, Total cost,
+  Cases, Errors**, and the model-id filter above it.
+- **Benchmarks tab, Failed models**: every failed pair with a `Permanent` / `Retryable` badge,
+  its class, reason, first/last failure and attempts, the next retry time, and a per-row
+  **Re-admit**.
+- **Routing table tab**: the published version, its generation time, and per route each
+  ranked pair with accuracy and average cost. A pair appears only once it is measured.
+
+### Failure states
+
+A failed entry is `failed` (retryable) or `unavailable` (permanent), classified in
+`src/profile-failure.ts`:
+
+- **Permanent (terminal)**: `catalog_absent`, `context_too_small`, `model_not_found`,
+  `unsupported`. The row goes `unavailable` at once with no retry time. It stays out of the
+  routing table but does not hold the table back — a live pair that has no ready row and no
+  measurement in flight leaves the table and is named in the publish log instead.
+- **Retryable — model tier**: `provider_unavailable`, `model_resolution`. Counts against the
+  model's budget (`PROFILE_MODEL_FAILURE_BUDGET = 3` consecutive failed runs).
+- **Retryable — infrastructure tier**: `ambiguous_execution`, `container_capacity`,
+  `catalog_load`, `grader`, `run_timed_out`, `orphaned_claim`, `run_init_failed`, `unknown`.
+  Only the overall budget (`PROFILE_FAILURE_BUDGET = 5`) applies, so an outage that never
+  clears still ends.
+- Exhausting either budget makes the failure permanent. The next retry waits
+  `2^(attempts-1)` hours, capped at 24.
+
+Recovery: **Requeue retryable** (admin, `POST /admin/registry/requeue`) puts every retryable
+row of a queue back to `pending` once its retry window has passed, charging no owner quota.
+A permanent row moves only through its own **Re-admit**: the console posts
+`POST /admin/registry/refresh` for that one pair with `mode: 'refresh'`, which clears its
+failure history and puts it back to `pending` as soon as the catalog can run it. That covers
+both a model whose budget ran out and one whose provider has since been fixed. The narrower
+`mode: 'repair_unavailable'` (see "Unavailable models and targeted refresh") selects only
+pairs with a recorded exact model-lookup failure, so it would leave a budget-exhausted row
+in `skipped`.
+
+### The remaining waits, and why they stay
+
+- **No wait on the admin path.** A save that adds a model drains the platform queue in the
+  same request, so the run exists by the time the save answers — no **Run platform queue**
+  click and no cron wait. The drain is bounded at 5 s; if it is slow, or the queue's slot is
+  taken, the save still answers 200 with the saved config and reports why in `drain`:
+  `skipped: 'timeout' | 'failed' | 'active_run' | 'nothing_pending'`. A drain that outlives
+  the deadline is not abandoned: the save hands its promise to the request's
+  `ctx.waitUntil`, so a claim that already started a run still records it, and the
+  per-minute cron starts anything it did not reach within a minute. Nothing is lost.
+- **Up to 60 s for an owner registration.** A custom router save admits its rows through
+  `POST /admin/profiles/register`, which is not a benchmark config save and does not drain;
+  the cron tick starts it. It stays because owner registrations arrive at arbitrary times
+  and a drain is the only thing that can start their run.
+- **The queue's active run must finish.** One active run per `(router, queue)`. A new model
+  waits behind the pair batch already in flight. More runs per queue is proposed separately
+  and is what removes this wait.
+- **Initialization at 20 s per pass.** A D1 write budget, not a policy choice: one pass
+  writes 50 chunks per batch so a big run never holds a single transaction open. A run
+  needing more passes just takes longer before its first case.
+- **The measurement itself.** Nothing removes it: it is the paid inference the benchmark
+  exists to perform.
+- **Publish waits for every serving pair.** The table is republished from the registry only
+  when every pair it serves is current or a settled failure. This is what keeps a
+  half-measured alias move from degrading the live table; it is also why one stuck pair used
+  to hold the whole table (fixed 2026-11-20: a settled failure now leaves the table instead
+  of blocking it).
+
+### Measurement revision 3: agentic probes (active)
 
 Every run records the revision it started under (`benchmark_runs.measurement_revision`),
 and every result stores the revision that measured it in `prompt_revision`, with the CLI's
 tool evidence (`tool_calls`, `tool_names`, `step_count`, `final_finish_reason`). Tool
 evidence is recorded at every revision. `src/measurement-revision.ts` separates two
 constants: `MEASUREMENT_REVISION` (3) is the newest defined revision, and
-`ACTIVE_MEASUREMENT_REVISION` (2) is the revision every new run starts under. `startRun`,
+`ACTIVE_MEASUREMENT_REVISION` (3) is the revision every new run starts under. `startRun`,
 `insertRun`'s default, case reuse and the `remeasure-prompt-transport` planner all use
-the active revision, so revision 3 is defined but nothing measures it until someone raises
-`ACTIVE_MEASUREMENT_REVISION` to 3.
+the active revision. Revision 3 was activated with migration `0035_probe_activation`, which
+also decides which pairs measure it now (below); nothing else in the deploy schedules
+revision-3 work.
 
 The CLI benchmark cannot see the production problem this revision measures: a CLI case is
 one prompt to a fresh session, so a model that ends a tool-offering turn with narration
@@ -1308,19 +1442,64 @@ probes later, through the normal queue or an admin re-measure, makes it eligible
 `supp-agent-term-pwd-base` is the one revision-2 case that changes: revision 3 keeps it
 tool-required and accepts only `other`, the answer its isolated workspace produces.
 
-Raising `ACTIVE_MEASUREMENT_REVISION` to 3 is a spending decision and an explicit step after
-this deploys. From the next deploy:
+Revision 3 is active from the deploy that raises `ACTIVE_MEASUREMENT_REVISION` to 3.
+Migration `0035_probe_activation` is the whole activation scope, and it is what keeps the
+spend bounded:
 
-- Every efficient decider run the system starts on its own runs at revision 3: the
-  per-minute cron drain and the 05:00Z platform sync drain every `pending` profile, and each
-  run completion drains again. Such a run reuses the pair's other results and measures the
-  21 probe cuts plus `supp-agent-term-pwd-base` per repetition; nothing else changes.
-- Ready pairs re-run nothing until the `remeasure-prompt-transport` `request` action queues
-  them. Its body accepts `pairs: [{model, variant}, ...]` to measure an explicit set; the
-  activation scope is the 29 pairs that serve the agentic routes, and the dry run projects
-  the spend. At 3 repetitions and catalog prices those 29 pairs cost $21.30 / $21.50 /
-  $22.22 without cache (low/mid/high); the full 52-pair pool $113.87 / $115.05 / $119.15,
-  $68.41 of it with half the input read from cache.
+- The migration only *stages* the scope: it writes `probe_activations` rows, one per pair,
+  with the action to take. It cannot write `profile_remeasures` rows or `pending` profiles
+  directly, because a migration applies while the previous image is still serving and that
+  worker claims both without knowing the revision: the queued pairs would run at revision 2,
+  measure nothing they lack and lose their queue row, and the re-admitted rows would be
+  measured without the probes. The old worker never reads `probe_activations`; the drain of
+  the deploy that raises the revision consumes it once
+  (`applyProbeActivations`, `src/probe-activation.ts`), and it waits while the deploy holds
+  the dispatch lock so no instance of the previous image can be serving when the rows land.
+  Each staged row also names the revision its action needs (`required_revision`), and the
+  apply leaves every row staged whose revision the worker does not run.
+- The 24 pairs that are `ready` at `efficient:v1:6649fed2`, repetitions 3 and need the
+  probes become `profile_remeasures` rows (23 platform pairs plus
+  `meta/muse-spark-1.2-contributor` `high`, a user-owned pair) — the rows the
+  `remeasure-prompt-transport` `request` action writes. Each run claims one row, reuses every
+  result that is still reusable and measures the 21 probe cuts plus
+  `supp-agent-term-pwd-base` per repetition, so 22 cases × 3 repetitions per pair and
+  nothing else. A pair whose provenance run already holds a revision-3 result for all 22 is
+  skipped instead, so a pair is never re-measured by this activation.
+- `meta/muse-ember` ×6 is re-admitted by the same activation: its 2026-11-11 rep-3 run lost
+  a lane and left all six rows `failed` (class `unknown`), so they had no probe measurement
+  and would stay ineligible on the agentic routes. The activation moves exactly those six
+  rows back to `pending` with the per-row Re-admit's fields (`src/profile-refresh.ts`),
+  `invalidated_at` included, and the next platform drain measures a full revision-3 run for
+  them. The re-admit's invalidation is deliberate and is what the forecast prices: results
+  measured before it are not reused (`reuseDeciderCaseResults` in `src/db.ts`), exactly as
+  for an admin Re-admit. Ember is the model this grading exists for, so it is re-admitted on
+  purpose now that narration stops are graded.
+- Every other efficient decider run the system starts on its own also runs at revision 3:
+  the per-minute cron drain and the 05:00Z platform sync drain every `pending` profile, and
+  each run completion drains again. For a pair with all of its case results stored that is
+  the same 22 cases × repetitions.
+- The pair list lives in `src/probe-activation.ts` and is mirrored in the migration; the
+  case list is the code's own `PROBE_ACTIVATION_CASE_IDS`, so the two cannot drift.
+  `src/probe-activation-sql.test.ts` fails if the migration's pairs drift from it, if
+  anything the live worker claims is visible before the activation is applied, if a
+  re-admitted row that is not a retryable failure (or that has a live chunk) moves, or if a
+  queued pair schedules a single case outside the probe set.
+- At 3 repetitions and catalog prices the 23 platform pairs cost $19.63 / $19.81 / $20.45
+  without cache (low/mid/high, $11.09 / $11.28 / $11.92 with half the input read from
+  cache), and `meta/muse-spark-1.2-contributor` `high` — the 24th queued pair — adds
+  $0.14 / $0.14 / $0.15 ($0.14 with half the input cached). The Ember re-admit adds
+  $10.22 / $10.25 / $10.32: 3 × 90 agentic cases at the measured rep-1 cost, the 1,021
+  missing non-agentic case-reps at $5.25, and its probes — a full run, because the re-admit
+  invalidates the failed run's results. Activation total $29.99 / $30.20 / $30.92,
+  $20.79 / $21.00 / $21.72 at 50 % cache.
+- Rolling back is lowering `ACTIVE_MEASUREMENT_REVISION` to 2 and deploying: every staged
+  row carries its `required_revision` (3), and `applyProbeActivations` skips — and leaves
+  staged — every row the worker's revision does not reach. A deploy at revision 2 therefore
+  neither queues the pairs nor re-admits the Ember rows; a later deploy that raises the
+  revision back to 3 applies whatever is still staged. An activation already applied is
+  cancelled by deleting the queued `profile_remeasures` rows, and the six Ember rows can go
+  back to `failed` with their lane failure. The new table is additive and every stored
+  result stays.
 - The platform table keeps publishing every route; only the agentic routes narrow as
   described above.
 

@@ -67,8 +67,11 @@ if (Platform.OS === 'ios') {
   // while the native observer is attached, and the observer is attached from
   // this subscription.
   subscribeToInteractions();
-  refreshActiveAgentsLiveActivityCopy();
-  refreshSessionLiveActivityCopy();
+  // Guarded for the same reason as the language listener below: these run at
+  // module scope, where a throwing host function would abort the import of the
+  // root layout's module graph before the app ever mounts.
+  guardSink('copy_agents_activity', refreshActiveAgentsLiveActivityCopy);
+  guardSink('copy_session_activity', refreshSessionLiveActivityCopy);
 
   // Registers the iOS Live Activity and widget sink at import time. The root
   // layout imports this file on both platforms; Android owns
@@ -92,7 +95,7 @@ if (Platform.OS === 'ios') {
   // The widget gallery shows the approved Needs input layouts with sample
   // agents; this writes that preview in the language i18n holds now, and the
   // language listener below re-writes it once the stored language applies.
-  refreshActiveAgentsWidgetCopy();
+  guardSink('copy_widget_gallery', refreshActiveAgentsWidgetCopy);
 
   // Claim a card raised by a push-to-start before anything else runs. iOS grants
   // this process background run time for exactly that, and the server cannot
@@ -132,10 +135,16 @@ if (Platform.OS === 'ios') {
   // stored language is applied a few ticks later. Re-bake on every language
   // change so both Live Activities and the widget gallery placeholder follow
   // the user's language.
+  //
+  // Guarded: i18next emits `languageChanged` synchronously inside
+  // `changeLanguage`, so a throwing WidgetKit or ActivityKit host function here
+  // would reject the language change itself and make the startup path fall back
+  // to English with the new catalog already applied. Each refresh is guarded on
+  // its own so one failing surface never skips the other two.
   i18n.on('languageChanged', () => {
-    refreshActiveAgentsLiveActivityCopy();
-    refreshSessionLiveActivityCopy();
-    refreshActiveAgentsWidgetCopy();
+    guardSink('language_copy_agents_activity', refreshActiveAgentsLiveActivityCopy);
+    guardSink('language_copy_session_activity', refreshSessionLiveActivityCopy);
+    guardSink('language_copy_widget', refreshActiveAgentsWidgetCopy);
   });
 
   // Turning the in-app switch off must clear the activity already on the Lock

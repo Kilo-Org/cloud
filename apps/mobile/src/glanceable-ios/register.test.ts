@@ -17,6 +17,11 @@ const mocks = vi.hoisted(() => ({
   // second registration beside the Live Activity press subscription, so its
   // module is mocked here too.
   registerWidgetActionHandling: vi.fn(),
+  // The native copy refreshes, and the handler the module registers on i18n.
+  refreshActiveAgentsLiveActivityCopy: vi.fn(),
+  refreshSessionLiveActivityCopy: vi.fn(),
+  refreshActiveAgentsWidgetCopy: vi.fn(),
+  languageChangedHandlers: [] as (() => void)[],
 }));
 
 vi.mock('react-native', () => ({
@@ -48,23 +53,32 @@ vi.mock('./session-follow', () => ({
   endAllSessionCards: vi.fn(),
   subscribeSessionFollows: vi.fn(),
 }));
-vi.mock('./session-live-activity', () => ({ refreshSessionLiveActivityCopy: vi.fn() }));
+vi.mock('./session-live-activity', () => ({
+  refreshSessionLiveActivityCopy: mocks.refreshSessionLiveActivityCopy,
+}));
 vi.mock('@/lib/glanceable/cleanup', () => ({ subscribeGlanceableTerminalEnd: vi.fn() }));
 vi.mock('@/lib/glanceable/persist', () => ({
   getLastGlanceableSnapshot: () => null,
   getGlanceableSnapshotForSignedInScope: () => null,
 }));
 vi.mock('./active-agents-live-activity', () => ({
-  refreshActiveAgentsLiveActivityCopy: vi.fn(),
+  refreshActiveAgentsLiveActivityCopy: mocks.refreshActiveAgentsLiveActivityCopy,
 }));
 vi.mock('./active-agents-widget', () => ({
-  refreshActiveAgentsWidgetCopy: vi.fn(),
+  refreshActiveAgentsWidgetCopy: mocks.refreshActiveAgentsWidgetCopy,
 }));
 vi.mock('./widget-actions', () => ({
   registerWidgetActionHandling: mocks.registerWidgetActionHandling,
 }));
 vi.mock('./widget-logo', () => ({ ensureWidgetLogo: vi.fn() }));
-vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
+vi.mock('@/i18n', () => ({
+  i18n: {
+    on: (_event: string, handler: () => void) => {
+      mocks.languageChangedHandlers.push(handler);
+    },
+    t: (key: string) => key,
+  },
+}));
 vi.mock('@/lib/glanceable/live-activity-switch', () => ({
   getLiveActivityEnabled: () => true,
   getNotificationPermissionGranted: () => true,
@@ -78,12 +92,17 @@ vi.mock('@/lib/glanceable/activity-kit-prompt', () => ({
 describe('glanceable-ios register', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.languageChangedHandlers.length = 0;
+    mocks.refreshActiveAgentsLiveActivityCopy.mockImplementation(() => undefined);
+    mocks.refreshSessionLiveActivityCopy.mockImplementation(() => undefined);
+    mocks.refreshActiveAgentsWidgetCopy.mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
     mocks.appStateListeners.clear();
+    mocks.languageChangedHandlers.length = 0;
     mocks.registerWidgetActionHandling.mockClear();
   });
 
@@ -166,5 +185,40 @@ describe('glanceable-ios register', () => {
       listener('active');
     }
     expect(mocks.sweepStrayActivities).toHaveBeenCalledTimes(1);
+  });
+
+  it('imports with a throwing native refresh', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.refreshActiveAgentsWidgetCopy.mockImplementation(() => {
+      throw new Error('native widget registration failed');
+    });
+    vi.resetModules();
+
+    // The root layout imports this module, so a host function that throws here
+    // must not abort the import before the app mounts.
+    await expect(import('./register')).resolves.toBeDefined();
+    expect(mocks.refreshActiveAgentsLiveActivityCopy).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshSessionLiveActivityCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a throwing native refresh from rejecting a language change', async () => {
+    mocks.platform.OS = 'ios';
+    await import('./register');
+    mocks.refreshActiveAgentsWidgetCopy.mockImplementation(() => {
+      throw new Error('native widget registration failed');
+    });
+
+    // i18next runs this handler synchronously inside `changeLanguage`, so a
+    // throw that escapes would reject the language change itself.
+    expect(mocks.languageChangedHandlers).toHaveLength(1);
+    for (const handler of mocks.languageChangedHandlers) {
+      expect(() => {
+        handler();
+      }).not.toThrow();
+    }
+    // One failing surface never skips the others.
+    expect(mocks.refreshActiveAgentsLiveActivityCopy).toHaveBeenCalledTimes(2);
+    expect(mocks.refreshSessionLiveActivityCopy).toHaveBeenCalledTimes(2);
+    expect(mocks.refreshActiveAgentsWidgetCopy).toHaveBeenCalledTimes(2);
   });
 });

@@ -15,6 +15,10 @@ vi.mock('../sandbox-outbound.js', () => ({
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
 import { ContainersOutbound, type ContainersOutboundProps } from './containers-outbound.js';
 import type { getSentryConfig } from '../shared/sentry.js';
+import {
+  RUNTIME_PROXY_ORIGIN_HEADER,
+  runtimeProxyOriginProof,
+} from '../runtime-credential-proxy-origin.js';
 
 function outbound(
   props: ContainersOutboundProps,
@@ -565,4 +569,52 @@ describe('ContainersOutbound egress enforcement', () => {
     expect(response.status).toBe(502);
     expect(handleManagedScmOutbound).not.toHaveBeenCalled();
   });
+});
+
+describe('ContainersOutbound runtime proxy origin', () => {
+  const env = {
+    NEXTAUTH_SECRET: 'origin-test-secret',
+    WORKER_URL: 'https://control.example.com',
+  } as unknown as Cloudflare.Env;
+
+  async function forwardedHeader(url: string): Promise<string | null | undefined> {
+    await outbound({ containerId: 'container-1' }, env).fetch(
+      new Request(url, { headers: { [RUNTIME_PROXY_ORIGIN_HEADER]: 'forged' } })
+    );
+    return vi
+      .mocked(handleManagedScmOutbound)
+      .mock.calls[0]?.[0].headers.get(RUNTIME_PROXY_ORIGIN_HEADER);
+  }
+
+  it('replaces a sandbox-supplied proof with this container proof for the facade', async () => {
+    const expected = await runtimeProxyOriginProof(env, 'container-1');
+    expect(expected).toEqual(expect.any(String));
+    expect(await forwardedHeader('https://control.example.com/api/profile')).toBe(expected);
+    expect(await runtimeProxyOriginProof(env, 'container-2')).not.toBe(expected);
+  });
+
+  it('replaces the proof before sending Session Sync uploads through the binding', async () => {
+    const sessionSync = vi.fn(async (_request: Request) => new Response('synced'));
+    const worker = outbound({ containerId: 'container-1' }, {
+      ...env,
+      SESSION_SYNC: { fetch: sessionSync },
+    } as unknown as Cloudflare.Env);
+    await worker.fetch(
+      new Request('https://session-sync.kiloapps.io/v1/sessions/ses_synthetic/batches', {
+        method: 'POST',
+        headers: { [RUNTIME_PROXY_ORIGIN_HEADER]: 'forged' },
+      })
+    );
+    expect(sessionSync).toHaveBeenCalledTimes(1);
+    expect(sessionSync.mock.calls[0]?.[0].headers.get(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(
+      await runtimeProxyOriginProof(env, 'container-1')
+    );
+  });
+
+  it.each(['https://example.com/api/profile', 'https://control.example.com/kilo/session'])(
+    'strips the proof header from requests outside the facade: %s',
+    async url => {
+      expect(await forwardedHeader(url)).toBeNull();
+    }
+  );
 });

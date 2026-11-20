@@ -2601,3 +2601,28 @@ cp packages/session-ingest-contracts/src/cloud-agent-billing.ts services/cloud-a
 ```
 
 The mirror test requires exact source equality. Verify the standalone Docker wrapper build after schema changes.
+
+
+### Runtime proxy origin proof rollout
+
+Origin proof support ships in two releases. Deploy the compatibility release fully
+before merging the enforcement release. A PR merge alone is not the deployment gate.
+
+1. **Compatibility:** Containers outbound and Vercel network policies add
+   `x-kilo-runtime-proxy-origin`. The facade, Session DO, Sandbox DO RPC inputs and
+   Session Sync authorization binding accept and forward the optional proof.
+   Allocations do not require proof yet. Session Sync still omits the proof when
+   it calls the authorization binding, so its deployment order does not matter.
+2. **Enforcement:** Deploy Session Sync proof forwarding before Cloud Agent.
+   Cloud Agent then marks new allocations and requires their platform proof.
+   Existing allocations remain exempt until they stop.
+
+Before the enforcement release, verify that every active Cloud Agent version has
+the compatibility readers and outbound proof injection. Search Worker logs for
+`runtime_proxy_origin_proof_unavailable`: each line is an egress that sent no proof.
+Also run one live Vercel sandbox request that sets its own
+`x-kilo-runtime-proxy-origin`. The facade must receive only the injected proof.
+Readers treat a value that is not exactly one proof, such as a joined duplicate,
+as absent. Keep the releases separate;
+deploying both PRs together removes the compatibility boundary. For a rollback after
+enforcement, use the compatibility release as the Cloud Agent rollback target.

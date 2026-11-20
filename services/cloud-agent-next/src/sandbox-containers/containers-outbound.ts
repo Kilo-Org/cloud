@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
+import { withRuntimeProxyOrigin } from '../runtime-credential-proxy-origin.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
 import { getSentryConfig } from '../shared/sentry.js';
 import { nativeEgressAllowlistSchema } from '../sandbox-control/egress-policy.js';
@@ -56,8 +57,12 @@ export class ContainersOutbound extends WorkerEntrypoint<
         ? policy.data
         : (nativeEgressAllowlistSchema.safeParse([...policy.data, sentryHostname]).data ??
           policy.data);
+    const stamped =
+      typeof request.headers?.has === 'function'
+        ? await withRuntimeProxyOrigin(request, this.env, containerId)
+        : request;
     return proxySandboxEgress(
-      request,
+      stamped,
       this.env,
       {
         ...(allowlist === undefined ? {} : { allowlist }),

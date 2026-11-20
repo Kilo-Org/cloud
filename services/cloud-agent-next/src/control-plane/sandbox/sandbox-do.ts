@@ -2568,6 +2568,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     kiloSessionId: string;
     directory: string;
     handle?: string;
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null> {
     await this.initialized;
     if (
@@ -2709,7 +2710,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * none served (the facade returns a retryable 503); `denied` is a known denial
    * on every candidate (including a handle not in the accepted set).
    */
-  async resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution> {
+  async resolveScopeHandle(input: {
+    handle: string;
+    originProof?: string;
+  }): Promise<ScopeHandleResolution> {
     await this.initialized;
     if (
       typeof input?.handle !== 'string' ||

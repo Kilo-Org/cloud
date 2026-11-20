@@ -1558,7 +1558,8 @@ export function removeSessionCredentialMembership(
 export function buildControlNetworkPolicy(
   grants: readonly SessionCredentialGrant[],
   acceptedHandlesByScopeId?: ReadonlyMap<string, readonly string[]>,
-  env: { WORKER_URL?: string } = {}
+  env: { WORKER_URL?: string } = {},
+  originProof?: string
 ): VercelSandboxNetworkPolicy {
   const policies = grants.map(value => {
     const grant = validateGrant(value);
@@ -1573,6 +1574,7 @@ export function buildControlNetworkPolicy(
     return buildVercelCredentialNetworkPolicy({
       rootSessionIds: grant.members.map(member => member.kiloSessionId),
       organizationId: grant.orgId,
+      originProof,
       runtimeProxy: {
         ...grant.kilo.runtimeProxy,
         handles: acceptedHandlesByScopeId?.get(grant.scopeId) ?? [],

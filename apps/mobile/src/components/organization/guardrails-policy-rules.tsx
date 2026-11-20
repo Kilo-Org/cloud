@@ -21,7 +21,12 @@ import { MenuSheet } from '@/components/ui/menu-sheet';
 import { Text } from '@/components/ui/text';
 import { selectionHaptic } from '@/lib/haptics';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  COMPACT_CONTROL_ROW_END_CLASS,
+} from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import {
   GUARDRAILS_LIMITS,
   type OrgPolicyRule,
@@ -99,13 +104,19 @@ export function PolicyRulesEditor({
               <Text className="text-sm font-medium text-foreground">
                 {t('organizationGuardrails.ruleNumber', { number: index + 1 })}
               </Text>
-              {/* The icon alone measures 16dp, so the action takes a width floor
-                  of its own: 35.8dp measured plus the line-action slop each
-                  way (5 + 5) reaches the 44pt target, and the box keeps the
-                  audit floor on its own node. */}
+              {/* The rule's delete action is the shared compact icon control,
+                  not a line action: the glyph alone measures 16dp, so the box
+                  carries the 32dp target and the 8dp slop takes the reach to
+                  48dp. The end pull keeps the glyph on the card's content edge
+                  while the box itself stays inside the row Android delivers
+                  touches in. */}
               <Pressable
-                className={`${LINE_ACTION_BOX_CLASS} min-w-[36px] items-center justify-center active:opacity-70`}
-                hitSlop={LINE_ACTION_HIT_SLOP}
+                className={cn(
+                  COMPACT_CONTROL_BOX_CLASS,
+                  COMPACT_CONTROL_ROW_END_CLASS,
+                  'shrink-0 active:opacity-70'
+                )}
+                hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
                 disabled={disabled}
                 accessibilityRole="button"
                 accessibilityLabel={t('organizationGuardrails.ruleRemove', {

@@ -3627,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "เปลี่ยนชื่อองค์กร",
-      "renamePlaceholder": "ชื่อองค์กร",
+      "renamePlaceholder": "กรอกชื่อองค์กร",
       "balance": "ยอดคงเหลือ",
       "plan": "แผน",
       "planTeams": "Teams",

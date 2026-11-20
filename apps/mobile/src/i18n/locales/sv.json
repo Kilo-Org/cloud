@@ -3627,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Byt namn på organisation",
-      "renamePlaceholder": "Organisationens namn",
+      "renamePlaceholder": "Ange ett namn på organisationen",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

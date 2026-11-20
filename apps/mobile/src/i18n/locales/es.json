@@ -3510,7 +3510,7 @@
       "planStatusLapsed": " · Finalizado",
       "planEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo.",
       "manageBilling": "Gestionar facturación",
-      "renamePlaceholder": "Nombre de la organización",
+      "renamePlaceholder": "Introduce un nombre para la organización",
       "renameTitle": "Cambiar nombre de la organización"
     },
     "inviteMember": {

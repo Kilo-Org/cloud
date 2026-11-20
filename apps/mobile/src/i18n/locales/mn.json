@@ -3627,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Байгууллагын нэрийг өөрчлөх",
-      "renamePlaceholder": "Байгууллагын нэр",
+      "renamePlaceholder": "Байгууллагын нэрийг оруулна уу",
       "balance": "Үлдэгдэл",
       "plan": "Төлөвлөгөө",
       "planTeams": "Teams",

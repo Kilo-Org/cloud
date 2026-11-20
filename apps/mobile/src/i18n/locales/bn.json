@@ -3627,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "সংস্থার নাম পরিবর্তন করুন",
-      "renamePlaceholder": "সংস্থার নাম",
+      "renamePlaceholder": "সংস্থার একটি নাম লিখুন",
       "balance": "ব্যালেন্স",
       "plan": "প্ল্যান",
       "planTeams": "Teams",

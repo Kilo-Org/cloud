@@ -3627,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Omdøb organisation",
-      "renamePlaceholder": "Organisationens navn",
+      "renamePlaceholder": "Angiv et navn til organisationen",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

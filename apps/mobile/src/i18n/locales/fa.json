@@ -3627,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "تغییر نام سازمان",
-      "renamePlaceholder": "نام سازمان",
+      "renamePlaceholder": "نام سازمان را وارد کنید",
       "balance": "موجودی",
       "plan": "طرح",
       "planTeams": "Teams",

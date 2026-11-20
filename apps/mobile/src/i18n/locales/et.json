@@ -3627,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Nimeta organisatsioon ümber",
-      "renamePlaceholder": "Organisatsiooni nimi",
+      "renamePlaceholder": "Sisesta organisatsiooni nimi",
       "balance": "Saldo",
       "plan": "Plaan",
       "planTeams": "Teams",

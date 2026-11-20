@@ -168,7 +168,11 @@ export const OpenRouterModelsResponseSchema = z.object({
         .optional(),
       opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
       architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),
-      retires_on: z.string().optional(),
+      retires_on: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional()
+        .catch(undefined),
     })
   ),
 });

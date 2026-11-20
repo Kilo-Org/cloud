@@ -18,8 +18,9 @@ export function isNewModel(
 }
 
 /**
- * The date a catalog entry retires, as the entry's own `yyyy-MM-dd`, or `undefined` when the note
- * does not apply.
+ * The date a catalog entry retires, as the parsed UTC day in `yyyy-MM-dd`, or `undefined` when the
+ * note does not apply. Every client receives that shape, so an `expiration_date` that carries a
+ * time still reaches them as its UTC day.
  *
  * The guards keep the note's precedence over the `(new)` marker, as the composed name had it: an
  * entry that already states a fact in its name (it ends with `)`) or reads as new carries no
@@ -36,7 +37,7 @@ export function retirementDate(
   const expirationDate = new Date(model.expiration_date);
   if (!Number.isFinite(expirationDate.getTime())) return undefined;
   if (expirationDate > addMonths(now, 1)) return undefined;
-  return model.expiration_date;
+  return expirationDate.toISOString().slice(0, 10);
 }
 
 /**

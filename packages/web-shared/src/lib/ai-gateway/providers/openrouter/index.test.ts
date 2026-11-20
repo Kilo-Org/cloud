@@ -230,6 +230,8 @@ describe('formatName', () => {
 });
 
 describe('retirement note', () => {
+  const NOT_PREFERRED = -1;
+
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(new Date('2026-06-17T00:00:00Z'));
   });
@@ -255,6 +257,12 @@ describe('retirement note', () => {
 
   it('leaves the name alone without a date', () => {
     expect(modelNameWithRetirement({ name: 'Test Model' })).toBe('Test Model');
+  });
+
+  it('normalizes a timestamp-shaped expiration date to its UTC day', () => {
+    expect(
+      retirementDate(buildModel({ expiration_date: '2026-07-01T12:00:00Z' }), NOT_PREFERRED)
+    ).toBe('2026-07-01');
   });
 });
 

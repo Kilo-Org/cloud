@@ -104,6 +104,20 @@ describe('OpenRouterModelsResponseSchema', () => {
     });
     expect(parsed.data[0]).toEqual({ id: 'a', name: 'A' });
   });
+
+  it('parses a date-only retires_on unchanged', () => {
+    const parsed = OpenRouterModelsResponseSchema.parse({
+      data: [{ id: 'a', name: 'A', retires_on: '2026-07-01' }],
+    });
+    expect(parsed.data[0]).toEqual({ id: 'a', name: 'A', retires_on: '2026-07-01' });
+  });
+
+  it('drops an off-contract retires_on instead of rejecting the body', () => {
+    const parsed = OpenRouterModelsResponseSchema.parse({
+      data: [{ id: 'a', name: 'A', retires_on: '2026-07-01T00:00:00Z' }],
+    });
+    expect(parsed.data[0]).toEqual({ id: 'a', name: 'A', retires_on: undefined });
+  });
 });
 
 describe('OrganizationDefaultsResponseSchema', () => {

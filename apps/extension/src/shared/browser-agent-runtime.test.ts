@@ -5949,6 +5949,60 @@ describe('the download hold on a real call', () => {
     expect(downloads.cancelled).toStrictEqual([62, 61, 64]);
     expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
   });
+
+  it('answers an approved call the browser named no item for, and keeps the approval unspent', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    let repeat = false;
+
+    // The guarded click starts the file and the hold stops it. The approved repeat's own file never reaches the
+    // Hold at all: Chrome's multiple-downloads limiter refuses it, so no item is ever named for it.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed' && !repeat) {
+          hold.handle({ filename: 'report.txt', id: 51, referrer: dashboard, url }, () => {});
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    // The guarded click starts the file and the hold stops it, so the refusal asks for the one file an approval buys.
+    const guarded = await click();
+    const token = expectStepToken(guarded);
+
+    repeat = true;
+
+    // The approved call waits the hold's own bound for the item its approval bought; the browser creates none, and
+    // the call answers with what that means.
+    const approved = await click([token]);
+
+    // The one approval bought a file the browser never created: the model is told the browser refused it, and the
+    // Approval is still unspent, so the repeat needs no second decision once the site is allowed.
+    expect(approved).toMatchObject({
+      afterAction: true,
+      kind: 'needs_permission',
+      result: { error: DOWNLOAD_BLOCKED_BY_BROWSER_ERROR, ok: false },
+    });
+    expect(hold.needOf('session-1')?.kind).toBe('armed');
+    expectStepToken(approved);
+    expect(downloads.cancelled).toStrictEqual([51]);
+  });
 });
 
 describe('a download the dialog answer starts', () => {

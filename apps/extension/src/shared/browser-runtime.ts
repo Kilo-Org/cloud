@@ -2873,7 +2873,6 @@ export const createBrowserRuntime = ({
 
   const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
     // The handover runs before the acquire, in one message.
-    // Only a panel may hand a lease over: its take-over asymmetry is the design's only one.
     // An agent's tab is never freed for someone else without a confirmation.
     if (from?.kind === 'panel') {
       leases.release(tabId, from);
@@ -3009,6 +3008,38 @@ export const createBrowserRuntime = ({
             tabId: tokenTabId,
             toolName: stepToolName,
           });
+
+        /**
+         * The refusal for an approved call the browser named no item for: Chrome's multiple-downloads limiter refuses
+         * the file a repeat already bought, and a plain success would hide it, while a spent approval would ask a
+         * human again for a file the browser swallowed. The approval stays unspent and the same step token is issued
+         * again, so the repeat needs no second decision once the site is allowed.
+         */
+        const browserBlockedRefusal = ({
+          need,
+          origin,
+          step,
+          tabId,
+        }: {
+          readonly need: StepTokenNeed | undefined;
+          readonly origin: string;
+          readonly step: DownloadStep | undefined;
+          readonly tabId: number;
+        }): BrowserToolRunOutcome => {
+          const token = issueSensitiveToken({ origin, reason: SENSITIVE_REASON.download }, tabId, need);
+
+          return needsPermissionOutcome(
+            [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
+            {
+              afterAction: true,
+              error: DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
+              ...(step === undefined
+                ? {}
+                : { step: { argumentsHash: step.argumentHash, tool: step.toolName } }),
+              stepToken: token,
+            }
+          );
+        };
 
         if (agentContext !== undefined) {
           // Only downloads this call starts may be reported: events left by an earlier call are stale.
@@ -3697,7 +3728,10 @@ export const createBrowserRuntime = ({
                   return unanswered ? 'pending' : 'none';
                 },
                 since: callStartedAt,
-                timeoutMs: DOWNLOAD_ITEM_WAIT_MS,
+                // An approved call waits for the one file its approval bought: the browser creates its item a moment
+                // After the command returns, and a re-download of a delayed attachment was measured 13 ms past the
+                // Announcement bound. Every other call pays the shorter bound.
+                timeoutMs: downloadApproved ? DOWNLOAD_HOLD_SETTLE_MS : DOWNLOAD_ITEM_WAIT_MS,
               })) ?? null;
           }
         }
@@ -3798,6 +3832,21 @@ export const createBrowserRuntime = ({
             if (owed !== undefined) {
               return owed;
             }
+          }
+
+          // An approved repeat is a call for exactly the one file its approval bought. When the call ends with that
+          // Approval still unspent and no file of its own, the browser named no item for it — Chrome's own
+          // Multiple-downloads limiter refuses it — so the answer says so instead of a success the human cannot trust.
+          if (downloadApproved && ownLate.length === 0 && downloadHold.needOf(sessionKey)?.kind === 'armed') {
+            return browserBlockedRefusal({
+              need:
+                approvedFile === undefined
+                  ? undefined
+                  : { tabId: approvedFile.need.tabId, url: approvedFile.need.url },
+              origin: preflight?.ok ? preflight.origin : '',
+              step: downloadStep,
+              tabId: runTabId,
+            });
           }
 
           // A download started and nothing was decided inside the bound: the file may exist, and the model is told
@@ -3977,34 +4026,19 @@ export const createBrowserRuntime = ({
           settlement.stopped === 0 &&
           intercepted.stopped.length === 0
         ) {
-          const origin = preflight?.ok ? preflight.origin : '';
           const approvedUrl =
             approvedFile?.need.url ??
             settlement.stoppedItems?.find(item => item.url !== undefined)?.url;
-          const token = issueSensitiveToken(
-            { origin, reason: SENSITIVE_REASON.download },
-            runTabId,
-            approvedUrl === undefined
-              ? undefined
-              : { tabId: approvedFile?.need.tabId ?? runTabId, url: approvedUrl }
-          );
 
-          return needsPermissionOutcome(
-            [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
-            {
-              afterAction: true,
-              error: DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
-              ...(downloadStep === undefined
-                ? {}
-                : {
-                    step: {
-                      argumentsHash: downloadStep.argumentHash,
-                      tool: downloadStep.toolName,
-                    },
-                  }),
-              stepToken: token,
-            }
-          );
+          return browserBlockedRefusal({
+            need:
+              approvedUrl === undefined
+                ? undefined
+                : { tabId: approvedFile?.need.tabId ?? runTabId, url: approvedUrl },
+            origin: preflight?.ok ? preflight.origin : '',
+            step: downloadStep,
+            tabId: runTabId,
+          });
         }
 
         // A download is not a document, so a navigate that became one never moved the tab.

@@ -445,16 +445,18 @@ describe('ModelAccessForm with no provider rows', () => {
     expect(onRetryCatalog).toHaveBeenCalledTimes(1);
   });
 
-  it('saves no provider list while the row set is empty', async () => {
-    // The catalog names a model but no provider for it: the same missing
-    // gateway data the notice reports. A save then must not write the allow
-    // list the empty row set would produce.
-    const root = render(undefined, {
+  it('saves no provider list when the row set empties under an edited draft', async () => {
+    // The gateway's provider data disappears after an edit: the baseline rebases
+    // to the empty rows while the draft keeps the providers the admin saw, so
+    // the next save must leave the stored allow list alone.
+    const root = render(undefined);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+
+    renderWithCatalog(undefined, {
       catalog: [model('openai/gpt', []), model('anthropic/claude', [])],
     });
-    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
 
-    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
     await pressSave(root);
 
     expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({

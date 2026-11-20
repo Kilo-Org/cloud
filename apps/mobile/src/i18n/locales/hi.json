@@ -19,7 +19,9 @@
     "presenceStatus": "होस्ट: {{connection}}",
     "commandStatus": "आदेश डिलीवरी: {{status}}",
     "delivered": "पहुँचाया गया",
-    "expired": "समय समाप्त"
+    "expired": "समय समाप्त",
+    "recoveryGaps_one": "इस ट्रांसक्रिप्ट का {{displayCount}} हिस्सा गायब है।",
+    "recoveryGaps_other": "इस ट्रांसक्रिप्ट के {{displayCount}} हिस्से गायब हैं।"
   },
   "common": {
     "manageOnWeb": "वेब पर प्रबंधित करें",
@@ -699,6 +701,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
+      "managedOnWebTitle": "वेब पर प्रबंधित",
+      "managedOnWebShort": "यह कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है।",
+      "managedOnWebRepositories": "{{organization}} के लिए कंप्यूटर से वेब पर रिपॉज़िटरी चुनें।",
       "description": "{{organization}} के लिए एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "descriptionReconnect": "{{organization}} के लिए एक नया वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "descriptionOverview": "{{organization}} के लिए एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे अगली स्क्रीन पर पेस्ट करें।",
@@ -737,6 +742,7 @@
     "platformList": {
       "activity": "गतिविधि",
       "checking": "जाँच हो रही है…",
+      "needsAttention": "ध्यान आवश्यक",
       "platforms": "प्लेटफ़ॉर्म",
       "statusUnavailable": "स्थिति अनुपलब्ध"
     },
@@ -2176,6 +2182,8 @@
     "modelPicker": {
       "title": "मॉडल चुनें",
       "noModelsDescription": "चुनने के लिए कोई मॉडल उपलब्ध नहीं है।",
+      "allUnavailableTitle": "कोई भी मॉडल उपयोग नहीं किया जा सकता",
+      "allUnavailableDescription": "प्रदाता कुंजी जोड़ें और फिर से कोशिश करें।",
       "favorites": "पसंदीदा"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "प्रदाता अभी उपलब्ध नहीं है। थोड़ी देर में फिर से भेजें।"
   },
   "settingsTools": {
-    "confirmTitle": "यह बदलाव पुष्टि करें?"
+    "confirmTitle": "यह बदलाव पुष्टि करें?",
+    "guarded": {
+      "spendAlertsOff": "खर्च अलर्ट बंद करें? खर्च सीमा पार होने और प्रति घंटे होने वाली अचानक बढ़ोतरी के बारे में आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "balanceAlertsOff": "बैलेंस अलर्ट बंद करें? आपके क्रेडिट कम होने पर आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "securityFindingsOff": "सुरक्षा निष्कर्ष बंद करें? नए सुरक्षा निष्कर्षों के बारे में आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "hideBalanceOn": "अपने बैलेंस छिपाएँ? क्रेडिट बैलेंस अब प्रोफ़ाइल स्क्रीन और संगठन हब पर नहीं दिखेंगे।"
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "इस संगठन के लिए Kilo का उस प्रदाता की ओर रूटिंग रोकने हेतु किसी प्रदाता को बंद करें।",
     "providersNeedCatalog": "पूरा मॉडल कैटलॉग लोड होने तक प्रदाता स्विच केवल पढ़ने योग्य रहते हैं। उन्हें संपादित करने के लिए ऊपर फिर से कोशिश करें।",
     "providersEmpty": "इस खोज से कोई प्रदाता मेल नहीं खाता।",
+    "providersNone": "इस संगठन के लिए कोई प्रदाता उपलब्ध नहीं है।",
     "allowAllShown": "दिखाए गए सभी को अनुमति दें",
     "denyAllShown": "दिखाए गए सभी को अस्वीकार करें",
     "gatewaysDescription": "Kilo मॉडल अनुरोधों को Vercel AI Gateway या OpenRouter के माध्यम से रूट करता है। अक्षम गेटवे उन अनुरोधों को विफल कर देता है।",

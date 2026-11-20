@@ -14,6 +14,7 @@ exports[`privileged inventory covers discovered route handlers the privileged ro
   "/admin/api/auto-routing/benchmark-routing-table read -> rest.admin.autoRouting",
   "/admin/api/auto-routing/benchmark-runs read -> rest.admin.autoRouting",
   "/admin/api/auto-routing/benchmark-runs write -> rest.admin.autoRouting",
+  "/admin/api/auto-routing/benchmark-runs/[runId]/summaries read -> rest.admin.autoRouting",
   "/admin/api/auto-routing/benchmark-scheduler-config read -> rest.admin.autoRouting",
   "/admin/api/auto-routing/benchmark-scheduler-config write -> rest.admin.autoRouting",
   "/admin/api/auto-routing/classifier-analytics read -> rest.admin.autoRouting",

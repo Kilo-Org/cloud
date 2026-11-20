@@ -6,6 +6,7 @@ import type {
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  ConfigSaveWarnings,
   configToFormState,
   effortCoverageForModel,
   formStateToConfig,
@@ -237,6 +238,36 @@ describe('compact route rankings', () => {
     const html = renderToStaticMarkup(React.createElement(RoutingTableView, { data }));
     expect(html).toContain('legacy · low');
     expect(html).toContain('Below threshold');
+  });
+});
+
+describe('config save warnings', () => {
+  it('shows each warning with its kind and the worker’s next step', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ConfigSaveWarnings, {
+        warnings: [
+          {
+            kind: 'registry_sync_failed',
+            message: 'Platform registry sync failed (catalog 503). Save again to retry now.',
+          },
+          {
+            kind: 'routing_table_publish_failed',
+            message: 'Routing table publish failed (D1 overloaded).',
+          },
+        ],
+      })
+    );
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Platform registry not synced');
+    expect(html).toContain('Platform registry sync failed (catalog 503). Save again to retry now.');
+    expect(html).toContain('Routing table not republished');
+    expect(html).toContain('Routing table publish failed (D1 overloaded).');
+  });
+
+  it('renders nothing after a clean save', () => {
+    expect(renderToStaticMarkup(React.createElement(ConfigSaveWarnings, { warnings: [] }))).toBe(
+      ''
+    );
   });
 });
 

@@ -8,6 +8,7 @@ import {
   BenchmarkConfigResponseSchema,
   BenchmarkSchedulerConfigResponseSchema,
   BenchmarkRunsResponseSchema,
+  BenchmarkRunSummariesResponseSchema,
   CUSTOM_ROUTER_STATUS_PATH,
   CustomRouterStatusResponseSchema,
   PLATFORM_MEASUREMENTS_PATH,
@@ -98,6 +99,14 @@ export function listBenchmarkRuns(
     `/admin/runs${suffix}`,
     { method: 'GET' },
     BenchmarkRunsResponseSchema
+  );
+}
+
+export function getBenchmarkRunSummaries(runId: string, router: AutoRouter = DEFAULT_AUTO_ROUTER) {
+  return fetchBenchmarkAdmin(
+    `/admin/runs/${encodeURIComponent(runId)}/summaries?router=${router}`,
+    { method: 'GET' },
+    BenchmarkRunSummariesResponseSchema
   );
 }
 

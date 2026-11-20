@@ -10,7 +10,7 @@ import {
   type NativeSnapshotMessage,
   type NativeSnapshotSession,
 } from './native-sync-snapshot';
-import { upsertByRequestId } from './pending-requests';
+import { upsertByKey, upsertByRequestId } from './pending-requests';
 import { permissionAskedIdentitySchema } from './schemas';
 import type { SessionSnapshot, UnreadablePermissionState } from './types';
 
@@ -64,6 +64,8 @@ export type NativeConversation = {
   nativeMessages: NativeSnapshotMessage[];
   messages: SessionSnapshot['messages'];
   incompleteMessageIDs: string[];
+  /** Count of transcript parts still missing after recovery; zero when whole. */
+  recoveryGaps: number;
   pending: NativePendingRequests;
   loading: boolean;
   error: string | undefined;
@@ -106,7 +108,8 @@ export function reduceNativePendingRequests(
       const permission = parsed.data;
       return {
         ...pending,
-        permissions: [...pending.permissions.filter(item => item.id !== permission.id), permission],
+        // In place, so a replayed request keeps its place in the oldest-first list.
+        permissions: [...upsertByKey(pending.permissions, permission, item => item.id)],
         // A readable request supersedes an unreadable notice for the same id.
         unreadablePermissions: pending.unreadablePermissions.filter(
           item => item.requestId !== permission.id
@@ -139,12 +142,41 @@ export function reduceNativePendingRequests(
     if (form.success)
       return {
         ...pending,
-        questions: [...pending.questions.filter(item => item.id !== form.data.id), form.data],
+        // In place, so a replayed form keeps its place in the oldest-first list.
+        questions: [...upsertByKey(pending.questions, form.data, item => item.id)],
       };
   }
   if (event.type === 'form.replied' || event.type === 'form.cancelled')
     return { ...pending, questions: pending.questions.filter(item => item.id !== data.data['id']) };
   return pending;
+}
+
+/**
+ * Parts the recovery snapshot can still fill, deduplicated by identity. A
+ * projection failure changes nothing here: those parts leave the transcript
+ * through `error`, and counting them as gaps would promise a Retry the
+ * recovery loop cannot deliver.
+ */
+export function retryableGapCount(
+  messages: NativeSnapshotMessage[],
+  pendingSnapshotMessageIDs: string[] | undefined,
+  unresolvedMessageIDs: ReadonlySet<string>,
+  projectionFailed: boolean
+): number {
+  // The same identities the projector would have consumed: when the
+  // projection itself fails, none of them is a recoverable gap — recovery
+  // fills missing transports, not a broken projector.
+  if (projectionFailed) {
+    return new Set([
+      ...messages.filter(item => item.incomplete).map(item => item.message.id),
+      ...(pendingSnapshotMessageIDs ?? []),
+    ]).size;
+  }
+  return new Set([
+    ...messages.filter(item => item.incomplete).map(item => item.message.id),
+    ...(pendingSnapshotMessageIDs ?? []),
+    ...unresolvedMessageIDs,
+  ]).size;
 }
 
 /** Shared native display boundary. It never opens a socket or owns replay/recovery. */
@@ -170,12 +202,15 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
   const last = state.messages.at(-1)?.message;
   let messages: SessionSnapshot['messages'] = [];
   let projectionError: string | undefined;
+  const unresolvedByProjection = new Set(unresolved.map(item => item.message.id));
   if (session) {
     try {
       messages = readKilo2Messages(
         session,
         complete
-          .filter(item => !undisplayable.includes(item) && !unresolved.includes(item))
+          .filter(
+            item => !undisplayable.includes(item) && !unresolvedByProjection.has(item.message.id)
+          )
           .map(item => item.message),
         { assetURLs: state.assetURLs }
       );
@@ -187,6 +222,15 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
           incompleteMessageIDs.push(item.message.id);
     }
   }
+  // Retryable gap count: parts the recovery snapshot can still fill. A
+  // projection failure is a real error below, not more gaps to charge the
+  // banner with.
+  const recoveryGaps = retryableGapCount(
+    state.messages,
+    state.pendingSnapshotMessageIDs,
+    unresolvedByProjection,
+    projectionError !== undefined
+  );
   return {
     source: { version: 'v2' as const, runtime: 'native' as const },
     // Keep the exact canonical values available to details, usage and export consumers.
@@ -194,17 +238,18 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
     nativeMessages: state.messages,
     messages,
     incompleteMessageIDs,
+    recoveryGaps,
     pending: state.pending,
-    loading: !session && !state.snapshot && !state.error && state.connection !== 'disconnected',
+    // A disconnected pre-snapshot window still shows progress, not a blank screen.
+    loading: !session && !state.snapshot && !state.error,
+    // Only real failures: a missing transcript part is a recovery gap, not an error.
     error:
       state.error ??
       projectionError ??
-      (incompleteMessageIDs.length
-        ? `Native transcript recovery is incomplete: ${incompleteMessageIDs.join(', ')}.`
-        : !session && state.snapshot
-          ? 'The native snapshot has no session metadata.'
-          : last?.type === 'idle' && last.error
-            ? last.error.message
-            : undefined),
+      (!session && state.snapshot
+        ? 'The native snapshot has no session metadata.'
+        : last?.type === 'idle' && last.error
+          ? last.error.message
+          : undefined),
   };
 }

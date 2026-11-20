@@ -19,7 +19,9 @@
     "presenceStatus": "Isännät: {{connection}}",
     "commandStatus": "Komennon toimitus: {{status}}",
     "delivered": "Toimitettu",
-    "expired": "Vanhentunut"
+    "expired": "Vanhentunut",
+    "recoveryGaps_one": "{{displayCount}} osa tästä litteroinnista puuttuu.",
+    "recoveryGaps_other": "{{displayCount}} osaa tästä litteroinnista puuttuu."
   },
   "common": {
     "manageOnWeb": "Hallinnoi verkossa",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
+      "managedOnWebTitle": "Hallitaan verkossa",
+      "managedOnWebShort": "Tätä yhteyttä hallitaan verkossa tietokoneella.",
+      "managedOnWebRepositories": "Valitse {{organization}}-organisaation repositoriot verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "descriptionReconnect": "Luo uusi työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "descriptionOverview": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se seuraavalla näytöllä.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "Tarkistetaan…",
       "statusUnavailable": "Tilaa ei ole saatavilla",
+      "needsAttention": "Vaatii huomiota",
       "platforms": "Alustat",
       "activity": "Tapahtumat"
     },
@@ -2784,6 +2790,8 @@
     "modelPicker": {
       "title": "Valitse malli",
       "noModelsDescription": "Valittavissa ei ole malleja.",
+      "allUnavailableTitle": "Yhtään mallia ei voi käyttää",
+      "allUnavailableDescription": "Lisää palveluntarjoajan avain ja yritä uudelleen.",
       "favorites": "Suosikit"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Palveluntarjoaja ei ole juuri nyt käytettävissä. Lähetä uudelleen pian."
   },
   "settingsTools": {
-    "confirmTitle": "Vahvistetaanko tämä muutos?"
+    "confirmTitle": "Vahvistetaanko tämä muutos?",
+    "guarded": {
+      "spendAlertsOff": "Poistetaanko kuluhälytykset käytöstä? Et enää saisi ilmoituksia kulutusrajojen ylityksistä etkä tunneittaisista piikeistä.",
+      "balanceAlertsOff": "Poistetaanko saldohälytykset käytöstä? Et enää saisi ilmoituksia, kun kredittisi käyvät vähiin.",
+      "securityFindingsOff": "Poistetaanko tietoturvahavainnot käytöstä? Et enää saisi ilmoituksia uusista tietoturvahavainnoista.",
+      "hideBalanceOn": "Piilotetaanko saldosi? Kredittisaldot eivät enää näkyisi profiilinäytöillä ja organisaation keskusnäkymässä."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "Poista palveluntarjoaja käytöstä, niin Kilo ei enää reititä pyyntöjä sille tässä organisaatiossa.",
     "providersNeedCatalog": "Palveluntarjoajien kytkimet ovat vain luku -tilassa, kunnes koko mallikatalogi on ladattu. Muokkaa niitä napauttamalla yllä Yritä uudelleen.",
     "providersEmpty": "Haulla ei löytynyt palveluntarjoajia.",
+    "providersNone": "Tälle organisaatiolle ei ole saatavilla palveluntarjoajia.",
     "allowAllShown": "Salli kaikki näytetyt",
     "denyAllShown": "Estä kaikki näytetyt",
     "gatewaysDescription": "Kilo reitittää mallipyynnöt Vercel AI Gatewayn tai OpenRouterin kautta. Jos yhdyskäytävä on poistettu käytöstä, sen kautta kulkevat pyynnöt epäonnistuvat.",

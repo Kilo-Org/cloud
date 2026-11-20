@@ -856,15 +856,29 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     }
   }
 
+  const query = text ?? regex ?? '';
+  const lastSearched = capture.lines.at(-1);
+  // A search that hit its line bound must not read as a page without the text: say where it stopped.
+  const stoppedAt =
+    capture.truncated && lastSearched !== undefined ? describeFindLine(lastSearched) : undefined;
+
   if (matches.length === 0) {
-    return done(`No matches for "${text ?? regex ?? ''}" in the current page snapshot.`);
+    return done(
+      stoppedAt === undefined
+        ? `No matches for "${query}" in the current page snapshot.`
+        : `No match for "${query}" in the first ${String(capture.lines.length)} lines of the page snapshot. The search stopped there, after ${stoppedAt}; the rest of the page was not searched.`
+    );
   }
 
   const sections = matches.map(index => renderFindSnippet(capture.lines, index));
+  const stoppedNote =
+    stoppedAt === undefined || matches.length >= MAX_BROWSER_TOOL_FIND_MATCHES
+      ? ''
+      : ` The search stopped after ${String(capture.lines.length)} lines, at ${stoppedAt}; the rest of the page was not searched.`;
 
   return done(
     boundBrowserToolText(
-      `Found ${String(matches.length)} match(es) for "${text ?? regex ?? ''}".\n\n${sections.join('\n\n')}`
+      `Found ${String(matches.length)} match(es) for "${query}".${stoppedNote}\n\n${sections.join('\n\n')}`
     )
   );
 };

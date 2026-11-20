@@ -437,6 +437,58 @@ describe('browser_find', () => {
       expect(text).toContain('(snapshot truncated at 5 lines)');
     }
   });
+
+  // More lines than a search reads: the needle sits past the search's line bound.
+  const PAST_FIND_BOUND_TREE: BrowserAriaNode[] = [
+    axNode({
+      childIds: [
+        ...[...Array.from({ length: 50_005 }).keys()].map(index => `b${String(index)}`),
+        'n',
+      ],
+      nodeId: 'root',
+      role: 'generic',
+    }),
+    ...[...Array.from({ length: 50_005 }).keys()].map(index =>
+      axNode({
+        backendDOMNodeId: 1000 + index,
+        name: `Item ${String(index)}`,
+        nodeId: `b${String(index)}`,
+        role: 'button',
+      })
+    ),
+    axNode({ backendDOMNodeId: 999_999, name: 'Needle 9', nodeId: 'n', role: 'button' }),
+  ];
+
+  it('says a search that hit its line bound stopped there, and where, instead of "No matches"', async () => {
+    const { session } = createSession({
+      axNodes: PAST_FIND_BOUND_TREE,
+      frameTree: MAIN_ONLY_FRAME_TREE,
+    });
+    const panel = await runReadBrowserTool('browser_find', { text: 'Needle 9' }, session);
+    const agent = await runReadBrowserTool('browser_find', { text: 'Needle 9' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+
+    for (const result of [panel, agent]) {
+      const text = String(result.ok ? result.value : '');
+
+      expect(text).not.toContain('No matches');
+      expect(text).toContain(
+        'No match for "Needle 9" in the first 50000 lines of the page snapshot. The search stopped there, after button \'Item 49999\'; the rest of the page was not searched.'
+      );
+    }
+  });
+
+  it('notes where a search that hit its line bound stopped when it still found matches', async () => {
+    const { session } = createSession({ axNodes: PAST_FIND_BOUND_TREE });
+    const result = await runReadBrowserTool('browser_find', { text: 'Item 4999' }, session);
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('Found 11 match(es) for "Item 4999"');
+    expect(text).toContain(
+      "The search stopped after 50000 lines, at button 'Item 49999'; the rest of the page was not searched."
+    );
+  });
 });
 
 describe('browser_take_screenshot', () => {

@@ -551,11 +551,13 @@ describe('GitHub installation persistence', () => {
     ).resolves.toMatchObject({ integrationId: second.integrationId });
     await disconnectGitHubInstallation({ type: 'org', id: organizationB.id }, second.integrationId);
     await expect(buildManagedInstallationLookupQuery(db, params)).resolves.toEqual([]);
+    // organizationB connected as the workflow association and keeps the role
+    // after its own local disconnect.
     await expect(
       db.query.platform_integrations.findFirst({
         where: eq(platform_integrations.id, second.integrationId),
       })
-    ).resolves.toMatchObject({ github_connection_role: 'agent_only' });
+    ).resolves.toMatchObject({ github_connection_role: 'workflow' });
   });
 
   test('keeps mixed-owner workflow selection independent of the oldest agent-only connection', async () => {
@@ -2019,6 +2021,47 @@ describe('GitHub installation persistence', () => {
     ).resolves.toBeUndefined();
     await expect(
       assertGitHubInstallationRuntimeAuthorized('990108', 'standard', successor.integrationId)
+    ).resolves.toBeUndefined();
+  });
+
+  test('lets a secondary association take the workflow role when no other association holds the installation', async () => {
+    const organization = await createTestOrganization('Recovery successor org', otherOwnerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('990107')
+    );
+    if (!first.ok) throw new Error('Expected the first personal owner to connect');
+    await disconnectGitHubInstallation({ type: 'user', id: ownerId }, first.integrationId);
+
+    const successor = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      { ...data('990107'), kiloUserId: otherOwnerId }
+    );
+    expect(successor).toMatchObject({ ok: true });
+    if (!successor.ok)
+      throw new Error('Expected the successor organization to take the workflow role');
+    await disconnectGitHubInstallation(
+      { type: 'org', id: organization.id },
+      successor.integrationId
+    );
+
+    // The association that connects again becomes the workflow association.
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data('990107'))
+    ).resolves.toEqual({ ok: true, integrationId: first.integrationId });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '990107'));
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+      github_disconnected_at: null,
+      integration_status: 'active',
+    });
+    expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('990107', 'standard')
     ).resolves.toBeUndefined();
   });
 

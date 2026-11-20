@@ -264,11 +264,9 @@ export async function connectVerifiedGitHubInstallation(
     const otherOwnerAssociations = existingMatches.filter(
       association => association.id !== existing?.id
     );
-    // The role follows the associations that can still act for the
-    // installation: the same health condition runtime authorization and the
-    // owner slot check apply. An association that is not active, is suspended,
-    // whose authorization expired, or that is locally disconnected does not
-    // count.
+    // The role follows the associations that can act for the installation, which
+    // is the health condition runtime authorization requires: active status, no
+    // suspension, valid authorization, and no local disconnect.
     const otherOwnerHolders = otherOwnerAssociations.filter(isPlatformIntegrationHealthy);
 
     if (
@@ -300,8 +298,9 @@ export async function connectVerifiedGitHubInstallation(
       return { ok: false, reason: 'installation_unavailable' };
     }
     const role: 'workflow' | 'agent_only' =
-      existing?.github_connection_role ??
-      (otherOwnerHolders.length > 0 ? 'agent_only' : 'workflow');
+      existing?.github_connection_role === 'workflow' || otherOwnerHolders.length === 0
+        ? 'workflow'
+        : 'agent_only';
     if (!existing && role === 'agent_only' && owner.type !== 'org') {
       return { ok: false, reason: 'claimed_by_other_owner' };
     }

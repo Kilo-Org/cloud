@@ -291,9 +291,7 @@ export function ReviewDetailScreen({
             // A failure keeps the danger tile under it: the red ink alone on
             // the card surface read as ordinary copy, and the tint is the
             // palette's own danger token, not a hand-built card fill.
-            <Card
-              className={cn('mt-2', cancellationLabel ? undefined : 'bg-danger-tile-bg')}
-            >
+            <Card className={cn('mt-2', cancellationLabel ? undefined : 'bg-danger-tile-bg')}>
               <Text
                 variant={cancellationLabel ? 'muted' : undefined}
                 className={cn('text-xs', !cancellationLabel && 'text-destructive')}

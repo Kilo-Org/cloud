@@ -58,4 +58,3 @@ export function trialRefusalMessage(
 ): string {
   return i18n.t(trialRefusalCopyKey(canManageBilling, billingStep));
 }
-

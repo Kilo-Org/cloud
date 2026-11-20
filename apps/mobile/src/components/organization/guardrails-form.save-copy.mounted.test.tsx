@@ -243,9 +243,7 @@ describe('GuardrailsForm save copy', () => {
     // The form renders no billing step beside the failure line, so even the
     // role that can change the plan reads the sentence that names the
     // destination instead of one that claims an owner must act.
-    expect(statusText(renderer.root)).toBe(
-      i18n.t('common.organizationTrialEndedBillingAtKiloAi')
-    );
+    expect(statusText(renderer.root)).toBe(i18n.t('common.organizationTrialEndedBillingAtKiloAi'));
   });
 
   it('falls back to the status-failed line for an unrecognized refusal', async () => {

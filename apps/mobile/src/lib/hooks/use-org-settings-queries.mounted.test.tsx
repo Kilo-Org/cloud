@@ -158,9 +158,7 @@ describe("organization settings refusal toasts — the localization hook's contr
     });
     await pressFire(renderer);
 
-    expect(toastError).toHaveBeenCalledWith(
-      i18n.t('common.organizationTrialEndedBillingAtKiloAi')
-    );
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEndedBillingAtKiloAi'));
     unmount();
   });
 

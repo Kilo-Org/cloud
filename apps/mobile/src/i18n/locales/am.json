@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር",
     "legalDocumentEnglishOnly": "ይህ ሰነድ በእንግሊዝኛ ብቻ ይገኛል።",
     "organizationTrialEndedBilling": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
-    "viewOnGitHub": "PRን በGitHub እይ"
+    "viewOnGitHub": "PRን በGitHub እይ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "የዝርዝር ነጥብ",
+        "nestedBulletPoint": "የጎጆ ዝርዝር ነጥብ",
+        "orderedItem": "የዝርዝር ንጥል {n}",
+        "nestedOrderedItem": "የጎጆ ዝርዝር ንጥል {n}"
+      },
+      "blockquote": {
+        "quote": "ጥቅስ",
+        "nestedQuote": "የጎጆ ጥቅስ"
+      },
+      "table": {
+        "row": "ረድፍ {n}፦ {content}"
+      },
+      "math": {
+        "equation": "ሒሳብ፦ {latex}"
+      },
+      "rotor": {
+        "headings": "አርዕስቶች",
+        "links": "አገናኞች",
+        "images": "ምስሎች"
+      }
+    }
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",

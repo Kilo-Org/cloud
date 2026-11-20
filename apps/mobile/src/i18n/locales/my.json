@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, သီးသန့် ကုဒ်သိုလှောင်ရာ",
     "legalDocumentEnglishOnly": "ဤစာရွက်စာတမ်းသည် အင်္ဂလိပ်ဘာသာဖြင့်သာ ရရှိနိုင်ပါသည်။",
     "organizationTrialEndedBilling": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။ သင်သည် ငွေတောင်းခံမှုကို အပ်ဒိတ်လုပ်ပြီးနောက် ထပ်မံကြိုးစားနိုင်ပါသည်။",
-    "viewOnGitHub": "PR ကို GitHub တွင် ကြည့်ပါ"
+    "viewOnGitHub": "PR ကို GitHub တွင် ကြည့်ပါ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "စာရင်းအစက်",
+        "nestedBulletPoint": "ထပ်နေသော စာရင်းအစက်",
+        "orderedItem": "စာရင်းအချက် {n}",
+        "nestedOrderedItem": "ထပ်နေသော စာရင်းအချက် {n}"
+      },
+      "blockquote": {
+        "quote": "ကိုးကားချက်",
+        "nestedQuote": "ထပ်နေသော ကိုးကားချက်"
+      },
+      "table": {
+        "row": "အတန်း {n}: {content}"
+      },
+      "math": {
+        "equation": "သင်္ချာ: {latex}"
+      },
+      "rotor": {
+        "headings": "ခေါင်းစဉ်များ",
+        "links": "လင့်ခ်များ",
+        "images": "ပုံများ"
+      }
+    }
   },
   "language": {
     "restarting": "ရွေးထားသော ဘာသာစကားကို သုံးရန် ပြန်စတင်နေသည်",

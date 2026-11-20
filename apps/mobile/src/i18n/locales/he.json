@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, מאגר פרטי",
     "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד.",
     "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב.",
-    "viewOnGitHub": "הצגת ה-PR ב-GitHub"
+    "viewOnGitHub": "הצגת ה-PR ב-GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "נקודת תבליט",
+        "nestedBulletPoint": "נקודת תבליט מקוננת",
+        "orderedItem": "פריט ברשימה {n}",
+        "nestedOrderedItem": "פריט מקונן ברשימה {n}"
+      },
+      "blockquote": {
+        "quote": "ציטוט",
+        "nestedQuote": "ציטוט מקונן"
+      },
+      "table": {
+        "row": "שורה {n}: {content}"
+      },
+      "math": {
+        "equation": "מתמטיקה: {latex}"
+      },
+      "rotor": {
+        "headings": "כותרות",
+        "links": "קישורים",
+        "images": "תמונות"
+      }
+    }
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",

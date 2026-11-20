@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, repòsitwa prive",
     "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman.",
     "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò.",
-    "viewOnGitHub": "Gade PR a sou GitHub"
+    "viewOnGitHub": "Gade PR a sou GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Pwen lis",
+        "nestedBulletPoint": "Pwen lis anbo",
+        "orderedItem": "Eleman lis {n}",
+        "nestedOrderedItem": "Eleman lis anbo {n}"
+      },
+      "blockquote": {
+        "quote": "Sitasyon",
+        "nestedQuote": "Sitasyon anbo"
+      },
+      "table": {
+        "row": "Ranje {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Tit",
+        "links": "Lyen",
+        "images": "Imaj"
+      }
+    }
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",

@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, մասնավոր պահեստ",
     "legalDocumentEnglishOnly": "Այս փաստաթուղթը հասանելի է միայն անգլերեն։",
     "organizationTrialEndedBilling": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Դուք կարող եք թարմացնել վճարումները, ապա կրկին փորձել։",
-    "viewOnGitHub": "Դիտել PR-ը GitHub-ում"
+    "viewOnGitHub": "Դիտել PR-ը GitHub-ում",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Ցուցակի կետ",
+        "nestedBulletPoint": "Ներդրված ցուցակի կետ",
+        "orderedItem": "Ցուցակի տարր {n}",
+        "nestedOrderedItem": "Ներդրված ցուցակի տարր {n}"
+      },
+      "blockquote": {
+        "quote": "Մեջբերում",
+        "nestedQuote": "Ներդրված մեջբերում"
+      },
+      "table": {
+        "row": "Տող {n}՝ {content}"
+      },
+      "math": {
+        "equation": "Մաթեմատիկա՝ {latex}"
+      },
+      "rotor": {
+        "headings": "Վերնագրեր",
+        "links": "Հղումներ",
+        "images": "Պատկերներ"
+      }
+    }
   },
   "language": {
     "restarting": "Վերագործարկվում է՝ լեզվի փոփոխությունը կիրառելու համար",

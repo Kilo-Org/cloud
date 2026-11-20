@@ -185,7 +185,30 @@
     "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔",
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
-    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
+    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "فہرست نقطہ",
+        "nestedBulletPoint": "نیسٹڈ فہرست نقطہ",
+        "orderedItem": "فہرست آئٹم {n}",
+        "nestedOrderedItem": "نیسٹڈ فہرست آئٹم {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "نیسٹڈ اقتباس"
+      },
+      "table": {
+        "row": "قطار {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "سرخیاں",
+        "links": "لنک",
+        "images": "تصاویر"
+      }
+    }
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",

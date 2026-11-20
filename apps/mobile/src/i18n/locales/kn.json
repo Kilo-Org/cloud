@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, ಖಾಸಗಿ ರೆಪೊಸಿಟರಿ",
     "legalDocumentEnglishOnly": "ಈ ದಾಖಲೆ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮಾತ್ರ ಲಭ್ಯವಿದೆ.",
     "organizationTrialEndedBilling": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ನೀವು ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "viewOnGitHub": "GitHubನಲ್ಲಿ PR ವೀಕ್ಷಿಸಿ"
+    "viewOnGitHub": "GitHubನಲ್ಲಿ PR ವೀಕ್ಷಿಸಿ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ಬುಲೆಟ್ ಪಾಯಿಂಟ್",
+        "nestedBulletPoint": "ನೆಸ್ಟೆಡ್ ಬುಲೆಟ್ ಪಾಯಿಂಟ್",
+        "orderedItem": "ಪಟ್ಟಿ ಐಟಂ {n}",
+        "nestedOrderedItem": "ನೆಸ್ಟೆಡ್ ಪಟ್ಟಿ ಐಟಂ {n}"
+      },
+      "blockquote": {
+        "quote": "ಉಲ್ಲೇಖ",
+        "nestedQuote": "ನೆಸ್ಟೆಡ್ ಉಲ್ಲೇಖ"
+      },
+      "table": {
+        "row": "ಸಾಲು {n}: {content}"
+      },
+      "math": {
+        "equation": "ಗಣಿತ: {latex}"
+      },
+      "rotor": {
+        "headings": "ಶೀರ್ಷಿಕೆಗಳು",
+        "links": "ಲಿಂಕ್‌ಗಳು",
+        "images": "ಚಿತ್ರಗಳು"
+      }
+    }
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",

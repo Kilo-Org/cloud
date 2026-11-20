@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, repositori persendirian",
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris.",
     "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi.",
-    "viewOnGitHub": "Lihat PR di GitHub"
+    "viewOnGitHub": "Lihat PR di GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Poin bulet",
+        "nestedBulletPoint": "Poin bulet bersarang",
+        "orderedItem": "Item senarai {n}",
+        "nestedOrderedItem": "Item senarai bersarang {n}"
+      },
+      "blockquote": {
+        "quote": "Petikan",
+        "nestedQuote": "Petikan bersarang"
+      },
+      "table": {
+        "row": "Baris {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Tajuk",
+        "links": "Pautan",
+        "images": "Imej"
+      }
+    }
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",

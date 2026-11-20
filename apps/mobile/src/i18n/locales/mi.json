@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, pūranga waehere tūmataiti",
     "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake.",
     "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō.",
-    "viewOnGitHub": "Tirohia te PR i GitHub"
+    "viewOnGitHub": "Tirohia te PR i GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Tohu rārangi",
+        "nestedBulletPoint": "Tohu rārangi whakauru",
+        "orderedItem": "Tūemi rārangi {n}",
+        "nestedOrderedItem": "Tūemi rārangi whakauru {n}"
+      },
+      "blockquote": {
+        "quote": "Whakahua",
+        "nestedQuote": "Whakahua whakauru"
+      },
+      "table": {
+        "row": "Rārangi {n}: {content}"
+      },
+      "math": {
+        "equation": "Pāngarau: {latex}"
+      },
+      "rotor": {
+        "headings": "Upoko",
+        "links": "Hono",
+        "images": "Whakaahua"
+      }
+    }
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",

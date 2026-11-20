@@ -185,7 +185,30 @@
     "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
     "privateRepositoryA11y": "{{name}}，私有儲存庫",
     "legalDocumentEnglishOnly": "本文件僅提供英文版本。",
-    "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。"
+    "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "項目符號",
+        "nestedBulletPoint": "巢狀項目符號",
+        "orderedItem": "清單項目 {n}",
+        "nestedOrderedItem": "巢狀清單項目 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "巢狀引用"
+      },
+      "table": {
+        "row": "列 {n}：{content}"
+      },
+      "math": {
+        "equation": "數學：{latex}"
+      },
+      "rotor": {
+        "headings": "標題",
+        "links": "連結",
+        "images": "圖片"
+      }
+    }
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",

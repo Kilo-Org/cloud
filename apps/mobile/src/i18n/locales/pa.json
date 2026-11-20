@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, ਨਿਜੀ ਰਿਪੋਜ਼ਟਰੀ",
     "legalDocumentEnglishOnly": "ਇਹ ਦਸਤਾਵੇਜ਼ ਸਿਰਫ਼ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਉਪਲਬਧ ਹੈ।",
     "organizationTrialEndedBilling": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਤੁਸੀਂ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-    "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ"
+    "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ਬੁਲੇਟ ਪੁਆਇੰਟ",
+        "nestedBulletPoint": "ਨੈਸਟਿਡ ਬੁਲੇਟ ਪੁਆਇੰਟ",
+        "orderedItem": "ਸੂਚੀ ਆਈਟਮ {n}",
+        "nestedOrderedItem": "ਨੈਸਟਿਡ ਸੂਚੀ ਆਈਟਮ {n}"
+      },
+      "blockquote": {
+        "quote": "ਹਵਾਲਾ",
+        "nestedQuote": "ਨੈਸਟਿਡ ਹਵਾਲਾ"
+      },
+      "table": {
+        "row": "ਕਤਾਰ {n}: {content}"
+      },
+      "math": {
+        "equation": "ਗਣਿਤ: {latex}"
+      },
+      "rotor": {
+        "headings": "ਸਿਰਲੇਖ",
+        "links": "ਲਿੰਕ",
+        "images": "ਤਸਵੀਰਾਂ"
+      }
+    }
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",

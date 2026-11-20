@@ -185,7 +185,30 @@
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
     "privateRepositoryA11y": "{{name}}，私有仓库",
     "legalDocumentEnglishOnly": "本文件仅提供英文版本。",
-    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。"
+    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "项目符号",
+        "nestedBulletPoint": "嵌套项目符号",
+        "orderedItem": "列表项 {n}",
+        "nestedOrderedItem": "嵌套列表项 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "嵌套引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数学：{latex}"
+      },
+      "rotor": {
+        "headings": "标题",
+        "links": "链接",
+        "images": "图片"
+      }
+    }
   },
   "language": {
     "restarting": "正在重启以应用语言设置",

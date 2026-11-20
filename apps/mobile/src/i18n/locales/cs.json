@@ -187,7 +187,30 @@
     "privateRepositoryA11y": "{{name}}, soukromý repozitář",
     "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
     "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu.",
-    "viewOnGitHub": "Zobrazit PR na GitHubu"
+    "viewOnGitHub": "Zobrazit PR na GitHubu",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Odrážka",
+        "nestedBulletPoint": "Vnořená odrážka",
+        "orderedItem": "Položka seznamu {n}",
+        "nestedOrderedItem": "Vnořená položka seznamu {n}"
+      },
+      "blockquote": {
+        "quote": "Citace",
+        "nestedQuote": "Vnořená citace"
+      },
+      "table": {
+        "row": "Řádek {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Nadpisy",
+        "links": "Odkazy",
+        "images": "Obrázky"
+      }
+    }
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",

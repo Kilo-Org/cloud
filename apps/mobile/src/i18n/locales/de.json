@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, privates Repository",
     "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
     "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
-    "viewOnGitHub": "PR auf GitHub ansehen"
+    "viewOnGitHub": "PR auf GitHub ansehen",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Aufzählungspunkt",
+        "nestedBulletPoint": "Verschachtelter Aufzählungspunkt",
+        "orderedItem": "Listeneintrag {n}",
+        "nestedOrderedItem": "Verschachtelter Listeneintrag {n}"
+      },
+      "blockquote": {
+        "quote": "Zitatblock",
+        "nestedQuote": "Verschachtelter Zitatblock"
+      },
+      "table": {
+        "row": "Zeile {n}: {content}"
+      },
+      "math": {
+        "equation": "Mathematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Überschriften",
+        "links": "Links",
+        "images": "Bilder"
+      }
+    }
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",

@@ -189,7 +189,30 @@
     "privateRepositoryA11y": "{{name}}، مستودع خاص",
     "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط.",
     "organizationTrialEndedBilling": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة، ثم المحاولة مرة أخرى.",
-    "viewOnGitHub": "عرض PR على GitHub"
+    "viewOnGitHub": "عرض PR على GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "نقطة تعداد",
+        "nestedBulletPoint": "نقطة تعداد متداخلة",
+        "orderedItem": "عنصر قائمة {n}",
+        "nestedOrderedItem": "عنصر قائمة متداخل {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "اقتباس متداخل"
+      },
+      "table": {
+        "row": "صف {n}: {content}"
+      },
+      "math": {
+        "equation": "رياضيات: {latex}"
+      },
+      "rotor": {
+        "headings": "العناوين",
+        "links": "الروابط",
+        "images": "الصور"
+      }
+    }
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",

@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀ",
     "legalDocumentEnglishOnly": "ଏହି ଦସ୍ତାବେଜଟି କେବଳ ଇଂରାଜୀରେ ଉପଲବ୍ଧ।",
     "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
-    "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ"
+    "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ବୁଲେଟ୍ ବିନ୍ଦୁ",
+        "nestedBulletPoint": "ନେଷ୍ଟେଡ୍ ବୁଲେଟ୍ ବିନ୍ଦୁ",
+        "orderedItem": "ତାଲିକା ଆଇଟମ୍ {n}",
+        "nestedOrderedItem": "ନେଷ୍ଟେଡ୍ ତାଲିକା ଆଇଟମ୍ {n}"
+      },
+      "blockquote": {
+        "quote": "ଉଦ୍ଧୃତି",
+        "nestedQuote": "ନେଷ୍ଟେଡ୍ ଉଦ୍ଧୃତି"
+      },
+      "table": {
+        "row": "ଧାଡ଼ି {n}: {content}"
+      },
+      "math": {
+        "equation": "ଗଣିତ: {latex}"
+      },
+      "rotor": {
+        "headings": "ଶୀର୍ଷକଗୁଡ଼ିକ",
+        "links": "ଲିଙ୍କ୍‌ଗୁଡ଼ିକ",
+        "images": "ଛବିଗୁଡ଼ିକ"
+      }
+    }
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",

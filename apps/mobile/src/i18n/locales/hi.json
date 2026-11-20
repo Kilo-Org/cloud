@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, निजी रिपॉज़िटरी",
     "legalDocumentEnglishOnly": "यह दस्तावेज़ केवल अंग्रेज़ी में उपलब्ध है।",
     "organizationTrialEndedBilling": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। आप बिलिंग अपडेट कर सकते हैं, फिर दोबारा प्रयास करें।",
-    "viewOnGitHub": "GitHub पर PR देखें"
+    "viewOnGitHub": "GitHub पर PR देखें",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "बुलेट पॉइंट",
+        "nestedBulletPoint": "नेस्टेड बुलेट पॉइंट",
+        "orderedItem": "सूची आइटम {n}",
+        "nestedOrderedItem": "नेस्टेड सूची आइटम {n}"
+      },
+      "blockquote": {
+        "quote": "उद्धरण",
+        "nestedQuote": "नेस्टेड उद्धरण"
+      },
+      "table": {
+        "row": "पंक्ति {n}: {content}"
+      },
+      "math": {
+        "equation": "गणित: {latex}"
+      },
+      "rotor": {
+        "headings": "शीर्षक",
+        "links": "लिंक",
+        "images": "छवियाँ"
+      }
+    }
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",

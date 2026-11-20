@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, privé repository",
     "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels.",
     "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen.",
-    "viewOnGitHub": "PR op GitHub bekijken"
+    "viewOnGitHub": "PR op GitHub bekijken",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Opsommingsteken",
+        "nestedBulletPoint": "Genest opsommingsteken",
+        "orderedItem": "Lijstitem {n}",
+        "nestedOrderedItem": "Genest lijstitem {n}"
+      },
+      "blockquote": {
+        "quote": "Citaat",
+        "nestedQuote": "Genest citaat"
+      },
+      "table": {
+        "row": "Rij {n}: {content}"
+      },
+      "math": {
+        "equation": "Wiskunde: {latex}"
+      },
+      "rotor": {
+        "headings": "Koppen",
+        "links": "Koppelingen",
+        "images": "Afbeeldingen"
+      }
+    }
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",

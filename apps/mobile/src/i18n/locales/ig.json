@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe",
     "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee.",
     "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ.",
-    "viewOnGitHub": "Lelee PR na GitHub"
+    "viewOnGitHub": "Lelee PR na GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bọlite",
+        "nestedBulletPoint": "Bọlite dị n’ime",
+        "orderedItem": "Ihe ndepụta {n}",
+        "nestedOrderedItem": "Ihe ndepụta dị n’ime {n}"
+      },
+      "blockquote": {
+        "quote": "Nhọta",
+        "nestedQuote": "Nhọta dị n’ime"
+      },
+      "table": {
+        "row": "Ahịrị {n}: {content}"
+      },
+      "math": {
+        "equation": "Mgbakọ: {latex}"
+      },
+      "rotor": {
+        "headings": "Isiokwu",
+        "links": "Njikọ",
+        "images": "Onyonyo"
+      }
+    }
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",

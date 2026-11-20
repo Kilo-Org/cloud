@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, repositorio privado",
     "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés.",
     "organizationTrialEndedBilling": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación y, después, volver a intentarlo.",
-    "viewOnGitHub": "Ver PR en GitHub"
+    "viewOnGitHub": "Ver PR en GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Viñeta",
+        "nestedBulletPoint": "Viñeta anidada",
+        "orderedItem": "Elemento de lista {n}",
+        "nestedOrderedItem": "Elemento de lista anidado {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita anidada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemáticas: {latex}"
+      },
+      "rotor": {
+        "headings": "Encabezados",
+        "links": "Enlaces",
+        "images": "Imágenes"
+      }
+    }
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",

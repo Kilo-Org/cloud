@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
     "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy.",
     "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray.",
-    "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR"
+    "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Teboka",
+        "nestedBulletPoint": "Teboka ao anaty",
+        "orderedItem": "Singa lisitra {n}",
+        "nestedOrderedItem": "Singa lisitra ao anaty {n}"
+      },
+      "blockquote": {
+        "quote": "Teny nalaina",
+        "nestedQuote": "Teny nalaina ao anaty"
+      },
+      "table": {
+        "row": "Andalana {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Lohateny",
+        "links": "Rohy",
+        "images": "Sary"
+      }
+    }
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",

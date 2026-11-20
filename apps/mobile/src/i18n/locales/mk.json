@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, приватен репозиториум",
     "legalDocumentEnglishOnly": "Овој документ е достапен само на англиски јазик.",
     "organizationTrialEndedBilling": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето, а потоа да се обидеш повторно.",
-    "viewOnGitHub": "Прикажи PR на GitHub"
+    "viewOnGitHub": "Прикажи PR на GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Точка на список",
+        "nestedBulletPoint": "Вгнездена точка на список",
+        "orderedItem": "Ставка на список {n}",
+        "nestedOrderedItem": "Вгнездена ставка на список {n}"
+      },
+      "blockquote": {
+        "quote": "Цитат",
+        "nestedQuote": "Вгнезден цитат"
+      },
+      "table": {
+        "row": "Ред {n}: {content}"
+      },
+      "math": {
+        "equation": "Математика: {latex}"
+      },
+      "rotor": {
+        "headings": "Наслови",
+        "links": "Линкови",
+        "images": "Слики"
+      }
+    }
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",

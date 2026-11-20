@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
     "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
-    "viewOnGitHub": "Skatīt PR GitHub"
+    "viewOnGitHub": "Skatīt PR GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Saraksta punkts",
+        "nestedBulletPoint": "Iekļautais saraksta punkts",
+        "orderedItem": "Saraksta vienums {n}",
+        "nestedOrderedItem": "Iekļautais saraksta vienums {n}"
+      },
+      "blockquote": {
+        "quote": "Citāts",
+        "nestedQuote": "Iekļautais citāts"
+      },
+      "table": {
+        "row": "Rinda {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemātika: {latex}"
+      },
+      "rotor": {
+        "headings": "Virsraksti",
+        "links": "Saites",
+        "images": "Attēli"
+      }
+    }
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",

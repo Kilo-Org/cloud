@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, პირადი რეპოზიტორია",
     "legalDocumentEnglishOnly": "ეს დოკუმენტი ხელმისაწვდომია მხოლოდ ინგლისურ ენაზე.",
     "organizationTrialEndedBilling": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. შეგიძლიათ განაახლოთ ბილინგი, შემდეგ კი ხელახლა სცადოთ.",
-    "viewOnGitHub": "PR-ის ნახვა GitHub-ზე"
+    "viewOnGitHub": "PR-ის ნახვა GitHub-ზე",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "პუნქტი",
+        "nestedBulletPoint": "ჩადგმული პუნქტი",
+        "orderedItem": "სიის ელემენტი {n}",
+        "nestedOrderedItem": "ჩადგმული სიის ელემენტი {n}"
+      },
+      "blockquote": {
+        "quote": "ციტატა",
+        "nestedQuote": "ჩადგმული ციტატა"
+      },
+      "table": {
+        "row": "სტრიქონი {n}: {content}"
+      },
+      "math": {
+        "equation": "მათემატიკა: {latex}"
+      },
+      "rotor": {
+        "headings": "სათაურები",
+        "links": "ბმულები",
+        "images": "სურათები"
+      }
+    }
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",

@@ -186,7 +186,30 @@
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
     "privateRepositoryA11y": "{{name}}, privatno spremište",
     "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku.",
-    "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu, a zatim pokušajte ponovo."
+    "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu, a zatim pokušajte ponovo.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Tačka spiska",
+        "nestedBulletPoint": "Ugniežđena tačka spiska",
+        "orderedItem": "Stavka spiska {n}",
+        "nestedOrderedItem": "Ugniežđena stavka spiska {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Ugniežđeni citat"
+      },
+      "table": {
+        "row": "Red {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Veze",
+        "images": "Slike"
+      }
+    }
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",

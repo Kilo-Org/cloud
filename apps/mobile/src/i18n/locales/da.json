@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
     "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
-    "viewOnGitHub": "Vis PR på GitHub"
+    "viewOnGitHub": "Vis PR på GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkttegn",
+        "nestedBulletPoint": "Indlejret punkttegn",
+        "orderedItem": "Listeelement {n}",
+        "nestedOrderedItem": "Indlejret listeelement {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Indlejret citat"
+      },
+      "table": {
+        "row": "Række {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Overskrifter",
+        "links": "Weblinks",
+        "images": "Billeder"
+      }
+    }
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",

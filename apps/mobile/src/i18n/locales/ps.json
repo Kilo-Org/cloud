@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}، شخصي زېرمتون",
     "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی.",
     "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
-    "viewOnGitHub": "PR په GitHub کې وګورئ"
+    "viewOnGitHub": "PR په GitHub کې وګورئ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "د لېست ټکی",
+        "nestedBulletPoint": "دننه د لېست ټکی",
+        "orderedItem": "د لېست توکی {n}",
+        "nestedOrderedItem": "دننه د لېست توکی {n}"
+      },
+      "blockquote": {
+        "quote": "نقل",
+        "nestedQuote": "دننه نقل"
+      },
+      "table": {
+        "row": "قطار {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "سرلیکونه",
+        "links": "لینکونه",
+        "images": "انځورونه"
+      }
+    }
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",

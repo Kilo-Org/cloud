@@ -185,7 +185,30 @@
     "privateRepositoryA11y": "{{name}}, частно хранилище",
     "legalDocumentEnglishOnly": "Този документ е достъпен само на английски.",
     "organizationTrialEndedBilling": "Пробният период на организацията е приключил и тя няма активен план. Можете да актуализирате фактурирането и след това да опитате отново.",
-    "viewOnGitHub": "Прегледай PR в GitHub"
+    "viewOnGitHub": "Прегледай PR в GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Точка от списък",
+        "nestedBulletPoint": "Вложена точка от списък",
+        "orderedItem": "Елемент от списък {n}",
+        "nestedOrderedItem": "Вложен елемент от списък {n}"
+      },
+      "blockquote": {
+        "quote": "Цитат",
+        "nestedQuote": "Вложен цитат"
+      },
+      "table": {
+        "row": "Ред {n}: {content}"
+      },
+      "math": {
+        "equation": "Математика: {latex}"
+      },
+      "rotor": {
+        "headings": "Заглавия",
+        "links": "Връзки",
+        "images": "Изображения"
+      }
+    }
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",

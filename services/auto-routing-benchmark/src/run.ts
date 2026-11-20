@@ -621,6 +621,11 @@ export async function publishPlatformRoutingTable(
     const key = exactPairKey(pair.model, pair.variant);
     return !readyPairs.has(key) && targets.has(key);
   });
+  // A settled failure is a row that will not be measured again on its own: `failed` after
+  // its retry window, or a permanent `unavailable` — which `listCurrentPlatformProfileStatuses`
+  // reports as `failed` (db.ts), so both arrive here in one class. A `pending`/`running` row
+  // is a measurement in flight, and a missing row is an engine the registry has not touched
+  // yet; those keep holding the table.
   const settledFailure = (pair: { model: string; variant: string | null }) =>
     statusByPair.get(exactPairKey(pair.model, pair.variant)) === 'failed';
   const dropped = unreadyLivePairs.find(pair => !settledFailure(pair));

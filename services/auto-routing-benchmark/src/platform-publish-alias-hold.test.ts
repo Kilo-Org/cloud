@@ -225,6 +225,116 @@ describe('publishPlatformRoutingTable — an alias move holds the live table, th
     expect((live?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([LIVE]);
   });
 
+  it('drops a permanently unavailable target without a serving predecessor', async () => {
+    // A second, healthy alias keeps the table publishable, so the drop path is reached
+    // instead of the empty-table guard.
+    const steadyAlias = '~vendor/steady-latest';
+    const steady = 'vendor/steady';
+    await replaceConfig(
+      env.BENCH_DB,
+      {
+        min_accuracy: 0.7,
+        benchmark_user_id: null,
+        benchmark_org_id: null,
+        updated_at: '2026-11-20',
+        updated_by: null,
+      },
+      ['classifier/a'],
+      [
+        { model: ALIAS, variant: null, reasoning_effort: null },
+        { model: steadyAlias, variant: null, reasoning_effort: null },
+      ],
+      router
+    );
+    const subscribe = () =>
+      sqlite
+        .prepare(
+          `INSERT OR REPLACE INTO benchmark_subscriptions (router, owner_type, owner_id, revision, snapshot, updated_at)
+           VALUES (?, 'platform', '', 'rev-1', ?, '2026-11-20T00:00:00.000Z')`
+        )
+        .run(
+          router,
+          JSON.stringify({
+            entries: [
+              {
+                model: ALIAS,
+                pairs: [{ model: NEXT, variant: null }],
+                servingPairs: [{ model: NEXT, variant: null }],
+                resolutionError: null,
+              },
+              {
+                model: steadyAlias,
+                pairs: [{ model: steady, variant: null }],
+                servingPairs: [{ model: steady, variant: null }],
+                resolutionError: null,
+              },
+            ],
+            previousEntries: [],
+          })
+        );
+    const insertProfile = sqlite.prepare(
+      `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status,
+        run_id, requested_at, updated_at, completed_at, platform_requested, user_requested,
+        failure_class, failure_reason)
+       VALUES (?, ?, '', ?, 1, ?, ?, '2026-11-20', '2026-11-20', '2026-11-20', 1, 0, ?, ?)`
+    );
+    subscribe();
+    insertProfile.run(router, NEXT, engine, 'ready', 'run-next', null, null);
+    insertProfile.run(router, steady, engine, 'ready', 'run-steady', null, null);
+    seedSummaries(NEXT, 'run-next', 0.9);
+    seedSummaries(steady, 'run-steady', 0.9);
+    expect(await publishPlatformRoutingTable(env, catalogFetch, router)).not.toBeNull();
+
+    // What an exhausted failure budget or a terminal class leaves behind (#12035).
+    sqlite
+      .prepare(
+        "UPDATE benchmark_profiles SET status = 'unavailable', failure_class = 'catalog_absent' WHERE router = ? AND model = ?"
+      )
+      .run(router, NEXT);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const published = await publishPlatformRoutingTable(env, catalogFetch, router);
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
+
+    // `listCurrentPlatformProfileStatuses` reports the permanent row as `failed`, so the
+    // publish treats it as settled: no predecessor to keep, and the rest still publishes.
+    const reported = events.find(
+      entry => entry.event === 'routing_table_publish_dropped_failed_pairs'
+    );
+    expect(reported?.dropped).toEqual([{ model: NEXT, variant: null, status: 'failed' }]);
+    expect(
+      events.some(entry => entry.event === 'routing_table_publish_skipped_serving_pair_unready')
+    ).toBe(false);
+    expect(published).not.toBeNull();
+    const live = await getLatestRoutingTable(env.BENCH_DB, router);
+    expect((live?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([steady]);
+  });
+
+  it('keeps the predecessor of a permanently unavailable target', async () => {
+    const liveVersion = await bootstrapLiveTable();
+    await moveAlias();
+    sqlite
+      .prepare(
+        "UPDATE benchmark_profiles SET status = 'unavailable', failure_class = 'model_not_found' WHERE router = ? AND model = ?"
+      )
+      .run(router, NEXT);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const published = await publishPlatformRoutingTable(env, catalogFetch, router);
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
+
+    // The alias still names the unavailable target while its predecessor serves.
+    expect(published).toBeNull();
+    expect(events.map(entry => entry.event)).toContain(
+      'routing_table_publish_skipped_serving_target_pending'
+    );
+    const live = await getLatestRoutingTable(env.BENCH_DB, router);
+    expect(live?.table.version).toBe(liveVersion);
+    expect((live?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([LIVE]);
+  });
+
   it('names the reason when the platform row has no configuration', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(await publishPlatformRoutingTable(env, catalogFetch, router)).toBeNull();

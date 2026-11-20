@@ -505,7 +505,7 @@
     "changelogFixesPolish": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
     "changelogAreas": {
       "signIn": "การลงชื่อเข้าใช้",
-      "profileOrganizations": "โปรไฟล์และองค์กร"
+      "profileOrganizations": "โปรไฟล์กับองค์กร"
     }
   },
   "preferences": {

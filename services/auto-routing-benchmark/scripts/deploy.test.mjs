@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import {
   chmodSync,
+  cpSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,6 +23,34 @@ import { sqliteD1 } from '../test/sqlite-d1.ts';
 
 const deployScript = fileURLToPath(new URL('./deploy.mjs', import.meta.url));
 const fixtureUrl = new URL('../test/fixtures/deploy-wrangler.mjs', import.meta.url).href;
+
+function packageCopy(t) {
+  const root = mkdtempSync(join(tmpdir(), 'benchmark-package-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'scripts'));
+  cpSync(deployScript, join(root, 'scripts', 'deploy.mjs'));
+  cpSync(
+    fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)),
+    join(root, 'wrangler.jsonc')
+  );
+  cpSync(fileURLToPath(new URL('../container/', import.meta.url)), join(root, 'container'), {
+    recursive: true,
+  });
+  symlinkSync(
+    fileURLToPath(new URL('../node_modules/', import.meta.url)),
+    join(root, 'node_modules')
+  );
+  return {
+    script: join(root, 'scripts', 'deploy.mjs'),
+    edit(file, change) {
+      const path = join(root, file);
+      const before = readFileSync(path, 'utf8');
+      const after = change(before);
+      assert.notEqual(after, before);
+      writeFileSync(path, after);
+    },
+  };
+}
 
 function fixture(t, overrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'benchmark-deploy-'));
@@ -39,6 +69,9 @@ function fixture(t, overrides = {}) {
     db.exec(readFileSync(new URL(name, migrations), 'utf8'));
   }
   db.exec(`CREATE TABLE fixture_events (kind TEXT NOT NULL, at INTEGER NOT NULL);
+    CREATE TABLE fixture_deployments (version_id TEXT PRIMARY KEY, message TEXT, created_on INTEGER NOT NULL);
+    CREATE TABLE fixture_app (updated_at INTEGER NOT NULL);
+    INSERT INTO fixture_app VALUES (1);
     INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at,
       min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity)
     VALUES ('fixture-run', 'efficient', 'decider', 'platform', 'running', '2026-01-01T00:00:00.000Z',
@@ -53,14 +86,15 @@ function fixture(t, overrides = {}) {
     BENCHMARK_DEPLOY_POLL_INTERVAL_MS: '50',
     BENCHMARK_DEPLOY_COMMAND_TIMEOUT_MS: '900',
     BENCHMARK_DEPLOY_DEPLOY_TIMEOUT_MS: '6000',
+    BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '3000',
     ...overrides,
   };
   let child;
   let result;
-  const start = (args = []) => {
-    assert.equal(child, undefined);
-    child = spawn(process.execPath, [deployScript, ...args], {
-      env,
+  const start = (args = [], runEnv = {}, script = deployScript) => {
+    assert.ok(child === undefined || child.exitCode !== null || child.signalCode !== null);
+    child = spawn(process.execPath, [script, ...args], {
+      env: { ...env, ...runEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -85,6 +119,11 @@ function fixture(t, overrides = {}) {
     db.close();
     rmSync(directory, { recursive: true, force: true });
   });
+  const addChunk = (id, status, slot, leaseUntil) => {
+    db.prepare(`INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
+      case_ids, status, token, slot, lease_until) VALUES (?, 'fixture-run', 'fixture-model', 'default',
+      '[]', 0, 0, '[]', ?, 'existing-claim', ?, ?)`).run(id, status, slot, leaseUntil);
+  };
   return {
     db,
     start,
@@ -107,23 +146,28 @@ function fixture(t, overrides = {}) {
         .prepare('SELECT token, lease_until FROM scheduler_dispatch_lock WHERE id = 1')
         .get();
     },
+    deployedMessages() {
+      return db
+        .prepare('SELECT message FROM fixture_deployments ORDER BY rowid')
+        .all()
+        .map(row => row.message);
+    },
+    rollOut(message) {
+      const createdOn =
+        Math.max(
+          Date.now(),
+          db.prepare('SELECT COALESCE(MAX(created_on), 0) AS latest FROM fixture_deployments').get()
+            .latest
+        ) + 10;
+      db.prepare(
+        'INSERT INTO fixture_deployments (version_id, message, created_on) VALUES (?, ?, ?)'
+      ).run(`seeded-${createdOn}`, message, createdOn);
+      db.prepare('UPDATE fixture_app SET updated_at = ?').run(createdOn + 1);
+    },
+    addChunk,
     addLive() {
-      db.prepare(`INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
-        case_ids, status, token, slot, lease_until) VALUES (?, 'fixture-run', 'fixture-model', 'default',
-        '[]', 0, 0, '[]', ?, 'existing-claim', ?, ?)`).run(
-        'queued-chunk',
-        'queued',
-        0,
-        Date.now() + 60_000
-      );
-      db.prepare(`INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
-        case_ids, status, token, slot, lease_until) VALUES (?, 'fixture-run', 'fixture-model', 'default',
-        '[]', 0, 0, '[]', ?, 'existing-claim', ?, ?)`).run(
-        'active-chunk',
-        'active',
-        1,
-        Date.now() + 60_000
-      );
+      addChunk('queued-chunk', 'queued', 0, Date.now() + 60_000);
+      addChunk('active-chunk', 'active', 1, Date.now() + 60_000);
     },
   };
 }
@@ -403,6 +447,288 @@ test(
         .prepare("SELECT COUNT(*) AS n FROM scheduler_chunks WHERE status IN ('queued', 'active')")
         .get().n,
       2
+    );
+    released(state);
+  }
+);
+
+test(
+  'a queued claim whose queue lease expired does not hold the drain',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    state.addChunk('undelivered-claim', 'queued', 0, Date.now() - 1_000);
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('drain'), 1);
+    assert.equal(state.count('deploy_completed'), 1);
+    assert.equal(state.count('unguarded_deploy'), 0);
+    assert.equal(
+      state.db.prepare("SELECT status FROM scheduler_chunks WHERE id = 'undelivered-claim'").get()
+        .status,
+      'queued'
+    );
+    assert.ok(
+      diagnostics(result).some(
+        row =>
+          row.event === 'benchmark_deploy_drain_progress' &&
+          row.queued === 0 &&
+          row.active === 0 &&
+          row.expired === 1
+      )
+    );
+    released(state);
+  }
+);
+
+test(
+  'a queued claim with a live queue lease holds the drain until it times out',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_DRAIN_TIMEOUT_MS: '400' });
+    state.addChunk('delivering-claim', 'queued', 0, Date.now() + 60_000);
+    const result = await state.start();
+    failed(result, 'drain_timeout');
+    assert.equal(state.count('migrations'), 0);
+    assert.equal(state.count('deploy_started'), 0);
+    released(state);
+  }
+);
+
+const CONTAINER_MARKER = /^container-inputs:[0-9a-f]{64}$/;
+
+test(
+  'rolls containers on an unmarked deployment, then skips the rollout when container inputs are unchanged',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '2' });
+    const first = await state.start();
+    assert.equal(first.code, 0, first.stdout);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.count('deploy_containers_none'), 0);
+    const [marker] = state.deployedMessages();
+    assert.match(marker, CONTAINER_MARKER);
+    assert.ok(
+      diagnostics(first).some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'unknown'
+      )
+    );
+
+    const second = await state.start();
+    assert.equal(second.code, 0, second.stdout);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.deepEqual(state.deployedMessages(), [marker, marker]);
+    assert.ok(
+      diagnostics(second).some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'unchanged'
+      )
+    );
+    assert.equal(state.count('unguarded_deploy'), 0);
+    released(state);
+  }
+);
+
+test(
+  'rolls containers when the rolled-out version carries different container inputs',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.count('deploy_containers_none'), 0);
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'changed'
+      )
+    );
+  }
+);
+
+test(
+  'does not trust the marker of a deploy whose image never reached the containers',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
+    const failed = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_IMAGE_PUSH_FAIL: '1' });
+    assert.equal(failed.code, 1);
+    assert.match(state.deployedMessages().at(-1), CONTAINER_MARKER);
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+    assert.equal(state.count('deploy_containers_none'), 0);
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'changed'
+      )
+    );
+    released(state);
+  }
+);
+
+test(
+  'container inputs change with the image build context and the containers configuration only',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t);
+    const copy = packageCopy(t);
+    const deploy = async () => {
+      const result = await state.start([], {}, copy.script);
+      assert.equal(result.code, 0, result.stdout);
+      return state.deployedMessages().at(-1);
+    };
+    const original = await deploy();
+    assert.match(original, CONTAINER_MARKER);
+
+    copy.edit('wrangler.jsonc', text =>
+      text.replace('"compatibility_date"', '"keep_vars": true,\n  "compatibility_date"')
+    );
+    assert.equal(await deploy(), original);
+    assert.equal(state.count('deploy_containers_none'), 1);
+
+    copy.edit('container/server.mjs', text => `${text}\n// changed\n`);
+    const serverChanged = await deploy();
+    assert.notEqual(serverChanged, original);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+
+    copy.edit('wrangler.jsonc', text =>
+      text.replace('"max_instances": 250', '"max_instances": 249')
+    );
+    const configChanged = await deploy();
+    assert.notEqual(configChanged, serverChanged);
+    assert.equal(state.count('deploy_containers_configured'), 3);
+    assert.equal(state.count('deploy_containers_none'), 1);
+  }
+);
+
+for (const [name, rolledOutMessage, runEnv] of [
+  ['the deployment list fails', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'fail' }],
+  ['the deployment list is malformed', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'malformed' }],
+  ['traffic was split across versions', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'split' }],
+  ['the container listing fails', true, { BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'fail' }],
+  [
+    'the container application is missing',
+    true,
+    { BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'missing' },
+  ],
+  ['the rolled-out version has no message', null, {}],
+  ['the rolled-out version has an unrelated message', 'Automatic deployment on upload.', {}],
+]) {
+  test(
+    `rolls containers when the deployed container inputs are unknown because ${name}`,
+    { timeout: 15_000 },
+    async t => {
+      const state = fixture(t);
+      const first = await state.start();
+      assert.equal(first.code, 0, first.stdout);
+      const [marker] = state.deployedMessages();
+      state.rollOut(rolledOutMessage === true ? marker : rolledOutMessage);
+      const result = await state.start([], runEnv);
+      assert.equal(result.code, 0, result.stdout);
+      assert.equal(state.count('deploy_containers_configured'), 2);
+      assert.equal(state.count('deploy_containers_none'), 0);
+      assert.ok(
+        diagnostics(result).some(
+          row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'unknown'
+        )
+      );
+    }
+  );
+}
+
+test(
+  'falls back to a rolling deploy when the deploy without a container rollout fails',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    assert.equal((await state.start()).code, 0);
+    const result = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_NONE_FAIL: '1' });
+    assert.equal(result.code, 0, result.stdout);
+    const events = state.events();
+    assert.ok(
+      events.lastIndexOf('deploy_containers_configured') > events.indexOf('deploy_containers_none')
+    );
+    assert.equal(state.count('deploy_completed'), 2);
+    assert.ok(
+      diagnostics(result).some(row => row.event === 'benchmark_deploy_rollout_skip_failed')
+    );
+    released(state);
+  }
+);
+
+test(
+  'holds the dispatch lease until the container rollout finishes',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '3' });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    const events = state.events();
+    assert.equal(state.count('rollout_poll'), 4);
+    assert.ok(events.indexOf('rollout_poll') > events.indexOf('deploy_completed'));
+    assert.ok(events.indexOf('release') > events.lastIndexOf('rollout_poll'));
+    assert.equal(state.count('rollout_without_lease'), 0);
+    const progress = diagnostics(result)
+      .filter(row => row.event === 'benchmark_deploy_rollout_progress')
+      .map(row => row.rolling);
+    assert.deepEqual(progress, [1, 1, 1, 0]);
+    released(state);
+  }
+);
+
+test(
+  'stops waiting for a rollout at its deadline and still releases the lease',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '1000',
+      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '400',
+    });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.ok(state.count('rollout_poll') >= 2);
+    assert.ok(
+      diagnostics(result).some(row => row.event === 'benchmark_deploy_rollout_wait_timeout')
+    );
+    released(state);
+  }
+);
+
+test(
+  'keeps polling through unreadable rollout state until the deadline',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_CONTAINER_INFO: 'fail',
+      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '400',
+    });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.ok(state.count('rollout_poll') >= 2);
+    const rows = diagnostics(result);
+    assert.ok(
+      rows
+        .filter(row => row.event === 'benchmark_deploy_rollout_progress')
+        .every(row => row.rolling === null)
+    );
+    assert.ok(rows.some(row => row.event === 'benchmark_deploy_rollout_wait_timeout'));
+    released(state);
+  }
+);
+
+test(
+  'does not wait when the container application is absent from the listing',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'missing' });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('rollout_poll'), 0);
+    assert.ok(
+      diagnostics(result).some(row => row.event === 'benchmark_deploy_rollout_unobservable')
     );
     released(state);
   }

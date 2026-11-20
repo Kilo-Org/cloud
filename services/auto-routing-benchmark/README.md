@@ -228,9 +228,20 @@ Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark 
 completed case results, and pending outputs remain available for compatible reuse.
 
 Production benchmark deploys use `pnpm run deploy`. The wrapper holds the scheduler dispatch
-lease, waits until no queued or active chunks remain, applies D1 migrations, deploys, then
-releases the lease. It renews the lease throughout and fails closed when draining exceeds
-its limit. It never pauses or resumes operator-controlled queues.
+lease, waits until no active chunks and no queued chunks with an unexpired queue lease remain,
+applies D1 migrations, deploys, waits for the container rollout to finish, then releases the
+lease. A queued claim whose queue lease expired cannot start, so it does not hold the drain;
+`recoverChunks` returns it to pending. It renews the lease throughout and fails closed when
+draining exceeds its limit. It never pauses or resumes operator-controlled queues.
+
+Each deploy records a hash of the container inputs (the `containers` configuration and every
+file in each local image's build context) as the Worker version message
+`container-inputs:<sha256>`. When the active version carries the same hash, the wrapper deploys
+with `--containers-rollout none`, so running containers are not replaced. A different, missing or
+unreadable hash deploys with the configured rollout, and a failed deploy without a rollout is
+retried with it. After the deploy the wrapper polls `wrangler containers list --json` until the
+application has no `active_rollout_id`, for at most `BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS`
+(15 minutes by default), and then releases the lease either way.
 
 An operator pauses dispatch by holding `scheduler_dispatch_lock` row 1 with a token that starts
 with `operator-pause-` and an unexpired lease. The wrapper treats that row as the dispatch hold:

@@ -1,7 +1,10 @@
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { z } from 'zod';
 
 const directory = fileURLToPath(new URL('..', import.meta.url));
@@ -108,13 +111,104 @@ const ownerRows = z
   .array(z.object({ token: z.string().nullable(), lease_until: z.number().int() }))
   .max(1);
 const OPERATOR_PAUSE_PREFIX = 'operator-pause-';
+const CONTAINER_INPUTS_PREFIX = 'container-inputs:';
 const MAX_TIMER_MS = 2_147_483_647;
 const sqlString = value => `'${value.replaceAll("'", "''")}'`;
 const occupancyRows = z
   .array(
-    z.object({ queued: z.number().int().nonnegative(), active: z.number().int().nonnegative() })
+    z.object({
+      queued: z.number().int().nonnegative(),
+      active: z.number().int().nonnegative(),
+      expired: z.number().int().nonnegative(),
+    })
   )
   .length(1);
+const workerConfig = z.object({
+  name: z.string().min(1),
+  containers: z
+    .array(
+      z
+        .object({
+          class_name: z.string().min(1),
+          name: z.string().min(1).optional(),
+          image: z.string().min(1),
+          image_build_context: z.string().min(1).optional(),
+        })
+        .passthrough()
+    )
+    .min(1),
+});
+const isoTime = z
+  .string()
+  .transform(value => Date.parse(value))
+  .pipe(z.number().finite());
+const workerDeployments = z.array(
+  z.object({
+    created_on: isoTime,
+    versions: z.array(z.object({ version_id: z.string().min(1), percentage: z.number() })),
+  })
+);
+const workerVersion = z.object({
+  annotations: z.object({ 'workers/message': z.string().optional() }).passthrough().optional(),
+});
+const containerApplications = z.array(
+  z.object({ id: z.string().min(1), name: z.string(), updated_at: isoTime })
+);
+const containerApplication = z.object({ active_rollout_id: z.string().nullish() });
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function filesUnder(root) {
+  const entries = readdirSync(root, { withFileTypes: true }).sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+  );
+  return entries.flatMap(entry => {
+    const path = join(root, entry.name);
+    return statSync(path).isDirectory() ? filesUnder(path) : [path];
+  });
+}
+
+/**
+ * Hashes everything `wrangler deploy` turns into the container application: the
+ * `containers` configuration and every file in each local image's build context.
+ */
+function containerInputs() {
+  const errors = [];
+  const parsed = workerConfig.safeParse(
+    parseJsonc(readFileSync(config, 'utf8'), errors, { allowTrailingComma: true })
+  );
+  if (errors.length > 0 || !parsed.success) throw new DeploymentError('invalid_configuration');
+  const hash = createHash('sha256').update(canonicalJson(parsed.data.containers));
+  const base = dirname(config);
+  for (const container of parsed.data.containers) {
+    const image = resolve(base, container.image);
+    if (!existsSync(image)) continue;
+    const context = container.image_build_context
+      ? resolve(base, container.image_build_context)
+      : dirname(image);
+    for (const file of filesUnder(context)) {
+      const content = readFileSync(file);
+      hash.update(`\0${relative(base, file)}\0${content.length}\0`).update(content);
+    }
+  }
+  return {
+    hash: hash.digest('hex'),
+    applications: new Set(
+      parsed.data.containers.map(
+        container => container.name ?? `${parsed.data.name}-${container.class_name}`
+      )
+    ),
+  };
+}
 
 async function execute(sql, timeoutMs, signal = abort.signal) {
   const stdout = await runWrangler(
@@ -139,17 +233,23 @@ async function deploy() {
   const commandTimeoutMs = duration('COMMAND_TIMEOUT', 30_000);
   const migrationTimeoutMs = duration('MIGRATION_TIMEOUT', 300_000);
   const deployTimeoutMs = duration('DEPLOY_TIMEOUT', 600_000);
+  const rolloutTimeoutMs = duration('ROLLOUT_TIMEOUT', 900_000);
   const renewalMs = Math.floor(leaseMs / 4);
   const safetyMs = Math.min(1_000, Math.floor(leaseMs / 10));
   if (commandTimeoutMs >= leaseMs / 2 || renewalMs < 1 || safetyMs < 1) {
     throw new DeploymentError('invalid_configuration');
   }
+  const inputs = containerInputs();
   let attempted = false;
+  let deployed = false;
   let pauseToken;
   let maintenance;
   let renewal;
   const maintenanceAbort = new AbortController();
-  const lossCode = () => (pauseToken === undefined ? 'lease_lost' : 'operator_pause_lost');
+  const lossCode = () => {
+    if (pauseToken === undefined) return deployed ? 'deployed_lease_unverified' : 'lease_lost';
+    return deployed ? 'deployed_operator_pause_unverified' : 'operator_pause_lost';
+  };
   const acceptLease = rows => {
     const parsed = leaseRows.safeParse(rows);
     if (!parsed.success) throw new DeploymentError('invalid_d1_response');
@@ -217,6 +317,96 @@ async function deploy() {
       throw error;
     }
   };
+  const readJson = async (args, schema, timeoutMs) => {
+    try {
+      const parsed = schema.safeParse(
+        JSON.parse(await runWrangler(args, timeoutMs, abort.signal, true))
+      );
+      return parsed.success ? parsed.data : undefined;
+    } catch (error) {
+      if (abort.signal.aborted) throw failure ?? error;
+      return undefined;
+    }
+  };
+  const trackedApplications = async timeoutMs => {
+    const applications = await readJson(
+      ['containers', 'list', '--json'],
+      containerApplications,
+      timeoutMs
+    );
+    if (applications === undefined) return undefined;
+    const tracked = applications.filter(application => inputs.applications.has(application.name));
+    return tracked.length === inputs.applications.size ? tracked : null;
+  };
+  /**
+   * The container inputs the running containers were last rolled out from: the
+   * marker of the Worker version that was live when the container application last
+   * changed. A deploy whose image build, push or rollout never reached the
+   * application leaves it unchanged, so its marker is never trusted. Anything
+   * unreadable or ambiguous is unknown.
+   */
+  const rolledOutContainerInputs = async () => {
+    const tracked = await trackedApplications(commandTimeoutMs);
+    if (!tracked) return undefined;
+    const changedAt = Math.min(...tracked.map(application => application.updated_at));
+    const deployments = await readJson(
+      ['deployments', 'list', '--json'],
+      workerDeployments,
+      commandTimeoutMs
+    );
+    const live = deployments
+      ?.filter(deployment => deployment.created_on <= changedAt)
+      .sort((a, b) => b.created_on - a.created_on)[0];
+    if (live?.versions.length !== 1 || live.versions[0].percentage !== 100) return undefined;
+    const version = await readJson(
+      ['versions', 'view', live.versions[0].version_id, '--json'],
+      workerVersion,
+      commandTimeoutMs
+    );
+    const message = version?.annotations?.['workers/message'];
+    return message?.startsWith(CONTAINER_INPUTS_PREFIX)
+      ? message.slice(CONTAINER_INPUTS_PREFIX.length)
+      : undefined;
+  };
+  const rollingApplications = async timeoutMs => {
+    const tracked = await trackedApplications(timeoutMs);
+    if (!tracked) return tracked;
+    let rolling = 0;
+    for (const application of tracked) {
+      const state = await readJson(
+        ['containers', 'info', application.id, '--json'],
+        containerApplication,
+        timeoutMs
+      );
+      if (state === undefined) return undefined;
+      if (state.active_rollout_id) rolling += 1;
+    }
+    return rolling;
+  };
+  const awaitRollout = async () => {
+    const deadline = Date.now() + rolloutTimeoutMs;
+    while (true) {
+      if (abort.signal.aborted) throw failure;
+      const remainingMs = deadline - Date.now();
+      const rolling =
+        remainingMs > 0
+          ? await rollingApplications(Math.min(commandTimeoutMs, remainingMs))
+          : undefined;
+      if (rolling === null) {
+        report('rollout_unobservable');
+        return;
+      }
+      report('rollout_progress', { rolling: rolling ?? null });
+      if (rolling === 0) return;
+      if (Date.now() >= deadline) {
+        report('rollout_wait_timeout');
+        return;
+      }
+      await sleep(Math.min(pollMs, Math.max(1, deadline - Date.now())), undefined, {
+        signal: abort.signal,
+      });
+    }
+  };
   try {
     phase = 'lock';
     report('waiting_for_lock', { timeoutMs: lockTimeoutMs });
@@ -269,10 +459,12 @@ async function deploy() {
     const drainDeadline = Date.now() + drainTimeoutMs;
     while (true) {
       if (abort.signal.aborted) throw failure;
+      const now = Date.now();
       const rows = await executeBeforeDeadline(
         `SELECT
-        COUNT(CASE WHEN status = 'queued' THEN 1 END) AS queued,
-        COUNT(CASE WHEN status = 'active' THEN 1 END) AS active
+        COUNT(CASE WHEN status = 'queued' AND lease_until > ${now} THEN 1 END) AS queued,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) AS active,
+        COUNT(CASE WHEN status = 'queued' AND lease_until <= ${now} THEN 1 END) AS expired
         FROM scheduler_chunks WHERE status IN ('queued', 'active')`,
         drainDeadline,
         'drain_timeout'
@@ -294,22 +486,45 @@ async function deploy() {
     report('completed');
     await renew();
     phase = 'deploy';
-    report('started');
-    await runWrangler(['deploy'], deployTimeoutMs);
+    const rolledOut = await rolledOutContainerInputs();
+    const unchanged = rolledOut === inputs.hash;
+    report('container_inputs', {
+      inputs: inputs.hash,
+      deployed: rolledOut === undefined ? 'unknown' : unchanged ? 'unchanged' : 'changed',
+    });
+    const deployArgs = ['deploy', '--message', `${CONTAINER_INPUTS_PREFIX}${inputs.hash}`];
+    report('started', { containersRollout: unchanged ? 'none' : 'configured' });
+    if (unchanged) {
+      try {
+        await runWrangler([...deployArgs, '--containers-rollout', 'none'], deployTimeoutMs);
+      } catch (error) {
+        if (
+          abort.signal.aborted ||
+          !(error instanceof DeploymentError) ||
+          error.code !== 'command_failed'
+        ) {
+          throw error;
+        }
+        report('rollout_skip_failed');
+        await renew();
+        await runWrangler(deployArgs, deployTimeoutMs);
+      }
+    } else {
+      await runWrangler(deployArgs, deployTimeoutMs);
+    }
     report('completed');
+    deployed = true;
+    phase = 'rollout';
+    await awaitRollout();
     phase = 'verify';
-    // A renewal that started during deploy already observed the pre-completion
-    // lock. Wait it out, then start a new renewal so the post-deploy read is
-    // fresh and still retries transient D1 failures.
+    // A renewal that started before this point already observed the earlier
+    // lock. Wait it out, then start a new renewal so the final read is fresh
+    // and still retries transient D1 failures.
     await renewal?.catch(() => {});
     try {
       await renew();
     } catch {
-      failure = new DeploymentError(
-        pauseToken === undefined
-          ? 'deployed_lease_unverified'
-          : 'deployed_operator_pause_unverified'
-      );
+      failure = new DeploymentError(lossCode());
       throw failure;
     }
     report(

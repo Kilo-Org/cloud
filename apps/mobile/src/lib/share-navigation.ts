@@ -1,5 +1,6 @@
 import {
   getSharePersistUserId,
+  peekSharePayload,
   putSharePayload,
   SHARE_PAYLOAD_MAX_ENTRIES,
   type ShareId,
@@ -112,15 +113,21 @@ export async function restoreShareNavigation(userId: string): Promise<void> {
   }
   // Merge in recorded order, and stop at the cap instead of dropping from the
   // front: a destination this process staged stays deliverable, and the
-  // account's oldest retained destinations fill the room that is left.
+  // account's oldest retained destinations fill the room that is left. A
+  // payload-bearing destination is queued only when its payload is staged, so
+  // delivery never receives an id the store cannot resolve; a destination with
+  // no payload (a Review PR route) has nothing to resolve and always queues.
   for (const entry of draft) {
     if (pendingQueue.length >= SHARE_PAYLOAD_MAX_ENTRIES) {
       break;
     }
-    pendingQueue.push({
-      pending: { href: entry.href, shareId: entry.shareId },
-      stagedUserId: userId,
-    });
+    const deliverable = entry.shareId === null || peekSharePayload(entry.shareId) !== null;
+    if (deliverable) {
+      pendingQueue.push({
+        pending: { href: entry.href, shareId: entry.shareId },
+        stagedUserId: userId,
+      });
+    }
   }
 }
 

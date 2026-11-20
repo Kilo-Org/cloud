@@ -2,7 +2,12 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setSharePersistUserId, SHARE_PAYLOAD_MAX_ENTRIES } from './share-payload';
+import {
+  putSharePayload,
+  restoreSharePayload,
+  setSharePersistUserId,
+  SHARE_PAYLOAD_MAX_ENTRIES,
+} from './share-payload';
 import {
   __resetPendingShareNavigationForTests,
   appendShareParams,
@@ -20,9 +25,15 @@ import { flushDraft, saveDraft, SHARE_NAV_DRAFT_KEY } from '@/lib/persist/drafts
 
 // share-navigation imports SHARE_PAYLOAD_MAX_ENTRIES from share-payload, which
 // pulls expo modules that transitively load react-native Flow sources.
-vi.mock('expo-crypto', () => ({
-  randomUUID: () => 'id-test',
-}));
+vi.mock('expo-crypto', () => {
+  let n = 0;
+  return {
+    randomUUID: () => {
+      n += 1;
+      return `id-test-${n}`;
+    },
+  };
+});
 const expoFileSystemMock = vi.hoisted(() => {
   const files = new Map<string, string>();
   const File = vi.fn(function FileMock(_base: unknown, ...rest: unknown[]) {
@@ -175,16 +186,25 @@ describe('share navigation durable persistence', () => {
     setSharePersistUserId(null);
   });
 
+  // A delivery always names a staged payload: the cold start restores the
+  // payloads first, then the queue. Queue cases therefore stage the payload
+  // their destination names.
+  function stageDestination(text: string): string {
+    const shareId = putSharePayload({ text, files: [], failedFiles: [] });
+    setPendingShareNavigation({ href: `/(app)/agent-chat/new?shareId=${shareId}`, shareId });
+    return shareId;
+  }
+
   it('set then restore returns the same href and shareId', async () => {
     setSharePersistUserId('u1');
-    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=a', shareId: 'a' });
+    const shareId = stageDestination('a');
     await persistShareNavigationNow();
     __resetPendingShareNavigationForTests();
     // simulate process death (clears memory)
     await restoreShareNavigation('u1');
     expect(takePendingShareNavigation()).toEqual({
-      href: '/(app)/agent-chat/new?shareId=a',
-      shareId: 'a',
+      href: `/(app)/agent-chat/new?shareId=${shareId}`,
+      shareId,
     });
   });
 
@@ -232,61 +252,95 @@ describe('share navigation durable persistence', () => {
   });
 
   it('persists only the account destination when a signed-out one shares the queue', async () => {
-    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+    stageDestination('captured-out');
     setSharePersistUserId('u1');
-    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=owned', shareId: 'owned' });
+    const owned = stageDestination('by-u1');
     await persistShareNavigationNow();
 
     __resetPendingShareNavigationForTests();
     await restoreShareNavigation('u1');
 
     expect(takePendingShareNavigation()).toEqual({
-      href: '/(app)/agent-chat/new?shareId=owned',
-      shareId: 'owned',
+      href: `/(app)/agent-chat/new?shareId=${owned}`,
+      shareId: owned,
     });
     expect(takePendingShareNavigation()).toBeNull();
   });
 
   it('resumes the account draft beside a destination staged before an account resolved', async () => {
     setSharePersistUserId('userA');
-    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=owned', shareId: 'owned' });
+    const owned = stageDestination('staged-by-a');
     await persistShareNavigationNow();
 
     // Sign-out: the account boundary drops its destination, draft stays.
     clearAccountStagedShareNavigation();
     setSharePersistUserId(null);
-    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+    const stagedOut = stageDestination('captured-out');
 
-    // Same-process sign-in as A restores A's draft for the cold start.
+    // Same-process sign-in as A: the cold start restores the payloads first, so
+    // A's staged payload is in the store when the queue merges its draft.
     setSharePersistUserId('userA');
+    putSharePayload({ text: 'staged-by-a', files: [], failedFiles: [] });
     await restoreShareNavigation('userA');
 
     // The capture keeps its place; taking it must never drop A's destination.
     expect(takePendingShareNavigation()).toEqual({
-      href: '/(app)/agent-chat/new?shareId=out',
-      shareId: 'out',
+      href: `/(app)/agent-chat/new?shareId=${stagedOut}`,
+      shareId: stagedOut,
     });
     expect(takePendingShareNavigation()).toEqual({
-      href: '/(app)/agent-chat/new?shareId=owned',
-      shareId: 'owned',
+      href: `/(app)/agent-chat/new?shareId=${owned}`,
+      shareId: owned,
+    });
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+
+  it('does not restore a destination whose payload was not restored', async () => {
+    // The payload restore stops at the cap, so a destination past that room has
+    // nothing to deliver. It must not queue, or delivery would clear the share
+    // id into an empty composer.
+    saveDraft('userA', SHARE_NAV_DRAFT_KEY, [
+      { href: '/(app)/agent-chat/new?shareId=kept', shareId: 'kept' },
+      { href: '/(app)/agent-chat/new?shareId=skipped', shareId: 'skipped' },
+      { href: '/(app)/pr-review/acme/repo/42', shareId: null },
+    ]);
+    await flushDraft('userA', SHARE_NAV_DRAFT_KEY);
+
+    setSharePersistUserId('userA');
+    restoreSharePayload('kept', { text: 'kept', files: [], failedFiles: [] }, 'userA');
+    await restoreShareNavigation('userA');
+
+    // The payload-bearing destination whose payload exists queues, the one whose
+    // payload the restore skipped does not, and the payload-free route does.
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/agent-chat/new?shareId=kept',
+      shareId: 'kept',
+    });
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/pr-review/acme/repo/42',
+      shareId: null,
     });
     expect(takePendingShareNavigation()).toBeNull();
   });
 
   it('keeps a live destination when the account draft alone fills the cap', async () => {
-    setSharePersistUserId('userA');
-    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES; i += 1) {
-      setPendingShareNavigation({
-        href: `/(app)/agent-chat/new?shareId=a-${i}`,
-        shareId: `a-${i}`,
-      });
-    }
-    await persistShareNavigationNow();
-    clearAccountStagedShareNavigation();
-    setSharePersistUserId(null);
+    // A full account draft, left by that account's previous session.
+    const ownedIds = Array.from({ length: SHARE_PAYLOAD_MAX_ENTRIES }, (_, i) => `owned-${i}`);
+    saveDraft(
+      'userA',
+      SHARE_NAV_DRAFT_KEY,
+      ownedIds.map(id => ({ href: `/(app)/agent-chat/new?shareId=${id}`, shareId: id }))
+    );
+    await flushDraft('userA', SHARE_NAV_DRAFT_KEY);
 
-    // A destination staged before the account resolved, still waiting to deliver.
-    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+    // That account's staged payloads come back first, then one capture staged
+    // before the account resolved waits behind them.
+    setSharePersistUserId('userA');
+    for (const id of ownedIds.slice(0, SHARE_PAYLOAD_MAX_ENTRIES - 1)) {
+      restoreSharePayload(id, { text: id, files: [], failedFiles: [] }, 'userA');
+    }
+    setSharePersistUserId(null);
+    const stagedOut = stageDestination('captured-out');
 
     setSharePersistUserId('userA');
     await restoreShareNavigation('userA');
@@ -300,7 +354,8 @@ describe('share navigation durable persistence', () => {
       queued.push(next.shareId);
     }
     // The live destination is still deliverable, and the queue holds the cap.
-    expect(queued).toContain('out');
+    expect(queued).toContain(stagedOut);
+    expect(queued).toContain(ownedIds[0]);
     expect(queued.length).toBe(SHARE_PAYLOAD_MAX_ENTRIES);
   });
 

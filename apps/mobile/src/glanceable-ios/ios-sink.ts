@@ -14,6 +14,7 @@ import {
 import { aggregateLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
 import { i18n } from '@/i18n';
+import { getAskBindState } from '@/lib/glanceable/ask-binding';
 import {
   type FollowableSessionRow,
   type FollowedSessionCounts,
@@ -162,17 +163,17 @@ function translate(key: string): string {
 }
 
 /**
- * True while the recorded ask is one Approve can answer. The count this
- * content state carries includes questions and retried asks, which
+ * True while the recorded ask's bind state is `bound`. The count this content
+ * state carries includes questions and retried asks, which
  * `runGlanceableApprove` resolves to `none`, so the layout needs this fact to
- * avoid offering a control that cannot act; an ask with no bound request has
- * no request to answer, so it cannot act either. The read is synchronous and
- * the publisher records the ask before it emits, and redraws once the binding
- * lands, so the flag matches the counts in the same state.
+ * avoid offering a control that cannot act. The state also separates an ask
+ * whose request read is still running or has failed from one that is bound:
+ * neither has a request to answer, so both withhold Approve. The read is
+ * synchronous and the publisher records the ask before it emits, and redraws
+ * once the binding lands, so the flag matches the counts in the same state.
  */
 function isApprovableAskRecorded(): boolean {
-  const ask = getWaitingAsk();
-  return ask?.status === 'permission' && ask.isCloudAgent && ask.boundPermissionId !== null;
+  return getAskBindState(getWaitingAsk()).kind === 'bound';
 }
 
 /**

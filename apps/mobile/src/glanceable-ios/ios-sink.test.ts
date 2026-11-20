@@ -12,6 +12,13 @@ import { type GlanceableLiveActivityContentState } from '@kilocode/notifications
 import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import {
+  _resetAskBindingForTests,
+  _setAskBindingForTests,
+  _whenAskBindsSettledForTests,
+  ASK_BIND_RETRY_MS,
+  recordSelectedAsk,
+} from '@/lib/glanceable/ask-binding';
+import {
   _resetHomeWidgetDataForTests,
   _setHomeWidgetStoreForTests,
 } from '@/lib/glanceable/home-widget-data';
@@ -253,6 +260,7 @@ beforeEach(() => {
   _resetHomeWidgetDataForTests();
   _setHomeWidgetStoreForTests(secureStoreMock);
   _resetWaitingAskForTests();
+  _resetAskBindingForTests();
   _resetGlanceablePersistForTests();
   secureStore.clear();
   _setSecureStoreForTests(secureStoreMock);
@@ -1153,6 +1161,23 @@ describe('iosSink Approve gate', () => {
     recordWaitingAsk(null);
     iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 4), CTX);
     expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+  });
+
+  it('withholds Approve while the request read has failed and offers it once a later select binds', async () => {
+    let now = NOW;
+    _setAskBindingForTests({ read: () => Promise.reject(new Error('nope')), now: () => now });
+
+    recordSelectedAsk(recordedAsk({ boundPermissionId: null }));
+    await _whenAskBindsSettledForTests();
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    expect(mockState.started.at(-1)?.props).toMatchObject({ canApprove: false });
+
+    now += ASK_BIND_RETRY_MS;
+    _setAskBindingForTests({ read: () => Promise.resolve('perm_2'), now: () => now });
+    recordSelectedAsk(recordedAsk({ boundPermissionId: null }));
+    await _whenAskBindsSettledForTests();
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 1), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: true });
   });
 
   it('carries the flag through a publish update', () => {

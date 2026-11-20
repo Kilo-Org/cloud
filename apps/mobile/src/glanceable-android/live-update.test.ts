@@ -6,6 +6,13 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
+import {
+  _resetAskBindingForTests,
+  _setAskBindingForTests,
+  _whenAskBindsSettledForTests,
+  getAskBindState,
+  recordSelectedAsk,
+} from '@/lib/glanceable/ask-binding';
 import { type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { type LiveUpdateCard } from './live-update';
@@ -63,6 +70,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  _resetAskBindingForTests();
   vi.useRealTimers();
 });
 
@@ -115,6 +123,27 @@ describe('notification Open destination', () => {
 
     expect(resolveIncomingUrl(actions.openUrl)).toBe('/(app)/agent-chat/ses_1');
     expect(actions.approveLabel).toBeNull();
+  });
+
+  it('withholds Approve while the ask request read has failed', async () => {
+    const ask: WaitingAsk = {
+      kiloSessionId: 'ses_1',
+      status: 'permission',
+      isCloudAgent: true,
+      scopeKey: 'scope',
+      organizationId: null,
+      userId: 'u1',
+      recordedAt: NOW,
+      statusUpdatedAt: null,
+      boundPermissionId: null,
+    };
+    _setAskBindingForTests({ read: () => Promise.reject(new Error('nope')) });
+
+    recordSelectedAsk(ask);
+    await _whenAskBindsSettledForTests();
+
+    expect(getAskBindState()).toEqual({ kind: 'failed' });
+    expect(buildNotificationActions(ask, key => key).approveLabel).toBeNull();
   });
 });
 

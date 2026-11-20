@@ -6,6 +6,7 @@ import {
 import { type AndroidNotificationChannelId } from '@kilocode/notifications/schemas';
 import { requireOptionalNativeModule } from 'expo';
 
+import { getAskBindState } from '@/lib/glanceable/ask-binding';
 import { type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
@@ -95,17 +96,17 @@ type NotificationActions = {
 };
 
 /**
- * Only a cloud-agent permission ask that names its pending request offers
- * Approve; the action answers that request by id, so a surface with no request
- * named keeps Open alone. The session id goes into the Open intent and nowhere
- * else: never the title, the text, the compact text, or the label.
+ * Only a cloud-agent permission ask whose bind state is `bound` offers
+ * Approve; the action answers that request by id, so an ask whose request read
+ * is still running, has failed, or was never started keeps Open alone. The
+ * session id goes into the Open intent and nowhere else: never the title, the
+ * text, the compact text, or the label.
  */
 export function buildNotificationActions(
   ask: WaitingAsk | null,
   translate: (key: string) => string
 ): NotificationActions {
-  const canApprove =
-    ask?.status === 'permission' && ask.isCloudAgent && ask.boundPermissionId !== null;
+  const canApprove = ask !== null && getAskBindState(ask).kind === 'bound';
   return {
     openLabel: translate(OPEN_SESSION_LABEL_KEY),
     openUrl: ask === null ? OPEN_AGENTS_URL : launcherSessionUrl(ask.kiloSessionId),

@@ -119,13 +119,13 @@ describe('Hindi restore report', () => {
 
 describe('Hindi changelog sentence', () => {
   it('names three areas with one list conjunction', () => {
-    const areas = ['cloudAgent', 'securityAgent', 'profileOrganizations'].map(area =>
-      area === 'profileOrganizations'
-        ? i18n.t('profile.changelogAreas.profileOrganizations')
-        : area === 'cloudAgent'
-          ? 'Cloud Agent'
-          : 'Security Agent'
-    );
+    // The two areas the app never translates keep their product names; the
+    // third renders from the catalog, which is the value under test.
+    const areas = [
+      'Cloud Agent',
+      'Security Agent',
+      i18n.t('profile.changelogAreas.profileOrganizations'),
+    ];
     expect(i18n.t('profile.changelogFixesIn', { areas: formatList(areas, 'hi') })).toBe(
       'Cloud Agent, Security Agent, और प्रोफ़ाइल व संगठन में त्रुटि-सुधार और बेहतरी।'
     );

@@ -558,10 +558,14 @@ export const classifyTargetElement = async (
     }
 
     if (session.isolatedProbe !== undefined) {
-      // The scripting backend resolves every target to its unique selector.
+      // The scripting backend resolves every target to its unique selector in the frame that holds it.
       return resolved.kind === 'selector'
         ? classifyProbePayload(
-            await readIsolatedTargetProbe(session.isolatedProbe, resolved.selector)
+            await readIsolatedTargetProbe(
+              session.isolatedProbe,
+              resolved.selector,
+              resolved.frameId
+            )
           )
         : { cause: 'the target has no selector to probe', kind: 'unknown' };
     }

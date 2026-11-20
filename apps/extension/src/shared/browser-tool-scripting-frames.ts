@@ -9,6 +9,8 @@ import { MAX_BROWSER_TOOL_SNAPSHOT_LINES } from './browser-tool-snapshot';
  * element hosts, splices in the documents of the frames the agent may read, and
  * marks every other frame line `[origin withheld: <origin>]` as the debugger
  * path does. A frame the agent may not read is never asked for its content.
+ * A spliced frame's refs carry its frame id, so an action on one runs in that
+ * frame's document and the act gate checks that frame's origin.
  */
 
 /** One frame line the page-side walker printed: its line index, depth, document-order owner index and ref. */
@@ -19,23 +21,37 @@ export interface ScriptingFramePlaceholder {
   readonly ref?: string | undefined;
 }
 
-/** One document's snapshot lines, with the frame lines among them. */
+/** One element ref a document's walker printed, and the selector that finds it in that document. */
+export interface ScriptingRef {
+  readonly ref: string;
+  readonly selector: string;
+}
+
+/** A ref inside a spliced child frame: its selector only matches in that frame's document. */
+export interface ScriptingFrameRef extends ScriptingRef {
+  readonly frameId: number;
+}
+
+/** One document's snapshot lines and refs, with the frame lines among them. */
 export interface ScriptingSnapshotPart {
   readonly frames: readonly ScriptingFramePlaceholder[];
   readonly lines: readonly string[];
+  readonly refs: readonly ScriptingRef[];
 }
 
 export interface ScriptingFrameScope {
   /** The tab's frames and the frame each frame element hosts; the call's own read when it has one. */
   readonly frameTree: () => Promise<IsolatedFrameTree | undefined>;
-  /** Origins the caller holds `read` for; the main frame was granted before the snapshot ran. */
+  /** Origins the caller holds `read` for; the root frame was granted before the snapshot ran. */
   readonly readableOrigins: readonly string[];
-  /** One readable frame's own snapshot, without refs, at most `maxDepth` levels deep, within `timeoutMs`. */
+  /** One readable frame's own snapshot with refs, at most `maxDepth` levels deep, within `timeoutMs`. */
   readonly readFrame: (
     frameId: number,
     maxDepth: number | undefined,
     timeoutMs: number
   ) => Promise<ScriptingSnapshotPart | undefined>;
+  /** The frame the root document belongs to: the tab's own, or the child frame a targeted snapshot starts in. */
+  readonly rootFrameId: number;
 }
 
 export interface ScriptingSplice {
@@ -46,10 +62,11 @@ export interface ScriptingSplice {
    * path does: only a withheld frame's line keeps its ref, for a read request.
    */
   readonly readableFrameRefs: readonly string[];
+  /** The refs of every spliced child frame, without its readable frame lines' refs; the root document's own refs are the caller's. */
+  readonly refs: readonly ScriptingFrameRef[];
 }
 
 const INDENT = '  ';
-const MAIN_FRAME_ID = '0';
 /** The origin a withheld line names when the browser could not say which frame an element hosts. */
 const UNKNOWN_FRAME_ORIGIN = 'unknown';
 /** Frame documents one snapshot reads; every frame after them is withheld. */
@@ -61,19 +78,20 @@ const withheldLine = (line: string, origin: string): string =>
   `${line} [origin withheld: ${origin}]`;
 
 /**
- * The agent's snapshot lines with every child frame resolved. A frame the
- * probe cannot map, or whose origin is not granted, keeps only its withheld
- * line; a readable frame's document follows its frame line one level deeper.
- * A granted frame that is not read (its read failed, or the frame count, time
- * or line budget ran out) is withheld too, so its absence says nothing about
- * its content. The result is capped at the debugger path's line limit.
+ * The agent's snapshot lines with every child frame of `rootFrameId` resolved.
+ * A frame the probe cannot map, or whose origin is not granted, keeps only its
+ * withheld line; a readable frame's document follows its frame line one level
+ * deeper, and its refs are returned with its frame id. A granted frame that is
+ * not read (its read failed, or the frame count, time or line budget ran out)
+ * is withheld too, so its absence says nothing about its content. The result
+ * is capped at the debugger path's line limit.
  */
 export const spliceScriptingFrames = async (
-  main: ScriptingSnapshotPart,
+  root: ScriptingSnapshotPart,
   maxDepth: number | undefined,
   scope: ScriptingFrameScope
 ): Promise<ScriptingSplice> => {
-  const tree = main.frames.length === 0 ? undefined : await scope.frameTree();
+  const tree = root.frames.length === 0 ? undefined : await scope.frameTree();
   const frames = new Map(
     (tree?.complete === true ? tree.frames : []).map(frame => [frame.id, frame])
   );
@@ -81,6 +99,7 @@ export const spliceScriptingFrames = async (
     scope.readableOrigins.some(pattern => originPatternMatches(pattern, origin));
   const deadline = Date.now() + SCRIPTING_FRAME_READS_DEADLINE_MS;
   const readableFrameRefs: string[] = [];
+  const refs: ScriptingFrameRef[] = [];
   let reads = 0;
   let produced = 0;
 
@@ -136,6 +155,8 @@ export const spliceScriptingFrames = async (
         readableFrameRefs.push(placeholder.ref);
       }
 
+      refs.push(...inner.refs.map(ref => ({ ...ref, frameId: Number(child.id) })));
+
       return [bare, ...(await render(inner, child.id, depth))];
     };
     const placeholders = new Map(part.frames.map(frame => [frame.line, frame]));
@@ -158,7 +179,8 @@ export const spliceScriptingFrames = async (
     return out;
   };
 
-  const lines = await render(main, MAIN_FRAME_ID, 0);
+  const lines = await render(root, String(scope.rootFrameId), 0);
+  const dropped = new Set(readableFrameRefs);
 
   return {
     lines:
@@ -169,5 +191,6 @@ export const spliceScriptingFrames = async (
           ]
         : lines,
     readableFrameRefs,
+    refs: refs.filter(ref => !dropped.has(ref.ref)),
   };
 };

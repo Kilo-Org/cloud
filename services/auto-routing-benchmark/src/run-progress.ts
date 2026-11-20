@@ -24,7 +24,9 @@ export async function loadRunProgress(
       completedCases: row.completedCases,
       totalCases: datasetChanged
         ? null
-        : row.enqueuedModels * expectedCaseCount(row.kind, row.router) * row.repetitions,
+        : row.enqueuedModels *
+          expectedCaseCount(row.kind, row.router, row.measurementRevision) *
+          row.repetitions,
       failedCases: row.failedCases,
     });
   }

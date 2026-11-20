@@ -230,6 +230,20 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function trpcError(code: string): Error {
+  return Object.assign(new Error(code), { data: { code, message: code } });
+}
+
+/**
+ * A read that never reached the server: a fetch rejection carries no tRPC code
+ * and no HTTP status, which is what names the connection rather than the
+ * server.
+ */
+function getConnectionBalanceFailure(): void {
+  getContextBalanceQueryFn.mockRejectedValue(new TypeError('Network request failed'));
+}
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
 
@@ -1007,15 +1021,18 @@ describe('CreditsCard add-credits entry point', () => {
     onlineManager.setOnline(true);
   });
 
-  it('settles an unreachable balance read to the retry surface while offline', async () => {
+  it('settles an unreachable balance read to the connection state while offline', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
+    getConnectionBalanceFailure();
     onlineManager.setOnline(false);
 
     const { labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    // A read that never reached the server names the connection, not a
+    // server-side failure, and keeps the Retry that a restored network makes
+    // useful.
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
-    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Could not reach the server. Try again.');
     expect(texts()).toContain('Retry');
     expect(texts()).not.toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
@@ -1025,10 +1042,10 @@ describe('CreditsCard add-credits entry point', () => {
 
   it('keeps personal Buy credits actionable when the balance request fails', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+    getConnectionBalanceFailure();
 
     const { renderer, labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
     expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
     expect(texts()).not.toContain('$0.00');
@@ -1037,6 +1054,52 @@ describe('CreditsCard add-credits entry point', () => {
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
 
+    unmount();
+  });
+
+  it('names a permission refusal without offering Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('FORBIDDEN'));
+
+    const { renderer, labels, texts, unmount } = await mountCard();
+    const PERMISSION_COPY = "You don't have permission to view this balance.";
+    await waitFor(() => labels().includes(PERMISSION_COPY));
+
+    expect(texts()).toContain(PERMISSION_COPY);
+    // A refusal cannot be fixed by asking again, so the card offers no action.
+    expect(texts()).not.toContain('Retry');
+    const retrySurface = renderer.root.findAll(
+      node => node.type === Pressable && node.props.accessibilityRole === 'button'
+    );
+    expect(
+      retrySurface.some(node =>
+        String(node.props.accessibilityLabel ?? '').includes('Tap to retry')
+      )
+    ).toBe(false);
+    unmount();
+  });
+
+  it('describes a terminal balance failure as an explanation with no Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('NOT_FOUND'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes("Balance couldn't be loaded."));
+
+    expect(texts()).toContain("Balance couldn't be loaded.");
+    expect(texts()).not.toContain('Retry');
+    unmount();
+  });
+
+  it('keeps the retry line for a transient balance failure', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+
+    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Retry');
     unmount();
   });
 

@@ -97,10 +97,21 @@ import {
   syncSubscriptionSnapshot,
 } from './subscriptions';
 import { planPromptTransportRemeasure } from './remeasure';
+import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
 
 const RemeasureRequestSchema = z.object({
   router: AutoRouterSchema.optional(),
   action: z.enum(['dry-run', 'request', 'cancel']).default('dry-run'),
+  // Exact pairs to measure; absent means every ready pair of the router.
+  pairs: z
+    .array(
+      z.object({
+        model: z.string().trim().min(1),
+        variant: z.string().trim().min(1).nullable().default(null),
+      })
+    )
+    .min(1)
+    .optional(),
 });
 
 const DebugCliRequestSchema = z.object({
@@ -536,7 +547,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     '/admin/registry/remeasure-prompt-transport',
     zodJsonValidator(RemeasureRequestSchema, { errorMessage: 'Invalid re-measure request' }),
     async c => {
-      const { router, action } = c.req.valid('json');
+      const { router, action, pairs } = c.req.valid('json');
       const catalog = await fetchBenchmarkModelCatalog(c.env).catch(() => null);
       const prices = catalog ? catalogCandidatePrices(catalog) : new Map();
       const reports = [];
@@ -552,8 +563,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
             router: selected,
             engineIdentity: computeEngineIdentity('decider', selected),
             repetitions: resolveEffectivePolicy(config).deciderRepetitions,
+            revision: ACTIVE_MEASUREMENT_REVISION,
             action,
             prices,
+            ...(pairs ? { pairs } : {}),
           })
         );
       }

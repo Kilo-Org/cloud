@@ -43,11 +43,19 @@ export function useLiveSessionHeaderNotice(
   const connection = useUserWebConnection();
   const retryLock = useMemo(createSubmitLock, []);
   const [retrying, setRetrying] = useState(false);
-  const content = liveSessionContent(context, sessions);
+  const content = liveSessionContent(context, sessions, internet);
 
   const loadFailed = content === 'rows' && context.isReady && Boolean(sessions.terminalError);
   const connectionLost =
     content !== 'error' && context.isReady && !isConnected && reconnectExhausted;
+  // The offline card is the one statement for the outage. While it owns the
+  // surface, a header line beside it would name the same connection loss a
+  // second time — and an exhausted socket would add "Connection lost" with no
+  // action, because `canRetry` stands down offline. The notice speaks only for
+  // rows and confirmed-empty content, which stay readable through the outage.
+  if (content === 'offline') {
+    return null;
+  }
   let message: string | null = null;
   if (loadFailed) {
     message = failureLabel;

@@ -1238,15 +1238,6 @@ importers:
       '@trpc/tanstack-react-query':
         specifier: 'catalog:'
         version: 11.19.0(@tanstack/react-query@5.104.3(react@19.2.6))(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.19.0(typescript@7.0.2))(react@19.2.6)(typescript@7.0.2)
-      '@types/archiver':
-        specifier: 7.0.0
-        version: 7.0.0
-      '@types/js-yaml':
-        specifier: 4.0.9
-        version: 4.0.9
-      '@types/mdx':
-        specifier: 2.0.13
-        version: 2.0.13
       '@typesafe-ai/sdk':
         specifier: 0.6.0
         version: 0.6.0
@@ -1470,15 +1461,24 @@ importers:
       '@tailwindcss/typography':
         specifier: 0.5.19
         version: 0.5.19(tailwindcss@4.2.4)
+      '@types/archiver':
+        specifier: 7.0.0
+        version: 7.0.0
       '@types/jest':
         specifier: 30.0.0
         version: 30.0.0
+      '@types/js-yaml':
+        specifier: 4.0.9
+        version: 4.0.9
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
       '@types/linkify-it':
         specifier: 5.0.0
         version: 5.0.0
+      '@types/mdx':
+        specifier: 2.0.13
+        version: 2.0.13
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4

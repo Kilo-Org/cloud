@@ -2,7 +2,7 @@
 import type * as ReactQuery from '@tanstack/react-query';
 import { createElement } from 'react';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import '@/i18n';
 import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
@@ -14,14 +14,27 @@ import { PrReviewMergeScreen } from './pr-review-merge-screen';
 import { PrReviewFileNavigatorScreen } from './pr-review-file-navigator-screen';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-const query = vi.hoisted(() => ({
-  data: undefined as unknown,
-  isLoading: false,
-  isError: true,
-  isFetching: false,
-  error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
-  refetch: vi.fn(),
-}));
+/** The mocked query result: a tRPC envelope (a code) or a plain rejection. */
+type QueryFixture = {
+  data: unknown;
+  isLoading: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  error: { data: { code: string } } | Error;
+  refetch: Mock;
+};
+
+const query = vi.hoisted((): QueryFixture => {
+  const fixture: QueryFixture = {
+    data: undefined,
+    isLoading: false,
+    isError: true,
+    isFetching: false,
+    error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    refetch: vi.fn(),
+  };
+  return fixture;
+});
 
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
@@ -139,7 +152,7 @@ beforeEach(() => {
   query.data = undefined;
   query.isError = true;
   query.isLoading = false;
-  query.error.data.code = 'INTERNAL_SERVER_ERROR';
+  query.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
   routeParams.current = {
     owner: 'org',
     repo: 'repo',
@@ -159,11 +172,29 @@ const overviewProps = {
   refreshControl: createElement(RefreshControl, { refreshing: false }),
 };
 
+/** A previously loaded overview, for the tests that must keep it on screen. */
+const CACHED_PR = {
+  title: 'Saved title',
+  headSha: '1234567',
+  counts: {},
+  bodyMarkdown: '',
+  state: 'open',
+  createdAt: '2026-03-01T12:00:00Z',
+  updatedAt: '2026-03-02T09:30:00Z',
+  closedAt: null,
+  mergedAt: null,
+  mergedBy: null,
+  labels: [],
+  assignees: [],
+  reviewers: [],
+  linkedIssues: [],
+};
+
 describe('PR Overview full-body states', () => {
   it.each(['INTERNAL_SERVER_ERROR', 'FORBIDDEN', 'NOT_FOUND', 'PRECONDITION_FAILED'])(
     'centers %s outside the scroller and preserves refresh',
     async code => {
-      query.error.data.code = code;
+      query.error = { data: { code } };
       const { renderer, unmount } = await renderWithProviders(
         createElement(PrReviewOverview, overviewProps)
       );
@@ -212,7 +243,7 @@ describe('PR Overview full-body states', () => {
   });
 
   it('gives a provider reconnect its own notice and recovery CTA instead of the GitHub empty state', async () => {
-    query.error.data.code = 'PRECONDITION_FAILED';
+    query.error = { data: { code: 'PRECONDITION_FAILED' } };
     const scope: ProviderPrScope = {
       ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
       organizationId: null,
@@ -245,7 +276,7 @@ describe('PR Overview full-body states', () => {
   });
 
   it('gives a provider not-found its retry and connection-check actions while GitHub keeps the install CTA', async () => {
-    query.error.data.code = 'NOT_FOUND';
+    query.error = { data: { code: 'NOT_FOUND' } };
     const scope: ProviderPrScope = {
       ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
       organizationId: null,
@@ -267,7 +298,7 @@ describe('PR Overview full-body states', () => {
   });
 
   it('keeps the GitHub not-found arm on the install CTA only', async () => {
-    query.error.data.code = 'NOT_FOUND';
+    query.error = { data: { code: 'NOT_FOUND' } };
     const { renderer, unmount } = await renderWithProviders(
       createElement(PrReviewOverview, overviewProps)
     );
@@ -282,22 +313,7 @@ describe('PR Overview full-body states', () => {
   });
 
   it('keeps cached overview content and its refresh control after a transient failure', async () => {
-    query.data = {
-      title: 'Saved title',
-      headSha: '1234567',
-      counts: {},
-      bodyMarkdown: '',
-      state: 'open',
-      createdAt: '2026-03-01T12:00:00Z',
-      updatedAt: '2026-03-02T09:30:00Z',
-      closedAt: null,
-      mergedAt: null,
-      mergedBy: null,
-      labels: [],
-      assignees: [],
-      reviewers: [],
-      linkedIssues: [],
-    };
+    query.data = CACHED_PR;
     const { renderer, unmount } = await renderWithProviders(
       createElement(PrReviewOverview, overviewProps)
     );
@@ -305,6 +321,44 @@ describe('PR Overview full-body states', () => {
     expect(scroll.props.refreshControl).toBe(overviewProps.refreshControl);
     expect(scroll.findByProps({ children: 'Saved title' })).toBeDefined();
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    unmount();
+  });
+
+  // Going offline must not cost the reader what they already had: the read
+  // never reached the server, so the cached overview stays and the retry is
+  // the way back once the connection returns.
+  it('keeps cached overview content when the refetch never reached the server', async () => {
+    query.data = CACHED_PR;
+    // A code-less, envelope-less rejection: the shape a failed fetch produces
+    // when the device has no network.
+    query.error = new Error('Network request failed');
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
+    expect(scroll.findByProps({ children: 'Saved title' })).toBeDefined();
+    unmount();
+  });
+
+  // The Overview's offline arm owns a first load that never reached the
+  // server: with nothing cached the body must name the connection instead of
+  // the backend, keep the page refresh control, and offer the Retry that a
+  // restored network makes useful.
+  it('names the connection when the first load never reached the server', async () => {
+    query.data = undefined;
+    // A code-less, envelope-less rejection: the shape a failed fetch produces
+    // when the device has no network.
+    query.error = new Error('Network request failed');
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.refreshControl).toBe(overviewProps.refreshControl);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    (error.props.onRetry as () => void)();
+    expect(query.refetch).toHaveBeenCalledOnce();
     unmount();
   });
 });

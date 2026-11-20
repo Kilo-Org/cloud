@@ -24,7 +24,6 @@ import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 import * as z from 'zod';
 import { getBenchmarkConfig } from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
-import { DECIDER_CASES, FRONTIER_CASES, type DeciderCase } from './datasets/decider-cases';
 import caseComplexity from './datasets/case-complexity.json';
 import type { RunModelRow, RunRow } from './db';
 import {
@@ -76,12 +75,14 @@ import {
   type BenchmarkRunPurpose,
   type CaseResultRow,
   type RunLaneFailureRow,
-  type PendingDeciderOutput,
+  type StoredDeciderOutput,
   type PriorModelResult,
 } from './db';
 import {
   gradeClassifierOutput,
   gradeDeciderOutput,
+  gradeProbeOutput,
+  lacksRequiredToolCalls,
   DeciderGraderRetryError,
   type DeciderJudge,
 } from './grading';
@@ -112,9 +113,11 @@ import {
 } from './cli-runner';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import {
-  catalogCandidatePrices,
   benchmarkPairUnavailability,
+  catalogCandidatePrices,
   fetchBenchmarkModelCatalog,
+  type BenchmarkModelCatalogSchema,
+  type CatalogModel,
 } from './platform-models';
 import {
   mostSevereFailureClass,
@@ -164,7 +167,17 @@ import {
   type SchedulerClaim,
   type SchedulerConfig,
 } from './scheduler';
-import { argvAffectedCases, PROMPT_TRANSPORT_REVISION } from './prompt-transport';
+import {
+  ACTIVE_MEASUREMENT_REVISION,
+  deciderCasesForRouter,
+  ENGINE_IDENTITY_REVISION,
+  minimumCaseRevisions,
+  PROBE_REVISION,
+  type MeasuredCase,
+} from './measurement-revision';
+import { isProbeCase } from './datasets/probe-cases';
+import { BenchmarkProbeFamilyError, runProbeCaseViaGateway } from './probe/executor';
+import { agenticEligibilityView, pairsMissingProbeResults } from './probe/eligibility';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
 export type RunModelEntry = {
@@ -211,17 +224,19 @@ export const BenchmarkJobMessageSchema = z.object({
   recoverOutput: z.boolean().optional(),
 });
 
-export function deciderCasesForRouter(router: AutoRouter = 'efficient') {
-  return router === 'frontier' ? FRONTIER_CASES : DECIDER_CASES;
-}
-
 /**
  * Cases one model repetition runs for a run kind: the length of the dataset
- * that kind selects. Shared with run progress so a displayed total cannot
- * disagree with the count run completion waits for.
+ * that kind and the run's measurement revision select. Shared with run progress so a
+ * displayed total cannot disagree with the count run completion waits for.
  */
-export function expectedCaseCount(kind: BenchmarkKind, router: AutoRouter): number {
-  return kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(router).length;
+export function expectedCaseCount(
+  kind: BenchmarkKind,
+  router: AutoRouter,
+  measurementRevision: number
+): number {
+  return kind === 'classifier'
+    ? CLASSIFIER_CASES.length
+    : deciderCasesForRouter(router, measurementRevision).length;
 }
 
 const DECIDER_CHUNK_SIZE = 1;
@@ -352,7 +367,7 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
     env.BENCH_DB,
     runId,
     state,
-    deciderCasesForRouter(state.router).length
+    expectedCaseCount('decider', state.router, state.measurementRevision)
   );
   for (const lane of unfinished) {
     if (deadLaneKeys.has(laneKey(lane.model, lane.variant, lane.rep))) continue;
@@ -658,10 +673,48 @@ export async function publishPlatformRoutingTable(
       })
     );
 
+  // Probe eligibility is route-scoped: a pair whose provenance run lacks complete probe
+  // results is ineligible on the agentic routes only and keeps serving every other route
+  // with the measurement it has. Before the probe revision is active nothing is filtered.
+  const probesActive = router === 'efficient' && ACTIVE_MEASUREMENT_REVISION >= PROBE_REVISION;
+  const ineligible = probesActive
+    ? await pairsMissingProbeResults(env.BENCH_DB, {
+        entries: readyEntries,
+        revision: PROBE_REVISION,
+      })
+    : new Set<string>();
+  if (ineligible.size > 0) {
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_agentic_ineligible_pairs',
+        probeRevision: PROBE_REVISION,
+        pairs: [...ineligible],
+      })
+    );
+  }
   const [summaries, perCaseResults] = await Promise.all([
     getSummariesForRuns(env.BENCH_DB, [...new Set(readyEntries.map(r => r.runId))]),
     getRoutingCaseResultsForEntries(env.BENCH_DB, readyEntries),
   ]);
+  const view = agenticEligibilityView({
+    active: probesActive,
+    ineligible,
+    summaries: filterSummariesByProvenance(readyEntries, summaries),
+    perCaseResults,
+    ...(previous?.table.routes ? { previousRoutes: previous.table.routes } : {}),
+  });
+  const tableSummaries = view.summaries;
+  const tableCaseResults = view.perCaseResults;
+  const fallbackRoutes = view.fallbackRoutes;
+  if (view.heldRouteKeys.length > 0) {
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_agentic_route_held',
+        routes: view.heldRouteKeys,
+        heldFromPrevious: Object.keys(fallbackRoutes),
+      })
+    );
+  }
   const generatedAt = new Date().toISOString();
   const deciderModels: BenchmarkDeciderModel[] = readyEntries.map(({ entry }) => ({
     id: entry.model,
@@ -685,9 +738,10 @@ export async function publishPlatformRoutingTable(
     lowConfidenceThreshold: policy.lowConfidenceThreshold,
     prices,
     deciderModels,
-    summaries: filterSummariesByProvenance(readyEntries, summaries),
-    perCaseResults,
+    summaries: tableSummaries,
+    perCaseResults: tableCaseResults,
     complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
+    fallbackRoutes,
   });
   table.version = `${computeRegistryRoutingTableVersion(
     readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant })),
@@ -703,7 +757,7 @@ export async function publishPlatformRoutingTable(
       switchHorizonTurns: policy.switchHorizonTurns,
       lowConfidenceThreshold: policy.lowConfidenceThreshold,
       prices,
-      summaries: filterSummariesByProvenance(readyEntries, summaries),
+      summaries: tableSummaries,
       effortByComplexity: table.effortByComplexity,
     }
   )}-variants`;
@@ -736,7 +790,9 @@ export async function publishPlatformRoutingTable(
 // Bump when grading logic, the CLI invocation/variant handling, the container
 // image's pinned CLI, or any other execution input NOT captured by the dataset
 // hash changes in a way that invalidates prior measurements. Forces every
-// carried summary to be re-benchmarked on the next run.
+// carried summary to be re-benchmarked on the next run. A change confined to some
+// cases adds a measurement revision instead (src/measurement-revision.ts), which
+// re-measures only those cases once ACTIVE_MEASUREMENT_REVISION reaches it.
 const BENCHMARK_ENGINE_VERSION = 1;
 
 function fnv1aHex(input: string): string {
@@ -753,7 +809,8 @@ function fnv1aHex(input: string): string {
 // the dataset contents (ids + grading checks/expectations) and an engine
 // version for code-level execution changes. Two runs sharing this identity
 // (plus repetitions + reasoning_effort) produced comparable measurements, so a
-// model's prior summaries can be carried instead of re-run.
+// model's prior summaries can be carried instead of re-run. The hash covers the
+// cases of ENGINE_IDENTITY_REVISION; later measurement revisions keep it.
 export function computeEngineIdentity(
   kind: BenchmarkKind,
   router: AutoRouter = 'efficient'
@@ -762,7 +819,7 @@ export function computeEngineIdentity(
   const datasetSignature =
     kind === 'classifier'
       ? { engine: 'system-one', cases: CLASSIFIER_CASES }
-      : deciderCasesForRouter(selectedRouter);
+      : deciderCasesForRouter(selectedRouter, ENGINE_IDENTITY_REVISION);
   return `${selectedRouter}:v${BENCHMARK_ENGINE_VERSION}:${fnv1aHex(JSON.stringify(datasetSignature))}`;
 }
 
@@ -1013,6 +1070,7 @@ export async function startRun(
         classifier_max_p95_latency_ms:
           kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
         engine_identity: engineIdentity,
+        measurement_revision: ACTIVE_MEASUREMENT_REVISION,
         purpose,
       },
       runModelRows,
@@ -1070,6 +1128,7 @@ export async function startRun(
       startedAt,
       purpose,
       engineIdentity,
+      measurementRevision: ACTIVE_MEASUREMENT_REVISION,
     });
     return { runId, enqueuedModels: 0, skippedModels };
   }
@@ -1221,21 +1280,16 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   // without chunks is the only one whose reuse may be missing or partial. The copies
   // skip rows the run already holds, so repeating a failed pass is safe.
   if (!(await hasScheduledChunks(env.BENCH_DB, runId))) {
-    const skipOldCaseIds = argvAffectedCases(run.router).map(benchCase => benchCase.id);
+    const minimumRevisions = minimumCaseRevisions(run.router, run.measurement_revision);
     try {
-      await copyRemeasureBaselines(env.BENCH_DB, {
-        runId,
-        skipOldCaseIds,
-        promptRevision: PROMPT_TRANSPORT_REVISION,
-      });
+      await copyRemeasureBaselines(env.BENCH_DB, { runId, minimumRevisions });
       await reuseDeciderCaseResults(env.BENCH_DB, {
         runId,
         router: run.router,
         engineIdentity: run.engine_identity,
         repetitions: run.repetitions,
         entries,
-        skipOldCaseIds,
-        promptRevision: PROMPT_TRANSPORT_REVISION,
+        minimumRevisions,
       });
     } catch (error) {
       await markProfilesFailedForRun(env.BENCH_DB, runId, {
@@ -1249,7 +1303,9 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
     runId,
     entries,
     repetitions: run.repetitions,
-    caseIds: deciderCasesForRouter(run.router).map(benchCase => benchCase.id),
+    caseIds: deciderCasesForRouter(run.router, run.measurement_revision).map(
+      benchCase => benchCase.id
+    ),
     chunkSize: DECIDER_CHUNK_SIZE,
   });
 }
@@ -1367,15 +1423,17 @@ class AmbiguousBenchmarkExecutionError extends Error {
   /**
    * Until this time the container may still deliver the paid call's output, so the
    * chunk keeps its slot and provider lease and rechecks instead of failing its lane.
+   * A probe has no container and produces its reply in the invocation, so nothing can
+   * satisfy that wait and its window is zero.
    */
   readonly outputDeadline: number;
 
-  constructor(paidStartedAt: number, options?: ErrorOptions) {
+  constructor(paidStartedAt: number, options?: ErrorOptions & { deliveryWindowMs?: number }) {
     super(
       'Previous paid execution has no recoverable output; refusing automatic duplicate inference',
       options
     );
-    this.outputDeadline = paidStartedAt + PAID_OUTPUT_WAIT_MS;
+    this.outputDeadline = paidStartedAt + (options?.deliveryWindowMs ?? PAID_OUTPUT_WAIT_MS);
   }
 }
 
@@ -1404,6 +1462,7 @@ const LANE_FAILURE_CLASS_BY_WAIT_REASON = {
   awaiting_output: 'ambiguous_execution',
   ambiguous_execution: 'ambiguous_execution',
   catalog_load: 'catalog_load',
+  probe_family: 'unsupported',
   model_resolution: 'model_resolution',
   grading: 'grader',
   container_capacity: 'container_capacity',
@@ -1482,8 +1541,8 @@ async function queueOutputRecovery(env: Env, execution: OutputRecoveryKey): Prom
 async function recordDeciderOutput(
   env: Env,
   key: OutputRecoveryKey,
-  benchCase: DeciderCase,
-  output: PendingDeciderOutput,
+  benchCase: MeasuredCase,
+  output: StoredDeciderOutput,
   judge: DeciderJudge | null
 ): Promise<number> {
   const pendingKey = {
@@ -1507,14 +1566,34 @@ async function recordDeciderOutput(
   }
   try {
     const { result, retried } = output;
-    const grade =
-      result.exitCode === 0 && result.text.length > 0
+    let grade: { score: number | null; costUsd: number; graderError: string | null };
+    if (isProbeCase(benchCase)) {
+      // A probe has no prompt to re-grade: the reply either continues the task (a tool
+      // call), states the correct final answer, or stops.
+      grade = {
+        score:
+          result.exitCode === 0
+            ? gradeProbeOutput(benchCase.check, {
+                text: result.text,
+                toolCalls: result.tools?.calls ?? 0,
+              })
+            : 0,
+        costUsd: 0,
+        graderError: null,
+      };
+    } else {
+      const answered =
+        result.exitCode === 0 &&
+        result.text.length > 0 &&
+        !lacksRequiredToolCalls(benchCase.requiredToolCalls, result.tools?.calls ?? null);
+      grade = answered
         ? await gradeDeciderOutput(benchCase.check, {
             userPrompt: benchCase.userPrompt,
             output: result.text,
             judge,
           })
         : { score: 0, costUsd: 0, graderError: null };
+    }
     if (grade.score === null) {
       throw new DeciderGraderRetryError(grade.graderError ?? 'Decider judge failed');
     }
@@ -1539,9 +1618,13 @@ async function recordDeciderOutput(
       output_prefix: result.text.slice(0, 200),
       event_count: result.eventCount,
       last_event_types: result.lastEventTypes.join(' '),
+      tool_calls: result.tools?.calls ?? null,
+      tool_names: result.tools ? JSON.stringify(result.tools.names) : null,
+      step_count: result.tools?.steps ?? null,
+      final_finish_reason: result.tools?.finalFinishReason ?? null,
       rep: key.rep,
       timed_out: result.timedOut ? 1 : 0,
-      prompt_revision: output.promptRevision ?? PROMPT_TRANSPORT_REVISION,
+      prompt_revision: output.promptRevision,
     });
     return grade.costUsd;
   } finally {
@@ -1570,7 +1653,9 @@ async function recoverPendingOutputJob(env: Env, message: BenchmarkJobMessage): 
     return;
   }
   const variant = variantToStorage(message.variant);
-  const benchCase = deciderCasesForRouter(state.router).find(candidate => candidate.id === caseId);
+  const benchCase = deciderCasesForRouter(state.router, state.measurementRevision).find(
+    candidate => candidate.id === caseId
+  );
   if (
     !benchCase ||
     !state.models.some(row => row.model === message.model && row.variant === variant)
@@ -1784,19 +1869,21 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         ? 'model_unavailable'
         : error instanceof ChunkClaimLostError
           ? 'claim_lost'
-          : awaitingOutput
-            ? 'awaiting_output'
-            : error instanceof AmbiguousBenchmarkExecutionError
-              ? 'ambiguous_execution'
-              : error instanceof BenchmarkCatalogLoadError
-                ? error.category
-                : error instanceof DeciderGraderRetryError
-                  ? 'grading'
-                  : isRetryableContainerAvailabilityError(error)
-                    ? 'container_capacity'
-                    : error instanceof BenchmarkThrottleError
-                      ? 'provider_throttle'
-                      : 'infrastructure';
+          : error instanceof BenchmarkProbeFamilyError
+            ? 'probe_family'
+            : awaitingOutput
+              ? 'awaiting_output'
+              : error instanceof AmbiguousBenchmarkExecutionError
+                ? 'ambiguous_execution'
+                : error instanceof BenchmarkCatalogLoadError
+                  ? error.category
+                  : error instanceof DeciderGraderRetryError
+                    ? 'grading'
+                    : isRetryableContainerAvailabilityError(error)
+                      ? 'container_capacity'
+                      : error instanceof BenchmarkThrottleError
+                        ? 'provider_throttle'
+                        : 'infrastructure';
     if (error instanceof BenchmarkModelUnavailableError) {
       await markProfilesFailedForEntries(
         env.BENCH_DB,
@@ -1805,6 +1892,16 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         { failureClass: 'model_not_found', reason: PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON }
       );
       await failScheduledEntry(env.BENCH_DB, claim, 'model_not_found');
+    } else if (error instanceof BenchmarkProbeFamilyError) {
+      // No amount of retrying builds a request this worker can send, and the pair must not
+      // reach `ready` with probe results missing: it fails with the exact reason.
+      await markProfilesFailedForEntries(
+        env.BENCH_DB,
+        claim.run_id,
+        [{ model: claim.model, variant: claim.variant }],
+        { failureClass: 'unsupported', reason: error.reason }
+      );
+      await failScheduledEntry(env.BENCH_DB, claim, 'unsupported');
     } else if (error instanceof ChunkClaimLostError) {
       await deferChunk(env.BENCH_DB, id, token, Date.now());
     } else if (awaitingOutput) {
@@ -2027,14 +2124,18 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             output_prefix: null,
             event_count: null,
             last_event_types: null,
+            tool_calls: null,
+            tool_names: null,
+            step_count: null,
+            final_finish_reason: null,
             rep,
             timed_out: 0,
-            prompt_revision: PROMPT_TRANSPORT_REVISION,
+            prompt_revision: state.measurementRevision,
           });
         } catch (error) {
           await upsertCaseResult(
             env.BENCH_DB,
-            failedRow(message, benchCase.id, null, startedAt, error, rep)
+            failedRow(message, benchCase.id, null, startedAt, error, rep, state.measurementRevision)
           );
         }
       }
@@ -2131,6 +2232,7 @@ type RunState = {
   startedAt: string;
   purpose: BenchmarkRunPurpose;
   engineIdentity: string;
+  measurementRevision: number;
 };
 
 async function getRunState(env: Env, runId: string): Promise<RunState> {
@@ -2152,6 +2254,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     startedAt: run.started_at,
     purpose: run.purpose === 'user' ? 'user' : 'platform',
     engineIdentity: run.engine_identity,
+    measurementRevision: run.measurement_revision,
   };
 }
 
@@ -2163,7 +2266,9 @@ async function processDeciderJob(
 ): Promise<void> {
   if (!message.caseIds?.length) throw new Error('Scheduler chunk has no cases');
   const caseIds = new Set(message.caseIds);
-  const cases = deciderCasesForRouter(state.router).filter(c => caseIds.has(c.id));
+  const cases = deciderCasesForRouter(state.router, state.measurementRevision).filter(c =>
+    caseIds.has(c.id)
+  );
   if (cases.length !== message.caseIds.length) throw new Error('Scheduler chunk has unknown cases');
 
   const { benchmarkUserId, benchmarkOrgId } = state;
@@ -2233,31 +2338,66 @@ async function processDeciderJob(
       }
     }
     // A short-lived user token is minted at most once per queue message and never
-    // logged. Fresh container instances run the CLI's one-time sqlite migration; the
-    // container owns that via its /warmup endpoint so the first real case doesn't
-    // burn its timeout on it. Ordinary warmup failures are non-fatal: the first case
-    // absorbs whatever warmup work remains. Container capacity failures are
-    // infrastructure pressure, so the queue retries the message. Both wait for the
-    // first case that needs a paid call, so rechecking awaited output stays in D1.
-    let cli: Promise<string> | undefined;
-    const cliToken = () =>
-      (cli ??= (async () => {
+    // logged. A CLI case warms its container before the paid ledger row exists, so the
+    // CLI's one-time sqlite migration never burns the first case's timeout and container
+    // capacity pressure defers the message with no ledger row written. Ordinary warmup
+    // failures are non-fatal: the first case absorbs whatever warmup work remains.
+    // Container capacity failures are infrastructure pressure, so the queue retries the
+    // message. Warmup waits for the first case that needs a CLI call, so rechecking
+    // awaited output stays in D1.
+    let minted: Promise<string> | undefined;
+    const mintedToken = () =>
+      (minted ??= (async () => {
         // The bot-token mint requires an org. Only run rows written before the
         // org snapshot existed lack one; checked here so chunks whose cases are
         // all recorded still finish without a mint.
         if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
-        const kiloToken = await fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId);
-        await warmUpCliContainer(env, {
-          instanceName,
-          model: message.model,
-          kiloToken,
-          kiloApiUrl: env.KILO_CLI_API_URL,
-          orgId: benchmarkOrgId,
-        }).catch(error => {
-          if (isRetryableContainerAvailabilityError(error)) throw error;
-        });
-        return kiloToken;
+        return fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId);
       })());
+    let catalogForProbes: Promise<z.infer<typeof BenchmarkModelCatalogSchema>> | undefined;
+    const probeCatalogEntry = async (model: string): Promise<CatalogModel> => {
+      catalogForProbes ??= mintedToken().then(token => {
+        if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
+        return fetchExecutableBenchmarkModelCatalog(
+          env,
+          { benchmarkUserId, benchmarkOrgId },
+          fetch,
+          token
+        );
+      });
+      // A catalog read that fails after the paid case started is a transient lookup failure,
+      // not a missing template: the case is cleared and the chunk retried, never failed.
+      const catalog = await catalogForProbes.catch(error => {
+        throw new BenchmarkCatalogLoadError(
+          `Benchmark model catalog could not be loaded: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          'catalog_load'
+        );
+      });
+      const entry = catalog.data.find(candidate => candidate.id === model);
+      if (!entry) {
+        throw new BenchmarkProbeFamilyError(
+          `Probe lane cannot run: ${model} is not in the executable model catalog.`,
+          `${model}/missing`
+        );
+      }
+      return entry;
+    };
+    let warmedUp = false;
+    const warmUpContainer = async (kiloToken: string) => {
+      if (warmedUp) return;
+      await warmUpCliContainer(env, {
+        instanceName,
+        model: message.model,
+        kiloToken,
+        kiloApiUrl: env.KILO_CLI_API_URL,
+        orgId: benchmarkOrgId,
+      }).catch(error => {
+        if (isRetryableContainerAvailabilityError(error)) throw error;
+      });
+      warmedUp = true;
+    };
 
     // Concurrency 1: the CLI's sqlite state in the container is not safe under
     // concurrent sessions (partial-migration crashes); the container serializes
@@ -2280,15 +2420,23 @@ async function processDeciderJob(
       };
       let attemptStartedAt: number | undefined;
       let unstartedRetryAt: number | undefined;
-      const runPaidCase = async (): Promise<PendingDeciderOutput> => {
+      const runPaidCase = async (): Promise<StoredDeciderOutput> => {
+        const promptRevision = state.measurementRevision;
+        // A container that loses its caller still posts its result, so an ambiguity there
+        // waits out that delivery. A probe answers in this invocation and has no later
+        // delivery to wait for, so its ambiguity fails the lane at once.
+        const deliveryWindowMs = isProbeCase(benchCase) ? 0 : PAID_OUTPUT_WAIT_MS;
         const priorStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
-        if (priorStartedAt !== null) throw new AmbiguousBenchmarkExecutionError(priorStartedAt);
-        const kiloToken = await cliToken();
+        if (priorStartedAt !== null) {
+          throw new AmbiguousBenchmarkExecutionError(priorStartedAt, { deliveryWindowMs });
+        }
+        const kiloToken = await mintedToken();
+        if (!isProbeCase(benchCase)) await warmUpContainer(kiloToken);
         let startedAt = Date.now();
         if (!(await beginPaidCase(env.BENCH_DB, execution, startedAt))) {
           const ledgeredStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
           if (ledgeredStartedAt === null) throw new ChunkClaimLostError();
-          throw new AmbiguousBenchmarkExecutionError(ledgeredStartedAt);
+          throw new AmbiguousBenchmarkExecutionError(ledgeredStartedAt, { deliveryWindowMs });
         }
         attemptStartedAt = startedAt;
         let retried = false;
@@ -2304,34 +2452,57 @@ async function processDeciderJob(
             caseId: benchCase.id,
             slot: claim.slot,
             chunk,
-            promptRevision: PROMPT_TRANSPORT_REVISION,
-            outputDeadline: startedAt + PAID_OUTPUT_WAIT_MS,
+            promptRevision,
+            outputDeadline: startedAt + deliveryWindowMs,
           })
         );
-        const invokeCli = () =>
-          runDeciderCaseViaCli(env, {
-            instanceName,
-            model: message.model,
-            benchCase,
-            kiloToken,
-            kiloApiUrl: env.KILO_CLI_API_URL,
-            orgId: benchmarkOrgId,
-            variant: cliVariant,
-            resultCallback: {
-              url: env.BENCH_RESULT_URL,
-              execution: {
-                ...execution,
-                attemptStartedAt: startedAt,
-                retried,
-                priorCostUsd,
-                priorUsage,
-              },
-            },
-          }).catch(error => {
-            if (isRetryableContainerAvailabilityError(error)) throw error;
-            throw new AmbiguousBenchmarkExecutionError(startedAt, { cause: error });
-          });
-        const first = await invokeCli();
+        // A probe goes straight to the gateway with the captured request template; every
+        // other case keeps the CLI container, which owns the workspace and tool execution.
+        const invokeCase = isProbeCase(benchCase)
+          ? async () =>
+              runProbeCaseViaGateway({
+                model: message.model,
+                variant: cliVariant,
+                benchCase,
+                catalogModel: await probeCatalogEntry(message.model),
+                kiloToken,
+                kiloApiUrl: env.KILO_CLI_API_URL,
+                orgId: benchmarkOrgId,
+                now: startedAt,
+              }).catch(error => {
+                if (error instanceof BenchmarkProbeFamilyError) throw error;
+                throw new AmbiguousBenchmarkExecutionError(startedAt, {
+                  cause: error,
+                  deliveryWindowMs,
+                });
+              })
+          : async () =>
+              runDeciderCaseViaCli(env, {
+                instanceName,
+                model: message.model,
+                benchCase,
+                kiloToken,
+                kiloApiUrl: env.KILO_CLI_API_URL,
+                orgId: benchmarkOrgId,
+                variant: cliVariant,
+                resultCallback: {
+                  url: env.BENCH_RESULT_URL,
+                  execution: {
+                    ...execution,
+                    attemptStartedAt: startedAt,
+                    retried,
+                    priorCostUsd,
+                    priorUsage,
+                  },
+                },
+              }).catch(error => {
+                if (isRetryableContainerAvailabilityError(error)) throw error;
+                throw new AmbiguousBenchmarkExecutionError(startedAt, { cause: error });
+              });
+        const first = await invokeCase();
+        if (isProbeCase(benchCase)) {
+          return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
+        }
         // The CLI occasionally ends a session with no assistant text at all
         // (transient empty completion: a lone step_finish with cost 0), or dies from
         // a signal before its first event. Mirror the production classifier's policy
@@ -2344,11 +2515,11 @@ async function processDeciderJob(
           !(emptyCompletion || isKilledBeforeEventsResult(first)) ||
           hasThrottleDiagnostic(first)
         ) {
-          return { result: first, retried: false, attemptStartedAt: startedAt };
+          return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
         startedAt = Math.max(Date.now(), startedAt + 1);
         if (!(await restartPaidCase(env.BENCH_DB, { ...execution, attemptStartedAt }, startedAt))) {
-          return { result: first, retried: false };
+          return { result: first, retried: false, promptRevision };
         }
         attemptStartedAt = startedAt;
         retried = true;
@@ -2376,7 +2547,7 @@ async function processDeciderJob(
         );
         // A first attempt killed before any event says nothing about the model, so it is
         // cleared and deferred with its unreached retry; an empty answer is graded instead.
-        const retry = await invokeCli().catch(error => {
+        const retry = await invokeCase().catch(error => {
           if (isRetryableContainerAvailabilityError(error) && !isKilledBeforeEventsResult(first)) {
             return null;
           }
@@ -2397,17 +2568,17 @@ async function processDeciderJob(
             })
           );
           unstartedRetryAt = startedAt;
-          return { result: first, retried: false, attemptStartedAt: startedAt };
+          return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
         addPriorAttempt(retry, first);
-        return { result: retry, retried: true, attemptStartedAt: startedAt };
+        return { result: retry, retried: true, attemptStartedAt: startedAt, promptRevision };
       };
       try {
         const pending = await getPendingDeciderOutput(env.BENCH_DB, pendingKey).catch(() => {
           throw new DeciderGraderRetryError('Pending decider output could not be read');
         });
         const output = pending ?? (await runPaidCase());
-        const { result, retried } = output;
+        const { result } = output;
         attemptStartedAt = output.attemptStartedAt;
         const throttled = isUnbilledTransientProviderResult(result);
         const unsupported = isUnsupportedModelResult(result, message.model);
@@ -2473,7 +2644,7 @@ async function processDeciderJob(
             caseId: benchCase.id,
           },
           benchCase,
-          { result, retried, promptRevision: pending?.promptRevision },
+          output,
           judge
         );
       } catch (error) {
@@ -2481,7 +2652,12 @@ async function processDeciderJob(
           graderFailure = error;
           return;
         }
-        if (isRetryableContainerAvailabilityError(error) && attemptStartedAt !== undefined) {
+        if (
+          (isRetryableContainerAvailabilityError(error) ||
+            error instanceof BenchmarkProbeFamilyError ||
+            error instanceof BenchmarkCatalogLoadError) &&
+          attemptStartedAt !== undefined
+        ) {
           await clearUnbilledCase(env.BENCH_DB, { ...execution, attemptStartedAt });
         }
         throw error;
@@ -2510,7 +2686,8 @@ function failedRow(
   routeKey: string | null,
   startedAt: number,
   error: unknown,
-  rep: number = 0
+  rep: number,
+  promptRevision: number
 ): CaseResultRow {
   return {
     run_id: message.runId,
@@ -2534,9 +2711,13 @@ function failedRow(
     output_prefix: null,
     event_count: null,
     last_event_types: null,
+    tool_calls: null,
+    tool_names: null,
+    step_count: null,
+    final_finish_reason: null,
     rep,
     timed_out: 0,
-    prompt_revision: PROMPT_TRANSPORT_REVISION,
+    prompt_revision: promptRevision,
   };
 }
 
@@ -2652,7 +2833,7 @@ async function finalizeRunIfComplete(
   state: RunState
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
-  const caseCount = expectedCaseCount(kind, state.router);
+  const caseCount = expectedCaseCount(kind, state.router, state.measurementRevision);
 
   // The run finalizes once every lane is accounted for, so one dead lane no
   // longer wedges the run until the stale sweep.

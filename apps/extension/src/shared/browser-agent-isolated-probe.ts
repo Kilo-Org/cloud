@@ -44,7 +44,8 @@ export interface IsolatedTargetProbe {
   readonly paymentFormSubmit: boolean;
 }
 
-const MAIN_FRAME_ID = 0;
+/** The WebExtension frame id of a tab's top-level document. */
+export const MAIN_FRAME_ID = 0;
 
 const probeTextSchema = z.string();
 const framePayloadSchema = z.object({
@@ -149,12 +150,13 @@ export const readIsolatedFrames = async (probe: IsolatedAgentProbe): Promise<Iso
   return { complete: main.length > 0, frames: [...main, ...children], owners };
 };
 
-/** The classification of the one element a selector names, or nothing when it names none or several. */
+/** The classification of the one element a selector names in frame `frameId`, or nothing when it names none or several. */
 export const readIsolatedTargetProbe = async (
   probe: IsolatedAgentProbe,
-  selector: string
+  selector: string,
+  frameId: number = MAIN_FRAME_ID
 ): Promise<IsolatedTargetProbe | undefined> => {
-  const [answer] = await runProbe(probe, { kind: 'target', selector }, [MAIN_FRAME_ID]);
+  const [answer] = await runProbe(probe, { kind: 'target', selector }, [frameId]);
 
   return parsePayload(answer?.result, targetPayloadSchema)?.probe;
 };
@@ -162,15 +164,16 @@ export const readIsolatedTargetProbe = async (
 const hostedPayloadSchema = z.object({ frameId: z.number().nullable().optional() });
 
 /**
- * Whether a selector names one `<iframe>`/`<frame>` of the tab's document, and
- * the frame it hosts: `undefined` for any other element, `{ frameId: undefined }`
- * for a frame element whose frame the browser cannot name.
+ * Whether a selector names one `<iframe>`/`<frame>` of frame `frameId`'s
+ * document, and the frame it hosts: `undefined` for any other element,
+ * `{ frameId: undefined }` for a frame element whose frame the browser cannot name.
  */
 export const readIsolatedHostedFrame = async (
   probe: IsolatedAgentProbe,
-  selector: string
+  selector: string,
+  frameId: number = MAIN_FRAME_ID
 ): Promise<{ readonly frameId: string | undefined } | undefined> => {
-  const [answer] = await runProbe(probe, { kind: 'hosted', selector }, [MAIN_FRAME_ID]);
+  const [answer] = await runProbe(probe, { kind: 'hosted', selector }, [frameId]);
   const payload = parsePayload(answer?.result, hostedPayloadSchema);
 
   if (payload === undefined || !('frameId' in payload)) {

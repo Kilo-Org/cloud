@@ -12,6 +12,11 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const queryFnMock = vi.hoisted(() => vi.fn());
 
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function trpcError(code: string): Error {
+  return Object.assign(new Error(code), { data: { code, message: code } });
+}
+
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     githubPrReview: {
@@ -81,7 +86,9 @@ beforeEach(() => {
 
 describe('usePrReviewFileListQuery error classification', () => {
   it('a first-page failure surfaces firstPageErrorState and no laterPageError', async () => {
-    queryFnMock.mockRejectedValue(new Error('network down'));
+    // A coded answer proves the server was reached; a transport rejection
+    // without a code is the connection (D5), so this case keeps a tRPC code.
+    queryFnMock.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
     const holder = await mountProbe();
 
     await waitFor(() => current(holder).errorState !== null);
@@ -108,7 +115,7 @@ describe('usePrReviewFileListQuery error classification', () => {
   it('a later-page failure keeps the loaded files and flips laterPageError', async () => {
     queryFnMock
       .mockResolvedValueOnce({ files: [FILE_A], nextCursor: 'cursor-2' })
-      .mockRejectedValueOnce(new Error('page 2 failed'));
+      .mockRejectedValueOnce(trpcError('INTERNAL_SERVER_ERROR'));
     const holder = await mountProbe();
 
     // Load page one, then let the hook auto-run fetch-to-completion? No: the

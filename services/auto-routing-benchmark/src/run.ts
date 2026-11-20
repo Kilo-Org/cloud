@@ -92,6 +92,7 @@ import {
 import {
   addPriorAttempt,
   type AttemptUsage,
+  CONTAINER_NOT_REACHED_PREFIX,
   DECIDER_CLI_TIMEOUT_MS,
   destroyDeciderCliContainer,
   hasThrottleDiagnostic,
@@ -1268,8 +1269,9 @@ export async function dispatchScheduler(env: Env): Promise<void> {
 
 // A container that loses its caller still finishes the paid case, then posts the outcome
 // to /container/case-result. Delivery covers the container's own start (at most ~30s)
-// and three timed post attempts (at most ~36s), with headroom.
-const CONTAINER_DELIVERY_WINDOW_MS = 90_000;
+// and its timed post attempts with backoff (at most ~5.5 minutes, so it outlasts a few
+// minutes of D1 overload), with headroom.
+const CONTAINER_DELIVERY_WINDOW_MS = 420_000;
 export const PAID_OUTPUT_WAIT_MS = DECIDER_CLI_TIMEOUT_MS + CONTAINER_DELIVERY_WINDOW_MS;
 const PAID_OUTPUT_RECHECK_MS = 30_000;
 
@@ -1277,16 +1279,21 @@ class AmbiguousBenchmarkExecutionError extends Error {
   /**
    * Until this time the container may still deliver the paid call's output, so the
    * chunk keeps its slot and provider lease and rechecks instead of failing its lane.
-   * Null when no ledger row remains to wait on.
    */
-  readonly outputDeadline: number | null;
+  readonly outputDeadline: number;
 
-  constructor(paidStartedAt: number | null, options?: ErrorOptions) {
+  constructor(paidStartedAt: number, options?: ErrorOptions) {
     super(
       'Previous paid execution has no recoverable output; refusing automatic duplicate inference',
       options
     );
-    this.outputDeadline = paidStartedAt === null ? null : paidStartedAt + PAID_OUTPUT_WAIT_MS;
+    this.outputDeadline = paidStartedAt + PAID_OUTPUT_WAIT_MS;
+  }
+}
+
+class ChunkClaimLostError extends Error {
+  constructor() {
+    super('The chunk claim can no longer start paid cases');
   }
 }
 
@@ -1558,6 +1565,7 @@ export function benchmarkErrorCategory(error: unknown): string {
   if (message.startsWith('benchmark executable model catalog failed')) {
     return `catalog_http_${status}`;
   }
+  if (message.includes(CONTAINER_NOT_REACHED_PREFIX)) return 'container_not_reached';
   if (message.startsWith('container /run failed')) return `container_run_http_${status}`;
   if (message.startsWith('container /warmup failed')) return `container_warmup_http_${status}`;
   if (message.includes('D1_ERROR')) return 'd1_error';
@@ -1677,6 +1685,8 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON
       );
       await failScheduledEntry(env.BENCH_DB, claim);
+    } else if (error instanceof ChunkClaimLostError) {
+      await deferChunk(env.BENCH_DB, id, token, Date.now());
     } else if (awaitingOutput) {
       await env.BENCH_QUEUE.send(
         {
@@ -1757,19 +1767,21 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         reason:
           error instanceof BenchmarkModelUnavailableError
             ? 'model_unavailable'
-            : awaitingOutput
-              ? 'awaiting_output'
-              : error instanceof AmbiguousBenchmarkExecutionError
-                ? 'ambiguous_execution'
-                : error instanceof BenchmarkCatalogLoadError
-                  ? error.category
-                  : error instanceof DeciderGraderRetryError
-                    ? 'grading'
-                    : isRetryableContainerAvailabilityError(error)
-                      ? 'container_capacity'
-                      : error instanceof BenchmarkThrottleError
-                        ? 'provider_throttle'
-                        : 'infrastructure',
+            : error instanceof ChunkClaimLostError
+              ? 'claim_lost'
+              : awaitingOutput
+                ? 'awaiting_output'
+                : error instanceof AmbiguousBenchmarkExecutionError
+                  ? 'ambiguous_execution'
+                  : error instanceof BenchmarkCatalogLoadError
+                    ? error.category
+                    : error instanceof DeciderGraderRetryError
+                      ? 'grading'
+                      : isRetryableContainerAvailabilityError(error)
+                        ? 'container_capacity'
+                        : error instanceof BenchmarkThrottleError
+                          ? 'provider_throttle'
+                          : 'infrastructure',
         errorType: error instanceof Error ? error.name : 'unknown',
         errorCategory: benchmarkErrorCategory(error),
       })
@@ -2150,15 +2162,16 @@ async function processDeciderJob(
         token: claim.token,
       };
       let attemptStartedAt: number | undefined;
+      let unstartedRetryAt: number | undefined;
       const runPaidCase = async (): Promise<PendingDeciderOutput> => {
         const priorStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
         if (priorStartedAt !== null) throw new AmbiguousBenchmarkExecutionError(priorStartedAt);
         const kiloToken = await cliToken();
         let startedAt = Date.now();
         if (!(await beginPaidCase(env.BENCH_DB, execution, startedAt))) {
-          throw new AmbiguousBenchmarkExecutionError(
-            await getPaidCaseStartedAt(env.BENCH_DB, execution)
-          );
+          const ledgeredStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
+          if (ledgeredStartedAt === null) throw new ChunkClaimLostError();
+          throw new AmbiguousBenchmarkExecutionError(ledgeredStartedAt);
         }
         attemptStartedAt = startedAt;
         let retried = false;
@@ -2244,7 +2257,31 @@ async function processDeciderJob(
             outputDeadline: startedAt + PAID_OUTPUT_WAIT_MS,
           })
         );
-        const retry = await invokeCli();
+        // A first attempt killed before any event says nothing about the model, so it is
+        // cleared and deferred with its unreached retry; an empty answer is graded instead.
+        const retry = await invokeCli().catch(error => {
+          if (isRetryableContainerAvailabilityError(error) && !isKilledBeforeEventsResult(first)) {
+            return null;
+          }
+          throw error;
+        });
+        if (retry === null) {
+          console.warn(
+            JSON.stringify({
+              event: 'benchmark_case_execution_retry_not_started',
+              runId: message.runId,
+              model: message.model,
+              variant: storedVariant,
+              rep,
+              caseId: benchCase.id,
+              slot: claim.slot,
+              chunk,
+              attemptStartedAt: startedAt,
+            })
+          );
+          unstartedRetryAt = startedAt;
+          return { result: first, retried: false, attemptStartedAt: startedAt };
+        }
         addPriorAttempt(retry, first);
         return { result: retry, retried: true, attemptStartedAt: startedAt };
       };
@@ -2278,7 +2315,31 @@ async function processDeciderJob(
           );
         }
         if (!pending) {
-          await savePendingDeciderOutput(env.BENCH_DB, pendingKey, output).catch(() => {
+          await savePendingDeciderOutput(env.BENCH_DB, pendingKey, output).catch(async () => {
+            // No callback can satisfy a retry that never reached its container, so its
+            // ledger generation must not outlive the only copy of the first output.
+            if (unstartedRetryAt !== undefined) {
+              const retryAt = unstartedRetryAt;
+              await clearUnbilledCase(env.BENCH_DB, {
+                ...execution,
+                attemptStartedAt: retryAt,
+              }).catch((error: unknown) => {
+                console.warn(
+                  JSON.stringify({
+                    event: 'benchmark_unstarted_retry_clear_failed',
+                    runId: message.runId,
+                    model: message.model,
+                    variant: storedVariant,
+                    rep,
+                    caseId: benchCase.id,
+                    slot: claim.slot,
+                    chunk,
+                    attemptStartedAt: retryAt,
+                    errorCategory: benchmarkErrorCategory(error),
+                  })
+                );
+              });
+            }
             throw new DeciderGraderRetryError('Pending decider output could not be saved');
           });
         }

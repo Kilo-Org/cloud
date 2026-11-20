@@ -373,7 +373,7 @@ function main() {
     '-t',
     image,
     '--build-arg',
-    `CLI_VERSION=${args.cliVersion}`,
+    `KILO_CLI_VERSION=${args.cliVersion}`,
     'container',
   ]);
   sh('docker', ['rm', '-f', runner, gateway], { allowFailure: true });

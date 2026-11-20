@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-import { checkParsedFile } from './check-classes.mjs';
+import { LAYOUT_RULES, checkParsedFile } from './check-classes.mjs';
 import { parseSourceEntry } from '../lib/source-files.mjs';
 
 // The rule cases read the repository's own files: the checker resolves the app's
@@ -893,6 +893,33 @@ function layoutProblems(relative, text) {
   return check(relative, text).filter(problem => /\[L\d+\]/.test(problem));
 }
 
+// The table is the only description of the layout rules, and the header says so.
+// These three properties are what makes that claim hold instead of drift: a new
+// rule cannot arrive with no detector, no two rules can share an id, and no rule
+// can name two detectors and leave the dispatch to pick one.
+test('states every layout rule once, with the detector that finds it', () => {
+  const ids = LAYOUT_RULES.map(rule => rule.id);
+  assert.deepEqual([...ids].sort(), [...new Set(ids)].sort(), 'two layout rules share an id');
+  for (const rule of LAYOUT_RULES) {
+    const detectors = ['patterns', 'detectSurface', 'detect'].filter(
+      field => rule[field] !== undefined
+    );
+    assert.equal(
+      detectors.length,
+      1,
+      `layout rule ${rule.id} must carry exactly one detector, has [${detectors.join(', ')}]`
+    );
+    assert.equal(
+      typeof rule.advice,
+      'string',
+      `layout rule ${rule.id} must name the primitive that replaces it`
+    );
+    if (rule.patterns !== undefined) {
+      assert.ok(rule.patterns.length > 0, `layout rule ${rule.id} has no pattern`);
+    }
+  }
+});
+
 test('flags arbitrary spacing outside the allowlist and passes it inside', () => {
   const found = layoutProblems(SCREEN_FILE, screen('<View className="mt-[6px]" />'));
   assert.equal(found.length, 1);
@@ -1372,6 +1399,27 @@ test('follows a local component that draws the sheet header', () => {
     ),
     []
   );
+});
+
+test('does not accept a nested sheet header drawn through a local component', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      'function AdvancedContent() {\n' +
+      '  return <SheetHeader title="Advanced" onDone={onClose} />;\n' +
+      '}\n' +
+      'export function Screen() {\n' +
+      '  return (\n' +
+      '    <Sheet visible onClose={onClose}>\n' +
+      '      <Sheet visible={other} onClose={onClose}>\n' +
+      '        <AdvancedContent />\n' +
+      '      </Sheet>\n' +
+      '    </Sheet>\n' +
+      '  );\n' +
+      '}'
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:7: \[L11\] "<Sheet>"/);
 });
 
 test('flags horizontal padding on a CenteredState content container', () => {

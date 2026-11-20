@@ -19,7 +19,10 @@
     "presenceStatus": "Amfitrions: {{connection}}",
     "commandStatus": "Lliurament de l'ordre: {{status}}",
     "delivered": "Lliurada",
-    "expired": "Caducada"
+    "expired": "Caducada",
+    "recoveryGaps_one": "Falta {{displayCount}} part d'aquesta transcripció.",
+    "recoveryGaps_many": "Falten {{displayCount}} parts d'aquesta transcripció.",
+    "recoveryGaps_other": "Falten {{displayCount}} parts d'aquesta transcripció."
   },
   "common": {
     "manageOnWeb": "Gestiona-ho al web",
@@ -980,6 +983,9 @@
       "pendingComment": "comentaris pendents",
       "pendingComment_other": "comentaris pendents",
       "submitCountOfTotal": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
+      "submitCountOfTotal_one": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
+      "submitCountOfTotal_many": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
+      "submitCountOfTotal_other": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
       "submitReview": "Envia la revisió",
       "partialPostedFresh": "Comentaris publicats: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentaris publicats: {{displayFreshCount}}. ",
@@ -1411,7 +1417,8 @@
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo."
+      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
+      "notConnectedReadOnlyPlan": "El període de prova de l'organització ha finalitzat, així que un propietari ha d'actualitzar la facturació a kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexió de Bitbucket amb {{organization}} es gestiona al web des d'un ordinador.",
@@ -2838,7 +2845,9 @@
     "modelPicker": {
       "title": "Model",
       "favorites": "Preferits",
-      "noModelsDescription": "No hi ha cap model per seleccionar."
+      "noModelsDescription": "No hi ha cap model per seleccionar.",
+      "allUnavailableTitle": "No es pot utilitzar cap model",
+      "allUnavailableDescription": "Afegeix una clau de proveïdor i torna-ho a provar."
     },
     "modelSelector": {
       "provider": "Proveïdor {{id}}",
@@ -3681,7 +3690,7 @@
     },
     "hub": {
       "renameTitle": "Reanomena l'organització",
-      "renamePlaceholder": "Nom de l'organització",
+      "renamePlaceholder": "Introdueix un nom per a l'organització",
       "balance": "Saldo",
       "plan": "Pla",
       "planTeams": "Teams",
@@ -5063,6 +5072,7 @@
     "providersDescription": "Desactiva un proveïdor perquè Kilo hi deixi d'encaminar sol·licituds en aquesta organització.",
     "providersNeedCatalog": "Els interruptors dels proveïdors són de només lectura fins que es carregui el catàleg complet de models. Toca Torna-ho a provar a dalt per editar-los.",
     "providersEmpty": "Cap proveïdor coincideix amb aquesta cerca.",
+    "providersNone": "No hi ha cap proveïdor disponible per a aquesta organització.",
     "allowAllShown": "Permet tots els mostrats",
     "denyAllShown": "Denega tots els mostrats",
     "gatewaysDescription": "Kilo encamina les sol·licituds de models a través de Vercel AI Gateway o OpenRouter. Si una passarel·la està desactivada, aquestes sol·licituds fallen.",

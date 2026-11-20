@@ -19,7 +19,9 @@
     "presenceStatus": "ഹോസ്റ്റുകൾ: {{connection}}",
     "commandStatus": "കമാൻഡ് ഡെലിവറി: {{status}}",
     "delivered": "ഡെലിവർ ചെയ്തു",
-    "expired": "കാലഹരണപ്പെട്ടു"
+    "expired": "കാലഹരണപ്പെട്ടു",
+    "recoveryGaps_one": "ഈ ട്രാൻസ്ക്രിപ്റ്റിന്റെ {{displayCount}} ഭാഗം കാണുന്നില്ല.",
+    "recoveryGaps_other": "ഈ ട്രാൻസ്ക്രിപ്റ്റിന്റെ {{displayCount}} ഭാഗങ്ങൾ കാണുന്നില്ല."
   },
   "common": {
     "manageOnWeb": "വെബിൽ നിയന്ത്രിക്കുക",
@@ -963,6 +965,8 @@
       "pendingComment": "സമർപ്പിക്കാത്ത അഭിപ്രായങ്ങൾ",
       "pendingComment_other": "സമർപ്പിക്കാത്ത അഭിപ്രായങ്ങൾ",
       "submitCountOfTotal": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
+      "submitCountOfTotal_one": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
+      "submitCountOfTotal_other": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
       "submitReview": "പരിശോധന സമർപ്പിക്കുക",
       "partialPostedFresh": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
       "partialPostedFresh_one": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "REVIEW.md പിന്തുടരുക",
     "followReviewMdSubtitle": "ഓരോ റിപ്പോസിറ്ററിയിലെയും REVIEW.md ഫയലിലെ നിർദ്ദേശങ്ങൾ പാലിക്കുക",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket കണക്റ്റുചെയ്തിട്ടില്ല. ഓർഗനൈസേഷൻ ഉടമകൾക്കും അഡ്മിനുകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ."
+      "notConnectedReadOnly": "Bitbucket കണക്റ്റുചെയ്തിട്ടില്ല. ഓർഗനൈസേഷൻ ഉടമകൾക്കും അഡ്മിനുകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ.",
+      "notConnectedReadOnlyPlan": "സ്ഥാപനത്തിന്റെ ട്രയൽ അവസാനിച്ചു, അതിനാൽ ഉടമ kilo.ai-ൽ ബില്ലിംഗ് അപ്ഡേറ്റ് ചെയ്യണം."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ന്റെ Bitbucket കണക്ഷൻ ഒരു കമ്പ്യൂട്ടറിൽ നിന്ന് വെബിലാണ് നിയന്ത്രിക്കുന്നത്.",
@@ -1720,7 +1725,7 @@
       "dueThisWeekDetail_one": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
       "dueThisWeekDetail_other": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
       "noDeadline": "സമയപരിധിയില്ല",
-      "reviewSlaAssignment": "നൽകിയ SLA സമയപരിധികൾ പരിശോധിക്കുക",
+      "reviewSlaAssignment": "SLA അനുവദന പരിശോധിക്കുക",
       "allOpenFindingsTracked": "തീർപ്പാകാത്ത എല്ലാ കണ്ടെത്തലുകളും നിരീക്ഷണത്തിലാണ്"
     },
     "dismiss": {
@@ -1839,7 +1844,7 @@
       "couldNotLoadMore": "കൂടുതൽ കണ്ടെത്തലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "noMatchesTitle": "ഫിൽട്ടറുകളുമായി പൊരുത്തപ്പെടുന്ന കണ്ടെത്തലുകളൊന്നുമില്ല",
       "noMatchesDescription": "തിരഞ്ഞെടുത്ത ഫിൽട്ടറുകൾ ക്രമീകരിക്കുകയോ മായ്ക്കുകയോ ചെയ്യുക.",
-      "emptyTitle": "തീർപ്പാകാത്ത കണ്ടെത്തലുകളില്ല",
+      "emptyTitle": "ഓപ്പൺ കണ്ടെത്തലുകളില്ല",
       "emptyDescription": "ഇപ്പോൾ ശ്രദ്ധ ആവശ്യമായ തീർപ്പാകാത്ത കണ്ടെത്തലുകളില്ല."
     },
     "findingRow": {
@@ -2030,7 +2035,7 @@
     "remediationUnavailable": {
       "findingNotFound": "സുരക്ഷാ കണ്ടെത്തൽ ഇനി നിലവിലില്ല.",
       "approvalRequired": "സ്വയമേവയുള്ള പരിഹാരത്തിന് അംഗീകാരം ആവശ്യമാണ്. അംഗീകാരം നൽകാൻ പരിഹാരം നേരിട്ട് ആരംഭിക്കുക.",
-      "findingNotOpen": "ഈ കണ്ടെത്തൽ ഇനി തീർപ്പാകാത്ത നിലയിലല്ല.",
+      "findingNotOpen": "ഈ കണ്ടെത്തൽ ഇനി ഓപ്പണിൽ അല്ല.",
       "repoNotInScope": "സുരക്ഷാ ഏജന്റിനായി ഈ റിപ്പോസിറ്ററി തിരഞ്ഞെടുത്തിട്ടില്ല.",
       "analysisRequired": "പരിഹാരം ആരംഭിക്കുന്നതിന് മുമ്പ് കോഡ്ബേസ് വിശകലനം ചെയ്യുക.",
       "staleAnalysis": "വിശകലനത്തിന് ശേഷം കണ്ടെത്തലിൽ മാറ്റമുണ്ടായി. പരിഹാരം ആരംഭിക്കുന്നതിന് മുമ്പ് വീണ്ടും വിശകലനം നടത്തുക.",
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "മോഡൽ തിരഞ്ഞെടുക്കുക",
       "noModelsDescription": "തിരഞ്ഞെടുക്കാൻ മോഡലുകൾ ലഭ്യമല്ല.",
+      "allUnavailableTitle": "ഒരു മോഡലും ഉപയോഗിക്കാൻ കഴിയില്ല",
+      "allUnavailableDescription": "ഒരു പ്രൊവൈഡർ കീ ചേർത്ത ശേഷം വീണ്ടും ശ്രമിക്കുക.",
       "favorites": "പ്രിയപ്പെട്ടവ"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "ഓർഗനൈസേഷന്റെ പേര് മാറ്റുക",
-      "renamePlaceholder": "ഓർഗനൈസേഷന്റെ പേര്",
+      "renamePlaceholder": "ഒരു ഓർഗനൈസേഷന്റെ പേര് നൽകുക",
       "balance": "ബാലൻസ്",
       "plan": "പ്ലാൻ",
       "planTeams": "Teams",
@@ -4987,6 +4994,7 @@
     "providersDescription": "ഈ ഓർഗനൈസേഷനിൽ Kilo അതിലേക്ക് റൂട്ട് ചെയ്യുന്നത് നിർത്താൻ ഒരു പ്രൊവൈഡർ ഓഫാക്കുക.",
     "providersNeedCatalog": "മുഴുവൻ മോഡൽ കാറ്റലോഗ് ലോഡ് ആകുന്നതുവരെ പ്രൊവൈഡർ സ്വിച്ചുകൾ വായിക്കാൻ മാത്രമായിരിക്കും. അവ എഡിറ്റ് ചെയ്യാൻ മുകളിലുള്ള വീണ്ടും ശ്രമിക്കുക ടാപ്പ് ചെയ്യുക.",
     "providersEmpty": "ഈ തിരയലുമായി പൊരുത്തപ്പെടുന്ന പ്രൊവൈഡർമാരില്ല.",
+    "providersNone": "ഈ ഓർഗനൈസേഷനിൽ ലഭ്യമായ പ്രൊവൈഡർമാരില്ല.",
     "allowAllShown": "കാണിച്ചിരിക്കുന്ന എല്ലാം അനുവദിക്കുക",
     "denyAllShown": "കാണിച്ചിരിക്കുന്ന എല്ലാം നിരസിക്കുക",
     "gatewaysDescription": "Kilo മോഡൽ അഭ്യർത്ഥനകൾ Vercel AI Gateway അല്ലെങ്കിൽ OpenRouter വഴി റൂട്ട് ചെയ്യുന്നു. പ്രവർത്തനരഹിതമാക്കിയ ഗേറ്റ്വേ ആ അഭ്യർത്ഥനകൾ പരാജയപ്പെടുത്തുന്നു.",

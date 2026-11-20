@@ -7,6 +7,8 @@ import {
   authorizedGrantsSchema,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
+  RUN_CODE_UNSUPPORTED_ERROR,
+  UNSERVED_BROWSER_TOOL_NAMES,
 } from '../browser-agent-checks';
 import type { BrowserCaller } from '../browser-caller';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
@@ -325,6 +327,14 @@ export const createRuntimeBrowserBridge = ({
         tabId,
         toolName: parsed.name,
       })
+      // A take-over that lands before the tool runs surfaces as the tab session's thrown guard error: same answer as a result.
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.message === TAB_TAKEN_ERROR) {
+          throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabTaken, TAB_TAKEN_ERROR);
+        }
+
+        throw error;
+      })
       // Turn end: the lease goes with the session's last call on this tab, its refs stay, and its other tabs keep theirs.
       .finally(() => {
         const remaining = (callsInFlight.get(flightKey) ?? 1) - 1;
@@ -537,6 +547,14 @@ export const createRuntimeBrowserBridge = ({
       await runtime().restoreSessions();
       assertLive(input.sessionHandle);
 
+      // Nothing can run it here: answered before the gate, so the CLI never asks for a grant it could not use.
+      if (parsed.data.name === 'browser_run_code_unsafe') {
+        throw new LocalAgentRpcError(
+          LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+          RUN_CODE_UNSUPPORTED_ERROR
+        );
+      }
+
       const existing = await targetTab(input.sessionHandle);
 
       // An agent gets its own tab rather than taking the user's; only the two tools that can start one do.
@@ -561,7 +579,11 @@ export const createRuntimeBrowserBridge = ({
     listTools: () =>
       Promise.resolve({
         contractSha: BROWSER_TOOL_CONTRACT_SHA,
-        tools: BROWSER_TOOL_CONTRACT.map(tool => ({
+        // The contract stays verbatim — its SHA is of the pinned upstream `tools/list` and the handshake compares it —
+        // But a tool no backend here can run is not offered: an offer costs a turn the call can only refuse.
+        tools: BROWSER_TOOL_CONTRACT.filter(
+          tool => !UNSERVED_BROWSER_TOOL_NAMES.has(tool.name)
+        ).map(tool => ({
           inputSchema: tool.inputSchema,
           name: tool.name,
           readOnly: tool.readOnly,

@@ -19,7 +19,9 @@
     "presenceStatus": "Abasingathi: {{connection}}",
     "commandStatus": "Ukulethwa komyalo: {{status}}",
     "delivered": "Kulethiwe",
-    "expired": "Kuphelelwe yisikhathi"
+    "expired": "Kuphelelwe yisikhathi",
+    "recoveryGaps_one": "Ingxenye {{displayCount}} yalo mbhalo ilahlekile.",
+    "recoveryGaps_other": "Izingxenye {{displayCount}} zalo mbhalo zilahlekile."
   },
   "common": {
     "manageOnWeb": "Phatha kuwebhu",
@@ -963,6 +965,8 @@
       "pendingComment": "amazwana angakathunyelwa",
       "pendingComment_other": "amazwana angakathunyelwa",
       "submitCountOfTotal": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
+      "submitCountOfTotal_one": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
+      "submitCountOfTotal_other": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
       "submitReview": "Thumela umbiko wokuhlola",
       "partialPostedFresh": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",
       "partialPostedFresh_one": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "Landela i-REVIEW.md",
     "followReviewMdSubtitle": "Landela imiyalo yamafayela e-REVIEW.md enqolobaneni ngayinye yekhodi",
     "bitbucket": {
-      "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma."
+      "notConnectedReadOnly": "I-Bitbucket ayixhunyiwe. Abanikazi benhlangano, abalawuli, nabaphathi bezinkokhelo kuphela abangayixhuma.",
+      "notConnectedReadOnlyPlan": "Isilingo senhlangano siphelile, ngakho umnikazi kufanele abuyekeze ukukhokhela ku-kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
@@ -1839,7 +1844,7 @@
       "couldNotLoadMore": "Asikwazanga ukulayisha okunye okutholakele.",
       "noMatchesTitle": "Akukho okutholakele okuhambisana nezihlungi",
       "noMatchesDescription": "Zama ukulungisa noma ukusula izihlungi ezikhethiwe.",
-      "emptyTitle": "Akukho okutholakele okungakaxazululwa",
+      "emptyTitle": "Akukho okutholakele okuvulekile",
       "emptyDescription": "Akukho okutholakele okungakaxazululwa okudinga ukunakwa njengamanje."
     },
     "findingRow": {
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "Khetha imodeli",
       "noModelsDescription": "Awekho amamodeli ongawakhetha.",
+      "allUnavailableTitle": "Awekho amamodeli angasetshenziswa",
+      "allUnavailableDescription": "Engeza ukhiye womhlinzeki bese uzama futhi.",
       "favorites": "Okuthandwayo"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Qamba kabusha inhlangano",
-      "renamePlaceholder": "Igama lenhlangano",
+      "renamePlaceholder": "Faka igama lenhlangano",
       "balance": "Ibhalansi",
       "plan": "Uhlelo",
       "planTeams": "Teams",
@@ -4987,6 +4994,7 @@
     "providersDescription": "Cisha umhlinzeki ukuze uvimbe i-Kilo ekudluliseleni izicelo kuwo kule nhlangano.",
     "providersNeedCatalog": "Amaswishi abahlinzeki ahlala engokufunda kuphela kuze kulayishwe ikhathalogi ephelele yamamodeli. Thepha Zama futhi ngenhla ukuze uwahlele.",
     "providersEmpty": "Abekho abahlinzeki abahambisana nalokhu kusesha.",
+    "providersNone": "Akukho bahlinzeki abatholakalayo kule nhlangano.",
     "allowAllShown": "Vumela konke okubonisiwe",
     "denyAllShown": "Nqaba konke okubonisiwe",
     "gatewaysDescription": "I-Kilo idlulisela izicelo zamamodeli nge-Vercel AI Gateway noma nge-OpenRouter. Isango elikhutshaziwe lehluleka lezo zicelo.",

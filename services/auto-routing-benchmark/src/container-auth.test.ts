@@ -646,7 +646,7 @@ it('bounds response completion after persisting output without blocking shutdown
 });
 
 it.each(['http_error', 'network_error', 'timeout'] as const)(
-  'retries a transient callback %s before answering without rerunning the CLI',
+  'answers after a transient callback %s and keeps delivering without rerunning the CLI',
   async category => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const fetch = vi
@@ -665,7 +665,7 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
     mocks.children[0].emit('close', 0);
     await flushServer();
     expect(fetch).toHaveBeenCalledOnce();
-    expect(pending.res.end).not.toHaveBeenCalled();
+    expect((await pending.done).status).toBe(200);
     expect(console.log).toHaveBeenCalledWith(
       JSON.stringify({
         event: 'benchmark_container_result_delivery_failed',
@@ -675,8 +675,9 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
         category,
       })
     );
+    stopServer();
+    expect(mocks.exit).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1_000);
-    expect((await pending.done).status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch.mock.calls[1][1].body).toBe(fetch.mock.calls[0][1].body);
     expect(console.log).toHaveBeenCalledWith(
@@ -698,13 +699,12 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
       })
     );
     expect(mocks.spawn).toHaveBeenCalledOnce();
-    stopServer();
     expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
   }
 );
 
 it.each(['http_error', 'network_error', 'timeout'] as const)(
-  'bounds callback %s retries and logs safe execution correlation before shutdown',
+  'retries callback %s delivery for about five minutes and logs safe execution correlation',
   async category => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -734,18 +734,16 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
     await flushServer();
     stopServer();
     expect(fetch).toHaveBeenCalledOnce();
-    expect(mocks.exit).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(999);
-    expect(fetch).toHaveBeenCalledOnce();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(mocks.exit).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1_999);
-    expect(fetch).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(fetch).toHaveBeenCalledTimes(3);
     expect((await pending.done).status).toBe(200);
-    expect(timeout).toHaveBeenCalledTimes(3);
+    const retryDelaysMs = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 45_000, 60_000, 60_000];
+    for (const [index, delayMs] of retryDelaysMs.entries()) {
+      expect(mocks.exit).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(delayMs - 1);
+      expect(fetch).toHaveBeenCalledTimes(index + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetch).toHaveBeenCalledTimes(index + 2);
+    }
+    expect(timeout).toHaveBeenCalledTimes(10);
     expect(timeout).toHaveBeenCalledWith(10_000);
     expect(error).toHaveBeenCalledExactlyOnceWith(
       JSON.stringify({
@@ -753,15 +751,15 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
         ...caseContext,
         category,
         outcome: 'completed',
-        attempt: 3,
-        attempts: 3,
+        attempt: 10,
+        attempts: 10,
       })
     );
     const logged = [...vi.mocked(console.log).mock.calls, ...error.mock.calls].flat().join('\n');
     for (const value of privateValues) expect(logged).not.toContain(value);
     expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(fetch).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(fetch).toHaveBeenCalledTimes(10);
     expect(mocks.spawn).toHaveBeenCalledOnce();
   }
 );

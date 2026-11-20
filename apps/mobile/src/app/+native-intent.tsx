@@ -12,6 +12,7 @@ import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { loginFixtureRoute } from '@/lib/login-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handleOrganizationInviteMemberFixturePath } from '@/lib/organization-invite-member-fixture';
+import { nativeRemoteFixtureRoute } from '@/lib/native-remote-fixture';
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
 import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
 import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
@@ -50,6 +51,13 @@ export function redirectSystemPath({
   // Dev-only glanceable fixture links (`kiloapp:///dev/glanceable-fixture/<name>`).
   if (__DEV__ && handleGlanceableFixturePath(path)) {
     return null;
+  }
+  // Dev-only native-remote transcript fixtures (`kiloapp:///dev/native-remote-
+  // fixture/reconnecting|gaps`): the handler records the state and returns the
+  // demo route, so the resolver lands on the screen with the fixture active.
+  const nativeRemoteFixture = nativeRemoteFixtureRoute(path);
+  if (nativeRemoteFixture) {
+    return nativeRemoteFixture;
   }
   // Dev-only Home fixture links (`kiloapp:///dev/home-fixture/<name>`).
   if (__DEV__ && handleHomeFixturePath(path)) {

@@ -19,7 +19,9 @@
     "presenceStatus": "ஹோஸ்ட்கள்: {{connection}}",
     "commandStatus": "கட்டளை வழங்கல்: {{status}}",
     "delivered": "வழங்கப்பட்டது",
-    "expired": "காலாவதியானது"
+    "expired": "காலாவதியானது",
+    "recoveryGaps_one": "இந்த உரைநகலின் {{displayCount}} பகுதி காணவில்லை.",
+    "recoveryGaps_other": "இந்த உரைநகலின் {{displayCount}} பகுதிகள் காணவில்லை."
   },
   "common": {
     "manageOnWeb": "இணையத்தில் நிர்வகிக்கவும்",
@@ -963,6 +965,8 @@
       "pendingComment": "நிலுவையிலுள்ள கருத்துகள்",
       "pendingComment_other": "நிலுவையிலுள்ள கருத்துகள்",
       "submitCountOfTotal": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
+      "submitCountOfTotal_one": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
+      "submitCountOfTotal_other": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
       "submitReview": "மதிப்பாய்வைச் சமர்ப்பிக்கவும்",
       "partialPostedFresh": "இடுகையிட்ட கருத்துகள்: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "இடுகையிட்ட கருத்துகள்: {{displayFreshCount}}. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "REVIEW.md-ஐப் பின்பற்றவும்",
     "followReviewMdSubtitle": "ஒவ்வொரு களஞ்சியத்தின் REVIEW.md கோப்பில் உள்ள வழிமுறைகளைப் பின்பற்றவும்",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket இணைக்கப்படவில்லை. நிறுவன உரிமையாளர்கள், நிர்வாகிகள் மற்றும் கட்டண மேலாளர்கள் மட்டுமே அதை இணைக்க முடியும்."
+      "notConnectedReadOnly": "Bitbucket இணைக்கப்படவில்லை. நிறுவன உரிமையாளர்கள், நிர்வாகிகள் மற்றும் கட்டண மேலாளர்கள் மட்டுமே அதை இணைக்க முடியும்.",
+      "notConnectedReadOnlyPlan": "நிறுவனத்தின் சோதனைக் காலம் முடிந்துவிட்டது, எனவே உரிமையாளர் kilo.ai இல் பில்லிங்கைப் புதுப்பிக்க வேண்டும்."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-இன் Bitbucket இணைப்பு கணினியிலிருந்து இணையத்தில் நிர்வகிக்கப்படுகிறது.",
@@ -1839,7 +1844,7 @@
       "couldNotLoadMore": "மேலும் சிக்கல்களை ஏற்ற முடியவில்லை.",
       "noMatchesTitle": "வடிப்பான்களுக்குப் பொருந்தும் சிக்கல்கள் இல்லை",
       "noMatchesDescription": "தேர்ந்தெடுத்த வடிப்பான்களை மாற்றவும் அல்லது நீக்கவும்.",
-      "emptyTitle": "நிலுவைச் சிக்கல்கள் இல்லை",
+      "emptyTitle": "திறந்த சிக்கல்கள் இல்லை",
       "emptyDescription": "இப்போது கவனம் தேவைப்படும் நிலுவைச் சிக்கல்கள் இல்லை."
     },
     "findingRow": {
@@ -1901,7 +1906,7 @@
         "findingDismissed": "நிராகரிக்கப்பட்டது",
         "findingSeverityChanged": "தீவிரத்தன்மை மாற்றப்பட்டது",
         "findingStatusChange": "நிலை மாற்றப்பட்டது",
-        "findingSuperseded": "மாற்றியமைக்கப்பட்டது",
+        "findingSuperseded": "மாற்றீடு செய்யப்பட்டது",
         "remediationBlocked": "சரிசெய்தல் தடுக்கப்பட்டது",
         "remediationCancelled": "ரத்து செய்யப்பட்டது",
         "remediationFailed": "சரிசெய்தல் தோல்வியடைந்தது",
@@ -2030,7 +2035,7 @@
     "remediationUnavailable": {
       "findingNotFound": "பாதுகாப்புச் சிக்கல் இனி இல்லை.",
       "approvalRequired": "தானியங்கி சரிசெய்தலுக்கு ஒப்புதல் தேவை. ஒப்புதல் அளிக்கச் சரிசெய்தலைக் கைமுறையாகத் தொடங்கவும்.",
-      "findingNotOpen": "இந்தச் சிக்கல் இனி நிலுவையில் இல்லை.",
+      "findingNotOpen": "இந்தச் சிக்கல் இனி திறந்ததாக இல்லை.",
       "repoNotInScope": "பாதுகாப்பு முகவருக்காக இந்தக் களஞ்சியம் தேர்ந்தெடுக்கப்படவில்லை.",
       "analysisRequired": "திருத்தத்தைத் தொடங்கும் முன் நிரல்தொகுப்பைப் பகுப்பாய்வு செய்யவும்.",
       "staleAnalysis": "பகுப்பாய்வுக்குப் பிறகு சிக்கல் மாறியுள்ளது. சரிசெய்தலைத் தொடங்கும் முன் பகுப்பாய்வை மீண்டும் இயக்கவும்.",
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "மாதிரியைத் தேர்ந்தெடுக்கவும்",
       "noModelsDescription": "தேர்ந்தெடுக்கக்கூடிய மாதிரிகள் எதுவும் இல்லை.",
+      "allUnavailableTitle": "எந்த மாதிரியையும் பயன்படுத்த முடியாது",
+      "allUnavailableDescription": "வழங்குநர் விசையைச் சேர்த்து, மீண்டும் முயற்சிக்கவும்.",
       "favorites": "பிடித்தவை"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "நிறுவனத்தின் பெயரை மாற்றவும்",
-      "renamePlaceholder": "நிறுவனத்தின் பெயர்",
+      "renamePlaceholder": "நிறுவனத்தின் பெயரை உள்ளிடவும்",
       "balance": "இருப்பு",
       "plan": "திட்டம்",
       "planTeams": "Teams",
@@ -4987,6 +4994,7 @@
     "providersDescription": "ஒரு வழங்குநரை அணைத்தால் இந்த நிறுவனத்திற்கு Kilo அதற்கு வழிமாற்றுவதை நிறுத்தும்.",
     "providersNeedCatalog": "முழு மாடல் பட்டியல் ஏற்றப்படும் வரை வழங்குநர் ஸ்விட்சுகள் படிக்க மட்டுமே. அவற்றைத் திருத்த மேலே உள்ள மீண்டும் முயற்சிக்கவும் என்பதைத் தட்டவும்.",
     "providersEmpty": "இந்தத் தேடலுக்கு எந்த வழங்குநரும் பொருந்தவில்லை.",
+    "providersNone": "இந்த நிறுவனத்திற்கு எந்த வழங்குநரும் கிடைக்கவில்லை.",
     "allowAllShown": "காட்டப்பட்ட அனைத்தையும் அனுமதி",
     "denyAllShown": "காட்டப்பட்ட அனைத்தையும் மறு",
     "gatewaysDescription": "Kilo மாடல் கோரிக்கைகளை Vercel AI Gateway அல்லது OpenRouter வழியாக வழிமாற்றுகிறது. முடக்கப்பட்ட நுழைவாயில் அந்தக் கோரிக்கைகளைத் தோல்வியடையச் செய்யும்.",

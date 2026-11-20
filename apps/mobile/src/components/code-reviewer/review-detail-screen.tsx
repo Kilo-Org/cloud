@@ -9,10 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import {
-  isCancellableReviewStatus,
-  isRetriggerableReviewStatus,
-} from '@kilocode/app-shared/code-review';
+import { canRetriggerReview, isCancellableReviewStatus } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-rows';
 import {
@@ -95,13 +92,14 @@ export function ReviewDetailScreen({
   // review, without an effect that would also fire on a plain re-render.
   const [transcriptReviewId, setTranscriptReviewId] = useState<string | null>(null);
   const loadedReview = data?.success ? data.review : undefined;
-  // Only a retriggerable automatic review needs the reviewer config. Bitbucket
-  // is org-only, and a personal Bitbucket query would throw in toPersonalPlatform.
+  // Only a retriggerable automatic review needs the reviewer config, and a
+  // review a newer commit replaced can never be retried. Bitbucket is org-only,
+  // and a personal Bitbucket query would throw in toPersonalPlatform.
   const reviewPlatform = loadedReview?.platform ?? 'github';
   const configQueryEnabled =
     loadedReview != null &&
     loadedReview.manual_config == null &&
-    isRetriggerableReviewStatus(loadedReview.status) &&
+    canRetriggerReview(loadedReview) &&
     !(isPersonal(scope) && reviewPlatform === 'bitbucket');
   const reviewConfig = useReviewConfig(scope, reviewPlatform, { enabled: configQueryEnabled });
 
@@ -218,7 +216,7 @@ export function ReviewDetailScreen({
   const { review, tokenUsage } = data;
   const meta = statusMeta(review.status);
   const canCancel = isCancellableReviewStatus(review.status);
-  const retryAction = isRetriggerableReviewStatus(review.status)
+  const retryAction = canRetriggerReview(review)
     ? selectRetryAction({
         hasManualConfig: review.manual_config != null,
         configPending: configQueryEnabled && reviewConfig.isPending,
@@ -461,6 +459,7 @@ export function ReviewDetailScreen({
 
           {retryAction === 'retry' ? (
             <Button
+              testID="review-detail-retry"
               variant="secondary"
               loading={retriggerReview.isPending}
               disabled={retriggerReview.isPending}

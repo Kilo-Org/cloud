@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CODE_REVIEW_STATUS_LABELS,
   CODE_REVIEW_STATUSES,
+  canRetriggerReview,
   hasInFlightReview,
   isCancellableReviewStatus,
   isInFlightReviewStatus,
@@ -48,6 +49,37 @@ describe('isRetriggerableReviewStatus', () => {
     expect(isRetriggerableReviewStatus('queued')).toBe(false);
     expect(isRetriggerableReviewStatus('running')).toBe(false);
     expect(isRetriggerableReviewStatus('completed')).toBe(false);
+  });
+});
+
+describe('canRetriggerReview', () => {
+  it('is false for a review cancelled because a newer commit replaced it', () => {
+    expect(canRetriggerReview({ status: 'cancelled', terminal_reason: 'superseded' })).toBe(false);
+  });
+
+  it('is true for a cancelled review the user stopped', () => {
+    expect(canRetriggerReview({ status: 'cancelled', terminal_reason: 'user_cancelled' })).toBe(
+      true
+    );
+  });
+
+  it('is true for a cancelled review with no terminal reason', () => {
+    expect(canRetriggerReview({ status: 'cancelled', terminal_reason: null })).toBe(true);
+    expect(canRetriggerReview({ status: 'cancelled', terminal_reason: undefined })).toBe(true);
+  });
+
+  it('is true for failed and interrupted reviews with a retryable reason', () => {
+    expect(canRetriggerReview({ status: 'failed', terminal_reason: 'timeout' })).toBe(true);
+    expect(canRetriggerReview({ status: 'interrupted', terminal_reason: 'interrupted' })).toBe(
+      true
+    );
+  });
+
+  it('is false for pending, queued, running, and completed', () => {
+    expect(canRetriggerReview({ status: 'pending', terminal_reason: null })).toBe(false);
+    expect(canRetriggerReview({ status: 'queued', terminal_reason: null })).toBe(false);
+    expect(canRetriggerReview({ status: 'running', terminal_reason: null })).toBe(false);
+    expect(canRetriggerReview({ status: 'completed', terminal_reason: null })).toBe(false);
   });
 });
 

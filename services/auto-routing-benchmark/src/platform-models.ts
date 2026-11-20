@@ -21,7 +21,6 @@ export const BenchmarkModelCatalogSchema = z.object({
       id: z.string().trim().min(1),
       alias_target: z.string().trim().min(1).optional(),
       description: z.string().optional(),
-      inference_provider_ids: z.array(z.string()).optional(),
       supported_parameters: z.array(z.string()).optional(),
       context_length: z.number().nullable().catch(null).optional(),
       max_completion_tokens: z.number().nullable().catch(null).optional(),
@@ -121,14 +120,6 @@ function resolveCatalogModel(
   return model?.id.startsWith('~') && model.alias_target
     ? (modelsById.get(model.alias_target) ?? model)
     : model;
-}
-
-export function catalogModelProviders(
-  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
-  modelId: string
-): string[] {
-  const modelsById = new Map(catalog.data.map(model => [model.id, model]));
-  return [...new Set(resolveCatalogModel(modelId, modelsById)?.inference_provider_ids ?? [])];
 }
 
 /** Expand only current catalog-supported reasoning controls, never saved effort aliases. */

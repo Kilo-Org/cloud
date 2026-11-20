@@ -19,7 +19,9 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Pengiriman perintah: {{status}}",
     "delivered": "Terkirim",
-    "expired": "Kedaluwarsa"
+    "expired": "Kedaluwarsa",
+    "recoveryGaps_one": "{{displayCount}} bagian transkrip ini tidak ada.",
+    "recoveryGaps_other": "{{displayCount}} bagian transkrip ini tidak ada."
   },
   "common": {
     "manageOnWeb": "Kelola di web",
@@ -695,7 +697,8 @@
     },
     "autoReviews": "Tinjauan otomatis",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya."
+      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
+      "notConnectedReadOnlyPlan": "Masa percobaan organisasi telah berakhir, jadi pemilik harus memperbarui penagihan di kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
@@ -2231,6 +2234,8 @@
     "modelPicker": {
       "title": "Pilih model",
       "noModelsDescription": "Tidak ada model yang dapat dipilih.",
+      "allUnavailableTitle": "Tidak ada model yang dapat digunakan",
+      "allUnavailableDescription": "Tambah kunci penyedia, lalu coba lagi.",
       "favorites": "Favorit"
     },
     "modelSelector": {
@@ -3234,6 +3239,8 @@
       "partialPostedStale_one": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "partialPostedStale_other": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "submitCountOfTotal": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
+      "submitCountOfTotal_one": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
+      "submitCountOfTotal_other": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
       "submitReview": "Kirim tinjauan",
       "blockedRequestChanges": "Tambahkan ringkasan atau setidaknya satu komentar untuk meminta perubahan.",
       "blockedComment": "Tambahkan ringkasan atau setidaknya satu komentar untuk mengirim tinjauan berupa komentar."
@@ -3443,7 +3450,7 @@
       "planStatusLapsed": " · Berakhir",
       "planEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif.",
       "manageBilling": "Kelola penagihan",
-      "renamePlaceholder": "Nama organisasi",
+      "renamePlaceholder": "Masukkan nama organisasi",
       "renameTitle": "Ganti nama organisasi"
     },
     "inviteMember": {
@@ -4987,6 +4994,7 @@
     "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
+    "providersNone": "Tidak ada penyedia yang tersedia untuk organisasi ini.",
     "allowAllShown": "Izinkan semua yang ditampilkan",
     "denyAllShown": "Tolak semua yang ditampilkan",
     "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",

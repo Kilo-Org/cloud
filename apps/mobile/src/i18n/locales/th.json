@@ -19,7 +19,9 @@
     "presenceStatus": "โฮสต์: {{connection}}",
     "commandStatus": "การส่งคำสั่ง: {{status}}",
     "delivered": "ส่งถึงแล้ว",
-    "expired": "หมดอายุแล้ว"
+    "expired": "หมดอายุแล้ว",
+    "recoveryGaps_one": "ส่วน {{displayCount}} ของบันทึกนี้หายไป",
+    "recoveryGaps_other": "ส่วน {{displayCount}} ของบันทึกนี้หายไป"
   },
   "common": {
     "manageOnWeb": "จัดการบนเว็บ",
@@ -963,6 +965,8 @@
       "pendingComment": "ความคิดเห็นที่รอส่ง",
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_one": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_other": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitReview": "ส่งรีวิว",
       "partialPostedFresh": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
       "partialPostedFresh_one": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้"
+      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
+      "notConnectedReadOnlyPlan": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้ว เจ้าของจึงต้องอัปเดตการเรียกเก็บเงินที่ kilo.ai"
     },
     "bitbucketConnect": {
       "managedOnWeb": "การเชื่อมต่อ Bitbucket ของ {{organization}} ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "เลือกโมเดล",
       "noModelsDescription": "ไม่มีโมเดลให้เลือก",
+      "allUnavailableTitle": "ไม่มีโมเดลใดใช้งานได้",
+      "allUnavailableDescription": "เพิ่มคีย์ผู้ให้บริการ แล้วลองอีกครั้ง",
       "favorites": "รายการโปรด"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "เปลี่ยนชื่อองค์กร",
-      "renamePlaceholder": "ชื่อองค์กร",
+      "renamePlaceholder": "กรอกชื่อองค์กร",
       "balance": "ยอดคงเหลือ",
       "plan": "แผน",
       "planTeams": "Teams",
@@ -4987,6 +4994,7 @@
     "providersDescription": "ปิดผู้ให้บริการเพื่อหยุดการกำหนดเส้นทางของ Kilo ไปยังผู้ให้บริการนั้นสำหรับองค์กรนี้",
     "providersNeedCatalog": "สวิตช์ผู้ให้บริการจะเป็นแบบอ่านอย่างเดียวจนกว่าแค็ตตาล็อกโมเดลทั้งหมดจะโหลดเสร็จ แตะลองอีกครั้งด้านบนเพื่อแก้ไข",
     "providersEmpty": "ไม่มีผู้ให้บริการที่ตรงกับการค้นหานี้",
+    "providersNone": "ไม่มีผู้ให้บริการที่พร้อมใช้งานสำหรับองค์กรนี้",
     "allowAllShown": "อนุญาตทั้งหมดที่แสดง",
     "denyAllShown": "ปฏิเสธทั้งหมดที่แสดง",
     "gatewaysDescription": "Kilo กำหนดเส้นทางคำขอของโมเดลผ่าน Vercel AI Gateway หรือ OpenRouter เกตเวย์ที่ปิดใช้งานจะทำให้คำขอเหล่านั้นล้มเหลว",

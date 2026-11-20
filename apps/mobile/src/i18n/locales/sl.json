@@ -19,7 +19,11 @@
     "presenceStatus": "Gostitelji: {{connection}}",
     "commandStatus": "Dostava ukaza: {{status}}",
     "delivered": "Dostavljeno",
-    "expired": "Poteklo"
+    "expired": "Poteklo",
+    "recoveryGaps_one": "Manjka {{displayCount}} del tega prepisa.",
+    "recoveryGaps_two": "Manjkata {{displayCount}} dela tega prepisa.",
+    "recoveryGaps_few": "Manjkajo {{displayCount}} deli tega prepisa.",
+    "recoveryGaps_other": "Manjka {{displayCount}} delov tega prepisa."
   },
   "common": {
     "manageOnWeb": "Upravljaj v spletu",
@@ -997,6 +1001,10 @@
       "pendingComment": "neoddanih komentarjev",
       "pendingComment_other": "neoddanih komentarjev",
       "submitCountOfTotal": "Pošlji {{displayFreshCount}} od {{displayTotalCount}} komentarjev",
+      "submitCountOfTotal_one": "Pošlji {{displayFreshCount}} od {{displayTotalCount}} komentarjev",
+      "submitCountOfTotal_two": "Pošlji {{displayFreshCount}} od {{displayTotalCount}} komentarjev",
+      "submitCountOfTotal_few": "Pošlji {{displayFreshCount}} od {{displayTotalCount}} komentarjev",
+      "submitCountOfTotal_other": "Pošlji {{displayFreshCount}} od {{displayTotalCount}} komentarjev",
       "submitReview": "Oddaj pregled",
       "partialPostedFresh": "Število objavljenih komentarjev: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Število objavljenih komentarjev: {{displayFreshCount}}. ",
@@ -1435,7 +1443,8 @@
     "followReviewMd": "Upoštevaj REVIEW.md",
     "followReviewMdSubtitle": "Upoštevaj navodila iz datotek REVIEW.md v posameznih skladiščih",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja."
+      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
+      "notConnectedReadOnlyPlan": "Preizkusna doba organizacije se je končala, zato mora lastnik posodobiti obračun na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
@@ -1794,7 +1803,7 @@
       "dueThisWeekDetail_few": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "dueThisWeekDetail_other": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "noDeadline": "Brez roka",
-      "reviewSlaAssignment": "Preglej dodeljene roke SLA",
+      "reviewSlaAssignment": "Preglej dodeljevanje rokov SLA",
       "allOpenFindingsTracked": "Spremljajo se vse odprte ugotovitve"
     },
     "dismiss": {
@@ -2888,6 +2897,8 @@
     "modelPicker": {
       "title": "Izbira modela",
       "noModelsDescription": "Na voljo ni nobenega modela.",
+      "allUnavailableTitle": "Nobenega modela ni mogoče uporabiti",
+      "allUnavailableDescription": "Dodaj ključ ponudnika in poskusi znova.",
       "favorites": "Priljubljeni"
     },
     "modelSelector": {
@@ -3741,7 +3752,7 @@
     },
     "hub": {
       "renameTitle": "Preimenuj organizacijo",
-      "renamePlaceholder": "Ime organizacije",
+      "renamePlaceholder": "Vnesite ime organizacije",
       "balance": "Stanje",
       "plan": "Načrt",
       "planTeams": "Teams",
@@ -5139,6 +5150,7 @@
     "providersDescription": "Izklopite ponudnika, da Kilo za to organizacijo preneha usmerjati vanj.",
     "providersNeedCatalog": "Stikala ponudnikov ostanejo samo za branje, dokler se ne naloži celoten katalog modelov. Če jih želite urejati, zgoraj tapnite Poskusi znova.",
     "providersEmpty": "Noben ponudnik ne ustreza temu iskanju.",
+    "providersNone": "Za to organizacijo ni na voljo nobenega ponudnika.",
     "allowAllShown": "Dovoli vse prikazane",
     "denyAllShown": "Zavrni vse prikazane",
     "gatewaysDescription": "Kilo usmerja zahteve modelov prek Vercel AI Gateway ali OpenRouter. Če je prehod onemogočen, te zahteve ne uspejo.",

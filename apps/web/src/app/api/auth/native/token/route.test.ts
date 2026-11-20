@@ -1718,7 +1718,6 @@ describe('POST /api/auth/native/token', () => {
       });
       // Must use the transactional combined function, not separate calls.
       expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
-        userId: fakeUser.id,
         userAgent: undefined,
         user: fakeUser,
         verification: expect.objectContaining({
@@ -1763,7 +1762,7 @@ describe('POST /api/auth/native/token', () => {
       });
       expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith(
         expect.objectContaining({
-          userId: fakeUser.id,
+          user: fakeUser,
           userAgent: undefined, // NextRequest has no user-agent header by default
         })
       );

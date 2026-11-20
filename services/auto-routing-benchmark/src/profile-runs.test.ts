@@ -441,8 +441,8 @@ describe('all-effort platform scheduling', () => {
     expect(batches.flat().map(row => row.variant)).toEqual(variants);
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: expect.any(String),
-      entries: variants.map(variant => ({ model: 'platform/a', variant, providers: [] })),
-      repetitions: 1,
+      entries: variants.map(variant => ({ model: 'platform/a', variant })),
+      repetitions: 3,
       caseIds: CURRENT_EFFICIENT_CASE_IDS,
       chunkSize: 1,
     });
@@ -482,12 +482,12 @@ describe('startRun — registry-backed decider runs', () => {
       env.BENCH_DB,
       result.runId,
       entries,
-      expect.objectContaining({ repetitions: 1 })
+      expect.objectContaining({ repetitions: 3 })
     );
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result.runId,
-      entries: entries.map(entry => ({ ...entry, providers: [] })),
-      repetitions: 1,
+      entries,
+      repetitions: 3,
       caseIds: CURRENT_EFFICIENT_CASE_IDS,
       chunkSize: 1,
     });
@@ -507,7 +507,7 @@ describe('startRun — registry-backed decider runs', () => {
       env.BENCH_DB,
       result.runId,
       entries,
-      expect.objectContaining({ repetitions: 1 })
+      expect.objectContaining({ repetitions: 3 })
     );
     // Dedup is the registry's job, so no run-level carry lookup happens.
     expect(getLatestSummariesByModel).not.toHaveBeenCalled();
@@ -543,7 +543,7 @@ describe('startRun — registry-backed decider runs', () => {
     expect(result.enqueuedModels).toBe(6);
     expect(scheduleRunChunks).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({ entries: entries.map(entry => ({ ...entry, providers: [] })) })
+      expect.objectContaining({ entries })
     );
   });
 
@@ -673,7 +673,6 @@ describe('decider run completion', () => {
       run_id: runId,
       model,
       variant: variant ?? '',
-      providers: '[]',
       rep: 0,
       chunk: 0,
       case_ids: JSON.stringify([DECIDER_CASES[0].id]),
@@ -1425,8 +1424,8 @@ describe('drainQueue', () => {
     expect(modelRows).toHaveLength(100);
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result!.runId,
-      entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
-      repetitions: 1,
+      entries: modelRows.map(row => ({ model: row.model, variant: null })),
+      repetitions: 3,
       caseIds: CURRENT_EFFICIENT_CASE_IDS,
       chunkSize: 1,
     });
@@ -1765,7 +1764,7 @@ describe('frontier router runs', () => {
     );
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result.runId,
-      entries: [{ model: 'platform/a', variant: null, providers: [] }],
+      entries: [{ model: 'platform/a', variant: null }],
       repetitions: 1,
       caseIds: FRONTIER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
@@ -2030,8 +2029,8 @@ it('reuses prior cases before delegating the complete durable chunk plan', async
   );
   expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
     runId: result.runId,
-    entries: [{ model: 'platform/a', variant: null, providers: [] }],
-    repetitions: 1,
+    entries: [{ model: 'platform/a', variant: null }],
+    repetitions: 3,
     caseIds: CURRENT_EFFICIENT_CASE_IDS,
     chunkSize: 1,
   });
@@ -2055,7 +2054,6 @@ it('dispatches every claim of one scheduler pass and stops when a pass claims no
     run_id: 'user-existing',
     model: 'platform/a',
     variant: 'high',
-    providers: '[]',
     rep: 2,
     chunk: 10,
     case_ids: JSON.stringify([DECIDER_CASES[10].id]),

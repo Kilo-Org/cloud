@@ -19,7 +19,9 @@
     "presenceStatus": "Hostet: {{connection}}",
     "commandStatus": "Dorëzimi i komandës: {{status}}",
     "delivered": "Dorëzuar",
-    "expired": "Skaduar"
+    "expired": "Skaduar",
+    "recoveryGaps_one": "Mungon {{displayCount}} pjesë e këtij transkripti.",
+    "recoveryGaps_other": "Mungojnë {{displayCount}} pjesë të këtij transkripti."
   },
   "common": {
     "manageOnWeb": "Menaxho në ueb",
@@ -963,6 +965,8 @@
       "pendingComment": "komente në pritje",
       "pendingComment_other": "komente në pritje",
       "submitCountOfTotal": "Dërgo {{displayFreshCount}} nga {{displayTotalCount}} komente",
+      "submitCountOfTotal_one": "Dërgo {{displayFreshCount}} nga {{displayTotalCount}} komente",
+      "submitCountOfTotal_other": "Dërgo {{displayFreshCount}} nga {{displayTotalCount}} komente",
       "submitReview": "Dërgo shqyrtimin",
       "partialPostedFresh": "Komente të postuara: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Komente të postuara: {{displayFreshCount}}. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "Ndiq REVIEW.md",
     "followReviewMdSubtitle": "Respekto skedarët e udhëzimeve REVIEW.md të çdo depoje",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nuk është i lidhur. Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin."
+      "notConnectedReadOnly": "Bitbucket nuk është i lidhur. Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
+      "notConnectedReadOnlyPlan": "Periudha e provës e organizatës ka përfunduar, prandaj pronari duhet të përditësojë faturimin në kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Lidhja me Bitbucket e {{organization}} menaxhohet në ueb nga një kompjuter.",
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "Zgjidh modelin",
       "noModelsDescription": "Nuk ka modele të disponueshme për të zgjedhur.",
+      "allUnavailableTitle": "Asnjë model nuk mund të përdoret",
+      "allUnavailableDescription": "Shto një çelës ofruesi, pastaj provo përsëri.",
       "favorites": "Të preferuarat"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Riemërto organizatën",
-      "renamePlaceholder": "Emri i organizatës",
+      "renamePlaceholder": "Fut emrin e organizatës",
       "balance": "Gjendja",
       "plan": "Plani",
       "planTeams": "Teams",
@@ -4987,6 +4994,7 @@
     "providersDescription": "Fikni një ofrues për të ndaluar Kilo që të rrugëzojë drejt tij për këtë organizatë.",
     "providersNeedCatalog": "Çelësat e ofruesve mbeten vetëm për lexim derisa të ngarkohet i gjithë katalogu i modeleve. Për t'i ndryshuar, prekni Riprovo më lart.",
     "providersEmpty": "Nuk ka ofrues që përputhen me këtë kërkim.",
+    "providersNone": "Nuk ka ofrues të disponueshëm për këtë organizatë.",
     "allowAllShown": "Lejo çdo gjë të shfaqur",
     "denyAllShown": "Ndal çdo gjë të shfaqur",
     "gatewaysDescription": "Kilo i rrugëzon kërkesat e modeleve përmes Vercel AI Gateway ose OpenRouter. Një portë e çaktivizuar i bën ato kërkesa të dështojnë.",

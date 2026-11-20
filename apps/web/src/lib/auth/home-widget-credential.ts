@@ -24,7 +24,9 @@ const claimsSchema = z
     widgetUserId: z.string().min(1),
     apiTokenPepper: z.string().nullable(),
     organizationId: z.uuid().nullable(),
-    deviceSessionId: z.uuid().optional(),
+    // Every minted credential carries a device session: the issuer refuses an
+    // authority without one, so the verifier always rechecks that session.
+    deviceSessionId: z.uuid(),
     env: z.string(),
     tokenPurpose: z.literal('home-widget'),
     aud: z.literal(HOME_WIDGET_AUDIENCE),
@@ -59,26 +61,24 @@ async function assertCurrentPrincipal(
   ) {
     unauthorized();
   }
-  if (claims.deviceSessionId !== undefined) {
-    const session = await db.query.device_sessions.findFirst({
-      where: and(
-        eq(device_sessions.id, claims.deviceSessionId),
-        eq(device_sessions.kilo_user_id, user.id),
-        isNull(device_sessions.revoked_at)
-      ),
-    });
-    if (!session) unauthorized();
-    // Sessions have no expires_at. Their live, unconsumed refresh credential
-    // defines the device-auth lifetime; widgets never consume or rotate it.
-    const refresh = await db.query.device_refresh_tokens.findFirst({
-      where: and(
-        eq(device_refresh_tokens.device_session_id, session.id),
-        isNull(device_refresh_tokens.consumed_at),
-        gt(device_refresh_tokens.expires_at, new Date().toISOString())
-      ),
-    });
-    if (!refresh) unauthorized();
-  }
+  const session = await db.query.device_sessions.findFirst({
+    where: and(
+      eq(device_sessions.id, claims.deviceSessionId),
+      eq(device_sessions.kilo_user_id, user.id),
+      isNull(device_sessions.revoked_at)
+    ),
+  });
+  if (!session) unauthorized();
+  // Sessions have no expires_at. Their live, unconsumed refresh credential
+  // defines the device-auth lifetime; widgets never consume or rotate it.
+  const refresh = await db.query.device_refresh_tokens.findFirst({
+    where: and(
+      eq(device_refresh_tokens.device_session_id, session.id),
+      isNull(device_refresh_tokens.consumed_at),
+      gt(device_refresh_tokens.expires_at, new Date().toISOString())
+    ),
+  });
+  if (!refresh) unauthorized();
   if (claims.organizationId !== null) {
     const organization = await db.query.organizations.findFirst({
       where: and(eq(organizations.id, claims.organizationId), isNull(organizations.deleted_at)),

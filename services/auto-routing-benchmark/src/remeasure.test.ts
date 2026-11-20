@@ -310,7 +310,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
 
     await scheduleRunChunks(db, {
       runId: 'remeasure',
-      entries: [{ ...entry, providers: [] }],
+      entries: [entry],
       repetitions: 1,
       caseIds: cases.map(c => c.id),
       chunkSize: 1,
@@ -346,7 +346,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     });
     await scheduleRunChunks(db, {
       runId: 'next',
-      entries: [{ ...entry, providers: [] }],
+      entries: [entry],
       repetitions: 1,
       caseIds: deciderCasesForRouter('efficient', MEASUREMENT_REVISION).map(c => c.id),
       chunkSize: 1,

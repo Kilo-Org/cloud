@@ -19,7 +19,9 @@
     "presenceStatus": "ホスト：{{connection}}",
     "commandStatus": "コマンドの配信：{{status}}",
     "delivered": "配信済み",
-    "expired": "期限切れ"
+    "expired": "期限切れ",
+    "recoveryGaps_one": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。",
+    "recoveryGaps_other": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。"
   },
   "common": {
     "manageOnWeb": "Webで管理",
@@ -695,7 +697,8 @@
     },
     "autoReviews": "自動レビュー",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。"
+      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。",
+      "notConnectedReadOnlyPlan": "組織のトライアルは終了したため、オーナーが kilo.ai で請求情報を更新する必要があります。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
@@ -1270,7 +1273,7 @@
       "couldNotLoad": "検出結果を読み込めませんでした。",
       "couldNotLoadMore": "検出結果を追加で読み込めませんでした。",
       "emptyDescription": "現在、対応が必要な未解決の検出結果はありません。",
-      "emptyTitle": "未解決の検出結果はありません",
+      "emptyTitle": "オープンな検出結果はありません",
       "noMatchesDescription": "フィルター条件を変更するか、解除してください。",
       "noMatchesTitle": "フィルター条件に一致する検出結果はありません"
     },
@@ -1473,7 +1476,7 @@
     "remediationUnavailable": {
       "findingNotFound": "このセキュリティの検出結果は存在しません。",
       "approvalRequired": "自動修復には承認が必要です。手動で修復を開始して承認してください。",
-      "findingNotOpen": "この検出結果は未解決の状態ではなくなりました。",
+      "findingNotOpen": "この検出結果はオープンではなくなりました。",
       "repoNotInScope": "このリポジトリはセキュリティエージェントの監視対象に選択されていません。",
       "analysisRequired": "修正を開始する前に、コードベースの分析を実行してください。",
       "staleAnalysis": "分析後に検出結果が変わりました。修復を開始する前に分析を再実行してください。",
@@ -2231,6 +2234,8 @@
     "modelPicker": {
       "title": "モデルの選択",
       "noModelsDescription": "選択できるモデルはありません。",
+      "allUnavailableTitle": "使用できるモデルはありません",
+      "allUnavailableDescription": "プロバイダーキーを追加してから、もう一度お試しください。",
       "favorites": "お気に入り"
     },
     "modelSelector": {
@@ -3234,6 +3239,8 @@
       "partialPostedStale_one": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "partialPostedStale_other": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitCountOfTotal_one": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitCountOfTotal_other": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信",
       "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",
       "blockedComment": "コメントとしてレビューを投稿するには、総評を入力するか、コメントを1件以上追加してください。"
@@ -3443,7 +3450,7 @@
       "planStatusLapsed": " · 終了",
       "planEnded": "組織のトライアルは終了し、有効なプランがありません。",
       "manageBilling": "請求を管理",
-      "renamePlaceholder": "組織名",
+      "renamePlaceholder": "組織名を入力してください",
       "renameTitle": "組織名を変更"
     },
     "inviteMember": {
@@ -4987,6 +4994,7 @@
     "providersDescription": "プロバイダーをオフにすると、この組織でKiloがそのプロバイダーへルーティングするのを停止します。",
     "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
     "providersEmpty": "この検索に一致するプロバイダーはありません。",
+    "providersNone": "この組織で利用できるプロバイダーはありません。",
     "allowAllShown": "表示されているすべてを許可",
     "denyAllShown": "表示されているすべてを拒否",
     "gatewaysDescription": "KiloはモデルリクエストをVercel AI GatewayまたはOpenRouter経由でルーティングします。無効なゲートウェイはそれらのリクエストを失敗させます。",

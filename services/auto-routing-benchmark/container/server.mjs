@@ -68,15 +68,22 @@ function runCaseSerialized(params) {
   });
 }
 
-const RESULT_DELIVERY_ATTEMPTS = 3;
+// Waits between delivery attempts: with a 10-second timeout per attempt, the ten
+// attempts span at most ~5.5 minutes, enough to outlast a few minutes of D1 overload.
+// The worker's CONTAINER_DELIVERY_WINDOW_MS (src/run.ts) waits for the whole schedule.
+const RESULT_DELIVERY_RETRY_DELAYS_MS = [
+  1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 45_000, 60_000, 60_000,
+];
+const RESULT_DELIVERY_ATTEMPTS = RESULT_DELIVERY_RETRY_DELAYS_MS.length + 1;
 const RESPONSE_COMPLETION_TIMEOUT_MS = 10_000;
 
 function logCaseEvent(event, context, details, level = 'log') {
   console[level](JSON.stringify({ event, ...context, ...details }));
 }
 
-// A successful HTTP write does not prove the worker persisted the result.
-async function deliverResult(callback, outcome, context) {
+// A successful HTTP write does not prove the worker persisted the result. Once the first
+// attempt fails, `onRetrying` lets the caller answer while later attempts continue.
+async function deliverResult(callback, outcome, context, onRetrying) {
   const body = JSON.stringify({ execution: callback.execution, outcome });
   let category = 'http_error';
   for (let attempt = 1; attempt <= RESULT_DELIVERY_ATTEMPTS; attempt++) {
@@ -120,7 +127,10 @@ async function deliverResult(callback, outcome, context) {
       category,
     });
     if (attempt < RESULT_DELIVERY_ATTEMPTS) {
-      await new Promise(resolve => setTimeout(resolve, attempt * 1_000));
+      if (attempt === 1) onRetrying();
+      await new Promise(resolve =>
+        setTimeout(resolve, RESULT_DELIVERY_RETRY_DELAYS_MS[attempt - 1])
+      );
     }
   }
   logCaseEvent(
@@ -469,19 +479,25 @@ const server = createServer(
             outcome: outcome.kind,
             category,
           });
+          let responded = false;
+          const respond = () => {
+            if (responded) return;
+            responded = true;
+            if (outcome.kind === 'completed') sendResponse(200, outcome.response);
+            else if (failure) sendResponse(500, { error: failure });
+            else sendResponse(503, { error: 'container is stopping' });
+            if (callback && !responseSettled) {
+              responseDeadline = setTimeout(() => {
+                finishRequest();
+                res.destroy();
+              }, RESPONSE_COMPLETION_TIMEOUT_MS);
+              responseDeadline.unref();
+            }
+          };
           if (callback && (outcome.kind === 'completed' || outcome.kind === 'not_started')) {
-            await deliverResult(callback, outcome, context);
+            await deliverResult(callback, outcome, context, respond);
           }
-          if (outcome.kind === 'completed') sendResponse(200, outcome.response);
-          else if (failure) sendResponse(500, { error: failure });
-          else sendResponse(503, { error: 'container is stopping' });
-          if (callback && !responseSettled) {
-            responseDeadline = setTimeout(() => {
-              finishRequest();
-              res.destroy();
-            }, RESPONSE_COMPLETION_TIMEOUT_MS);
-            responseDeadline.unref();
-          }
+          respond();
         } finally {
           if (callback) {
             pendingDeliveries -= 1;

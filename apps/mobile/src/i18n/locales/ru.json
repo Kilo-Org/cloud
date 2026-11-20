@@ -19,7 +19,11 @@
     "presenceStatus": "Хосты: {{connection}}",
     "commandStatus": "Доставка команды: {{status}}",
     "delivered": "Доставлено",
-    "expired": "Срок истёк"
+    "expired": "Срок истёк",
+    "recoveryGaps_one": "Отсутствует {{displayCount}} часть этой расшифровки.",
+    "recoveryGaps_few": "Отсутствуют {{displayCount}} части этой расшифровки.",
+    "recoveryGaps_many": "Отсутствует {{displayCount}} частей этой расшифровки.",
+    "recoveryGaps_other": "Отсутствуют {{displayCount}} части этой расшифровки."
   },
   "common": {
     "manageOnWeb": "Управление в веб-версии",
@@ -695,7 +699,8 @@
     },
     "autoReviews": "Автоматические проверки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не подключён. Подключить его могут только владельцы организации, администраторы и ответственные за оплату."
+      "notConnectedReadOnly": "Bitbucket не подключён. Подключить его могут только владельцы организации, администраторы и ответственные за оплату.",
+      "notConnectedReadOnlyPlan": "Пробный период организации закончился, поэтому владелец должен обновить данные об оплате на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Подключение Bitbucket для {{organization}} управляется в веб-версии с компьютера.",
@@ -1247,7 +1252,7 @@
       "dueThisWeekDetail_many": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
       "dueThisWeekDetail_other": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
       "noDeadline": "Без срока",
-      "reviewSlaAssignment": "Проверить назначенные сроки SLA",
+      "reviewSlaAssignment": "Проверить назначение сроков SLA",
       "allOpenFindingsTracked": "Все открытые уязвимости отслеживаются"
     },
     "dismiss": {
@@ -1456,7 +1461,7 @@
       "failedDescription": "Агент безопасности не смог завершить анализ.",
       "extractionFailedDescription": "Не удалось извлечь структурированный результат из технического отчёта.",
       "exploitableDescription": "Код приложения может вызвать уязвимую функцию.",
-      "notExploitable": "Уязвимый код недостижим",
+      "notExploitable": "Недостижимый путь",
       "notExploitableDescription": "В этом репозитории не найден путь выполнения кода, ведущий к уязвимой функции.",
       "unknown": "Требует проверки",
       "unknownDescription": "Не удалось установить, может ли код приложения вызвать уязвимую функцию.",
@@ -2283,7 +2288,9 @@
     "modelPicker": {
       "title": "Выбор модели",
       "favorites": "Избранное",
-      "noModelsDescription": "Нет доступных моделей."
+      "noModelsDescription": "Нет доступных моделей.",
+      "allUnavailableTitle": "Ни одну модель нельзя использовать",
+      "allUnavailableDescription": "Добавьте ключ провайдера и попробуйте снова."
     },
     "modelSelector": {
       "provider": "Провайдер {{id}}",
@@ -3346,6 +3353,10 @@
       "partialPostedStale_many": "Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
       "partialPostedStale_other": "Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
       "submitCountOfTotal": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
+      "submitCountOfTotal_one": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
+      "submitCountOfTotal_few": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
+      "submitCountOfTotal_many": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
+      "submitCountOfTotal_other": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
       "submitReview": "Отправить результаты проверки",
       "pendingComment_few": "неотправленных комментария",
       "pendingComment_many": "неотправленных комментариев",
@@ -3561,7 +3572,7 @@
       "planStatusLapsed": " · Закончился",
       "planEnded": "Пробный период организации закончился, и у неё нет активного плана.",
       "manageBilling": "Управление оплатой",
-      "renamePlaceholder": "Название организации",
+      "renamePlaceholder": "Введите название организации",
       "renameTitle": "Переименовать организацию"
     },
     "inviteMember": {
@@ -5139,6 +5150,7 @@
     "providersDescription": "Выключите провайдера, чтобы Kilo не маршрутизировал запросы к нему для этой организации.",
     "providersNeedCatalog": "Переключатели провайдеров доступны только для чтения, пока не загрузится полный каталог моделей. Нажмите Повторить выше, чтобы изменить их.",
     "providersEmpty": "Нет провайдеров, соответствующих этому поиску.",
+    "providersNone": "Для этой организации нет доступных провайдеров.",
     "allowAllShown": "Разрешить всё показанное",
     "denyAllShown": "Запретить всё показанное",
     "gatewaysDescription": "Kilo направляет запросы к моделям через Vercel AI Gateway или OpenRouter. Отключённый шлюз приводит к ошибке для этих запросов.",

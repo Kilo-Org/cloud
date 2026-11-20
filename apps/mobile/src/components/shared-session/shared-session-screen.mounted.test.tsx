@@ -81,7 +81,9 @@ function isolated(text: string): string {
 }
 
 function sharedByLabel(ownerName: string): string {
-  return i18n.t('sharedSession.sharedBy', { owner: ownerName });
+  // The screen isolates the interpolated owner inside the sentence, so a
+  // catalog that puts the placeholder first keeps the sentence's direction.
+  return i18n.t('sharedSession.sharedBy', { owner: isolated(ownerName) });
 }
 
 function sharedSession(metadata: Record<string, unknown>): Record<string, unknown> {
@@ -252,12 +254,17 @@ describe('shared session subtitle', () => {
 
     const subtitle = headers.rendered[0]?.subtitle ?? '';
     // The dropped branch leaves two segments and no pair of marks with nothing
-    // between them.
+    // between them: each of the two carries its own outer pair, and the sharer's
+    // inner pair holds the interpolated owner.
     expect(subtitle).toBe(
       [isolated(sharedByLabel('alice')), isolated(subtitleDateLabel(CREATED_AT))].join(' · ')
     );
-    expect(subtitle.split(ISOLATE_OPEN)).toHaveLength(3);
-    expect(subtitle.split(ISOLATE_CLOSE)).toHaveLength(3);
+    const segments = subtitle.split(' · ');
+    expect(segments).toHaveLength(2);
+    for (const segment of segments) {
+      expect(segment.startsWith(ISOLATE_OPEN)).toBe(true);
+      expect(segment.endsWith(ISOLATE_CLOSE)).toBe(true);
+    }
     renderer.unmount();
   });
 });

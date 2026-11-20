@@ -142,6 +142,7 @@
     "keepRunning": "Nie przerywaj",
     "newSession": "Nowa sesja",
     "noModelsAvailable": "Brak dostępnych modeli",
+    "modelRetires": "Wycofany {{date}}",
     "notFound": "Nie znaleziono elementu.",
     "online": "W sieci",
     "open": "Otwórz {{name}}",
@@ -185,7 +186,9 @@
     "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
     "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
-    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie."
+    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
+    "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "viewOnGitHub": "Zobacz PR w serwisie GitHub"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -509,7 +512,7 @@
     "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
     "changelogAreas": {
       "signIn": "Logowanie",
-      "profileOrganizations": "Profil i organizacje"
+      "profileOrganizations": "Profil oraz organizacje"
     }
   },
   "preferences": {
@@ -699,7 +702,6 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
       "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {
@@ -709,7 +711,7 @@
       "managedOnWebRepositories": "Wybierz repozytoria dla {{organization}} w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
-      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go na następnym ekranie.",
+      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego i wklej go na następnym ekranie.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego",
       "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
@@ -751,9 +753,9 @@
     },
     "providerConnect": {
       "description": "Skonfiguruj połączenie z Kilo ({{label}}), aby automatycznie przeglądać PR.",
-      "githubApp": "Aplikacja GitHub",
+      "githubApp": "aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
-      "gitlabAccount": "Konto GitLab",
+      "gitlabAccount": "konto GitLab",
       "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie."
     },
     "reviewDetail": {
@@ -2864,7 +2866,6 @@
       "skipped_few": "pominięte: {{displayCount}}",
       "skipped_many": "pominięte: {{displayCount}}",
       "title": "Kontrole",
-      "viewOnGitHub": "Zobacz PR w serwisie GitHub",
       "checkDetails": "szczegóły kontroli"
     },
     "composer": {
@@ -2925,6 +2926,11 @@
       "commentActions": "Opcje komentarza",
       "comment": "{{displayCount}} komentarza",
       "comment_other": "{{displayCount}} komentarza",
+      "conversationTruncated": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_one": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_few": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_many": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_other": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
       "couldNotLoad": "Nie udało się wczytać dyskusji.",
       "couldNotLoadMore": "Nie udało się wczytać kolejnych komentarzy.",
       "loadMoreComments": "Wczytaj kolejne komentarze",
@@ -5010,12 +5016,15 @@
     "inputDescription": "Skanuje wszystkie dane wejściowe za pomocą Enkrypt AI, w tym wyniki narzędzi. Gdy Enkrypt jest niedostępny, żądania są wysyłane bez skanowania zamiast być odrzucane.",
     "outputTitle": "Zabezpieczenia danych wyjściowych",
     "outputDescription": "Skanuje odpowiedzi za pomocą Enkrypt AI, zanim członkowie je otrzymają. Wyłączone, chyba że je włączysz.",
+    "outputUnavailable": "Kilo nie włączył skanowania danych wyjściowych dla tej organizacji, więc odpowiedzi nie są sprawdzane i nie ma tu nic do ustawienia. Skontaktuj się z {{supportEmail}}, aby o to poprosić.",
     "detectorsHint": "Blokuj odrzuca oznaczone żądanie. Tylko rejestruj zapisuje je bez opóźniania żądania.",
     "detectorsHintOutput": "Blokuj powoduje niepowodzenie oznaczonej odpowiedzi. Tylko rejestruj zapisuje ją bez opóźniania odpowiedzi.",
     "choiceLog": "Tylko rejestruj",
     "applyTo": "Zastosuj do",
     "applyToAllMembers": "Wszyscy członkowie",
     "applyKiloDefault": "Zastosuj domyślne ustawienia Kilo",
+    "applyKiloDefaultEnglishNote": "Tekst domyślnej polityki Kilo jest w języku angielskim, ponieważ Kilo Gateway stosuje go dokładnie tak, jak został zapisany.",
+    "applyKiloDefaultReplaceMessage": "Domyślna polityka Kilo jest napisana w języku angielskim i zastępuje to, co ustawiono w Naruszenie polityki. Tekstu wpisanego w polu tekstu polityki nie można odzyskać.",
     "invalidSavedTitle": "Nie można odczytać zapisanych ustawień detektora danych wejściowych",
     "invalidSavedBody": "Żądania są blokowane, dopóki detektory danych wejściowych nie zostaną zapisane ponownie. Poniższe detektory zaczynają od domyślnych ustawień Kilo.",
     "invalidSavedOutputTitle": "Nie można odczytać zapisanych ustawień detektora danych wyjściowych",

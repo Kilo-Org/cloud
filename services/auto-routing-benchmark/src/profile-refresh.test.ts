@@ -61,7 +61,7 @@ beforeEach(() => {
 afterEach(() => sqlite.close());
 
 describe('targeted benchmark refresh', () => {
-  it('invalidates only selected current pairs and leaves unavailable models failed', async () => {
+  it('invalidates only selected current pairs and fails unavailable models permanently', async () => {
     seedProfile('vendor/selected');
     seedProfile('vendor/removed');
     seedProfile('vendor/other');
@@ -87,6 +87,13 @@ describe('targeted benchmark refresh', () => {
       refreshed: [{ model: 'vendor/selected', variant: null }],
       unavailable: [{ model: 'vendor/removed', variant: null }],
       skipped: [],
+      refusals: [
+        {
+          entry: { model: 'vendor/removed', variant: null },
+          failureClass: 'catalog_absent',
+          reason: 'Model or variant is unavailable in the executable benchmark catalog.',
+        },
+      ],
     });
     expect(
       sqlite
@@ -103,7 +110,7 @@ describe('targeted benchmark refresh', () => {
       {
         model: 'vendor/removed',
         engine_identity: 'test-engine',
-        status: 'failed',
+        status: 'unavailable',
         invalidated_at: refreshedAt,
       },
       {
@@ -183,6 +190,7 @@ describe('targeted benchmark refresh', () => {
         refreshed: [],
         unavailable: [],
         skipped: [{ model: 'vendor/selected', variant: null }],
+        refusals: [],
       });
       expect(
         sqlite.prepare(`SELECT status, run_id, invalidated_at FROM benchmark_profiles`).get()

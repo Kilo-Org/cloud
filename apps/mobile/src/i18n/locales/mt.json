@@ -143,6 +143,7 @@
     "keepRunning": "Ħallih għaddej",
     "newSession": "Sessjoni ġdida",
     "noModelsAvailable": "L-ebda mudell disponibbli",
+    "modelRetires": "Jirtira {{date}}",
     "notFound": "Ma nstabx.",
     "online": "Onlajn",
     "open": "Iftaħ {{name}}",
@@ -186,7 +187,9 @@
     "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
     "privateRepositoryA11y": "{{name}}, repositorju privat",
     "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss.",
-    "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova."
+    "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova.",
+    "organizationTrialEndedBillingAtKiloAi": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni fuq kilo.ai, imbagħad terġa' tipprova.",
+    "viewOnGitHub": "Ara l-PR fuq GitHub"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -510,7 +513,7 @@
     "changelogFixesPolish": "Tiswijiet u titjib fl-applikazzjoni kollha.",
     "changelogAreas": {
       "signIn": "Dħul",
-      "profileOrganizations": "Profil u organizzazzjonijiet"
+      "profileOrganizations": "Profil & organizzazzjonijiet"
     }
   },
   "preferences": {
@@ -785,6 +788,12 @@
       "couldNotLoadMore": "Ma setgħux jitgħabbew aktar kummenti.",
       "retryLoadingMore": "Erġa' pprova tgħabbi aktar kummenti",
       "loadMoreComments": "Għabbi aktar kummenti",
+      "conversationTruncated": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_one": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_two": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_few": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_many": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_other": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
       "addReaction": "Żid reazzjoni",
       "reactionPill": "reazzjoni {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reazzjoni",
@@ -923,7 +932,6 @@
       "noAccess": "M'għandekx aċċess għall-kontrolli ta' dan ir-repożitorju.",
       "couldNotLoad": "Ma setgħux jitgħabbew il-kontrolli.",
       "retryChecks": "Erġa' pprova tgħabbi l-kontrolli",
-      "viewOnGitHub": "Ara l-PR fuq GitHub",
       "noChecksReported": "L-ebda kontroll irrapportat",
       "passed": "{{displayCount}} għaddew",
       "passed_one": "{{displayCount}} għaddew",
@@ -1469,7 +1477,6 @@
     "followReviewMd": "Segwi REVIEW.md",
     "followReviewMdSubtitle": "Segwi l-fajls tal-istruzzjonijiet REVIEW.md ta' kull repożitorju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
       "notConnectedReadOnlyPlan": "Il-prova tal-organizzazzjoni ntemmet, għalhekk is-sid irid jaġġorna l-fatturazzjoni fuq kilo.ai."
     },
     "bitbucketConnect": {
@@ -1479,7 +1486,7 @@
       "managedOnWebRepositories": "Agħżel ir-repożitorji għal {{organization}} fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
       "descriptionReconnect": "Oħloq token ta' aċċess ġdid għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
-      "descriptionOverview": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}}, imbagħad waħħlu fl-iskrin li jmiss.",
+      "descriptionOverview": "Oħloq token ta' aċċess għall-ispazju tax-xogħol, imbagħad waħħlu fl-iskrin li jmiss.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
       "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol",
       "tokenRefused": "Bitbucket ma aċċettax dan it-token tal-ispazju tax-xogħol. Iċċekkja li għandu l-permessi ta' hawn fuq, imbagħad ipprova mill-ġdid."
@@ -1505,9 +1512,9 @@
       "activity": "Attività"
     },
     "providerConnect": {
-      "githubApp": "l-App ta' GitHub",
+      "githubApp": "l-app ta' GitHub",
       "githubError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova.",
-      "gitlabAccount": "il-Kont ta' GitLab",
+      "gitlabAccount": "il-kont ta' GitLab",
       "gitlabError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitLab. Jekk jogħġbok erġa' pprova.",
       "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament."
     },
@@ -5088,12 +5095,15 @@
     "inputDescription": "Jiskennja kull dħul b'Enkrypt AI, inklużi r-riżultati tal-għodod. Meta Enkrypt ma jkunx disponibbli, it-talbiet jintbagħtu mingħajr skennjar minflok ma jiġu rrifjutati.",
     "outputTitle": "Gwardjani tal-ħruġ",
     "outputDescription": "Jiskennja r-risposti b'Enkrypt AI qabel ma jirċevuhom il-membri. Mitfi sakemm ma tattivahx.",
+    "outputUnavailable": "Kilo ma attivatx ix-xkennjar tal-ħruġ għal din l-organizzazzjoni, għalhekk ir-risposti ma jiġux iċċekkjati u m'hemm xejn x'issettja hawn. Ikkuntattja lil {{supportEmail}} biex titlob dan.",
     "detectorsHint": "Il-modalità Imblokka tirrifjuta talba mmarkata. Il-modalità Irreġistra biss tirreġistraha mingħajr ma tdewwem it-talba.",
     "detectorsHintOutput": "Il-modalità Imblokka tfalli risposta mmarkata. Il-modalità Irreġistra biss tirreġistraha mingħajr ma tdewwem ir-risposta.",
     "choiceLog": "Irreġistra biss",
     "applyTo": "Applika għal",
     "applyToAllMembers": "Il-membri kollha",
     "applyKiloDefault": "Applika l-Valur Predefinit ta' Kilo",
+    "applyKiloDefaultEnglishNote": "It-test tal-politika predefinita ta' Kilo huwa bl-Ingliż, għax Kilo Gateway japplikah eżattament kif miktub.",
+    "applyKiloDefaultReplaceMessage": "Il-politika predefinita ta' Kilo hija miktuba bl-Ingliż u tissostitwixxi dak li stabbilixxeit f'Vjolazzjoni tal-politika. It-test li daħħalt fil-qasam tat-test tal-politika ma jistax jiġi rkuprat.",
     "invalidSavedTitle": "L-impostazzjonijiet tad-detetturi tad-dħul salvati ma jistgħux jinqraw",
     "invalidSavedBody": "It-talbiet jiġu mblokkati sakemm id-detetturi tad-dħul jiġu salvati mill-ġdid. Id-detetturi hawn taħt jibdew mill-Predefinit ta' Kilo.",
     "invalidSavedOutputTitle": "L-impostazzjonijiet tad-detetturi tal-ħruġ salvati ma jistgħux jinqraw",

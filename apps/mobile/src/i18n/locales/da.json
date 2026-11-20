@@ -140,6 +140,7 @@
     "keepRunning": "Lad køre",
     "newSession": "Ny session",
     "noModelsAvailable": "Ingen modeller tilgængelige",
+    "modelRetires": "Udfases {{date}}",
     "notFound": "Indholdet blev ikke fundet.",
     "online": "Forbundet",
     "open": "Åbn {{name}}",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
-    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen."
+    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen på kilo.ai og derefter prøve igen.",
+    "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
     "changelogAreas": {
       "signIn": "Log-ind",
-      "profileOrganizations": "Profil og organisationer"
+      "profileOrganizations": "Profil & organisationer"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "Kunne ikke indlæse flere kommentarer.",
       "retryLoadingMore": "Prøv at indlæse flere kommentarer igen",
       "loadMoreComments": "Indlæs flere kommentarer",
+      "conversationTruncated": "Kun de første {{displayCount}} kommentarer vises.",
+      "conversationTruncated_one": "Kun de første {{displayCount}} kommentarer vises.",
+      "conversationTruncated_other": "Kun de første {{displayCount}} kommentarer vises.",
       "addReaction": "Tilføj reaktion",
       "reactionPill": "Reaktion: {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
@@ -881,7 +887,6 @@
       "noAccess": "Du har ikke adgang til kontroller for dette kodelager.",
       "couldNotLoad": "Kunne ikke indlæse kontroller.",
       "retryChecks": "Prøv at indlæse kontrollerne igen",
-      "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen kontroller rapporteret",
       "passed": "{{displayCount}} bestået",
       "passed_one": "{{displayCount}} bestået",
@@ -1391,7 +1396,6 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "notConnectedReadOnlyPlan": "Organisationens prøveperiode er udløbet, så en ejer skal opdatere betalingen på kilo.ai."
     },
     "bitbucketConnect": {
@@ -1401,7 +1405,7 @@
       "managedOnWebRepositories": "Vælg repositorier for {{organization}} på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
-      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det på næste skærm.",
+      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet, og indsæt det på næste skærm.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
       "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
       "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
@@ -4854,12 +4858,15 @@
     "inputDescription": "Scanner alt input med Enkrypt AI, inklusive værktøjsresultater. Når Enkrypt ikke er tilgængelig, sendes anmodninger uden scanning i stedet for at blive afvist.",
     "outputTitle": "Sikkerhedsgrænser for output",
     "outputDescription": "Scanner svar med Enkrypt AI, før medlemmerne modtager dem. Er slået fra, medmindre du slår det til.",
+    "outputUnavailable": "Kilo har ikke slået scanning af output til for denne organisation, så svar kontrolleres ikke, og der er intet at indstille her. Kontakt {{supportEmail}} for at anmode om det.",
     "detectorsHint": "Bloker afviser en markeret anmodning. Kun log registrerer den uden at forsinke anmodningen.",
     "detectorsHintOutput": "Bloker får et markeret svar til at mislykkes. Kun log registrerer det uden at forsinke svaret.",
     "choiceLog": "Kun log",
     "applyTo": "Anvend på",
     "applyToAllMembers": "Alle medlemmer",
     "applyKiloDefault": "Anvend Kilo-standard",
+    "applyKiloDefaultEnglishNote": "Teksten i Kilos standardpolitik er på engelsk, fordi Kilo Gateway anvender den præcis som skrevet.",
+    "applyKiloDefaultReplaceMessage": "Kilos standardpolitik er skrevet på engelsk og erstatter det, du har angivet under Politikovertrædelse. Den tekst, du har indtastet i feltet til politiktekst, kan ikke gendannes.",
     "invalidSavedTitle": "Gemte indstillinger for inputdetektorer kan ikke læses",
     "invalidSavedBody": "Anmodninger blokeres, indtil inputdetektorerne gemmes igen. Detektorerne nedenfor starter fra Kilo-standard.",
     "invalidSavedOutputTitle": "Gemte indstillinger for outputdetektorer kan ikke læses",

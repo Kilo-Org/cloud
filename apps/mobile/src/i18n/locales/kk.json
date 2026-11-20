@@ -140,6 +140,7 @@
     "keepRunning": "Жұмысты жалғастыру",
     "newSession": "Жаңа сессия",
     "noModelsAvailable": "Қолжетімді модельдер жоқ",
+    "modelRetires": "Тоқтатылады: {{date}}",
     "notFound": "Табылмады.",
     "online": "Желіде",
     "open": "{{name}} ашу",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Ұйым иесі kilo.ai сайтында төлем ақпаратын жаңартып, содан кейін қайталап көре алады.",
     "privateRepositoryA11y": "{{name}}, жеке репозиторий",
     "legalDocumentEnglishOnly": "Бұл құжат тек ағылшын тілінде қолжетімді.",
-    "organizationTrialEndedBilling": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Төлем ақпаратын жаңартып, содан кейін қайталап көре аласыз."
+    "organizationTrialEndedBilling": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Төлем ақпаратын жаңартып, содан кейін қайталап көре аласыз.",
+    "organizationTrialEndedBillingAtKiloAi": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. kilo.ai сайтында төлем ақпаратын жаңартып, содан кейін қайталап көре аласыз.",
+    "viewOnGitHub": "PR-ді GitHub-та қарау"
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Бүкіл қолданбадағы түзетулер мен жақсартулар.",
     "changelogAreas": {
       "signIn": "Кіру",
-      "profileOrganizations": "Профиль және ұйымдар"
+      "profileOrganizations": "Профиль мен ұйымдар"
     }
   },
   "preferences": {
@@ -748,6 +751,9 @@
       "comment_one": "1 пікір",
       "comment": "{{displayCount}} пікір",
       "comment_other": "{{displayCount}} пікір",
+      "conversationTruncated": "Тек алғашқы {{displayCount}} пікір көрсетіледі.",
+      "conversationTruncated_one": "Тек алғашқы {{displayCount}} пікір көрсетіледі.",
+      "conversationTruncated_other": "Тек алғашқы {{displayCount}} пікір көрсетіледі.",
       "startedRelative": " · {{relative}} басталды",
       "couldNotLoadMore": "Қосымша пікірлерді жүктеу мүмкін болмады.",
       "retryLoadingMore": "Қосымша пікірлерді қайта жүктеу",
@@ -881,7 +887,6 @@
       "noAccess": "Бұл репозиторийдің тексерулерін көруге рұқсатыңыз жоқ.",
       "couldNotLoad": "Тексерулерді жүктеу мүмкін болмады.",
       "retryChecks": "Тексерулерді қайталау",
-      "viewOnGitHub": "PR-ді GitHub-та қарау",
       "noChecksReported": "Тексеру нәтижелері жоқ",
       "passed": "{{displayCount}} өтті",
       "passed_one": "{{displayCount}} өтті",
@@ -936,9 +941,9 @@
       "checkFailedTitleGitLab": "GitLab қосылымын тексеру мүмкін болмады.",
       "checkFailedTitleBitbucket": "Bitbucket қосылымын тексеру мүмкін болмады.",
       "providerCheckFailedMessage": "Провайдерге қосылу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
-      "reconnectTitle": "GitHub-қа қайта қосылу",
-      "reconnectTitleGitLab": "GitLab-қа қайта қосылу",
-      "reconnectTitleBitbucket": "Bitbucket-қа қайта қосылу",
+      "reconnectTitle": "GitHub-ты қайта қосу",
+      "reconnectTitleGitLab": "GitLab-ты қайта қосу",
+      "reconnectTitleBitbucket": "Bitbucket-ті қайта қосу",
       "reconnectDescription": "GitHub қосылымына берілген рұқсат қайтарып алынды.",
       "gitlabDescription": "Біріктіру сұрауларын мобильді құрылғыда тексеру",
       "gitlabInstanceMismatchTitle": "GitLab қосылымы басқа инстанцияға арналған",
@@ -1391,7 +1396,6 @@
     "followReviewMd": "REVIEW.md нұсқауларын орындау",
     "followReviewMdSubtitle": "Әр репозиторийдегі REVIEW.md файлының нұсқауларын орындау",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
       "notConnectedReadOnlyPlan": "Ұйымның сынақ мерзімі аяқталды, сондықтан иесі kilo.ai сайтында төлемді жаңартуы керек."
     },
     "bitbucketConnect": {
@@ -1401,7 +1405,7 @@
       "managedOnWebRepositories": "{{organization}} үшін репозиторийлерді компьютерден веб арқылы таңдаңыз.",
       "description": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жасап, төмендегі өріске қойыңыз.",
       "descriptionReconnect": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жаңадан жасап, төмендегі өріске қойыңыз.",
-      "descriptionOverview": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жасап, оны келесі экранда қойыңыз.",
+      "descriptionOverview": "Жұмыс кеңістігіне кіру токенін жасап, оны келесі экранда қойыңыз.",
       "scopes": "Тіркелгі: оқу · Репозиторийлер: оқу/жазу · Біріктіру сұраулары: оқу · Вебхуктар: оқу/жазу",
       "tokenPlaceholder": "Жұмыс кеңістігіне кіру токені",
       "tokenRefused": "Bitbucket бұл жұмыс кеңістігі токенін қабылдамады. Оның жоғарыдағы рұқсаттарға ие екенін тексеріп, қайталап көріңіз."
@@ -4854,12 +4858,15 @@
     "inputDescription": "Әрбір кірісті, соның ішінде құрал нәтижелерін, Enkrypt AI арқылы тексереді. Enkrypt AI қолжетімсіз болғанда, сұраулар қабылданбаудың орнына тексерілместен жіберіледі.",
     "outputTitle": "Шығыс қорғаныс шектеулері",
     "outputDescription": "Қатысушылар оларды алмас бұрын жауаптарды Enkrypt AI арқылы тексереді. Сіз оны қоспайынша өшірулі болады.",
+    "outputUnavailable": "Kilo бұл ұйым үшін шығыс сканерлеуін қоспаған, сондықтан жауаптар тексерілмейді және мұнда орнатылатын ештеңе жоқ. Оны сұрау үшін {{supportEmail}} мекенжайына хабарласыңыз.",
     "detectorsHint": "Блоктау белгіленген сұрауды қабылдамайды. Тек журналға жазу сұрауды кідіртпестен оны тіркейді.",
     "detectorsHintOutput": "Блоктау белгіленген жауапты қабылдамайды. Тек журналға жазу жауапты кідіртпестен оны тіркейді.",
     "choiceLog": "Тек журналға жазу",
     "applyTo": "Қолдану",
     "applyToAllMembers": "Барлық қатысушылар",
     "applyKiloDefault": "Kilo әдепкісін қолдану",
+    "applyKiloDefaultEnglishNote": "Kilo әдепкі саясатының мәтіні ағылшын тілінде, өйткені Kilo Gateway оны жазылған күйінде дәл қолданады.",
+    "applyKiloDefaultReplaceMessage": "Kilo әдепкі саясаты ағылшын тілінде жазылған және Саясатты бұзу бөлімінде орнатқаныңызды алмастырады. Саясат мәтіні өрісіне енгізген мәтінді қалпына келтіру мүмкін емес.",
     "invalidSavedTitle": "Сақталған кіріс детекторының параметрлерін оқу мүмкін емес",
     "invalidSavedBody": "Кіріс детекторлары қайта сақталғанша сұраулар блокталады. Төмендегі детекторлар Kilo әдепкісінен басталады.",
     "invalidSavedOutputTitle": "Сақталған шығыс детекторының параметрлерін оқу мүмкін емес",

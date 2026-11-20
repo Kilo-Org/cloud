@@ -1,6 +1,6 @@
 import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createConnection, type ConnectionConfig } from './cloud-agent-connection';
-import { cloudAgentId, kiloId } from './test-helpers';
+import { cloudAgentId, deferred, kiloId } from './test-helpers';
 import type { ServiceEvent } from './normalizer';
 
 jest.mock('./cloud-agent-connection', () => ({ createConnection: jest.fn() }));
@@ -27,7 +27,22 @@ beforeEach(() => {
 });
 afterEach(() => jest.useRealTimers());
 
-function setup(version: 'v1' | 'v2' = 'v2') {
+function pageFor(version: 'v1' | 'v2') {
+  return {
+    kind: 'success' as const,
+    source: version === 'v2' ? { version, session: native } : { version },
+    info: { id: native.id },
+    messages: [],
+    nextCursor: null,
+    omittedItemCount: 0,
+    updateCursor: 0,
+  };
+}
+
+function setup(
+  version: 'v1' | 'v2' = 'v2',
+  fetchCloudSnapshotPage: () => Promise<unknown> = async () => pageFor(version)
+) {
   const events: ServiceEvent[] = [];
   const read = jest.fn().mockResolvedValue(empty);
   const transport = createCloudAgentTransport({
@@ -43,15 +58,7 @@ function setup(version: 'v1' | 'v2' = 'v2') {
     },
     getTicket: async () => 'local-ticket',
     websocketBaseUrl: 'ws://localhost:8794',
-    fetchCloudSnapshotPage: async () => ({
-      kind: 'success',
-      source: version === 'v2' ? { version, session: native } : { version },
-      info: { id: native.id },
-      messages: [],
-      nextCursor: null,
-      omittedItemCount: 0,
-      updateCursor: 0,
-    }),
+    fetchCloudSnapshotPage,
   })({ onChatEvent() {}, onServiceEvent: event => events.push(event) });
   return { transport, read, events };
 }
@@ -152,4 +159,82 @@ test('destroy fences a late read from the previous chat', async () => {
     type: 'background.activity',
     state: { status: 'inactive' },
   });
+});
+
+test('a v2 page that lands before the connection opens reads the inventory on connect', async () => {
+  const { transport, read } = setup();
+  transport.connect();
+  // The page replays before `connectWebSocket`, so this flushes the page and
+  // the ticket without reaching the reader's own timer.
+  await jest.advanceTimersByTimeAsync(0);
+  expect(read).not.toHaveBeenCalled();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(read).toHaveBeenCalledTimes(1);
+  transport.destroy();
+});
+
+test('starts the reader when a v2 page lands after the connection opened', async () => {
+  const retryPage = deferred<unknown>();
+  let calls = 0;
+  // The initial read fails so the socket opens without a page; the retry then
+  // carries the v2 page, exactly the window in which a page used to enable the
+  // readers without starting them.
+  const { transport, read } = setup('v2', () => {
+    calls += 1;
+    return calls === 1 ? Promise.reject(new Error('history read failed')) : retryPage.promise;
+  });
+  transport.connect();
+  await jest.advanceTimersByTimeAsync(500);
+  expect(read).not.toHaveBeenCalled();
+  retryPage.resolve(pageFor('v2'));
+  await jest.advanceTimersByTimeAsync(100);
+  expect(read).toHaveBeenCalledTimes(1);
+  transport.destroy();
+});
+
+test('starts the reader when a v2 page lands after a reconnect', async () => {
+  const reconnectPage = deferred<unknown>();
+  let calls = 0;
+  const { transport, read } = setup('v2', () => {
+    calls += 1;
+    return calls === 1 ? Promise.reject(new Error('history read failed')) : reconnectPage.promise;
+  });
+  transport.connect();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(read).not.toHaveBeenCalled();
+  connection.onUnexpectedDisconnect?.();
+  // The reconnect supersedes the armed retry and reads its own page.
+  connection.onReconnected?.();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(read).not.toHaveBeenCalled();
+  reconnectPage.resolve(pageFor('v2'));
+  await jest.advanceTimersByTimeAsync(100);
+  expect(read).toHaveBeenCalledTimes(1);
+  transport.destroy();
+});
+
+test('holds a v2 page that lands while the socket is down until the next reconnect', async () => {
+  const latePage = deferred<unknown>();
+  let calls = 0;
+  const { transport, read, events } = setup('v2', () => {
+    calls += 1;
+    return calls === 1 ? Promise.reject(new Error('history read failed')) : latePage.promise;
+  });
+  transport.connect();
+  await jest.advanceTimersByTimeAsync(100);
+  connection.onUnexpectedDisconnect?.();
+  // The armed retry fires while the socket is down and carries the v2 page.
+  await jest.advanceTimersByTimeAsync(400);
+  latePage.resolve(pageFor('v2'));
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(read).not.toHaveBeenCalled();
+  expect(
+    events.some(
+      event => event.type === 'background.activity' && event.state.status === 'unavailable'
+    )
+  ).toBe(false);
+  connection.onReconnected?.();
+  await jest.advanceTimersByTimeAsync(100);
+  expect(read).toHaveBeenCalledTimes(1);
+  transport.destroy();
 });

@@ -66,6 +66,18 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternal }));
+// The mounted form keeps its draft in the account-scoped encrypted store, which
+// this Node project cannot import; neither the key helper nor the hook's
+// answer is what these states are about, and no state here asserts a draft.
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+vi.mock('@/lib/persist/drafts', () => ({
+  orgGuardrailsFormDraftKey: (organizationId: string) => `org-guardrails-form:${organizationId}`,
+}));
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () => ({ kind: 'ready', value: null, save: vi.fn(), clear: vi.fn() }),
+}));
 vi.mock('@/lib/hooks/use-surface-feedback', () => ({ useSurfaceFeedback: () => vi.fn() }));
 // EmptyState's centered-surface chain reads the native surface-geometry module
 // through the expo package, which cannot load in this project; the state only
@@ -98,6 +110,7 @@ vi.mock('@/components/organization/guardrails-input-section', () => ({
 }));
 vi.mock('@/components/organization/guardrails-output-section', () => ({
   OutputGuardrailsSection: 'OutputGuardrailsSection',
+  OutputGuardrailsUnavailableSection: 'OutputGuardrailsUnavailableSection',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({

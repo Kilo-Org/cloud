@@ -14,7 +14,9 @@ import type {
 import { READ_BROWSER_TOOL_NAMES, runReadBrowserTool } from './browser-tool-read-actions';
 import type { BrowserReadToolOptions } from './browser-tool-read-actions';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
+import { createAgentFrameReader } from './browser-agent-frames';
 import type { AgentFrameInventory, AgentReadScope } from './browser-agent-frames';
+import { maskIsolatedAgentScreenshot } from './browser-agent-isolated-probe';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
 import type { BrowserToolSession } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
@@ -191,6 +193,13 @@ const validateBrowserToolArguments = (
 const contractEntryFor = (upstreamName: string): BrowserToolContractEntry | undefined =>
   BROWSER_TOOL_CONTRACT.find(entry => entry.name === upstreamName);
 
+/**
+ * The tools that only drive the tabs API. Their page-family handlers never
+ * speak the debugger protocol, and they carry the agent's group boundary
+ * (D9), so every backend runs them there.
+ */
+const TAB_ONLY_TOOL_NAMES: ReadonlySet<string> = new Set(['browser_close', 'browser_tabs']);
+
 export interface RunKiloBrowserToolInput {
   /** The model's verbatim tool arguments; absent arguments are treated as `{}`. */
   readonly arguments?: unknown;
@@ -246,12 +255,32 @@ export const runKiloBrowserTool = async ({
      * The family handlers drive `session.send`, whose scripting backend throws
      * unconditionally (Firefox exposes no debugger protocol). Where the session
      * factory selected the scripting backend, the only reachable
-     * implementation of the expressible tools is `session.callTool`, so the
-     * contract-validated arguments go there. The platform gate above has
+     * implementation of the expressible page tools is `session.callTool`, so
+     * the contract-validated arguments go there. The platform gate above has
      * already refused the tools Firefox cannot express.
      */
-    if (session.backend === 'scripting') {
-      return await session.callTool(toolName, parsedArgs.data);
+    if (session.backend === 'scripting' && !TAB_ONLY_TOOL_NAMES.has(upstreamName)) {
+      const scope = options?.agentScope;
+      const readFrames = options?.readFrames ?? createAgentFrameReader(session);
+      const result = await session.callTool(
+        toolName,
+        parsedArgs.data,
+        scope === undefined ? undefined : { ...scope, readFrames }
+      );
+
+      // The capture shows every frame and field on the page; an agent sees only what it may read.
+      if (upstreamName !== 'browser_take_screenshot' || scope === undefined) {
+        return result;
+      }
+
+      const inventory = await readFrames();
+
+      return await maskIsolatedAgentScreenshot({
+        capture: result,
+        frames: inventory.complete ? inventory.frames : [],
+        probe: inventory.complete ? session.isolatedProbe : undefined,
+        readableOrigins: scope.readableOrigins,
+      });
     }
 
     return await handler(parsedArgs.data, session, options ?? {});

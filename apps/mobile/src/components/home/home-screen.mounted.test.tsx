@@ -75,6 +75,8 @@ vi.mock('react-native', () => ({
     },
   },
   ActivityIndicator: 'ActivityIndicator',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',

@@ -140,6 +140,7 @@
     "keepRunning": "Ci gaba da aikin",
     "newSession": "Sabon zama",
     "noModelsAvailable": "Babu samfura",
+    "modelRetires": "Zai yi ritaya {{date}}",
     "notFound": "Ba a samu ba.",
     "online": "Kan layi",
     "open": "Buɗe {{name}}",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
     "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri",
     "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
-    "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa."
+    "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa.",
+    "organizationTrialEndedBillingAtKiloAi": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi a kilo.ai, sannan ka sake gwadawa.",
+    "viewOnGitHub": "Duba PR a GitHub"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
     "changelogAreas": {
       "signIn": "Shiga",
-      "profileOrganizations": "Bayanan martaba da ƙungiyoyi"
+      "profileOrganizations": "Bayanan martaba & ƙungiyoyi"
     }
   },
   "preferences": {
@@ -748,6 +751,9 @@
       "comment_one": "tsokaci 1",
       "comment": "tsokace-tsokace {{displayCount}}",
       "comment_other": "tsokace-tsokace {{displayCount}}",
+      "conversationTruncated": "Ana nuna tsokace-tsokace {{displayCount}} na farko kawai.",
+      "conversationTruncated_one": "Ana nuna tsokace-tsokace {{displayCount}} na farko kawai.",
+      "conversationTruncated_other": "Ana nuna tsokace-tsokace {{displayCount}} na farko kawai.",
       "startedRelative": " · an fara {{relative}}",
       "couldNotLoadMore": "Ba a iya loda ƙarin tsokaci ba.",
       "retryLoadingMore": "Sake gwada loda ƙarin tsokaci",
@@ -881,7 +887,6 @@
       "noAccess": "Ba ka da damar duba gwaje-gwajen wannan ma'ajiyar lamba.",
       "couldNotLoad": "Ba a iya loda gwaje-gwaje ba.",
       "retryChecks": "Sake gwada gwaje-gwajen",
-      "viewOnGitHub": "Duba PR a GitHub",
       "noChecksReported": "Ba a bayar da rahoton gwaje-gwaje ba",
       "passed": "{{displayCount}} sun yi nasara",
       "passed_one": "{{displayCount}} sun yi nasara",
@@ -1391,7 +1396,6 @@
     "followReviewMd": "Bi REVIEW.md",
     "followReviewMdSubtitle": "Bi umarnin fayil ɗin REVIEW.md na kowace ma'ajiya",
     "bitbucket": {
-      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
       "notConnectedReadOnlyPlan": "Gwajin ƙungiyar ya ƙare, don haka dole ne mai shi ya sabunta lissafin kuɗi a kilo.ai."
     },
     "bitbucketConnect": {
@@ -1401,7 +1405,7 @@
       "managedOnWebRepositories": "Zaɓi ma'ajiyoyi don {{organization}} a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionReconnect": "Ƙirƙiri sabuwar lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
-      "descriptionOverview": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a shafi na gaba.",
+      "descriptionOverview": "Ƙirƙiri lambar izinin shiga muhallin aiki, sannan ka manna ta a shafi na gaba.",
       "scopes": "Asusu: karantawa · Ma'ajiyoyi: karantawa/rubutawa · Buƙatun haɗa canje-canje: karantawa · Hanyoyin sanarwa ta yanar gizo: karantawa/rubutawa",
       "tokenPlaceholder": "Lambar izinin shiga muhallin aiki",
       "tokenRefused": "Bitbucket bai karɓi wannan lambar izinin shiga muhallin aikin ba. Ka duba cewa tana da izinin da ke sama, sannan ka sake gwadawa."
@@ -1427,9 +1431,9 @@
       "activity": "Aiki"
     },
     "providerConnect": {
-      "githubApp": "Manhajar GitHub",
+      "githubApp": "manhajar GitHub",
       "githubError": "An kasa buɗe saitin GitHub. Sake gwadawa.",
-      "gitlabAccount": "Asusun GitLab",
+      "gitlabAccount": "asusun GitLab",
       "gitlabError": "An kasa buɗe saitin GitLab. Sake gwadawa.",
       "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik."
     },
@@ -4854,12 +4858,15 @@
     "inputDescription": "Yana duba kowace shigarwa da Enkrypt AI, har da sakamakon kayan aiki. Idan Enkrypt ba ya samuwa, ana aika buƙatu ba tare da duba su ba maimakon a ƙi su.",
     "outputTitle": "Shingayen tsaro na fitarwa",
     "outputDescription": "Yana duba martani da Enkrypt AI kafin membobi su karɓe su. A kashe ne sai kun kunna shi.",
+    "outputUnavailable": "Kilo bai kunna duba fitarwa ba ga wannan ƙungiya, saboda haka ba a duba martani kuma babu abin da za a saita a nan. Tuntuɓi {{supportEmail}} don neman hakan.",
     "detectorsHint": "Toshewa yana ƙin buƙatar da aka yi wa alama. Rubuta kawai yana yin rikodin ta ba tare da jinkirta buƙatar ba.",
     "detectorsHintOutput": "Toshewa yana sa martanin da aka yi wa alama ya gaza. Rubuta kawai yana yin rikodin shi ba tare da jinkirta martanin ba.",
     "choiceLog": "Rubuta kawai",
     "applyTo": "Aiwatar da shi ga",
     "applyToAllMembers": "Dukan membobi",
     "applyKiloDefault": "Aiwatar da Kilo na Asali",
+    "applyKiloDefaultEnglishNote": "Rubutun manufar Kilo na asali cikin Turanci yake, domin Kilo Gateway yana aiwatar da shi daidai yadda aka rubuta.",
+    "applyKiloDefaultReplaceMessage": "Manufar Kilo ta asali an rubuta ta cikin Turanci kuma tana maye gurbin abin da ka saita a Keta manufa. Rubutun da ka shigar a filin rubutun manufa ba za a iya dawo da shi ba.",
     "invalidSavedTitle": "Ba a iya karanta saitunan gano shigarwar da aka ajiye ba",
     "invalidSavedBody": "Ana toshe buƙatu har sai an sake ajiye masu gano shigarwa. Masu gano da ke ƙasa suna farawa daga Kilo na Asali.",
     "invalidSavedOutputTitle": "Ba a iya karanta saitunan gano fitarwar da aka ajiye ba",

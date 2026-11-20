@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f8a5639c-2dfc-43da-b15c-79d1b5336c17",
+  "id": "9c189e91-325e-4615-adca-62ef01f224c2",
   "prevId": "1b919c36-b70c-4eb2-93c5-b5847452cd08",
   "tables": {
     "benchmark_config": {
@@ -237,6 +237,43 @@
           "notNull": false,
           "autoincrement": false
         },
+        "failure_class": {
+          "name": "failure_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "failure_attempts": {
+          "name": "failure_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "model_failure_attempts": {
+          "name": "model_failure_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "first_failed_at": {
+          "name": "first_failed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "retry_after": {
+          "name": "retry_after",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "invalidated_at": {
           "name": "invalidated_at",
           "type": "text",
@@ -441,14 +478,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'platform'"
-        },
-        "measurement_revision": {
-          "name": "measurement_revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 2
         }
       },
       "indexes": {
@@ -668,34 +697,6 @@
         },
         "last_event_types": {
           "name": "last_event_types",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "tool_calls": {
-          "name": "tool_calls",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "tool_names": {
-          "name": "tool_names",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "step_count": {
-          "name": "step_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "final_finish_reason": {
-          "name": "final_finish_reason",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1922,6 +1923,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "failure_class": {
+          "name": "failure_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -2104,6 +2112,14 @@
         },
         "throttle_deferrals": {
           "name": "throttle_deferrals",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "catalog_deferrals": {
+          "name": "catalog_deferrals",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

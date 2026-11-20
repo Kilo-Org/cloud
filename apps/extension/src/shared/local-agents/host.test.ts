@@ -906,6 +906,56 @@ describe('pairing admission', () => {
     host.stop();
   });
 
+  it('shows the unreachable hint when a redeemed endpoint cannot connect', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(56, { url: PAIRING_URL }, { url: PAIRING_URL });
+    const socket = await connectSocketIfNeeded(harness);
+    socket.handlers.onError();
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('unreachable');
+    });
+    host.stop();
+  });
+
+  it('clears the unreachable hint once the redeemed endpoint connects on a retry', async () => {
+    const harness = createHarness();
+    let clock = 1000;
+    harness.hostOptions.now = () => clock;
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(57, { url: PAIRING_URL }, { url: PAIRING_URL });
+    const socket = await connectSocketIfNeeded(harness);
+    socket.handlers.onError();
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('unreachable');
+    });
+
+    clock += 60_000;
+    harness.listeners.alarm?.({ name: 'kilo-local-agents-watchdog' });
+    await vi.waitFor(() => {
+      expect(harness.sockets).toHaveLength(2);
+    });
+    const [, retry] = harness.sockets;
+
+    if (retry === undefined) {
+      throw new Error('expected the retry socket');
+    }
+
+    await completeHandshake(retry);
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBeNull();
+    });
+    host.stop();
+  });
+
   it('keeps buffered pairings when the first apply fails', async () => {
     const harness = createHarness();
     harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });

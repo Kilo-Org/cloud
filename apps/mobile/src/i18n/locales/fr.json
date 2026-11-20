@@ -72,7 +72,7 @@
     "findings": "Problèmes détectés",
     "mergeRequest": "requête de fusion",
     "notConnected": "Non connecté",
-    "notifications": "Alertes et notifications",
+    "notifications": "Alertes & notifications",
     "pullRequest": "PR",
     "repositories": "Dépôts",
     "securityAgent": "Agent de sécurité",
@@ -141,6 +141,7 @@
     "keepRunning": "Laisser continuer",
     "newSession": "Nouvelle session",
     "noModelsAvailable": "Aucun modèle disponible",
+    "modelRetires": "Retiré le {{date}}",
     "notFound": "Cet élément est introuvable",
     "online": "En ligne",
     "open": "Ouvrir {{name}}",
@@ -184,7 +185,9 @@
     "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer.",
     "privateRepositoryA11y": "{{name}}, dépôt privé",
     "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
-    "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer."
+    "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer.",
+    "organizationTrialEndedBillingAtKiloAi": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation sur kilo.ai, puis réessayer.",
+    "viewOnGitHub": "Voir la PR sur GitHub"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -508,7 +511,7 @@
     "changelogFixesPolish": "Corrections et améliorations dans toute l'application.",
     "changelogAreas": {
       "signIn": "Connexion",
-      "profileOrganizations": "Profil et organisations"
+      "profileOrganizations": "Profil & organisations"
     }
   },
   "notifications": {
@@ -665,7 +668,6 @@
     },
     "autoReviews": "Revues automatiques",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "notConnectedReadOnlyPlan": "L'essai de l'organisation a pris fin, donc un propriétaire doit mettre à jour la facturation sur kilo.ai."
     },
     "bitbucketConnect": {
@@ -675,7 +677,7 @@
       "managedOnWebRepositories": "Choisissez les dépôts de {{organization}} sur le web, depuis un ordinateur.",
       "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
-      "descriptionOverview": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le sur l'écran suivant.",
+      "descriptionOverview": "Créez un jeton d'accès à l'espace de travail, puis collez-le sur l'écran suivant.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail",
       "tokenRefused": "Bitbucket n'a pas accepté ce jeton d'accès à l'espace de travail. Vérifiez qu'il dispose des autorisations ci-dessus, puis réessayez."
@@ -717,9 +719,9 @@
     },
     "providerConnect": {
       "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
-      "githubApp": "Application GitHub",
+      "githubApp": "application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
-      "gitlabAccount": "Compte GitLab",
+      "gitlabAccount": "compte GitLab",
       "gitlabError": "Impossible d'ouvrir la configuration de GitLab. Réessayez."
     },
     "reviewDetail": {
@@ -2824,7 +2826,6 @@
       "skipped_other": "{{displayCount}} ignorées",
       "skipped_many": "{{displayCount}} ignorées",
       "title": "Vérifications",
-      "viewOnGitHub": "Voir la PR sur GitHub",
       "checkDetails": "détails de la vérification"
     },
     "composer": {
@@ -2885,6 +2886,10 @@
       "commentActions": "Actions du commentaire",
       "comment": "{{displayCount}} commentaires",
       "comment_other": "{{displayCount}} commentaires",
+      "conversationTruncated": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_one": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_many": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_other": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
       "couldNotLoad": "Impossible de charger les échanges",
       "couldNotLoadMore": "Impossible de charger d'autres commentaires.",
       "loadMoreComments": "Charger d'autres commentaires",
@@ -4932,12 +4937,15 @@
     "inputDescription": "Analyse chaque entrée avec Enkrypt AI, y compris les résultats d'outils. Lorsque Enkrypt est indisponible, les requêtes sont envoyées sans analyse plutôt que rejetées.",
     "outputTitle": "Garde-fous de sortie",
     "outputDescription": "Analyse les réponses avec Enkrypt AI avant qu'elles ne parviennent aux membres. Désactivé tant que vous ne l'activez pas.",
+    "outputUnavailable": "Kilo n'a pas activé l'analyse des sorties pour cette organisation, donc les réponses ne sont pas vérifiées et il n'y a rien à configurer ici. Contactez {{supportEmail}} pour en faire la demande.",
     "detectorsHint": "Bloquer rejette une requête signalée. Journaliser uniquement l'enregistre sans retarder la requête.",
     "detectorsHintOutput": "Bloquer fait échouer une réponse signalée. Journaliser uniquement l'enregistre sans retarder la réponse.",
     "choiceLog": "Journaliser uniquement",
     "applyTo": "Appliquer à",
     "applyToAllMembers": "Tous les membres",
     "applyKiloDefault": "Appliquer la configuration par défaut de Kilo",
+    "applyKiloDefaultEnglishNote": "Le texte de la politique par défaut de Kilo est en anglais, car Kilo Gateway l'applique exactement tel qu'il est écrit.",
+    "applyKiloDefaultReplaceMessage": "La politique par défaut de Kilo est rédigée en anglais et remplace ce que vous avez défini dans Violation de politique. Le texte saisi dans le champ du texte de la politique ne peut pas être récupéré.",
     "invalidSavedTitle": "Impossible de lire les paramètres enregistrés des détecteurs d'entrée",
     "invalidSavedBody": "Les requêtes sont bloquées jusqu'à ce que les détecteurs d'entrée soient de nouveau enregistrés. Les détecteurs ci-dessous reprennent la configuration par défaut de Kilo.",
     "invalidSavedOutputTitle": "Impossible de lire les paramètres enregistrés des détecteurs de sortie",

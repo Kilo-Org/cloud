@@ -1,4 +1,5 @@
-import { useState } from 'react';
+/* eslint-disable max-lines -- one form owns the two lists, the gateways tab and the durable-draft restore; the state rebases onto the server's answer in one place, and splitting it would let two copies disagree */
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -9,6 +10,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type OrgGatewaySettings,
   useSaveOrgModelAccess,
@@ -21,11 +23,14 @@ import {
   denyListModels,
   draftsEqual,
   initialDraft,
+  isModelAccessFormDraft,
   type ModelAccessDraft,
   modelAccessSave,
   providerRows,
 } from '@/lib/organization/model-access';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
+import { orgModelAccessFormDraftKey } from '@/lib/persist/drafts';
+import { useFormDraft } from '@/lib/persist/use-form-draft';
 
 type Tab = 'models' | 'providers' | 'gateways';
 
@@ -61,9 +66,11 @@ type FormState = Readonly<{
  * The provider rows are provisional while the catalog is unavailable: they hold
  * only the providers the organization's own models name, and no provider edit is
  * possible in that state (the tab is read-only). When the catalog arrives they
- * rebase to the whole gateway catalog and keep only the edits the deny list
- * holds. Without this the first toggle after a retry would write the provisional
- * rows as the organization's whole allow list.
+ * rebase to the whole gateway catalog, the baseline takes the server's list, and
+ * the draft keeps its own provider list while it holds edits — the same rule the
+ * deny list moves under — so a restored draft is not overwritten before the
+ * person sees it. Without this the first toggle after a retry would write the
+ * provisional rows as the organization's whole allow list.
  *
  * Both rebases compose here, so a catalog that arrives in the same render as a
  * newer deny list keeps that deny list instead of restoring the values the
@@ -86,6 +93,11 @@ function syncedFormState(params: {
     return state;
   }
   const clean = draftsEqual(state.draft, state.baseline);
+  // The provider list itself, not the whole draft: a draft dirtied only by a
+  // model toggle still carries the provisional rows, which must not survive the
+  // arrival as the organization's allow list.
+  const providersMoved =
+    state.draft.providerAllowList.join('\n') !== state.baseline.providerAllowList.join('\n');
   let baseline = savedListsMoved ? params.serverDraft : state.baseline;
   let draft = savedListsMoved && clean ? params.serverDraft : state.draft;
   if (catalogArrived) {
@@ -93,8 +105,15 @@ function syncedFormState(params: {
       providerAllowList: params.serverDraft.providerAllowList,
       modelDenyList: baseline.modelDenyList,
     };
+    // The draft's own provider list survives the arrival when the person moved
+    // it — a restored draft changed it, and replacing it here would silently
+    // drop that before they could see it, exactly as it would drop a deny-list
+    // edit. A list the draft did not move has nothing of its own, so it takes
+    // the server's.
     draft = {
-      providerAllowList: params.serverDraft.providerAllowList,
+      providerAllowList: providersMoved
+        ? draft.providerAllowList
+        : params.serverDraft.providerAllowList,
       modelDenyList: draft.modelDenyList,
     };
   }
@@ -119,6 +138,7 @@ function syncedFormState(params: {
 export function ModelAccessForm({
   organizationId,
   canEdit,
+  canManageBilling = false,
   models,
   catalog,
   catalogUnavailable,
@@ -133,6 +153,8 @@ export function ModelAccessForm({
 }: Readonly<{
   organizationId: string;
   canEdit: boolean;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   models: readonly AvailableModel[];
   /** The gateway's whole catalog; empty while it is unavailable. */
   catalog: readonly CatalogModel[];
@@ -151,7 +173,11 @@ export function ModelAccessForm({
   onRetryGateway: () => void;
 }>) {
   const { t } = useTranslation();
-  const save = useSaveOrgModelAccess(organizationId);
+  // The screen resolves the reader's role once and hands it down: this form
+  // renders no billing step beside the failure line, so a money role reads the
+  // sentence that names the destination instead of one that claims an owner
+  // must act.
+  const save = useSaveOrgModelAccess(organizationId, canManageBilling);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
   const [tab, setTab] = useState<Tab>('models');
   // A provider saved in the allow list but no longer served by any catalog model
@@ -182,6 +208,34 @@ export function ModelAccessForm({
   }
   const { baseline, draft } = form;
 
+  // The lists also live in the account-scoped encrypted store: a device language
+  // change that flips the text direction reloads the bundle, which kills this
+  // tree without running its cleanup, and the toggles would come back as the
+  // server's. The form has the saved lists to show, so it renders from them at
+  // once and applies a restored draft once, only while the person has moved
+  // nothing.
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const formDraft = useFormDraft<ModelAccessDraft>({
+    userId,
+    isIdentityLoading,
+    entityKey: orgModelAccessFormDraftKey(organizationId),
+    validate: isModelAccessFormDraft,
+  });
+  // An edit or a tab change owns the form: a stored draft that lands later never
+  // replaces what the person already moved, and a restore runs once per mount.
+  const touchedRef = useRef(false);
+  const restoredRef = useRef(false);
+  const restoredDraft = formDraft.kind === 'ready' ? formDraft.value : null;
+  useEffect(() => {
+    if (restoredDraft === null || touchedRef.current || restoredRef.current) {
+      return;
+    }
+    restoredRef.current = true;
+    // Both lists move together, so the restored draft replaces the pair;
+    // `dirty` recomputes against the baseline, which is what enables Save.
+    setForm(previous => ({ ...previous, draft: restoredDraft }));
+  }, [restoredDraft]);
+
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
   // Back — the header arrow, Android Back and the back gesture — must not drop
@@ -197,6 +251,10 @@ export function ModelAccessForm({
     enabled: canEdit,
     isDirty: () => dirty,
     saving,
+    // A confirmed Discard is the person dropping the edits on purpose, so the
+    // stored draft goes with them; Cancel drops it the same way. Without this
+    // the next mount would restore exactly what they threw away.
+    onDiscard: formDraft.clear,
   });
   const savePayload = modelAccessSave({
     savedAllowList: providerAllowList,
@@ -210,7 +268,11 @@ export function ModelAccessForm({
   const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
+    touchedRef.current = true;
     setForm(previous => ({ ...previous, draft: next }));
+    // The whole draft, on every edit: a reload may follow any of them, and the
+    // hook writes through while it still reports `loading`.
+    formDraft.save(next);
   };
 
   const onSave = async () => {
@@ -237,11 +299,16 @@ export function ModelAccessForm({
         syncedKey: serverKey,
         baseline: previous.draft,
       }));
+      // The draft became the saved policy; nothing is left to restore.
+      restoredRef.current = true;
+      formDraft.clear();
       attempt.succeed();
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
+        message:
+          knownServerErrorMessage(error, canManageBilling, 'absent') ??
+          t('organizationGuardrails.statusFailed'),
       });
     }
   };
@@ -287,7 +354,12 @@ export function ModelAccessForm({
             { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
           ]}
           value={tab}
-          onChange={setTab}
+          onChange={nextTab => {
+            // A tab change is the person looking elsewhere: a draft that lands
+            // after it must not move the lists under the tab they chose.
+            touchedRef.current = true;
+            setTab(nextTab);
+          }}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
         />
         {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
@@ -307,6 +379,11 @@ export function ModelAccessForm({
             disabled={!dirty || saving}
             onPress={() => {
               clearWhere(() => true);
+              // Cancel is a deliberate discard: the stored copy goes with the
+              // screen's, or a language-direction reload would restore exactly
+              // the edits the person just threw away.
+              touchedRef.current = true;
+              formDraft.clear();
               setForm(previous => ({ ...previous, draft: previous.baseline }));
             }}
           >
@@ -344,6 +421,7 @@ export function ModelAccessForm({
       {tab === 'gateways' ? (
         <GatewaySettingsSection
           organizationId={organizationId}
+          canManageBilling={canManageBilling}
           settings={gateway}
           isError={gatewayIsError}
           isFetching={gatewayIsFetching}

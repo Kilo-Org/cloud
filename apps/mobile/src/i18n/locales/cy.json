@@ -144,6 +144,7 @@
     "keepRunning": "Parhau i redeg",
     "newSession": "Sesiwn newydd",
     "noModelsAvailable": "Dim modelau ar gael",
+    "modelRetires": "Yn ymddeol {{date}}",
     "notFound": "Ni ddaethpwyd o hyd i'r eitem.",
     "online": "Ar-lein",
     "open": "Agor {{name}}",
@@ -187,7 +188,9 @@
     "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
     "privateRepositoryA11y": "{{name}}, yn repositori preifat",
     "legalDocumentEnglishOnly": "Dim ond yn Saesneg y mae'r ddogfen hon ar gael.",
-    "organizationTrialEndedBilling": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio, ac yna rhoi cynnig arall arni."
+    "organizationTrialEndedBilling": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio, ac yna rhoi cynnig arall arni.",
+    "organizationTrialEndedBillingAtKiloAi": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
+    "viewOnGitHub": "Gweld y PR ar GitHub"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -796,6 +799,13 @@
       "couldNotLoadMore": "Ni lwyddwyd i lwytho mwy o sylwadau.",
       "retryLoadingMore": "Rhoi cynnig eto ar lwytho mwy o sylwadau",
       "loadMoreComments": "Llwytho mwy o sylwadau",
+      "conversationTruncated": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_zero": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_one": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_two": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_few": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_many": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
+      "conversationTruncated_other": "Dim ond y {{displayCount}} sylw cyntaf sy'n cael eu dangos.",
       "addReaction": "Ychwanegu ymateb",
       "reactionPill": "ymateb {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "ymateb",
@@ -937,7 +947,6 @@
       "noAccess": "Nid oes gennych fynediad at wiriadau'r ystorfa hon.",
       "couldNotLoad": "Ni lwyddwyd i lwytho'r gwiriadau.",
       "retryChecks": "Rhoi cynnig eto ar wiriadau",
-      "viewOnGitHub": "Gweld y PR ar GitHub",
       "noChecksReported": "Dim gwiriadau wedi'u hadrodd",
       "passed": "{{displayCount}} wedi pasio",
       "passed_one": "{{displayCount}} wedi pasio",
@@ -1495,7 +1504,6 @@
     "followReviewMd": "Dilyn REVIEW.md",
     "followReviewMdSubtitle": "Dilyn y cyfarwyddiadau yn ffeil REVIEW.md pob ystorfa",
     "bitbucket": {
-      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
       "notConnectedReadOnlyPlan": "Mae treial y sefydliad wedi dod i ben, felly rhaid i berchnogydd ddiweddaru bilio ar kilo.ai."
     },
     "bitbucketConnect": {
@@ -1505,7 +1513,7 @@
       "managedOnWebRepositories": "Dewiswch ystorfeydd ar gyfer {{organization}} ar y we o gyfrifiadur.",
       "description": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo isod.",
       "descriptionReconnect": "Crëwch docyn mynediad gweithle newydd ar gyfer {{organization}} a'i ludo isod.",
-      "descriptionOverview": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo ar y sgrin nesaf.",
+      "descriptionOverview": "Crëwch docyn mynediad gweithle a'i ludo ar y sgrin nesaf.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
       "tokenPlaceholder": "Tocyn mynediad gweithle",
       "tokenRefused": "Ni dderbyniodd Bitbucket y tocyn mynediad gweithle hwn. Gwiriwch fod ganddo'r cwmpasau uchod, yna ceisiwch eto."
@@ -5166,12 +5174,15 @@
     "inputDescription": "Mae'n sganio pob mewnbwn gydag Enkrypt AI, gan gynnwys canlyniadau offer. Pan nad yw Enkrypt ar gael, anfonir ceisiadau heb eu sganio yn hytrach na'u gwrthod.",
     "outputTitle": "Mesurau diogelu allbwn",
     "outputDescription": "Mae'n sganio ymatebion gydag Enkrypt AI cyn i aelodau eu derbyn. Wedi diffodd oni bai eich bod yn ei droi ymlaen.",
+    "outputUnavailable": "Nid yw Kilo wedi galluogi sganio allbwn ar gyfer y sefydliad hwn, felly nid yw ymatebion yn cael eu gwirio ac nid oes dim i'w osod yma. Cysylltwch â {{supportEmail}} i ofyn am hyn.",
     "detectorsHint": "Mae Blocio yn gwrthod cais sydd wedi'i nodi. Mae Cofnodi yn unig yn ei gofnodi heb oedi'r cais.",
     "detectorsHintOutput": "Mae Blocio yn gwneud i ymateb sydd wedi'i nodi fethu. Mae Cofnodi yn unig yn ei gofnodi heb oedi'r ymateb.",
     "choiceLog": "Cofnodi yn unig",
     "applyTo": "Cymhwyso i",
     "applyToAllMembers": "Pob aelod",
     "applyKiloDefault": "Cymhwyso Rhagosodiad Kilo",
+    "applyKiloDefaultEnglishNote": "Mae testun polisi rhagosodedig Kilo yn Saesneg, oherwydd bod Kilo Gateway yn ei gymhwyso'n union fel y'i hysgrifennwyd.",
+    "applyKiloDefaultReplaceMessage": "Mae polisi rhagosodedig Kilo wedi'i ysgrifennu yn Saesneg ac yn disodli'r hyn a osodwyd gennych yn Torri polisi. Ni ellir adfer y testun a gofnodwyd gennych yn y maes testun polisi.",
     "invalidSavedTitle": "Methu darllen y gosodiadau synwyryddion mewnbwn sydd wedi'u cadw",
     "invalidSavedBody": "Mae ceisiadau'n cael eu blocio nes bod y synwyryddion mewnbwn yn cael eu cadw eto. Mae'r synwyryddion isod yn dechrau o Ragosodiad Kilo.",
     "invalidSavedOutputTitle": "Methu darllen y gosodiadau synwyryddion allbwn sydd wedi'u cadw",

@@ -62,6 +62,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   // The header reads the window to decide whether its actions share the title

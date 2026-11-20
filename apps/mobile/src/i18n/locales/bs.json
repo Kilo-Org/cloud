@@ -141,6 +141,7 @@
     "keepRunning": "Nastavi izvršavanje",
     "newSession": "Nova sesija",
     "noModelsAvailable": "Nema dostupnih modela",
+    "modelRetires": "Povlači se {{date}}",
     "notFound": "Nije pronađeno.",
     "online": "Na mreži",
     "open": "Otvori {{name}}",
@@ -184,7 +185,9 @@
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai, a zatim pokušati ponovo.",
     "privateRepositoryA11y": "{{name}}, privatno spremište",
     "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku.",
-    "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete ažurirati naplatu, a zatim pokušati ponovo."
+    "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete ažurirati naplatu, a zatim pokušati ponovo.",
+    "organizationTrialEndedBillingAtKiloAi": "Probni period organizacije je završen i ona nema aktivan plan. Možete ažurirati naplatu na kilo.ai, a zatim pokušati ponovo.",
+    "viewOnGitHub": "Pogledaj PR na GitHubu"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -508,7 +511,7 @@
     "changelogFixesPolish": "Ispravke i poboljšanja u cijeloj aplikaciji.",
     "changelogAreas": {
       "signIn": "Prijava",
-      "profileOrganizations": "Profil i organizacije"
+      "profileOrganizations": "Profil te organizacije"
     }
   },
   "preferences": {
@@ -763,6 +766,10 @@
       "couldNotLoadMore": "Učitavanje dodatnih komentara nije uspjelo.",
       "retryLoadingMore": "Pokušaj ponovo učitati dodatne komentare",
       "loadMoreComments": "Učitaj dodatne komentare",
+      "conversationTruncated": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_one": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_few": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_other": "Prikazuje se samo prvih {{displayCount}} komentara.",
       "addReaction": "Dodaj reakciju",
       "reactionPill": "reakcija {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
@@ -895,7 +902,6 @@
       "noAccess": "Nemaš pristup provjerama za ovaj repozitorij.",
       "couldNotLoad": "Učitavanje provjera nije uspjelo.",
       "retryChecks": "Ponovo pokušaj učitati provjere",
-      "viewOnGitHub": "Pogledaj PR na GitHubu",
       "noChecksReported": "Nema prijavljenih provjera",
       "passed": "uspješno: {{displayCount}}",
       "passed_one": "uspješno: {{displayCount}}",
@@ -1417,7 +1423,6 @@
     "followReviewMd": "Slijedi upute iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
       "notConnectedReadOnlyPlan": "Probni period organizacije je završen, pa vlasnik mora ažurirati naplatu na kilo.ai."
     },
     "bitbucketConnect": {
@@ -1427,7 +1432,7 @@
       "managedOnWebRepositories": "Odaberi repozitorije za {{organization}} na webu s računara.",
       "description": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "descriptionReconnect": "Kreiraj novi token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
-      "descriptionOverview": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem ekranu.",
+      "descriptionOverview": "Kreiraj token za pristup radnom prostoru i zalijepi ga na sljedećem ekranu.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri da ima gore navedene dozvole, pa pokušaj ponovo."
@@ -4932,12 +4937,15 @@
     "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Kada Enkrypt nije dostupan, zahtjevi se šalju bez skeniranja umjesto da budu odbijeni.",
     "outputTitle": "Zaštitna ograničenja izlaza",
     "outputDescription": "Skenira odgovore pomoću Enkrypt AI prije nego što ih članovi prime. Isključeno dok to ne uključite.",
+    "outputUnavailable": "Kilo nije omogućio skeniranje izlaza za ovu organizaciju, pa se odgovori ne provjeravaju i ovdje nema šta podesiti. Kontaktirajte {{supportEmail}} da to zatražite.",
     "detectorsHint": "„Blokiraj“ odbija označeni zahtjev. „Samo evidentiraj“ ga bilježi bez odgađanja zahtjeva.",
     "detectorsHintOutput": "„Blokiraj“ odbacuje označeni odgovor. „Samo evidentiraj“ ga bilježi bez odgađanja odgovora.",
     "choiceLog": "Samo evidentiraj",
     "applyTo": "Primijeni na",
     "applyToAllMembers": "Sve članove",
     "applyKiloDefault": "Primijeni Kilo zadane postavke",
+    "applyKiloDefaultEnglishNote": "Tekst Kilo zadane politike je na engleskom, jer ga Kilo Gateway primjenjuje tačno onako kako je napisan.",
+    "applyKiloDefaultReplaceMessage": "Kilo zadana politika napisana je na engleskom i zamjenjuje ono što ste postavili u Kršenje pravilnika. Tekst koji ste unijeli u polje teksta pravilnika ne može se vratiti.",
     "invalidSavedTitle": "Sačuvane postavke ulaznih detektora nije moguće pročitati",
     "invalidSavedBody": "Zahtjevi su blokirani dok se ulazni detektori ponovo ne sačuvaju. Detektori ispod počinju od Kilo zadanih postavki.",
     "invalidSavedOutputTitle": "Sačuvane postavke izlaznih detektora nije moguće pročitati",

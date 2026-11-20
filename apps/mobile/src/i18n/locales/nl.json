@@ -140,6 +140,7 @@
     "keepRunning": "Laten doorgaan",
     "newSession": "Nieuwe sessie",
     "noModelsAvailable": "Geen modellen beschikbaar",
+    "modelRetires": "Wordt stopgezet op {{date}}",
     "notFound": "Dit item is niet gevonden.",
     "online": "Verbonden",
     "open": "{{name}} openen",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
     "privateRepositoryA11y": "{{name}}, privé repository",
     "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels.",
-    "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen."
+    "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen.",
+    "organizationTrialEndedBillingAtKiloAi": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
+    "viewOnGitHub": "PR op GitHub bekijken"
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
     "changelogAreas": {
       "signIn": "Inloggen",
-      "profileOrganizations": "Profiel en organisaties"
+      "profileOrganizations": "Profiel & organisaties"
     }
   },
   "preferences": {
@@ -697,7 +700,6 @@
     },
     "autoReviews": "Automatische reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
       "notConnectedReadOnlyPlan": "De proefperiode van de organisatie is afgelopen, dus een eigenaar moet de facturering bijwerken op kilo.ai."
     },
     "bitbucketConnect": {
@@ -707,7 +709,7 @@
       "managedOnWebRepositories": "Kies voor {{organization}} de repositories via het web op een computer.",
       "description": "Maak voor {{organization}} een toegangstoken voor de werkruimte en plak het hieronder.",
       "descriptionReconnect": "Maak voor {{organization}} een nieuw toegangstoken voor de werkruimte en plak het hieronder.",
-      "descriptionOverview": "Maak voor {{organization}} een toegangstoken voor de werkruimte en plak het op het volgende scherm.",
+      "descriptionOverview": "Maak een toegangstoken voor de werkruimte en plak het op het volgende scherm.",
       "scopes": "Vereiste rechten: account lezen, repositories lezen en schrijven, PR's lezen en webhooks lezen en schrijven.",
       "tokenPlaceholder": "Toegangstoken voor de werkruimte",
       "tokenRefused": "Bitbucket heeft dit toegangstoken voor de werkruimte niet geaccepteerd. Controleer of het de rechten hierboven heeft en probeer het daarna opnieuw."
@@ -2784,7 +2786,6 @@
       "skipped_one": "{{displayCount}} overgeslagen",
       "skipped_other": "{{displayCount}} overgeslagen",
       "title": "Controles",
-      "viewOnGitHub": "PR op GitHub bekijken",
       "checkDetails": "controledetails"
     },
     "composer": {
@@ -2845,6 +2846,9 @@
       "commentActions": "Acties voor opmerking",
       "comment": "{{displayCount}} opmerkingen",
       "comment_other": "{{displayCount}} opmerkingen",
+      "conversationTruncated": "Je ziet alleen de eerste {{displayCount}} opmerkingen.",
+      "conversationTruncated_one": "Je ziet alleen de eerste {{displayCount}} opmerkingen.",
+      "conversationTruncated_other": "Je ziet alleen de eerste {{displayCount}} opmerkingen.",
       "couldNotLoad": "De discussie kon niet worden geladen.",
       "couldNotLoadMore": "Er konden geen extra opmerkingen worden geladen.",
       "loadMoreComments": "Meer opmerkingen laden",
@@ -4854,12 +4858,15 @@
     "inputDescription": "Scant elke invoer met Enkrypt AI, inclusief resultaten van hulpmiddelen. Wanneer Enkrypt niet beschikbaar is, worden verzoeken ongescand verzonden in plaats van afgewezen.",
     "outputTitle": "Beveiligingsmaatregelen voor uitvoer",
     "outputDescription": "Scant antwoorden met Enkrypt AI voordat leden ze ontvangen. Staat uit tenzij u het inschakelt.",
+    "outputUnavailable": "Kilo heeft het scannen van uitvoer voor deze organisatie niet ingeschakeld, dus antwoorden worden niet gecontroleerd en er is hier niets in te stellen. Neem contact op met {{supportEmail}} om het aan te vragen.",
     "detectorsHint": "Blokkeren wijst een gemarkeerd verzoek af. Alleen loggen registreert het zonder het verzoek te vertragen.",
     "detectorsHintOutput": "Blokkeren laat een gemarkeerd antwoord mislukken. Alleen loggen registreert het zonder het antwoord te vertragen.",
     "choiceLog": "Alleen loggen",
     "applyTo": "Toepassen op",
     "applyToAllMembers": "Alle leden",
     "applyKiloDefault": "Kilo-standaard toepassen",
+    "applyKiloDefaultEnglishNote": "De tekst van het Kilo-standaardbeleid is in het Engels, omdat de Kilo Gateway het toepast precies zoals het is geschreven.",
+    "applyKiloDefaultReplaceMessage": "Het Kilo-standaardbeleid is in het Engels geschreven en vervangt wat je bij Beleidsschending hebt ingesteld. De tekst die je in het veld voor beleidstekst hebt ingevuld, kan niet worden hersteld.",
     "invalidSavedTitle": "Opgeslagen instellingen voor invoerdetectoren kunnen niet worden gelezen",
     "invalidSavedBody": "Verzoeken worden geblokkeerd totdat de invoerdetectoren opnieuw zijn opgeslagen. De onderstaande detectoren starten met Kilo-standaard.",
     "invalidSavedOutputTitle": "Opgeslagen instellingen voor uitvoerdetectoren kunnen niet worden gelezen",

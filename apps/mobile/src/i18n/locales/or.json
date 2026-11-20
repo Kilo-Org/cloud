@@ -140,6 +140,7 @@
     "keepRunning": "ଚାଲୁ ରଖନ୍ତୁ",
     "newSession": "ନୂଆ ସେସନ୍",
     "noModelsAvailable": "କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ",
+    "modelRetires": "{{date}}ରେ ଅବସର ନେବ",
     "notFound": "ମିଳିଲା ନାହିଁ।",
     "online": "ଅନଲାଇନ୍",
     "open": "{{name}} ଖୋଲନ୍ତୁ",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଜଣେ ସଂଗଠନ ମାଲିକ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
     "privateRepositoryA11y": "{{name}}, ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀ",
     "legalDocumentEnglishOnly": "ଏହି ଦସ୍ତାବେଜଟି କେବଳ ଇଂରାଜୀରେ ଉପଲବ୍ଧ।",
-    "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।"
+    "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "organizationTrialEndedBillingAtKiloAi": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
     "changelogAreas": {
       "signIn": "ସାଇନ୍ ଇନ୍",
-      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଓ ସଂଗଠନ"
+      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "loadMoreComments": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରନ୍ତୁ",
+      "conversationTruncated": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
+      "conversationTruncated_one": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
+      "conversationTruncated_other": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
       "addReaction": "ପ୍ରତିକ୍ରିୟା ଯୋଡ଼ନ୍ତୁ",
       "reactionPill": "{{emoji}} ପ୍ରତିକ୍ରିୟା, {{displayCount}} {{countLabel}}",
       "reaction_one": "ପ୍ରତିକ୍ରିୟା",
@@ -881,7 +887,6 @@
       "noAccess": "ଏହି ରିପୋଜିଟୋରିର ଯାଞ୍ଚ ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "couldNotLoad": "ଯାଞ୍ଚ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryChecks": "ଯାଞ୍ଚ ପାଇଁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
-      "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ",
       "noChecksReported": "କୌଣସି ଯାଞ୍ଚ ରିପୋର୍ଟ ହୋଇନାହିଁ",
       "passed": "{{displayCount}} ସଫଳ",
       "passed_one": "{{displayCount}} ସଫଳ",
@@ -936,9 +941,9 @@
       "checkFailedTitleGitLab": "GitLab ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "checkFailedTitleBitbucket": "Bitbucket ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "providerCheckFailedMessage": "ପ୍ରଦାନକାରୀ ସହ ସଂଯୋଗ ସ୍ଥାପନ କରିହେଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ",
-      "reconnectTitleGitLab": "GitLab ସହ ପୁଣି ସଂଯୋଗ",
-      "reconnectTitleBitbucket": "Bitbucket ସହ ପୁଣି ସଂଯୋଗ",
+      "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
+      "reconnectTitleGitLab": "GitLab ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
+      "reconnectTitleBitbucket": "Bitbucket ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
       "reconnectDescription": "ଆପଣଙ୍କ GitHub ସଂଯୋଗର ଅନୁମତି ପ୍ରତ୍ୟାହାର କରାଯାଇଛି।",
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରନ୍ତୁ",
       "gitlabInstanceMismatchTitle": "GitLab ସଂଯୋଗ ଅନ୍ୟ ଏକ ଇନଷ୍ଟାନ୍ସ ପାଇଁ ଅଟେ",
@@ -1391,7 +1396,6 @@
     "followReviewMd": "REVIEW.md ଅନୁସରଣ କରନ୍ତୁ",
     "followReviewMdSubtitle": "ପ୍ରତ୍ୟେକ ରିପୋଜିଟୋରୀର REVIEW.md ଫାଇଲ୍‌ରେ ଥିବା ନିର୍ଦ୍ଦେଶ ମାନନ୍ତୁ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
       "notConnectedReadOnlyPlan": "ସଂଗଠନର ଟ୍ରାୟଲ୍ ଅବଧି ଶେଷ ହୋଇଛି, ତେଣୁ ମାଲିକଙ୍କୁ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିବାକୁ ହେବ।"
     },
     "bitbucketConnect": {
@@ -1401,7 +1405,7 @@
       "managedOnWebRepositories": "{{organization}} ପାଇଁ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ରେପୋଜିଟୋରୀ ଚୟନ କରନ୍ତୁ।",
       "description": "{{organization}} ପାଇଁ ଏକ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ତଳେ ପେଷ୍ଟ କରନ୍ତୁ।",
       "descriptionReconnect": "{{organization}} ପାଇଁ ଏକ ନୂଆ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ତଳେ ପେଷ୍ଟ କରନ୍ତୁ।",
-      "descriptionOverview": "{{organization}} ପାଇଁ ଏକ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ପରବର୍ତ୍ତୀ ସ୍କ୍ରିନରେ ପେଷ୍ଟ କରନ୍ତୁ।",
+      "descriptionOverview": "ଏକ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ପରବର୍ତ୍ତୀ ସ୍କ୍ରିନରେ ପେଷ୍ଟ କରନ୍ତୁ।",
       "scopes": "ଆକାଉଣ୍ଟ: ପଢ଼ିବା · ରିପୋଜିଟୋରୀ: ପଢ଼ିବା/ଲେଖିବା · ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ: ପଢ଼ିବା · ୱେବ୍‌ହୁକ୍: ପଢ଼ିବା/ଲେଖିବା",
       "tokenPlaceholder": "କାର୍ଯ୍ୟକ୍ଷେତ୍ରର ଆକ୍ସେସ୍ ଟୋକେନ୍",
       "tokenRefused": "Bitbucket ଏହି କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍‌କୁ ଗ୍ରହଣ କରିନାହିଁ। ଏଥିରେ ଉପରେ ଦିଆଯାଇଥିବା ସ୍କୋପ୍‌ଗୁଡ଼ିକ ଅଛି କି ନାହିଁ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
@@ -4854,12 +4858,15 @@
     "inputDescription": "ପ୍ରତ୍ୟେକ ଇନପୁଟକୁ Enkrypt AI ସହିତ ସ୍କାନ କରେ, ଯେଉଁଥିରେ ଟୁଲ ଫଳାଫଳ ଅନ୍ତର୍ଭୁକ୍ତ। Enkrypt ଉପଲବ୍ଧ ନ ଥିବାବେଳେ ଅନୁରୋଧଗୁଡ଼ିକ ପ୍ରତ୍ୟାଖ୍ୟାନ ହେବା ବଦଳରେ ସ୍କାନ ନହୋଇ ପଠାଯାଏ।",
     "outputTitle": "ଆଉଟପୁଟ ଗାର୍ଡରେଲ୍ସ",
     "outputDescription": "ସଦସ୍ୟମାନେ ପ୍ରାପ୍ତ କରିବା ପୂର୍ବରୁ ପ୍ରତିକ୍ରିୟାଗୁଡ଼ିକୁ Enkrypt AI ସହିତ ସ୍କାନ କରେ। ଆପଣ ଏହାକୁ ଚାଲୁ ନ କଲେ ଏହା ବନ୍ଦ ରହେ।",
+    "outputUnavailable": "Kilo ଏହି ସଂସ୍ଥା ପାଇଁ ଆଉଟପୁଟ ସ୍କାନିଂ ସକ୍ଷମ କରିନାହିଁ, ତେଣୁ ପ୍ରତିକ୍ରିୟାଗୁଡ଼ିକ ଯାଞ୍ଚ ହେଉନାହିଁ ଏବଂ ଏଠାରେ ସେଟ୍ କରିବାକୁ କିଛି ନାହିଁ। ଏହା ଅନୁରୋଧ କରିବାକୁ {{supportEmail}} ସହିତ ଯୋଗାଯୋଗ କରନ୍ତୁ।",
     "detectorsHint": "ଅବରୋଧ ଚିହ୍ନିତ ଅନୁରୋଧକୁ ପ୍ରତ୍ୟାଖ୍ୟାନ କରେ। କେବଳ ଲଗ୍ ଏହାକୁ ରେକର୍ଡ କରେ, ଅନୁରୋଧକୁ ବିଳମ୍ବ ନ କରି।",
     "detectorsHintOutput": "ଅବରୋଧ ଚିହ୍ନିତ ପ୍ରତିକ୍ରିୟାକୁ ବିଫଳ କରେ। କେବଳ ଲଗ୍ ଏହାକୁ ରେକର୍ଡ କରେ, ପ୍ରତିକ୍ରିୟାକୁ ବିଳମ୍ବ ନ କରି।",
     "choiceLog": "କେବଳ ଲଗ୍",
     "applyTo": "ଏଥିପ୍ରତି ଲାଗୁ କରନ୍ତୁ",
     "applyToAllMembers": "ସମସ୍ତ ସଦସ୍ୟ",
     "applyKiloDefault": "Kilo ଡିଫଲ୍ଟ ଲାଗୁ କରନ୍ତୁ",
+    "applyKiloDefaultEnglishNote": "Kilo ର ଡିଫଲ୍ଟ ନୀତିର ପାଠ୍ୟ ଇଂରାଜୀରେ ଅଛି, କାରଣ Kilo Gateway ଏହାକୁ ଯେପରି ଲେଖା ଯାଇଛି ସେହିପରି ଲାଗୁ କରେ।",
+    "applyKiloDefaultReplaceMessage": "Kilo ର ଡିଫଲ୍ଟ ନୀତି ଇଂରାଜୀରେ ଲେଖା ଯାଇଛି ଏବଂ ନୀତି ଉଲ୍ଲଂଘନରେ ଆପଣ ସେଟ୍ କରିଥିବା ବିଷୟକୁ ବଦଳାଇଥାଏ। ନୀତି ପାଠ୍ୟ ଫିଲ୍ଡରେ ଆପଣ ଦାଖଲ କରିଥିବା ପାଠ୍ୟ ପୁନଃପ୍ରାପ୍ତ କରାଯାଇପାରିବ ନାହିଁ।",
     "invalidSavedTitle": "ସଞ୍ଚିତ ଇନପୁଟ ଡିଟେକ୍ଟର ସେଟିଂସମୂହ ପଢ଼ାଯାଇପାରିବ ନାହିଁ",
     "invalidSavedBody": "ଇନପୁଟ ଡିଟେକ୍ଟରଗୁଡ଼ିକ ପୁନର୍ବାର ସଞ୍ଚୟ ହେବା ପର୍ଯ୍ୟନ୍ତ ଅନୁରୋଧଗୁଡ଼ିକ ଅବରୋଧିତ ରହେ। ତଳେ ଥିବା ଡିଟେକ୍ଟରଗୁଡ଼ିକ Kilo ଡିଫଲ୍ଟରୁ ଆରମ୍ଭ ହୁଏ।",
     "invalidSavedOutputTitle": "ସଞ୍ଚିତ ଆଉଟପୁଟ ଡିଟେକ୍ଟର ସେଟିଂସମୂହ ପଢ଼ାଯାଇପାରିବ ନାହିଁ",

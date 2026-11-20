@@ -140,6 +140,7 @@
     "keepRunning": "ادامه اجرا",
     "newSession": "نشست جدید",
     "noModelsAvailable": "مدلی در دسترس نیست",
+    "modelRetires": "بازنشستگی در {{date}}",
     "notFound": "پیدا نشد.",
     "online": "آنلاین",
     "open": "باز کردن {{name}}",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در kilo.ai به‌روزرسانی کند و سپس دوباره تلاش کند.",
     "privateRepositoryA11y": "{{name}}، مخزن خصوصی",
     "legalDocumentEnglishOnly": "این سند تنها به زبان انگلیسی در دسترس است.",
-    "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید."
+    "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
+    "organizationTrialEndedBillingAtKiloAi": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را در kilo.ai به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
+    "viewOnGitHub": "مشاهدهٔ PR در GitHub"
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
       "signIn": "ورود",
-      "profileOrganizations": "نمایه و سازمان‌ها"
+      "profileOrganizations": "نمایه & سازمان‌ها"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "بارگذاری نظرات بیشتر ممکن نشد.",
       "retryLoadingMore": "تلاش مجدد برای بارگذاری نظرات بیشتر",
       "loadMoreComments": "بارگذاری نظرات بیشتر",
+      "conversationTruncated": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
+      "conversationTruncated_one": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
+      "conversationTruncated_other": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
       "addReaction": "افزودن واکنش",
       "reactionPill": "واکنش {{emoji}}، {{displayCount}} {{countLabel}}",
       "reaction_one": "واکنش",
@@ -881,7 +887,6 @@
       "noAccess": "شما به بررسی‌های این مخزن دسترسی ندارید.",
       "couldNotLoad": "بارگذاری بررسی‌ها ممکن نشد.",
       "retryChecks": "تلاش مجدد برای بارگذاری بررسی‌ها",
-      "viewOnGitHub": "مشاهدهٔ PR در GitHub",
       "noChecksReported": "هیچ بررسی‌ای گزارش نشده است",
       "passed": "{{displayCount}} موفق",
       "passed_one": "{{displayCount}} موفق",
@@ -936,9 +941,9 @@
       "checkFailedTitleGitLab": "بررسی اتصال به GitLab ممکن نشد.",
       "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
       "providerCheckFailedMessage": "اتصال به ارائه‌دهنده برقرار نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
-      "reconnectTitle": "اتصال مجدد به GitHub",
-      "reconnectTitleGitLab": "اتصال مجدد به GitLab",
-      "reconnectTitleBitbucket": "اتصال مجدد به Bitbucket",
+      "reconnectTitle": "GitHub را دوباره متصل کنید",
+      "reconnectTitleGitLab": "GitLab را دوباره متصل کنید",
+      "reconnectTitleBitbucket": "Bitbucket را دوباره متصل کنید",
       "reconnectDescription": "مجوز اتصال شما به GitHub لغو شده است.",
       "gitlabDescription": "بازبینی درخواست‌های ادغام در موبایل",
       "gitlabInstanceMismatchTitle": "اتصال GitLab برای نمونه دیگری است",
@@ -1391,7 +1396,6 @@
     "followReviewMd": "پیروی از REVIEW.md",
     "followReviewMdSubtitle": "رعایت دستورالعمل‌های فایل REVIEW.md در هر مخزن",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket متصل نیست. فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
       "notConnectedReadOnlyPlan": "دوره آزمایشی سازمان به پایان رسیده است، بنابراین مالک باید صورتحساب را در ⁨kilo.ai⁩ به‌روزرسانی کند."
     },
     "bitbucketConnect": {
@@ -1401,7 +1405,7 @@
       "managedOnWebRepositories": "مخزن‌های {{organization}} را از طریق وب و با رایانه انتخاب کنید.",
       "description": "یک توکن دسترسی فضای کاری برای {{organization}} ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
       "descriptionReconnect": "یک توکن دسترسی فضای کاری جدید برای {{organization}} ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
-      "descriptionOverview": "یک توکن دسترسی فضای کاری برای {{organization}} ایجاد کنید و آن را در صفحهٔ بعد جای‌گذاری کنید.",
+      "descriptionOverview": "یک توکن دسترسی فضای کاری ایجاد کنید و آن را در صفحهٔ بعد جای‌گذاری کنید.",
       "scopes": "حساب: خواندن · مخازن: خواندن/نوشتن · درخواست‌های ادغام: خواندن · وب‌هوک‌ها: خواندن/نوشتن",
       "tokenPlaceholder": "توکن دسترسی فضای کاری",
       "tokenRefused": "Bitbucket این توکن فضای کاری را نپذیرفت. بررسی کنید که مجوزهای بالا را داشته باشد، سپس دوباره تلاش کنید."
@@ -4854,12 +4858,15 @@
     "inputDescription": "همه ورودی‌ها، از جمله نتایج ابزارها، را با Enkrypt AI بررسی می‌کند. وقتی Enkrypt در دسترس نباشد، درخواست‌ها به‌جای رد شدن، بدون بررسی ارسال می‌شوند.",
     "outputTitle": "محدودیت‌های ایمنی خروجی",
     "outputDescription": "پاسخ‌ها را پیش از رسیدن به اعضا با Enkrypt AI بررسی می‌کند. تا وقتی آن را روشن نکنید، خاموش است.",
+    "outputUnavailable": "Kilo بررسی خروجی را برای این سازمان فعال نکرده است، بنابراین پاسخ‌ها بررسی نمی‌شوند و چیزی برای تنظیم در اینجا وجود ندارد. برای درخواست آن با {{supportEmail}} تماس بگیرید.",
     "detectorsHint": "«مسدودسازی» درخواست علامت‌گذاری‌شده را رد می‌کند. «فقط ثبت» آن را بدون ایجاد تأخیر در درخواست ثبت می‌کند.",
     "detectorsHintOutput": "«مسدودسازی» پاسخ علامت‌گذاری‌شده را ناموفق می‌کند. «فقط ثبت» آن را بدون ایجاد تأخیر در پاسخ ثبت می‌کند.",
     "choiceLog": "فقط ثبت",
     "applyTo": "اعمال بر",
     "applyToAllMembers": "همه اعضا",
     "applyKiloDefault": "اعمال پیش‌فرض Kilo",
+    "applyKiloDefaultEnglishNote": "متن خط‌مشی پیش‌فرض Kilo به زبان انگلیسی است، زیرا Kilo Gateway آن را دقیقاً همان‌گونه که نوشته شده اعمال می‌کند.",
+    "applyKiloDefaultReplaceMessage": "خط‌مشی پیش‌فرض Kilo به زبان انگلیسی نوشته شده است و آنچه را در نقض خط‌مشی تعیین کرده‌اید جایگزین می‌کند. متنی که در فیلد متن خط‌مشی وارد کرده‌اید قابل بازیابی نیست.",
     "invalidSavedTitle": "تنظیمات ذخیره‌شده تشخیص‌دهنده‌های ورودی قابل خواندن نیست",
     "invalidSavedBody": "تا وقتی تشخیص‌دهنده‌های ورودی دوباره ذخیره نشوند، درخواست‌ها مسدود می‌شوند. تشخیص‌دهنده‌های زیر با پیش‌فرض Kilo شروع می‌شوند.",
     "invalidSavedOutputTitle": "تنظیمات ذخیره‌شده تشخیص‌دهنده‌های خروجی قابل خواندن نیست",

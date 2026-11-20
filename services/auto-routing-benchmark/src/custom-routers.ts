@@ -434,7 +434,9 @@ export async function assembleCustomRouterTable(
 
 type MeasuredStatus = Exclude<CustomRouterEntryStatus, 'missing' | 'stale'>;
 
-function measurementStatus<T extends { status: MeasuredStatus; failure_reason: string | null }>(
+function measurementStatus<
+  T extends { status: MeasuredStatus | 'unavailable'; failure_reason: string | null },
+>(
   rows: readonly T[],
   isCurrent: (row: T) => boolean,
   measuredAt: (row: T) => string,
@@ -444,11 +446,10 @@ function measurementStatus<T extends { status: MeasuredStatus; failure_reason: s
   if (served) return { status: served.stale ? 'stale' : 'ready', failureReason: null };
   const currentRow = rows.find(isCurrent);
   if (!currentRow) return { status: 'missing', failureReason: null };
-  return {
-    status: currentRow.status,
-    failureReason:
-      currentRow.status === 'failed' ? boundFailureReason(currentRow.failure_reason) : null,
-  };
+  if (currentRow.status === 'failed' || currentRow.status === 'unavailable') {
+    return { status: 'failed', failureReason: boundFailureReason(currentRow.failure_reason) };
+  }
+  return { status: currentRow.status, failureReason: null };
 }
 
 /**

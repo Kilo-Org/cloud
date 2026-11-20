@@ -22,7 +22,7 @@ import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
-import { isProbeCase, PROBE_CASES } from './datasets/probe-cases';
+import { PROBE_CASES } from './datasets/probe-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity, publishPlatformRoutingTable } from './run';
 import {
@@ -128,7 +128,8 @@ vi.mock('./db', async importOriginal => {
     getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     countCurrentProfilesByStatus: vi.fn(),
     listCurrentPlatformProfileStatuses: vi.fn(),
-    requeueFailedCurrentProfiles: vi.fn(),
+    listCurrentFailedProfiles: vi.fn().mockResolvedValue([]),
+    requeueRetryableCurrentProfiles: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
@@ -159,10 +160,12 @@ import {
   insertRun,
   getRunWithModels,
   listPendingCurrentProfiles,
+  markProfilesFailedForRun,
   markProfilesRunningForRun,
   listReadyCurrentProfilesForEntries,
   getSummariesForRuns,
   syncPlatformRegistryRows,
+  listCurrentFailedProfiles,
   listCurrentPlatformProfileStatuses,
   countCurrentProfilesByStatus,
   listRuns,
@@ -221,7 +224,12 @@ const env = {
   BENCH_DB: undefined,
   BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
-  AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn(), delete: vi.fn() },
+  AUTO_ROUTING_CONFIG: {
+    put: vi.fn(),
+    get: vi.fn(),
+    getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+    delete: vi.fn(),
+  },
   KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
 
@@ -847,10 +855,24 @@ describe('GET /admin/runs', () => {
     await expect(res.json()).resolves.toEqual({ runs: [], hasRunningRun: false });
   });
 
-  it('sweeps stale runs before listing so a wedged run is recovered', async () => {
-    await authedGet('/admin/runs');
-    // sweepStaleRuns → markStaleRunsFailed runs on list, independent of starting.
-    expect(markStaleRunsFailed).toHaveBeenCalledTimes(1);
+  it('lists runs without writing, leaving the stale-run sweep to the cron', async () => {
+    const target = env.BENCH_DB;
+    const statements: string[] = [];
+    env.BENCH_DB = {
+      prepare(sql: string) {
+        statements.push(sql);
+        return target.prepare(sql);
+      },
+      batch: (list: D1PreparedStatement[]) => target.batch(list),
+      exec: (sql: string) => target.exec(sql),
+    } as D1Database;
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    expect(statements.filter(sql => /^\s*(insert|update|delete|replace)\b/i.test(sql))).toEqual([]);
+    expect(listStaleRunningDeciderRuns).not.toHaveBeenCalled();
+    expect(markStaleRunsFailed).not.toHaveBeenCalled();
   });
 
   it('attaches live progress to running runs only', async () => {
@@ -1209,7 +1231,7 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'platform' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
@@ -1231,23 +1253,22 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     // Owner-requested work must not silently re-admit platform models.
     expect(syncPlatformRegistryRows).not.toHaveBeenCalled();
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('user');
-    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
-      runId: expect.any(String),
-      entries: [{ model: 'owner/a', variant: 'high' }],
-      repetitions: 3,
-      caseIds: deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION).map(
-        benchCase => benchCase.id
-      ),
-      chunkSize: 1,
+    const [, run] = vi.mocked(insertRun).mock.calls[0];
+    expect(queueSend).toHaveBeenCalledExactlyOnceWith({
+      runId: run.id,
+      kind: 'decider',
+      model: 'owner/a',
+      schedulerWake: true,
     });
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('runs a drained pair on the revision-2 cases while revision 3 is inactive', async () => {
+  it('starts a drained pair on the revision-2 cases while revision 3 is inactive', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
@@ -1255,14 +1276,15 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(200);
-    expect(vi.mocked(insertRun).mock.calls[0][1].measurement_revision).toBe(2);
-    const [[, schedule]] = vi.mocked(scheduleRunChunks).mock.calls;
-    expect(schedule.caseIds).toEqual(DECIDER_CASES.map(benchCase => benchCase.id));
-    const scheduled = new Set(schedule.caseIds);
-    expect(PROBE_CASES.filter(benchCase => scheduled.has(benchCase.id))).toEqual([]);
-    const graded = deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION);
-    expect(graded.filter(benchCase => isProbeCase(benchCase))).toEqual([]);
+    expect(res.status).toBe(202);
+    const [, run] = vi.mocked(insertRun).mock.calls[0];
+    expect(run.measurement_revision).toBe(2);
+    // The dispatcher materializes chunks from the run's own revision, so a run started
+    // now never reaches the probe cases of the still-inactive revision 3.
+    const scheduled = deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION);
+    expect(scheduled).toEqual(DECIDER_CASES);
+    const scheduledIds = new Set(scheduled.map(benchCase => benchCase.id));
+    expect(PROBE_CASES.filter(benchCase => scheduledIds.has(benchCase.id))).toEqual([]);
   });
 
   it('starts one run per queue for queue=both', async () => {
@@ -1318,20 +1340,15 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const [, run, modelRows] = vi.mocked(insertRun).mock.calls[0];
     expect(modelRows).toHaveLength(100);
     expect(run).toMatchObject({ repetitions: 3, max_concurrency: 0, router: 'efficient' });
     expect(modelRows[0].model).toBe('m/0');
-    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
-      runId: run.id,
-      entries: modelRows.map(row => ({ model: row.model, variant: null })),
-      repetitions: 3,
-      caseIds: deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION).map(
-        benchCase => benchCase.id
-      ),
-      chunkSize: 1,
-    });
+    expect(queueSend).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ runId: run.id, schedulerWake: true })
+    );
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
@@ -1344,7 +1361,7 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const body = (await res.json()) as {
       startedRuns: { purpose: string; entryCount: number }[];
       drainErrors: string[];
@@ -1352,9 +1369,32 @@ describe('POST /admin/runs', () => {
     expect(body.startedRuns).toEqual([expect.objectContaining({ purpose: 'user', entryCount: 1 })]);
     expect(body.drainErrors).toEqual([]);
     expect(insertRun).toHaveBeenCalledOnce();
-    expect(scheduleRunChunks).toHaveBeenCalledOnce();
-    expect(claimScheduledChunks).toHaveBeenCalled();
-    expect(queueSend).not.toHaveBeenCalled();
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(claimScheduledChunks).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: 'decider', model: 'm/1', schedulerWake: true })
+    );
+  });
+
+  it('returns the started run as 202 when the scheduler wake cannot be sent', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    queueSend.mockRejectedValueOnce(new Error('D1 DB is overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(202);
+    const [, run] = vi.mocked(insertRun).mock.calls[0];
+    await expect(res.json()).resolves.toMatchObject({
+      runId: run.id,
+      startedRuns: [{ runId: run.id, purpose: 'user', entryCount: 1 }],
+      drainErrors: [],
+    });
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(markProfilesFailedForRun).not.toHaveBeenCalled();
   });
 
   it('reports a wedged queue alongside the queue that did start', async () => {
@@ -1368,7 +1408,7 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'both' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const body = (await res.json()) as {
       startedRuns: { purpose: string }[];
       drainErrors: string[];
@@ -1415,6 +1455,7 @@ describe('GET /admin/registry', () => {
       platform: { pending: 0, running: 0, ready: 0, failed: 0 },
       user: { pending: 0, running: 0, ready: 0, failed: 0 },
       platformEntries: [],
+      failedEntries: [],
     });
     expect(BenchmarkRegistryResponseSchema.parse(body).router).toBe(router);
     expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, router);
@@ -1434,6 +1475,37 @@ describe('GET /admin/registry', () => {
       router: 'efficient',
       repetitions: 3,
       platformEntries,
+    });
+  });
+
+  it('lists failed entries of both queues with their retry state', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    const failedEntries = [
+      {
+        model: 'model/gone',
+        variant: null,
+        queues: ['platform' as const, 'user' as const],
+        runId: null,
+        failure: {
+          kind: 'permanent' as const,
+          failureClass: 'catalog_absent' as const,
+          reason: 'Not in the catalog.',
+          attempts: 1,
+          firstFailedAt: '2026-11-19T22:59:00.000Z',
+          lastFailedAt: '2026-11-19T22:59:00.000Z',
+          cause: 'terminal_class' as const,
+        },
+      },
+    ];
+    vi.mocked(listCurrentFailedProfiles).mockResolvedValueOnce(failedEntries);
+    const response = await authedGet('/admin/registry');
+    expect(response.status).toBe(200);
+    const body = BenchmarkRegistryResponseSchema.parse(await response.json());
+    expect(body.failedEntries).toEqual(failedEntries);
+    expect(listCurrentFailedProfiles).toHaveBeenCalledWith(env.BENCH_DB, {
+      router: 'efficient',
+      engineIdentity: body.engineIdentity,
+      repetitions: body.repetitions,
     });
   });
 });

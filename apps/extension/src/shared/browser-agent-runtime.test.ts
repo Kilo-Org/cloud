@@ -5869,6 +5869,86 @@ describe('the download hold on a real call', () => {
     expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
     expect(downloads.cancelled).toStrictEqual([71, 72, 72]);
   });
+
+  it('names the step’s own file when the browser stops a second one first', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const own = { filename: 'report.txt', id: 61, url: `${MAIN_ORIGIN}/download` };
+    const extra = { filename: 'second.txt', id: 62, url: `${MAIN_ORIGIN}/download-second` };
+    const suggested: number[] = [];
+    let repeat = false;
+
+    // The click navigates the tab to the link's own attachment; the page script starts a second, different file.
+    // Measured on real Chrome, that second file is refused 8 ms before the link's, so the stop order says nothing.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          const files = repeat
+            ? [
+                { filename: 'second.txt', id: 64, url: extra.url },
+                { filename: 'report.txt', id: 63, url: own.url },
+              ]
+            : [extra, own];
+
+          cdp.emit('Network.requestWillBeSent', {
+            request: { method: 'GET', url: own.url },
+            requestId: repeat ? 'repeat-document' : 'click-document',
+            type: 'Document',
+          });
+
+          for (const file of files) {
+            hold.handle(
+              { filename: file.filename, id: file.id, referrer: dashboard, url: file.url },
+              () => {
+                suggested.push(file.id);
+              }
+            );
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const guarded = await click();
+    const refused = guarded.kind === 'needs_permission' && !guarded.result.ok ? guarded.result.error : '';
+
+    // The one approval is for the link's own file — the document this call asked for — and the second file is named
+    // beside it, so the human is never asked for a file the model did not ask for.
+    expect(refused).toContain('The download of report.txt was stopped');
+    expect(refused).toContain('second.txt');
+
+    const token = expectStepToken(guarded);
+
+    suggested.length = 0;
+    repeat = true;
+
+    const approved = await click([token]);
+
+    if (approved.kind !== 'result') {
+      throw new Error(`expected the approved file to land, got ${JSON.stringify(approved)}`);
+    }
+
+    // The same gesture again: the approval keeps the link's file and stops the script's, which is reported on this
+    // Very call, and the approval is spent on exactly the file it bought.
+    expect(hold.needOf('session-1')?.kind).toBe('spent');
+    expect(downloads.cancelled).toStrictEqual([62, 61, 64]);
+    expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
+  });
 });
 
 describe('a download the dialog answer starts', () => {

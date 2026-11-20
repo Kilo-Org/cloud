@@ -1082,6 +1082,22 @@ const lateDownloadError = (files: readonly DownloadReport[]): string => {
 };
 
 /**
+ * The file a refusal is about: the step's own download — the one whose url is a document this call asked the browser
+ * for — and never whichever file the browser stopped first. A gesture that starts two downloads stops them in the
+ * browser's own order: in the measured two-download click the script's `second.txt` was refused 8 ms before the link's
+ * `report.txt`, so a refusal built from that order promised the human one file and then kept the other.
+ */
+const ownDownloadOf = <File extends { readonly url?: string | undefined }>(
+  files: readonly File[],
+  documents: ReadonlySet<string>
+): File | undefined =>
+  files.find(file => {
+    const page = pageOf(file.url);
+
+    return page !== undefined && documents.has(page);
+  }) ?? files[0];
+
+/**
  * The downloads an act call started that the stream has not named yet, searched
  * for because the browser creates the item a moment after the call's own
  * command returns. A guard that only listened would leave the linger deleting a
@@ -3393,10 +3409,11 @@ export const createBrowserRuntime = ({
         // A navigate names the document it asked for, so a download that starts after the call returns can still be found.
         const destination =
           preflight?.class === 'navigate' || runIsTranslation ? stepUrl : undefined;
-        // The requests this call can be charged with: everything the tab starts from here on.
-        // A download needs one, so a call that starts none never waits for a file.
+        // The requests this call can be charged with: everything the tab starts from here on. Read for every
+        // Download-capable call, not only the guarded ones: the document a step asks for is how the hold's and the
+        // Guard's reports tell the step's own file from a second one the same gesture started.
         const requestsBefore = new Set(
-          guardDownloads ? runSession.networkRequests().map(request => request.requestId) : []
+          runSession.networkRequests().map(request => request.requestId)
         );
         // The step this call is: what a download it starts is reported against, and what the token then binds.
         // The moment the guard is armed, which its settle window is measured from and a navigate expectation covers.
@@ -3706,6 +3723,18 @@ export const createBrowserRuntime = ({
         }
         const ownLate = late.filter(file => (file.since ?? callStartedAt) >= callStartedAt);
         const earlierLate = late.filter(file => (file.since ?? callStartedAt) < callStartedAt);
+        // The pages this call asked the browser for as a document: the url its own download comes from, which is
+        // What tells the file the model asked for from a second one the same gesture started.
+        const stepDocuments = new Set(
+          runSession
+            .networkRequests()
+            .filter(
+              request =>
+                !requestsBefore.has(request.requestId) && request.resourceType === 'Document'
+            )
+            .map(request => pageOf(request.url) ?? '')
+            .filter(page => page !== '')
+        );
         const stoppedFiles = downloadHold === undefined ? settlement.stopped : ownLate.length;
         // A file the guard could not delete is named, whichever call stopped it.
         const keptFiles = [
@@ -3796,7 +3825,8 @@ export const createBrowserRuntime = ({
           if (bought) {
             alsoStopped = ownLate;
           } else {
-            const [ownRefusal, ...otherOwn] = ownLate;
+            const ownRefusal = ownDownloadOf(ownLate, stepDocuments);
+            const otherOwn = ownLate.filter(file => file !== ownRefusal);
 
             if (ownRefusal !== undefined) {
               return downloadRefusal(
@@ -3821,8 +3851,9 @@ export const createBrowserRuntime = ({
         } else if (agentContext !== undefined && stoppedFiles + settlement.kept.length > 0) {
           const origin = preflight?.ok ? preflight.origin : '';
           const reason = SENSITIVE_REASON.download;
-          // The refused file is what the approval will buy: a later step's download is a fresh approval of its own.
-          const refusedFile = settlement.stoppedItems?.find(item => item.url !== undefined);
+          // The refused file is what the approval will buy: the step's own download, never the first one the browser
+          // Stopped. A later step's download is a fresh approval of its own.
+          const refusedFile = ownDownloadOf(settlement.stoppedItems ?? [], stepDocuments);
           const stepToken = preflight?.ok
             ? issueSensitiveToken(
                 { origin, reason },

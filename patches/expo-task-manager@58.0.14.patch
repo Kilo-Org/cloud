@@ -1,0 +1,67 @@
+diff --git a/android/src/main/java/expo/modules/taskmanager/TaskService.java b/android/src/main/java/expo/modules/taskmanager/TaskService.java
+
+--- a/android/src/main/java/expo/modules/taskmanager/TaskService.java
++++ b/android/src/main/java/expo/modules/taskmanager/TaskService.java
+@@ -427,7 +427,15 @@
+     }
+     mTasksAndEventsRepository.putEventForAppScopeKey(appScopeKey, body);
+ 
+-    getAppLoader().loadApp(mContextRef.get(),
++    HeadlessAppLoader appLoader = getAppLoader();
++    if (appLoader == null) {
++      // Job restoration can precede initialization of the application context.
++      Log.e(TAG, "Cannot execute background task '" + task.getName() + "': headless app loader is unavailable (context released). Dropping queued event.");
++      mTasksAndEventsRepository.removeEvents(appScopeKey);
++      return;
++    }
++
++    appLoader.loadApp(mContextRef.get(),
+       new HeadlessAppLoader.Params(appScopeKey, task.getAppUrl()),
+       () -> {
+       },
+@@ -448,8 +456,10 @@
+   //region helpers
+ 
+   private HeadlessAppLoader getAppLoader() {
+-    if (mContextRef.get() != null) {
+-      return AppLoaderProvider.getLoader("react-native-headless", mContextRef.get());
++    // JobScheduler can call this before initialization or after the reference clears.
++    Context context = mContextRef != null ? mContextRef.get() : null;
++    if (context != null) {
++      return AppLoaderProvider.getLoader("react-native-headless", context);
+     } else {
+       return null;
+     }
+diff --git a/ios/EXTaskManager/EXTaskService.m b/ios/EXTaskManager/EXTaskService.m
+index 1fc73e88d18529a38156452fff6b358f8716a8dd..e7b8d802186ff1b5e228ec12b88bf04b760a2c1d 100644
+--- a/ios/EXTaskManager/EXTaskService.m
++++ b/ios/EXTaskManager/EXTaskService.m
+@@ -585,18 +585,24 @@
+     request = nil;
+   }];
+ 
++  // A task can finish on another thread while this method is still running (for
++  // example a background task whose JavaScript completes on the JS thread). Its
++  // callback then clears `request`, which releases the request. Keep it alive
++  // until this method returns.
++  EXTaskExecutionRequest *strongRequest = request;
++
+   @synchronized (_lockTarget) {
+-    [_requests addObject:request];
++    [_requests addObject:strongRequest];
+   }
+ 
+   [self _iterateTasksUsingBlock:^(id<EXTaskInterface> task) {
+     if ([task.consumer.class respondsToSelector:@selector(supportsLaunchReason:)] && [task.consumer.class supportsLaunchReason:launchReason]) {
+-      [self _addTask:task toRequest:request withInfo:userInfo];
++      [self _addTask:task toRequest:strongRequest withInfo:userInfo];
+     }
+   }];
+-  
++
+   // Evaluate request immediately if no tasks were added.
+-  [request maybeEvaluate];
++  [strongRequest maybeEvaluate];
+ }
+ 
+ - (void)_loadAppWithId:(nonnull NSString *)appId

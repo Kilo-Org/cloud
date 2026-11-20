@@ -7,11 +7,13 @@ import { SessionMessageList } from './session-message-list';
 import { getSessionTranscriptItemKey, type SessionTranscriptItem } from './session-transcript';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_RESUME_OLDER_LOADS } from '@/lib/session-resume';
+import { SurfaceClearsSideInsets } from '@/lib/screen-insets';
 import { stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 const flashListProps = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 const scrollMock = vi.hoisted(() => ({ scrollToEnd: vi.fn(), scrollToIndex: vi.fn() }));
 const insets = vi.hoisted(() => ({ left: 0, right: 0 }));
+const platform = vi.hoisted(() => ({ OS: 'ios' }));
 
 // The real `useSessionListAutoScroll` hook is exercised here (not a stub), so
 // the ref it hands FlashList must expose `scrollToEnd` for the auto-scroll
@@ -28,8 +30,9 @@ vi.mock('@/lib/a11y/motion', () => ({
 }));
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  Platform: { OS: 'ios' },
+  Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -152,6 +155,7 @@ afterEach(() => {
   flashListProps.current = null;
   insets.left = 0;
   insets.right = 0;
+  platform.OS = 'ios';
   vi.useRealTimers();
 });
 
@@ -346,11 +350,10 @@ describe('SessionMessageList scroll-to-bottom control', () => {
     expect(String(button.props.className)).toContain(ICON_TARGET_BOX_CLASS);
     expect(button.props.hitSlop).toBeUndefined();
 
-    // The visible circle stays compact inside the enlarged target. Its explicit
-    // px keep NativeWind's 14pt rem from shrinking it back below the look it
-    // shipped with (`h-10` renders at 35pt).
+    // The visible circle stays compact inside the enlarged target: `h-10`
+    // renders at 35pt on NativeWind's 14pt rem.
     const circle = button.find(node => Object.is(node.type, 'View'));
-    expect(String(circle.props.className)).toContain('h-[35px] w-[35px]');
+    expect(String(circle.props.className)).toContain('h-10 w-10');
     expect(String(circle.props.className)).toContain('rounded-full');
   });
 });
@@ -401,6 +404,27 @@ describe('SessionMessageList landscape side insets', () => {
       paddingLeft: 0,
       paddingRight: 0,
     });
+  });
+
+  // A sheet is its own capped, centred window on Android and an inset surface
+  // on iOS, so its edges never reach the cutout: the sheet's header drops the
+  // side insets, and the transcript inside the same sheet must drop them too.
+  it.each(['android', 'ios'])('drops the side insets inside a sheet surface (%s)', os => {
+    platform.OS = os;
+    insets.left = 47;
+    insets.right = 59;
+    act(() => {
+      mounted.push(
+        TestRenderer.create(
+          createElement(
+            SurfaceClearsSideInsets,
+            { value: true },
+            createElement(SessionMessageList<string>, baseProps)
+          )
+        )
+      );
+    });
+    expect(flashListProps.current?.contentContainerStyle).toEqual({ paddingVertical: 8 });
   });
 });
 

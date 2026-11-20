@@ -53,8 +53,10 @@ import {
   getSessionMessagesPage,
   getSessionToolPartDetail,
 } from './router/handlers/session-history.js';
+import { getAnalysisCreditAdmission } from './router/handlers/analysis-credit-admission.js';
 
 export const appRouter = router({
+  getAnalysisCreditAdmission,
   getSessionMessagesPage,
   getSessionToolPartDetail,
   deleteWorktree,

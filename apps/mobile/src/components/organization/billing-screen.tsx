@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- The billing readout composes the plan, seats, auto top-up and Kilo Pass blocks on one screen. */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { BillingCardSkeleton } from '@/components/organization/billing-card-skeleton';
 import {
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
@@ -9,7 +11,7 @@ import {
   getScheduledSeatChange,
   seatCountReadout,
 } from '@/components/organization/billing-model';
-import { ExternalBillingLink } from '@/components/organization/external-billing-link';
+import { BillingWebSettings } from '@/components/organization/billing-web-settings';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { getOrgKiloPassRowState } from '@/components/organization/org-kilo-pass-row-state';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
@@ -17,14 +19,17 @@ import { PermissionDenied } from '@/components/organization/permission-denied';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { KvRow } from '@/components/ui/kv-row';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   isMoneyRole,
   useOrgBoundary,
@@ -38,27 +43,6 @@ import {
 } from '@/lib/hooks/use-org-billing-queries';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
-/** A settings block: the raised surface the hub's own cards paint. */
-function BillingCard({ children }: Readonly<{ children: ReactNode }>) {
-  return <View className="rounded-lg bg-secondary px-3">{children}</View>;
-}
-
-/**
- * Two rows' worth of loading shape. A billing readout that grows its card when
- * the answer lands would move every block under it, so the placeholder holds
- * the same height the rows will.
- */
-function BillingCardSkeleton() {
-  return (
-    <View className="rounded-lg bg-secondary px-3">
-      <View className="gap-3 py-3">
-        <Skeleton className="h-4 w-28 rounded bg-muted-soft" />
-        <Skeleton className="h-4 w-20 rounded bg-muted-soft" />
-      </View>
-    </View>
-  );
-}
-
 /** A block whose read failed, with the retry that asks it again. */
 function BillingCardError({
   onRetry,
@@ -66,8 +50,8 @@ function BillingCardError({
 }: Readonly<{ onRetry: () => void; isRetrying: boolean }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
-      <Text className="text-sm text-muted-foreground">{t('common.somethingWentWrong')}</Text>
+    <Card>
+      <Text variant="muted">{t('common.somethingWentWrong')}</Text>
       <Button
         variant="outline"
         size="sm"
@@ -77,17 +61,14 @@ function BillingCardError({
       >
         <Text>{t('common.retry')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }
 
-function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-      {children}
-    </Text>
-  );
-}
+type OrganizationBillingScreenProps = Readonly<{
+  /** Explicit org id from the route's `?org=`, replacing the persisted selection for this render. */
+  organizationIdOverride?: string;
+}>;
 
 /**
  * The organization's billing readout: the plan and its subscription state, the
@@ -95,12 +76,14 @@ function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
  *
  * Nothing here changes a plan. Buying seats, changing the plan and setting up
  * auto top-up exist only on the web, so those controls lead there — a link only
- * on an iOS build in the US storefront, plain text everywhere else, the rule
- * `useCanLinkExternalPurchase` owns.
+ * on an iOS build in the US storefront, a statement of where the setting lives
+ * everywhere else, the rule `useCanLinkExternalPurchase` owns.
  */
-export function OrganizationBillingScreen() {
+export function OrganizationBillingScreen({
+  organizationIdOverride,
+}: OrganizationBillingScreenProps = {}) {
   const { t } = useTranslation();
-  const { organizationId, role, org, isResolving } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary(organizationIdOverride);
   const hasBillingRole = isMoneyRole(role);
   const subscription = useOrgSeatSubscription(organizationId, hasBillingRole);
   const seats = useOrgSeats(organizationId);
@@ -118,14 +101,23 @@ export function OrganizationBillingScreen() {
   const screenTitle = t('organization.billing.title');
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />;
+    return (
+      <OrganizationBoundary
+        title={screenTitle}
+        backFallback={ORGANIZATION_HUB_PATH}
+        organizationIdOverride={organizationIdOverride}
+      />
+    );
   }
 
   if (!hasBillingRole) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
-        <PermissionDenied description={t('organization.billing.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.billing.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }
@@ -186,30 +178,28 @@ export function OrganizationBillingScreen() {
       return <BillingCardSkeleton />;
     }
     return (
-      <BillingCard>
+      <RowGroup>
         <KvRow label={t('organization.hub.plan')} value={planName} valueFace="text" />
         <KvRow
           label={t('organization.billing.state')}
           value={subscriptionState.label}
           valueFace="text"
           valueTone={subscriptionState.tone}
-          last={scheduledSeatChange == null}
         />
         {scheduledSeatChange == null ? null : (
           <KvRow
             label={t('kiloPass.manage.scheduledChange')}
             value={scheduledSeatChange}
             valueFace="text"
-            last
           />
         )}
-      </BillingCard>
+      </RowGroup>
     );
   };
 
   const renderAutoTopUpState = (): ReactNode => {
     if (autoTopUp.isPending) {
-      return <BillingCardSkeleton />;
+      return <BillingCardSkeleton rows={3} />;
     }
     if (autoTopUp.isError) {
       return (
@@ -220,10 +210,10 @@ export function OrganizationBillingScreen() {
       );
     }
     if (autoTopUpReadout == null) {
-      return <BillingCardSkeleton />;
+      return <BillingCardSkeleton rows={3} />;
     }
     return (
-      <BillingCard>
+      <RowGroup>
         <KvRow
           label={t('common.status')}
           value={autoTopUpReadout.status}
@@ -239,9 +229,44 @@ export function OrganizationBillingScreen() {
           label={t('organization.billing.autoTopUpThreshold')}
           value={autoTopUpReadout.threshold}
           valueFace="numeric"
-          last
         />
-      </BillingCard>
+      </RowGroup>
+    );
+  };
+
+  const renderKiloPassState = () => {
+    if (kiloPassRowState == null) {
+      return null;
+    }
+    return (
+      <Section label={t('kiloPass.title')}>
+        {kiloPassRowState.loading ? (
+          <BillingCardSkeleton rows={1} />
+        ) : (
+          <RowGroup>
+            <KvRow
+              label={t('common.status')}
+              value={kiloPassRowState.subtitle}
+              valueFace="text"
+              valueTone={kiloPassRowState.tone}
+              trailing={
+                kiloPassRowState.action === 'retry' ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onPress={() => {
+                      void kiloPassSummary.refetch();
+                    }}
+                    loading={kiloPassSummary.isFetching}
+                  >
+                    <Text>{t('common.retry')}</Text>
+                  </Button>
+                ) : undefined
+              }
+            />
+          </RowGroup>
+        )}
+      </Section>
     );
   };
 
@@ -250,7 +275,7 @@ export function OrganizationBillingScreen() {
       <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {/* A lapsed plan blocks every new session, so it is stated before the
@@ -273,76 +298,30 @@ export function OrganizationBillingScreen() {
           />
         ) : null}
 
-        <View className="gap-2">
-          <SectionLabel>{t('organization.billing.subscription')}</SectionLabel>
+        <Section label={t('organization.billing.subscription')}>
           {renderSubscriptionState()}
-        </View>
+        </Section>
 
-        <View className="gap-2">
-          <SectionLabel>{t('organization.billing.seats')}</SectionLabel>
-          <BillingCard>
+        <Section label={t('organization.billing.seats')}>
+          <RowGroup>
             <KvRow
               label={t('organization.billing.seatsInUse')}
               value={seatCountValue}
               valueFace="numeric"
-              last
             />
-          </BillingCard>
-        </View>
+          </RowGroup>
+        </Section>
 
-        <View className="gap-2">
-          <SectionLabel>{t('organization.billing.autoTopUp')}</SectionLabel>
-          {renderAutoTopUpState()}
-        </View>
+        <Section label={t('organization.billing.autoTopUp')}>{renderAutoTopUpState()}</Section>
 
-        {kiloPassRowState == null ? null : (
-          <View className="gap-2">
-            {kiloPassRowState.loading ? (
-              <BillingCardSkeleton />
-            ) : (
-              <BillingCard>
-                <KvRow
-                  label={t('kiloPass.title')}
-                  value={kiloPassRowState.subtitle}
-                  valueFace="text"
-                  valueTone={kiloPassRowState.attention ? 'warn' : 'default'}
-                  last
-                  trailing={
-                    kiloPassRowState.action === 'retry' ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onPress={() => {
-                          void kiloPassSummary.refetch();
-                        }}
-                        loading={kiloPassSummary.isFetching}
-                      >
-                        <Text>{t('common.retry')}</Text>
-                      </Button>
-                    ) : undefined
-                  }
-                />
-              </BillingCard>
-            )}
-          </View>
-        )}
+        {renderKiloPassState()}
 
-        <View className="gap-2">
-          <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
-          <View className="gap-3 rounded-lg bg-secondary p-3">
-            {changePlanOnBanner ? null : (
-              <ExternalBillingLink url={subscriptionsUrl} label={changePlanLabel} />
-            )}
-            <ExternalBillingLink
-              url={`${subscriptionsUrl}/seats`}
-              label={t('organization.billing.buySeats')}
-            />
-            <ExternalBillingLink
-              url={organizationBillingUrl(organizationId)}
-              label={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
-            />
-          </View>
-        </View>
+        <BillingWebSettings
+          subscriptionsUrl={subscriptionsUrl}
+          planLabel={changePlanOnBanner ? null : changePlanLabel}
+          autoTopUpUrl={organizationBillingUrl(organizationId)}
+          autoTopUpLabel={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
+        />
       </TabScreenScrollView>
     </View>
   );

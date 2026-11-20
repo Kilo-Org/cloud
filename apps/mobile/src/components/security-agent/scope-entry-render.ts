@@ -1,5 +1,6 @@
 import { isUnauthorizedTrpcError } from '@/lib/auth/trpc-unauthorized';
 import { type BannerState } from '@/lib/offline-banner-state';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 export type ScopeEntryView =
@@ -146,10 +147,8 @@ export function selectScopeEntryLoadFailure({
   connectivity,
   lastAttemptFailed,
 }: SelectScopeEntryLoadFailureInput): ScopeEntryLoadFailure {
-  const serverAnswered = errors.some(error => readTrpcErrorField(error, 'code') !== undefined);
-  const isConnection =
-    isPaused || connectivity === 'offline' || (errors.length > 0 && !serverAnswered);
-  if (!isConnection) {
+  const variant = classifyReadFailureVariant({ errors, isPaused, connectivity });
+  if (variant !== 'offline') {
     return { variant: 'server', descriptionKey: null };
   }
   return {

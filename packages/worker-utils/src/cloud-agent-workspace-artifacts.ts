@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export const WORKSPACE_ARTIFACT_MAX_FILES = 1_000;
 export const WORKSPACE_ARTIFACT_MAX_PATH_BYTES = 1_024;
-export const WORKSPACE_ARTIFACT_RETENTION_MS = 14 * 24 * 60 * 60 * 1_000;
 
 export const workspaceArtifactRevisionSchema = z
   .number()
@@ -24,7 +23,6 @@ export const workspaceArtifactEntrySchema = z
     sizeBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     contentType: z.string().min(1),
     updatedAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-    expiresAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   })
   .strict();
 
@@ -47,10 +45,15 @@ export const workspaceArtifactDeleteInputSchema = z
   })
   .strict();
 
+// During independent web and Worker rollouts, older Workers still send the per-file expiry.
+const legacyCompatibleArtifactEntrySchema = workspaceArtifactEntrySchema
+  .extend({ expiresAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional() })
+  .transform(({ expiresAt: _expiresAt, ...entry }) => entry);
+
 export const listWorkspaceArtifactsOutputSchema = z
   .object({
     revision: workspaceArtifactRevisionSchema,
-    entries: z.array(workspaceArtifactEntrySchema).max(WORKSPACE_ARTIFACT_MAX_FILES),
+    entries: z.array(legacyCompatibleArtifactEntrySchema).max(WORKSPACE_ARTIFACT_MAX_FILES),
   })
   .strict();
 

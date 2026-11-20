@@ -1,3 +1,5 @@
+import { hasVisibleGlyph } from '@kilocode/app-shared/display-text';
+import { sessionDisplayLine } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 
 /**
@@ -16,15 +18,39 @@ export type RequestingClient = {
 export const REQUESTING_CLIENT_FIELD_MAX = 200;
 
 /**
- * A value rendered as text on the approval page: bounded, and free of control
- * characters so it cannot break a line or a shell-style record.
+ * A value rendered as text on the approval page: bounded, free of control
+ * characters so it cannot break a line or a shell-style record, and normalized
+ * through the repository's display-text rule so a layout format control cannot
+ * reorder what the approver confirms. The value is normalized after the raw
+ * checks, so what is stored and echoed is the display text the approver reads,
+ * and a value that draws nothing is refused: the approver cannot confirm a
+ * blank client.
  */
 const displayField = z
   .string()
   .trim()
   .min(1)
   .max(REQUESTING_CLIENT_FIELD_MAX)
-  .refine(value => !/\p{Cc}/u.test(value), 'must not contain control characters');
+  .refine(value => !/\p{Cc}/u.test(value), 'must not contain control characters')
+  .transform(value => sessionDisplayLine(value).trim())
+  .refine(hasVisibleGlyph, 'must not contain only invisible characters');
+
+/**
+ * The client identifier the requester is held to. Unlike the displayed fields,
+ * the stored value is compared byte-for-byte against the identifier the OAuth
+ * flow carries (the pairing echo and the approval confirmation), so a value
+ * the display normalization would change — a layout format control, a control
+ * character, or leading or trailing whitespace — is refused with a definite
+ * 400 instead of pairing one identifier and confirming another. The check runs
+ * on the untouched value, before any normalization.
+ */
+const clientIdField = z
+  .string()
+  .refine(
+    value => value.trim() === value && sessionDisplayLine(value) === value,
+    'must not contain characters its display normalization would change'
+  )
+  .pipe(displayField);
 
 /**
  * Schemes a browser handles itself. A bare scheme is only accepted for a native
@@ -75,7 +101,7 @@ function redirectOriginFor(url: URL): string {
 
 /** The `requesting_client` member of `POST /api/device-auth/codes`. */
 export const requestingClientSchema = z.object({
-  client_id: displayField,
+  client_id: clientIdField,
   client_name: displayField,
   redirect_origin: displayField.refine(
     isRedirectOrigin,
@@ -97,6 +123,11 @@ export function toRequestingClient(payload: RequestingClientPayload): Requesting
 /**
  * The requesting client of a stored row, or null when the row carries none
  * (a caller that names no client, and every row written before this flow).
+ *
+ * The values are the stored ones: the approval posts `clientId` back to confirm
+ * the client it approved, and the server compares it with the stored value, so
+ * this type must not transform it. The approval page renders each value through
+ * `displaySafeText`, which is where display text belongs.
  */
 export function requestingClientOfRow(row: {
   requesting_client_id: string | null;

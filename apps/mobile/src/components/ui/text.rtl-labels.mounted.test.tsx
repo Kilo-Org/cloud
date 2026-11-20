@@ -41,7 +41,10 @@ describe('Text eyebrow in an RTL interface', () => {
     const classes = (label.props.className as string).split(' ');
 
     expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
-    expect(classes).toEqual(expect.arrayContaining(['text-[10px]', 'text-muted-foreground']));
+    // The size is the script's, not the interface's: an Arabic eyebrow takes the
+    // token's 13px twin and `cn` (twMerge) drops the variant's `text-[10px]`.
+    expect(classes).toEqual(expect.arrayContaining(['text-[13px]', 'text-muted-foreground']));
+    expect(classes).not.toContain('text-[10px]');
     expect(label.props.style).toContainEqual({ letterSpacing: 0 });
     expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
     expect(label.children).toEqual([ARABIC]);

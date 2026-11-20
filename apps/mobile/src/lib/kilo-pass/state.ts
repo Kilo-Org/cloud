@@ -2,6 +2,7 @@ import { KILO_PASS_TITLE } from '@kilocode/app-shared/commerce';
 
 import { i18n } from '@/i18n';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
+import { joinSentences } from '@/lib/i18n/join-sentences';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
@@ -43,6 +44,11 @@ const TIER_LABEL_KEYS = {
   tier_49: 'kiloPass.tierPro',
   tier_199: 'kiloPass.tierExpert',
 } as const satisfies Record<KiloPassSubscription['tier'], string>;
+
+/** The tier's own name, for a row that names the plan without its cadence. */
+export function kiloPassTierLabel(tier: KiloPassSubscription['tier']): string {
+  return i18n.t(TIER_LABEL_KEYS[tier]);
+}
 
 const CADENCE_LABEL_KEYS = {
   monthly: 'kiloPass.cadenceMonthly',
@@ -101,7 +107,7 @@ export function kiloPassPlanLabel(
   tier: KiloPassSubscription['tier'],
   cadence: KiloPassSubscription['cadence']
 ): string {
-  return `${i18n.t(TIER_LABEL_KEYS[tier])} · ${i18n.t(CADENCE_LABEL_KEYS[cadence])}`;
+  return `${kiloPassTierLabel(tier)} · ${i18n.t(CADENCE_LABEL_KEYS[cadence])}`;
 }
 
 function planLabel(subscription: KiloPassSubscription): string {
@@ -269,7 +275,13 @@ export function getKiloPassDetailState(params: KiloPassQueryFields): KiloPassDet
 
 export type KiloPassCardContentState =
   | { kind: 'loading' }
-  | { kind: 'error'; title: string; description: string; actionLabel: string }
+  | {
+      kind: 'error';
+      title: string;
+      description: string;
+      actionLabel: string;
+      accessibilityLabel: string;
+    }
   | { kind: 'card'; title: string; description: string; accessibilityLabel: string };
 
 /**
@@ -284,13 +296,17 @@ export function getKiloPassCardContentState(params: KiloPassQueryFields): KiloPa
     return { kind: 'loading' };
   }
   if (state.kind === 'error') {
+    const title = i18n.t('kiloPass.unavailable');
+    // The card sits on the Profile screen, so it names the action instead of
+    // sending the reader to the screen they are already on.
+    const description = i18n.t('kiloPass.loadFailedRetry');
+    const actionLabel = i18n.t('common.retry');
     return {
       kind: 'error',
-      title: i18n.t('kiloPass.unavailable'),
-      // The card sits on the Profile screen, so it names the action instead of
-      // sending the reader to the screen they are already on.
-      description: i18n.t('kiloPass.loadFailedRetry'),
-      actionLabel: i18n.t('common.retry'),
+      title,
+      description,
+      actionLabel,
+      accessibilityLabel: joinSentences([title, description, actionLabel]),
     };
   }
 
@@ -310,6 +326,6 @@ function cardState(description: string): KiloPassCardContentState {
     kind: 'card',
     title: KILO_PASS_TITLE,
     description,
-    accessibilityLabel: [KILO_PASS_TITLE, description].join(i18n.t('common.sentenceJoiner')),
+    accessibilityLabel: joinSentences([KILO_PASS_TITLE, description]),
   };
 }

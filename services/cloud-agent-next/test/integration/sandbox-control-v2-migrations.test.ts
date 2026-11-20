@@ -77,6 +77,7 @@ const WORKSPACE_DISK_MIGRATION_AT = 1793713237356;
 const CREATE_ATTEMPT_MIGRATION_AT = 1794145671968;
 const BILLING_FAILURE_MIGRATION_AT = 1794258032795;
 const WORKSPACE_ARTIFACTS_MIGRATION_AT = 1794406959569;
+const NETWORK_SECRET_SNAPSHOTS_MIGRATION_AT = 1794934771584;
 
 const OLD_FOUR_MIGRATIONS = {
   journal: {
@@ -127,6 +128,7 @@ function newSandboxStub(): DurableObjectStub<SandboxControlV2> {
 }
 
 function clearSchema(db: MigrationDb): void {
+  db.run(sql`DROP TABLE IF EXISTS network_secret_snapshots`);
   db.run(sql`DROP TABLE IF EXISTS workspace_artifact_orphans`);
   db.run(sql`DROP TABLE IF EXISTS workspace_artifacts`);
   db.run(sql`DROP TABLE IF EXISTS workspace_disk_allocation`);
@@ -188,6 +190,7 @@ describe('sandbox control V2 consolidated migrations', () => {
 
       expect(appTableNames(db)).toEqual([
         'allocation',
+        'network_secret_snapshots',
         'routes',
         'scope_grants',
         'workspace_artifact_orphans',
@@ -217,6 +220,10 @@ describe('sandbox control V2 consolidated migrations', () => {
         { name: 'object_key', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
         { name: 'queued_at', type: 'integer', notnull: 1, dflt_value: null, pk: 0 },
       ]);
+      expect(columnSignatures(db, 'network_secret_snapshots')).toEqual([
+        { name: 'scope_id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+        { name: 'secrets', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+      ]);
       expect(db.select().from(workspaceDiskAllocation).all()).toEqual([]);
       expect(db.select().from(workspaceDiskSnapshots).all()).toEqual([]);
 
@@ -233,6 +240,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
         { hash: '', created_at: BILLING_FAILURE_MIGRATION_AT },
         { hash: '', created_at: WORKSPACE_ARTIFACTS_MIGRATION_AT },
+        { hash: '', created_at: NETWORK_SECRET_SNAPSHOTS_MIGRATION_AT },
       ]);
       const applied = appliedMigrations(db);
       await migrate(db, migrations);
@@ -275,6 +283,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
         { hash: '', created_at: BILLING_FAILURE_MIGRATION_AT },
         { hash: '', created_at: WORKSPACE_ARTIFACTS_MIGRATION_AT },
+        { hash: '', created_at: NETWORK_SECRET_SNAPSHOTS_MIGRATION_AT },
       ]);
       expect(db.select().from(scopeGrants).all()).toEqual([]);
       expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);

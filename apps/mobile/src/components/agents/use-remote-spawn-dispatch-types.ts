@@ -1,7 +1,27 @@
 import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
+import {
+  type CreateRemoteSessionInput,
+  type CreateSessionOutcome,
+  type CreateSessionSpawnOptions,
+  type RemoteInstanceSpawnStatus,
+} from '@/lib/hooks/use-remote-instance-spawn';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { type SharePayload } from '@/lib/share-payload';
+import { type TrialRefusalAction } from '@/lib/trial-refusal';
+
+/**
+ * The slice of `useRemoteInstanceSpawn` the dispatch consumes, spelled out so
+ * a widened hook surface cannot silently leak into the dispatch.
+ */
+export type RemoteSpawnController = {
+  status: RemoteInstanceSpawnStatus;
+  spawn: (
+    connectionId: string,
+    opts?: CreateRemoteSessionInput,
+    options?: CreateSessionSpawnOptions
+  ) => Promise<CreateSessionOutcome>;
+};
 
 /**
  * The dispatch hook's inputs, extracted so the hook file stays within the
@@ -111,6 +131,12 @@ export type UseRemoteSpawnDispatchArgs = {
 export type RemoteSpawnFailure = {
   retryable: boolean;
   message: string;
+  /**
+   * The step that ends the refusal, when the refusal offers one: only the
+   * organization plan's refusal carries the billing step, and only for a reader
+   * who may change the plan. Every other failure keeps its copy alone.
+   */
+  action?: TrialRefusalAction;
 };
 
 export type UseRemoteSpawnDispatchResult = {

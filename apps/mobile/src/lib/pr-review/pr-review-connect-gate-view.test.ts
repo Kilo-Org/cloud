@@ -251,22 +251,16 @@ describe('selectPrReviewConnectAction', () => {
     }
   });
 
-  it('a first-time GitLab connect keeps the CTA for a member', () => {
-    // The organization GitLab OAuth connect only requires a billing role when
-    // a connection already exists, so a first-time connect stays member-level.
-    expect(selectPrReviewConnectAction(base)).toBe('connect');
-  });
-
-  it('an organization GitLab re-authorization explains the role for a member', () => {
-    expect(selectPrReviewConnectAction({ ...base, view: 'reconnect' })).toBe(
-      'organization-admin-only'
-    );
-  });
-
-  it('an organization Bitbucket connect explains the role for a member', () => {
-    expect(selectPrReviewConnectAction({ ...base, platform: 'bitbucket' })).toBe(
-      'organization-admin-only'
-    );
+  it('an organization connect explains the role to a member on every provider and view', () => {
+    // Every organization GitLab and Bitbucket connect asks for a billing role,
+    // first connect and re-authorization alike, so a member gets no CTA.
+    for (const platform of ['gitlab', 'bitbucket'] as const) {
+      for (const view of ['connect', 'reconnect'] as const) {
+        expect(selectPrReviewConnectAction({ ...base, platform, view })).toBe(
+          'organization-admin-only'
+        );
+      }
+    }
   });
 
   it('a billing role keeps the CTA wherever the server accepts it', () => {

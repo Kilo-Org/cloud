@@ -4,7 +4,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { appShellSignInUrl } from '@/lib/app-shell-handoff';
 import { API_BASE_URL } from '@/lib/config';
 import { openAuthBrowser, resolveAuthBrowserKind } from '@/lib/auth/auth-browser';
-import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
+import { getDeviceAuthStartRefusalError } from '@/lib/auth/poll-response';
 import { parseAuthError, parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
@@ -14,7 +14,7 @@ import {
   idleDeviceAuthState,
   pendingDeviceAuthState,
 } from '@/lib/auth/device-auth-state';
-import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
+import { deviceAuthExpiresAt, startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import {
   clearPendingExternalAuth,
   readPendingExternalAuth,
@@ -117,7 +117,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         setState,
         cleanup,
         browserKind: resolveAuthBrowserKind(record.verificationUrl),
-        startedAt: record.startedAt,
+        expiresAt: record.expiresAt,
       });
     }
 
@@ -169,26 +169,23 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         if (!response.ok) {
-          if (response.status === 429) {
-            const body = (await response.json().catch(() => undefined)) as
-              | { error?: string }
-              | undefined;
-            setState(errorDeviceAuthState(undefined, getDeviceAuth429Error(body), undefined));
-            return;
-          }
+          // One body read serves both refusals below: the pending-link match and
+          // the stable code that picks the banner copy.
+          const body = await response.json().catch(() => undefined);
           // A link that lapsed or was used elsewhere cannot start a browser sign-in. The
           // pending-link screen shows its own expired state, so this is no error banner.
-          if (response.status === 400 && pendingLinkToken) {
-            const refusal = parseAuthError(await response.json().catch(() => undefined));
-            if (refusal?.code === 'PENDING_LINK_EXPIRED') {
-              setState({ ...idleDeviceAuthState(), expiredPendingLinkToken: pendingLinkToken });
-              return;
-            }
+          if (
+            response.status === 400 &&
+            pendingLinkToken &&
+            parseAuthError(body)?.code === 'PENDING_LINK_EXPIRED'
+          ) {
+            setState({ ...idleDeviceAuthState(), expiredPendingLinkToken: pendingLinkToken });
+            return;
           }
           setState(
             errorDeviceAuthState(
               undefined,
-              deviceAuthErrorKey('authErrors.startSignInFailed'),
+              getDeviceAuthStartRefusalError(body, response.status),
               undefined
             )
           );
@@ -208,6 +205,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         const { userCode, deviceCode } = data;
+        const expiresAt = deviceAuthExpiresAt(Date.now(), data.expiresIn);
 
         deviceCodeReference.current = deviceCode;
 
@@ -232,7 +230,7 @@ export function useDeviceAuth(): DeviceAuthResult {
           deviceCode,
           userCode,
           verificationUrl: browserUrl,
-          startedAt: Date.now(),
+          expiresAt,
         });
 
         setState(pendingDeviceAuthState(userCode, browserUrl));
@@ -249,6 +247,7 @@ export function useDeviceAuth(): DeviceAuthResult {
           // which API opened it: the plain browser on a non-product host (or on
           // Android) needs its own dismissal.
           browserKind: resolveAuthBrowserKind(browserUrl),
+          expiresAt,
         });
 
         await openAuthBrowser(browserUrl);

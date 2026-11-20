@@ -1,0 +1,373 @@
+/* eslint-disable max-lines -- the checks cover origins, tokens, masks, downloads and field classification in one table-driven suite. */
+import { describe, expect, it } from 'vitest';
+import {
+  applyAgentSnapshotLine,
+  canStartDownload,
+  classifyFormField,
+  createStepTokenStore,
+  downloadTierOf,
+  hashBrowserToolArguments,
+  isOAuthConsentUrl,
+  isOriginGranted,
+  maskSensitiveValues,
+  MASKED_VALUE,
+  originPatternMatches,
+  SENSITIVE_REASON,
+  sensitiveReasonForField,
+  toBrowserOrigin,
+  toolGrantClass,
+} from './browser-agent-checks';
+import { sensitiveTargetsOf } from './browser-agent-probes';
+
+const absentUrl: string | undefined = undefined;
+
+const reversedArgumentKeys = (): Record<string, unknown> =>
+  Object.fromEntries(Object.entries({ first: 1, second: [2] }).toReversed());
+
+describe('origin normalisation', () => {
+  it('drops the path, query and default port', () => {
+    expect(toBrowserOrigin('https://Example.com:443/a?b#c')).toBe('https://example.com');
+    expect(toBrowserOrigin('http://localhost:3001/page')).toBe('http://localhost:3001');
+    expect(toBrowserOrigin('http://127.0.0.1:80/')).toBe('http://127.0.0.1');
+  });
+
+  it('keeps a non-default port and collapses every file URL to one origin', () => {
+    expect(toBrowserOrigin('http://localhost:8123/x')).toBe('http://localhost:8123');
+    expect(toBrowserOrigin('file:///Users/me/page.html')).toBe('file://');
+  });
+
+  it('refuses browser-internal and extension pages', () => {
+    expect(toBrowserOrigin('chrome://settings')).toBeUndefined();
+    expect(toBrowserOrigin('chrome-extension://abc/sidepanel.html')).toBeUndefined();
+    expect(toBrowserOrigin('about:blank')).toBeUndefined();
+    expect(toBrowserOrigin(absentUrl)).toBeUndefined();
+  });
+});
+
+describe('tool class mapping', () => {
+  it('maps the read tools to read', () => {
+    for (const name of ['browser_snapshot', 'browser_find', 'browser_take_screenshot']) {
+      expect(toolGrantClass(name)).toBe('read');
+    }
+  });
+
+  it('maps navigation to navigate', () => {
+    expect(toolGrantClass('browser_navigate')).toBe('navigate');
+    expect(toolGrantClass('browser_navigate_back')).toBe('navigate');
+  });
+
+  it('treats model-authored code as act (D11)', () => {
+    expect(toolGrantClass('browser_evaluate')).toBe('act');
+    expect(toolGrantClass('browser_run_code_unsafe')).toBe('act');
+  });
+
+  it('falls back to act for an unknown tool', () => {
+    expect(toolGrantClass('browser_teleport')).toBe('act');
+  });
+});
+
+describe('download-capable tools', () => {
+  it('covers every tool whose page action can start one', () => {
+    for (const name of [
+      'browser_click',
+      'browser_drag',
+      'browser_drop',
+      'browser_evaluate',
+      // Each field goes through the page's `input`/`change` handler, and a checkbox is clicked into place.
+      'browser_fill_form',
+      'browser_navigate',
+      'browser_navigate_back',
+      'browser_navigate_forward',
+      'browser_press_key',
+      'browser_reload',
+      'browser_run_code_unsafe',
+      // An export-style `change` handler and page-registered WebMCP code can each answer with an attachment.
+      'browser_select_option',
+      'browser_webmcp_call',
+      // `submit` presses Enter, exactly as `browser_press_key` does, and typing alone fires `input`.
+      'browser_type',
+    ]) {
+      expect(canStartDownload(name)).toBe(true);
+    }
+  });
+
+  it('counts a tab only for the action that opens a page', () => {
+    expect(canStartDownload('browser_tabs', { action: 'new' })).toBe(true);
+    expect(canStartDownload('browser_tabs', { action: 'list' })).toBe(false);
+    expect(canStartDownload('browser_tabs', { action: 'close' })).toBe(false);
+  });
+
+  it('leaves a tool that only reads the page alone', () => {
+    expect(canStartDownload('browser_snapshot')).toBe(false);
+    expect(canStartDownload('browser_take_screenshot')).toBe(false);
+  });
+});
+
+describe('download tier choice', () => {
+  const base = {
+    approved: false,
+    canDownload: true,
+    canIntercept: true,
+    hasHold: true,
+    hasPermission: true,
+    needsTheFile: false,
+    sensitiveToken: false,
+  } as const;
+
+  it('holds on a browser with the event and the permission', () => {
+    expect(downloadTierOf(base)).toBe('hold');
+  });
+
+  it('intercepts only when the event exists and the permission is withheld, so the hold is never armed alone', () => {
+    expect(downloadTierOf({ ...base, hasPermission: false })).toBe('intercept');
+    // A browser that cannot pause a response has nothing to fall back to.
+    expect(downloadTierOf({ ...base, canIntercept: false, hasPermission: false })).toBe('none');
+  });
+
+  it('keeps the legacy cancel-after-start guard on a browser with the permission but no event', () => {
+    expect(downloadTierOf({ ...base, hasHold: false })).toBe('legacy');
+  });
+
+  it('names one tier per permission and browser combination, never two', () => {
+    const tiers = [true, false].flatMap(hasHold =>
+      [true, false].flatMap(hasPermission =>
+        [true, false].map(canIntercept =>
+          downloadTierOf({ ...base, canIntercept, hasHold, hasPermission })
+        )
+      )
+    );
+
+    // Every combination picks at most one tier: the hold wins with the permission, the interceptor only without it.
+    expect(tiers).toStrictEqual([
+      'hold',
+      'hold',
+      'intercept',
+      'none',
+      'legacy',
+      'legacy',
+      'intercept',
+      'none',
+    ]);
+  });
+
+  it('chooses no guard for a call that cannot start a download or already spent its token', () => {
+    expect(downloadTierOf({ ...base, canDownload: false })).toBe('none');
+    expect(downloadTierOf({ ...base, sensitiveToken: true })).toBe('none');
+  });
+
+  it('guards nothing on a browser whose only guard is the legacy one, when the approval names no file', () => {
+    expect(downloadTierOf({ ...base, approved: true, hasHold: false })).toBe('none');
+    expect(downloadTierOf({ ...base, approved: true, hasHold: false, needsTheFile: true })).toBe(
+      'legacy'
+    );
+  });
+});
+
+describe('grant matching', () => {
+  const grants = [
+    { class: 'read' as const, origin: 'https://example.com' },
+    { class: 'act' as const, origin: 'http://localhost:*' },
+  ];
+
+  it('matches class and origin exactly', () => {
+    expect(isOriginGranted(grants, 'read', 'https://example.com')).toBe(true);
+    expect(isOriginGranted(grants, 'act', 'https://example.com')).toBe(false);
+    expect(isOriginGranted(grants, 'read', 'https://other.com')).toBe(false);
+  });
+
+  it('matches a wildcard origin', () => {
+    expect(isOriginGranted(grants, 'act', 'http://localhost:5173')).toBe(true);
+    expect(originPatternMatches('*.example.com', 'api.example.com')).toBe(true);
+    expect(originPatternMatches('*.example.com', 'example.com')).toBe(false);
+  });
+});
+
+describe('argument hashing', () => {
+  it('matches the fixed vectors the CLI pins', () => {
+    // The same three vectors are written to /tmp/browser-bridge/hash-vectors.json: the CLI hashes a call's
+    // Arguments with this exact form, so a change here must fail this test and that file together.
+    const vectors = [
+      { args: { scale: 'css', url: 'https://example.com/report.txt' }, hash: '19ea8d50:54' },
+      {
+        args: {
+          nested: { items: [{ count: 2, rank: 1 }], zeta: 1 },
+          options: { button: 'left', doubleClick: true },
+          target: 'e12',
+        },
+        hash: 'a243193a:114',
+      },
+      // The same arguments with every top-level key set in another order: the hash must not change.
+      {
+        // eslint-disable-next-line sort-keys -- the fixture's key order is the point: the hash must ignore it
+        args: {
+          options: { button: 'left', doubleClick: true },
+          target: 'e12',
+          nested: { items: [{ count: 2, rank: 1 }], zeta: 1 },
+        },
+        hash: 'a243193a:114',
+      },
+      // An astral character contributes its full code point and then its low surrogate, one per UTF-16 index; a
+      // Code-unit-only fold would disagree, and the CLI's hash must equal this one to find a step token.
+      { args: { text: 'café' }, hash: '4acfafd3:15' },
+      { args: { text: 'a😀b' }, hash: 'c3f119:15' },
+      { args: { text: '日本語テキスト' }, hash: 'edae66dd:18' },
+      { args: { ключ: 'значение' }, hash: '2d42327b:19' },
+      { args: { target: 'e1', text: 'naïve 😀 漢字' }, hash: 'd54a8501:36' },
+    ];
+
+    for (const vector of vectors) {
+      expect(hashBrowserToolArguments(vector.args)).toBe(vector.hash);
+    }
+  });
+
+  it('ignores key order and names the length', () => {
+    expect(hashBrowserToolArguments({ first: 1, second: [2] })).toBe(
+      hashBrowserToolArguments(reversedArgumentKeys())
+    );
+  });
+
+  it('changes with a value', () => {
+    expect(hashBrowserToolArguments({ first: 1 })).not.toBe(hashBrowserToolArguments({ first: 2 }));
+  });
+});
+
+describe('step tokens', () => {
+  const binding = {
+    argumentHash: 'abc',
+    element: 'e12',
+    origin: 'https://example.com',
+    session: 'session-1',
+    tabId: 7,
+    toolName: 'browser_type',
+  };
+
+  it('consumes a token once for the same call', () => {
+    const store = createStepTokenStore({ now: () => 1000, random: () => 'token-1' });
+    const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
+
+    expect(store.consume(token, binding)).toBe(true);
+    expect(store.consume(token, binding)).toBe(false);
+  });
+
+  it('rejects a token bound to another tab, tool, element or argument set', () => {
+    const store = createStepTokenStore({ now: () => 1000, random: () => 'token-2' });
+    const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
+
+    expect(store.consume(token, { ...binding, tabId: 8 })).toBe(false);
+  });
+
+  it('keeps the file an approval is for, for the whole life of the token', () => {
+    let clock = 1000;
+    const store = createStepTokenStore({ now: () => clock, random: () => 'token-need' });
+    const need = { kind: 'page' as const, tabId: 7, url: 'https://example.com/invoice.pdf' };
+    const token = store.issue({ ...binding, need, reason: SENSITIVE_REASON.download });
+
+    // A human takes half a minute: no download record survives that long, and the token still names the file.
+    clock += 30_000;
+
+    expect(store.take(token, binding)).toStrictEqual({ need, ok: true });
+    // The token is spent whether or not the next call matches: a replay cannot probe for a valid binding.
+    expect(store.take(token, binding)).toStrictEqual({ ok: false });
+  });
+
+  it('expires after 60 s', () => {
+    let clock = 1000;
+    const store = createStepTokenStore({ now: () => clock, random: () => 'token-3' });
+    const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
+
+    clock += 59_999;
+    expect(store.consume(token, binding)).toBe(true);
+
+    const second = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
+    clock += 60_000;
+    expect(store.consume(second, binding)).toBe(false);
+    expect(store.size()).toBe(0);
+  });
+});
+
+describe('sensitive form fields', () => {
+  it('classifies password, one-time-code and payment fields', () => {
+    expect(classifyFormField({ type: 'password' })).toBe('password');
+    expect(classifyFormField({ autocomplete: 'one-time-code' })).toBe('one-time-code');
+    expect(classifyFormField({ autocomplete: 'section-a cc-number' })).toBe('payment');
+    expect(classifyFormField({ name: 'card-number' })).toBe('payment');
+    expect(classifyFormField({ name: 'email', type: 'email' })).toBeUndefined();
+  });
+
+  it('names the reason a human sees', () => {
+    expect(sensitiveReasonForField('password')).toBe(SENSITIVE_REASON.password);
+    expect(sensitiveReasonForField('payment')).toBe(SENSITIVE_REASON.paymentField);
+    expect(sensitiveReasonForField('one-time-code')).toBe(SENSITIVE_REASON.oneTimeCode);
+  });
+
+  it('collects the targets of a fill_form call', () => {
+    expect(
+      sensitiveTargetsOf('browser_fill_form', {
+        fields: [
+          { name: 'Email', target: 'e1', type: 'textbox', value: 'a@b.c' },
+          { name: 'Card', target: '#cc', type: 'textbox', value: '4111' },
+        ],
+      })
+    ).toStrictEqual(['e1', '#cc']);
+    expect(sensitiveTargetsOf('browser_navigate', { element: 'e1' })).toStrictEqual([]);
+  });
+});
+
+describe('oauth consent pages', () => {
+  it('matches the listed host and path routes', () => {
+    expect(isOAuthConsentUrl('https://accounts.google.com/o/oauth2/v2/auth?x=1')).toBe(true);
+    expect(isOAuthConsentUrl('https://accounts.google.com/signin/oauth/consent')).toBe(true);
+    expect(isOAuthConsentUrl('https://github.com/login/oauth/authorize?client_id=1')).toBe(true);
+    expect(
+      isOAuthConsentUrl('https://login.microsoftonline.com/tenant/oauth2/v2.0/authorize')
+    ).toBe(true);
+    expect(isOAuthConsentUrl('https://appleid.apple.com/auth/authorize')).toBe(true);
+  });
+
+  it('does not match a normal page on the same host', () => {
+    expect(isOAuthConsentUrl('https://github.com/Kilo-Org/cloud')).toBe(false);
+    expect(isOAuthConsentUrl('https://accounts.google.com/gsi/client')).toBe(false);
+    expect(isOAuthConsentUrl(absentUrl)).toBe(false);
+  });
+});
+
+describe('hidden text and value masking', () => {
+  it('drops hidden text leaves and masks sensitive values', () => {
+    const hidden = new Set(['secret note']);
+    const values = new Set(['hunter2']);
+
+    expect(
+      applyAgentSnapshotLine(
+        { depth: 0, name: 'secret note', role: '', textLeaf: true },
+        {
+          hiddenText: hidden,
+          sensitiveValues: values,
+        }
+      )
+    ).toBeUndefined();
+    expect(
+      applyAgentSnapshotLine(
+        { depth: 0, name: 'hunter2', role: '', textLeaf: true },
+        {
+          hiddenText: hidden,
+          sensitiveValues: values,
+        }
+      )
+    ).toStrictEqual({ depth: 0, name: MASKED_VALUE, role: '', textLeaf: true });
+    expect(
+      applyAgentSnapshotLine(
+        { depth: 1, name: 'Email', ref: 'e4', role: 'textbox' },
+        {
+          hiddenText: hidden,
+          sensitiveValues: values,
+        }
+      )
+    ).toStrictEqual({ depth: 1, name: 'Email', ref: 'e4', role: 'textbox' });
+  });
+
+  it('masks a value wherever it leaked into text', () => {
+    expect(maskSensitiveValues('value=hunter2 and again hunter2', ['hunter2'])).toBe(
+      'value=[masked] and again [masked]'
+    );
+  });
+});

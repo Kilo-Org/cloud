@@ -10,7 +10,7 @@ import {
 import { isRecordableLastRoute, lastRouteHrefFrom } from '@/lib/last-route-recordable';
 
 type RecordLastRouteInput = {
-  /** The account the record belongs to; null records nothing. */
+  /** The account the record belongs to; undefined records nothing. */
   readonly userId: string | undefined;
 };
 

@@ -2142,11 +2142,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
     };
     await runInDurableObject(stub, instance => {
-      const peerFor = instance.sessionPeerFor.bind(instance);
-      instance.sessionPeerFor = (ownerId, sessionId) => {
-        const peer = peerFor(ownerId, sessionId);
-        return peer ? { ...peer, issueCloudAgentMcpGrant: async () => mcpGrant } : null;
-      };
+      instance.cloudAgentMcpGrantFor = async () => mcpGrant;
     });
     const { wrapper } = await prepareWarmRoute(stub, provider);
     await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
@@ -2157,6 +2153,80 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(frame).toMatchObject({ type: 'session.credentials', cloudAgentMcp: mcpGrant });
     expect((await wrapper.next())?.type).toBe('session.prompt');
     expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(mcpGrant.token);
+  });
+
+  it('does not ask for an MCP credential before prompts of a non-interactive workspace', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    const issueMcpGrant = vi.fn(async () => undefined);
+    await runInDurableObject(stub, instance => {
+      instance.cloudAgentMcpGrantFor = issueMcpGrant;
+    });
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    const atPrepare = issueMcpGrant.mock.calls.length;
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(issueMcpGrant).toHaveBeenCalledTimes(atPrepare);
+  });
+
+  it('offers a renewed workspace MCP credential before a prompt without re-issuing the route grant', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expiring = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'expiring-workspace-mcp-grant',
+      expiresAt: nowSeconds + 60,
+    };
+    const renewed = {
+      ...expiring,
+      token: 'renewed-workspace-mcp-grant',
+      expiresAt: nowSeconds + 24 * 3600,
+    };
+    let current: typeof expiring | undefined = expiring;
+    const issueMcpGrant = vi.fn(async () => current);
+    await runInDurableObject(stub, instance => {
+      instance.cloudAgentMcpGrantFor = issueMcpGrant;
+    });
+    const { wrapper, prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, { ...credentialsSource(SESSION), createdOnPlatform: 'cloud-agent-web' })
+    );
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(prepareFrame.credentials?.cloudAgentMcp).toEqual(expiring);
+    const issuedBefore = broker.githubIssued();
+
+    // The workspace authority is unavailable: the prompt is delivered without a credentials frame.
+    current = undefined;
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+
+    // The owner renewed the workspace: the next prompt carries the new credential first.
+    current = renewed;
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+      'sent'
+    );
+    expect(await wrapper.next()).toMatchObject({
+      type: 'session.credentials',
+      sessionId: SESSION,
+      cloudAgentMcp: renewed,
+    });
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(broker.githubIssued()).toBe(issuedBefore);
+
+    // A current credential is not offered again.
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m3')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(issueMcpGrant).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(renewed.token);
   });
 
   it.each(['rejection', 'timeout'] as const)(
@@ -2181,11 +2251,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
       try {
         await runInDurableObject(stub, instance => {
-          const peerFor = instance.sessionPeerFor.bind(instance);
-          instance.sessionPeerFor = (ownerId, sessionId) => {
-            const peer = peerFor(ownerId, sessionId);
-            return peer ? { ...peer, issueCloudAgentMcpGrant: issueMcpGrant } : null;
-          };
+          instance.cloudAgentMcpGrantFor = issueMcpGrant;
           Object.assign(instance, { grantIssueTimeoutMs: () => 100 });
         });
         await setGrantExpiry(stub, SESSION, Date.now() - 1);
@@ -2209,7 +2275,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
         expect(fields).toHaveBeenCalledWith({
           sandboxId: SANDBOX_ID,
           sessionId: SESSION,
-          anchorSessionId: SESSION,
+          workspaceSessionId: SESSION,
         });
         expect(warn).toHaveBeenCalledWith(
           'Optional Cloud Agent MCP grant unavailable; continuing without it'
@@ -4334,26 +4400,56 @@ describe('SandboxControlV2 environment repository credentials', () => {
     expect(broker.githubIssued()).toBeGreaterThan(0);
   });
 
-  it('fails a V2 start on a Vercel sandbox and still starts a V1 session there', async () => {
+  it('starts a V2 session on a Vercel sandbox and forwards each member host to the Worker', async () => {
     const provider = createFakeProvider();
-    const broker = createFakeCredentialBroker();
-    const stub = await setupVercel(provider, broker);
-    const capture = captureRouteFailed();
-    const view = await stub.prepare(environmentInput([WIDGETS, GADGETS]));
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
+    const { stub, admission } = await setupSyntheticVercel(provider);
+    const environment = environmentOf([WIDGETS, GADGETS]);
+    const input = {
+      ...prepareInput(SESSION),
+      environment: {
+        ...environment,
+        repositories: [
+          ...environment.repositories,
+          {
+            identity: {
+              platform: 'gitlab' as const,
+              cloneUrl: 'https://gitlab.example/acme/widgets.git',
+            },
+            repoFullName: 'acme/widgets',
+            leaf: 'widgets-gitlab',
+            branch: 'kilo/session',
+          },
+        ],
+      },
+    } as ControlPlanePrepareInput;
+    await prepareWarmRoute(stub, provider, input);
 
-    expect(events[0]).toMatchObject({
-      grantPhase: 'validation',
-      grantFailureReason: 'invalid_grant',
-      provider: 'vercel',
-    });
-    expect(broker.githubIssued()).toBe(0);
-    // The same sandbox serves a V1 session.
+    const grant = await readGrant(stub);
+    const [gadgets, project] = grant.additionalRepositories ?? [];
+    expect(gadgets?.repository.repo).toBe(GADGETS);
+    expect(project?.repository.type).toBe('gitlab');
+    // The policy sends every member host to the Worker, which selects the capability.
+    const policy = provider.policyCalls.at(-1) as ReturnType<typeof buildControlNetworkPolicy>;
+    const forward = { forwardURL: `${VERCEL_TARGET}/scm/vercel/${SANDBOX_ID}` };
+    expect(policy.allow['github.com']?.at(-1)).toEqual(forward);
+    expect(policy.allow['gitlab.example']?.at(-1)).toEqual(forward);
+    const capabilityOf = async (url: string, alias = grant.scm.alias) => {
+      const admitted = await admission(url, { authorization: `Bearer ${alias}` });
+      return admitted.ok && admitted.authority.type === 'managed'
+        ? admitted.authority.capability
+        : null;
+    };
+    expect(await capabilityOf('https://github.com/acme/gadgets.git/info/refs')).toBe(
+      gadgets?.scm.capability.credential
+    );
+    expect(await capabilityOf('https://api.github.com/repos/acme/widgets/pulls')).toBe(
+      grant.scm.capability.credential
+    );
     expect(
-      await stub.prepare(prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT)))
-    ).toMatchObject({
-      state: 'preparing',
-    });
+      await capabilityOf(
+        'https://gitlab.example/api/v4/projects/acme%2Fwidgets/merge_requests',
+        project?.scm.alias
+      )
+    ).toBe(project?.scm.capability.credential);
   });
 });

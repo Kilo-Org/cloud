@@ -9,6 +9,7 @@ import {
   glanceableAgentsSnapshotSchema,
   glanceableStatusKind,
   isEligibleGlanceableWork,
+  isIdleOnlyGlanceableWork,
   isStartableGlanceableWork,
   newestGlanceableResult,
   oldestNeedsInputSince,
@@ -354,7 +355,7 @@ describe('buildGlanceableSnapshot', () => {
     expect(snapshot.status).toBe('happy');
   });
 
-  it('sets organizationBound only when organizationId is a string', () => {
+  it('sets organizationBound only for a non-empty organization id', () => {
     const personal = buildGlanceableSnapshot({
       sessions: [],
       userId: 'u1',
@@ -369,6 +370,17 @@ describe('buildGlanceableSnapshot', () => {
     });
     expect(personal.organizationBound).toBe(false);
     expect(org.organizationBound).toBe(true);
+  });
+
+  it('reads an empty organization id as the personal scope', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: '',
+      now: NOW,
+    });
+    expect(snapshot.organizationBound).toBe(false);
+    expect(snapshot.scopeKey).toBe(buildOpaqueScopeKey({ userId: 'u1', organizationId: null }));
   });
 
   it('honours a status override and omits accountEpoch when absent', () => {
@@ -502,6 +514,88 @@ describe('isEligibleGlanceableWork and revision discard', () => {
     expect(shouldDiscardGlanceableRevision(olderAtEqualRevision, current)).toBe(true);
     expect(shouldDiscardGlanceableRevision(newerAtEqualRevision, current)).toBe(false);
   });
+
+  it('orders a same-revision offset-form timestamp chronologically, not lexicographically', () => {
+    const current = {
+      ...buildGlanceableSnapshot({
+        sessions: [{ status: 'busy' }],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+        previousRevision: 4,
+      }),
+      updatedAt: '2026-11-18T09:00:00.000Z',
+    };
+    // 01:00-11:00 parses to 12:00Z — 3 h NEWER than the current 09:00Z — yet
+    // its string sorts before. The parsed-instant tie must keep it; the old
+    // raw-string tie discarded it, and the reverse comparison had the same
+    // bug the other way round.
+    const incoming = {
+      ...buildGlanceableSnapshot({
+        sessions: [{ status: 'busy' }],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+        previousRevision: 4,
+      }),
+      updatedAt: '2026-11-18T01:00:00.000-11:00',
+    };
+    expect(incoming.revision).toBe(current.revision);
+    // Guard the fixture: the incoming instant really is later.
+    expect(Date.parse(incoming.updatedAt)).toBe(Date.parse('2026-11-18T12:00:00.000Z'));
+    expect(incoming.updatedAt < current.updatedAt).toBe(true);
+    expect(shouldDiscardGlanceableRevision(incoming, current)).toBe(false);
+    expect(shouldDiscardGlanceableRevision(current, incoming)).toBe(true);
+  });
+
+  it('falls back to the raw string comparison when either updatedAt does not parse', () => {
+    const current = {
+      ...buildGlanceableSnapshot({
+        sessions: [{ status: 'busy' }],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+        previousRevision: 4,
+      }),
+      updatedAt: '2026-11-18T09:00:00.000Z',
+    };
+    // 'garbage' parses to no instant, so the raw strings decide. 'g' (0x67)
+    // sorts after '2' (0x32), so the fallback reads 'garbage' as newer in
+    // both directions, the same verdict the old rule returned.
+    const unparseable = {
+      ...buildGlanceableSnapshot({
+        sessions: [{ status: 'busy' }],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+        previousRevision: 4,
+      }),
+      updatedAt: 'garbage',
+    };
+    expect(unparseable.revision).toBe(current.revision);
+    expect(shouldDiscardGlanceableRevision(unparseable, current)).toBe(false);
+    expect(shouldDiscardGlanceableRevision(current, unparseable)).toBe(true);
+  });
+});
+
+describe('isIdleOnlyGlanceableWork', () => {
+  // The predicate takes the counts shape, so a caller holding only counts (the
+  // followed-session counts, for example) states the rule without building a
+  // snapshot. Idle work keeps a card alive; nothing else may raise one.
+  it('reads idle-only from a bare counts object', () => {
+    expect(isIdleOnlyGlanceableWork({ running: 0, needsInput: 0, idle: 2, scheduled: 0 })).toBe(
+      true
+    );
+    expect(isIdleOnlyGlanceableWork({ running: 1, needsInput: 0, idle: 2, scheduled: 0 })).toBe(
+      false
+    );
+    expect(isIdleOnlyGlanceableWork({ running: 0, needsInput: 0, idle: 0, scheduled: 1 })).toBe(
+      false
+    );
+    expect(isIdleOnlyGlanceableWork({ running: 0, needsInput: 0, idle: 0, scheduled: 0 })).toBe(
+      false
+    );
+  });
 });
 
 describe('oldestNeedsInputSince', () => {
@@ -538,6 +632,9 @@ describe('oldestNeedsInputSince', () => {
         { status: 'question', statusUpdatedAt: at(300_000) },
       ])
     ).toBe(at(300_000));
+    // A producer that serializes an absent value reads the same as one that
+    // omits it: null, absent and unparseable are one outcome for the reader.
+    expect(oldestNeedsInputSince([{ status: 'question', statusUpdatedAt: null }])).toBeNull();
   });
 
   it('returns null when nothing needs input', () => {
@@ -658,6 +755,8 @@ describe('session timestamp parsing', () => {
         { status: 'scheduled', scheduledAt: 'garbage' },
       ])
     ).toBeNull();
+    // A serialized absent wake reads the same as an omitted one.
+    expect(soonestScheduledAt([{ status: 'scheduled', scheduledAt: null }])).toBeNull();
   });
 
   it('reports the newest change from a PostgreSQL timestamp as ISO', () => {

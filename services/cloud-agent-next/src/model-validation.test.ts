@@ -355,13 +355,18 @@ describe('modern model validation trust boundary', () => {
       const bearer = await token({ organizationId });
       const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ valid: true }));
       await assertKiloModelAvailable({
-        env,
+        env: { ...env, KILO_OPENROUTER_BASE: `${env.KILOCODE_BACKEND_BASE_URL}/api/openrouter` },
         submittedModel: 'private/model',
         originalToken: bearer,
         originalOrganizationId: organizationId,
         procedure: 'send',
       });
       const init = fetchMock.mock.calls[0][1];
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        organizationId
+          ? `${env.KILOCODE_BACKEND_BASE_URL}/api/organizations/${organizationId}/models/validate`
+          : `${env.KILOCODE_BACKEND_BASE_URL}/api/openrouter/models/validate`
+      );
       const headers = new Headers(init?.headers);
       expect(init?.redirect).toBe('manual');
       expect(

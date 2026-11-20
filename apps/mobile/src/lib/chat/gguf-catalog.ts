@@ -97,7 +97,6 @@ export function readGgufLink(input: string): GgufLinkResult {
   }
 }
 
-/** A direct download link: HTTPS only, no embedded credentials, and a `.gguf` file. */
 function parseGgufUrl(input: string): GgufLink {
   const url = asUrl(input);
   if (url === null) {

@@ -1,4 +1,6 @@
-import { type PushData } from './push-data';
+import { isAppVersionAtLeast } from '@kilocode/app-shared/app-version';
+
+import { classifyCloudAgentSessionPush, type PushData } from './push-data';
 
 /**
  * Android notification channels. Each push is routed to exactly one channel
@@ -38,6 +40,25 @@ export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS
 export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
 
 /**
+ * The channel every Android build before the agent-channel split addressed the
+ * glanceable active-agents pushes with. It is not in
+ * `ANDROID_NOTIFICATION_CHANNELS`: current builds only create the split
+ * channels, and this id exists solely so a server push can still reach a token
+ * registered by an older build (see `androidChannelIdForPushDataToAppVersion`).
+ */
+export const LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID = 'active-agents';
+
+/**
+ * The channel `androidChannelIdForPushDataToAppVersion` keeps an agent briefing
+ * on for a token that predates the split. The id itself is current — every
+ * split build creates `agent-progress` (see `AGENT_CHANNEL_SPLIT_APP_VERSION`)
+ * — so this is not legacy vocabulary: it names the fallback role the resolver
+ * gives the channel, the one place a briefing goes to a channel the version
+ * gate, not the payload, chose.
+ */
+export const BRIEFING_FALLBACK_CHANNEL_ID: AndroidNotificationChannelId = 'agent-progress';
+
+/**
  * The first mobile build that creates both split agent channels. `app_version`
  * on a push token is the build that created that device's channels, so a lower
  * version has only `LEGACY_AGENT_ANDROID_CHANNEL_ID`: `1.0.11` was released
@@ -53,48 +74,35 @@ export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
  */
 export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
 
-/** Channels that only a build at or above the given version creates. */
-const ANDROID_CHANNEL_MIN_APP_VERSIONS: Partial<Record<AndroidNotificationChannelId, string>> = {
+/**
+ * The first mobile version whose every build creates
+ * `followed-sessions-lock-screen`. Builds of `1.0.14` shipped both without it
+ * (release tags from before the channel existed) and with it, so a lower
+ * version must not be addressed with the id (see
+ * `androidChannelIdForPushDataToAppVersion`).
+ */
+export const FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION = '1.0.15';
+
+/**
+ * The minimum app version that creates each channel, or `undefined` when every
+ * build creates it. Total over the channel ids, so a channel added to
+ * `ANDROID_NOTIFICATION_CHANNELS` fails typecheck here until this map
+ * classifies it.
+ */
+const ANDROID_CHANNEL_MIN_APP_VERSIONS: Record<AndroidNotificationChannelId, string | undefined> = {
   'needs-input': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-progress': AGENT_CHANNEL_SPLIT_APP_VERSION,
   'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
+  balance: undefined,
+  security: undefined,
+  'followed-sessions-lock-screen': FOLLOWED_SESSIONS_LOCK_SCREEN_APP_VERSION,
 };
-
-/**
- * Compare dotted-numeric versions (`1.10.0` > `1.9.9`, missing segments count
- * as zero). A version the server cannot parse sorts below every release, so a
- * client that cannot prove its age never receives a channel id it may not have
- * created.
- */
-export function comparePushAppVersions(a: string, b: string): number {
-  const left = a.split('.').map(segment => Number.parseInt(segment, 10) || 0);
-  const right = b.split('.').map(segment => Number.parseInt(segment, 10) || 0);
-  const length = Math.max(left.length, right.length);
-  for (let index = 0; index < length; index += 1) {
-    const delta = (left[index] ?? 0) - (right[index] ?? 0);
-    if (delta !== 0) {
-      return delta < 0 ? -1 : 1;
-    }
-  }
-  return 0;
-}
-
-/**
- * True when `current` is at or above `min`. An unknown version never clears the
- * gate, so a token without a recorded version is treated as an older build.
- */
-export function isPushAppVersionAtLeast(current: string | null | undefined, min: string): boolean {
-  if (!current) {
-    return false;
-  }
-  return comparePushAppVersions(current, min) >= 0;
-}
 
 /** A channel a server push may address, including pre-split channel ids. */
 export type AndroidPushChannelId =
   | AndroidNotificationChannelId
   | typeof LEGACY_AGENT_ANDROID_CHANNEL_ID
-  | 'active-agents';
+  | typeof LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID;
 
 /**
  * Resolve the channel a *server push* addresses for a token registered by
@@ -115,11 +123,30 @@ export function androidChannelIdForPushDataToAppVersion(
     case 'cloud_agent_session':
       return LEGACY_AGENT_ANDROID_CHANNEL_ID;
     case 'active_agents_glanceable':
-      return 'active-agents';
+      return LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID;
     case 'agent_briefing':
-      return androidChannelIdForRegisteredClient('agent-progress', appVersion);
-    default:
+      return androidChannelIdForRegisteredClient(BRIEFING_FALLBACK_CHANNEL_ID, appVersion);
+    case 'session_live_update':
+      // No released build ever created a followed-sessions channel, so there
+      // is no legacy id to redirect to. The push is data-only: the caller omits
+      // `channelId` and the client draws its own card.
       return undefined;
+    // Unreachable by construction, and named only so the switch stays total: a
+    // null app version already returned at the guard above, and each of these
+    // variants carries a channel no build gates by version, so the
+    // registered-client lookup returned it. A variant added here without an arm
+    // would instead fall into the exhaustiveness guard below.
+    case 'low_balance':
+    case 'spend_alert':
+    case 'security_finding':
+    case 'security_lifecycle':
+      return undefined;
+    default: {
+      // Exhaustiveness: a new push variant must be classified above, so one
+      // that only a version-gated channel accepts cannot silently lose it.
+      const _exhaustive: never = data;
+      return _exhaustive;
+    }
   }
 }
 
@@ -140,7 +167,7 @@ export function androidChannelIdForRegisteredClient(
   if (minAppVersion === undefined) {
     return channelId;
   }
-  return isPushAppVersionAtLeast(appVersion, minAppVersion) ? channelId : undefined;
+  return isAppVersionAtLeast(appVersion, minAppVersion) ? channelId : undefined;
 }
 
 /**
@@ -179,9 +206,9 @@ export function agentNotificationKindForGlanceableSnapshot(snapshot: {
 function agentKindForAgentPush(data: AgentPushData): AgentNotificationKind {
   switch (data.type) {
     case 'cloud_agent_session':
-      // The schema default is 'status', applied at the producer's enforcement
-      // read site; an omitted category is a status update, not a question.
-      return data.category === 'attention' ? 'needs-input' : 'progress';
+      // An omitted category is a status update, not a question: the shared
+      // classifier applies the schema default.
+      return classifyCloudAgentSessionPush(data) === 'attention' ? 'needs-input' : 'progress';
     case 'active_agents_glanceable':
       return agentNotificationKindForGlanceableSnapshot(data);
     default: {
@@ -203,6 +230,11 @@ const AGENT_KIND_CHANNEL: Record<AgentNotificationKind, AndroidNotificationChann
   progress: 'agent-progress',
 };
 
+/** The reverse of `AGENT_KIND_CHANNEL`: the kind each agent channel carries. */
+const AGENT_CHANNEL_KIND: ReadonlyMap<string, AgentNotificationKind> = new Map(
+  AGENT_NOTIFICATION_KINDS.map(kind => [AGENT_KIND_CHANNEL[kind], kind] as const)
+);
+
 /** The Android channel that carries a kind. */
 export function androidChannelIdForAgentKind(
   kind: AgentNotificationKind
@@ -220,14 +252,10 @@ export function androidChannelIdForAgentKind(
 export function agentNotificationKindForAndroidChannelId(
   channelId: string | null | undefined
 ): AgentNotificationKind | null {
-  switch (channelId) {
-    case 'needs-input':
-      return 'needs-input';
-    case 'agent-progress':
-      return 'progress';
-    default:
-      return null;
+  if (channelId == null) {
+    return null;
   }
+  return AGENT_CHANNEL_KIND.get(channelId) ?? null;
 }
 
 /**
@@ -270,6 +298,39 @@ export const LIVE_ACTIVITY_RELEVANCE = {
   aggregate: 40,
   sessionIdle: 20,
 } as const;
+
+/**
+ * The smallest positive gap between adjacent values of a relevance band
+ * table; throws when the values cannot space two bands apart (fewer than two
+ * distinct values). A bands-less tie-break would make every recency score
+ * non-finite and serialize an absent `relevance-score` in its place, so a
+ * degenerate table fails loudly rather than silently degrading every score.
+ */
+export function liveActivityBandStep(bands: readonly number[]): number {
+  const sorted = [...bands].sort((a, b) => a - b);
+  let smallest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < sorted.length; index += 1) {
+    // Both operands exist by the loop bounds; the fallbacks only satisfy the
+    // index checker and are guarded below by the positive-gap test.
+    const gap = (sorted[index] ?? 0) - (sorted[index - 1] ?? 0);
+    if (gap > 0 && gap < smallest) smallest = gap;
+  }
+  if (!Number.isFinite(smallest)) {
+    throw new Error(
+      'LIVE_ACTIVITY_RELEVANCE bands must have at least two distinct values to derive the tie-break limit'
+    );
+  }
+  return smallest;
+}
+
+/**
+ * The bound of the recency tie-break term (`recencyTerm` in
+ * `session-live-activity.ts`), one below the band step: a tie-break that
+ * stays under the smallest gap can never promote a score into the next band.
+ * Derive the tie-break from the band table, never hardcode 19.
+ */
+export const LIVE_ACTIVITY_TIE_BREAK_LIMIT =
+  liveActivityBandStep(Object.values(LIVE_ACTIVITY_RELEVANCE)) - 1;
 
 /** Map a push payload to the Android channel that should carry it. */
 export function androidChannelIdForPushData(data: PushData): AndroidNotificationChannelId {

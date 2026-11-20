@@ -3,7 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { knownServerErrorMessage } from '@/lib/server-error-copy';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 /**
@@ -39,6 +41,10 @@ export function useOrphanedRepositories(scope: string) {
 export function useDeleteFindingsByRepository(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // The scope is the organization id for an organization scope, so the
+  // refusal's copy and step follow this reader's role in that organization.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -57,7 +63,11 @@ export function useDeleteFindingsByRepository(scope: string) {
       );
     },
     onError: error => {
-      announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
+      announceTrialRefusal(
+        knownServerErrorMessage(error, canManageBilling) ?? i18n.t('common.somethingWentWrong'),
+        billingAction,
+        isTrialExpiredRefusal(error)
+      );
     },
     onSettled: async () => {
       // Both lists change: the deleted repository leaves the orphan list, and

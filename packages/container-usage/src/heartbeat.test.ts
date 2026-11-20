@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Container } from '@cloudflare/containers';
-import { ContainerUsageAdmissionError, ContainerUsageClient } from './client';
+import {
+  ContainerUsageAdmissionError,
+  ContainerUsageClient,
+  ContainerUsageContractError,
+} from './client';
 import {
   getBillingContext,
   setBillingContext,
@@ -151,6 +155,113 @@ describe('installBillingHeartbeat', () => {
       expect.objectContaining({ startEpochMs: 123 })
     );
     expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+  });
+
+  it.each(['stop', 'warn'] as const)('surfaces a failed budget %s action', async verdict => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const error = new Error('budget action failed');
+    const budgetAction = vi.fn(async () => {
+      throw error;
+    });
+    const schedule = vi.fn();
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+        schedule: schedule as Container['schedule'],
+      },
+      {
+        client: usageClient(verdict),
+        storage,
+        enforceBudgetStop: budgetAction,
+        onBudgetWarning: budgetAction,
+      }
+    );
+
+    await expect(controller.billingHeartbeatTick()).rejects.toBe(error);
+    expect(budgetAction).toHaveBeenCalledOnce();
+    expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+    expect((await getBillingContext(storage))?.nextSeq).toBe(2);
+  });
+
+  it.each(['stop verdict', 'unreadable verdict'])(
+    'defers stop delivery after a %s',
+    async verdict => {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const client = usageClient('stop');
+      if (verdict === 'unreadable verdict') {
+        vi.spyOn(client, 'recordHeartbeat').mockRejectedValueOnce(
+          new ContainerUsageContractError('recordHeartbeat', new Error('invalid ack'))
+        );
+      }
+      const recordStop = vi
+        .spyOn(client, 'recordStop')
+        .mockRejectedValueOnce(new Error('stop timed out'));
+      const enforceBudgetStop = vi.fn();
+      const schedule = vi.fn();
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
+        },
+        { client, storage, enforceBudgetStop }
+      );
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+      expect(enforceBudgetStop).toHaveBeenCalledOnce();
+      expect((await getBillingContext(storage))?.pendingStop).toMatchObject({ seq: 2 });
+      expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+      expect(recordStop).toHaveBeenCalledTimes(2);
+      expect(recordStop.mock.calls[1]).toEqual(recordStop.mock.calls[0]);
+      expect(await getBillingContext(storage)).toBeUndefined();
+    }
+  );
+
+  it('surfaces a failed post-ack write and keeps the pending heartbeat', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const error = new Error('heartbeat acknowledgement write failed');
+    const put = storage.put;
+    vi.spyOn(storage, 'put').mockImplementation(async (key, value) => {
+      if ((value as BillingContext).nextSeq === 2) throw error;
+      await put(key, value);
+    });
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+        schedule: vi.fn() as Container['schedule'],
+      },
+      { client: usageClient('continue'), storage, enforceBudgetStop: vi.fn() }
+    );
+
+    await expect(controller.billingHeartbeatTick()).rejects.toBe(error);
+    expect((await getBillingContext(storage))?.pendingHeartbeat?.seq).toBe(1);
+  });
+
+  it('surfaces a failed stop acknowledgement cleanup without cancelling the alarm', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const error = new Error('billing context cleanup failed');
+    vi.spyOn(storage, 'delete').mockRejectedValue(error);
+    const deleteSchedules = vi.fn();
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules,
+        getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: Date.now() })),
+        schedule: vi.fn() as Container['schedule'],
+      },
+      { client: usageClient('continue'), storage, enforceBudgetStop: vi.fn() }
+    );
+
+    await expect(controller.billingHeartbeatTick()).rejects.toBe(error);
+    expect(deleteSchedules).not.toHaveBeenCalled();
+    expect((await getBillingContext(storage))?.pendingStop).toBeDefined();
   });
 
   it('treats an unreadable heartbeat verdict as a budget stop and settles the generation', async () => {
@@ -1647,72 +1758,273 @@ describe('installBillingHeartbeat', () => {
     }
   });
 
-  it('reschedules, rethrows, and keeps a retryable running heartbeat failure retryable', async () => {
+  it('reschedules and defers a retryable running heartbeat failure without an alarm error', async () => {
     const storage = memoryStorage();
     await storedContext(storage);
     const schedule = vi.fn();
     const onGenerationClosed = vi.fn();
-    const controller = installBillingHeartbeat(
-      {
-        deleteSchedules: vi.fn(),
-        getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
-        schedule: schedule as Container['schedule'],
-      },
-      {
-        client: usageClient('continue'),
-        storage,
-        beforeHeartbeatDelivery: async () => {
-          throw new Error('meter unavailable');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
         },
-        onGenerationClosed,
-        enforceBudgetStop: vi.fn(),
-      }
-    );
-    schedule.mockClear();
+        {
+          client: usageClient('continue'),
+          storage,
+          beforeHeartbeatDelivery: async () => {
+            throw new Error('meter unavailable');
+          },
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      schedule.mockClear();
 
-    await expect(controller.billingHeartbeatTick()).rejects.toThrow('meter unavailable');
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
 
-    expect(await getBillingContext(storage)).toBeDefined();
-    expect(onGenerationClosed).not.toHaveBeenCalled();
-    expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+      expect(await getBillingContext(storage)).toBeDefined();
+      expect((await getBillingContext(storage))?.pendingHeartbeat).toBeDefined();
+      expect(onGenerationClosed).not.toHaveBeenCalled();
+      expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+      expect(warn).toHaveBeenCalledWith(
+        'Billing usage delivery deferred after a retryable failure',
+        expect.objectContaining({ error: 'meter unavailable' })
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
-  it('rethrows a retryable running heartbeat failure even when a replacement generation was installed', async () => {
+  it('defers a retryable running heartbeat failure without touching a replacement generation', async () => {
     const storage = memoryStorage();
     await storedContext(storage);
     let replacement: BillingContext | undefined;
     const schedule = vi.fn();
     const onGenerationClosed = vi.fn();
-    const controller = installBillingHeartbeat(
-      {
-        deleteSchedules: vi.fn(),
-        getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
-        schedule: schedule as Container['schedule'],
-      },
-      {
-        client: usageClient('continue'),
-        storage,
-        beforeHeartbeatDelivery: async () => {
-          replacement = await setBillingContext(storage, {
-            service: 'cloud-agent-next',
-            instanceId: 'instance-1',
-            startEpochMs: 456,
-            sku: 'cloud-agent-next:Sandbox',
-            subject: { type: 'user', id: 'user-1' },
-            actor: { type: 'user', id: 'user-1' },
-          });
-          throw new Error('meter unavailable');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
         },
-        onGenerationClosed,
-        enforceBudgetStop: vi.fn(),
+        {
+          client: usageClient('continue'),
+          storage,
+          beforeHeartbeatDelivery: async () => {
+            replacement = await setBillingContext(storage, {
+              service: 'cloud-agent-next',
+              instanceId: 'instance-1',
+              startEpochMs: 456,
+              sku: 'cloud-agent-next:Sandbox',
+              subject: { type: 'user', id: 'user-1' },
+              actor: { type: 'user', id: 'user-1' },
+            });
+            throw new Error('meter unavailable');
+          },
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      schedule.mockClear();
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+
+      expect(await getBillingContext(storage)).toEqual(replacement);
+      expect(onGenerationClosed).not.toHaveBeenCalled();
+      expect(schedule).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('redelivers the same pending heartbeat after a transient timeout recovers on the next tick', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      let meterHealthy = false;
+      const recordHeartbeat = vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>(async input => {
+        if (!meterHealthy) throw new Error('Meter heartbeat timed out');
+        return {
+          intervalId: `${input.instanceId}:${input.startEpochMs}`,
+          durable: 'pg',
+          dedup: true,
+          budget: { verdict: 'continue' },
+        };
+      });
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat,
+          recordStop: async () => ({ intervalId: 'instance-1:123', durable: 'pg', dedup: false }),
+        },
+        { service: 'cloud-agent-next', retry: { attempts: 3, initialDelayMs: 0 } }
+      );
+      const schedule = vi.fn();
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
+        },
+        { client, storage, enforceBudgetStop: vi.fn() }
+      );
+
+      now.mockReturnValue(5_000);
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+
+      expect(recordHeartbeat).toHaveBeenCalledTimes(3);
+      expect((await getBillingContext(storage))?.pendingHeartbeat).toMatchObject({
+        seq: 1,
+        usageSinceLast: 4,
+      });
+      expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+
+      meterHealthy = true;
+      schedule.mockClear();
+      now.mockReturnValue(305_000);
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+
+      expect(recordHeartbeat).toHaveBeenCalledTimes(4);
+      const firstAttempt = recordHeartbeat.mock.calls[0]?.[0];
+      const redelivery = recordHeartbeat.mock.calls[3]?.[0];
+      expect(redelivery).toMatchObject({ seq: 1, usageSinceLast: 4 });
+      expect(redelivery?.idempotencyKey).toBe(firstAttempt?.idempotencyKey);
+      expect(schedule).toHaveBeenCalledOnce();
+      const advanced = await getBillingContext(storage);
+      expect(advanced?.nextSeq).toBe(2);
+      expect(advanced?.pendingHeartbeat).toBeUndefined();
+      expect(advanced?.usageMeasuredAtMs).toBe(5_000);
+    } finally {
+      now.mockRestore();
+      warn.mockRestore();
+    }
+  });
+
+  it('keeps a persistent heartbeat timeout bounded and durable without abandoning a running generation', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordHeartbeat = vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>(async () => {
+        throw new Error('Meter heartbeat timed out');
+      });
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat,
+          recordStop: async () => ({ intervalId: 'instance-1:123', durable: 'pg', dedup: false }),
+        },
+        { service: 'cloud-agent-next', retry: { attempts: 3, initialDelayMs: 0 } }
+      );
+      const schedule = vi.fn();
+      const onGenerationClosed = vi.fn();
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
+        },
+        { client, storage, onGenerationClosed, enforceBudgetStop: vi.fn() }
+      );
+
+      const ticks = 3;
+      for (let tick = 0; tick < ticks; tick += 1) {
+        now.mockReturnValue(5_000 + tick * 300_000);
+        await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
       }
-    );
-    schedule.mockClear();
 
-    await expect(controller.billingHeartbeatTick()).rejects.toThrow('meter unavailable');
+      expect(recordHeartbeat).toHaveBeenCalledTimes(ticks * 3);
+      expect(recordHeartbeat.mock.calls.every(call => call[0].seq === 1)).toBe(true);
+      expect(recordHeartbeat.mock.calls.every(call => call[0].usageSinceLast === 4)).toBe(true);
+      const pending = await getBillingContext(storage);
+      expect(pending?.pendingHeartbeat).toMatchObject({ seq: 1, usageSinceLast: 4 });
+      expect(pending?.nextSeq).toBe(1);
+      expect(onGenerationClosed).not.toHaveBeenCalled();
+      expect(schedule).toHaveBeenCalledTimes(ticks);
+    } finally {
+      now.mockRestore();
+      warn.mockRestore();
+    }
+  });
 
-    expect(await getBillingContext(storage)).toEqual(replacement);
-    expect(onGenerationClosed).not.toHaveBeenCalled();
-    expect(schedule).not.toHaveBeenCalled();
+  it('abandons a stopped generation after the abandon window when stop delivery keeps timing out', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async () => {
+        throw new Error('Meter stop timed out');
+      });
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat: async () => ({
+            intervalId: 'instance-1:123',
+            durable: 'pg',
+            dedup: false,
+            budget: { verdict: 'continue' },
+          }),
+          recordStop,
+        },
+        { service: 'cloud-agent-next', retry: { attempts: 3, initialDelayMs: 0 } }
+      );
+      const deleteSchedules = vi.fn();
+      const schedule = vi.fn();
+      const onGenerationClosed = vi.fn();
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules,
+          getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
+        },
+        {
+          client,
+          storage,
+          stopOnStoppedState: false,
+          stoppedStateGraceSeconds: 900,
+          stoppedStateAbandonSeconds: 3_600,
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      now.mockReturnValue(10_000);
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+      expect(recordStop).not.toHaveBeenCalled();
+      expect((await getBillingContext(storage))?.stoppedObservedAtMs).toBe(10_000);
+
+      now.mockReturnValue(910_000);
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+      expect(recordStop).toHaveBeenCalledTimes(3);
+      expect((await getBillingContext(storage))?.pendingStop).toBeDefined();
+      expect(onGenerationClosed).not.toHaveBeenCalled();
+
+      now.mockReturnValue(3_610_000);
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+      expect(await getBillingContext(storage)).toBeUndefined();
+      expect(onGenerationClosed).toHaveBeenCalledOnce();
+      expect(deleteSchedules).toHaveBeenCalledWith(BILLING_HEARTBEAT_CALLBACK);
+    } finally {
+      now.mockRestore();
+      warn.mockRestore();
+    }
   });
 });

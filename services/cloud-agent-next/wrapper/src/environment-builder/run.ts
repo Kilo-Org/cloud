@@ -1,6 +1,6 @@
 import path from 'node:path';
 import {
-  CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  RESERVED_ENV_VARS,
   MULTI_MEMBER_GIT_CREDENTIAL_ENV,
   RESERVED_ENV_VAR_PREFIXES,
   SYSTEM_GIT_CONFIG_ENV,
@@ -42,9 +42,10 @@ import type { BuildReporter } from './reporter.js';
 
 /**
  * The setup environment: the builder's inherited process environment without
- * the build credential and runtime-owned names, then the environment's
- * variables and secrets, then the fixed home and the XDG directories under it,
- * as a session's setup sees them, so caches land in the same paths.
+ * the build credential and the names the platform sets — the control-runtime
+ * names and the session-identity names — then the environment's variables and
+ * secrets, then the fixed home and the XDG directories under it, as a
+ * session's setup sees them, so caches land in the same paths.
  * `KILO_ENVIRONMENT_BUILD=1` tells setup it runs in the builder; the reserved
  * `KILO` prefix keeps environment variables from setting it.
  */
@@ -56,10 +57,11 @@ export function builderSetupEnvironment(input: {
   /** A V2 build can hold a different token for each repository of one host, so Git must send the request path. */
   isV2: boolean;
 }): Record<string, string> {
-  const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
+  // The platform sets the control-runtime and session-identity names, and the
+  // fixed home and XDG paths below; PWD stays the canonical workspace.
+  const reserved = new Set<string>(RESERVED_ENV_VARS);
   const runtimeOwned = (name: string): boolean =>
     reserved.has(name) ||
-    name === 'HOME' ||
     name === 'PWD' ||
     name.startsWith('ENVIRONMENT_BUILD_') ||
     RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));

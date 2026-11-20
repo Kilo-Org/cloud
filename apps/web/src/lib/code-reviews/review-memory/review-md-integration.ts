@@ -35,6 +35,7 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
   repoFullName: string;
   existingReviewMd: string | null;
   proposal: CodeReviewMemoryProposal;
+  signal?: AbortSignal;
 }): Promise<ReviewMdIntegrationResult> {
   if (input.existingReviewMd && input.existingReviewMd.length > MAX_REVIEW_MD_CHARS) {
     throw new Error(
@@ -55,6 +56,7 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
     schemaName: 'review_md_integration',
     schema: ReviewMdIntegrationOutputSchema,
     validate: validateReviewMdIntegrationOutput,
+    abortSignal: input.signal,
   });
 
   return {

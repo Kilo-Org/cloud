@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { i18n } from '@/i18n';
 import { type OutboxRow } from '@/lib/persist/mutation-outbox';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { AGENT_MODEL_PREFERENCE_KEY } from '@/lib/storage-keys';
 import { resolveStartAgentRepository, startAgent } from './start-agent';
 
@@ -98,6 +99,13 @@ function serviceUnavailableError(): Error {
 
 function badRequestError(): Error {
   return Object.assign(new Error('session_creation_failed'), { data: { code: 'BAD_REQUEST' } });
+}
+
+/** The organization subscription gate's rejection of a create. */
+function trialRefusalError(): Error {
+  return Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+    data: { code: 'FORBIDDEN' },
+  });
 }
 
 function usedOperationKeys(): (string | undefined)[] {
@@ -419,6 +427,37 @@ describe('startAgent failure codes', () => {
       message: i18n.t('agentChat.newSession.failedToCreate'),
     });
     expect(prepareSessionMutate).not.toHaveBeenCalled();
+  });
+
+  it('reports the trial refusal in its reader copy with the flag the caller adds the step from', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(trialRefusalError());
+
+    const billingRole = await startAgent({
+      prompt: 'fix the failing build',
+      repository: 'owner/repo',
+      canManageBilling: true,
+    });
+
+    expect(billingRole).toMatchObject({
+      ok: false,
+      code: 'start-failed',
+      retryable: false,
+      trialRefusal: true,
+      message: i18n.t('common.organizationTrialEndedBilling'),
+    });
+
+    prepareSessionMutate.mockRejectedValueOnce(trialRefusalError());
+
+    const otherRole = await startAgent({
+      prompt: 'fix the failing build',
+      repository: 'owner/repo',
+    });
+
+    expect(otherRole).toMatchObject({
+      ok: false,
+      trialRefusal: true,
+      message: i18n.t('common.organizationTrialEnded'),
+    });
   });
 });
 

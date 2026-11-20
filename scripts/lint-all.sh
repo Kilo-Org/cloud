@@ -80,7 +80,10 @@ while IFS= read -r pkg; do
   affects "$pkg" || continue
   if [ -d "$pkg/src" ]; then
     if [[ "$pkg" == apps/mobile ]]; then
-      mobile_lint_dirs+=("$pkg/src")
+      # Local Expo modules carry app TypeScript too (module test harnesses read
+      # the native sources they ship), so the mobile lint covers both trees and
+      # matches `apps/mobile` package.json's own lint target.
+      mobile_lint_dirs+=("$pkg/src" "$pkg/modules")
     else
       lint_dirs+=("$pkg/src")
     fi
@@ -88,7 +91,10 @@ while IFS= read -r pkg; do
 done <<< "$workspace_dirs"
 
 if [ ${#lint_dirs[@]} -gt 0 ]; then
-  oxlint --config .oxlintrc.json "${lint_dirs[@]}"
+  # The config loads the plugin, so the plugin source is linted by the same
+  # pass; the config's ignorePatterns allow exactly this file through the
+  # blanket **/*.js ignore.
+  oxlint --config .oxlintrc.json oxlint-plugin-drizzle.js "${lint_dirs[@]}"
 fi
 
 if [ ${#mobile_lint_dirs[@]} -gt 0 ]; then

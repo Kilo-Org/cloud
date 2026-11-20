@@ -1,4 +1,3 @@
-import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -9,16 +8,27 @@ import {
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { SelectableText } from '@/components/ui/selectable-text';
-import { Text } from '@/components/ui/text';
+import { codeFieldTextStyle, hasRtlScript, withoutMonoFamily } from '@/lib/rtl-text';
+import { cn } from '@/lib/utils';
 
 type SetupCommandFieldProps = Readonly<{
   /** The command the caller holds; seeds the field and sizes the hint. */
   command: string;
   /** The field's label, which is also its accessible name. */
   label: string;
-  /** Controls that belong to this command's own row, at the end of its label line. */
-  trailing?: ReactNode;
+  /**
+   * The gap between the label row and the field. Undefined keeps the ordinary
+   * compact block (`gap-1.5`); a card that renders row controls over the label
+   * line passes `COMMAND_ROW_FIELD_GAP_CLASS`, which lands on a wrapper around
+   * the label row and the field/value box only — the pair the controls' 46 dp
+   * touch band has to clear. The block root and anything below the field (an
+   * error or reserved message, the counter, the at-limit line) keep the
+   * ordinary compact spacing.
+   */
+  gapClassName?: string;
   /** The viewer cannot manage this row: render the command as read-only text. */
   readOnly?: boolean;
   /** The row is busy, not unmanageable: the field stays a field, dimmed. */
@@ -50,7 +60,7 @@ type SetupCommandFieldProps = Readonly<{
 export function SetupCommandField({
   command,
   label,
-  trailing,
+  gapClassName,
   readOnly = false,
   disabled = false,
   accessibilityHint,
@@ -62,16 +72,27 @@ export function SetupCommandField({
 
   if (readOnly) {
     return (
+      // The caller's gap lands only on the label-to-value pair, via the same
+      // wrapper the editable branch uses; the block root keeps its compact
+      // `gap-1.5`.
       <View className="gap-1.5">
-        <FormFieldLabel label={label} labelAccessory={trailing} />
-        <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
-          <SelectableText
-            accessibilityLabel={label}
-            accessibilityHint={accessibilityHint}
-            className="text-sm leading-[1.25rem] text-foreground"
+        <View className={gapClassName ?? 'gap-1.5'}>
+          <FormFieldLabel label={label} />
+          <View
+            className={cn(
+              INPUT_BOX_SHAPE_CLASS,
+              'justify-center rounded-md border border-input bg-background py-2.5 dark:bg-[#FFFFFF0A]'
+            )}
           >
-            {command}
-          </SelectableText>
+            <SelectableText
+              accessibilityLabel={label}
+              accessibilityHint={accessibilityHint}
+              className="font-mono text-sm leading-[1.25rem] text-foreground"
+              style={codeFieldTextStyle()}
+            >
+              {command}
+            </SelectableText>
+          </View>
         </View>
       </View>
     );
@@ -82,15 +103,31 @@ export function SetupCommandField({
   // is none. At zero the count would only restate the sentence below it.
   const showsCounter = !disabled && remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
   const showsBound = !disabled && remaining <= 0;
+  // A shell command is code: mono, on its own left edge, whatever the interface
+  // direction. The mono family ships no right-to-left glyphs, so only the empty
+  // field's localized placeholder in that script keeps the interface font (the
+  // rule `Text` uses). A field holding a command keeps mono: the value is Latin
+  // code either way, and dropping the family for good left the command in the
+  // proportional face after the first keystroke.
+  const placeholder = t('profiles.commandPlaceholder');
+  const monoClass =
+    command.length === 0 && hasRtlScript(placeholder)
+      ? withoutMonoFamily('font-mono')
+      : 'font-mono';
 
+  // The caller's gap lands only on the label-to-input pair inside `FormField`:
+  // the block's own root keeps its compact `gap-1.5`, so the counter and the
+  // at-limit line below the field keep the ordinary spacing no matter what the
+  // controls' touch band needs above the input.
   return (
     <View className="gap-1.5">
       <FormField
         label={label}
-        labelAccessory={trailing}
+        gapClassName={gapClassName}
         defaultValue={command}
-        placeholder={t('profiles.commandPlaceholder')}
-        className="min-h-[44px] leading-[normal]"
+        placeholder={placeholder}
+        className={monoClass}
+        style={codeFieldTextStyle()}
         maxLength={MAX_SETUP_COMMAND_LENGTH}
         autoCapitalize="none"
         autoCorrect={false}
@@ -101,17 +138,7 @@ export function SetupCommandField({
         onSubmitEditing={onSubmitEditing}
         onChangeText={onChangeText}
       />
-      {showsCounter ? (
-        <View className="flex-row justify-end">
-          {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-          <Text
-            className="text-xs font-normal text-muted-foreground"
-            accessibilityLabel={t('agentChat.composer.charactersRemaining', { count: remaining })}
-          >
-            {remaining}
-          </Text>
-        </View>
-      ) : null}
+      {showsCounter ? <RemainingCharactersCounter remaining={remaining} /> : null}
       {showsBound ? (
         <AccessibleStatus
           message={t('profiles.commandAtLimit', { max: MAX_SETUP_COMMAND_LENGTH })}

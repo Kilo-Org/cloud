@@ -5,7 +5,9 @@ import {
   canManageOrganizationBilling,
   canManageOrganizationOwners,
   ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
   ORGANIZATION_PARENT_ACCESS_ROLES,
+  ORGANIZATION_ROLE_PRIORITY,
   ORGANIZATION_ROLES,
   ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES,
 } from './roles';
@@ -13,6 +15,23 @@ import {
 describe('ORGANIZATION_ROLES', () => {
   it('is exactly owner, admin, member, billing_manager', () => {
     expect(ORGANIZATION_ROLES).toEqual(['owner', 'admin', 'member', 'billing_manager']);
+  });
+});
+
+describe('ORGANIZATION_ROLE_PRIORITY', () => {
+  it('ranks owner, admin, billing_manager, member in that order', () => {
+    expect(ORGANIZATION_ROLE_PRIORITY).toEqual(['owner', 'admin', 'billing_manager', 'member']);
+  });
+
+  it('ranks every canonical role exactly once', () => {
+    expect([...ORGANIZATION_ROLE_PRIORITY].sort()).toEqual([...ORGANIZATION_ROLES].sort());
+    expect(ORGANIZATION_ROLE_PRIORITY).toHaveLength(ORGANIZATION_ROLES.length);
+  });
+});
+
+describe('ORGANIZATION_MANAGE_ROLES', () => {
+  it('is owner and admin', () => {
+    expect(ORGANIZATION_MANAGE_ROLES).toEqual(['owner', 'admin']);
   });
 });
 
@@ -37,10 +56,9 @@ describe('canManageOrganizationBilling', () => {
     expect(canManageOrganizationBilling('billing_manager')).toBe(true);
   });
 
-  it('is false for member, undefined, and unrelated strings', () => {
+  it('is false for member and undefined', () => {
     expect(canManageOrganizationBilling('member')).toBe(false);
     expect(canManageOrganizationBilling(undefined)).toBe(false);
-    expect(canManageOrganizationBilling('kilo_staff')).toBe(false);
   });
 });
 

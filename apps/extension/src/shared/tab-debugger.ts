@@ -42,11 +42,19 @@ export interface ChromeDebuggerTargetInfo {
 
 export interface ChromeDebuggerTarget {
   readonly tabId: number;
+  /**
+   * A flattened child session of this tab — an out-of-process iframe, which
+   * `Target.setAutoAttach` attaches under the tab's one debugger. Absent for
+   * the tab's own session.
+   */
+  readonly sessionId?: string;
 }
 
 /** CDP events report which target they came from; a session filters on `tabId`. */
 export interface ChromeDebuggerEventSource {
   readonly tabId?: number;
+  /** Set when the event came from a flattened child session rather than the tab itself. */
+  readonly sessionId?: string;
 }
 
 export type ChromeDebuggerEventListener = (
@@ -88,10 +96,23 @@ export interface ChromeDebuggerApi {
 
 export interface BrowserTabInfo {
   readonly active?: boolean;
+  /** `chrome.tabGroups` id the tab is in; `-1` (or absent) when ungrouped. */
+  readonly groupId?: number;
   readonly id?: number;
+  /** `loading` while a document loads, `complete` once it has. */
+  readonly status?: string;
   readonly title?: string;
   readonly url?: string;
   readonly windowId?: number;
+}
+
+export interface BrowserTabCreatedApi {
+  readonly addListener: (
+    listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+  ) => void;
+  readonly removeListener?: (
+    listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+  ) => void;
 }
 
 export interface BrowserTabRemovedApi {
@@ -100,19 +121,48 @@ export interface BrowserTabRemovedApi {
 }
 
 export interface BrowserTabsApi {
+  /** Firefox's `tabs.captureTab`: renders one tab's viewport without making it the active tab. */
+  readonly captureTab?: (
+    tabId: number,
+    options?: { readonly format: 'png'; readonly scale?: number }
+  ) => Promise<string> | string;
   readonly captureVisibleTab?: (
     windowId?: number,
     options?: { readonly format: 'png' }
   ) => Promise<string> | string;
   readonly get?: (tabId: number) => Promise<BrowserTabInfo> | BrowserTabInfo;
   /** `chrome.tabs.onRemoved` — a browser-tool session disposes when its tab closes. */
+  /** `chrome.tabs.onCreated` — a tab opened from a session's tab joins that session. */
+  readonly onCreated?: BrowserTabCreatedApi;
   readonly onRemoved?: BrowserTabRemovedApi;
+  /**
+   * `chrome.tabs.onUpdated` — the browser's own progress signal; a tab is
+   * inspectable only after its document commits.
+   */
+  readonly onUpdated?: {
+    readonly addListener: (
+      listener: (
+        tabId: number,
+        changeInfo: {
+          readonly pendingUrl?: string;
+          readonly status?: string;
+          readonly url?: string;
+        },
+        tab?: { readonly url?: string }
+      ) => void
+    ) => void;
+    readonly removeListener: (
+      listener: (tabId: number, changeInfo: never, tab?: never) => void
+    ) => void;
+  };
   readonly query: (
     queryInfo: Record<string, unknown>
   ) => Promise<BrowserTabInfo[]> | BrowserTabInfo[];
+  /** `chrome.tabs.remove` — a call that opened a tab and cannot use it closes it again. */
+  readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
   readonly update?: (
     tabId: number,
-    updateProperties: { readonly active: boolean }
+    updateProperties: { readonly active?: boolean; readonly url?: string }
   ) => Promise<BrowserTabInfo> | BrowserTabInfo;
 }
 
@@ -129,8 +179,14 @@ export interface BrowserScriptingApi {
   readonly executeScript: <Result>(details: {
     readonly args: string[];
     readonly func: (...args: string[]) => Result;
-    readonly target: { readonly tabId: number; readonly documentIds?: string[] };
-    readonly world: 'MAIN';
+    readonly target: {
+      readonly allFrames?: boolean;
+      readonly documentIds?: string[];
+      readonly frameIds?: number[];
+      readonly tabId: number;
+    };
+    /** `ISOLATED` is the extension's content-script world, where page script cannot reach the DOM it reads. */
+    readonly world: 'ISOLATED' | 'MAIN';
   }) => Promise<BrowserScriptingInjectionResult[]> | BrowserScriptingInjectionResult[];
 }
 
@@ -289,13 +345,32 @@ export type TabDebuggerRequest =
       readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
     }
   | {
+      /**
+       * Present only for the CLI agent transport: the grant pairs the session
+       * already approved and the sensitive step token a retry carries.
+       */
+      readonly agent?: BrowserToolAgentContext | undefined;
       readonly arguments: Record<string, unknown>;
       readonly caller: BrowserCaller;
+      /**
+       * The panel's mode, when it has one: safe mode exposes only the read-only
+       * tools, so a modal state must not name an answer the caller cannot call.
+       */
+      readonly safeMode?: boolean | undefined;
       readonly tabId: number;
       readonly takeOver?: boolean;
       readonly tool: string;
       readonly type: typeof BROWSER_TOOL_MESSAGE;
     };
+
+/** The grant pairs and step tokens one CLI agent call carries. */
+export interface BrowserToolAgentContext {
+  readonly authorized: readonly {
+    readonly class: 'act' | 'navigate' | 'read';
+    readonly origin: string;
+  }[];
+  readonly sensitive?: readonly string[] | undefined;
+}
 
 export type TabDebuggerResponse =
   | {
@@ -337,6 +412,27 @@ export type TabDebuggerResponse =
       readonly released: number;
       readonly ok: true;
       readonly type: typeof RELEASE_BROWSER_CALLER_MESSAGE;
+    }
+  | {
+      /** `needs_permission`: the transport maps this to JSON-RPC -32010. */
+      readonly permission?:
+        | {
+            readonly items: readonly Record<string, unknown>[];
+            readonly stepToken?: string | undefined;
+          }
+        | undefined;
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
+      /** Origins whose frames this agent call could not read. */
+      readonly withheldFrames?: readonly string[] | undefined;
+    }
+  | {
+      /** `origin_changed`: the transport maps this to JSON-RPC -32012. */
+      readonly originChanged: { readonly from: string; readonly to: string };
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
     }
   | {
       readonly released: number;
@@ -423,8 +519,22 @@ const tabDebuggerRequestSchema = z.union([
     type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
   }),
   z.object({
+    agent: z
+      .object({
+        authorized: z.array(
+          z.object({ class: z.enum(['act', 'navigate', 'read']), origin: z.string().min(1) })
+        ),
+        sensitive: z.array(z.string()).optional(),
+      })
+      .optional(),
     arguments: z.record(z.string(), z.unknown()),
     caller: browserCallerSchema,
+    /**
+     * The panel's mode when it has one: safe mode exposes only the read-only
+     * tools, so a modal state must not name an answer the caller cannot call.
+     * Absent for a CLI agent, whose tool set always has the handler.
+     */
+    safeMode: z.boolean().optional(),
     tabId: z.number(),
     takeOver: z.boolean().optional(),
     tool: z.string(),
@@ -474,6 +584,12 @@ const tabDebuggerResponseSchema = z.union([
   }),
   z.object({
     ok: z.literal(true),
+    originChanged: z.object({ from: z.string(), to: z.string() }),
+    result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
     released: z.number(),
     type: z.literal(DISPOSE_BROWSER_CALLER_MESSAGE),
   }),
@@ -481,6 +597,18 @@ const tabDebuggerResponseSchema = z.union([
     ok: z.literal(true),
     result: evalTabResultSchema,
     type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    permission: z
+      .object({
+        items: z.array(z.record(z.string(), z.unknown())),
+        stepToken: z.string().optional(),
+      })
+      .optional(),
+    result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+    withheldFrames: z.array(z.string()).optional(),
   }),
   z.object({
     ok: z.literal(true),
@@ -628,20 +756,52 @@ const runScreenshotCaptureExclusively = <Result>(task: () => Promise<Result>): P
   return run;
 };
 
-export const getViewportScreenshotWithTabsApi = ({
+const viewportScreenshotOf = (dataUrl: string): EvalTabResult => {
+  if (!dataUrl.startsWith('data:image/png;base64,')) {
+    return { error: 'Viewport screenshot API returned an invalid image.', ok: false };
+  }
+  const dimensions = getPngDimensions(dataUrl);
+
+  return {
+    ok: true,
+    value: {
+      dataUrl,
+      devicePixelRatio: 1,
+      height: dimensions?.height ?? 0,
+      mediaType: 'image/png',
+      width: dimensions?.width ?? 0,
+    } satisfies ViewportScreenshot,
+  };
+};
+
+export const getViewportScreenshotWithTabsApi = async ({
   tabId,
   tabsApi,
 }: {
   readonly tabId: number;
   readonly tabsApi: BrowserTabsApi;
 }): Promise<EvalTabResult> => {
+  const captureTab = tabsApi.captureTab?.bind(tabsApi);
+
+  // Firefox renders any tab on its own, so the user's foreground tab is never switched away (D9).
+  if (captureTab !== undefined) {
+    try {
+      return viewportScreenshotOf(await captureTab(tabId, { format: 'png', scale: 1 }));
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'The tab could not be captured.',
+        ok: false,
+      };
+    }
+  }
+
   const captureVisibleTab = tabsApi.captureVisibleTab?.bind(tabsApi);
   const getTab = tabsApi.get?.bind(tabsApi);
   const updateTab = tabsApi.update?.bind(tabsApi);
   const queryTabs = tabsApi.query.bind(tabsApi);
 
   if (captureVisibleTab === undefined || getTab === undefined || updateTab === undefined) {
-    return Promise.resolve({ error: 'Viewport screenshot API is unavailable.', ok: false });
+    return { error: 'Viewport screenshot API is unavailable.', ok: false };
   }
 
   return runScreenshotCaptureExclusively(async () => {
@@ -660,23 +820,7 @@ export const getViewportScreenshotWithTabsApi = ({
         return { error: 'The selected tab was not active at capture time.', ok: false };
       }
 
-      const dataUrl = await captureVisibleTab(windowId, { format: 'png' });
-
-      if (!dataUrl.startsWith('data:image/png;base64,')) {
-        return { error: 'Viewport screenshot API returned an invalid image.', ok: false };
-      }
-      const dimensions = getPngDimensions(dataUrl);
-
-      return {
-        ok: true,
-        value: {
-          dataUrl,
-          devicePixelRatio: 1,
-          height: dimensions?.height ?? 0,
-          mediaType: 'image/png',
-          width: dimensions?.width ?? 0,
-        } satisfies ViewportScreenshot,
-      };
+      return viewportScreenshotOf(await captureVisibleTab(windowId, { format: 'png' }));
     } finally {
       if (previousActiveTabId !== undefined && previousActiveTabId !== tabId) {
         try {
@@ -1313,11 +1457,14 @@ export const evaluateTabCode = async ({
 
 export const evalInTabWithScripting = async ({
   code,
+  frameId,
   scriptingApi,
   tabId,
   timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
 }: {
   readonly code: string;
+  /** One frame of the tab; absent runs in the top-level document. */
+  readonly frameId?: number;
   readonly scriptingApi: BrowserScriptingApi;
   readonly tabId: number;
   readonly timeoutMs?: number;
@@ -1334,7 +1481,7 @@ export const evalInTabWithScripting = async ({
         scriptingApi.executeScript({
           args: [code],
           func: runInjectedEval,
-          target: { tabId },
+          target: frameId === undefined ? { tabId } : { frameIds: [frameId], tabId },
           world: 'MAIN',
         })
       ),

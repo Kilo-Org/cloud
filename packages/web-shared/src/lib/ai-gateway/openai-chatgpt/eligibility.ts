@@ -1,11 +1,7 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import {
-  OPENAI_CHATGPT_API_KEY_ENV,
-  OPENAI_CHATGPT_API_URL,
-  OPENAI_ON_BEHALF_OF_TOKEN_HEADER,
-  withTraceabilityMetadata,
-} from './routing';
+import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER, withTraceabilityMetadata } from './routing';
 import { isOpenAiModelServed } from './served-models';
+import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
  * Detection for an account OpenAI refuses to share a plan for.

@@ -9,6 +9,7 @@ import type { SessionObservation } from './session-supervisor.js';
 import type { RestoreRoots } from '../restore-roots.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { BackgroundActivityInventory } from '../../../src/shared/background-activity.js';
+import type { AgentBoard } from '../../../src/shared/agent-board.js';
 
 export type HarnessSession = { sessionId: string; directory: string; signal?: AbortSignal };
 export type HarnessPrompt = HarnessSession & {
@@ -68,6 +69,11 @@ export type HarnessReads = Pick<
     directory: string,
     signal: AbortSignal
   ) => Promise<BackgroundActivityInventory>;
+  getAgentBoard?: (
+    sessionId: string,
+    directory: string,
+    signal: AbortSignal
+  ) => Promise<AgentBoard>;
   /** Kilo v1 message rows. Other harnesses keep native messages in Cloud history. */
   getRecentSessionMessages?: WrapperKiloClient['getRecentSessionMessages'];
 };
@@ -84,6 +90,15 @@ export type Harness = {
       restoreFiles: boolean;
       roots?: RestoreRoots;
       onRestore(): void;
+      snapshotRestore?: {
+        startedAt?: number;
+        timings: Partial<Record<'downloadMs' | 'importMs' | 'diffsMs', number>>;
+        durationMs?: number;
+        result?: {
+          outcome: 'restored' | 'partial' | 'fallback' | 'failed';
+          reason?: 'download' | 'import' | 'diffs' | 'not_found' | 'empty';
+        };
+      };
     }
   ): Promise<boolean>;
   submit(input: HarnessPrompt): Promise<void>;

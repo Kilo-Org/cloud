@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { epochMsToIso, parseTimestamp, timestampMs, timestampToIso } from './utils';
+import {
+  epochMsToIso,
+  formatCents,
+  formatDollars,
+  parseTimestamp,
+  timestampMs,
+  timestampToIso,
+} from './utils';
 
 function inTimeZone<T>(timeZone: string, run: () => T): T {
   vi.stubEnv('TZ', timeZone);
@@ -120,5 +127,37 @@ describe('epochMsToIso', () => {
 
   it('drops the sub-millisecond part', () => {
     expect(epochMsToIso(1_772_000_000_123.9)).toBe('2026-02-25T06:13:20.123Z');
+  });
+});
+
+describe('formatCents', () => {
+  it('formats USD with the standard dollar presentation', () => {
+    expect(formatCents(12345)).toBe('$123.45');
+    expect(formatCents(-5)).toBe('-$0.05');
+    expect(formatCents(0)).toBe('$0.00');
+  });
+
+  it('formats a non-USD currency from its uppercase code', () => {
+    expect(formatCents(12345, 'eur')).toBe('€123.45');
+  });
+
+  it('reuses one formatter per currency across calls (same output, cached construction)', () => {
+    // The second and later calls format through a memoized Intl.NumberFormat;
+    // pinning repeated-call stability catches a cache that returns a formatter
+    // built with the wrong currency or options.
+    const first = formatCents(999, 'JPY');
+    expect(formatCents(999, 'JPY')).toBe(first);
+    // JPY has no minor unit, so Intl rounds to whole yen.
+    expect(first).toBe('¥10');
+    // The USD cache is independent of the JPY cache.
+    expect(formatCents(999)).toBe('$9.99');
+  });
+});
+
+describe('formatDollars', () => {
+  it('routes dollars through the same en-US USD presentation as formatCents', () => {
+    expect(formatDollars(123.45)).toBe('$123.45');
+    expect(formatDollars(0.5)).toBe('$0.50');
+    expect(formatDollars(123.456)).toBe('$123.46');
   });
 });

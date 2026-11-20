@@ -204,6 +204,7 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
       experimental_byok: [],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
+      org_permission_policy: [],
     });
   });
 
@@ -216,6 +217,7 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
       experimental_byok: ['00000000-0000-4000-8000-000000000001'],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
+      org_permission_policy: [],
     });
   });
 
@@ -231,6 +233,7 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
       experimental_byok: [],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
+      org_permission_policy: [],
     });
   });
 });
@@ -247,6 +250,7 @@ test('lowercases stored organization IDs', () => {
     experimental_byok: [],
     enkrypt_output_guardrail: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
     gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+    org_permission_policy: [],
   });
 });
 
@@ -260,11 +264,16 @@ describe('OrganizationFeaturesInputSchema', () => {
         ],
         enkrypt_output_guardrail: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
         gateway_settings: [],
+        org_permission_policy: [
+          '9D278969-5453-4AE3-A51F-A8D2274A7B56',
+          '9d278969-5453-4ae3-a51f-a8d2274a7b56',
+        ],
       })
     ).toEqual({
       experimental_byok: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
       enkrypt_output_guardrail: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
       gateway_settings: [],
+      org_permission_policy: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
     });
   });
 
@@ -274,6 +283,7 @@ describe('OrganizationFeaturesInputSchema', () => {
         experimental_byok: ['kilo'],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
+        org_permission_policy: [],
       }).success
     ).toBe(false);
   });

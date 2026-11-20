@@ -99,6 +99,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  reviewerOrganizationId: (scope: string) => (scope === 'personal' ? undefined : scope),
   useReviewConfig: () => config,
   useSaveReviewConfig: () => ({ mutate: vi.fn() }),
   useReviewConfigCacheReader: () => () => config.data,

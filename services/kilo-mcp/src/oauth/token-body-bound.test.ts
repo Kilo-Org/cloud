@@ -62,12 +62,22 @@ function makeDeps() {
 }
 
 function makeRevokingDeps() {
-  const tokens = new Map<string, { userId: string; grantId: string; current: boolean }>();
+  const tokens = new Map<
+    string,
+    { userId: string; grantId: string; current: boolean; previous: boolean }
+  >();
   const store: RefreshReuseStore = {
     getRefreshToken: async hash => tokens.get(hash) ?? null,
-    rememberRefreshToken: async (hash, parts) => {
-      for (const entry of tokens.values()) entry.current = false;
-      tokens.set(hash, { ...parts, current: true });
+    rememberRefreshToken: async (hash, parts, _expiresAt, presentedHash) => {
+      for (const entry of tokens.values()) {
+        entry.current = false;
+        entry.previous = false;
+      }
+      if (presentedHash !== null) {
+        const presented = tokens.get(presentedHash);
+        if (presented) presented.previous = true;
+      }
+      tokens.set(hash, { ...parts, current: true, previous: false });
     },
     forgetRefreshTokens: async ({ userId, grantId }) => {
       for (const [hash, entry] of tokens) {
@@ -192,7 +202,16 @@ describe('createRefreshReuseHandler (body reading)', () => {
     const deps = makeRevokingDeps();
     const handle = createRefreshReuseHandler(deps);
     await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
-    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:second' }),
+      deps,
+      'u:g:first'
+    );
+    await rememberIssuedRefreshToken(
+      Response.json({ refresh_token: 'u:g:third' }),
+      deps,
+      'u:g:second'
+    );
     const replay = await handle(
       formRequest(
         new URLSearchParams([

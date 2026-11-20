@@ -7,8 +7,9 @@ import { renderWithProviders, type RenderWithProvidersResult } from '@/test/rend
 import { FindingFilterModal } from './finding-filter-modal';
 
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
@@ -29,8 +30,12 @@ async function mount(repositories: { fullName: string }[]) {
 /** Every string the sheet renders, in render order. */
 function renderedStrings(renderer: RenderWithProvidersResult['renderer']): string[] {
   return renderer.root
-    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Text')
-    .map(n => n.props.children)
+    .findAll(
+      n =>
+        typeof n.type === 'string' &&
+        ((n.type as string) === 'Text' || (n.type as string) === 'ChoiceRow')
+    )
+    .map(n => ((n.type as string) === 'ChoiceRow' ? n.props.label : n.props.children))
     .filter((child): child is string => typeof child === 'string');
 }
 
@@ -59,14 +64,14 @@ describe('FindingFilterModal section labels', () => {
     expect(sectionTitle(renderer, i18n.t('common.repository'))?.props.variant).toBe('eyebrow');
   });
 
-  it('renders an RTL-script section label at the secondary text size and colour', async () => {
+  it('renders an RTL-script section label as the section eyebrow', async () => {
     await i18n.changeLanguage('ar');
     try {
       const renderer = await mount([]);
       const title = i18n.t('common.repository');
 
       expect(title).not.toBe('Repository');
-      expect(sectionTitle(renderer, title)?.props.variant).toBe('muted');
+      expect(sectionTitle(renderer, title)?.props.variant).toBe('eyebrow');
     } finally {
       await i18n.changeLanguage('en');
     }

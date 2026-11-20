@@ -1,7 +1,11 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it, vi } from 'vitest';
+import { cloud_agent_worktrees } from '@kilocode/db/schema';
 
-import { queryAccessibleKiloSession } from './cloud-agent-session-access.js';
+import {
+  checkWorkspaceChatTarget,
+  queryAccessibleKiloSession,
+} from './cloud-agent-session-access.js';
 
 function createCapturingDb() {
   const joins: { table: unknown; condition: unknown }[] = [];
@@ -29,6 +33,32 @@ function createCapturingDb() {
     },
   };
 }
+
+describe('checkWorkspaceChatTarget', () => {
+  it('checks the requested chat and reads workspace state from its worktree', async () => {
+    const captured = createCapturingDb();
+    await expect(
+      checkWorkspaceChatTarget(captured.db as never, {
+        cloudAgentSessionId: 'workspace-chat',
+        userId: 'usr_1',
+        organizationId: null,
+      })
+    ).resolves.toBe('not_found');
+
+    const dialect = new PgDialect();
+    expect(captured.joins).toHaveLength(1);
+    expect(captured.joins.map(join => dialect.sqlToQuery(join.condition as never).sql)).toEqual([
+      '"cli_sessions_v2"."cloud_agent_worktree_id" = "cloud_agent_worktrees"."worktree_id"',
+    ]);
+    expect(dialect.sqlToQuery(captured.whereCondition as never)).toMatchObject({
+      sql: '"cli_sessions_v2"."cloud_agent_session_id" = $1',
+      params: ['workspace-chat'],
+    });
+    expect(captured.db.select).toHaveBeenCalledWith(
+      expect.objectContaining({ deletionStartedAt: cloud_agent_worktrees.deletion_started_at })
+    );
+  });
+});
 
 describe('queryAccessibleKiloSession', () => {
   it('honours parent-organization inheritance in the session read predicate', async () => {

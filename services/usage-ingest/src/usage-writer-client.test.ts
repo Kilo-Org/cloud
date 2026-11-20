@@ -542,7 +542,7 @@ describe('Exa usage writer client', () => {
     source: 'queue' as const,
   };
 
-  it.each(['recorded', 'duplicate'] as const)(
+  it.each(['recorded', 'duplicate', 'rejected'] as const)(
     'posts the record unchanged and accepts a %s echo of its id',
     async status => {
       fetchMock.mockResolvedValue(Response.json({ status, usageId: exaRecord.id }));
@@ -568,6 +568,10 @@ describe('Exa usage writer client', () => {
 
   it.each([
     ['another usage id', { status: 'recorded', usageId: '7b2d3f4a-5c6e-4f7a-9b8c-0d1e2f3a4b5c' }],
+    [
+      'another usage id on a rejection',
+      { status: 'rejected', usageId: '7b2d3f4a-5c6e-4f7a-9b8c-0d1e2f3a4b5c' },
+    ],
     ['a missing usage id', { status: 'duplicate' }],
     ['an LLM acknowledgement', { status: 'recorded', result: { usageId: exaRecord.id } }],
     ['not_recorded', { status: 'not_recorded', usageId: exaRecord.id }],

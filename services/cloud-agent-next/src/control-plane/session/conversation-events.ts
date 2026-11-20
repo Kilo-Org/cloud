@@ -19,6 +19,11 @@ const textEventSchema = z.object({
   text: z.string().optional(),
 });
 
+const conversationMessagePayloadSchema = z.object({
+  event: z.literal('conversation.message.updated'),
+  properties: kilo2ConversationMessageSchema,
+});
+
 /** Native transcript rows use the same cursor and retention as v1 rows. */
 export function persistConversationEvent(input: {
   sessionId: string;
@@ -29,7 +34,7 @@ export function persistConversationEvent(input: {
   const { event, queries, sessionId } = input;
   const timestamp = Date.now();
   let entityId: string;
-  const liveProperties = publicEventProperties(event);
+  let liveProperties = publicEventProperties(event);
   let properties: Record<string, unknown> = liveProperties;
   let type = event.type;
   const stored = (id: number): StoredEvent => ({
@@ -48,11 +53,28 @@ export function persistConversationEvent(input: {
     if (!source.success || properties.sessionID !== source.data.session.id) return null;
     entityId = `conversation-source/${source.data.session.id}`;
     properties = { sessionID: source.data.session.id, source: source.data };
+    input.partText.flush();
   } else if (type === 'conversation.message.updated') {
     const parsed = kilo2ConversationMessageSchema.safeParse(properties);
     if (!parsed.success) return null;
-    properties = parsed.data;
+    input.partText.flush();
     entityId = `message/${parsed.data.message.id}`;
+    properties = parsed.data;
+    if (!parsed.data.parentID) {
+      const prior = readStoredMessage(queries, entityId);
+      const parentID =
+        prior?.properties.sessionID === parsed.data.sessionID
+          ? prior.properties.parentID
+          : undefined;
+      properties = { ...parsed.data, parentID: parentID || undefined };
+      if (
+        parentID &&
+        parsed.data.message.type === 'assistant' &&
+        prior?.properties.message.type === 'assistant'
+      ) {
+        liveProperties = { ...liveProperties, parentID };
+      }
+    }
   } else if (type === 'conversation.event') {
     const parsed = kilo2ConversationEventSchema.safeParse(properties);
     if (!parsed.success) return null;
@@ -99,8 +121,6 @@ export function persistConversationEvent(input: {
     type = 'conversation.message.updated';
     properties = next;
   } else return null;
-  // Every row write sees, and is ordered after, the text streamed before it.
-  input.partText.flush();
   return stored(
     queries.upsert({
       executionId: '',
@@ -117,6 +137,17 @@ function payload(name: string, data: Record<string, unknown>) {
   return JSON.stringify({ type: name, event: name, properties: data });
 }
 
+function readStoredMessage(queries: SessionEventQueries, entityId: string) {
+  const previous = queries.findByEntityId(entityId);
+  if (previous === null) return undefined;
+  try {
+    const parsed = conversationMessagePayloadSchema.safeParse(JSON.parse(previous.payload));
+    return parsed.success ? { id: previous.id, properties: parsed.data.properties } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The stored message that streamed text extends, as a buffer entry it owns.
  *
@@ -129,18 +160,13 @@ function bufferFromRow(
   sessionId: string,
   timestamp: number
 ): BufferedMessageText | undefined {
-  const previous = queries.findByEntityId(entityId);
-  if (previous === null) return undefined;
-  const envelope = z
-    .object({ properties: kilo2ConversationMessageSchema })
-    .safeParse(JSON.parse(previous.payload));
-  if (!envelope.success || envelope.data.properties.message.time.completed !== undefined)
-    return undefined;
+  const previous = readStoredMessage(queries, entityId);
+  if (!previous || previous.properties.message.time.completed !== undefined) return undefined;
   return {
     kind: 'message',
     rowId: previous.id,
     sessionId,
     timestamp,
-    properties: envelope.data.properties,
+    properties: previous.properties,
   };
 }

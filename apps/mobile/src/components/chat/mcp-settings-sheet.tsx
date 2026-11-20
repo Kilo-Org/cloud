@@ -8,6 +8,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { SlidersHorizontal } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { kiloMcpState, watchKiloMcp } from '@/lib/chat/kilo-mcp';
 import { chatFlagBehind } from '@/lib/chat/chat-flag';
@@ -34,6 +35,8 @@ import {
 import { McpServerFormSheet, type McpServerFormTarget } from './mcp-server-form-sheet';
 import { McpServersSection } from './mcp-servers-section';
 import { WebSearchRow, type WebSearchSetting } from './web-search-row';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 /**
  * The chat-tools sheet.
@@ -281,23 +284,25 @@ export function McpSettingsSheet({
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pb-6 pt-4"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
         showsVerticalScrollIndicator={false}
       >
         <WebSearchRow setting={webSearch} />
 
         {/* 1. The one switch for the settings-changing tools. */}
         <View className="gap-2">
-          <PreferenceRow
-            icon={SlidersHorizontal}
-            title={t(settingsTools.titleKey)}
-            subtitle={t(settingsTools.subtitleKey)}
-            value={settings.settingsToolsEnabled}
-            disabled={false}
-            onValueChange={next => {
-              settings.setSettingsToolsEnabled(next);
-            }}
-          />
+          <RowGroup>
+            <PreferenceRow
+              icon={SlidersHorizontal}
+              title={t(settingsTools.titleKey)}
+              subtitle={t(settingsTools.subtitleKey)}
+              value={settings.settingsToolsEnabled}
+              disabled={false}
+              onValueChange={next => {
+                settings.setSettingsToolsEnabled(next);
+              }}
+            />
+          </RowGroup>
           {/* One line's height in every state, so on -> off never moves what
               follows it. */}
           <View className="min-h-6 justify-center px-1">

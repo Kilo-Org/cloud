@@ -213,7 +213,7 @@ describe('dead-letter alert wiring', () => {
       fileURLToPath(new URL('../../o11y/src/alerting/dead-letter-queue.ts', import.meta.url).href),
       'utf8'
     );
-    const watched = /DEAD_LETTER_QUEUE_NAME = '([^']+)'/.exec(alertConfig)?.[1];
+    const watched = /\bDEAD_LETTER_QUEUE_NAME = '([^']+)'/.exec(alertConfig)?.[1];
     const source = production.queues.producers.find(
       ({ binding }: { binding: string }) => binding === 'USAGE_INGEST_QUEUE'
     )?.queue;
@@ -221,6 +221,22 @@ describe('dead-letter alert wiring', () => {
       ({ queue }: { queue: string }) => queue === source
     );
     expect(source).toBe('usage-ingest-processing-eu');
+    expect(watched).toBe(consumer?.dead_letter_queue);
+  });
+
+  it('is watched by the o11y dead-letter alert under the production Enkrypt DLQ name', () => {
+    const alertConfig = readFileSync(
+      fileURLToPath(new URL('../../o11y/src/alerting/dead-letter-queue.ts', import.meta.url).href),
+      'utf8'
+    );
+    const watched = /ENKRYPT_DEAD_LETTER_QUEUE_NAME = '([^']+)'/.exec(alertConfig)?.[1];
+    const source = production.queues.producers.find(
+      ({ binding }: { binding: string }) => binding === 'USAGE_INGEST_ENKRYPT_QUEUE'
+    )?.queue;
+    const consumer = production.queues.consumers.find(
+      ({ queue }: { queue: string }) => queue === source
+    );
+    expect(source).toBe('usage-ingest-enkrypt-eu');
     expect(watched).toBe(consumer?.dead_letter_queue);
   });
 });

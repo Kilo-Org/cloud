@@ -16,18 +16,34 @@ import { i18n } from '@/i18n';
  *   `RCTRecursiveAccessibilityLabel` co-opting, so the message body would not
  *   be announced anywhere. `accessible={false}` is the only correct fix.
  *
+ * Why the wrapper is also `focusable: false`:
+ *   `Pressable` also defaults `focusable` to true, and on Android that installs
+ *   a native click listener. The wrapper then stayed a clickable, role-less
+ *   focus stop around the whole row ("User message" with nothing to activate)
+ *   even though it is not accessible.
+ *
  * Why the role/label/hint/actions live on a separate inner overlay:
  *   `accessibilityActions` need a focusable element to attach to. The overlay
  *   is an inset-matched, non-interactive, focusable `View` with no children,
  *   so it does not swallow the message subtree while still giving the rotor a
- *   target aligned with the bubble's actual bounds. The caller must only render
- *   this host when `accessibilityActions` is non-empty; when no action is
- *   exposed the overlay is omitted so VoiceOver/TalkBack do not stop on an
- *   empty focusable node.
+ *   target aligned with the bubble's actual bounds. It paints nothing, and it
+ *   must not be transparent through opacity: neither platform exposes a view
+ *   at zero opacity to its screen reader (Android reports it as not visible to
+ *   the user, UIKit skips it), so with `opacity-0` neither TalkBack nor
+ *   VoiceOver reached the row's Copy and Details actions. On both platforms
+ *   the host is therefore one stop per row that has actions, read as "User
+ *   message" or "Assistant message" before the content. It spans the row,
+ *   including the empty space beside an end-aligned user bubble, because it
+ *   is the row's own target, the same frame the long press uses. The caller
+ *   must only render this host when `accessibilityActions` is non-empty; when
+ *   no action is exposed the overlay is omitted so VoiceOver/TalkBack do not
+ *   stop on an empty focusable node.
  */
 type AgentMessageBubbleAccessibility = {
   /** Applied to the wrapping `Pressable` so the message subtree stays navigable. */
   accessible: false;
+  /** Applied to the wrapping `Pressable` so it is no native click target either. */
+  focusable: false;
   /** Applied to the dedicated inner actions host (VoiceOver/TalkBack rotor). */
   accessibilityLabel: string;
   /** Applied to the dedicated inner actions host. */
@@ -69,6 +85,7 @@ export function buildAgentMessageBubbleAccessibilityProps(
 
   return {
     accessible: false,
+    focusable: false,
     accessibilityLabel,
     accessibilityHint,
     accessibilityRole: 'text',

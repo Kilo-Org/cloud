@@ -52,6 +52,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/screen-footer', () => ({ ScreenFooter: 'ScreenFooter' }));
 vi.mock('@/lib/pr-review/diff-selection-bridge', () => ({
   clearDiffSelection: vi.fn(),
 }));
@@ -81,22 +82,27 @@ function renderBar(): React.ReactElement {
 }
 
 describe('PrDiffFloatingActions opaque backdrop (spot check e2)', () => {
-  it('paints the bar container with the screen background and swallows touches', () => {
+  it('paints the bar with the screen background through the shared footer', () => {
     // With a transparent container the diff rows scrolled under the bar
-    // stayed visible around and below the button. The container carries the
-    // screen background, and the removed `pointerEvents="box-none"` means a
-    // tap in the padding ring can never reach a diff row hidden behind it.
-    const props = renderBar().props as { className?: string; pointerEvents?: string };
-    expect(props.pointerEvents).toBeUndefined();
-    expect((props.className ?? '').split(' ')).toContain('bg-background');
+    // stayed visible around and below the button. The shared footer paints
+    // the screen background for its whole ring, and no `pointerEvents=
+    // "box-none"` is left on it, so a tap in the padding ring can never reach
+    // a diff row hidden behind it.
+    const bar = renderBar();
+    expect(bar.type).toBe('ScreenFooter');
+    expect((bar.props as { pointerEvents?: string }).pointerEvents).toBeUndefined();
   });
 
-  it('keeps the action card on the same background inside the bar', () => {
-    const card = (renderBar().props as { children?: React.ReactElement }).children;
-    if (!card) {
-      throw new Error('floating action card not found');
+  it('draws no floating card of its own inside the bar', () => {
+    // The actions sit on the bar itself, as on every pinned footer: a
+    // bordered, shadowed card inside it read as a floating island.
+    const content = (renderBar().props as { children?: React.ReactElement }).children;
+    if (!content) {
+      throw new Error('footer content not found');
     }
-    const classes = (card.props as { className?: string }).className ?? '';
-    expect(classes.split(' ')).toContain('bg-background');
+    const classes = ((content.props as { className?: string }).className ?? '').split(' ');
+    for (const card of ['rounded-xl', 'border', 'shadow-lg', 'bg-background']) {
+      expect(classes).not.toContain(card);
+    }
   });
 });

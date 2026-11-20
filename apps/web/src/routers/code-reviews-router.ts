@@ -9,7 +9,6 @@ import {
 import {
   getAgentConfigForOwner,
   upsertAgentConfigForOwner,
-  setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig, RepositoryModelOverride } from '@/lib/agent-config/core/types';
 import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
@@ -31,6 +30,7 @@ import {
   clearCodeReviewActionRequiredState,
   getCodeReviewActionRequiredState,
 } from '@/lib/code-reviews/action-required';
+import { setCodeReviewEnabled } from '@/lib/code-reviews/enable-code-review';
 import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
 import {
   createManualCodeReviewJob,
@@ -739,7 +739,12 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
         const platform = input.platform ?? 'github';
 
-        await setAgentEnabledForOwner(owner, 'code_review', platform, input.isEnabled);
+        await setCodeReviewEnabled({
+          owner,
+          platform,
+          isEnabled: input.isEnabled,
+          createdBy: ctx.user.id,
+        });
         await clearCodeReviewActionRequiredState({ owner, platform });
 
         return { success: true, isEnabled: input.isEnabled };

@@ -90,6 +90,24 @@ export function fromMicrodollars(microdollars: number): number {
   return microdollars / 1000000;
 }
 
+// Every currency, USD included, is memoized by its uppercase code, so one
+// construction site owns the en-US currency presentation. Construction is
+// deferred to the first call: mobile bundles import this module before their
+// Intl polyfill warm-up, and the native Intl that exists at import time must
+// not own the cached formatter.
+const currencyNumberFormats = new Map<string, Intl.NumberFormat>();
+
+function currencyNumberFormat(currency: string): Intl.NumberFormat {
+  const code = currency.toUpperCase();
+  const cached = currencyNumberFormats.get(code);
+  if (cached) {
+    return cached;
+  }
+  const format = new Intl.NumberFormat('en-US', { style: 'currency', currency: code });
+  currencyNumberFormats.set(code, format);
+  return format;
+}
+
 export function formatDollars(amount: number): string {
   // One owner of the en-US USD presentation: Intl derives USD's 2 minor-unit
   // digits by default, so cents in, dollars out, same string.
@@ -97,8 +115,5 @@ export function formatDollars(amount: number): string {
 }
 
 export function formatCents(amount: number, currency: string = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(amount / 100);
+  return currencyNumberFormat(currency).format(amount / 100);
 }

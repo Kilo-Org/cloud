@@ -6,6 +6,7 @@ import type { TriggerFormData, TriggerFormProps } from '@/components/webhook-tri
 import type { EditWebhookTriggerContent as EditWebhookTriggerContentComponent } from './EditWebhookTriggerContent';
 
 let formProps: TriggerFormProps | undefined;
+let targetType = 'cloud_agent';
 const updateMutation = jest.fn<(input: unknown) => Promise<unknown>>();
 const invokeTrigger = jest.fn<(triggerId: string) => Promise<unknown>>();
 const invalidateQueries = jest.fn();
@@ -38,7 +39,7 @@ jest.mock('@tanstack/react-query', () => ({
           profileId: 'profile-1',
           environmentId: savedEnvironmentId,
           isActive: true,
-          targetType: 'cloud_agent',
+          targetType,
           canEdit: true,
           canEditReason: null,
           canRun: true,
@@ -94,7 +95,12 @@ jest.mock('next/link', () => ({
 jest.mock('sonner', () => ({ toast: { error: jest.fn(), success: jest.fn() } }));
 jest.mock('lucide-react', () => new Proxy({}, { get: () => () => null }));
 jest.mock('@/components/ui/button', () => ({
-  Button: ({ children }: { children: React.ReactNode }) => children,
+  Button: ({
+    children,
+    asChild,
+    onClick,
+  }: React.ComponentProps<'button'> & { asChild?: boolean }) =>
+    asChild ? children : createElement('button', { onClick }, children),
 }));
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/components/ui/card', () => ({
@@ -160,6 +166,7 @@ beforeAll(
 describe('EditWebhookTriggerContent save and invoke', () => {
   let root: Root | undefined;
   let cleanup: (() => void) | undefined;
+  let container: HTMLElement;
   const data: TriggerFormData = {
     triggerId: 'daily-report',
     activationMode: 'scheduled',
@@ -180,12 +187,14 @@ describe('EditWebhookTriggerContent save and invoke', () => {
     cleanup?.();
     cleanup = undefined;
     formProps = undefined;
+    targetType = 'cloud_agent';
     updateMutation.mockReset();
     invokeTrigger.mockReset();
   });
 
   async function render() {
     const dom = installDom();
+    container = dom.container;
     cleanup = dom.cleanup;
     root = createRoot(dom.container);
     await act(async () => {
@@ -200,6 +209,36 @@ describe('EditWebhookTriggerContent save and invoke', () => {
     if (!formProps?.onSaveAndInvoke) throw new Error('save and invoke callback missing');
     return formProps.onSaveAndInvoke;
   }
+
+  it('pauses an existing-chat trigger without submitting the form configuration', async () => {
+    targetType = 'cloud_agent_chat';
+    updateMutation.mockResolvedValue(undefined);
+    await render();
+    const button = [...container.querySelectorAll('button')].find(
+      element => element.textContent === 'Pause trigger'
+    );
+    if (!button) throw new Error('Pause trigger button missing');
+    const confirm = jest.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const originalConfirm = Object.getOwnPropertyDescriptor(window, 'confirm');
+    Object.defineProperty(window, 'confirm', { configurable: true, value: confirm });
+    try {
+      await act(async () => button.click());
+      expect(updateMutation).not.toHaveBeenCalled();
+      expect(confirm).toHaveBeenCalledWith(
+        'Pause this trigger? Unsaved changes will be discarded.'
+      );
+      await act(async () => button.click());
+    } finally {
+      if (originalConfirm) Object.defineProperty(window, 'confirm', originalConfirm);
+      else Reflect.deleteProperty(window, 'confirm');
+    }
+    expect(updateMutation).toHaveBeenCalledWith({
+      triggerId: 'daily-report',
+      organizationId: 'org-1',
+      isActive: false,
+    });
+    expect(invokeTrigger).not.toHaveBeenCalled();
+  });
 
   it('awaits the saved current configuration before invoking in the organization namespace', async () => {
     let resolveUpdate: () => void = () => undefined;

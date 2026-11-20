@@ -5,6 +5,7 @@ import {
   KILO_GATEWAY_AUDIENCE,
   SESSION_INGEST_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import type { RuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 
 type TokenUser = {
   id: string;
@@ -48,7 +49,7 @@ export async function generateInternalServiceToken(
 export async function generateControlToken(
   user: TokenUser,
   secret: string,
-  environment: string,
+  environment: RuntimeEnvironment,
   sharedResourceTokensEnabled: string | boolean | undefined,
   organizationId?: string
 ): Promise<string> {
@@ -93,7 +94,7 @@ export async function generateControlToken(
 export async function generateTriageToken(
   user: TokenUser,
   secret: string,
-  environment: string,
+  environment: RuntimeEnvironment,
   sharedResourceTokensEnabled: string | boolean | undefined,
   organizationId?: string
 ): Promise<string> {

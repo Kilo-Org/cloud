@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  chunkTokenLines,
-  CODE_CHUNK_TOKENS,
-  normalizeFenceLanguage,
-  tokenizeCodeLines,
-} from './code-block-model';
+import { chunkTokenLines, CODE_CHUNK_TOKENS } from './code-block-fence-walk';
+import { normalizeFenceLanguage, tokenizeCodeLines } from './code-block-model';
 
 describe('normalizeFenceLanguage', () => {
   it('returns null for undefined, empty, and whitespace-only info strings', () => {

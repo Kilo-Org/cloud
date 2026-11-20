@@ -1,0 +1,182 @@
+diff --git a/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt b/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
+index 1c41d99..e2e7464 100644
+--- a/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
++++ b/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
+@@ -12,12 +12,8 @@ object BadgeHelper {
+ 
+   fun setBadgeCount(context: Context, badgeCount: Int): Boolean {
+     return try {
+-      if (badgeCount == 0) {
+-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+-        notificationManager.cancelAll()
+-      } else {
+-        ShortcutBadger.applyCountOrThrow(context.applicationContext, badgeCount)
+-      }
++      // Badge updates must preserve ongoing notifications.
++      ShortcutBadger.applyCountOrThrow(context.applicationContext, badgeCount)
+       BadgeHelper.badgeCount = badgeCount
+       true
+     } catch (e: ShortcutBadgeException) {
+diff --git a/android/src/main/java/expo/modules/notifications/notifications/background/BackgroundRemoteNotificationTaskConsumer.kt b/android/src/main/java/expo/modules/notifications/notifications/background/BackgroundRemoteNotificationTaskConsumer.kt
+index 6fdc1c6..754af93 100644
+--- a/android/src/main/java/expo/modules/notifications/notifications/background/BackgroundRemoteNotificationTaskConsumer.kt
++++ b/android/src/main/java/expo/modules/notifications/notifications/background/BackgroundRemoteNotificationTaskConsumer.kt
+@@ -60,7 +60,12 @@ class BackgroundRemoteNotificationTaskConsumer(
+   }
+ 
+   fun executeTask(bundle: Bundle) {
+-    requireNotNull(task) { "executeTask called but no task is registered" }.execute(bundle, null)
++    // The consumer joins the running list in `init`, before `didRegister` hands it
++    // the task, and every received message runs the whole list. A message that
++    // lands inside that window must skip this consumer instead of killing the
++    // process; the task registers right after and later messages reach it.
++    val task = task ?: return
++    task.execute(bundle, null)
+   }
+ 
+   companion object {
+diff --git a/ios/ExpoNotifications/Notifications/Emitter/EmitterModule.swift b/ios/ExpoNotifications/Notifications/Emitter/EmitterModule.swift
+index 1c7872b..2d72866 100644
+--- a/ios/ExpoNotifications/Notifications/Emitter/EmitterModule.swift
++++ b/ios/ExpoNotifications/Notifications/Emitter/EmitterModule.swift
+@@ -30,6 +30,10 @@ open class EmitterModule: Module, NotificationDelegate {
+     Function("clearLastNotificationResponse") {
+       lastResponse = nil
+     }
++
++    Function("finishHandlingNotificationResponse") { (key: String) in
++      NotificationCenterManager.shared.finishHandlingResponse(withKey: key)
++    }
+   }
+ 
+   open func didReceive(_ response: UNNotificationResponse, completionHandler: @escaping () -> Void) -> Bool {
+diff --git a/ios/ExpoNotifications/Notifications/NotificationCenterManager.swift b/ios/ExpoNotifications/Notifications/NotificationCenterManager.swift
+index 5e3a902..07ac777 100644
+--- a/ios/ExpoNotifications/Notifications/NotificationCenterManager.swift
++++ b/ios/ExpoNotifications/Notifications/NotificationCenterManager.swift
+@@ -2,6 +2,7 @@
+ 
+ import ExpoModulesCore
+ import Foundation
++import UIKit
+ import UserNotifications
+ 
+ /**
+@@ -91,6 +92,54 @@ internal final class NotificationDelegateRegistry {
+   }
+ }
+ 
++/**
++ The completion handlers of notification responses that arrived while the app was in the background.
++
++ A handler is called when JavaScript reports that it handled its response, or after `timeout`, which
++ stays below the time that iOS gives a background notification action. Each handler is called
++ exactly once, on the main thread.
++ */
++internal final class HeldResponseCompletions {
++  static let timeout: TimeInterval = 25
++
++  private let state = Mutex([String: [UUID: () -> Void]]())
++
++  func hold(_ completionHandler: @escaping () -> Void, forKey key: String) {
++    let id = UUID()
++    state.withLock { $0[key, default: [:]][id] = completionHandler }
++    DispatchQueue.main.asyncAfter(deadline: .now() + Self.timeout) {
++      self.complete(id: id, forKey: key)
++    }
++  }
++
++  func completeAll(forKey key: String) {
++    let handlers = state.withLock { $0.removeValue(forKey: key) } ?? [:]
++    call(Array(handlers.values))
++  }
++
++  private func complete(id: UUID, forKey key: String) {
++    let handler = state.withLock { held -> (() -> Void)? in
++      let handler = held[key]?.removeValue(forKey: id)
++      if held[key]?.isEmpty == true {
++        held.removeValue(forKey: key)
++      }
++      return handler
++    }
++    if let handler {
++      call([handler])
++    }
++  }
++
++  private func call(_ handlers: [() -> Void]) {
++    guard !handlers.isEmpty else {
++      return
++    }
++    DispatchQueue.main.async {
++      handlers.forEach { $0() }
++    }
++  }
++}
++
+ /**
+  Singleton that sets itself as the UserNotificationCenter delegate,
+  and calls its own delegates in response to notification center calls.
+@@ -119,6 +168,8 @@ public class NotificationCenterManager: NSObject,
+    */
+   private weak var chainedDelegate: UNUserNotificationCenterDelegate?
+ 
++  private let heldResponseCompletions = HeldResponseCompletions()
++
+   private override init() {
+     super.init()
+     install()
+@@ -227,15 +278,50 @@ public class NotificationCenterManager: NSObject,
+     didReceive response: UNNotificationResponse,
+     withCompletionHandler completionHandler: @escaping () -> Void
+   ) {
++    // iOS keeps the app running for an action that does not open the app only until this
++    // completion handler is called. Hold it until JavaScript has handled the response, or the
++    // delegates' early calls would let iOS suspend the app before the action runs.
++    let holdsCompletion = Self.isAppInBackground()
++    let delegateCompletionHandler: () -> Void = holdsCompletion ? {} : completionHandler
++    if holdsCompletion {
++      heldResponseCompletions.hold(completionHandler, forKey: Self.responseKey(response))
++    }
+     var handled = false
+     for delegate in delegates {
+-      handled = delegate.didReceive(response, completionHandler: completionHandler) || handled
++      handled = delegate.didReceive(response, completionHandler: delegateCompletionHandler) || handled
+     }
+     if !handled {
+       registry.appendPendingResponse(response)
+     }
+-    chainedDelegate?.userNotificationCenter?(center, didReceive: response, withCompletionHandler: completionHandler)
+-    completionHandler()
++    chainedDelegate?.userNotificationCenter?(center, didReceive: response, withCompletionHandler: delegateCompletionHandler)
++    if !holdsCompletion {
++      completionHandler()
++    }
++  }
++
++  /**
++   Calls the held completion handlers of the response with this key. JavaScript calls this through
++   `finishHandlingNotificationResponse` when it has handled the response.
++   */
++  public func finishHandlingResponse(withKey key: String) {
++    heldResponseCompletions.completeAll(forKey: key)
++  }
++
++  /**
++   The key of a response: its request identifier and its action identifier as JavaScript reads them.
++   */
++  static func responseKey(_ response: UNNotificationResponse) -> String {
++    let actionIdentifier = response.actionIdentifier == UNNotificationDefaultActionIdentifier
++      ? notificationResponseDefaultActionIdentifier
++      : response.actionIdentifier
++    return "\(response.notification.request.identifier):\(actionIdentifier)"
++  }
++
++  private static func isAppInBackground() -> Bool {
++    if Thread.isMainThread {
++      return UIApplication.shared.applicationState == .background
++    }
++    return DispatchQueue.main.sync { UIApplication.shared.applicationState == .background }
+   }
+ 
+   public func userNotificationCenter(_ center: UNUserNotificationCenter, openSettingsFor notification: UNNotification?) {

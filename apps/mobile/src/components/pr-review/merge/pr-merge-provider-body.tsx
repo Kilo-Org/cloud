@@ -11,8 +11,11 @@ import {
 import { PrFormSheetFooter } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { i18n } from '@/i18n';
 
 function providerBlockedReasonText(
@@ -78,7 +81,7 @@ function MergeRestrictionsList({
     return null;
   }
   return (
-    <View className="gap-2 rounded-lg border border-border bg-secondary p-4">
+    <Card className="gap-2">
       <Text className="text-sm font-medium text-foreground">
         {t('prReview.merge.restrictions.title')}
       </Text>
@@ -88,7 +91,7 @@ function MergeRestrictionsList({
           {row.text}
         </Text>
       ))}
-    </View>
+    </Card>
   );
 }
 
@@ -97,12 +100,15 @@ function ProviderAutoMergeBody({
   term,
 }: Readonly<{ mergeState: ProviderPrMergeState | null | undefined; term: string }>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className="gap-4 px-6 pt-4">
-      {mergeState ? <MergeRestrictionsList mergeState={mergeState} term={term} /> : null}
-      <Text className="text-sm text-muted-foreground">
-        {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
-      </Text>
+    <View style={sideInsetStyle}>
+      <View className={SCREEN_BODY_CLASS}>
+        {mergeState ? <MergeRestrictionsList mergeState={mergeState} term={term} /> : null}
+        <Text className="text-sm text-muted-foreground">
+          {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -127,6 +133,7 @@ export function PrMergeProviderBody({
   children: ReactNode;
 }>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   function cancelButton() {
     return (
       <Button
@@ -134,9 +141,9 @@ export function PrMergeProviderBody({
         onPress={onCancel}
         disabled={isMutating}
         className="mt-2"
-        accessibilityLabel={t('common.cancel')}
+        accessibilityLabel={t('common.discard')}
       >
-        <Text>{t('common.cancel')}</Text>
+        <Text>{t('common.discard')}</Text>
       </Button>
     );
   }
@@ -144,8 +151,10 @@ export function PrMergeProviderBody({
   if (providerAutoMerge && autoMergeCapability?.supported === false) {
     return (
       <>
-        <View className="gap-4 px-6 pt-4">
-          <PrReviewCapabilityBanner capability={autoMergeCapability} />
+        <View style={sideInsetStyle}>
+          <View className="px-4 pt-3">
+            <PrReviewCapabilityBanner capability={autoMergeCapability} />
+          </View>
         </View>
         <View className="flex-1" />
         <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
@@ -174,8 +183,10 @@ export function PrMergeProviderBody({
   if (mergeState && !mergeState.canMerge) {
     return (
       <>
-        <View className="gap-4 px-6 pt-4">
-          <MergeRestrictionsList mergeState={mergeState} term={term} />
+        <View style={sideInsetStyle}>
+          <View className={SCREEN_BODY_CLASS}>
+            <MergeRestrictionsList mergeState={mergeState} term={term} />
+          </View>
         </View>
         <View className="flex-1" />
         <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
@@ -185,8 +196,10 @@ export function PrMergeProviderBody({
   return (
     <>
       {mergeState ? (
-        <View className="px-6 pt-4">
-          <MergeRestrictionsList mergeState={mergeState} term={term} />
+        <View style={sideInsetStyle}>
+          <View className="px-4 pt-3">
+            <MergeRestrictionsList mergeState={mergeState} term={term} />
+          </View>
         </View>
       ) : null}
       {children}

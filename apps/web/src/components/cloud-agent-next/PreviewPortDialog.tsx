@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useState, type ComponentProps, type FormEvent } from 'react';
 import { ChevronRight, ExternalLink, Globe, LoaderCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,11 +19,13 @@ import { useOpenPreview, usePreviewServices } from './use-preview';
 export function PreviewPortDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   target,
   organizationId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
   target: PreviewTarget;
   organizationId?: string;
 }) {
@@ -36,7 +38,11 @@ export function PreviewPortDialog({
         if (!isOpening) onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-lg" showCloseButton={!isOpening}>
+      <DialogContent
+        className="sm:max-w-lg"
+        showCloseButton={!isOpening}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>Open preview</DialogTitle>
           <DialogDescription>

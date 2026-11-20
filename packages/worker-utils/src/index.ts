@@ -6,6 +6,7 @@ export type { DORetryConfig, DORetryScope } from './do-retry.js';
 export {
   isTransientDurableObjectFailure,
   isDurableObjectRetryDeadline,
+  isNetworkConnectionLost,
 } from './durable-object-failure.js';
 
 export { backendAuthMiddleware } from './backend-auth-middleware.js';
@@ -179,6 +180,8 @@ export type { VercelExecutionRegion } from './vercel-execution-region.js';
 export { normalizeGitUrl } from './normalize-git-url.js';
 
 export { chunkArray } from './chunk-array.js';
+
+export { webUrlHost } from './web-url-host.js';
 
 export { deriveCallbackToken, verifyCallbackToken } from './callback-token.js';
 export type { CallbackTokenParams, VerifyCallbackTokenParams } from './callback-token.js';

@@ -124,11 +124,7 @@ export type FetchAlertsResult =
   | { status: 'access_blocked' }
   | { status: 'auth_invalid' };
 
-type FetchAlertsSkipStatus =
-  | 'repo_not_found'
-  | 'alerts_disabled'
-  | 'access_blocked'
-  | 'auth_invalid';
+type FetchAlertsSkipStatus = Exclude<FetchAlertsResult, { status: 'success' }>['status'];
 
 export type RepositoryDependabotAlertsAvailability = {
   id: number;

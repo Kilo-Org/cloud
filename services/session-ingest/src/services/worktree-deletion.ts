@@ -18,6 +18,7 @@ import {
   WORKTREE_MEMBERSHIP_CHANGED,
   type CanDestroyCloudAgentWorktreeSandboxResult,
   type UnresolvedCloudAgentSandboxOwner,
+  type BeginCloudAgentWorktreeDeletionParams,
   type CloudAgentWorktreeDeletionParams,
   type CloudAgentWorktreeDeletionResult,
   type CloudAgentWorktreeDeletionState,
@@ -413,7 +414,7 @@ function assertSoleRootSession(
  */
 async function beginWorktreeDeletionOn(
   tx: WorktreeDb,
-  params: CloudAgentWorktreeDeletionParams
+  params: BeginCloudAgentWorktreeDeletionParams
 ): Promise<CloudAgentWorktreeDeletionState> {
   const row = await lockWorktree(tx, params);
   if (row.deletion_completed_at !== null) return deletionState(row);
@@ -481,7 +482,10 @@ async function beginWorktreeDeletionOn(
   return deletionState(updated);
 }
 
-export async function beginWorktreeDeletion(env: Env, params: CloudAgentWorktreeDeletionParams) {
+export async function beginWorktreeDeletion(
+  env: Env,
+  params: BeginCloudAgentWorktreeDeletionParams
+) {
   return deletionDiagnostic('begin', params, async timing => {
     const db = getWorkerDb(env.HYPERDRIVE.connectionString);
     timing.setStage('sqlTransaction');

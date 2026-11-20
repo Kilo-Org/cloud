@@ -116,6 +116,18 @@ describe('PrReviewFileNavigatorScreen states', () => {
     expect(queryState.refetch).toHaveBeenCalled();
   });
 
+  it('names the connection when the navigator read never reached the server', () => {
+    queryState.isError = true;
+    // A code-less, envelope-less rejection: a failed fetch with no network.
+    queryState.error = new Error('Network request failed');
+    const error = find(mountScreen(), 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    act(() => {
+      (error.props.onRetry as () => void)();
+    });
+    expect(queryState.refetch).toHaveBeenCalled();
+  });
+
   it.each([
     ['FORBIDDEN', 'permission'],
     ['NOT_FOUND', 'not-found'],

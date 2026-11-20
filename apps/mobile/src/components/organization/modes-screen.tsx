@@ -12,15 +12,15 @@ import { OrgRecordRow } from '@/components/organization/org-record-row';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrgModes } from '@/lib/hooks/use-org-modes-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { collator } from '@/lib/intl-cache';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 const MODE_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/mode-form' as const;
 
@@ -33,14 +33,10 @@ function sortModes(modes: readonly OrgMode[], language: string): readonly OrgMod
 
 function ModesSkeleton() {
   return (
-    <View className="mx-6 gap-2 rounded-lg bg-secondary p-4">
+    <Card>
       <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-56 rounded bg-muted-soft" />
-      <View className="pt-2">
-        <Skeleton className="h-4 w-32 rounded bg-muted-soft" />
-        <Skeleton className="mt-2 h-3 w-48 rounded bg-muted-soft" />
-      </View>
-    </View>
+    </Card>
   );
 }
 
@@ -73,6 +69,9 @@ export function OrganizationModesScreen() {
 
   const modes = modesQuery.data?.modes ?? [];
   const errorView = modesQuery.isError ? selectOrgListErrorView(modesQuery.error) : null;
+  // An empty or failed list is the whole surface; the header's "+" is its one
+  // create control, so the state carries no button of its own.
+  const wholeSurface = errorView !== null || (!modesQuery.isPending && modes.length === 0);
 
   let body: ReactNode = null;
   if (modesQuery.isPending) {
@@ -89,39 +88,29 @@ export function OrganizationModesScreen() {
     body = (
       <EmptyState
         icon={SlidersHorizontal}
-        placement="top"
         title={t('organization.modes.emptyTitle')}
         description={t('organization.modes.emptyDescription')}
-        action={
-          <Button
-            className={STATE_ACTION_CLASS}
-            onPress={() => {
-              openModeForm();
-            }}
-          >
-            <Text className="text-primary-foreground">{t('organization.modes.create')}</Text>
-          </Button>
-        }
       />
     );
   } else {
     const sorted = sortModes(modes, i18n.language);
     body = (
-      <View className="mx-6 overflow-hidden rounded-lg bg-secondary">
-        {sorted.map((mode, index) => (
+      <RowGroup>
+        {sorted.map(mode => (
           <OrgRecordRow
             key={mode.id}
             title={mode.name}
             meta={mode.slug}
             description={mode.config.description}
-            accessibilityLabel={mode.name}
+            // Names can repeat; the slug is the row's unique fact, so a reader
+            // hears it too instead of two identical rows.
+            accessibilityLabel={[mode.name, mode.slug].join(', ')}
             onPress={() => {
               openModeForm(mode.id);
             }}
-            last={index === sorted.length - 1}
           />
         ))}
-      </View>
+      </RowGroup>
     );
   }
 
@@ -140,13 +129,19 @@ export function OrganizationModesScreen() {
           </IconButton>
         }
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-4 pb-8 pt-4"
-        showsVerticalScrollIndicator={false}
-      >
-        {body}
-      </TabScreenScrollView>
+      {wholeSurface ? (
+        body
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          showsVerticalScrollIndicator={false}
+          // The design gate's proof readiness marker for this route.
+          testID="organization-modes-list"
+        >
+          {body}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

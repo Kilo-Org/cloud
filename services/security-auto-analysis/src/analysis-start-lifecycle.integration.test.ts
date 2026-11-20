@@ -579,6 +579,73 @@ describe('analysis start lifecycle durable transitions', () => {
     ]);
     expect(await getFindingAuditRows(findingId)).toEqual([]);
   });
+
+  it('requeues a manual start failure that declares a temporary precondition', async () => {
+    const findingId = await insertFinding('manual-retryable-failure');
+    const queueRowId = await insertQueueClaim({
+      findingId,
+      claimToken: 'manual-retry-claim',
+      jobId: 'manual-retry-job',
+    });
+
+    await expect(
+      transitionAnalysisStartLifecycle(client.db as never, {
+        claim: {
+          source: 'manual',
+          findingId,
+          claimToken: 'manual-retry-claim',
+        },
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'admission unavailable',
+          queueStatus: 'queued',
+          failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+          incrementAttempt: true,
+          nextRetryAt: '2026-05-19T09:05:00.000Z',
+        },
+      })
+    ).resolves.toEqual({ transitioned: true });
+
+    const findingRows = await client.db
+      .select({
+        analysisStatus: security_findings.analysis_status,
+        analysisError: security_findings.analysis_error,
+        analysisCompletedAt: security_findings.analysis_completed_at,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(findingRows).toEqual([
+      {
+        analysisStatus: null,
+        analysisError: null,
+        analysisCompletedAt: null,
+      },
+    ]);
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        attemptCount: security_analysis_queue.attempt_count,
+        failureCode: security_analysis_queue.failure_code,
+        nextRetryAt: security_analysis_queue.next_retry_at,
+        claimToken: security_analysis_queue.claim_token,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.id, queueRowId));
+    expect(queueRows).toEqual([
+      {
+        status: 'queued',
+        attemptCount: 1,
+        failureCode: 'REQUEUE_TEMPORARY_PRECONDITION',
+        nextRetryAt: expect.any(String),
+        claimToken: null,
+      },
+    ]);
+    expect(Date.parse(String(queueRows[0]?.nextRetryAt))).toBe(
+      Date.parse('2026-05-19T09:05:00.000Z')
+    );
+    expect(await getFindingAuditRows(findingId)).toEqual([]);
+  });
 });
 
 function getFindingAuditRows(findingId: string) {

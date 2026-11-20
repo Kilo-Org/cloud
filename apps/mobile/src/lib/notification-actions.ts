@@ -41,9 +41,11 @@ import {
 import { notificationPathForData, prPathForData } from './notification-path';
 import {
   clearPostedNeedsInputNotification,
+  markNeedsInputReplyResult,
   notificationIdentifierForSession,
 } from './needs-input-presentation';
 import { type NotificationPreviews } from './needs-input-notification';
+import { finishHandlingNotificationResponse } from './notification-response-completion';
 
 /** Register one category per (raise kind × hasPr) descriptor. */
 export async function registerNeedsInputCategories(): Promise<void> {
@@ -133,6 +135,11 @@ export type NeedsInputActionDeps = {
    * which was produced under the choice at that moment.
    */
   readPreviews?: () => NotificationPreviews | undefined;
+  /**
+   * Defaults to the native report that ends the response on iOS (see
+   * `notification-response-completion.ts`); called once the dispatch settles.
+   */
+  finishHandlingResponse?: (key: string) => void;
 };
 
 /** The shape of the s4 entry point, kept as an annotation on the lazy load. */
@@ -190,6 +197,10 @@ const headlessStringDataSchema = z.string();
  * twice. Concurrent dispatches of one response share the first one — an action
  * answers once, and a body tap stashes its destination once; once it settles, a
  * later tap — on the replaced result notification — is answered again.
+ *
+ * When the shared dispatch settles, with a result or an error, the response is
+ * reported finished: iOS keeps the app running for a background action only
+ * until then.
  */
 // eslint-disable-next-line promise-function-async -- passthrough dispatch: one interaction per tap shares an in-flight promise
 export function handleNeedsInputNotificationResponse(
@@ -201,16 +212,17 @@ export function handleNeedsInputNotificationResponse(
   if (inFlight) {
     return inFlight;
   }
-  const dispatch = trackDispatch(key, dispatchNeedsInputResponse(response, deps));
+  const dispatch = trackDispatch(
+    key,
+    dispatchNeedsInputResponse(response, deps),
+    deps.finishHandlingResponse ?? finishHandlingNotificationResponse
+  );
   inFlightDispatches.set(key, dispatch);
   return dispatch;
 }
 
-// One dispatch per tap: the in-flight dispatch for each OS response, keyed by
-// its notification identifier and action. A body tap is deduped like an action
-// button, because Expo delivers a warm-background tap to both the JS listener
-// and the registered background task. Entries are removed on settle so a retry
-// tap on the replaced notification runs again.
+// One in-flight dispatch per OS response, keyed by its notification identifier
+// and action; removed on settle so a retry tap runs again.
 const inFlightDispatches = new Map<string, Promise<boolean>>();
 
 /** The OS identity of a response: its notification identifier and action id. */
@@ -218,15 +230,20 @@ function responseDispatchKey(response: Notifications.NotificationResponse): stri
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
 }
 
-/** Forget the in-flight dispatch once it settles, without disturbing its result. */
-async function trackDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
+/**
+ * Forget the in-flight dispatch once it settles, without disturbing its result,
+ * and report the response finished.
+ */
+async function trackDispatch(
+  key: string,
+  dispatch: Promise<boolean>,
+  finishHandlingResponse: (key: string) => void
+): Promise<boolean> {
   try {
-    const result = await dispatch;
+    return await dispatch;
+  } finally {
     inFlightDispatches.delete(key);
-    return result;
-  } catch (error) {
-    inFlightDispatches.delete(key);
-    throw error;
+    finishHandlingResponse(key);
   }
 }
 
@@ -493,9 +510,9 @@ async function runAnswerAction(args: {
     clearPostedNeedsInputNotification(data.cliSessionId);
   }
 
+  const identities = resultIdentities(response, data);
   await replaceNotification({
-    resultIdentifier: notificationIdentifierForSession(data.cliSessionId),
-    originalIdentifier: response.notification.request.identifier,
+    ...identities,
     title: resultTitleFor({
       previews: deps.readPreviews?.(),
       actedOnTitle: response.notification.request.content.title,
@@ -506,6 +523,11 @@ async function runAnswerAction(args: {
     categoryIdentifier: presentation.categoryIdentifier,
     interruptionLevel: presentation.interruptionLevel,
   });
+  if (identities.resultIdentifier !== notificationIdentifierForSession(data.cliSessionId)) {
+    // The result sits under a push's identifier, which the session's plan does
+    // not name: it is recorded so the plan retires it with the raise.
+    markNeedsInputReplyResult(data.cliSessionId, identities.resultIdentifier);
+  }
 
   if (presentation.raiseCleared) {
     // The raise is over for the user. The glanceable surfaces count the tray
@@ -526,11 +548,36 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
 }
 
 /**
- * Replace the acted-on notification with the action's result. The result is
- * posted under `notificationIdentifierForSession` — the identifier the next
- * sync's plan dismisses — and the notification the user actually acted on is
- * dismissed when it is a different one (a server push carries an OS-assigned
- * identifier), so one raise never ends with two notifications.
+ * Where the result goes, and which notification it replaces.
+ *
+ * The result is normally posted under `notificationIdentifierForSession` — the
+ * identifier the next sync's plan dismisses — and the notification the user
+ * acted on is dismissed when it is a different one (a server push carries an
+ * OS-assigned identifier).
+ *
+ * An inline Reply is the exception. Android keeps the replied notification on
+ * screen for the reply (`LIFETIME_EXTENDED_BY_DIRECT_REPLY`) and ignores a
+ * dismissal of it, so the raise would end with two notifications. Only a post
+ * under its own identifier ends that, so the result replaces it in place, and
+ * the session's identifier is the one dismissed. iOS removes a replied
+ * notification itself, and a post under its identifier is an ordinary post, so
+ * both platforms take the same path.
+ */
+function resultIdentities(
+  response: Notifications.NotificationResponse,
+  data: NeedsInputRaiseData
+): { resultIdentifier: string; replacedIdentifier: string } {
+  const actedOn = response.notification.request.identifier;
+  const session = notificationIdentifierForSession(data.cliSessionId);
+  return response.userText === undefined
+    ? { resultIdentifier: session, replacedIdentifier: actedOn }
+    : { resultIdentifier: actedOn, replacedIdentifier: session };
+}
+
+/**
+ * Replace a notification with the action's result: post the result under
+ * `resultIdentifier`, and dismiss `replacedIdentifier` when it is a different
+ * one, so one raise never ends with two notifications.
  *
  * `interruptionLevel` is outcome-derived: the retryable failure keeps the
  * raise's time-sensitive break-through because it still needs the user; the
@@ -538,7 +585,7 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
  */
 async function replaceNotification(args: {
   resultIdentifier: string;
-  originalIdentifier: string;
+  replacedIdentifier: string;
   title: string;
   body: string;
   data: NeedsInputRaiseData;
@@ -547,7 +594,7 @@ async function replaceNotification(args: {
 }): Promise<void> {
   const {
     resultIdentifier,
-    originalIdentifier,
+    replacedIdentifier,
     title,
     body,
     data,
@@ -571,9 +618,9 @@ async function replaceNotification(args: {
   } catch (error) {
     reportActionFailure('publish', error);
   }
-  if (originalIdentifier !== resultIdentifier) {
+  if (replacedIdentifier !== resultIdentifier) {
     try {
-      await Notifications.dismissNotificationAsync(originalIdentifier);
+      await Notifications.dismissNotificationAsync(replacedIdentifier);
     } catch (error) {
       reportActionFailure('dismiss', error);
     }

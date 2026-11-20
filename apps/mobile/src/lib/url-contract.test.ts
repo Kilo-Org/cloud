@@ -11,6 +11,7 @@ import {
   assertUrlScheme,
   LATENCY_INGEST_URL_DEFAULT,
   PRODUCTION_HOSTS,
+  URL_KEY_EXEMPTIONS,
   URL_SCHEMES,
 } from '@/lib/url-contract';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './env-keys';
@@ -24,6 +25,7 @@ describe('assertUrlScheme', () => {
     { key: 'sessionIngestWsUrl', value: 'wss://session-ingest.kilo.ai' },
     { key: 'eventServiceUrl', value: 'https://events.kilo.ai' },
     { key: 'latencyIngestUrl', value: 'https://latency.kiloapps.io' },
+    { key: 'kiloMcpUrl', value: 'https://mcp.kiloapps.io' },
   ];
 
   it('accepts each URL key with its production scheme', () => {
@@ -167,11 +169,25 @@ function parseEnv(source: string): Record<string, string> {
 }
 
 const committedEnv = parseEnv(envSource);
-// Every URL key except the optional latency ingest endpoint is a required
-// ENV_KEYS entry committed in apps/mobile/.env.
-const requiredUrlKeys = (Object.keys(URL_SCHEMES) as (keyof typeof URL_SCHEMES)[]).filter(
-  key => key !== 'latencyIngestUrl'
-);
+/** The config key names in `map` that are URL keys. Every URL key is named in
+ *  ENV_KEYS or OPTIONAL_ENV_KEYS; the required ones are committed in
+ *  apps/mobile/.env, while an optional one falls back to its committed default
+ *  (LATENCY_INGEST_URL_DEFAULT, or KILO_MCP_URL_PRODUCTION in lib/config.ts). */
+const urlKeysIn = (map: object): (keyof typeof URL_SCHEMES)[] =>
+  Object.keys(map).filter((key): key is keyof typeof URL_SCHEMES => key in URL_SCHEMES);
+
+const requiredUrlKeys = urlKeysIn(ENV_KEYS);
+const optionalUrlKeys = urlKeysIn(OPTIONAL_ENV_KEYS);
+
+// The derivation above is the single source for the required and optional URL
+// key lists; guard that both stay non-empty so the loop tests below cannot
+// pass vacuously.
+describe('derived URL key lists', () => {
+  it('derives a non-empty required and optional URL key list', () => {
+    expect(requiredUrlKeys.length, requiredUrlKeys.join(',')).toBeGreaterThan(0);
+    expect(optionalUrlKeys.length, optionalUrlKeys.join(',')).toBeGreaterThan(0);
+  });
+});
 
 describe('committed production URL defaults (host contract)', () => {
   it('accepts every committed .env URL value for scheme and production host', () => {
@@ -302,7 +318,33 @@ describe('URL key → environment variable resolution', () => {
     }
   });
 
-  it('keeps the optional URL key out of the required-presence values', () => {
-    expect(Object.values(ENV_KEYS)).not.toContain('LATENCY_INGEST_URL');
+  // The reverse direction: a URL-valued env key must be registered in
+  // URL_SCHEMES (so the app.config.ts build loop and the config.ts runtime
+  // loop check it) or named in URL_KEY_EXEMPTIONS. The test above iterates
+  // URL_SCHEMES and cannot see a URL key missing from it.
+  it('registers every URL-valued env key in the URL contract', () => {
+    const exempted = new Set(URL_KEY_EXEMPTIONS);
+    const urlEnvNames: Record<string, string | undefined> = {
+      ...ENV_KEYS,
+      ...OPTIONAL_ENV_KEYS,
+    };
+    for (const [key, envName] of Object.entries(urlEnvNames)) {
+      if (envName?.endsWith('_URL') === true) {
+        expect(
+          key in URL_SCHEMES || exempted.has(key),
+          `${key} (${envName}) is URL-valued but is missing from URL_SCHEMES; register it or add it to the exemption list`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('keeps every optional env key out of the required-presence values', () => {
+    const requiredNames = new Set(Object.values(ENV_KEYS));
+    for (const optionalName of Object.values(OPTIONAL_ENV_KEYS)) {
+      expect(
+        requiredNames.has(optionalName),
+        `${optionalName} is optional but is also listed in ENV_KEYS`
+      ).toBe(false);
+    }
   });
 });

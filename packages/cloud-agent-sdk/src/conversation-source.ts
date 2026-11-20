@@ -8,31 +8,33 @@ import { normalize, type ChatEvent, type NormalizedEvent } from './normalizer';
 import { setBounded } from './bounded-map';
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import {
+  projectKilo2Message,
   readKilo2ContentLayout,
-  readKilo2Messages,
   isCompactionSummaryPart,
+  kilo2ContentLayoutKey,
+  kilo2PartPosition,
   type Kilo2ContentLayout,
 } from './kilo2-source-messages';
 import type { SessionSnapshot } from './types';
 
 const MAX_TRACKED_MESSAGES = 2048;
 
-export type ConversationSource = { version: 'v1' } | { version: 'v2' };
+const conversationEnvelopeSchema = z.object({ type: z.string(), properties: z.unknown() });
 
-function positionFromPartId(messageId: string, partId: string): number | undefined {
-  const prefix = `${messageId}_`;
-  if (!partId.startsWith(prefix)) return undefined;
-  const suffix = partId.slice(prefix.length);
-  // Tool-result files are derivative attachments of a native content position.
-  if (!/^\d{6}(?:_file_\d+)?$/.test(suffix)) return undefined;
-  return Number(suffix.slice(0, 6));
-}
+const conversationTextEventDataSchema = z.object({
+  assistantMessageID: z.string(),
+  ordinal: z.number().int().nonnegative(),
+  delta: z.string().optional(),
+  text: z.string().optional(),
+});
+
+export type ConversationSource = { version: 'v1' } | { version: 'v2' };
 
 function layoutFromProjected(
   message: SessionSnapshot['messages'][number]
 ): Kilo2ContentLayout | undefined {
   const parts = message.parts.filter(part => !isCompactionSummaryPart(part));
-  const located = parts.map(part => positionFromPartId(message.info.id, part.id));
+  const located = parts.map(part => kilo2PartPosition(message.info.id, part.id));
   if (located.some(position => position === undefined)) return undefined;
   const summary = message.info.role === 'assistant' && message.info.summary === true;
   const ordinals = new Map<string, number>();
@@ -46,7 +48,7 @@ function layoutFromProjected(
     if (part.type !== 'text' && part.type !== 'reasoning') continue;
     const ordinal = ordinals.get(part.type) ?? 0;
     ordinals.set(part.type, ordinal + 1);
-    positions.set(`${part.type}:${ordinal}`, position);
+    positions.set(kilo2ContentLayoutKey(part.type, ordinal), position);
   }
   return { positions, next };
 }
@@ -70,11 +72,11 @@ export function createConversationSourceReader() {
       positions: new Map<string, number>(),
       next: 0,
     };
-    let position = layout.positions.get(`${kind}:${ordinal}`);
+    let position = layout.positions.get(kilo2ContentLayoutKey(kind, ordinal));
     if (position === undefined) {
       // A started item is appended, as the native message appends it.
       position = layout.next++;
-      layout.positions.set(`${kind}:${ordinal}`, position);
+      layout.positions.set(kilo2ContentLayoutKey(kind, ordinal), position);
     }
     setBounded(layouts, messageId, layout, MAX_TRACKED_MESSAGES);
     return position;
@@ -92,11 +94,11 @@ export function createConversationSourceReader() {
         }
       }
       setBounded(layouts, message.id, readKilo2ContentLayout(message), MAX_TRACKED_MESSAGES);
-      const display = readKilo2Messages(source.session, [message])[0];
+      // A live event must never throw into the socket handler: omit only the message
+      // that cannot display and keep the rest of the event batch.
+      const display = projectKilo2Message(source.session, message, parentID);
       if (!display) return [];
       observeReasoning(message.id, display.parts);
-      if (display.info.role === 'assistant' && parentID !== undefined)
-        display.info.parentID = parentID;
       return [
         { type: 'message.updated', info: display.info },
         ...display.parts.map((part): ChatEvent => ({ type: 'message.part.updated', part })),
@@ -106,6 +108,7 @@ export function createConversationSourceReader() {
     const parsed = kilo2ConversationEventSchema.safeParse(properties);
     if (!parsed.success) return [];
     const event = parsed.data.event;
+    if (event.type === 'rpc.kilocode.board.changed') return [{ type: 'agent-board.invalidated' }];
     if (
       /^session\.(shell\.|synthetic$|execution\.|tool\.(called|started|ended|success|failed)$)|^(form\.|permission\.)/.test(
         event.type
@@ -118,14 +121,7 @@ export function createConversationSourceReader() {
         ? 'reasoning'
         : undefined;
     if (!kind) return [];
-    const data = z
-      .object({
-        assistantMessageID: z.string(),
-        ordinal: z.number().int().nonnegative(),
-        delta: z.string().optional(),
-        text: z.string().optional(),
-      })
-      .safeParse(event.data);
+    const data = conversationTextEventDataSchema.safeParse(event.data);
     if (!data.success || completed.has(data.data.assistantMessageID)) return [];
     const id = kilo2PartId(
       data.data.assistantMessageID,
@@ -186,16 +182,14 @@ export function createConversationSourceReader() {
     },
     /** Select the native reader at the SDK boundary. Renderers receive display events. */
     read(raw: CloudAgentEvent): { source: ConversationSource; events: NormalizedEvent[] } {
-      const envelope = z.object({ type: z.string(), properties: z.unknown() }).safeParse(raw.data);
-      if (
-        raw.streamEventType === 'kilocode' &&
-        envelope.success &&
-        envelope.data.type.startsWith('conversation.')
-      )
-        return {
-          source: { version: 'v2' },
-          events: readV2(envelope.data.type, envelope.data.properties),
-        };
+      if (raw.streamEventType === 'kilocode') {
+        const envelope = conversationEnvelopeSchema.safeParse(raw.data);
+        if (envelope.success && envelope.data.type.startsWith('conversation.'))
+          return {
+            source: { version: 'v2' },
+            events: readV2(envelope.data.type, envelope.data.properties),
+          };
+      }
       const event = normalize(raw);
       return { source: { version: 'v1' }, events: event ? [event] : [] };
     },

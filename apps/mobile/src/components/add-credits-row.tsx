@@ -15,8 +15,9 @@ import { cn } from '@/lib/utils';
 
 /**
  * How prominent the control reads where it sits. `quiet` is the balance line's
- * outline control. `primary` fills with the accent surface, which is how a
- * transcript marks the one action that settles a refused send.
+ * outline control. `primary` takes the palette's one action fill — olive in
+ * light, Kilo yellow in dark — with the label ink that reads on it: that is how
+ * a transcript marks the one action that settles a refused send.
  */
 export type AddCreditsEmphasis = 'quiet' | 'primary';
 
@@ -62,15 +63,16 @@ export function AddCreditsButton({
       size="sm"
       variant={primary ? 'default' : 'outline'}
       className={cn(
-        // The theme's `--primary` is olive in light, which reads as one more
-        // secondary action in a transcript, so the primary emphasis fills with
-        // the surface the person's own bubble uses instead.
-        primary ? 'bg-accent-soft' : 'dark:bg-secondary-fill',
+        // The primary emphasis takes the palette's own action fill: light stays
+        // olive and dark turns Kilo yellow. The accent surface it used before is
+        // yellow in both schemes, so in light mode the one action that settles a
+        // refused send painted an off-palette yellow button.
+        primary ? undefined : 'dark:bg-secondary-fill',
         className,
         // A line action fills the box `AddCreditsRow` wraps around it: the frame
         // is the box's floor with no vertical margin, so the box alone cancels
         // the height and the caller's line stays one text line tall.
-        lineAction ? 'min-h-[28px]' : STATE_ACTION_CLASS
+        lineAction ? 'min-h-8' : STATE_ACTION_CLASS
       )}
       // Undefined keeps the shared `Button`'s own `sm` default; a line action
       // draws a smaller frame, so it carries the flush-to-44pt slop itself.
@@ -79,7 +81,7 @@ export function AddCreditsButton({
       accessibilityRole="button"
       accessibilityLabel={t('addCredits.cta')}
     >
-      <Text className={primary ? 'text-accent-soft-foreground' : 'text-xs font-semibold'}>
+      <Text className={primary ? 'text-primary-foreground' : 'text-xs font-semibold'}>
         {t('addCredits.cta')}
       </Text>
     </Button>

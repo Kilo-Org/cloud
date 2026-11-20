@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -11,6 +12,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
+import { openAiChatGptConnectorGone } from './connector';
 import {
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
@@ -18,6 +20,7 @@ import {
   type OpenAiChatGptStoredConnection,
 } from './store';
 import { isOpenAiModelServed } from './served-models';
+import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
@@ -26,10 +29,16 @@ import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
  * on the delegated token instead of a managed gateway.
  */
 
-/** The delegated upstream URL, shared with the served-model lookup. */
-export { OPENAI_CHATGPT_API_URL };
-
-export { OPENAI_CHATGPT_API_KEY_ENV };
+/**
+ * Shown on the organization's shared connection card when the person recorded
+ * as its connector is gone: the account row is missing, the account is
+ * soft-deleted or being deleted, or it holds no usable email. The row belongs
+ * to the organization, so an organization owner or admin reconnects it instead
+ * of losing it. Routing never refuses on this: it skips the shared row and
+ * falls back to the caller's own connection.
+ */
+export const OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE =
+  'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner or admin can reconnect it.';
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -91,8 +100,11 @@ export function withTraceabilityMetadata(
 
   const merged: Record<string, string> = { ...(metadata ?? {}), ...traceability };
   const removable = Object.keys(merged).filter(key => !(key in traceability));
-  while (Object.keys(merged).length > METADATA_ENTRY_LIMIT && removable.length > 0) {
-    delete merged[removable.shift() as string];
+  const excess = Object.keys(merged).length - METADATA_ENTRY_LIMIT;
+  if (excess > 0) {
+    for (const key of removable.slice(0, excess)) {
+      delete merged[key];
+    }
   }
   return merged;
 }
@@ -188,29 +200,34 @@ function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiC
 }
 
 /**
- * An enabled, readable ChatGPT connection makes a delegated OpenAI model
- * eligible. The partner project key is deliberately not part of this check: a
- * missing deployment credential must not hide the person's connection state.
- * The delegated-token flow is accepted only by `POST /v1/responses`: a
- * `chat/completions` request for the same model keeps its current route, and
- * declaring `chat_completions` support here would make the gateway answer the
- * person with an api-kind error instead of their existing provider.
- */
-export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput): Promise<boolean> {
-  const [owner] = openAiChatGptOwnerCandidates(input);
-  if (!owner) return false;
-  return (await eligibleUpstreamModelForOwner(input, owner)) !== null;
-}
-
-/**
  * Whether a stored row may serve traffic. The payload's `status` mirrors a save
  * or a terminal failure, but a person can also disable the row through the
  * ordinary BYOK toggle, which leaves the payload saying `connected`. Both the
  * enable flag and a connected status must hold for the route to be eligible and
  * for the models list to carry the BYOK tag.
  */
-function isUsableStoredConnection(stored: OpenAiChatGptStoredConnection | null): boolean {
+function isUsableStoredConnection(
+  stored: OpenAiChatGptStoredConnection | null
+): stored is OpenAiChatGptStoredConnection {
   return stored?.isEnabled === true && stored.connection.status === 'connected';
+}
+
+/**
+ * A shared connector that cannot serve stays in that state until an owner or
+ * admin reconnects it, so the report describes one standing fact rather than an
+ * event. The shared report window keeps that fact visible without repeating it
+ * on every request, and bounds the keys it remembers.
+ */
+function logSharedConnectorGone(organizationId: string, connectorId: string): void {
+  const key = `openai-chatgpt-shared-connector-gone:${organizationId}:${connectorId}`;
+  if (!claimReportWindow(key, Date.now())) return;
+  logExceptInTest(
+    JSON.stringify({
+      type: 'openai_chatgpt_shared_connector_gone',
+      organizationId,
+      connectorId,
+    })
+  );
 }
 
 /**
@@ -227,23 +244,28 @@ async function eligibleUpstreamModelForOwner(
   );
   if (!upstreamModel) return null;
 
-  // The catalog can list an OpenAI model the plain API does not serve. A
-  // `-pro` slug such as `openai/gpt-5.6-luna-pro` is a reasoning mode on the
-  // base model, not an API model id, so sending it upstream fails the request.
-  // Only a model this project actually serves may take the delegated route.
   if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
     return null;
   }
 
   const stored = await getOpenAiChatGptStoredConnection(owner);
-  return isUsableStoredConnection(stored) ? upstreamModel : null;
+  if (!isUsableStoredConnection(stored)) return null;
+
+  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
+    logSharedConnectorGone(owner.organizationId, stored.createdBy);
+    return null;
+  }
+
+  return upstreamModel;
 }
 
 /**
  * The catalog model ids an enabled ChatGPT connection can serve, for the models
- * list's BYOK tag. Returns null when the person has no usable connection, so the
- * caller leaves the list untouched. The served-model gate is the same one
- * routing uses, so a model is tagged only when the delegated route can carry it.
+ * list's BYOK tag. Returns null when the usable connection is not there, so the
+ * caller leaves the list untouched: a person with no usable connection, or an
+ * organization's shared connection whose recorded connector is gone. The
+ * served-model gate is the same one routing uses, so a model is tagged only when
+ * the delegated route can carry it.
  */
 export async function getOpenAiChatGptByokModelIds(
   owner: OpenAiChatGptOwner,
@@ -251,6 +273,10 @@ export async function getOpenAiChatGptByokModelIds(
 ): Promise<Set<string> | null> {
   const stored = await getOpenAiChatGptStoredConnection(owner);
   if (!isUsableStoredConnection(stored)) return null;
+
+  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
+    return null;
+  }
 
   const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
   if (apiKey.trim().length === 0) return null;
@@ -396,8 +422,8 @@ export function buildOpenAiChatGptProvider(
   if (apiKey.trim().length === 0) return null;
 
   return {
-    type: 'openai-chatgpt',
-    inferenceProviderId: 'openai-chatgpt',
+    type: OPENAI_CHATGPT_PROVIDER_ID,
+    inferenceProviderId: OPENAI_CHATGPT_PROVIDER_ID,
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},

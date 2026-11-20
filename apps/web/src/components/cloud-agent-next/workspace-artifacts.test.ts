@@ -3,7 +3,6 @@ import {
   formatWorkspaceArtifactSize,
   groupWorkspaceArtifactsByFolder,
   isSandboxNotRunning,
-  workspaceArtifactExpiresAt,
   workspaceArtifactFileName,
 } from './workspace-artifacts';
 import type { WorkspaceArtifactEntry } from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
@@ -32,13 +31,6 @@ describe('workspace artifact presentation', () => {
       'reports/a.pdf',
       'reports/z.pdf',
     ]);
-  });
-
-  it('expires fourteen days after the last update', () => {
-    expect(workspaceArtifactExpiresAt({ updatedAt: 1_000 })).toBe(
-      1_000 + 14 * 24 * 60 * 60 * 1_000
-    );
-    expect(workspaceArtifactExpiresAt({ updatedAt: 1_000, expiresAt: 5_000 })).toBe(5_000);
   });
 
   it('derives the file name from the relative path', () => {

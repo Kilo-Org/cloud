@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 
 import { ImageViewer } from '@/components/ui/image-viewer';
 import { TOKEN_DARK_LIGHT } from '@/lib/pr-review/diff/syntax-colors';
-import { rtlBlockTextAlign } from '@/lib/rtl-text';
 
 import {
   type MarkdownCopyCodeHandler,
@@ -30,13 +29,9 @@ import { rtlListItems } from './markdown-rtl-list-items';
 type MarkdownEnrichedProps = {
   value: string;
   palette: MarkdownPalette;
+  /** Base direction of the document body; see `MarkdownTextProps`. */
+  documentDirection?: 'ltr';
   selectable: boolean;
-  /**
-   * Body line height in the library's sp units. The line box is what a native
-   * inline link exposes as its tappable target, so a caller that needs a taller
-   * link target raises it here.
-   */
-  lineHeight?: number;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
   onCopyCode?: MarkdownCopyCodeHandler;
@@ -46,20 +41,16 @@ const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 const BODY_LINE_HEIGHT = 24;
 
-function enrichedStyle(
-  palette: MarkdownPalette,
-  isRtl: boolean,
-  lineHeight = BODY_LINE_HEIGHT
-): MarkdownStyle {
+function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
   const headings = getMarkdownHeadingStyles(palette);
   // The native renderer resolves each paragraph's direction from its first
-  // strong character, so an English reply stays at the left edge of a
-  // right-to-left interface while the Thought row and the failure block around
-  // it sit on the start edge. Naming the interface start keeps the assistant
-  // turn in one column; the run inside the line still reads left to right.
-  const blockTextAlign = rtlBlockTextAlign(isRtl);
+  // strong character. That is the rule for markdown, which is always copy the
+  // app did not write: an English reply keeps its left edge and the punctuation
+  // that ends it inside a right-to-left interface, and an Arabic one still sits
+  // on the right. Naming the interface's start edge instead right-aligned the
+  // English and left the punctuation of a wrapped line at the wrong end.
   const heading = (level: keyof typeof headings) => {
     const style = headings[level];
     return {
@@ -68,7 +59,6 @@ function enrichedStyle(
       fontWeight: style.fontWeight,
       marginTop: style.marginTop,
       marginBottom: style.marginBottom,
-      ...blockTextAlign,
     };
   };
   return {
@@ -79,10 +69,9 @@ function enrichedStyle(
     paragraph: {
       color: textColor,
       fontSize: 16,
-      lineHeight,
+      lineHeight: BODY_LINE_HEIGHT,
       marginTop: 0,
       marginBottom: 4,
-      ...blockTextAlign,
     },
     h1: heading('h1'),
     h2: heading('h2'),
@@ -138,7 +127,7 @@ function enrichedStyle(
     list: {
       color: textColor,
       fontSize: 16,
-      lineHeight,
+      lineHeight: BODY_LINE_HEIGHT,
       markerColor: textColor,
       bulletColor: textColor,
     },
@@ -165,18 +154,17 @@ function enrichedStyle(
 export function MarkdownEnriched({
   value,
   palette,
+  documentDirection,
   selectable,
-  lineHeight,
   onLongPressLink,
   onPressLink,
   onCopyCode,
 }: Readonly<MarkdownEnrichedProps>) {
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
-  const markdownStyle = useMemo(
-    () => enrichedStyle(palette, I18nManager.isRTL, lineHeight),
-    [palette, lineHeight]
-  );
+  // Markdown is always copy the app did not write, so every block keeps the
+  // renderer's own per-paragraph direction (`enrichedStyle`).
+  const markdownStyle = useMemo(() => enrichedStyle(palette), [palette]);
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
   // with the real image and a revoke gates it again.
@@ -196,10 +184,15 @@ export function MarkdownEnriched({
   // gives a list no alignment, so a bullet's marker and text stay on the
   // physical left while the heading and every other block name the interface
   // start edge. The iOS renderer indents a list from the paragraph's own
-  // direction, so only Android needs the mark.
+  // direction, so only Android needs the mark. A body with its own base
+  // direction wants its markers on the physical left, where it already puts
+  // them.
   const renderedMarkdown = useMemo(
-    () => (Platform.OS === 'android' && I18nManager.isRTL ? rtlListItems(markdown) : markdown),
-    [markdown]
+    () =>
+      Platform.OS === 'android' && I18nManager.isRTL && documentDirection !== 'ltr'
+        ? rtlListItems(markdown)
+        : markdown,
+    [markdown, documentDirection]
   );
   return (
     <>

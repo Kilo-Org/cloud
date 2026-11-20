@@ -1,22 +1,18 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
-import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
-import { ContextControl } from '@/components/context-control';
-import { EmptyState } from '@/components/empty-state';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { Button } from '@/components/ui/button';
-import { MessageCircle, Plus } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { Fab, FAB_GUTTER, FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
+import { MessageCircle, MessageCirclePlus } from '@/components/ui/icons';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { useAuth } from '@/lib/auth/auth-context';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
@@ -27,12 +23,13 @@ import { useChatBackends } from '@/lib/chat/backend-store';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useOrganization } from '@/lib/organization-context';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
+import { useOrganization } from '@/lib/organization-context';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
+import { selectChatListSurface } from './chat-list-surface';
 import { BackendSettingsControl } from './backend-settings-sheet';
 
 /**
@@ -58,15 +55,16 @@ export function ChatListScreen() {
 function ScopedChatListScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const tabBarHeight = useEffectiveTabBarHeight();
+  const connectivity = useCommittedConnectivityStatus();
 
   const {
     models,
     isLoading: modelsLoading,
     isError: modelsFailed,
+    isFetched: modelsFetched,
     refetch: refetchModels,
   } = useAvailableModels(organizationId ?? undefined);
   const backends = useChatBackends();
@@ -83,7 +81,15 @@ function ScopedChatListScreen() {
     rememberModelFacts(models);
   }, [models]);
 
-  const { chats, isLoading, isError, refetch, remove, rename } = useChatList(place);
+  const {
+    chats,
+    isLoading,
+    isError,
+    isSuccess: listAnswered,
+    refetch,
+    remove,
+    rename,
+  } = useChatList(place);
 
   // There is no picker here: a chat starts on the model the latest one is on,
   // and the conversation's own picker switches it from its next message.
@@ -177,15 +183,33 @@ function ScopedChatListScreen() {
   );
 
   // Nothing to start a chat with is nothing for the button to do, and an empty
-  // list carries its own button, so the corner one would be the second.
-  const empty = !isLoading && chats.length === 0;
-  const failed = isError || (modelsFailed && options.length === 0 && chats.length === 0);
+  // list carries its own button, so the corner one would be the second. The
+  // body is decided by the two reads' own provenance (see
+  // `selectChatListSurface`), so an unanswered read can never read as "no
+  // chats": the corner button follows the same body.
+  const surface = selectChatListSurface({
+    chatCount: chats.length,
+    listAnswered,
+    listFailed: isError,
+    listLoading: isLoading,
+    hasPlace: place !== null,
+    catalogAnswered: modelsFetched && !modelsFailed,
+    catalogLoading: modelsLoading,
+    // The model a New chat would start on. A catalog that cannot load does not
+    // remove a model that is already known (cached rows, a backend, an
+    // on-device model), so an answered list keeps its empty state and its
+    // button instead of a full-screen catalog error.
+    catalogStartable: selectedModel !== undefined,
+    offline: connectivity === 'offline',
+  });
+  const empty = surface.kind === 'empty';
+  const failed = surface.kind === 'list-error' || surface.kind === 'catalog-error';
   const showFab = !empty && !failed && place !== null && selectedModel !== undefined;
 
   const fabStyle = useMemo(
     () => ({
       bottom: tabBarHeight + FAB_MARGIN,
-      right: 20,
+      right: FAB_GUTTER,
       width: FAB_SIZE,
       height: FAB_SIZE,
     }),
@@ -198,7 +222,7 @@ function ScopedChatListScreen() {
   );
 
   function renderBody() {
-    if (isError) {
+    if (surface.kind === 'list-error') {
       return (
         <QueryError
           variant="server"
@@ -209,29 +233,34 @@ function ScopedChatListScreen() {
         />
       );
     }
-    if (modelsFailed && options.length === 0 && chats.length === 0) {
+    if (surface.kind === 'catalog-error') {
       return (
         <QueryError
-          variant="server"
-          title={t('common.couldNotLoadModels')}
+          // Offline names the connection; anything else is the catalog's own
+          // failure. Retry asks either read again.
+          variant={surface.offline ? 'offline' : 'server'}
+          title={surface.offline ? undefined : t('common.couldNotLoadModels')}
           onRetry={() => {
             void refetchModels();
           }}
         />
       );
     }
-    if (isLoading) {
+    if (surface.kind === 'loading') {
       return (
-        <View className="pt-[18px]">
+        <View className="pt-1">
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-            <View key={index} className="py-1.5">
-              <Skeleton className="mx-[22px] h-[52px] rounded-none" />
-            </View>
+            <RowSkeleton
+              key={index}
+              variant="session"
+              subtitle
+              last={index === SKELETON_ROW_COUNT - 1}
+            />
           ))}
         </View>
       );
     }
-    if (empty) {
+    if (surface.kind === 'empty') {
       return (
         <EmptyState
           icon={MessageCircle}
@@ -242,15 +271,13 @@ function ScopedChatListScreen() {
           // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
           description={t('modelChat.empty.description')}
           action={
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={t('modelChat.list.new')}
+              icon={MessageCirclePlus}
               onPress={start}
               loading={starting}
               disabled={selectedModel === undefined}
-              accessibilityLabel={t('modelChat.list.new')}
-            >
-              <Text>{t('modelChat.list.new')}</Text>
-            </Button>
+            />
           }
         />
       );
@@ -273,57 +300,23 @@ function ScopedChatListScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.chat')}
-          titleContent={
-            <View className="flex-row items-center gap-2">
-              <Text
-                // An explicit pixel line height keeps the title's header
-                // measurement stable on Android.
-                className="text-[30px] font-semibold leading-[36px] text-foreground"
-                numberOfLines={1}
-              >
-                {t('common.chat')}
-              </Text>
-              <BetaPill />
-            </View>
-          }
+          titleAccessory={<BetaPill />}
           size="large"
           showBackButton={false}
-          className="px-[22px] pb-1"
           headerRight={<BackendSettingsControl />}
+          inlineActions={<ContextControl />}
+          allowInlineActionsStacking={false}
+          inlineActionsMinWidth={CONTEXT_CONTROL_INLINE_MIN_DP}
         />
-        {/* The account every read on this screen is scoped to: the chat list
-            (`useChatPlace`), the model catalogue, and the empty state below.
-            Switching it remounts the scoped screen, so without the name here a
-            person in two workspaces watches their conversations disappear with
-            nothing saying which workspace they are now in. It is the same
-            switchable control Home and the new-session screen put in their
-            header — the active account's name and the account picker sheet, no
-            copy of its own — and it holds one row in every scope (Personal and
-            a single membership included), so the list never moves when the
-            account list resolves or changes. It sits at the header's own
-            gutter and on its own row: the 30px title already fills the title
-            row, so a trailing cluster would paint over it on a phone. */}
-        <View className="px-[22px] pb-1">
-          <ContextControl />
-        </View>
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('modelChat.list.new')}
-            accessibilityState={{ disabled: starting, busy: starting }}
+          <Fab
+            label={t('modelChat.list.new')}
             testID="chat-new-fab"
-            disabled={starting}
+            busy={starting}
             onPress={start}
-            className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
             style={fabStyle}
-          >
-            {starting ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : (
-              <Plus size={24} color={colors.primaryForeground} />
-            )}
-          </Pressable>
+          />
         )}
       </View>
     </StateSurfaceInsets>

@@ -220,6 +220,7 @@ export function WebhookRequestsContent({
         triggerId,
         organizationId: organizationId ?? undefined,
         limit: 50,
+        includeLegacySessionIds: true,
       },
       { enabled: !adminScope }
     ),
@@ -498,12 +499,16 @@ export function WebhookRequestsContent({
                             );
                           }
 
-                          return organizationId ? (
+                          const canOpenOrgChat =
+                            triggerData &&
+                            'canRun' in triggerData &&
+                            triggerData.canRun === true &&
+                            triggerData.targetType === 'cloud_agent_chat';
+                          return organizationId && !canOpenOrgChat ? (
                             <span className="text-muted-foreground font-mono text-xs">
                               {shortId(sessionId)}
                             </span>
                           ) : (
-                            // Personal context: direct link to session
                             <Button
                               variant="link"
                               size="sm"

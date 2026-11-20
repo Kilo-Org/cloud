@@ -9,9 +9,9 @@ import * as z from 'zod';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   findOrganizationGroupPolicy,
-  OrganizationGroupPoliciesSchema,
   type OrganizationGroupPolicies,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import { parseOrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
@@ -352,7 +352,10 @@ export async function summarizeSubOrganizationModelPolicies(
     input.defaultPolicyRows.map(row => [
       row.organizationId,
       {
-        policies: OrganizationGroupPoliciesSchema.parse(row.defaultPolicies),
+        policies: parseOrganizationGroupPolicies(row.defaultPolicies, {
+          organizationId: row.organizationId,
+          source: 'default',
+        }),
         policyRevision: row.policyRevision,
       },
     ])
@@ -366,7 +369,11 @@ export async function summarizeSubOrganizationModelPolicies(
     groups.push({
       groupId: row.groupId,
       groupName: row.groupName,
-      policies: OrganizationGroupPoliciesSchema.parse(row.policies),
+      policies: parseOrganizationGroupPolicies(row.policies, {
+        organizationId: row.organizationId,
+        groupId: row.groupId,
+        source: 'group',
+      }),
     });
     groupsByOrganization.set(row.organizationId, groups);
   }

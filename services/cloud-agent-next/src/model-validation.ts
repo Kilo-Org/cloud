@@ -215,11 +215,12 @@ export function buildKiloOverrideValidationUrl(
   let modelsBaseUrl: string;
   if (organizationId) {
     const encodedOrganizationId = encodeURIComponent(organizationId);
-    modelsBaseUrl = trimmed.includes('/api/organizations/')
-      ? trimmed
-      : trimmed.endsWith('/api')
-        ? `${trimmed}/organizations/${encodedOrganizationId}`
-        : `${trimmed}/api/organizations/${encodedOrganizationId}`;
+    const apiBase = trimmed.replace(/\/api\/openrouter$/, '/api');
+    modelsBaseUrl = apiBase.includes('/api/organizations/')
+      ? apiBase
+      : apiBase.endsWith('/api')
+        ? `${apiBase}/organizations/${encodedOrganizationId}`
+        : `${apiBase}/api/organizations/${encodedOrganizationId}`;
   } else {
     modelsBaseUrl = trimmed.includes('/openrouter')
       ? trimmed

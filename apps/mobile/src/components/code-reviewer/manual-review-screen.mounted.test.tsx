@@ -22,6 +22,9 @@ const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
+// The side safe areas a landscape phone reports. The suite drives them so the
+// body's inset style can be asserted; every other test leaves them at zero.
+const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 // The empty state's connect action is the provider app install, which only an
 // organization-manage role may run; `canManage` is that role, `canEdit` the
 // wider settings capability the sibling screens use.
@@ -62,6 +65,12 @@ const keyboardStore = vi.hoisted(() => {
     },
   };
 });
+
+// The header's scope subtitle reads the membership list; this suite tests the
+// form, so the subtitle is a fixed name for each kind of scope.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: (scope: string) => (scope === 'personal' ? 'Personal' : 'Drain Labs'),
+}));
 
 // The screen scrolls the body back to the URL section when Start rejects an
 // empty or malformed URL; the shared mock records those calls so the suite can
@@ -118,7 +127,12 @@ vi.mock('react-native-keyboard-controller', async () => {
 // mocks it. So stub the module's only native dependency instead of the module
 // itself, and keep the real footer and clearance.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: BOTTOM_INSET, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: BOTTOM_INSET,
+    left: sideInsets.left,
+    right: sideInsets.right,
+  }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -130,8 +144,28 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
 }));
+// The connect actions read the reader's organization role for a trial refusal.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({}),
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -141,6 +175,8 @@ vi.mock('@/components/ui/radio-group', () => ({
   radioItemA11y: () => ({}),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The real `@/components/tab-screen` and `@/lib/code-reviewer-status` are used
 // on purpose. The footer measures its clearance with the real
@@ -149,6 +185,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // depend on the real `classifyProviderErrorCode` to tell retryable from
 // permanent failures.
 vi.mock('@/lib/code-reviewer-config', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -323,6 +360,8 @@ function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
 
 beforeEach(() => {
   keyboardStore.setHeight(0);
+  sideInsets.left = 0;
+  sideInsets.right = 0;
   permissionState.status = 'ready';
   permissionState.canEdit = true;
   permissionState.canManage = true;
@@ -339,6 +378,41 @@ beforeEach(() => {
   operationKey.rotateKey.mockClear();
   scrollToSpy.mockClear();
 });
+
+describe.each(['android', 'ios'] as const)(
+  'ManualReviewScreen body side insets on %s',
+  platform => {
+    beforeEach(() => {
+      platformState.OS = platform;
+    });
+
+    it('clears the landscape side insets on the body scroller', async () => {
+      sideInsets.left = 47;
+      sideInsets.right = 0;
+      const { renderer, unmount } = await renderScreen();
+
+      const scrollView = only(findAllOfType(renderer.root, 'ScrollView'), 'scroll view');
+      // A margin, not a padding: the scroller's content container carries the
+      // page gutter, and a padding on the scroller would not narrow its content.
+      // The 8 dp on the other side is the shared helper's corner clearance for a
+      // side status area that leaves the top inset at zero.
+      expect(propOf(scrollView, 'style')).toEqual({ marginLeft: 47, marginRight: 8 });
+      // The gutter itself stays the content container's, so the two add up.
+      expect(String(propOf(scrollView, 'contentContainerClassName'))).toContain('px-4');
+
+      unmount();
+    });
+
+    it('leaves the portrait scroller without an inset style', async () => {
+      const { renderer, unmount } = await renderScreen();
+
+      const scrollView = only(findAllOfType(renderer.root, 'ScrollView'), 'scroll view');
+      expect(propOf(scrollView, 'style')).toBeUndefined();
+
+      unmount();
+    });
+  }
+);
 
 describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on %s', platform => {
   beforeEach(() => {
@@ -412,8 +486,15 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     status.connected = false;
     const { renderer, unmount } = await renderScreen();
     // Neither the form nor its pinned action can be rendered before the status
-    // says whether the scope can start one, and the body cannot stay empty.
-    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(3);
+    // says whether the scope can start one, and the body cannot stay empty. The
+    // placeholder reserves the form's own geometry — the platform section's
+    // label and its two-choice row group — instead of a bar count.
+    expect(findAllOfType(renderer.root, 'RowGroup')).toHaveLength(1);
+    const subtitleRows = renderer.root.findAll(
+      node => String(node.type) === 'RowSkeleton' && node.props.subtitle === true
+    );
+    expect(subtitleRows).toHaveLength(2);
+    expect(findAllOfType(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
     expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(0);
     expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
@@ -467,15 +548,14 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 });
 
 describe('ManualReviewScreen connect provider CTA', () => {
-  it('renders the Connect GitHub action full-width like the PR-review connect gate', async () => {
+  it('renders the Connect GitHub action through the shared state action', async () => {
     status.connected = false;
     const { renderer, unmount } = await renderScreen();
 
     const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
-    const { action } = empty.props as { action: ReactElement<{ className?: string }> };
-    const className = String(action.props.className);
-    expect(className).toContain('w-full');
-    expect(className).toContain('mt-3');
+    const { action } = empty.props as { action: ReactElement<{ label: string }> };
+    expect(action.type).toBe('StateAction');
+    expect(action.props.label).toBe(i18n.t('common.connectGithub'));
 
     unmount();
   });
@@ -989,6 +1069,35 @@ describe('ManualReviewScreen URL validation', () => {
 
     unmount();
   });
+
+  it('starts from a pull request link copied from a sub-page', async () => {
+    platformState.OS = 'android';
+    const { renderer, unmount } = await renderScreen();
+
+    const subPageUrl = `${GITHUB_PR_URL}/files`;
+    const { onChangeText } = findUrlField(renderer.root).props as {
+      onChangeText: (value: string) => void;
+    };
+    act(() => {
+      onChangeText(subPageUrl);
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    const { onPress } = action.props as { onPress: () => void };
+    act(() => {
+      onPress();
+    });
+
+    // A sub-tab link names the same review, so it is a valid draft: no status
+    // line and no error border, and the start carries the URL as copied.
+    expect(findVisibleStatusTexts(renderer.root)).toHaveLength(0);
+    expect(String(findUrlField(renderer.root).props.className)).not.toContain('border-destructive');
+    expect(status.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ url: subPageUrl }),
+      expect.anything()
+    );
+
+    unmount();
+  });
 });
 
 describe('ManualReviewScreen instructions field', () => {
@@ -1048,12 +1157,12 @@ function typeInto(field: TestRenderer.ReactTestInstance, value: string) {
   });
 }
 
-/** The remaining-character row, found by the counted sentence it is named with. */
+/** The remaining-character row, found by the counted sentence it shows. */
 function counterRow(root: TestRenderer.ReactTestInstance, remaining: number) {
   return root.findAll(
     node =>
       String(node.type) === 'Text' &&
-      propOf(node, 'accessibilityLabel') ===
+      propOf(node, 'children') ===
         i18n.t('agentChat.composer.charactersRemaining', { count: remaining })
   );
 }
@@ -1089,10 +1198,10 @@ describe('ManualReviewScreen instructions limit', () => {
     const { renderer, unmount } = await renderScreen();
     typeInto(instructionsField(renderer.root), 'x'.repeat(3_500));
 
-    // The number is the visible row; the counted sentence is its accessible
-    // name, so a screen reader reads "500 characters remaining", not "500".
+    // The counted sentence is the visible row, so a sighted reader and a screen
+    // reader both get "500 characters remaining", not "500".
     const [counter] = counterRow(renderer.root, 500);
-    expect(counter?.props.children).toBe(500);
+    expect(counter?.props.children).toBe('500 characters remaining');
 
     unmount();
   });

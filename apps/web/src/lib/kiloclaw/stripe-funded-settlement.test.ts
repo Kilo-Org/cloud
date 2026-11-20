@@ -1,21 +1,40 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type * as Sentry from '@sentry/nextjs';
 import { eq, sql } from 'drizzle-orm';
 
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import {
   credit_transactions,
+  kiloclaw_email_log,
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
+import type { applyStripeFundedKiloClawPeriod as SettleStripeFundedPeriod } from '@/lib/kiloclaw/credit-billing';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+
+const captureExceptionMock = jest.fn<typeof Sentry.captureException>();
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<typeof Sentry>('@sentry/nextjs'),
+  captureException: captureExceptionMock,
+}));
 
 const makeStripeSubscriptionNonRenewing =
   jest.fn<(stripeSubscriptionId: string) => Promise<void>>();
 const settlementDependencies = { makeStripeSubscriptionNonRenewing };
+
+let settleStripeFundedPeriod: typeof SettleStripeFundedPeriod;
+type SettlementParams = Parameters<typeof SettleStripeFundedPeriod>[0];
+
+function applyStripeFundedKiloClawPeriod(
+  params: Omit<SettlementParams, 'stripeSubscriptionStatus'> &
+    Partial<Pick<SettlementParams, 'stripeSubscriptionStatus'>>,
+  dependencies?: Parameters<typeof SettleStripeFundedPeriod>[1]
+) {
+  return settleStripeFundedPeriod({ stripeSubscriptionStatus: 'active', ...params }, dependencies);
+}
 
 async function insertPersonalInstance(params: { id: string; userId: string }) {
   await db.insert(kiloclaw_instances).values({
@@ -40,8 +59,14 @@ async function readUser(id: string) {
 }
 
 describe('Stripe-funded KiloClaw settlement', () => {
+  beforeAll(async () => {
+    const creditBilling = await import('@/lib/kiloclaw/credit-billing');
+    settleStripeFundedPeriod = creditBilling.applyStripeFundedKiloClawPeriod;
+  });
+
   beforeEach(async () => {
     await cleanupDbForTest();
+    captureExceptionMock.mockClear();
     makeStripeSubscriptionNonRenewing.mockReset();
     makeStripeSubscriptionNonRenewing.mockResolvedValue();
   });
@@ -194,6 +219,99 @@ describe('Stripe-funded KiloClaw settlement', () => {
       transactions.map(transaction => transaction.amount_microdollars).sort((a, b) => a - b)
     ).toEqual([-55_000_000, 55_000_000]);
   });
+
+  it.each(['authorized', 'forbidden'])(
+    'settles a late %s invoice for an ended provider subscription without reactivating the row',
+    async authorization => {
+      const user = await insertTestUser({ id: 'settlement-ended-provider-user' });
+      const instanceId = crypto.randomUUID();
+      const subscriptionId = crypto.randomUUID();
+      const stripeSubscriptionId = 'sub_ended_final_commit';
+      const suspendedAt = '2026-11-14T06:00:00.000Z';
+      const destructionDeadline = '2026-11-21T06:00:00.000Z';
+      await insertPersonalInstance({ id: instanceId, userId: user.id });
+      await db.insert(kiloclaw_subscriptions).values({
+        id: subscriptionId,
+        user_id: user.id,
+        instance_id: instanceId,
+        stripe_subscription_id: stripeSubscriptionId,
+        payment_source: 'credits',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+        plan: 'commit',
+        status: 'canceled',
+        current_period_start: '2026-05-14T00:00:00.000Z',
+        current_period_end: '2026-11-14T00:00:00.000Z',
+        commit_ends_at: '2026-11-14T00:00:00.000Z',
+        credit_renewal_at: '2026-11-14T00:00:00.000Z',
+        suspended_at: suspendedAt,
+        destruction_deadline: destructionDeadline,
+        auto_resume_attempt_count: 2,
+      });
+
+      await expect(
+        applyStripeFundedKiloClawPeriod(
+          {
+            userId: user.id,
+            metadataInstanceId: instanceId,
+            stripeSubscriptionId,
+            stripeSubscriptionStatus: 'canceled',
+            stripePaymentId: 'in_ended_final_commit',
+            plan: 'commit',
+            priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+            amountMicrodollars: 661_000_000,
+            periodStart:
+              authorization === 'forbidden'
+                ? '2026-11-14T00:00:00.000Z'
+                : '2026-10-19T00:00:00.000Z',
+            periodEnd:
+              authorization === 'forbidden'
+                ? '2027-05-14T00:00:00.000Z'
+                : '2026-11-14T00:00:00.000Z',
+          },
+          settlementDependencies
+        )
+      ).resolves.toBe(true);
+
+      const row = await readSubscription(subscriptionId);
+      expect(row).toMatchObject({
+        status: 'canceled',
+        stripe_subscription_id: stripeSubscriptionId,
+        current_period_start:
+          authorization === 'forbidden' ? '2026-05-14 00:00:00+00' : '2026-10-19 00:00:00+00',
+        current_period_end: '2026-11-14 00:00:00+00',
+        commit_ends_at: '2026-11-14 00:00:00+00',
+        credit_renewal_at: '2026-11-14 00:00:00+00',
+        auto_resume_attempt_count: 2,
+      });
+      expect(row?.suspended_at && new Date(row.suspended_at).toISOString()).toBe(suspendedAt);
+      expect(row?.destruction_deadline && new Date(row.destruction_deadline).toISOString()).toBe(
+        destructionDeadline
+      );
+      expect(makeStripeSubscriptionNonRenewing).not.toHaveBeenCalled();
+      if (authorization === 'forbidden') {
+        expect(captureExceptionMock).toHaveBeenCalledWith(
+          new Error('kiloclaw_commit_retirement:forbidden_commit_invoice'),
+          expect.objectContaining({
+            extra: expect.objectContaining({
+              summary:
+                'Invoice from an ended Stripe subscription failed Commit retirement checks and cannot change the subscription.',
+            }),
+          })
+        );
+      }
+      await expect(readUser(user.id)).resolves.toMatchObject({ total_microdollars_acquired: 0 });
+      const transactions = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, user.id));
+      expect(
+        transactions.map(transaction => transaction.amount_microdollars).sort((a, b) => a - b)
+      ).toEqual([-661_000_000, 661_000_000]);
+      await expect(
+        db.select().from(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, user.id))
+      ).resolves.toHaveLength(0);
+    }
+  );
 
   it.each(['missing-anchor', 'missing-confirmation', 'invalid-confirmation', 'older-confirmation'])(
     'rejects an unverified canceled-provider replacement (%s)',

@@ -16,7 +16,11 @@ import {
   type DrizzleConnection,
   type DrizzleTransaction,
 } from '@kilocode/web-shared/lib/drizzle';
-import { claudeBillingOwnerMatches, type ClaudeBillingOwner } from './owner';
+import {
+  claudeBillingOwnerMatches,
+  type ClaudeBillingOwner,
+  type ClaudeBillingOwnerColumns,
+} from './owner';
 import { specificRefusalCodesFor } from './refusal';
 
 export type { ClaudeBillingOwner } from './owner';
@@ -42,19 +46,29 @@ export type UnreferencedClaudeBillingPayer = {
   userProfileId: string;
 };
 
-export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
+/**
+ * The columns of a row that belongs to an owner: a personal owner names only the
+ * person column, an organization owner only the organization column.
+ */
+function claudeBillingOwnerColumnsWhere(
+  kiloUserId: AnyPgColumn,
+  organizationId: AnyPgColumn,
+  owner: ClaudeBillingOwner
+) {
   switch (owner.kind) {
     case 'personal':
-      return and(
-        eq(claude_billing_connections.kilo_user_id, owner.kiloUserId),
-        isNull(claude_billing_connections.organization_id)
-      );
+      return and(eq(kiloUserId, owner.kiloUserId), isNull(organizationId));
     case 'organization':
-      return and(
-        eq(claude_billing_connections.organization_id, owner.organizationId),
-        isNull(claude_billing_connections.kilo_user_id)
-      );
+      return and(eq(organizationId, owner.organizationId), isNull(kiloUserId));
   }
+}
+
+export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
+  return claudeBillingOwnerColumnsWhere(
+    claude_billing_connections.kilo_user_id,
+    claude_billing_connections.organization_id,
+    owner
+  );
 }
 
 /** Rows the caller may see: their own rows, plus the organization rows of the allowed organizations. */
@@ -88,7 +102,7 @@ export async function getClaudeBillingConnection(
     .from(claude_billing_connections)
     .where(claudeBillingOwnerWhere(owner))
     .orderBy(
-      sql`${claude_billing_connections.status} = 'removed'`,
+      sql`${claude_billing_connections.status} = ${ClaudeBillingConnectionStatus.Removed}`,
       asc(claude_billing_connections.created_at)
     )
     .limit(1);
@@ -96,18 +110,11 @@ export async function getClaudeBillingConnection(
 }
 
 export function claudeBillingGrantOwnerWhere(owner: ClaudeBillingOwner) {
-  switch (owner.kind) {
-    case 'personal':
-      return and(
-        eq(claude_billing_connection_grants.kilo_user_id, owner.kiloUserId),
-        isNull(claude_billing_connection_grants.organization_id)
-      );
-    case 'organization':
-      return and(
-        eq(claude_billing_connection_grants.organization_id, owner.organizationId),
-        isNull(claude_billing_connection_grants.kilo_user_id)
-      );
-  }
+  return claudeBillingOwnerColumnsWhere(
+    claude_billing_connection_grants.kilo_user_id,
+    claude_billing_connection_grants.organization_id,
+    owner
+  );
 }
 
 /**
@@ -133,7 +140,7 @@ async function selectNextActiveGrant(
   onDb: DrizzleConnection,
   payerConnectionId: string,
   excludeOwner: ClaudeBillingOwner | null = null
-): Promise<{ kilo_user_id: string | null; organization_id: string | null } | null> {
+): Promise<ClaudeBillingOwnerColumns | null> {
   const excludeWhere = excludeOwner ? claudeBillingGrantOwnerWhere(excludeOwner) : undefined;
   const [grant] = await onDb
     .select({
@@ -156,6 +163,17 @@ async function selectNextActiveGrant(
   return grant ?? null;
 }
 
+/**
+ * The owner-to-columns projection for inserts: a personal row stores the user
+ * id, an organization row the organization id; neither stores both.
+ */
+function ownerColumns(owner: ClaudeBillingOwner): ClaudeBillingOwnerColumns {
+  return {
+    kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
+    organization_id: owner.kind === 'personal' ? null : owner.organizationId,
+  };
+}
+
 async function upsertClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   payerConnectionId: string,
@@ -166,8 +184,7 @@ async function upsertClaudeBillingGrant(
     .insert(claude_billing_connection_grants)
     .values({
       payer_connection_id: payerConnectionId,
-      kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
-      organization_id: owner.kind === 'personal' ? null : owner.organizationId,
+      ...ownerColumns(owner),
       created_by: createdBy,
     })
     .onConflictDoNothing();
@@ -242,10 +259,7 @@ export async function getGrantedClaudeBillingConnection(
  * `member` rows name a person and an organization together, and no current
  * owner names both.
  */
-function ownerFromColumns(columns: {
-  kilo_user_id: string | null;
-  organization_id: string | null;
-}): ClaudeBillingOwner | null {
+function ownerFromColumns(columns: ClaudeBillingOwnerColumns): ClaudeBillingOwner | null {
   if (columns.kilo_user_id && columns.organization_id) return null;
   if (columns.kilo_user_id) return { kind: 'personal', kiloUserId: columns.kilo_user_id };
   if (columns.organization_id) {
@@ -319,8 +333,7 @@ export async function insertClaudeBillingProfile(
   await onDb
     .insert(claude_billing_connections)
     .values({
-      kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
-      organization_id: owner.kind === 'personal' ? null : owner.organizationId,
+      ...ownerColumns(owner),
       user_profile_id: userProfileId,
       created_by: createdBy,
     })
@@ -368,89 +381,86 @@ export async function shareClaudeBillingConnection(
   createdBy: string,
   onDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow> {
-  return await onDb.transaction(async tx => {
-    let source = await getGrantedClaudeBillingConnection(sourceOwner, tx);
-    if (!source || source.status !== ClaudeBillingConnectionStatus.Connected) {
-      throw new ClaudeBillingShareError('source_unavailable');
-    }
-    await lockClaudeBillingPayer(tx, source.id);
-    source = await getGrantedClaudeBillingConnection(sourceOwner, tx);
-    if (!source || source.status !== ClaudeBillingConnectionStatus.Connected) {
-      throw new ClaudeBillingShareError('source_unavailable');
-    }
-    const [payerRow] = await tx
-      .select()
-      .from(claude_billing_connections)
-      .where(eq(claude_billing_connections.id, source.id))
-      .limit(1);
-    if (!payerRow) {
-      throw new ClaudeBillingShareError('source_unavailable');
-    }
-    if (sourceOwner.kind === 'organization' && payerRow.created_by !== createdBy) {
-      const [callerGrant] = await tx
-        .select({ id: claude_billing_connection_grants.id })
-        .from(claude_billing_connection_grants)
-        .where(
-          and(
-            eq(claude_billing_connection_grants.payer_connection_id, source.id),
-            eq(claude_billing_connection_grants.kilo_user_id, createdBy),
-            isNull(claude_billing_connection_grants.removed_at)
-          )
-        )
-        .limit(1);
-      if (!callerGrant) {
-        throw new ClaudeBillingShareError('source_forbidden');
+  return await withClaudeBillingPayerLock(
+    sourceOwner,
+    async (tx, source) => {
+      if (!source || source.status !== ClaudeBillingConnectionStatus.Connected) {
+        throw new ClaudeBillingShareError('source_unavailable');
       }
-    }
-    await upsertClaudeBillingGrant(sourceOwner, source.id, source.created_by, tx);
-
-    const target = await getGrantedClaudeBillingConnection(targetOwner, tx);
-    if (
-      target &&
-      target.status !== ClaudeBillingConnectionStatus.Removed &&
-      target.status !== ClaudeBillingConnectionStatus.Pending
-    ) {
-      if (target.id === source.id && target.status === ClaudeBillingConnectionStatus.Connected) {
-        if (targetOwner.kind === 'personal') {
-          await deletePersonalAnthropicByokKey(tx, targetOwner.kiloUserId);
+      const [payerRow] = await tx
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, source.id))
+        .limit(1);
+      if (!payerRow) {
+        throw new ClaudeBillingShareError('source_unavailable');
+      }
+      if (sourceOwner.kind === 'organization' && payerRow.created_by !== createdBy) {
+        const [callerGrant] = await tx
+          .select({ id: claude_billing_connection_grants.id })
+          .from(claude_billing_connection_grants)
+          .where(
+            and(
+              eq(claude_billing_connection_grants.payer_connection_id, source.id),
+              eq(claude_billing_connection_grants.kilo_user_id, createdBy),
+              isNull(claude_billing_connection_grants.removed_at)
+            )
+          )
+          .limit(1);
+        if (!callerGrant) {
+          throw new ClaudeBillingShareError('source_forbidden');
         }
-        return target;
       }
-      throw new ClaudeBillingShareError('target_connected');
-    }
+      await upsertClaudeBillingGrant(sourceOwner, source.id, source.created_by, tx);
 
-    await upsertClaudeBillingGrant(targetOwner, source.id, createdBy, tx);
-    if (
-      target &&
-      target.id !== source.id &&
-      target.status === ClaudeBillingConnectionStatus.Pending
-    ) {
-      const [otherActiveGrant] = await tx
-        .select({ id: claude_billing_connection_grants.id })
-        .from(claude_billing_connection_grants)
-        .where(
-          and(
-            eq(claude_billing_connection_grants.payer_connection_id, target.id),
-            isNull(claude_billing_connection_grants.removed_at)
-          )
-        )
-        .limit(1);
-      if (!otherActiveGrant) {
-        await tx
-          .update(claude_billing_connections)
-          .set({ status: ClaudeBillingConnectionStatus.Removed })
-          .where(eq(claude_billing_connections.id, target.id));
+      const target = await getGrantedClaudeBillingConnection(targetOwner, tx);
+      if (
+        target &&
+        target.status !== ClaudeBillingConnectionStatus.Removed &&
+        target.status !== ClaudeBillingConnectionStatus.Pending
+      ) {
+        if (target.id === source.id && target.status === ClaudeBillingConnectionStatus.Connected) {
+          if (targetOwner.kind === 'personal') {
+            await deletePersonalAnthropicByokKey(tx, targetOwner.kiloUserId);
+          }
+          return target;
+        }
+        throw new ClaudeBillingShareError('target_connected');
       }
-    }
-    if (targetOwner.kind === 'personal') {
-      await deletePersonalAnthropicByokKey(tx, targetOwner.kiloUserId);
-    }
-    const shared = await getGrantedClaudeBillingConnection(targetOwner, tx);
-    if (!shared || shared.id !== source.id) {
-      throw new ClaudeBillingShareError('target_connected');
-    }
-    return shared;
-  });
+
+      await upsertClaudeBillingGrant(targetOwner, source.id, createdBy, tx);
+      if (
+        target &&
+        target.id !== source.id &&
+        target.status === ClaudeBillingConnectionStatus.Pending
+      ) {
+        const [otherActiveGrant] = await tx
+          .select({ id: claude_billing_connection_grants.id })
+          .from(claude_billing_connection_grants)
+          .where(
+            and(
+              eq(claude_billing_connection_grants.payer_connection_id, target.id),
+              isNull(claude_billing_connection_grants.removed_at)
+            )
+          )
+          .limit(1);
+        if (!otherActiveGrant) {
+          // A Pending row never carries the retirement columns: only the insert
+          // default writes Pending, and the approval callback sets the columns.
+          await retireClaudeBillingConnection(tx, target.id);
+        }
+      }
+      if (targetOwner.kind === 'personal') {
+        await deletePersonalAnthropicByokKey(tx, targetOwner.kiloUserId);
+      }
+      const shared = await getGrantedClaudeBillingConnection(targetOwner, tx);
+      if (!shared || shared.id !== source.id) {
+        throw new ClaudeBillingShareError('target_connected');
+      }
+      return shared;
+    },
+    onDb
+  );
 }
 
 async function deletePersonalAnthropicByokKey(
@@ -471,7 +481,7 @@ async function deletePersonalAnthropicByokKey(
 async function reassignPayerOwnerColumns(
   tx: DrizzleTransaction,
   payerConnectionId: string,
-  remaining: { kilo_user_id: string | null; organization_id: string | null }
+  remaining: ClaudeBillingOwnerColumns
 ): Promise<void> {
   const nextOwner = ownerFromColumns(remaining);
   if (nextOwner) {
@@ -489,18 +499,22 @@ async function reassignPayerOwnerColumns(
 
 /**
  * Runs `work` while holding the payer lock that sharing and removal take, so no
- * grant on the payer changes between a read and the write that follows it. A
- * scope without a row has nothing to serialize.
+ * grant on the payer changes between a read and the write that follows it. The
+ * helper reads the scope's granted connection, locks the payer, re-reads the
+ * grant under that lock, and passes the re-read connection, or null when the
+ * scope has no row, to `work`.
  */
 export async function withClaudeBillingPayerLock<T>(
   owner: ClaudeBillingOwner,
-  work: (tx: DrizzleTransaction) => Promise<T>,
+  work: (tx: DrizzleTransaction, connection: ClaudeBillingConnectionRow | null) => Promise<T>,
   onDb: DrizzleConnection = db
 ): Promise<T> {
   return await onDb.transaction(async tx => {
-    const connection = await getGrantedClaudeBillingConnection(owner, tx);
-    if (connection) await lockClaudeBillingPayer(tx, connection.id);
-    return await work(tx);
+    let connection = await getGrantedClaudeBillingConnection(owner, tx);
+    if (!connection) return await work(tx, null);
+    await lockClaudeBillingPayer(tx, connection.id);
+    connection = await getGrantedClaudeBillingConnection(owner, tx);
+    return await work(tx, connection);
   });
 }
 
@@ -524,41 +538,41 @@ export async function removeClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   onDb: DrizzleConnection = db
 ): Promise<UnreferencedClaudeBillingPayer | null> {
-  return await onDb.transaction(async tx => {
-    let connection = await getGrantedClaudeBillingConnection(owner, tx);
-    if (!connection) return null;
-    await lockClaudeBillingPayer(tx, connection.id);
-    connection = await getGrantedClaudeBillingConnection(owner, tx);
-    if (!connection) return null;
+  return await withClaudeBillingPayerLock(
+    owner,
+    async (tx, connection) => {
+      if (!connection) return null;
 
-    await upsertClaudeBillingGrant(owner, connection.id, connection.created_by, tx);
-    await tx
-      .update(claude_billing_connection_grants)
-      .set({ removed_at: new Date().toISOString() })
-      .where(claudeBillingGrantOwnerWhere(owner));
-    const remaining = await selectNextActiveGrant(tx, connection.id);
+      await upsertClaudeBillingGrant(owner, connection.id, connection.created_by, tx);
+      await tx
+        .update(claude_billing_connection_grants)
+        .set({ removed_at: new Date().toISOString() })
+        .where(claudeBillingGrantOwnerWhere(owner));
+      const remaining = await selectNextActiveGrant(tx, connection.id);
 
-    if (!remaining) {
-      await retireClaudeBillingConnection(tx, connection.id);
-      return { id: connection.id, userProfileId: connection.user_profile_id };
-    }
+      if (!remaining) {
+        await retireClaudeBillingConnection(tx, connection.id);
+        return { id: connection.id, userProfileId: connection.user_profile_id };
+      }
 
-    const [payerRow] = await tx
-      .select()
-      .from(claude_billing_connections)
-      .where(eq(claude_billing_connections.id, connection.id))
-      .limit(1);
-    if (payerRow && claudeBillingOwnerMatches(payerRow, owner)) {
-      await reassignPayerOwnerColumns(tx, connection.id, remaining);
+      const [payerRow] = await tx
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, connection.id))
+        .limit(1);
+      if (payerRow && claudeBillingOwnerMatches(payerRow, owner)) {
+        await reassignPayerOwnerColumns(tx, connection.id, remaining);
+        return null;
+      }
+
+      await tx
+        .update(claude_billing_connections)
+        .set({ updated_at: sql`clock_timestamp()` })
+        .where(eq(claude_billing_connections.id, connection.id));
       return null;
-    }
-
-    await tx
-      .update(claude_billing_connections)
-      .set({ updated_at: sql`clock_timestamp()` })
-      .where(eq(claude_billing_connections.id, connection.id));
-    return null;
-  });
+    },
+    onDb
+  );
 }
 
 function ownerToInput(owner: ClaudeBillingOwner): ClaudeBillingOwnerInput {
@@ -585,6 +599,18 @@ function scopeSortRank(
   if (owner.kind === 'organization' && owner.organizationId === targetOrganizationId) return 0;
   if (owner.kind === 'personal') return 1;
   return 2;
+}
+
+function compareScopes(
+  a: ClaudeBillingOwner,
+  b: ClaudeBillingOwner,
+  targetOrganizationId: string | undefined,
+  orgNames: ReadonlyMap<string, string>
+): number {
+  return (
+    scopeSortRank(a, targetOrganizationId) - scopeSortRank(b, targetOrganizationId) ||
+    formatScopeLabel(a, orgNames).localeCompare(formatScopeLabel(b, orgNames))
+  );
 }
 
 export async function describeClaudeBillingSharing(
@@ -668,11 +694,7 @@ export async function describeClaudeBillingSharing(
       if (!owner || claudeBillingOwnerKey(owner) === targetKey) continue;
       siblingOwners.push(owner);
     }
-    siblingOwners.sort(
-      (a, b) =>
-        scopeSortRank(a, targetOrganizationId) - scopeSortRank(b, targetOrganizationId) ||
-        formatScopeLabel(a, orgNames).localeCompare(formatScopeLabel(b, orgNames))
-    );
+    siblingOwners.sort((a, b) => compareScopes(a, b, targetOrganizationId, orgNames));
     sharedWith = siblingOwners.map(owner => formatScopeLabel(owner, orgNames));
   }
 
@@ -770,39 +792,38 @@ export async function describeClaudeBillingSharing(
     );
   }
 
-  const shareableLinks: ClaudeBillingShareableLink[] = [];
+  const collected: Array<{
+    primary: ClaudeBillingOwner;
+    link: ClaudeBillingShareableLink;
+  }> = [];
   for (const { payer, scopes } of byPayer.values()) {
     if (payer.created_by !== userId && !scopes.some(scope => scope.kind === 'personal')) {
       continue;
     }
-    scopes.sort(
-      (a, b) =>
-        scopeSortRank(a, targetOrganizationId) - scopeSortRank(b, targetOrganizationId) ||
-        formatScopeLabel(a, orgNames).localeCompare(formatScopeLabel(b, orgNames))
-    );
+    scopes.sort((a, b) => compareScopes(a, b, targetOrganizationId, orgNames));
     const primary = scopes[0];
     if (!primary) continue;
-    shareableLinks.push({
-      payerId: payer.id,
-      source: ownerToInput(primary),
-      label: scopes.map(scope => formatScopeLabel(scope, orgNames)).join(', '),
-      connectedAt: payer.connected_at ? new Date(payer.connected_at).toISOString() : null,
+    collected.push({
+      primary,
+      link: {
+        payerId: payer.id,
+        source: ownerToInput(primary),
+        label: scopes.map(scope => formatScopeLabel(scope, orgNames)).join(', '),
+        connectedAt: payer.connected_at ? new Date(payer.connected_at).toISOString() : null,
+      },
     });
   }
 
-  shareableLinks.sort((a, b) => {
-    const aSameOrg =
-      targetOrganizationId !== undefined && a.source.organizationId === targetOrganizationId;
-    const bSameOrg =
-      targetOrganizationId !== undefined && b.source.organizationId === targetOrganizationId;
-    if (aSameOrg !== bSameOrg) return aSameOrg ? -1 : 1;
-    const aPersonal = a.source.organizationId === undefined;
-    const bPersonal = b.source.organizationId === undefined;
-    if (aPersonal !== bPersonal) return aPersonal ? -1 : 1;
-    return a.label.localeCompare(b.label);
-  });
+  collected.sort(
+    (a, b) =>
+      scopeSortRank(a.primary, targetOrganizationId) -
+        scopeSortRank(b.primary, targetOrganizationId) || a.link.label.localeCompare(b.link.label)
+  );
 
-  return { shareableLinks, sharedWith };
+  return {
+    shareableLinks: collected.map(item => item.link),
+    sharedWith,
+  };
 }
 
 /**

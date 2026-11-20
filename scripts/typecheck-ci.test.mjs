@@ -567,8 +567,18 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   );
   const producer = jobs[harnessProducer];
   assert.ok(producer, 'the harness producer exists');
-  assert.equal(producer.needs, 'mobile-changes', 'the harness producer waits for change detection');
-  assert.equal(producer.if, "needs.mobile-changes.outputs.mobile == 'true'");
+  // No step of the producer reads a detection output, so it starts beside
+  // change detection instead of behind it.
+  assert.equal(
+    producer.needs,
+    undefined,
+    'the producer starts beside change detection because no step reads a detection output'
+  );
+  assert.equal(
+    producer.if,
+    undefined,
+    'the producer starts beside change detection because no step reads a detection output'
+  );
   const producerSteps = producer.steps;
   const producerInstall = producerSteps.findIndex(step =>
     /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
@@ -655,14 +665,154 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
     assert.equal(download.with.path, sdkDist, `${name} restores it where the build writes`);
   }
 
-  // A failed build leaves the suite jobs skipped, and a skipped required check
-  // passes, so the aggregator must carry each producer's failure.
+  // A producer that failed its job only skips the jobs that consume it, and a
+  // skipped required check passes, so the aggregator must carry each producer's
+  // failure.
   for (const requiredProducer of [harnessProducer, trpcProducer]) {
     assert.ok(
       [jobs['mobile-test-result'].needs].flat().includes(requiredProducer),
       `the mobile-test-result aggregator fails with a failed ${requiredProducer}`
     );
   }
+
+  // The producer cannot fail its own job: the release reuses only a run that
+  // concluded successfully, and the producer now runs on every run. Pin the
+  // wiring that reports the failure instead: the build step swallows its own
+  // failure, a mark step writes the output, the upload is skipped, and the job
+  // publishes the mark step's output. A failed job would fail a run the release
+  // reuses.
+  const buildStep = producerSteps.find(step => step.uses === './.github/actions/harness-sdk-build');
+  assert.equal(
+    buildStep.id,
+    'build',
+    'the build step is addressable, or the mark step below finds nothing'
+  );
+  assert.equal(
+    buildStep['continue-on-error'],
+    true,
+    'a failed build must not fail the job, because a failed job fails a run the release reuses'
+  );
+  const markStep = producerSteps.find(step => step.name === 'Record a failed build');
+  assert.ok(markStep, 'a failed build must publish the failure as an output');
+  assert.equal(
+    markStep.if,
+    "steps.build.outcome == 'failure'",
+    'the mark step records exactly a failed build outcome'
+  );
+  assert.match(markStep.run, /failed=true/, 'the mark step writes the failed output');
+  assert.match(
+    markStep.run,
+    /\$GITHUB_OUTPUT/,
+    'the mark step publishes the output GitHub can collect'
+  );
+  const sdkUpload = producerSteps.find(
+    step => step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === sdkArtifact
+  );
+  assert.equal(
+    sdkUpload.if,
+    "steps.build.outcome == 'success'",
+    'a failed build publishes no artifact, so consumers fail on the missing artifact'
+  );
+  assert.equal(
+    jobs[harnessProducer].outputs.failed,
+    '${{ steps.mark.outputs.failed }}',
+    'the job output publishes the mark step output'
+  );
+
+  // The aggregator reads the whole `needs` object. One scan counts each need's
+  // job result and, for the producer, its reported build failure.
+  const aggregateStep = jobs['mobile-test-result'].steps.find(
+    step => step.name === 'Check test results'
+  );
+  assert.equal(
+    aggregateStep.env.RESULTS,
+    '${{ toJSON(needs) }}',
+    'the aggregator reads every needed job with its result and its outputs'
+  );
+  assert.equal(
+    aggregateStep.env.MOBILE,
+    '${{ needs.mobile-changes.outputs.mobile }}',
+    'the aggregator takes that flag from change detection'
+  );
+  assert.equal(
+    aggregateStep.env.SDK_FAILED,
+    undefined,
+    'the job result and the reported output are both read from needs'
+  );
+});
+
+// The assertions above pin the wiring, not the predicate: a rewrite of the run
+// block could pass unnoticed. This fixture runs the step's own script against
+// result fixtures, so an edit to the predicate cannot pass unnoticed.
+test('the required check fails on a shard or producer failure only when the suite was selected', t => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-aggregate-'));
+  t.after(() => rmSync(work, { recursive: true, force: true }));
+  const step = workflows['kilo-app-ci.yml'].jobs['mobile-test-result'].steps.find(
+    step => step.name === 'Check test results'
+  );
+  // `toJSON(needs)` expands to an object keyed by job name, holding each
+  // job's result and outputs; run the step with `RESULTS` holding that same
+  // object and `jq` reading it back.
+  const aggregate = (needs, { mobile = 'true' } = {}) =>
+    spawnSync('bash', ['-c', step.run], {
+      encoding: 'utf8',
+      cwd: work,
+      env: {
+        ...process.env,
+        RESULTS: JSON.stringify({
+          'mobile-changes': { result: 'success', outputs: { mobile } },
+          'prepare-harness-sdk': { result: 'success', outputs: {} },
+          'prepare-trpc': { result: 'success', outputs: {} },
+          'mobile-test': { result: 'success', outputs: {} },
+          'i18n-catalogs': { result: 'success', outputs: {} },
+          ...needs,
+        }),
+        MOBILE: mobile,
+      },
+    }).status;
+
+  assert.equal(aggregate({}), 0, 'all shards pass');
+  assert.notEqual(
+    aggregate({ 'mobile-test': { result: 'failure', outputs: {} } }),
+    0,
+    'a failed shard fails the check'
+  );
+  assert.notEqual(
+    aggregate({ 'mobile-test': { result: 'cancelled', outputs: {} } }),
+    0,
+    'a cancelled shard fails the check'
+  );
+  assert.notEqual(
+    aggregate({ 'prepare-harness-sdk': { result: 'failure', outputs: {} } }),
+    0,
+    'a failed producer job fails the check when detection selected the suite'
+  );
+  assert.equal(
+    aggregate({ 'prepare-harness-sdk': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
+    0,
+    'the producer failure escapes the check only when detection selected no suite'
+  );
+  assert.notEqual(
+    aggregate({ 'prepare-harness-sdk': { result: 'success', outputs: { failed: 'true' } } }),
+    0,
+    'a reported build failure fails the check when detection selected the suite'
+  );
+  assert.equal(
+    aggregate(
+      { 'prepare-harness-sdk': { result: 'success', outputs: { failed: 'true' } } },
+      {
+        mobile: 'false',
+      }
+    ),
+    0,
+    'a reported build failure without a selected suite passes'
+  );
+  assert.equal(aggregate({}, { mobile: 'false' }), 0, 'a run without a selected suite passes');
+  assert.notEqual(
+    aggregate({ 'prepare-trpc': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
+    0,
+    'only the harness producer is exempt, not the declaration producer'
+  );
 });
 
 // mobile-native-build needs the same single producer for a different reason:
@@ -680,12 +830,12 @@ test('mobile-native-build builds the harness SDK once and both platform jobs dow
   assert.deepEqual(actionUsers, [harnessProducer], 'only the producer builds the harness SDK');
 
   const producer = jobs[harnessProducer];
-  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
   assert.equal(
-    producer.if,
-    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
-    'a run with every platform published must not pay a build for nobody'
+    producer.needs,
+    undefined,
+    'the producer starts beside the gate instead of behind it'
   );
+  assert.equal(producer.if, undefined, 'the producer waits for no job before building');
   const producerSteps = producer.steps;
   const producerInstall = producerSteps.findIndex(step =>
     /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
@@ -904,12 +1054,12 @@ test('mobile-native-build builds the tRPC declarations once and both platform jo
   assert.deepEqual(actionUsers, [trpcProducer], 'only the producer builds the declarations');
 
   const producer = jobs[trpcProducer];
-  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
   assert.equal(
-    producer.if,
-    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
-    'a run with every platform published must not pay a build for nobody'
+    producer.needs,
+    undefined,
+    'the producer starts beside the gate instead of behind it'
   );
+  assert.equal(producer.if, undefined, 'the producer waits for no job before building');
   const producerSteps = producer.steps;
   const installIndex = producerSteps.findIndex(step =>
     /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
@@ -2208,14 +2358,14 @@ test('a changes-only run checks the packages the detector selects, readers inclu
     root: true,
     changes: 'scoped',
     affected: selection({
-      dirs: ['apps/ai-gateway', 'apps/web', 'packages/usage-queue', 'packages/web-shared'],
-      packages: ['@kilocode/usage-queue', '@kilocode/web-shared', 'ai-gateway', 'web'],
+      dirs: ['apps/ai-gateway', 'apps/web', 'packages/usage-contracts', 'packages/web-shared'],
+      packages: ['@kilocode/usage-contracts', '@kilocode/web-shared', 'ai-gateway', 'web'],
     }),
   });
   assert.equal(result.status, 0);
   assert.ok(result.commands.includes(detectorCall));
   assert.deepEqual(workspaceRuns(result), [
-    selectedTypecheck(['@kilocode/usage-queue', '@kilocode/web-shared', 'ai-gateway']),
+    selectedTypecheck(['@kilocode/usage-contracts', '@kilocode/web-shared', 'ai-gateway']),
   ]);
 });
 

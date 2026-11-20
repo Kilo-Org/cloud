@@ -24,12 +24,13 @@ import {
 } from '@/lib/request-logs/filters';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
-import { ABSENT_CELL, ToneBadge } from './detail-primitives';
+import { ABSENT_CELL, LabelHint, ToneBadge } from './detail-primitives';
 import {
   GUARDRAIL_LABELS,
   OUTCOMES,
   firedDetectorsLabel,
   type EnkryptGuardrail,
+  ENKRYPT_LATENCY_HINT,
   type EnkryptUsageRow,
 } from './enkrypt-usage-labels';
 import { EnkryptRequestSheet } from './EnkryptRequestSheet';
@@ -66,7 +67,7 @@ const COLUMNS = [
   { label: 'Decision' },
   { label: 'Detectors fired' },
   { label: 'Charged', numeric: true },
-  { label: 'Added latency', numeric: true },
+  { label: 'Latency', numeric: true, hint: ENKRYPT_LATENCY_HINT },
   { label: 'Session' },
 ] as const;
 
@@ -261,7 +262,14 @@ export function EnkryptUsageTab({
                     key={column.label}
                     className={cn('whitespace-nowrap', 'numeric' in column && 'text-right')}
                   >
-                    {column.label}
+                    {'hint' in column ? (
+                      <span className="inline-flex items-center gap-1">
+                        {column.label}
+                        <LabelHint label={column.label} hint={column.hint} />
+                      </span>
+                    ) : (
+                      column.label
+                    )}
                   </TableHead>
                 ))}
               </TableRow>

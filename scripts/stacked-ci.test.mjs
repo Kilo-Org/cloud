@@ -408,6 +408,21 @@ for (const [name, files, expected] of [
     ['tools/i18n/check-catalogs.mjs'],
     { mobile: 'false', lint_only: 'false', catalogs: 'true' },
   ],
+  // The shared source walk has no family of its own in this grep: `OWNED` in
+  // scripts/affected-workspaces.mjs attributes it to the app, so real
+  // attribution selects `kilo-app` and runs the suite. The stub `node` here
+  // answers an empty selection, which pins that this path reaches the selection
+  // instead of a family above and that the catalog job stays down.
+  [
+    'a shared source walk path alone',
+    ['tools/lib/source-files.mjs'],
+    { mobile: 'false', lint_only: 'false', catalogs: 'false' },
+  ],
+  [
+    'the shared source walk and its test',
+    ['tools/lib/source-files.mjs', 'tools/lib/source-files.test.mjs'],
+    { mobile: 'false', lint_only: 'false', catalogs: 'false' },
+  ],
   // A services change beside an app path runs the whole suite, which includes
   // the audit, so the output stays true and the job stands down through its
   // `if` instead.
@@ -483,8 +498,9 @@ test('the catalog job owns exactly the paths no mobile family selects', () => {
       'Install dependencies',
       'Check i18n catalogs',
       'Test the i18n catalog checker',
+      'Test the plural audit',
     ],
-    'the catalog job runs the audit and its test after the shared setup'
+    'the catalog job runs the audit and its tests after the shared setup'
   );
   assert.ok(
     [mobile.jobs['mobile-test-result'].needs ?? []].flat().includes('i18n-catalogs'),
@@ -511,19 +527,25 @@ test('only the shards and the typecheck skip a lint-only change', () => {
       `${name} must skip exactly a lint-only change`
     );
   }
-  for (const name of [
-    'prepare-harness-sdk',
-    'prepare-trpc',
-    'mobile-lint',
-    'i18n-leftover',
-    'check-unused',
-  ]) {
+  for (const name of ['prepare-trpc', 'mobile-lint', 'i18n-leftover', 'check-unused']) {
     assert.equal(
       mobile.jobs[name].if,
       "needs.mobile-changes.outputs.mobile == 'true'",
       `${name} must keep running for a lint-only change`
     );
   }
+  // The harness producer reads no detection output, so it starts beside change
+  // detection instead of behind it.
+  assert.equal(
+    mobile.jobs['prepare-harness-sdk'].needs,
+    undefined,
+    'the harness producer starts beside change detection'
+  );
+  assert.equal(
+    mobile.jobs['prepare-harness-sdk'].if,
+    undefined,
+    'the harness producer starts beside change detection'
+  );
   assert.equal(
     mobile.jobs['mobile-test-result'].if,
     '${{ !cancelled() }}',

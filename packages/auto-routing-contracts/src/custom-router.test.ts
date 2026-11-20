@@ -32,12 +32,12 @@ import {
   customRouterCandidateModel,
   customRouterClientEntriesPath,
   customRouterEntryKey,
-  customRouterEntryRef,
   customRouterModelId,
   customRouterPath,
   parseCustomRouterCandidateModel,
   parseCustomRouterModelId,
   signAutoDecision,
+  toCustomRouterEntryRef,
   verifyAutoDecision,
   type AutoDecisionPayload,
   type ClientCustomRouterEntry,
@@ -147,7 +147,7 @@ describe('custom router entry keys', () => {
   });
 
   it('strips client fields when building an entry ref', () => {
-    expect(customRouterEntryRef(clientEntry)).toEqual({
+    expect(toCustomRouterEntryRef(clientEntry)).toEqual({
       kind: 'client',
       provider: 'ollama',
       model: 'qwen3:32b',
@@ -629,9 +629,10 @@ describe('internal custom router context', () => {
       ...context,
       clientEvalEntryKeys: [clientKey, clientKey, 'gateway:other/model'],
     });
-    expect(result.error?.issues.map(issue => issue.path)).toEqual([
-      ['clientEvalEntryKeys', 1],
-      ['clientEvalEntryKeys', 2],
+    // The membership pass runs first, then the duplicate pass over the whole array.
+    expect(result.error?.issues.map(issue => [issue.path, issue.message])).toEqual([
+      [['clientEvalEntryKeys', 2], 'clientEvalEntryKeys must name a pool entry'],
+      [['clientEvalEntryKeys', 1], `Duplicate client eval entry ${clientKey}`],
     ]);
   });
 
@@ -653,7 +654,7 @@ describe('internal custom router context', () => {
     expect(
       InternalClientEvalResultRequestSchema.safeParse({
         ...upload,
-        entry: customRouterEntryRef(clientEntry),
+        entry: toCustomRouterEntryRef(clientEntry),
       }).success
     ).toBe(true);
     const platformMeasured = InternalClientEvalResultRequestSchema.safeParse({

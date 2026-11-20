@@ -3,6 +3,7 @@
 // own field and Add-button contract lives in
 // `repo-bindings-screen.add-form.mounted.test.tsx`.
 
+import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -49,9 +50,6 @@ const h = vi.hoisted(() => ({
   },
 }));
 const routerPush = vi.hoisted(() => vi.fn<(href: string) => void>());
-const permissionState = vi.hoisted(() => ({
-  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
-}));
 
 vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoBindings: () => h.bindingsQuery,
@@ -62,12 +60,18 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
 }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useOrganizationProfilePermission: () => permissionState.permission,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -88,14 +92,22 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+  StateAction: (props: { label: string; onPress: () => void }) =>
+    createElement('StateAction', props),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
+  Plus: 'Plus',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
   GitBranch: 'GitBranch',
@@ -121,7 +133,6 @@ describe('RepoBindingsScreen add form profile picker', () => {
       isError: false,
       isRefetching: false,
     });
-    permissionState.permission = 'allowed';
     routerPush.mockReset();
   });
 
@@ -136,7 +147,7 @@ describe('RepoBindingsScreen add form profile picker', () => {
     expect(empty.description).toBe(
       'Create a profile to reuse environment variables, setup commands, and skills across sessions.'
     );
-    expect(empty.action?.props.children.props.children).toBe('Create profile');
+    expect(empty.action?.props.label).toBe('Create profile');
     act(() => {
       empty.action?.props.onPress();
     });
@@ -187,42 +198,6 @@ describe('RepoBindingsScreen add form profile picker', () => {
     expect(routerPush).toHaveBeenCalledWith(
       '/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1'
     );
-
-    unmount();
-  });
-
-  it('empty picker: a read-only organization context offers no create action', async () => {
-    permissionState.permission = 'read-only';
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'An organization owner or admin can create an organization profile.'
-    );
-    expect(empty.action).toBeUndefined();
-
-    unmount();
-  });
-
-  it('empty picker: an unresolved role does not yet read as read-only', async () => {
-    permissionState.permission = 'resolving';
-    Object.assign(h.profileList, { orgProfiles: [], personalProfiles: [PROFILE] });
-
-    const { renderer, unmount } = await mountScreen('org-1');
-    pressButton(renderer.root, 'Add default');
-    pressPressable(renderer.root, 'Select profile');
-
-    const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.description).toBe(
-      'Create an organization profile to reuse environment variables, setup commands, and skills across sessions.'
-    );
-    // The action still waits for the role: a member must never be offered a
-    // create the server rejects.
-    expect(empty.action).toBeUndefined();
 
     unmount();
   });

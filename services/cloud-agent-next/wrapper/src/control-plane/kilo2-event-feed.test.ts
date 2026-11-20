@@ -1,9 +1,11 @@
 import { expect, it } from 'bun:test';
 import { createKilo2EventFeed, nativeTurnError } from './kilo2-event-feed.js';
 import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
+import { kilo2ConversationMessageSchema } from '../../../src/shared/kilo2-conversation.js';
 import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
+import { KILO_ACTIVITY_MESSAGE_LIMIT } from '../kilo-api.js';
 
 it('persists a native background notice before another model turn starts', async () => {
   const events: KiloFeedEvent[] = [];
@@ -408,9 +410,128 @@ it.each([200, 503])(
   }
 );
 
+it.each(['cached', 'http_error', 'history_exhausted'])(
+  'projects the final answer after the prompt leaves the window (%s)',
+  async scenario => {
+    const directory = '/workspace';
+    const sessionID = 'ses_child';
+    const prompt = { id: 'msg_prompt', type: 'user', text: 'Run the steps', time: { created: 1 } };
+    const previousPrompt = { ...prompt, id: 'msg_previous', time: { created: 0 } };
+    const steps = Array.from({ length: KILO_ACTIVITY_MESSAGE_LIMIT * 2 }, (_, index) => ({
+      id: `msg_step_${index}`,
+      type: 'assistant',
+      time: { created: index + 2 },
+      content: [{ type: 'text', text: `Step ${index + 1}` }],
+    }));
+    const answer = {
+      id: 'msg_answer',
+      type: 'assistant',
+      time: { created: steps.length + 2, completed: steps.length + 3 },
+      content: [{ type: 'text', text: 'Final answer' }],
+    };
+    const history = [answer, ...steps.toReversed(), prompt, previousPrompt];
+    const events: KiloFeedEvent[] = [];
+    const logs: string[] = [];
+    let olderReads = 0;
+    let recentReads = 0;
+    const finished = Promise.withResolvers<void>();
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url);
+        if (url.pathname === '/api/event') {
+          const frames = [
+            { id: 'evt_connected', type: 'server.connected', data: {} },
+            { id: 'evt_step', type: 'session.step.ended', data: { sessionID } },
+            { id: 'evt_succeeded', type: 'session.execution.succeeded', data: { sessionID } },
+          ].map(event => `data: ${JSON.stringify(event)}\n\n`);
+          return new Response(frames.join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          });
+        }
+        if (url.pathname.endsWith('/message')) {
+          const cursor = url.searchParams.get('cursor');
+          const order = url.searchParams.get('order');
+          if (cursor === null ? order !== 'desc' : order !== null)
+            return new Response(null, { status: 400 });
+          if (cursor === null) recentReads += 1;
+          else {
+            olderReads += 1;
+            if (recentReads === 1 && scenario === 'http_error')
+              return new Response(null, { status: 500 });
+            if (scenario === 'history_exhausted')
+              return Response.json({ data: [], cursor: { next: null } });
+            if (scenario === 'cached' && olderReads > 2) return new Response(null, { status: 500 });
+          }
+          const start = cursor === null ? 0 : Number(cursor.slice('cursor '.length));
+          const end = start + Number(url.searchParams.get('limit'));
+          return Response.json({
+            data: history
+              .slice(start, end)
+              .map(message =>
+                message === answer && recentReads === 1
+                  ? { ...answer, time: { created: answer.time.created }, content: [] }
+                  : message
+              ),
+            cursor: { next: end < history.length ? `cursor ${end}` : null },
+          });
+        }
+        return Response.json({
+          data: { id: sessionID, location: { directory }, time: { created: 0, updated: 100 } },
+        });
+      },
+    });
+    const feed = createKilo2EventFeed({
+      source: { server: { url: native.url.origin }, directory, nativeRuntimeId: 'runtime_local' },
+      signal: AbortSignal.timeout(5000),
+      onEvent(event) {
+        events.push(event);
+        if (event.type === 'session.idle') finished.resolve();
+      },
+      onFailure: () => finished.reject(new Error('Native feed ended before session.idle')),
+      log: entry => logs.push(entry),
+    });
+    try {
+      await feed.open();
+      await finished.promise;
+      const updates = events
+        .filter(event => event.type === 'conversation.message.updated')
+        .map(event => kilo2ConversationMessageSchema.parse(event.properties));
+      if (scenario === 'history_exhausted') {
+        expect(updates.at(-1)).toMatchObject({ sessionID, message: answer });
+        expect(updates.at(-1)).not.toHaveProperty('parentID');
+        expect(updates).toHaveLength(KILO_ACTIVITY_MESSAGE_LIMIT + 1);
+        expect(olderReads).toBe(1);
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toContain('reason=history_exhausted');
+        return;
+      }
+      expect(updates.at(-1)).toMatchObject({ sessionID, parentID: prompt.id, message: answer });
+      if (scenario === 'cached') {
+        expect(updates).toHaveLength(KILO_ACTIVITY_MESSAGE_LIMIT + 1);
+        expect(olderReads).toBe(2);
+        expect(logs).toEqual([]);
+      } else {
+        expect(updates[0]).not.toHaveProperty('parentID');
+        expect(updates.slice(KILO_ACTIVITY_MESSAGE_LIMIT)).toHaveLength(
+          KILO_ACTIVITY_MESSAGE_LIMIT
+        );
+        expect(olderReads).toBe(3);
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toContain('phase=parent_lookup_failed');
+      }
+    } finally {
+      feed.close();
+      await native.stop(true);
+    }
+  }
+);
+
 it('forwards an unchanged assistant projection once', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
+  const error = { type: 'provider.quota', message: 'Request failed', status: 402 };
   const events: KiloFeedEvent[] = [];
   let text = 'first';
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
@@ -441,6 +562,7 @@ it('forwards an unchanged assistant projection once', async () => {
               type: 'assistant',
               time: { created: 2 },
               content: [{ type: 'text', text }],
+              error,
             },
           ],
           cursor: { next: null },
@@ -476,7 +598,18 @@ it('forwards an unchanged assistant projection once', async () => {
     text = 'second';
     controller?.enqueue(frame('session.step.ended', { sessionID }));
     await until(() => updates().length === 2);
-    expect(updates()[1].properties).toMatchObject({ parentID: '', message: { id: 'msg_answer' } });
+    expect(updates()[1].properties).toMatchObject({
+      message: { id: 'msg_answer', error },
+    });
+    expect(updates()[1].properties).not.toHaveProperty('parentID');
+    expect(activity[0].activity).toMatchObject({
+      type: 'message',
+      message: {
+        id: 'msg_answer',
+        sessionId: sessionID,
+        error: { name: 'APIError', data: { statusCode: 402 } },
+      },
+    });
     // Each changed read reports the message, then its parts under the delta identity.
     expect(
       activity.map(event =>
@@ -666,12 +799,24 @@ it.each([
     'model_catalog_unavailable',
   ],
   [catalogFailure('HTTP 503'), 'provider_unavailable'],
+  ['Model unavailable: kilo/nvidia/nemotron-3-ultra-550b-a55b:free', 'model_unavailable'],
+  [
+    'SessionRunnerModel.ModelUnavailableError: Model unavailable: kilo/example',
+    'model_unavailable',
+  ],
+  ['Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant', 'invalid_request'],
+  [
+    'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
+    'invalid_request',
+  ],
+  ['Request failed: Model unavailable: kilo/example', 'unknown'],
   [catalogFailure('HTTP 401'), 'provider_authentication'],
   [catalogFailure('network'), 'unknown'],
   ['No model is selected', 'unknown'],
 ] as const)('classifies a native no-route failure %s as %s', (message, reason) => {
   const failure = classifyAssistantFailure(nativeTurnError({ type: 'provider.no-route', message }));
   expect(failure.reason).toBe(reason);
+  if (reason === 'model_unavailable') expect(failure.terminalCode).toBe('model_missing');
   if (reason === 'model_catalog_unavailable') {
     expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
     expect(failure.terminalCode).toBeUndefined();

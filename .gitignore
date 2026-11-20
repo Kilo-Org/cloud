@@ -28,7 +28,6 @@ next-env.d.ts
 /dev/*/.dev-logs/
 /dev/fixtures/
 /dev/*/fixtures/
-dev-debug-request-logs/*
 **/dev-debug-request-logs/
 /dev/logs/
 /dev/*/logs/
@@ -59,7 +58,6 @@ npm-debug.log*
 .kilo/plans
 .superpowers/
 docs/superpowers/
-.kilo/node_modules
 .kilo/package.json
 .kilo/package-lock.json
 .kilo/bun.lock
@@ -127,6 +125,3 @@ run-milvus-test.sh
 # Harness markers: the kwf workflow drops these in a worktree, and one
 # reached a product commit (46640f5e8e96) before it was removed by hand.
 .kwf*
-
-# Staging-only usage queue callback, created by the gateway build.
-/apps/ai-gateway/src/app/api/v1/internal/queues/usage/route.ts

@@ -37,6 +37,8 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
   I18nManager: { isRTL: false },
 }));
@@ -50,6 +52,7 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   ExternalLink: 'ExternalLink',
   ScanSearch: 'ScanSearch',
   Ban: 'Ban',

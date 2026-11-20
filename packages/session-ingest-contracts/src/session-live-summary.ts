@@ -40,9 +40,7 @@ export type SessionLiveFailureKind = (typeof SESSION_LIVE_FAILURE_KINDS)[number]
 
 /** The longest step target (a file basename or a short tool target). */
 export const SESSION_LIVE_TARGET_LIMIT = 40;
-/** The longest plan step name. */
 export const SESSION_LIVE_PLAN_STEP_LIMIT = 40;
-/** The longest permission command. */
 export const SESSION_LIVE_COMMAND_LIMIT = 60;
 
 export const sessionLiveStepSchema = z.object({
@@ -161,17 +159,20 @@ function characterSegmenter(): Intl.Segmenter | null {
  * The end of the character at or before `maxIndex`, as the index just past it:
  * the largest extended grapheme cluster boundary no greater than `maxIndex`.
  * A runtime without segmentation falls back to a code unit boundary that keeps
- * a surrogate pair whole.
+ * a surrogate pair whole. A cap past the end of the line reads as the line end,
+ * and a cap at or below zero reads as zero.
  */
 export function characterCut(line: string, maxIndex: number): number {
+  // Clamping once keeps the two runtime branches on one contract.
+  const cap = Math.min(Math.max(maxIndex, 0), line.length);
   const segmenter = characterSegmenter();
   if (segmenter === null) {
-    const last = line.charCodeAt(maxIndex - 1);
-    return maxIndex > 0 && last >= 0xd800 && last <= 0xdbff ? maxIndex - 1 : maxIndex;
+    const last = line.charCodeAt(cap - 1);
+    return cap > 0 && last >= 0xd800 && last <= 0xdbff ? cap - 1 : cap;
   }
   let end = 0;
   for (const { index, segment } of segmenter.segment(line)) {
-    if (index + segment.length > maxIndex) break;
+    if (index + segment.length > cap) break;
     end = index + segment.length;
   }
   return end;
@@ -213,4 +214,114 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
   }
   if (line.length <= limit) return line;
   return `${sessionLiveCut(line, limit - 1).trimEnd()}…`;
+}
+
+function basename(value: unknown): string | null {
+  const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
+  if (text === null) return null;
+  const trimmed = text.replace(/[/\\]+$/, '');
+  const last = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  const base = last === -1 ? trimmed : trimmed.slice(last + 1);
+  return sessionLiveText(base === '' ? trimmed : base, SESSION_LIVE_TARGET_LIMIT);
+}
+
+function firstString(input: Record<string, unknown>, keys: readonly string[]): unknown {
+  for (const key of keys) {
+    if (typeof input[key] === 'string') return input[key];
+  }
+  return null;
+}
+
+/** The path a file tool acted on: `filePath` (CLI), `file_path` or `path`. */
+const FILE_PATH_KEYS = ['filePath', 'file_path', 'path'] as const;
+
+/**
+ * The host a URL names, or null when the text is not a URL. The caller supplies
+ * it because this package compiles under consumers whose `lib` has no platform
+ * globals: `webUrlHost` in `@kilocode/worker-utils` is the implementation every
+ * producer passes.
+ */
+export type SessionLiveUrlHost = (url: string) => string | null;
+
+/** The URL host, or the whole trimmed URL when it does not parse. */
+function urlHost(value: unknown, webHost: SessionLiveUrlHost): string | null {
+  const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
+  if (text === null) return null;
+  const host = webHost(text);
+  return sessionLiveText(host ?? text, SESSION_LIVE_TARGET_LIMIT);
+}
+
+/**
+ * The step a started tool call shows: its verb and a short target (a file
+ * basename, a command, a pattern or a host). Every producer of the summary
+ * names a tool through this one table; `webHost` reads a web fetch URL's host
+ * for the `webfetch` cases.
+ */
+export function sessionLiveToolStep(
+  tool: string,
+  input: Record<string, unknown>,
+  webHost: SessionLiveUrlHost
+): SessionLiveStep {
+  switch (tool.toLowerCase()) {
+    case 'edit':
+    case 'write':
+    case 'multiedit':
+    case 'patch':
+    case 'apply_patch':
+      return { verb: 'editing', target: basename(firstString(input, FILE_PATH_KEYS)) };
+    case 'read':
+      return { verb: 'reading', target: basename(firstString(input, FILE_PATH_KEYS)) };
+    case 'bash':
+      return {
+        verb: 'running',
+        target: sessionLiveText(input['command'], SESSION_LIVE_TARGET_LIMIT),
+      };
+    case 'grep':
+    case 'glob':
+      return {
+        verb: 'searching',
+        target: sessionLiveText(input['pattern'], SESSION_LIVE_TARGET_LIMIT),
+      };
+    case 'list':
+      return { verb: 'searching', target: basename(input['path']) };
+    case 'codesearch':
+      return {
+        verb: 'searching',
+        target: sessionLiveText(input['query'], SESSION_LIVE_TARGET_LIMIT),
+      };
+    case 'websearch':
+    case 'web_search':
+      return {
+        verb: 'searching',
+        target: sessionLiveText(input['query'], SESSION_LIVE_TARGET_LIMIT),
+      };
+    case 'webfetch':
+    case 'web_fetch':
+      return { verb: 'searching', target: urlHost(input['url'], webHost) };
+    default:
+      return { verb: 'other', target: null };
+  }
+}
+
+const todoSchema = z.object({ content: z.string(), status: z.string() });
+const todoInputSchema = z.object({ todos: z.array(z.unknown()) });
+
+/** `todowrite` input: completed count, total (cancelled excluded) and the active step. */
+export function sessionLivePlan(input: Record<string, unknown>): SessionLivePlan | null {
+  const parsed = todoInputSchema.safeParse(input);
+  if (!parsed.success) return null;
+  let done = 0;
+  let total = 0;
+  let current: string | null = null;
+  for (const raw of parsed.data.todos) {
+    const todo = todoSchema.safeParse(raw);
+    if (!todo.success || todo.data.status === 'cancelled') continue;
+    total++;
+    if (todo.data.status === 'completed') done++;
+    if (current === null && todo.data.status === 'in_progress') {
+      current = sessionLiveText(todo.data.content, SESSION_LIVE_PLAN_STEP_LIMIT);
+    }
+  }
+  if (total === 0) return null;
+  return { done, total, current };
 }

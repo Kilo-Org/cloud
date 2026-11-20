@@ -28,7 +28,8 @@ import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Text } from '@/components/ui/text';
+import { InputFrame } from '@/components/ui/input-frame';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
@@ -41,6 +42,7 @@ import {
   shouldEnableComposerInputScroll,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import {
   resolveNewSessionPromptControlState,
   resolvePromptCounterRemaining,
@@ -53,7 +55,6 @@ import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-cl
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { hasVisibleComposerText } from '@/lib/composer-text';
-import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
@@ -516,38 +517,28 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <InputFrame className="overflow-hidden">
       <View
         className="pb-2"
         onLayout={event => {
           setTopChromeHeight(event.nativeEvent.layout.height);
         }}
       >
-        {isModelsError && modelOptions.length === 0 ? (
-          <QueryError
-            placement="top"
-            variant="server"
-            title={t('agentChat.newSession.couldNotLoadModels')}
-            message={t('organization.boundary.loadErrorMessage')}
-            onRetry={() => {
-              onRefetchModels();
-            }}
-            className="border-b border-border py-4"
-          />
-        ) : (
-          <ChatToolbar
-            modeControl={{ mode, onModeChange, customOptions }}
-            model={model}
-            variant={variant}
-            modelOptions={modelOptions}
-            onModelSelect={onModelSelect}
-            disabled={isCreating}
-            isLoadingModels={isLoadingModels}
-            modelLocked={modelLocked}
-            modelLockLabel={modelLockLabel}
-            className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-          />
-        )}
+        {/* A failed models read keeps the toolbar: the pinned footer names that
+            failure as the reason Start waits and carries its Retry, so the
+            composer does not state it a second time above the prompt. */}
+        <ChatToolbar
+          modeControl={{ mode, onModeChange, customOptions }}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onModelSelect={onModelSelect}
+          disabled={isCreating}
+          isLoadingModels={isLoadingModels}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          className="border-b-[0.5px] border-hair-soft bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+        />
         {sharePrefill.failed ? (
           <SharePrefillFailure
             onRetry={() => {
@@ -625,6 +616,11 @@ export function NewSessionPrompt({
             submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
             onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
             maxFontSizeMultiplier={1}
+            // The app rewrites this field's text programmatically (voice
+            // transcript, paste, share prefill), so Android keeps the
+            // framework suggestion popup off — it crashes against rewritten
+            // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+            autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
             // Focus on arrival only when the form has nothing left to configure
             // (the host resolves this) and no share payload prefills it: the
             // keyboard it raises would otherwise shrink the frame past the
@@ -675,17 +671,7 @@ export function NewSessionPrompt({
           }}
         >
           {showsCounter ? (
-            <View className="flex-row justify-end px-1 pb-1">
-              {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-              <Text
-                className="text-xs font-normal text-muted-foreground"
-                accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                  count: counterRemaining,
-                })}
-              >
-                {counterRemaining}
-              </Text>
-            </View>
+            <RemainingCharactersCounter remaining={counterRemaining} className="px-1 pb-1" />
           ) : null}
           <NewSessionPromptControls
             control={control}
@@ -714,6 +700,6 @@ export function NewSessionPrompt({
           </NewSessionPromptControls>
         </View>
       </View>
-    </View>
+    </InputFrame>
   );
 }

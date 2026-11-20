@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TestRenderer } from '@/test/renderer';
 
 import { CHIP_FRAME_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -58,6 +59,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     warn: '#9F6612',
+    foreground: '#1C1917',
     mutedForeground: '#6F6A61',
     primary: '#4F5A10',
   }),
@@ -188,7 +190,7 @@ describe('ModelPickerOptionRow unavailable row', () => {
     expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
   });
 
-  it('dims the selected check and leaves the badge copy readable', () => {
+  it('marks a selected unavailable row with the muted check and keeps the badge copy readable', () => {
     const renderer = renderRow(
       cliCatalogOption({ unavailable: true, hasUserByokAvailable: true, name: 'Minimax M2.5' }),
       { selected: true }
@@ -201,6 +203,23 @@ describe('ModelPickerOptionRow unavailable row', () => {
     );
     expect(views.some(node => String(node.props.className).includes('opacity-50'))).toBe(false);
     expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+  });
+
+  it('draws no check on a selected unavailable row the all-unavailable sheet shows', () => {
+    const renderer = renderRow(cliCatalogOption({ unavailable: true, name: 'Minimax M2.5' }), {
+      selected: true,
+      suppressUnavailableCheck: true,
+    });
+
+    // Nothing is pickable in that sheet, so a check would claim a selection
+    // the state above denies.
+    expect(checkAccessories(renderer)).toHaveLength(0);
+  });
+
+  it('still draws the check on a selected available row', () => {
+    const renderer = renderRow(cliCatalogOption({ name: 'Minimax M2.5' }), { selected: true });
+
+    expect(checkAccessories(renderer)).toEqual([{ color: '#1C1917', size: 18 }]);
   });
 });
 
@@ -249,7 +268,7 @@ describe('ModelPickerOptionRow trailing accessory slot', () => {
     expect(selectedSlot?.type).toBe('View');
     expect(unselectedSlot?.type).toBe('View');
     expect(selectedSlot?.props.className).toBe(unselectedSlot?.props.className);
-    expect(String(selectedSlot?.props.className)).toContain('w-[18px]');
+    expect(selectedSlot?.props.style).toEqual({ width: 18 });
 
     // Only the contents differ: the check marks the selected row.
     expect(selectedSlot?.findAllByType('Check')).toHaveLength(1);
@@ -334,6 +353,82 @@ describe('ModelPickerOptionRow provider and model id lines', () => {
 
     expect(labelTextsOf(false)).toContain(expected);
     expect(labelTextsOf(true)).toContain(expected);
+  });
+});
+
+// The retirement note is a fact about the model beside its name, so it renders
+// on its own muted line under the id and never inside the title: the row keeps
+// the Latin name as its primary text in every reading direction.
+describe('ModelPickerOptionRow retirement note', () => {
+  const retiresOn = '2026-11-22';
+  const englishNote = 'Retires Nov 22';
+  const textNodes = (root: TestRenderer.ReactTestInstance) =>
+    root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        typeof node.props.children === 'string'
+    );
+
+  it('renders the note on its own muted line after the model id, with the bare name as title', () => {
+    const renderer = renderRow(cliCatalogOption({ retires_on: retiresOn }));
+    const texts = textStrings(renderer.root);
+    const title = texts.indexOf('Minimax M2.5');
+    const id = texts.indexOf('minimax/minimax-m2.5');
+    const note = texts.indexOf(englishNote);
+
+    expect(title).toBeGreaterThanOrEqual(0);
+    expect(id).toBeGreaterThan(title);
+    expect(note).toBeGreaterThan(id);
+    expect(
+      textNodes(renderer.root).find(node => node.props.children === englishNote)?.props.className
+    ).toBe('text-xs text-muted-foreground');
+  });
+
+  it('places the note above the row badge copy', () => {
+    const texts = textStrings(
+      renderRow(cliCatalogOption({ retires_on: retiresOn, hasUserByokAvailable: true })).root
+    );
+
+    expect(texts.indexOf(englishNote)).toBeLessThan(texts.indexOf(BYOK_MODEL_LABEL));
+  });
+
+  it('reads the note inside the row accessibility label', () => {
+    const renderer = renderRow(cliCatalogOption({ retires_on: retiresOn }));
+    const [row] = renderer.root.findAll(node => node.props.accessibilityRole === 'button');
+
+    expect(String(row?.props.accessibilityLabel)).toContain(englishNote);
+  });
+
+  it('renders no note for a model the catalogue does not date', () => {
+    const renderer = renderRow(cliCatalogOption());
+    const labels = renderer.root
+      .findAll(node => typeof node.props.accessibilityLabel === 'string')
+      .map(node => node.props.accessibilityLabel as string);
+
+    expect(textStrings(renderer.root)).not.toContain(englishNote);
+    expect(labels.some(label => label.includes(englishNote))).toBe(false);
+  });
+
+  it('words the note in the catalog language and keeps the Latin name as the title', async () => {
+    await i18n.changeLanguage('hi');
+    try {
+      const renderer = renderRow(cliCatalogOption({ retires_on: retiresOn }));
+      const texts = textStrings(renderer.root);
+      const title = texts.indexOf('Minimax M2.5');
+      const note = texts.indexOf('22 नव॰ को बंद हो जाएगा');
+
+      expect(title).toBeGreaterThanOrEqual(0);
+      expect(note).toBeGreaterThan(texts.indexOf('minimax/minimax-m2.5'));
+      expect(
+        String(
+          textNodes(renderer.root).find(node => node.props.children === 'Minimax M2.5')?.props
+            .className
+        )
+      ).toBe('text-base text-foreground');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
 
@@ -466,11 +561,12 @@ describe('ModelSelector loading chip', () => {
     expect(textStrings(renderer.root)).not.toContain('Model');
     const skeletons = renderer.root.findAllByType('Skeleton');
     expect(skeletons).toHaveLength(1);
-    // The bar takes the label line's own `text-sm` box and the default model's
-    // measured label width, so the pill is the size it will have once that model
-    // arrives; a shorter bar grew it by 3.4 dp on the emulator.
-    expect(skeletons[0]?.props.className).toContain('h-[17.5px]');
-    expect(skeletons[0]?.props.className).toContain('w-[75.5px]');
+    // The bar takes the label line's own `text-sm` box (`h-5` on the scale), so
+    // the pill is the height it will have once the model arrives. Its width is a
+    // spacing step, not the arriving label's measured width: the width belongs to
+    // the label, and the contract keeps that decision on the scale.
+    expect(skeletons[0]?.props.className).toContain('h-5');
+    expect(skeletons[0]?.props.className).toContain('w-20');
     // `bg-muted-soft`, not the default fill: that one equals the pill's own
     // `bg-secondary` in the light palette, so the bar would paint nothing.
     expect(skeletons[0]?.props.className).toContain('bg-muted-soft');
@@ -528,5 +624,96 @@ describe('ModelSelector pill touch target', () => {
     expect(slop).not.toHaveProperty('right');
 
     renderer.unmount();
+  });
+});
+
+// A chip whose whole catalog was unavailable disabled itself and returned
+// before opening the picker, so the per-model reason only the sheet carries was
+// unreachable. The chip stays pressable and states the reason itself.
+describe('ModelSelector chip availability disclosure', () => {
+  function chip(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+    const [pressable] = renderer.root.findAllByType('Pressable');
+    if (!pressable) {
+      throw new Error('model chip not found');
+    }
+    return pressable;
+  }
+
+  it('keeps an every-unavailable chip pressable and opens the picker', () => {
+    routerPush.mockClear();
+    const option = cliCatalogOption({ unavailable: true });
+    const renderer = renderSelector({ value: option.id, options: [option] });
+    const pill = chip(renderer);
+
+    expect(pill.props.disabled).toBe(false);
+    expect(pill.props.accessibilityState).toEqual({ disabled: false });
+    expect(String(pill.props.accessibilityLabel)).toContain(
+      i18n.t('agentChat.modelSelector.unavailable')
+    );
+
+    TestRenderer.act(() => {
+      const press = pill.props.onPress as (() => void) | undefined;
+      press?.();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a chip with no options disabled, so it never opens a blank picker', () => {
+    routerPush.mockClear();
+    const renderer = renderSelector({ value: 'missing-model', options: [] });
+    const pill = chip(renderer);
+
+    expect(pill.props.disabled).toBe(true);
+    expect(pill.props.accessibilityState).toEqual({ disabled: true });
+
+    TestRenderer.act(() => {
+      const press = pill.props.onPress as (() => void) | undefined;
+      press?.();
+    });
+
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('reads a locked chip as one sentence with the lock reason', () => {
+    const option = cliCatalogOption();
+    const renderer = renderSelector({
+      value: option.id,
+      options: [option],
+      disabled: true,
+      lockLabel: 'Reviewer',
+    });
+    const label = String(chip(renderer).props.accessibilityLabel);
+    const lockedSentence = i18n.t('agentChat.modelSelector.lockedByAgent', { agent: 'Reviewer' });
+
+    expect(label).toBe(`${option.name}${i18n.t('common.sentenceJoiner')}${lockedSentence}`);
+  });
+
+  it('states availability for the model the chip names, not for the whole catalog', () => {
+    const unavailable = cliCatalogOption({ id: 'remote-model-gone', unavailable: true });
+    const available = cliCatalogOption({ id: 'remote-model-here' });
+    const mixed = renderSelector({ value: available.id, options: [unavailable, available] });
+    expect(String(chip(mixed).props.accessibilityLabel)).not.toContain(
+      i18n.t('agentChat.modelSelector.unavailable')
+    );
+
+    const selectedGone = renderSelector({
+      value: unavailable.id,
+      options: [unavailable, available],
+    });
+    expect(String(chip(selectedGone).props.accessibilityLabel)).toContain(
+      i18n.t('agentChat.modelSelector.unavailable')
+    );
+    expect(chip(selectedGone).props.disabled).toBe(false);
+  });
+
+  it('joins the model name and BYOK through the active locale list format', async () => {
+    await i18n.changeLanguage('de');
+    const option = cliCatalogOption({ hasUserByokAvailable: true });
+    const renderer = renderSelector({ value: option.id, options: [option] });
+    const label = String(chip(renderer).props.accessibilityLabel);
+
+    expect(label).toBe(formatList([option.name, BYOK_MODEL_LABEL], i18n.language));
+    expect(label).not.toContain(', ');
   });
 });

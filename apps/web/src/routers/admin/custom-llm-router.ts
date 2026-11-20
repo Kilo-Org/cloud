@@ -16,6 +16,7 @@ import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isUpstreamUrlPolicyEnforced } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 
 const publicIdSchema = z.string().trim().min(1, 'public_id is required');
 
@@ -31,26 +32,24 @@ function assertPricingMatchesPublicId(publicId: string, definition: CustomLlmDef
 }
 
 /**
- * Routing resolves custom LLMs before any other upstream, so a new id must not
- * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
- * only runs when an id is claimed.
+ * The gateway refuses non-HTTPS upstreams wherever its URL policy applies, so
+ * such a definition is refused at save time instead of failing every request.
  */
-async function assertPublicIdIsClaimable(publicId: string) {
+function assertBaseUrlUsesHttps(definition: CustomLlmDefinition) {
+  if (!isUpstreamUrlPolicyEnforced()) return;
+  if (new URL(definition.base_url).protocol !== 'https:') {
+    badRequest('base_url must use https');
+  }
+}
+
+/** A valid public id, unique ignoring case. Custom LLM lookups ignore case, so a case
+ * variant of an existing row would shadow it or be shadowed by it. */
+async function assertPublicIdIsValidAndUnique(publicId: string): Promise<string> {
   const parsedPublicId = CustomLlmPublicIdSchema.safeParse(publicId);
   if (!parsedPublicId.success) {
     badRequest(parsedPublicId.error.issues.map(issue => issue.message).join('; '));
   }
   const modelId = parsedPublicId.data;
-  const directByokProvider = DirectUserByokInferenceProviderIdSchema.options.find(providerId =>
-    modelId.startsWith(`${providerId}/`)
-  );
-  if (directByokProvider) {
-    badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
-  }
-  if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
-    badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);
-  }
-  // Custom LLM lookups ignore case, so a case variant would shadow the other row.
   const [caseVariant] = await db
     .select({ public_id: custom_llm2.public_id })
     .from(custom_llm2)
@@ -61,6 +60,35 @@ async function assertPublicIdIsClaimable(publicId: string) {
   if (caseVariant) {
     badRequest(
       `public_id "${modelId}" differs only in case from the existing custom LLM "${caseVariant.public_id}"`
+    );
+  }
+  return modelId;
+}
+
+/**
+ * Routing resolves custom LLMs before any other upstream, so a new id must not
+ * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
+ * only runs when an id is claimed.
+ */
+async function assertPublicIdIsClaimable(publicId: string) {
+  const modelId = await assertPublicIdIsValidAndUnique(publicId);
+  const directByokProvider = DirectUserByokInferenceProviderIdSchema.options.find(providerId =>
+    modelId.startsWith(`${providerId}/`)
+  );
+  if (directByokProvider) {
+    badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
+  }
+  if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
+    badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);
+  }
+}
+
+/** A partner serves a catalog model, so its id must name one. */
+async function assertPartnerPublicIdIsCatalogModel(publicId: string) {
+  const modelId = await assertPublicIdIsValidAndUnique(publicId);
+  if (!Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
+    badRequest(
+      `public_id "${modelId}" must exist in the OpenRouter model list when partner is set`
     );
   }
 }
@@ -96,11 +124,16 @@ export const adminCustomLlmRouter = createTRPCRouter({
 
   upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {
     assertPricingMatchesPublicId(input.public_id, input.definition);
+    assertBaseUrlUsesHttps(input.definition);
     const existing = await db.query.custom_llm2.findFirst({
       where: eq(custom_llm2.public_id, input.public_id),
     });
 
-    if (!existing) {
+    if (input.definition.partner) {
+      // An existing partner stays editable after its model leaves the catalog.
+      if (!existing?.definition.partner) await assertPartnerPublicIdIsCatalogModel(input.public_id);
+    } else if (!existing || existing.definition.partner) {
+      // A former partner's id names a catalog model, which a custom LLM must not hide.
       await assertPublicIdIsClaimable(input.public_id);
     }
 
@@ -164,6 +197,9 @@ export const adminCustomLlmRouter = createTRPCRouter({
         code: 'NOT_FOUND',
         message: `Custom LLM with public_id "${input.source_public_id}" not found`,
       });
+    }
+    if (source.definition.partner) {
+      badRequest('A partner custom LLM cannot be copied');
     }
     assertPricingMatchesPublicId(input.public_id, source.definition);
     await assertPublicIdIsClaimable(input.public_id);

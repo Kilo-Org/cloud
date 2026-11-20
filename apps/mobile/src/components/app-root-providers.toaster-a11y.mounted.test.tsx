@@ -115,8 +115,9 @@ it('floors the toast offset at the shared bottom-chrome height', async () => {
  */
 it('clears the floating tab bar while a tab screen is on top', async () => {
   platform.OS = 'android';
-  route.segments = ['(app)', '(tabs)', '(3_profile)', 'code-reviewer', 'personal', 'manual-review'];
-  route.pathname = '/code-reviewer/personal/manual-review';
+  // Only the four tab roots draw the bar; every pushed route hides it.
+  route.segments = ['(app)', '(tabs)', '(3_profile)'];
+  route.pathname = '/profile';
   await mount();
 
   // The bar publishes the height it renders, so the toast clears exactly what is

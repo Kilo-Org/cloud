@@ -1,44 +1,36 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { memo, type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { canStepOlderTo, HOUR_MS } from '@/components/organization/request-log-window';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { RequestLogRow } from '@/components/organization/request-log-row';
+import { RequestLogsSkeleton } from '@/components/organization/request-logs-skeleton';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { DirectionalChevronLeft, DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { FileText } from '@/components/ui/icons';
+import {
+  DirectionalArrowLeft,
+  DirectionalArrowRight,
+  DirectionalLogs,
+} from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { isolateLtrBidiText } from '@/lib/bidi';
-import {
-  formatClockTime,
-  formatDate,
-  formatNumber,
-  formatPrefixedUsd,
-  UNMEASURED_VALUE,
-} from '@/lib/format';
+import { isolateBidiText } from '@/lib/bidi';
+import { formatClockTime, formatDate } from '@/lib/format';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
-import { parseTimestamp } from '@/lib/utils';
-
-/**
- * The hour the procedure lists: `organizations.requestLogs.list` answers the
- * rows created in the hour before `startTime`, so a window end is the screen's
- * paging control and one step is one hour.
- */
-const HOUR_MS = 60 * 60 * 1000;
+import { cn } from '@/lib/utils';
 
 /**
  * The server caps one window at 100 rows (`REQUEST_LOGS_LIMIT`,
@@ -47,38 +39,17 @@ const HOUR_MS = 60 * 60 * 1000;
  */
 const REQUEST_LOG_LIMIT = 100;
 
-/**
- * The procedure refuses a start time more than `REQUEST_LOGS_START_TIME_MAX_AGE_DAYS`
- * (365, apps/web) before its own clock, which runs later than this screen's
- * mount-time anchor. The stepper keeps an hour of margin, so the oldest window
- * it opens still names a start time the server accepts.
- */
-const HISTORY_DAYS = 365;
-
-/** Whether a window ending at `windowEndMs` is inside the procedure's age bound. */
-export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {
-  return windowEndMs >= anchorMs - (HISTORY_DAYS * 24 - 1) * HOUR_MS;
-}
-
-// FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
-// inset maps to its pixel values; the tab bar's own bottom padding rides on the
-// footer, which `gap` would not cover.
+// The cards carry the page gutter themselves. The tab bar's own bottom padding
+// rides on the footer, which `gap` would not cover, and the body's top pad sits
+// on a header component because a FlashList cannot take a class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const WINDOW_DATE = { weekday: 'short', month: 'short', day: 'numeric' } as const;
 
 const RowSeparator = () => <View className="h-3" />;
-
-function RowSkeleton() {
-  return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
-      <Skeleton className="h-4 w-3/4 rounded bg-muted-soft" />
-      <Skeleton className="h-3 w-1/2 rounded bg-muted-soft" />
-      <Skeleton className="h-3 w-1/3 rounded bg-muted-soft" />
-    </View>
-  );
-}
 
 /**
  * The body one window paints. A window keeps the rows it already holds while a
@@ -110,64 +81,6 @@ function requestLogsBody(
     : { kind: 'refused', variant };
 }
 
-/** The name the web table prints for a request's user, with its own fallbacks. */
-const RequestLogRow = memo(function RequestLogRow({
-  entry,
-}: Readonly<{ entry: OrgRequestLogEntry }>) {
-  const { t } = useTranslation();
-  const locale = i18n.language;
-  const created = parseTimestamp(entry.created_at);
-  const time = Number.isNaN(created.getTime())
-    ? UNMEASURED_VALUE
-    : formatClockTime(created, locale);
-  // Six fraction digits, as the web table prints a request's cost: a gateway
-  // request can cost less than a cent, and two digits would round it to zero.
-  const cost = formatPrefixedUsd(fromMicrodollars(entry.cost_microdollars), locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  });
-  const tokens = t('organization.requestLogs.tokens', {
-    input: formatNumber(entry.input_tokens, locale),
-    output: formatNumber(entry.output_tokens, locale),
-  });
-  // The web table names a request's user by name, then email, then id, and skips
-  // an empty value rather than printing a blank cell.
-  const userName =
-    [entry.user.name, entry.user.email, entry.user.id].find(Boolean) ?? UNMEASURED_VALUE;
-
-  return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
-      <View className="flex-row items-baseline gap-3">
-        <Text className="flex-1 font-mono text-xs text-foreground" numberOfLines={1}>
-          {entry.model ?? UNMEASURED_VALUE}
-        </Text>
-        <Text className="shrink-0 text-sm font-medium tabular-nums text-foreground">{cost}</Text>
-      </View>
-      <View className="flex-row items-center gap-3">
-        <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
-          {userName}
-        </Text>
-        <Text className="shrink-0 text-xs text-muted-foreground" numberOfLines={1}>
-          {entry.provider ?? UNMEASURED_VALUE}
-        </Text>
-      </View>
-      <View className="flex-row items-center gap-2">
-        <Text className="text-xs tabular-nums text-muted-foreground">
-          {isolateLtrBidiText(time)}
-        </Text>
-        <Text className="flex-1 text-xs tabular-nums text-muted-foreground" numberOfLines={1}>
-          {tokens}
-        </Text>
-        {entry.is_user_byok ? (
-          <Text className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
-            {t('organization.requestLogs.byok')}
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  );
-});
-
 /**
  * The organization's request logs, read-only.
  *
@@ -183,12 +96,14 @@ const RequestLogRow = memo(function RequestLogRow({
  */
 export function OrganizationRequestLogsScreen() {
   const { t } = useTranslation();
-  const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   // The window's newest end. The anchor is captured once, so "Newer" has a
   // fixed edge to return to instead of sliding with the clock.
   const [anchorMs] = useState(() => Date.now());
   const [windowEndMs, setWindowEndMs] = useState(anchorMs);
+  const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const allowed = canManageOrganizationBilling(role);
   const logs = useOrgRequestLogs(organizationId, new Date(windowEndMs).toISOString(), allowed);
   const paddingBottom = useTabBarBottomPadding();
@@ -217,7 +132,10 @@ export function OrganizationRequestLogsScreen() {
           title={t('organization.settingsOnWeb.requestLogs')}
           backFallback={ORGANIZATION_HUB_PATH}
         />
-        <PermissionDenied description={t('organization.requestLogs.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.requestLogs.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }
@@ -238,17 +156,13 @@ export function OrganizationRequestLogsScreen() {
   const renderBody = (current: RequestLogsBody): ReactNode => {
     switch (current.kind) {
       case 'loading': {
-        return (
-          <View className="gap-3 px-6 pt-4">
-            <RowSkeleton />
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        );
+        return <RequestLogsSkeleton />;
       }
       case 'retryable': {
         return (
           <QueryError
+            placement="top"
+            inset="gutter"
             variant={current.variant}
             message={t('organization.requestLogs.loadError')}
             onRetry={() => void logs.refetch()}
@@ -260,6 +174,8 @@ export function OrganizationRequestLogsScreen() {
       case 'refused': {
         return (
           <QueryError
+            placement="top"
+            inset="gutter"
             variant={current.variant}
             message={t('organization.requestLogs.loadError')}
             refreshControl={refreshControl}
@@ -269,9 +185,18 @@ export function OrganizationRequestLogsScreen() {
       case 'empty': {
         return (
           <EmptyState
-            icon={FileText}
+            placement="top"
+            inset="gutter"
+            icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
-            description={t('organization.requestLogs.emptyDescription')}
+            // The description points at the paging control while an older hour
+            // can still be reached; at the history bound it names the bound
+            // instead, so the state always says why the window is empty.
+            description={
+              canStepOlder
+                ? t('organization.requestLogs.emptyDescription')
+                : t('organization.requestLogs.emptyBoundDescription')
+            }
             refreshControl={refreshControl}
           />
         );
@@ -285,12 +210,12 @@ export function OrganizationRequestLogsScreen() {
             renderItem={renderItem}
             getItemType={() => 'requestLog'}
             ItemSeparatorComponent={RowSeparator}
-            contentContainerStyle={listContentContainerStyle}
+            ListHeaderComponent={<ListTopPad />}
             refreshControl={refreshControl}
             ListFooterComponent={
               <View className="pt-3">
                 {current.truncated ? (
-                  <Text variant="muted" className="px-6 text-center text-xs">
+                  <Text variant="caption" className="px-4 text-center">
                     {t('organization.requestLogs.truncated')}
                   </Text>
                 ) : null}
@@ -313,55 +238,72 @@ export function OrganizationRequestLogsScreen() {
         title={t('organization.settingsOnWeb.requestLogs')}
         backFallback={ORGANIZATION_HUB_PATH}
       />
-      {/* The window the rows below belong to, and the only filter the phone
-          needs: the procedure answers one hour at a time, so moving the window
-          is both the time range and the paging. The hint states the window's
-          one rule in place, and it never changes, so no row moves when a
-          window loads. */}
-      <View className="gap-2 px-6 pt-4">
-        <View className="gap-0.5">
-          <Text className="text-sm font-medium text-foreground">
-            {formatDate(windowStart, i18n.language, WINDOW_DATE)}
-          </Text>
-          <Text className="text-xs tabular-nums text-muted-foreground">
-            {isolateLtrBidiText(
-              `${formatClockTime(windowStart, i18n.language)}–${formatClockTime(windowEnd, i18n.language)}`
-            )}
-          </Text>
+      <View className="flex-1" style={sideInsetStyle}>
+        {/* The window the rows below belong to, and the only filter the phone
+            needs: the procedure answers one hour at a time, so moving the window
+            is both the time range and the paging. The hint states the window's
+            one rule in place, and it never changes, so no row moves when a
+            window loads. */}
+        <View className="gap-2 px-4 pt-3">
+          <View className="gap-0.5">
+            <Text className="text-sm font-medium text-foreground">
+              {formatDate(windowStart, i18n.language, WINDOW_DATE)}
+            </Text>
+            {/* Each time is isolated on its own, so the AM/PM marker it carries
+                stays beside its own clock, and the join is the catalog's, so a
+                right-to-left reader gets the pair in that language's order
+                instead of one reversed run. */}
+            <Text variant="caption" className="tabular-nums">
+              {t('common.timeRange', {
+                start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
+                end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
+              })}
+            </Text>
+          </View>
+          {/* A step with no further hour is still readable: it takes the muted
+              fill and ink at full strength, where the outline variant would halve
+              both into the page. */}
+          <View className="flex-row gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn('flex-1', !canStepOlder && 'bg-muted opacity-100')}
+              disabled={!canStepOlder}
+              onPress={() => {
+                setWindowEndMs(current => current - HOUR_MS);
+              }}
+              accessibilityLabel={t('organization.requestLogs.older')}
+            >
+              <DirectionalArrowLeft
+                size={16}
+                color={canStepOlder ? colors.foreground : mutedDisabledInk}
+              />
+              <Text className={canStepOlder ? undefined : 'text-muted-foreground'}>
+                {t('organization.requestLogs.older')}
+              </Text>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn('flex-1', !canStepNewer && 'bg-muted opacity-100')}
+              disabled={!canStepNewer}
+              onPress={() => {
+                setWindowEndMs(current => Math.min(current + HOUR_MS, anchorMs));
+              }}
+              accessibilityLabel={t('organization.requestLogs.newer')}
+            >
+              <Text className={canStepNewer ? undefined : 'text-muted-foreground'}>
+                {t('organization.requestLogs.newer')}
+              </Text>
+              <DirectionalArrowRight
+                size={16}
+                color={canStepNewer ? colors.foreground : mutedDisabledInk}
+              />
+            </Button>
+          </View>
         </View>
-        <View className="flex-row gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            disabled={!canStepOlder}
-            onPress={() => {
-              setWindowEndMs(current => current - HOUR_MS);
-            }}
-            accessibilityLabel={t('organization.requestLogs.older')}
-          >
-            <DirectionalChevronLeft size={16} color={colors.foreground} />
-            <Text>{t('organization.requestLogs.older')}</Text>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            disabled={!canStepNewer}
-            onPress={() => {
-              setWindowEndMs(current => Math.min(current + HOUR_MS, anchorMs));
-            }}
-            accessibilityLabel={t('organization.requestLogs.newer')}
-          >
-            <Text>{t('organization.requestLogs.newer')}</Text>
-            <DirectionalChevronRight size={16} color={colors.foreground} />
-          </Button>
-        </View>
-        <Text variant="muted" className="text-xs">
-          {t('organization.requestLogs.hint')}
-        </Text>
+        {renderBody(body)}
       </View>
-      {renderBody(body)}
     </View>
   );
 }

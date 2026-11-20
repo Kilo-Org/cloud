@@ -198,8 +198,10 @@ async function processMessage(
 
   const writerStatus =
     outcome.kind === 'unavailable' && outcome.reason === 'http_error' ? outcome.status : undefined;
-  const overloaded = writerStatus === 429 || writerStatus === 503;
-  const acknowledged = outcome.kind === 'recorded' || outcome.kind === 'duplicate';
+  const classOnly = outcome.kind === 'unavailable' && 'classOnly' in outcome && outcome.classOnly;
+  const overloaded = (writerStatus === 429 && !classOnly) || writerStatus === 503;
+  const acknowledged =
+    outcome.kind === 'recorded' || outcome.kind === 'duplicate' || outcome.kind === 'rejected';
   const admissionReason =
     outcome.kind === 'unavailable' && outcome.reason === 'http_error' && outcome.status === 429
       ? outcome.admissionReason
@@ -223,7 +225,8 @@ async function processMessage(
           retry_delay_seconds: retryDelaySeconds,
           ...(admissionReason === undefined ? {} : { admission_reason: admissionReason }),
         }),
-    ...(overloaded ? { writer_status: writerStatus, invocation_failure: 'writer_overloaded' } : {}),
+    ...(writerStatus === 429 || writerStatus === 503 ? { writer_status: writerStatus } : {}),
+    ...(overloaded ? { invocation_failure: 'writer_overloaded' } : {}),
     queue_message_id: message.id,
     delivery_attempts: message.attempts,
     queue_wait_ms: queueWaitMs,

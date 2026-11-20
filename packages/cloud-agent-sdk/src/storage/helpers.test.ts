@@ -306,8 +306,10 @@ beforeEach(() => {
   orderingEvidence = new Map();
 });
 
-function upsert(arr: Part[], part: Part, eventTime?: number): Part[] {
-  return upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, orderingEvidence);
+function upsert(arr: Part[], part: Part, eventTime?: number, bucket = part.messageID): Part[] {
+  // One identity keys the whole update: the bucket the backend stores the part
+  // under. It equals the part's own label unless a caller passes another.
+  return upsertPartDroppingStaleSyntheticParts(bucket, arr, part, eventTime, orderingEvidence);
 }
 
 describe('insertSortedBy', () => {
@@ -435,6 +437,32 @@ describe('upsertPartDroppingStaleSyntheticParts', () => {
 
     expect(result.map(part => part.id)).toEqual(['msg-1-file-0', 'prt-file']);
   });
+
+  test('drops the placeholder by the bucket the parts are stored under', () => {
+    // The bucket is the identity every backend operation uses (`getParts`,
+    // `deletePart`, `applyPartDelta`), so the placeholder comparison reads it
+    // too. Here the authoritative part's own label names another message than
+    // the bucket: the bucket decides, and the placeholder of the same type goes.
+    const syntheticPart = {
+      id: 'optimistic-text',
+      sessionID: 's',
+      messageID: 'msg-A',
+      type: 'text',
+      text: 'hello',
+      synthetic: true,
+    } as Part;
+    const realPart = {
+      id: 'prt-real',
+      sessionID: 's',
+      messageID: 'msg-B',
+      type: 'text',
+      text: 'hello',
+    } as Part;
+
+    const result = upsert([syntheticPart], realPart, undefined, 'msg-A');
+
+    expect(result.map(part => part.id)).toEqual(['prt-real']);
+  });
 });
 
 describe('tool part lifecycle ordering', () => {
@@ -477,6 +505,49 @@ describe('tool part lifecycle ordering', () => {
     const result = upsert(arr, makeToolPart('p-1', 'completed'), 150);
     expect(toolStatus(result, 'p-1')).toBe('running');
     expect(result).toBe(arr);
+  });
+
+  test('drops a rejected update without reading its payload and copies an accepted one', () => {
+    // The accept path owns the copy. A copy reads every own enumerable
+    // property, so a counting getter on a bulky payload shows whether a
+    // dropped update is read at all.
+    const arr = upsert([], makeToolPart('p-1', 'completed'), 200);
+    let payloadReads = 0;
+    const withPayload = (part: Part): Part => {
+      Object.defineProperty(part, 'text', {
+        get() {
+          payloadReads += 1;
+          return 'x'.repeat(1_024);
+        },
+        enumerable: true,
+        configurable: true,
+      });
+      return part;
+    };
+
+    const stale = upsert(arr, withPayload(makeToolPart('p-1', 'running')), 100);
+    expect(stale).toBe(arr);
+    expect(payloadReads).toBe(0);
+
+    const preview = withPayload(makeToolPart('p-1', 'completed'));
+    Object.defineProperty(preview, 'cloudDetail', {
+      value: {
+        version: 1,
+        revision: 1,
+        omitted: ['state.output'],
+        omittedCount: 1,
+        omittedBytes: 64,
+      },
+      enumerable: true,
+    });
+    const bounded = upsert(arr, preview, 300);
+    expect(bounded).toBe(arr);
+    expect(payloadReads).toBe(0);
+
+    const accepted = upsert(arr, withPayload(makeToolPart('p-2', 'running')), 300);
+    expect(accepted).not.toBe(arr);
+    expect(payloadReads).toBe(1);
+    expect(JSON.stringify(accepted.find(part => part.id === 'p-2'))).toContain('xxxxxxxxxx');
   });
 
   test('drops a terminal update that carries no ordering evidence over a live running task', () => {

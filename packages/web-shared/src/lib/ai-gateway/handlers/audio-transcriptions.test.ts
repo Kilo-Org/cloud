@@ -807,7 +807,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
-        provider: { only: ['azure'], zdr: true },
+        provider: { only: ['openai', 'azure'], zdr: true },
       }) as never
     );
 
@@ -819,6 +819,28 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       zdr: true,
     });
   });
+
+  it.each([{ provider: { only: ['azure'], zdr: true } }, { provider: { ignore: ['openai'] } }])(
+    'rejects a request whose providers the member routes exclude: %j',
+    async ({ provider }) => {
+      setOrganizationMemberAuth(new Set(['openai']));
+
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(
+        makeRequest({
+          model: 'openai/gpt-4o-mini-transcribe',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+          provider,
+        }) as never
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error_type: ProxyErrorType.model_not_allowed,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
 
   it('limits a multipart request to the organization member provider routes', async () => {
     setOrganizationMemberAuth(new Set(['openai']));

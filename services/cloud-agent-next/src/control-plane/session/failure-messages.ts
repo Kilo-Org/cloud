@@ -23,6 +23,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
     'Container limit reached. Stop an existing container before starting another.',
   account_blocked: 'This account is blocked.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
+  network_secret_configuration_invalid:
+    'Network secret configuration is invalid. Check the variable names and allowed domains.',
   sandbox_create_failed: 'The sandbox could not be created',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',
@@ -33,6 +35,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   no_outcome: 'The turn did not complete',
   completion_unconfirmed:
     'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.',
+  completion_quiet_drain:
+    'The assistant finished its reply, but background work did not finish in time. Send a new message to continue.',
   prompt_failed: 'Prompt delivery failed',
   sandbox_stopped: 'The sandbox stopped while waiting for an answer',
   execution_limit: 'The turn exceeded its time limit',

@@ -113,6 +113,7 @@ export function classifyControlPlaneFailure(
     case 'billing_unavailable':
       return { stage: 'pre_dispatch', code: 'admission_billing_unavailable' };
     case 'invalid_configuration':
+    case 'network_secret_configuration_invalid':
     case 'sandbox_create_failed':
       return PRE_DISPATCH_SANDBOX_CONNECT;
     case 'agent_unavailable':
@@ -130,6 +131,7 @@ export function classifyControlPlaneFailure(
     case 'no_progress':
     case 'no_outcome':
     case 'completion_unconfirmed':
+    case 'completion_quiet_drain':
       return POST_DISPATCH_WRAPPER_NO_OUTPUT;
     case 'prompt_failed':
       return POST_DISPATCH_WRAPPER_ERROR_BEFORE_ACTIVITY;

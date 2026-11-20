@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, type OperationLedgerRow } from '@kilocode/db/schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +11,7 @@ import {
 
 import { t } from '../auth.js';
 import { parseSessionMetadata, type SessionMetadata } from '../../persistence/session-metadata.js';
+import { shouldCaptureCloudAgentException } from '../../sentry.js';
 import type * as SessionPlane from '../../session-identity.js';
 import type { TRPCContext } from '../../types.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
@@ -1567,6 +1569,66 @@ describe('createWorktreeChat operation-ledger replay and conflict handling', () 
 
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('createWorktreeChat ownership failures', () => {
+  it.each([
+    { delivery: 'a thrown error', outcome: new Error('worktree_deleting') },
+    { delivery: 'a rejected result', outcome: { status: 'rejected', code: 'worktree_deleting' } },
+  ])(
+    'returns a conflict when ingest reports worktree deletion as $delivery',
+    async ({ outcome }) => {
+      const { context, input, db, destinationStub } = fixture();
+      if (outcome instanceof Error) {
+        createSessionForCloudAgentMock.mockRejectedValueOnce(outcome);
+      } else {
+        createSessionForCloudAgentMock.mockResolvedValueOnce(outcome);
+      }
+      const req = new Request('https://worktree.test/trpc/createWorktreeChat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      const shouldCapture = vi.fn(({ error }: { error: TRPCError }) =>
+        shouldCaptureCloudAgentException(error)
+      );
+
+      const response = await fetchRequestHandler({
+        endpoint: '/trpc',
+        req,
+        router,
+        createContext: () => ({ ...context, request: req }),
+        onError: shouldCapture,
+      });
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error: { message: 'workspace_deleting', data: { code: 'CONFLICT' } },
+      });
+      expect(shouldCapture).toHaveReturnedWith(false);
+      expect(settleOperationMock).toHaveBeenCalledExactlyOnceWith(db, {
+        rowId: LEDGER_ROW_ID,
+        status: 'failed',
+        outcomeCode: 'ownership_row_rejected',
+      });
+      expect(markReconcilePendingMock).not.toHaveBeenCalled();
+      expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+    }
+  );
+
+  it('propagates unexpected ingest errors as internal errors', async () => {
+    const { caller, input, db, destinationStub } = fixture();
+    const error = new Error('ingest unavailable');
+    createSessionForCloudAgentMock.mockRejectedValueOnce(error);
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      cause: error,
+    });
+    expect(markReconcilePendingMock).toHaveBeenCalledExactlyOnceWith(db, { rowId: LEDGER_ROW_ID });
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
   });
 });
 

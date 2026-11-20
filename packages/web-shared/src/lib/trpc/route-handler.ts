@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import { createTRPCContext, type TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { stepUpRefusalPayload } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import { logTRPCError } from '@kilocode/web-shared/lib/trpc/error-utils';
 import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
@@ -38,7 +39,11 @@ export function createTRPCRouteHandler<TCaller>(
       if (error instanceof TRPCError) {
         if (error.cause instanceof StepUpRequiredError) {
           return NextResponse.json(
-            { error: error.cause.code, message: error.cause.code },
+            {
+              error: error.cause.code,
+              message: error.cause.code,
+              stepUp: stepUpRefusalPayload(error.cause),
+            },
             { status: 403 }
           );
         }

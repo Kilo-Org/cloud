@@ -15,7 +15,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { buildExaUsageRecord } from '@/lib/exa-usage-record';
+import { buildExaUsageRecord, ExaCostAbovePerCallMaximumError } from '@/lib/exa-usage-record';
 import {
   isExaUsageQueueFallbackAvailable,
   queueExaUsageAfterFailedWrite,
@@ -219,10 +219,20 @@ export async function POST(request: NextRequest) {
         maxDuration * 1_000 - publicationReserveMs - (performance.now() - invocationStartedAt);
       await recordExaUsageWithinDeadline(record, writeBudgetMs);
     } catch (error) {
+      const stage =
+        error instanceof ExaCostAbovePerCallMaximumError
+          ? 'cost_above_max'
+          : record === undefined
+            ? 'cost_parse'
+            : error instanceof ExaUsageWriteSkippedError
+              ? 'write_skipped'
+              : 'record_write';
+      // The stage is a tag, so alerting keys on `cost_above_max` directly.
       captureException(error, {
         tags: {
           route: '/api/exa/[...path]',
           exaPath,
+          usage_failure_stage: stage,
         },
         extra: {
           userId: user.id,
@@ -234,12 +244,6 @@ export async function POST(request: NextRequest) {
       const described = describeDatabaseError(error);
       const code =
         described.code !== null && /^[0-9A-Z]{5}$/.test(described.code) ? described.code : null;
-      const stage =
-        record === undefined
-          ? 'cost_parse'
-          : error instanceof ExaUsageWriteSkippedError
-            ? 'write_skipped'
-            : 'record_write';
       console.error('[exa] usage record failed; charge may be unrecorded', {
         exa_path: exaPath,
         payer_kind: organizationId ? 'organization' : 'personal',

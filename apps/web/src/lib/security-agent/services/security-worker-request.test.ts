@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
 import {
+  isDefinitiveSecurityWorkerRejection,
   postSecurityWorkerJson,
   SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
 } from './security-worker-request';
@@ -140,5 +141,114 @@ describe('postSecurityWorkerJson', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('isDefinitiveSecurityWorkerRejection', () => {
+  const disabledRoutingError = 'Sync Worker routing is disabled';
+
+  it('treats any 4xx as a definitive rejection', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({ status: 400, body: { error: 'bad request' } })
+    ).toBe(true);
+  });
+
+  it('treats the known disabled-routing 503 as definitive without a success requirement', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 503,
+        body: { error: disabledRoutingError },
+        disabledRoutingError,
+      })
+    ).toBe(true);
+  });
+
+  it('treats the disabled-routing 503 with success false as definitive when required', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 503,
+        body: { success: false, error: disabledRoutingError },
+        disabledRoutingError,
+        requireSuccessFalse: true,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps a disabled-routing 503 with success true ambiguous when success false is required', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 503,
+        body: { success: true, error: disabledRoutingError },
+        disabledRoutingError,
+        requireSuccessFalse: true,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a disabled-routing 503 without a success field ambiguous when success false is required', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 503,
+        body: { error: disabledRoutingError },
+        disabledRoutingError,
+        requireSuccessFalse: true,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a 503 with a non-matching error body ambiguous', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 503,
+        body: { error: 'some other error' },
+        disabledRoutingError,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a 500 ambiguous even with the matching disabled-routing body', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 500,
+        body: { error: disabledRoutingError },
+        disabledRoutingError,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps every 5xx ambiguous without a named disabled-routing error', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 503,
+        body: { success: false, error: disabledRoutingError },
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a named disabled-routing 503 with a non-object body ambiguous', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 503,
+        body: null,
+        disabledRoutingError,
+      })
+    ).toBe(false);
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 503,
+        body: 'text',
+        disabledRoutingError,
+      })
+    ).toBe(false);
+  });
+
+  it('treats a 4xx with a named disabled-routing error as definitive', () => {
+    expect(
+      isDefinitiveSecurityWorkerRejection({
+        status: 404,
+        body: { error: 'not found' },
+        disabledRoutingError,
+      })
+    ).toBe(true);
   });
 });

@@ -151,15 +151,22 @@ describe('Cloud Agent Sentry privacy', () => {
         data: { prompt: 'private-prompt' },
         headers: { Authorization: 'private-token', Cookie: 'private-cookie' },
       },
-      user: { email: 'private-email', ip_address: 'private-ip' },
+      user: {
+        id: 'private-sdk-id',
+        email: 'private-email',
+        username: 'private-username',
+        ip_address: 'private-ip',
+        token: 'private-token',
+      },
       extra: { code: 'private-code', env: { API_KEY: 'private-key' } },
       breadcrumbs: [{ message: 'private-log' }],
-      tags: { user: 'private-user' },
+      tags: { user: 'private-user', orgId: 'private-org', authorization: 'private-token' },
       contexts: {
         cloud_agent: {
           component: 'worker',
           operation: 'send',
           sessionId: 'workspace_one',
+          sandboxId: 'sandbox_one',
           messageId: 'message_one',
           prompt: 'private-context',
         },
@@ -192,6 +199,13 @@ describe('Cloud Agent Sentry privacy', () => {
     };
     const sanitized = sanitizeSentryEvent(event);
     expect(JSON.stringify(sanitized)).not.toContain('private-');
+    expect(sanitized).not.toHaveProperty('user');
+    expect(sanitized?.tags).toEqual({
+      component: 'worker',
+      operation: 'send',
+      sessionId: 'workspace_one',
+      sandboxId: 'sandbox_one',
+    });
     expect(sanitized?.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
       filename: '/usr/local/bin/kilocode-wrapper.js',
       function: 'handleMessage',
@@ -205,6 +219,7 @@ describe('Cloud Agent Sentry privacy', () => {
         component: 'worker',
         operation: 'send',
         sessionId: 'workspace_one',
+        sandboxId: 'sandbox_one',
         messageId: 'message_one',
       },
     });
@@ -221,5 +236,15 @@ describe('Cloud Agent Sentry privacy', () => {
         exception: { values: [{ type: 'private-type', value: 'private-value' }] },
       })?.exception?.values?.[0]?.type
     ).toBe('Error');
+  });
+
+  it('drops malformed identity even when passed through the trusted identity fields', () => {
+    const sanitized = sanitizeSentryEvent(
+      { type: undefined, exception: { values: [{}] } },
+      { userId: 'private@example.test', orgId: 'private prompt\nprivate token' }
+    );
+    expect(sanitized).not.toHaveProperty('user');
+    expect(sanitized?.tags).not.toHaveProperty('orgId');
+    expect(JSON.stringify(sanitized)).not.toContain('private');
   });
 });

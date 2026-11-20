@@ -133,6 +133,38 @@ export class GitHubRateLimitError extends Error {
 }
 
 /**
+ * Mirrors the real adapter's typed credential rejection so
+ * `isGitHubCredentialRejection` classifies it in tests that run against this
+ * mock.
+ */
+export class GitHubCredentialRejectionError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'GitHubCredentialRejectionError';
+    this.cause = cause;
+  }
+}
+
+/**
+ * Mirrors the real adapter's listing-budget refusal so callers that map it to
+ * `PAYLOAD_TOO_LARGE` classify it in tests that run against this mock. Keep
+ * the copy in step with `GITHUB_LISTING_BUDGET_MESSAGE` in the real adapter.
+ */
+export const GITHUB_LISTING_BUDGET_MESSAGE =
+  'This GitHub installation has more repositories or branches than Kilo can list. Limit its repository access and try again.';
+
+export class GitHubListingBudgetExceededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GitHubListingBudgetExceededError';
+  }
+}
+
+export function isGitHubCredentialRejection(error: unknown): boolean {
+  return error instanceof GitHubCredentialRejectionError;
+}
+
+/**
  * Mirrors the adapter's rule: 429, `x-ratelimit-remaining: 0`, or a 403 whose
  * Retry-After header or message names a rate limit or abuse. Keep in step with
  * `isGitHubRateLimitError` in the real adapter.
@@ -246,5 +278,16 @@ export async function fetchGitHubRootTextFileAtRef(_params: {
   path: string;
   ref: string;
 }): Promise<string | null> {
+  return null;
+}
+
+export type GitHubHeadPullRequest = { number: number; url: string };
+
+export async function fetchGitHubPullRequestForHeadBranch(_params: {
+  token: string;
+  owner: string;
+  repo: string;
+  headBranch: string;
+}): Promise<GitHubHeadPullRequest | null> {
   return null;
 }

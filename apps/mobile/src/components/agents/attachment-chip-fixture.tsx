@@ -1,8 +1,10 @@
+/* eslint-disable no-literal-copy/no-literal-copy -- Development-only attachment chip fixture; its title never ships. */
 import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/screen-header';
 import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
 
 import { AttachmentPreviewStrip } from './attachment-preview-strip';
@@ -15,6 +17,26 @@ const FIXTURE_DIR_NAME = 'agent-attachment-fixture';
  */
 const FIXTURE_FILENAME = 'quarterly-revenue-forecast-northern-region-2026-q4-final.pdf';
 const FIXTURE_BYTES = 564;
+
+/**
+ * A markdown chip over the preview's byte budget: the sheet must show a bounded
+ * prefix and the Truncated marker instead of rendering the whole file. The
+ * budget is four bytes per capped character, so a 60k-character file would now
+ * read whole; this stays above it. Deterministic content, so every capture of
+ * this fixture shows the same text.
+ */
+const FIXTURE_MD_FILENAME = 'oversized-notes.md';
+const FIXTURE_MD_PARAGRAPH =
+  'This paragraph exists only to push the attachment preview past its bound.';
+const FIXTURE_MD_CHARS = 400_000;
+// ASCII, one byte per character.
+const FIXTURE_MD_BYTES = FIXTURE_MD_CHARS;
+
+function fixtureMarkdown(): string {
+  const paragraphs = Math.ceil(FIXTURE_MD_CHARS / (FIXTURE_MD_PARAGRAPH.length + 1));
+  const header = '# Oversized notes\n\n';
+  return header + Array.from({ length: paragraphs }, () => FIXTURE_MD_PARAGRAPH).join('\n\n');
+}
 
 /**
  * A one-page PDF with a valid cross-reference table, so the chip's document has
@@ -49,15 +71,23 @@ export function AttachmentChipFixture() {
     return new File(directory, FIXTURE_FILENAME).uri;
   }, []);
 
+  const markdownUri = useMemo(() => {
+    const directory = new Directory(Paths.cache, FIXTURE_DIR_NAME);
+    return new File(directory, FIXTURE_MD_FILENAME).uri;
+  }, []);
+
   useEffect(() => {
     async function writeFixture() {
       const directory = new Directory(Paths.cache, FIXTURE_DIR_NAME);
       directory.create({ idempotent: true, intermediates: true });
       const file = new File(directory, FIXTURE_FILENAME);
-      if (file.exists) {
-        return;
+      if (!file.exists) {
+        await file.write(FIXTURE_PDF_BASE64, { encoding: 'base64' });
       }
-      await file.write(FIXTURE_PDF_BASE64, { encoding: 'base64' });
+      const markdown = new File(directory, FIXTURE_MD_FILENAME);
+      if (!markdown.exists) {
+        await markdown.write(fixtureMarkdown());
+      }
     }
     void writeFixture();
   }, []);
@@ -76,20 +106,37 @@ export function AttachmentChipFixture() {
         status: 'uploaded',
         progress: 1,
       },
+      {
+        id: 'attachment-chip-fixture-md',
+        filename: FIXTURE_MD_FILENAME,
+        kind: 'document',
+        extension: 'md',
+        mimeType: 'text/plain',
+        size: FIXTURE_MD_BYTES,
+        localUri: markdownUri,
+        localFileOwned: true,
+        status: 'uploaded',
+        progress: 1,
+      },
     ],
-    [localUri]
+    [localUri, markdownUri]
   );
 
+  // The header names the screen for a reader that navigates by headings; the
+  // strip keeps its place above the bottom inset, where the composer holds it.
   return (
-    <View className="flex-1 justify-end bg-background pb-2">
-      <AttachmentPreviewStrip
-        attachments={attachments}
-        onRemove={() => undefined}
-        onRetry={() => undefined}
-        onMove={() => undefined}
-        onReorder={() => undefined}
-      />
-      <View style={{ height: insets.bottom }} />
+    <View className="flex-1 bg-background">
+      <ScreenHeader title="Attachment chips" />
+      <View className="flex-1 justify-end pb-2">
+        <AttachmentPreviewStrip
+          attachments={attachments}
+          onRemove={() => undefined}
+          onRetry={() => undefined}
+          onMove={() => undefined}
+          onReorder={() => undefined}
+        />
+        <View style={{ height: insets.bottom }} />
+      </View>
     </View>
   );
 }

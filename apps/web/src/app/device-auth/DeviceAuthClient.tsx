@@ -16,6 +16,7 @@ import {
   getDeviceAuthSignInUrl,
 } from './device-auth-url';
 import type { RequestingClient } from '@/lib/device-auth/requesting-client';
+import { displaySafeText } from '@kilocode/app-shared/display-text';
 import type { DeviceAuthPendingLink } from '@/lib/device-auth/device-auth';
 import { getProviderById } from '@/lib/auth/provider-metadata';
 
@@ -258,15 +259,19 @@ export function DeviceAuthClient({
               data-testid="requesting-client"
             >
               <p className="text-sm font-medium">Requesting app</p>
-              <p className="text-sm break-words">{requestingClient.clientName}</p>
+              <p className="text-sm break-words">{displaySafeText(requestingClient.clientName)}</p>
               <dl className="text-muted-foreground space-y-1 text-xs">
                 <div className="flex gap-2">
                   <dt className="shrink-0">Redirects to</dt>
-                  <dd className="font-mono break-all">{requestingClient.redirectOrigin}</dd>
+                  <dd className="font-mono break-all">
+                    {displaySafeText(requestingClient.redirectOrigin)}
+                  </dd>
                 </div>
                 <div className="flex gap-2">
                   <dt className="shrink-0">Client ID</dt>
-                  <dd className="font-mono break-all">{requestingClient.clientId}</dd>
+                  <dd className="font-mono break-all">
+                    {displaySafeText(requestingClient.clientId)}
+                  </dd>
                 </div>
               </dl>
               <p className="text-muted-foreground text-xs">

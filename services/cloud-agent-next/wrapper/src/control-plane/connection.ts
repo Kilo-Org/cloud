@@ -9,6 +9,8 @@ import {
   WORKSPACE_CONFIGURATION_VERSION,
   RUNTIME_INSTRUCTIONS_HEADER,
   RUNTIME_INSTRUCTIONS_VERSION,
+  RUNTIME_WEB_SEARCH_HEADER,
+  RUNTIME_WEB_SEARCH_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -440,6 +442,7 @@ export function createControlPlaneConnection(
           [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION,
           [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION,
           [RUNTIME_INSTRUCTIONS_HEADER]: RUNTIME_INSTRUCTIONS_VERSION,
+          [RUNTIME_WEB_SEARCH_HEADER]: RUNTIME_WEB_SEARCH_VERSION,
           ...(options.runtimeHarness ? { [RUNTIME_HARNESS_HEADER]: options.runtimeHarness } : {}),
           ...(options.runtimeVersions?.kiloCliVersion
             ? { [KILO_CLI_VERSION_HEADER]: options.runtimeVersions.kiloCliVersion }
@@ -484,6 +487,7 @@ export function createControlPlaneConnection(
           startCommands: true,
           worktreeGit: true,
           transferGrants: true,
+          previewTunnel: true,
         })
       )
         return;

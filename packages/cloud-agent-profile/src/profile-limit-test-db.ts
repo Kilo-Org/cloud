@@ -60,7 +60,7 @@ export function createLimitTestDb(initialRowCount: number, initialVarKeys: reado
       where: () => {
         const resolve = () =>
           table === agent_environment_profile_vars
-            ? [...varKeys].map(key => ({ key }))
+            ? [...varKeys].map(key => ({ key, delivery: 'env' }))
             : resolveRowsFor(table, rowCount);
         const then = (
           onFulfilled?: (value: unknown) => unknown,

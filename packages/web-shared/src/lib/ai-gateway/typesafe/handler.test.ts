@@ -44,7 +44,7 @@ import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/pr
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getOpenRouterModelsMetadataFromDatabase,
-  getOpenRouterSystemOneModelsFromDatabase,
+  getOpenRouterSystemOneModelIdsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -97,7 +97,7 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getCachedVercelInferenceProviderIdsForModel: jest.fn(),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
-  getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
+  getOpenRouterSystemOneModelIdsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
@@ -395,7 +395,7 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
-      .mocked(getOpenRouterSystemOneModelsFromDatabase)
+      .mocked(getOpenRouterSystemOneModelIdsFromDatabase)
       .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(pricedSystemOneModels);
     jest.mocked(getCachedVercelInferenceProviderIdsForModel).mockResolvedValue(null);
@@ -869,7 +869,7 @@ describe('handleSystemOneRequest', () => {
     { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL, isFree: true },
     { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL, isFree: false },
   ])(
-    'forwards OpenRouter System One model $model unchanged',
+    'forwards OpenRouter System One model $model as the model it resolves to',
     async ({ model, policyModel, isFree }) => {
       setAuth('org-123');
 
@@ -881,7 +881,7 @@ describe('handleSystemOneRequest', () => {
         model: model === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : model,
         usage: { cost: isFree ? 0 : 0.000124 },
       });
-      expect(upstreamRequest().body.model).toBe(model);
+      expect(upstreamRequest().body.model).toBe(policyModel);
       expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
         expect.objectContaining({ modelId: policyModel })
       );
@@ -907,7 +907,7 @@ describe('handleSystemOneRequest', () => {
   );
 
   it('answers 503 when the catalog has no metadata for the model', async () => {
-    jest.mocked(getOpenRouterSystemOneModelsFromDatabase).mockResolvedValue(new Set());
+    jest.mocked(getOpenRouterSystemOneModelIdsFromDatabase).mockResolvedValue(new Set());
 
     const response = await handleSystemOneRequest(
       makeRequest({ ...requestBody, model: 'vendor/unlisted-decide' })
@@ -1723,7 +1723,7 @@ describe('handleSystemOneRequest', () => {
   it('returns a URL policy refusal without sending or recording', async () => {
     const refusal = NextResponse.json({ error_type: 'upstream_url_rejected' }, { status: 503 });
     jest.mocked(isUpstreamUrlPolicyEnforced).mockReturnValue(true);
-    jest.mocked(rejectDisallowedUpstreamUrls).mockResolvedValue(refusal);
+    jest.mocked(rejectDisallowedUpstreamUrls).mockResolvedValue({ rejected: refusal });
 
     const response = await handleSystemOneRequest(makeRequest());
 

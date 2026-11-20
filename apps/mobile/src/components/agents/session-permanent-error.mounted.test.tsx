@@ -1,28 +1,22 @@
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
-import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { i18n } from '@/i18n';
-import { Button } from '@/components/ui/button';
 import { QueryError } from '@/components/query-error';
 import { SessionPermanentError } from './session-permanent-error';
-import { Text } from '@/components/ui/text';
 
-const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
-const copy = vi.hoisted(() => ({ performCopy: vi.fn() }));
-
-vi.mock('expo-router', () => ({ useRouter: () => router }));
-vi.mock('./use-message-copy', () => ({ performCopy: copy.performCopy }));
 vi.mock('./restored-route-fallback', () => ({ RestoredRouteFallback: 'RestoredRouteFallback' }));
-vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/components/ui/icons', () => ({ RotateCcw: 'RotateCcw' }));
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
+// The body of the shared state is another suite's; this one reads the state it
+// asks for, so the stub forwards the recovery slot it was handed.
+vi.mock('@/components/query-error', () => ({
+  QueryError: ({ action }: { action?: ReactNode }) => action ?? null,
+}));
 
-function mountCard(): TestRenderer.ReactTestRenderer {
+function mountCard(retry?: () => void, isRetrying = false): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
@@ -30,8 +24,8 @@ function mountCard(): TestRenderer.ReactTestRenderer {
         variant: 'not-found',
         title: 'Session not found',
         message: 'This session is no longer available.',
-        isRetrying: false,
-        copyText: 'ses_test not-found',
+        retry,
+        isRetrying,
         restoredRouteOpen: false,
       })
     );
@@ -42,38 +36,40 @@ function mountCard(): TestRenderer.ReactTestRenderer {
   return ref.current;
 }
 
-describe('SessionPermanentError actions', () => {
-  it('fills Back with the muted dark tone, keeps Copy outlined, and returns to the sessions index', () => {
+function actions(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => String(node.type) === 'StateAction');
+}
+
+describe('SessionPermanentError recovery', () => {
+  it('leaves the way out to the header, with no action of its own', () => {
+    // The screen header draws the back chevron, so a terminal state that
+    // repeated it would be the second way out on one surface.
     const renderer = mountCard();
-    const root = renderer.root;
 
-    expect(root.findAllByType(QueryError)).toHaveLength(1);
+    expect(renderer.root.findByType(QueryError).props.action).toBeUndefined();
+    expect(actions(renderer)).toHaveLength(0);
+  });
 
-    const buttons = root.findAllByType(Button);
-    const back = buttons.find(
-      button =>
-        button.findByType(Text).props.children === i18n.t('agentChat.session.backToSessions')
-    );
-    const copyButton = buttons.find(
-      button => button.findByType(Text).props.children === i18n.t('common.copy')
-    );
-    if (!back || !copyButton) {
-      throw new Error('the terminal card is missing one of its actions');
+  it.each([true, false])('draws one retry when the denial can clear, loading=%s', isRetrying => {
+    const retry = vi.fn<() => void>();
+    const renderer = mountCard(retry, isRetrying);
+    const [attempt, ...rest] = actions(renderer);
+    if (!attempt) {
+      throw new Error('the card rendered no retry');
     }
-
-    // Dark --primary is the brand yellow that glares on the near-black page, so dark takes the muted lifted olive.
-    expect(String(back.props.className)).toContain('bg-primary');
-    expect(String(back.props.className)).toContain('dark:bg-selection');
-    const backLabel = back.findByType(Text);
-    expect(String(backLabel.props.className)).toContain('text-primary-foreground');
-    expect(String(backLabel.props.className)).toContain('dark:text-selection-foreground');
-
-    expect(copyButton.props.variant).toBe('outline');
-    expect(String(copyButton.props.className)).not.toContain('dark:bg-selection');
+    expect(rest).toHaveLength(0);
+    expect(attempt.props.label).toBe(i18n.t('common.retry'));
+    expect(attempt.props.loading).toBe(isRetrying);
 
     act(() => {
-      (back.props.onPress as () => void)();
+      (attempt.props.onPress as () => void)();
     });
-    expect(router.dismissTo).toHaveBeenCalledWith(AGENTS_SESSIONS_INDEX_HREF);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the error body out of the action slot', () => {
+    const renderer = mountCard();
+    const error = renderer.root.findByType(QueryError);
+    expect(error.props.onRetry).toBeUndefined();
   });
 });

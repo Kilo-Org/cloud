@@ -2512,7 +2512,13 @@ describe('logMicrodollarUsage', () => {
     });
 
     const result = await processTokenData(
-      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 300, cacheDiscount_mUsd: 50 },
+      {
+        ...BASE_USAGE_STATS,
+        messageId: null,
+        cost_mUsd: 300,
+        cacheDiscount_mUsd: 50,
+        is_byok: null,
+      },
       {
         ...createBaseUsageContext(user),
         provider: 'custom',
@@ -2542,7 +2548,66 @@ describe('logMicrodollarUsage', () => {
     const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
       where: eq(microdollar_usage_metadata.id, result.usageId),
     });
-    expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 300 });
+    expect(metadataRecord).toMatchObject({
+      is_free: false,
+      is_byok: true,
+      is_user_byok: false,
+      market_cost: 300,
+    });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
+  });
+
+  test('bills partner usage at the partner pricing and keeps the upstream model', async () => {
+    const user = await insertTestUser({
+      id: 'test-partner-priced-user',
+      microdollars_used: 1000,
+      google_user_email: 'partner-priced@example.com',
+    });
+
+    const result = await processTokenData(
+      {
+        ...BASE_USAGE_STATS,
+        model: 'partner-upstream-model',
+        messageId: null,
+        cost_mUsd: 300,
+        cacheDiscount_mUsd: 50,
+        is_byok: null,
+      },
+      {
+        ...createBaseUsageContext(user),
+        provider: 'partner',
+        requested_model: 'moonshotai/kimi-k2.6',
+        is_free: false,
+        custom_llm_pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 2,
+              completion_per_million: 10,
+              input_cache_read_per_million: 1,
+              input_cache_write_per_million: 3,
+            },
+          },
+        ],
+      }
+    );
+
+    // 85 uncached * 2 + 10 cache writes * 3 + 5 cache reads * 1 + 50 output * 10
+    const pricedCost = 705;
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({
+      provider: 'partner',
+      model: 'partner-upstream-model',
+      requested_model: 'moonshotai/kimi-k2.6',
+      cost: pricedCost,
+    });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({ is_byok: true, is_user_byok: false });
     expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
   });
 
@@ -2585,7 +2650,7 @@ describe('logMicrodollarUsage', () => {
         expect(await isCustomLlm(modelId)).toBe(false);
 
         const result = await processTokenData(
-          { ...BASE_USAGE_STATS, cost_mUsd: 700, cacheDiscount_mUsd: 50 },
+          { ...BASE_USAGE_STATS, cost_mUsd: 700, cacheDiscount_mUsd: 50, is_byok: false },
           usageContext
         );
         assert(result);
@@ -2602,7 +2667,12 @@ describe('logMicrodollarUsage', () => {
         const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
           where: eq(microdollar_usage_metadata.id, result.usageId),
         });
-        expect(metadataRecord).toMatchObject({ is_free: true, market_cost: 700 });
+        expect(metadataRecord).toMatchObject({
+          is_free: true,
+          is_byok: true,
+          is_user_byok: false,
+          market_cost: 700,
+        });
         expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
         const updatedOrganization = await db.query.organizations.findFirst({
           where: eq(organizations.id, organization.id),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { displaySafeText } from './display-text';
+import { displaySafeText, hasVisibleGlyph } from './display-text';
 
 describe('displaySafeText', () => {
   it('leaves an ordinary command exactly as it is', () => {
@@ -76,5 +76,37 @@ describe('displaySafeText', () => {
 
   it('keeps an astral character whole', () => {
     expect(displaySafeText('\u{1F44B}')).toBe('\u{1F44B}');
+  });
+});
+
+describe('hasVisibleGlyph', () => {
+  it('accepts text a person can read', () => {
+    expect(hasVisibleGlyph('Acme')).toBe(true);
+    expect(hasVisibleGlyph('https://acme.test')).toBe(true);
+    expect(hasVisibleGlyph('مرحبا')).toBe(true);
+    expect(hasVisibleGlyph('\u{1F44B}')).toBe(true);
+  });
+
+  it('accepts a combining mark beside a letter', () => {
+    expect(hasVisibleGlyph('e\u0301')).toBe(true);
+  });
+
+  it('rejects a value that draws nothing', () => {
+    expect(hasVisibleGlyph('')).toBe(false);
+    expect(hasVisibleGlyph('\u202e\u2066')).toBe(false);
+    expect(hasVisibleGlyph('\u200b\u200e\u200f\u061c\uFEFF')).toBe(false);
+    expect(hasVisibleGlyph('\u00ad')).toBe(false);
+    expect(hasVisibleGlyph('\u115F\u1160\u2800\u3164\uFFA0')).toBe(false);
+    expect(hasVisibleGlyph('\u200c\u200d')).toBe(false);
+    expect(hasVisibleGlyph('\u2028\u2029')).toBe(false);
+  });
+
+  it('rejects a mark that has nothing to attach to', () => {
+    expect(hasVisibleGlyph('\uFE00')).toBe(false);
+    expect(hasVisibleGlyph('\uFE0F\uFE0E')).toBe(false);
+    expect(hasVisibleGlyph('\u034F')).toBe(false);
+    expect(hasVisibleGlyph('\u180B\u180C')).toBe(false);
+    expect(hasVisibleGlyph('\u17B4')).toBe(false);
+    expect(hasVisibleGlyph('\u0301\u0308')).toBe(false);
   });
 });

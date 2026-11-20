@@ -4,7 +4,7 @@ import { TestRenderer } from '@/test/renderer';
 
 import { NewSessionProfileRow } from './new-session-environment-row';
 
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 
 import { i18n } from '@/i18n';
 
@@ -44,7 +44,7 @@ const EMPTY_PROFILE = {
   agentCount: 0,
 };
 
-const CARD_CHROME = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5`;
+const CARD_CHROME = FIELD_TRIGGER_FRAME_CLASS;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
@@ -121,31 +121,39 @@ describe('new-session environment row accessible name', () => {
 });
 
 describe('new-session environment row height', () => {
-  it('renders a one-line summary at the placeholder height', () => {
-    const root = renderRow({ profile: { ...PROFILE, kiloCommandCount: 0, commandCount: 0 } });
-    const summary = root
+  /** The row's summary line: the only Text in the card that may wrap to two. */
+  function summaryText(root: TestRenderer.ReactTestInstance) {
+    return root
       .findAllByType('Text')
       .map(node => node.props as { className?: string; numberOfLines?: number; children?: unknown })
-      .find(props => props.className?.includes('min-h-10'));
+      .find(props => props.numberOfLines === 2);
+  }
+
+  it('renders a one-line summary without reserving a blank second line', () => {
+    const root = renderRow({ profile: { ...PROFILE, kiloCommandCount: 0, commandCount: 0 } });
+    const summary = summaryText(root);
 
     expect(summary?.numberOfLines).toBe(2);
     expect(summary?.children).toBe('2 vars · 1 MCP · 2 skills · 4 agents');
+    expect(summary?.className).not.toContain('min-h-10');
   });
 
   it.each([
-    ['an unconfigured profile', { profile: EMPTY_PROFILE }],
-    ['the default environment', {}],
-  ])('keeps the two-line placeholder for %s', (_label, overrides) => {
+    ['an unconfigured profile', { profile: EMPTY_PROFILE }, EMPTY_PROFILE.name],
+    ['the default environment', {}, i18n.t('agentChat.newSession.defaultEnvironment')],
+  ])('renders only the title line for %s', (_label, overrides, title) => {
     const root = renderRow(overrides);
-    const summary = root
-      .findAllByType('Text')
-      .map(node => node.props as { className?: string; children?: unknown })
-      .find(props => props.className?.includes('min-h-10'));
 
-    expect(summary?.children).toBe('\u00A0\n\u00A0');
-    expect(
-      root.findByProps({ importantForAccessibility: 'no-hide-descendants' }).props
-    ).toMatchObject({ accessibilityElementsHidden: true });
+    expect(summaryText(root)).toBeUndefined();
+    // The card is its title line alone: no blank summary, and nothing hidden
+    // from accessibility to hold a line the row does not show.
+    expect(root.findAllByType('Text').map(node => node.props.children)).toEqual([
+      'Environment',
+      title,
+    ]);
+    expect(root.findAll(node => node.props.importantForAccessibility !== undefined)).toHaveLength(
+      0
+    );
   });
 
   it.each([

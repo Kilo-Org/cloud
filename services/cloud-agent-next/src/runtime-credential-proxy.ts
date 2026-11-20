@@ -166,7 +166,16 @@ export async function verifyRuntimeCredentialProxyHandle(
   env: Pick<Env, 'NEXTAUTH_SECRET'>,
   value: string
 ): Promise<RuntimeProxyHandleClaims | null> {
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  return verifyRuntimeCredentialProxyHandleWithSecret(
+    await resolveSecret(env.NEXTAUTH_SECRET),
+    value
+  );
+}
+
+export function verifyRuntimeCredentialProxyHandleWithSecret(
+  secret: string | null,
+  value: string
+): RuntimeProxyHandleClaims | null {
   if (!secret || value.length > 4096) return null;
   try {
     const verified = jwt.verify(value, secret, { algorithms: ['HS256'] });
@@ -210,6 +219,21 @@ export function runtimeProxyHandleGrantId(handle: string): string | null {
   return claims.success ? claims.data.grantId : null;
 }
 
+export function matchesRuntimeProxyGrantHandle(
+  grant: RuntimeProxyGrant,
+  handle: RuntimeProxyHandleClaims
+): boolean {
+  return (
+    Math.floor(grant.leaseExpiresAt / 1000) === handle.exp &&
+    grant.grantId === handle.grantId &&
+    grant.authorizationId === handle.authorizationId &&
+    grant.sessionId === handle.sessionId &&
+    grant.kiloSessionId === handle.kiloSessionId &&
+    grant.userId === handle.userId &&
+    grant.nonce === handle.nonce
+  );
+}
+
 export function matchesRuntimeProxyGrant(
   value: unknown,
   handle: RuntimeProxyHandleClaims,
@@ -229,13 +253,7 @@ export function matchesRuntimeProxyGrant(
   return (
     current.state === 'active' &&
     current.leaseExpiresAt > context.now &&
-    Math.floor(current.leaseExpiresAt / 1000) === handle.exp &&
-    current.grantId === handle.grantId &&
-    current.authorizationId === handle.authorizationId &&
-    current.sessionId === handle.sessionId &&
-    current.kiloSessionId === handle.kiloSessionId &&
-    current.userId === handle.userId &&
-    current.nonce === handle.nonce &&
+    matchesRuntimeProxyGrantHandle(current, handle) &&
     current.authorizationId === context.authorizationId &&
     current.sessionId === context.sessionId &&
     current.kiloSessionId === context.kiloSessionId &&
@@ -252,7 +270,7 @@ export function matchesRuntimeProxyGrant(
 
 export async function resolveRuntimeProxyCredential(input: {
   handle: string;
-  env: Pick<Env, 'NEXTAUTH_SECRET'>;
+  secret: string;
   grant: unknown;
   authorization: { id: string; state: string; delegationExpiresAt: string } | null;
   context: {
@@ -266,7 +284,7 @@ export async function resolveRuntimeProxyCredential(input: {
   token: string;
   renew: () => Promise<string>;
 }): Promise<{ token: string; transportProofRequired: boolean } | null> {
-  const claims = await verifyRuntimeCredentialProxyHandle(input.env, input.handle);
+  const claims = verifyRuntimeCredentialProxyHandleWithSecret(input.secret, input.handle);
   const now = input.now ?? Date.now();
   const parsedGrant = runtimeProxyGrantSchema.safeParse(input.grant);
   if (

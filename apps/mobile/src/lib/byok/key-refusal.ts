@@ -1,0 +1,74 @@
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+  MANAGED_KEY_READ_ONLY_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
+import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
+import { i18n } from '@/i18n';
+
+/**
+ * What one save attempt reports to the surface: a final refusal in the app's own
+ * words, or a failure the server has not settled, which keeps its retryable
+ * sentence and offers the reader a retry.
+ */
+export type KeySaveFailure =
+  | { readonly kind: 'retryable'; readonly message: string }
+  | { readonly kind: 'refused'; readonly message: string };
+
+/**
+ * Why the server refused the key, in the app's own words, or `null` when it has
+ * not made a final decision and asking again can still succeed. Its message can
+ * quote the provider's response, which names things this form does not show and
+ * does not translate, so the code decides the copy. The unavailable-provider
+ * refusal is the one exception: `FORBIDDEN` alone also covers other denials, so
+ * it is recognised by the code and the sentence together, where the sentence is
+ * the constant both sides import. The managed-key refusals are the other two
+ * exceptions for the same reason: `CONFLICT` alone also covers an ordinary
+ * duplicate, and `PRECONDITION_FAILED` alone covers other refusals, so each is
+ * recognised by the code and the shared sentence together.
+ */
+export function refusedKeyMessage(error: unknown): string | null {
+  const code = readTrpcErrorField(error, 'code');
+  // The update route refuses a coding-plan-managed key with this exact
+  // sentence; an ordinary duplicate carries a different one, so this must be
+  // matched before the bare `CONFLICT` branch.
+  if (
+    code === 'CONFLICT' &&
+    readTrpcErrorField(error, 'message') === MANAGED_KEY_READ_ONLY_MESSAGE
+  ) {
+    return i18n.t('profile.providerKeys.keyManagedByCodingPlan');
+  }
+  if (code === 'CONFLICT') {
+    return i18n.t('profile.providerKeys.keyAlreadyExists');
+  }
+  // The create route refuses a provider a coding plan's key already owns with
+  // this exact sentence; other precondition refusals carry a different one, so
+  // this must be matched before the bare `PRECONDITION_FAILED` branch.
+  if (
+    code === 'PRECONDITION_FAILED' &&
+    readTrpcErrorField(error, 'message') === MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE
+  ) {
+    return i18n.t('profile.providerKeys.keyManagedByCodingPlan');
+  }
+  // Any other precondition the server will repeat for the same value: it has
+  // settled the verdict, so the copy must not ask for a retry.
+  if (code === 'PRECONDITION_FAILED') {
+    return i18n.t('profile.providerKeys.keyStoreFailed');
+  }
+  if (code === 'UNPROCESSABLE_CONTENT') {
+    return i18n.t('profile.providerKeys.invalidCredentials');
+  }
+  // The server refuses a provider it has not opened for this account. Retrying
+  // the same request cannot change that verdict, so the copy must not ask for
+  // one.
+  if (
+    code === 'FORBIDDEN' &&
+    readTrpcErrorField(error, 'message') === BYOK_PROVIDER_UNAVAILABLE_MESSAGE
+  ) {
+    return i18n.t('profile.providerKeys.providerUnavailable');
+  }
+  // Any other verdict the server will repeat for the same value: a duplicate, a
+  // malformed credential or another denial. The reader can only fix the value,
+  // so the generic store copy states the failure without offering a retry.
+  return isRetryableTrpcError(error) ? null : i18n.t('profile.providerKeys.keyStoreFailed');
+}

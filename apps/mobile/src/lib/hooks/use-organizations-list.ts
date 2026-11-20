@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/lib/auth/auth-context';
-import { useTRPC } from '@/lib/trpc';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import { useTRPC } from '@/lib/trpc';
 
 /**
  * The current user's memberships. `trpc.organizations.list` requires auth (not
@@ -25,11 +25,8 @@ export function useOrganizationsList() {
   return useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: token != null,
-    // The create flow awaits this read's refetch before it moves the
-    // selection, so a paused (default `networkMode: 'online'`) refetch would
-    // keep the create screen's submit busy for the whole outage even after the
-    // create itself succeeded. Settle the read, like every screen whose flow
-    // waits on it.
+    // The boundary waits on this first read; a paused one keeps it from
+    // reaching its offline/error branch.
     ...SETTLE_WHILE_OFFLINE,
   });
 }

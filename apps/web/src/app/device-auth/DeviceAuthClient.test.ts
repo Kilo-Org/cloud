@@ -170,6 +170,21 @@ describe('DeviceAuthClient requesting app', () => {
     expect(html).toContain('I expect this connection and recognize the destination above.');
   });
 
+  test('names each layout format control in the app details instead of drawing it', () => {
+    const html = renderClient({
+      clientId: 'client-\u2066abc',
+      clientName: 'Claude\u202EDesktop',
+      redirectOrigin: 'https://cli\u202Eent.test',
+    });
+
+    expect(html).toContain('Claude\\u202eDesktop');
+    expect(html).toContain('https://cli\\u202eent.test');
+    expect(html).toContain('client-\\u2066abc');
+    // Nothing in the block draws the control, so the three details read one way.
+    expect(html).not.toContain('\u202e');
+    expect(html).not.toContain('\u2066');
+  });
+
   test('keeps the approval disabled until the app is confirmed', () => {
     const html = renderClient(requestingClient);
 

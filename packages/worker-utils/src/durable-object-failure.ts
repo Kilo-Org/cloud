@@ -15,12 +15,14 @@
  * never retryable by accident.
  */
 
+const NETWORK_CONNECTION_LOST_MESSAGE = 'Network connection lost.';
+
 const TRANSIENT_PLATFORM_MESSAGES: readonly string[] = [
   'Your account is generating too much load on Durable Objects. Please back off and try again later.',
   "Durable Object's isolate exceeded its memory limit and was reset.",
   'Durable Object reset because its code was updated.',
   'Durable Object reset because its code was updated',
-  'Network connection lost.',
+  NETWORK_CONNECTION_LOST_MESSAGE,
 ];
 
 const OVERLOADED_PREFIX = 'Durable Object is overloaded.';
@@ -43,6 +45,22 @@ export function isTransientDurableObjectFailure(error: unknown): boolean {
   return (
     message.startsWith(OVERLOADED_PREFIX) ||
     TRANSIENT_PLATFORM_MESSAGES.some(candidate => message.startsWith(candidate))
+  );
+}
+
+/**
+ * True only for the runtime's connection-lost transport error. Cloudflare
+ * raises this exact text when a client stream or a Durable Object connection
+ * closes mid-request, so the message itself proves the connection closed;
+ * application code never raises it. Matches the exact platform text only,
+ * not other transient failures or application errors.
+ */
+export function isNetworkConnectionLost(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    error.message === NETWORK_CONNECTION_LOST_MESSAGE
   );
 }
 

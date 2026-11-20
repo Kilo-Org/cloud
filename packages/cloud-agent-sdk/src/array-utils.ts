@@ -6,7 +6,6 @@ export function splitByContiguousPrefix<T>(
   isComplete: (item: T) => boolean
 ): { staticItems: T[]; dynamicItems: T[] } {
   let lastCompleteIndex = -1;
-  // Extend the prefix while items are complete; the first gap ends it.
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (item === undefined || !isComplete(item)) break;

@@ -6,12 +6,10 @@ import {
   WORKSPACE_ARTIFACT_MAX_FILE_BYTES,
   WORKSPACE_ARTIFACT_MAX_FILES,
   WORKSPACE_ARTIFACT_MAX_TOTAL_BYTES,
-  WORKSPACE_ARTIFACT_RETENTION_MS,
 } from './workspace-artifacts.js';
 
 const COMMAND_TIMEOUT_BUFFER_MS = 30_000;
 const MIB = 1024 * 1024;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
@@ -27,11 +25,6 @@ function formatMegabytes(bytes: number): string {
   return `${Math.round(bytes / MIB)} MiB`;
 }
 
-function formatDays(ms: number): string {
-  const days = Math.round(ms / DAY_MS);
-  return `${days} day${days === 1 ? '' : 's'}`;
-}
-
 function artifactsRule(): string[] {
   const excluded = WORKSPACE_ARTIFACT_EXCLUDED_SEGMENTS.map(segment => `\`${segment}\``);
   return [
@@ -42,7 +35,7 @@ function artifactsRule(): string[] {
     "- Use clear file names and subfolders. Saving to an existing path replaces the user's copy.",
     '- Write the finished file in place, or create it elsewhere and move it into `/artifacts` when it is complete.',
     `- Limits: ${formatMegabytes(WORKSPACE_ARTIFACT_MAX_FILE_BYTES)} per file, ${formatMegabytes(WORKSPACE_ARTIFACT_MAX_TOTAL_BYTES)} and ${WORKSPACE_ARTIFACT_MAX_FILES.toLocaleString('en-US')} files in total. Larger files are not kept. Paths with a folder or file name starting with \`.\`, or named ${excluded.slice(0, -1).join(', ')}, or ${excluded.at(-1)}, are ignored.`,
-    `- Files are kept for ${formatDays(WORKSPACE_ARTIFACT_RETENTION_MS)} after their last change.`,
+    '- Saved files are kept until the workspace or standalone session is deleted.',
     '- Files saved in earlier sessions may not be present in `/artifacts`. Do not rely on them.',
     '- Do not put repositories, dependency folders, caches, secrets, credentials, or tokens in `/artifacts`.',
     '- When you save an artifact, tell the user its path, for example `/artifacts/report.pdf`.',

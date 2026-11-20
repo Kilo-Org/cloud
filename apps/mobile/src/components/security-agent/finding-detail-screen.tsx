@@ -1,10 +1,9 @@
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { Ban, ShieldOff } from '@/components/ui/icons';
+import { Ban } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
@@ -13,9 +12,9 @@ import { FindingRemediationPanel } from '@/components/security-agent/finding-rem
 import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
-import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentCapability,
@@ -30,8 +29,10 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { tabEntryA11y } from '@/lib/a11y/tab-entry';
+import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
@@ -63,10 +64,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const pushOnce = useSinglePushRoute();
   const navigation = useNavigation();
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
-  const analysisQuery = useSecurityAnalysis(scope, findingId);
+  // The analysis query polls while a run is active, and only the analysis and
+  // remediation panels read it — the details tab never does.
+  const analysisActive = tab === 'analysis' || tab === 'remediation';
+  const analysisQuery = useSecurityAnalysis(scope, findingId, analysisActive);
   // Bumped once the boundary's recovery refetch settles, so the boundary
   // remounts with clean state over the recovered payload. Bumping it in the
   // same tick would mount the fresh boundary against the still-cached
@@ -84,6 +89,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const capability = useSecurityAgentCapability(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
   const { refresh: refreshDismissDraft } = dismissDraft;
+  // One role answer decides both the sentence a stored refusal paints and the
+  // step under it: the draft records which refusal it was, not which reader saw
+  // it, so `useCanManageBilling` is handed to the copy resolver while the step
+  // comes from the same predicate inside `useBillingAction`. A draft written for
+  // a member therefore reads the billing sentence with the step when a billing
+  // role opens it, and the reverse keeps the ask-an-owner sentence with no step.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   // The detail screen stays mounted while the dismiss sheet is open, so
   // re-read the draft on focus: a fresh failure must show the retry card and
@@ -154,30 +167,23 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }, [loadFailed, findingId]);
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
-  // The not-found and load-failure states share a header without an eyebrow
-  // line. Neither ever gains a repository, so the title belongs on the back
-  // control's row, centred on the chevron, rather than half a line below it
-  // above a gap no label ever fills.
+  // The not-found, load-failure and loading states share one header with its
+  // subtitle line reserved. The payload names the finding's repository on that
+  // line, and neither a not-found nor a failed read can be known before the
+  // first paint — the first frame is always the loading one — so dropping the
+  // line afterwards would pull the title up out of the position the loading
+  // frame gave it. Only a read that is still running paints the placeholder
+  // bar: a terminal answer, and a failure the retry surface holds, keep the
+  // same line blank so nothing pulses on a finishable screen.
   const pendingHeader = (
     <ScreenHeader
-      className="px-6"
       title={t('securityAgent.findingDetail.title')}
-      showBackButton
-      onBack={handleBack}
-    />
-  );
-
-  // Loading does gain the repository: the loaded header draws it on an eyebrow
-  // line above the title. The row centres the heading column against the back
-  // control, so that line moves the title down by half its height — 7.6 dp
-  // measured on the Android emulator — in the frame the payload lands. Reserving
-  // the line here puts the title where the payload will leave it, so it holds
-  // still from the first paint instead of being pushed down later.
-  const loadingHeader = (
-    <ScreenHeader
-      className="px-6"
-      title={t('securityAgent.findingDetail.title')}
-      reserveEyebrow
+      reserveSubtitle
+      subtitlePlaceholder={
+        findingQuery.isFetching && !notFound ? (
+          <Skeleton className="h-3.5 w-28 rounded-full" />
+        ) : undefined
+      }
       showBackButton
       onBack={handleBack}
     />
@@ -187,10 +193,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         {pendingHeader}
-        <EmptyState
-          icon={ShieldOff}
+        <QueryError
+          variant="not-found"
           title={t('securityAgent.dismiss.notFoundTitle')}
-          description={t('securityAgent.dismiss.notFoundDescription')}
+          message={t('securityAgent.dismiss.notFoundDescription')}
         />
       </View>
     );
@@ -212,12 +218,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        {loadingHeader}
-        <View className="flex-1 gap-3 px-6 pt-4">
-          <Skeleton className="h-6 w-2/3 rounded" />
-          <Skeleton className="h-4 w-1/3 rounded" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-40 w-full rounded-lg" />
+        {pendingHeader}
+        <View className="flex-1" style={sideInsetStyle}>
+          <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
+            <Skeleton className="h-6 w-2/3 rounded" />
+            <Skeleton className="h-4 w-1/3 rounded" />
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </View>
         </View>
       </View>
     );
@@ -229,95 +237,80 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // A pre-accept dismissal failure (no command id) leaves a durable draft; the
   // retry card restores it until the user retries or discards it.
   const draft = dismissDraft.draft;
-  const dismissFailure = draft?.lastError != null ? securityDismissFailureCopy(draft) : null;
+  // The segmented control's options: the three views under the labels the
+  // catalogs already carry for them.
+  const viewOptions = TABS.map(({ key, labelKey }) => ({ value: key, label: t(labelKey) }));
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('securityAgent.findingDetail.title')}
-        eyebrow={finding.repo_full_name}
+        subtitle={finding.repo_full_name}
+        reserveSubtitle
         showBackButton
         onBack={handleBack}
+        // The dismiss is one icon target, the shape every other header action
+        // in the app takes (the dashboard's findings and settings, the
+        // findings list's filter): a labelled button here outweighed the
+        // title it sits beside.
+        headerRightWidth={48}
         headerRight={
           canDismiss ? (
-            <Button
-              variant="secondary"
-              size="sm"
+            <IconButton
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
               accessibilityLabel={t('securityAgent.dismiss.title')}
-              // A labelled header action is variable width, so it bounds itself
-              // the way the settings Save button does: the label shrinks inside
-              // the cap instead of taking the title's room (see the trailing
-              // cluster note in screen-header.tsx).
-              className="min-w-0 max-w-[140px] shrink"
             >
-              <Ban size={16} color={colors.secondaryForeground} />
-              <Text className="shrink text-center">
-                {t('securityAgent.analysis.action.dismiss')}
-              </Text>
-            </Button>
+              <Ban size={20} color={colors.foreground} />
+            </IconButton>
           ) : undefined
         }
       />
-      {findingQuery.isError ? (
-        <View className="px-6 pb-2">
-          <SettingsRecoveryStatus
-            message={t('securityAgent.dismiss.couldNotLoad')}
-            isRetrying={findingQuery.isFetching}
-            onRetry={() => void findingQuery.refetch()}
-          />
-        </View>
-      ) : null}
-      {dismissFailure !== null && dismissDraft.draft ? (
-        <View className="px-6 pb-2">
-          <SecurityCommandRetryCard
-            lastError={dismissFailure}
-            retryable={dismissDraft.draft.retryable === true}
-            onRetry={() => {
-              pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
-            }}
-            onDiscard={() => {
-              dismissDraft.clear();
-            }}
-          />
-        </View>
-      ) : null}
-      <View accessibilityRole="tablist" className="flex-row gap-2 px-6 pb-2 pt-1">
-        {TABS.map(({ key, labelKey }) => {
-          const selected = tab === key;
-          return (
-            <Pressable
-              key={key}
-              className={cn(
-                // The strip is a segmented row: each tab carries the shared
-                // row floor on its own node so a tap anywhere in the tab's
-                // height lands, not just the label line.
-                ROW_TARGET_CLASS,
-                'flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
-                selected ? 'bg-selection' : 'bg-secondary'
-              )}
-              onPress={() => {
-                setTab(key);
+      {/* The status rows and the view switch sit beside the side insets that
+          the header and the panels' scroll views clear. */}
+      <View style={sideInsetStyle}>
+        {findingQuery.isError ? (
+          <View className="px-4 pb-2">
+            <SettingsRecoveryStatus
+              message={t('securityAgent.dismiss.couldNotLoad')}
+              isRetrying={findingQuery.isFetching}
+              onRetry={() => void findingQuery.refetch()}
+            />
+          </View>
+        ) : null}
+        {draft?.lastError != null ? (
+          <View className="px-4 pb-2">
+            <SecurityCommandRetryCard
+              lastError={securityDismissFailureCopy(draft, canManageBilling)}
+              retryable={draft.retryable === true}
+              action={isSecurityTrialRefusalCopyKey(draft.lastErrorKey) ? billingAction : undefined}
+              onRetry={() => {
+                pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
-              {...tabEntryA11y({ selected })}
-            >
-              <Text
-                className={cn(
-                  'text-xs font-medium',
-                  selected ? 'text-selection-foreground' : 'text-foreground'
-                )}
-              >
-                {t(labelKey)}
-              </Text>
-            </Pressable>
-          );
-        })}
+              onDiscard={() => {
+                dismissDraft.clear();
+              }}
+            />
+          </View>
+        ) : null}
+        {/* The three views are the app's one view switch: the shared segmented
+            control, which owns the track, the selected pill, the 48pt floor and
+            the selection tick. Each view swaps the body below it, so the strip
+            reads as tabs. Its accessible name is the screen's own, so a reader
+            hears the finding's views, not an unnamed tab list. */}
+        <View className="px-4 pb-2 pt-1">
+          <SegmentedControl
+            options={viewOptions}
+            value={tab}
+            semantics="tabs"
+            accessibilityLabel={t('securityAgent.findingDetail.title')}
+            onChange={setTab}
+          />
+        </View>
       </View>
       {tab === 'details' && (
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-2">
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
           <FindingDetailsPanel finding={finding} scope={scope} />
         </TabScreenScrollView>
       )}

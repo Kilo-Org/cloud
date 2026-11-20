@@ -5,3 +5,4 @@ export * from './commands';
 export * from './settings';
 export * from './sync-preconditions';
 export * from './config-conflict';
+export * from './stable-error-messages';

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
+import { getDeviceAuthStartRefusalError } from '@/lib/auth/poll-response';
 import {
   buildDeviceAuthPollRequest,
   parseDeviceAuthTokenResponse,
@@ -32,7 +32,8 @@ vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://app.kilo.ai',
 }));
 
-vi.mock('@/lib/auth/device-auth-poll', () => ({
+vi.mock('@/lib/auth/device-auth-poll', async importOriginal => ({
+  ...(await importOriginal<typeof DeviceAuthPoll>()),
   startDeviceAuthPoll: vi.fn(() => ({ cleanup: vi.fn(), pollNow: vi.fn() })),
 }));
 
@@ -51,6 +52,7 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/trpc', () => ({ trpcClient: {} }));
 
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
+import type * as DeviceAuthPoll from '@/lib/auth/device-auth-poll';
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import { pendingDeviceAuthState } from '@/lib/auth/device-auth-state';
 import { openAuthSessionAsync, openBrowserAsync } from 'expo-web-browser';
@@ -69,29 +71,40 @@ describe('device-auth polling request', () => {
   });
 });
 
-// --- Existing 429 tests (unchanged) ---
+// --- Device-auth start refusals ---
 
-describe('use-device-auth start path — 429 rate-limit message', () => {
-  it('carries the server error field as untranslated text', () => {
+describe('use-device-auth start path — rate-limit refusal', () => {
+  it('reads the stable RATE_LIMITED code and ignores the server sentence', () => {
     const serverBody = {
-      error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.',
+      error: 'RATE_LIMITED',
+      message: 'x',
+      retryAfterSeconds: 30,
     };
-    const error = getDeviceAuth429Error(serverBody);
-    expect(error).toEqual({ kind: 'text', text: serverBody.error });
-  });
-
-  it('falls back to the catalog key when the server body has no error field', () => {
-    const serverBody: { error?: string } = {};
-    expect(getDeviceAuth429Error(serverBody)).toEqual({
+    // A status other than 429, so the code alone decides this case.
+    expect(getDeviceAuthStartRefusalError(serverBody, 400)).toEqual({
       kind: 'key',
       key: 'authErrors.tooManySignInAttempts',
     });
   });
 
-  it('falls back to the catalog key when JSON parsing fails', () => {
-    expect(getDeviceAuth429Error(undefined)).toEqual({
+  it('keeps the rate-limit copy for a 429 whose body names no code', () => {
+    expect(getDeviceAuthStartRefusalError(undefined, 429)).toEqual({
       kind: 'key',
       key: 'authErrors.tooManySignInAttempts',
+    });
+  });
+
+  it('keeps the rate-limit copy for a 429 whose body names another code', () => {
+    expect(getDeviceAuthStartRefusalError({ error: 'SOMETHING_ELSE' }, 429)).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
+  });
+
+  it('falls back to the generic start failure for a non-429 refusal', () => {
+    expect(getDeviceAuthStartRefusalError({ error: 'INVALID_REQUESTING_CLIENT' }, 400)).toEqual({
+      kind: 'key',
+      key: 'authErrors.startSignInFailed',
     });
   });
 });
@@ -223,7 +236,7 @@ type PendingExternalAuthRecord = {
   deviceCode: string;
   userCode: string;
   verificationUrl: string;
-  startedAt: number;
+  expiresAt: number;
 };
 
 type DeviceAuthResult = ReturnType<typeof useDeviceAuth>;
@@ -302,7 +315,8 @@ describe('useDeviceAuth hook', () => {
       deviceCode: 'device-secret',
       userCode: 'UC-1234',
       verificationUrl: 'https://example.com/device-auth?code=UC-1234',
-      startedAt: Date.now(),
+      // Not the 5-minute default, so a restarted budget cannot match it.
+      expiresAt: Date.now() + 437_000,
     };
     vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'valid', record });
 
@@ -314,6 +328,8 @@ describe('useDeviceAuth hook', () => {
     expect(startDeviceAuthPoll).toHaveBeenCalledTimes(1);
     // The resumed poll closes whatever the flow opened for this URL.
     expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].browserKind).toBe('plain-browser');
+    // The resumed poll keeps the stored server deadline instead of a new budget.
+    expect(vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].expiresAt).toBe(record.expiresAt);
   });
 
   it('lets a start() that runs during the restore read win without a second poll', async () => {
@@ -339,7 +355,7 @@ describe('useDeviceAuth hook', () => {
           deviceCode: 'stale-device',
           userCode: 'STALE',
           verificationUrl: 'https://stale.example',
-          startedAt: Date.now(),
+          expiresAt: Date.now() + 600_000,
         },
       });
       await Promise.resolve();
@@ -503,6 +519,28 @@ describe('useDeviceAuth hook', () => {
     expect(init).not.toHaveProperty('body');
   });
 
+  it('gives the poll and the stored record the server code lifetime', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({
+        code: 'UC',
+        verificationUrl: 'https://app.kilo.ai/device-auth?code=UC',
+        expiresIn: 600,
+      })
+    );
+    const before = Date.now();
+
+    const result = requireResult(await mountSettled());
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    const expiresAt = vi.mocked(startDeviceAuthPoll).mock.calls[0]?.[0].expiresAt ?? 0;
+    expect(expiresAt).toBeGreaterThanOrEqual(before + 600_000);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 600_000);
+    expect(vi.mocked(writePendingExternalAuth).mock.calls[0]?.[0].expiresAt).toBe(expiresAt);
+  });
+
   it('reports a refused pending link as expired instead of a start error', async () => {
     vi.mocked(openAuthSessionAsync).mockClear();
     vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
@@ -535,6 +573,30 @@ describe('useDeviceAuth hook', () => {
       key: 'authErrors.startSignInFailed',
     });
     expect(resultRef.current?.expiredPendingLinkToken).toBeUndefined();
+  });
+
+  it('shows the rate-limit copy for a refused start and opens no browser', async () => {
+    vi.mocked(openAuthSessionAsync).mockClear();
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json(
+        { error: 'RATE_LIMITED', message: 'Too many sign-in attempts.', retryAfterSeconds: 600 },
+        { status: 429 }
+      )
+    );
+
+    const resultRef = await mountSettled();
+    await act(async () => {
+      await requireResult(resultRef).start('signin');
+    });
+
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.error).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
+    expect(startDeviceAuthPoll).not.toHaveBeenCalled();
+    expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
   });
 
   it('opens a plain browser for a non-product auth host (no consent alert)', async () => {

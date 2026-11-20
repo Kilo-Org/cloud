@@ -526,7 +526,7 @@ describe('scoped workspace folder tools', () => {
     const assignment = tools.find(tool => tool.name === 'assign_workspace_to_folder');
     expect(assignment?.annotations.readOnlyHint).toBe(false);
     expect(assignment?.description).toContain('all sibling chats');
-    expect(assignment?.description).toContain('Cannot move the parent workspace');
+    expect(assignment?.description).toContain('Cannot move this workspace');
   });
 });
 

@@ -75,6 +75,7 @@ describe('GET /api/v1/embedding-models', () => {
     const response = await handleEmbeddingModelsRequest();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
     await expect(response.json()).resolves.toEqual(catalog);
     expect(getUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
@@ -89,6 +90,7 @@ describe('GET /api/v1/embedding-models', () => {
     const response = await handleEmbeddingModelsRequest();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
     await expect(response.json()).resolves.toEqual(catalog);
   });
 
@@ -140,6 +142,7 @@ describe('GET /api/v1/embedding-models', () => {
       const response = await handleEmbeddingModelsRequest();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
       await expect(response.json()).resolves.toEqual({
         defaultModel: 'openai/text-embedding-3-small',
         models: catalog.models.slice(1),

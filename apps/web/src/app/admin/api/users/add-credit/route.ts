@@ -50,6 +50,60 @@ export async function POST(
     return warnAndCreateErrorResponse('Invalid credit kind');
   }
   const credit_expiry_date = requestData.credit_expiry_date ?? requestData.creditExpiryDate;
+  const amount_usd = requestData.amount_usd ?? requestData.creditAmount;
+  if (creditKind === 'promotional' && credit_expiry_date) {
+    const expiryTime = new Date(credit_expiry_date).getTime();
+    if (Number.isNaN(expiryTime)) {
+      return warnAndCreateErrorResponse('Credit expiry date is not a valid date');
+    }
+    // Negative grants (debits) never store an expiry, so their supplied date has no effect.
+    if (amount_usd == null || amount_usd > 0) {
+      if (expiryTime <= Date.now()) {
+        // A replay of an idempotent category writes nothing, so the expiry rule
+        // does not apply to it. These are the terms of the partial unique index
+        // that makes the grant insert conflict.
+        const category = promoCreditCategoriesByKey.get(credit_category);
+        if (category?.is_idempotent) {
+          const [existing] = await db
+            .select({ id: credit_transactions.id })
+            .from(credit_transactions)
+            .where(
+              and(
+                eq(credit_transactions.kilo_user_id, user.id),
+                eq(credit_transactions.credit_category, credit_category),
+                eq(credit_transactions.check_category_uniqueness, true)
+              )
+            )
+            .limit(1);
+          if (existing) {
+            return warnAndCreateErrorResponse(
+              `Code ${credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${email}.`
+            );
+          }
+        }
+        return warnAndCreateErrorResponse('Credit expiry date must be in the future');
+      }
+    }
+  }
+  const requested_expiry_hours = requestData.expiry_hours ?? requestData.creditExpiryHours;
+  // A negative hour count would store an expiry before the current instant,
+  // and the ledger must not show an expiry in the past. A debit does not store
+  // the supplied expiry, so its supplied hours have no effect here.
+  if (
+    creditKind === 'promotional' &&
+    requested_expiry_hours != null &&
+    (amount_usd == null || amount_usd > 0)
+  ) {
+    const hours: unknown = requested_expiry_hours;
+    // An unparseable count cannot be trusted, and a negative one would store an
+    // expiry before the current instant. Report each cause on its own.
+    if (typeof hours !== 'number' || !Number.isFinite(hours)) {
+      return warnAndCreateErrorResponse('Expiry hours must be a number');
+    }
+    if (hours < 0) {
+      return warnAndCreateErrorResponse('Expiry hours must not be negative');
+    }
+  }
   const options = {
     amount_usd: requestData.amount_usd ?? requestData.creditAmount ?? undefined,
     creditKind,

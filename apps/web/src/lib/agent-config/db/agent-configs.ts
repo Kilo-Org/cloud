@@ -210,22 +210,73 @@ export async function upsertAgentConfigForOwner(
       });
   });
 
-  // Create bot user for code review agents (only for organizations)
-  if (data.agentType === 'code_review' && data.owner.type === 'org') {
-    try {
-      await ensureBotUserForOrg(data.owner.id, 'code-review');
-    } catch (error) {
-      // Log warning but don't fail the config save
-      warnExceptInTest('[upsertAgentConfig] Failed to create bot user:', error);
-      captureException(error, {
-        tags: { operation: 'upsert-agent-config', step: 'ensure-bot-user' },
-        extra: {
-          ownerType: data.owner.type,
-          ownerId: data.owner.id,
-          agentType: data.agentType,
+  await ensureCodeReviewBotUser(data.owner, data.agentType);
+}
+
+/**
+ * Creates an enabled configuration for an owner that has none, or enables an
+ * existing row.
+ *
+ * The conflict branch writes only the enabled flag, so a first enable never
+ * replaces a configuration saved concurrently with the default configuration.
+ */
+export async function createOrEnableAgentConfigForOwner(data: {
+  owner: AgentConfigOwner;
+  agentType: string;
+  platform: string;
+  config: CodeReviewAgentConfig | Record<string, unknown>;
+  createdBy: string;
+}) {
+  const config =
+    data.agentType === 'code_review'
+      ? withPlatformRepositoryMode(data.platform, data.config)
+      : data.config;
+
+  await db.transaction(async tx => {
+    await assertAgentConfigCanBeEnabled({
+      owner: data.owner,
+      platform: data.platform,
+      enabled: true,
+      executor: tx,
+    });
+    await tx
+      .insert(agent_configs)
+      .values({
+        ...agentConfigOwnerValues(data.owner),
+        agent_type: data.agentType,
+        platform: data.platform,
+        config,
+        is_enabled: true,
+        created_by: data.createdBy,
+      })
+      .onConflictDoUpdate({
+        target: agentConfigConflictTarget(data.owner),
+        set: {
+          is_enabled: true,
+          updated_at: new Date().toISOString(),
         },
       });
-    }
+  });
+
+  await ensureCodeReviewBotUser(data.owner, data.agentType);
+}
+
+async function ensureCodeReviewBotUser(owner: AgentConfigOwner, agentType: string) {
+  if (agentType !== 'code_review' || owner.type !== 'org') return;
+
+  try {
+    await ensureBotUserForOrg(owner.id, 'code-review');
+  } catch (error) {
+    // Log warning but don't fail the config save
+    warnExceptInTest('[upsertAgentConfig] Failed to create bot user:', error);
+    captureException(error, {
+      tags: { operation: 'upsert-agent-config', step: 'ensure-bot-user' },
+      extra: {
+        ownerType: owner.type,
+        ownerId: owner.id,
+        agentType,
+      },
+    });
   }
 }
 

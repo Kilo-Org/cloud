@@ -258,6 +258,7 @@ describe('null-pepper personal webhook compatibility', () => {
         connectionString: 'unused',
         resourceKind: 'cloud-agent-next',
         resourceId: 'session-1',
+        environment: 'production',
         adapters: {
           getPrincipal: async () => ({
             id: 'oauth/personal',

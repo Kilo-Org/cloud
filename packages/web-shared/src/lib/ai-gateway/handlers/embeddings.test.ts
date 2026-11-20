@@ -693,7 +693,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(getUpstreamBody().provider).toEqual({ data_collection: 'deny' });
+      expect(getUpstreamBody().provider).toEqual({ only: ['azure'], data_collection: 'deny' });
     }
   );
 
@@ -736,7 +736,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     });
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(
-      makeRequest({ provider: { zdr: false, only: ['azure'] } })
+      makeRequest({ provider: { zdr: false, only: ['openai', 'azure'] } })
     );
 
     expect(response.status).toBe(200);
@@ -745,6 +745,46 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       data_collection: 'allow',
       zdr: false,
     });
+  });
+
+  it('forwards the request provider lists alongside the organization data collection policy', async () => {
+    setUserAuth({ data_collection: 'deny', provider_allow_list: ['openai', 'azure'] });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({
+        provider: {
+          only: ['openai', 'azure'],
+          ignore: ['azure'],
+          order: ['openai', 'azure'],
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(getUpstreamBody().provider).toEqual({
+      only: ['openai', 'azure'],
+      ignore: ['azure'],
+      order: ['openai', 'azure'],
+      data_collection: 'deny',
+    });
+  });
+
+  it('rejects a request whose providers the group routes exclude', async () => {
+    setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai'] });
+    mockedResolveModelDecision.mockResolvedValue({
+      ...allowedModelDecision,
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+    });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({ provider: { only: ['azure'], zdr: true } })
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.model_not_allowed,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('answers malformed JSON without reporting the body to Sentry', async () => {

@@ -7,7 +7,6 @@ import {
   WORKSPACE_ARTIFACT_MAX_DEPTH,
   WORKSPACE_ARTIFACT_MAX_FILES,
   WORKSPACE_ARTIFACT_MAX_PATH_BYTES,
-  WORKSPACE_ARTIFACT_RETENTION_MS,
 } from './workspace-artifacts.js';
 
 describe('validateWorkspaceArtifactPath', () => {
@@ -103,7 +102,6 @@ describe('workspace artifact helpers', () => {
     expect(WORKSPACE_ARTIFACT_MAX_PATH_BYTES).toBe(
       publicArtifacts.WORKSPACE_ARTIFACT_MAX_PATH_BYTES
     );
-    expect(WORKSPACE_ARTIFACT_RETENTION_MS).toBe(publicArtifacts.WORKSPACE_ARTIFACT_RETENTION_MS);
   });
 
   it('maps file extensions to content types and falls back to octet-stream', () => {

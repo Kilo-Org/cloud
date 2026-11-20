@@ -2,10 +2,8 @@ import { useEffect } from 'react';
 import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { type ReviewConfigData, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { reviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import {
   getRepoSelectionSender,
   isRepoSelectionEpochCurrent,
@@ -13,10 +11,12 @@ import {
   sameSelection,
   scheduleSend,
 } from '@/lib/hooks/repo-selection-senders';
+import { useReviewerBillingRefusal } from '@/lib/hooks/reviewer-refusal';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient } from '@/lib/trpc';
 
 import {
+  announceReviewerSaveFailure,
   gitLabWebhookWarningQueryKey,
   isPersonal,
   toNumericRepositoryIds,
@@ -35,6 +35,7 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
   const queryKey = useReviewConfigQueryKey(scope, platform);
   const webhookWarningQueryKey = gitLabWebhookWarningQueryKey(scope, platform);
   const saveChainKey = `${scope}:${platform}`;
+  const refusal = useReviewerBillingRefusal(scope);
 
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -96,9 +97,7 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
       }
       // Same reason as the full config save: the server's sentence is English
       // and may name a refusal the app explains itself.
-      announcingToast.error(
-        reviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed')).message
-      );
+      announceReviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed'), refusal);
     },
     onSuccess: (_result, vars) => {
       if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {

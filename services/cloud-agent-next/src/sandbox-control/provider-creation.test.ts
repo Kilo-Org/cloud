@@ -1,7 +1,12 @@
 import { supervisorStartup } from '../../test/fixtures/supervisor-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ContainerCapacityUnavailableError } from '../container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  getContainerCapacityFailureReason,
+} from '../container-concurrency.js';
 import { containerLimitError } from '../container-limit-test-helpers.js';
+import { messageFailureText } from '../control-plane/session/failure-messages.js';
+import { logger } from '../logger.js';
 import {
   parseSandboxBillingInput,
   type SandboxBillingAdmissionResult,
@@ -15,6 +20,10 @@ import {
 import { createCloudflareContainersProviderAdapter } from './cloudflare-containers-provider.js';
 import { createControlPlaneCredential } from './managed-credential.js';
 import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
+import {
+  RUNTIME_PROXY_ORIGIN_HEADER,
+  runtimeProxyOriginProof,
+} from '../runtime-credential-proxy-origin.js';
 import {
   createVercelProviderAdapter,
   decodeVercelProviderRef,
@@ -238,6 +247,35 @@ describe('cloudflare-containers creation causes', () => {
       await expect(provider.create(intent)).rejects.toBe(denial);
     }
   );
+
+  it('preserves the user-facing limit reason without an RPC failure or retry', async () => {
+    const admit = vi.fn<() => Promise<SandboxBillingAdmissionResult>>().mockResolvedValue({
+      success: false,
+      code: 'container_limit_reached',
+      message: 'Meter capacity rejection',
+    });
+    const withFields = vi.spyOn(logger, 'withFields');
+    try {
+      const error = await cloudflareProvider(admit)
+        .create(intent)
+        .catch((error: unknown) => error);
+      expect(error).toMatchObject({
+        name: 'ContainerUsageAdmissionError',
+        code: 'container_limit_reached',
+        message: 'Meter capacity rejection',
+      });
+      const reason = getContainerCapacityFailureReason(error);
+      expect(reason).toBe('container_limit_reached');
+      expect(messageFailureText(reason ?? '')).toBe(
+        'Container limit reached. Stop an existing container before starting another.'
+      );
+      expect(admit).toHaveBeenCalledOnce();
+      expect(withFields).not.toHaveBeenCalled();
+    } finally {
+      withFields.mockRestore();
+    }
+  });
+
   it.each([
     'insufficient_credits',
     'stopping',
@@ -487,6 +525,20 @@ describe('Vercel runtime metadata', () => {
     }
   );
 
+  it('reads a ref that a newer Worker wrote and drops the fields it does not know', () => {
+    const known = {
+      sandboxName: SANDBOX_ID,
+      sessionId: 'physical-session',
+      metadata: { region: 'iad1' },
+    };
+    const newerRef = JSON.stringify({
+      ...known,
+      addedLater: 'value',
+      metadata: { ...known.metadata, addedLater: 1 },
+    });
+    expect(decodeVercelProviderRef(newerRef)).toEqual(known);
+  });
+
   it('reads old refs without metadata using the configured snapshot and no region', () => {
     const provider = createVercelProviderAdapter({
       sandboxName: SANDBOX_ID,
@@ -540,13 +592,17 @@ function containedGrantWithProxy(): SessionCredentialGrant {
 }
 
 describe('Vercel contained-credential policy wiring', () => {
-  async function createBodyFor(grants: readonly SessionCredentialGrant[]): Promise<unknown> {
+  async function createBodyFor(
+    grants: readonly SessionCredentialGrant[],
+    env?: { NEXTAUTH_SECRET: string }
+  ): Promise<unknown> {
     const request = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response('provider error', { status: 500 }));
     vi.stubGlobal('fetch', request);
     const provider = createVercelProviderAdapter({
       sandboxName: SANDBOX_ID,
+      env,
       config,
       readContainedGrants: async () => grants,
     });
@@ -563,6 +619,18 @@ describe('Vercel contained-credential policy wiring', () => {
     const body = (await createBodyFor([grant])) as { networkPolicy: unknown };
     expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([grant]));
     expect(JSON.stringify(body.networkPolicy)).toContain('handle_test');
+  });
+
+  it('injects the logical sandbox origin proof beside the runtime-proxy handle', async () => {
+    const grant = containedGrantWithProxy();
+    const env = { NEXTAUTH_SECRET: 'origin-test-secret' };
+    const proof = await runtimeProxyOriginProof(env, SANDBOX_ID);
+    if (proof === null) throw new Error('missing origin proof');
+    const body = (await createBodyFor([grant], env)) as { networkPolicy: unknown };
+    expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([grant], undefined, {}, proof));
+    expect(JSON.stringify(body.networkPolicy)).toContain(
+      `"${RUNTIME_PROXY_ORIGIN_HEADER}":"${proof}"`
+    );
   });
 
   it('creates with unrestricted egress and no credential injections for an empty grant set', async () => {

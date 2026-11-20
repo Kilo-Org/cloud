@@ -69,7 +69,7 @@ describe('EnvironmentVariablesEditor readOnly', () => {
     const markup = renderVariables(true);
 
     expect(tag(markup, 'textarea')).toMatch(/\sreadOnly=""/i);
-    expect(markup).toContain('Secret values are hidden. Only their names are shown.');
+    expect(markup).toContain('Saved values are hidden. Only their names are shown.');
     expect(markup).not.toContain('New and replaced values are encrypted.');
     expect(markup).toContain('NODE_ENV');
   });
@@ -79,6 +79,6 @@ describe('EnvironmentVariablesEditor readOnly', () => {
 
     expect(tag(markup, 'textarea')).not.toMatch(/\sreadOnly=/i);
     expect(markup).toContain('New and replaced values are encrypted.');
-    expect(markup).not.toContain('Secret values are hidden.');
+    expect(markup).not.toContain('Saved values are hidden.');
   });
 });

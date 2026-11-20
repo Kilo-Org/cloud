@@ -80,6 +80,7 @@ async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {
       canManage
       canManageLimit
       callerRole="owner"
+      canManageBilling={false}
       enableUsageLimits
       isSalesDemo={false}
       organizationId="org-1"
@@ -161,7 +162,7 @@ describe('MemberRow menu', () => {
 
     expect(actionsMenu().visible).toBe(false);
     expect(row.props.accessibilityLabel).toBe(
-      i18n.t('organization.members.manageA11y', { name: 'Member E2E' })
+      `${i18n.t('organization.members.manageA11y', { name: 'Member E2E' })}, member@example.com`
     );
 
     await act(() => {
@@ -179,6 +180,32 @@ describe('MemberRow menu', () => {
     ]);
     expect(menu.options[2]?.destructive).toBe(true);
     expect(menu.options[0]?.destructive).toBeUndefined();
+  });
+
+  it('names a row whose display name repeats another member by its email', async () => {
+    // Two members can carry the same display name; the email is the row's
+    // unique fact, so the accessible name carries it and the rows differ.
+    const duplicate = { ...member, name: 'Same Name' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: duplicate });
+
+    expect(renderer.root.findByType('Pressable').props.accessibilityLabel).toBe(
+      `${i18n.t('organization.members.manageA11y', { name: 'Same Name' })}, member@example.com`
+    );
+  });
+
+  it('does not repeat the email for a member with no name', async () => {
+    // The nameless row already reads by its email; appending it again would
+    // say the address twice.
+    const nameless = { ...member, name: '' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: nameless });
+
+    expect(renderer.root.findByType('Pressable').props.accessibilityLabel).toBe(
+      i18n.t('organization.members.manageA11y', { name: 'member@example.com' })
+    );
   });
 
   it('offers an admin the daily limit alone on an owner row', async () => {
@@ -389,7 +416,10 @@ describe('MemberRow menu', () => {
     };
   }
 
-  it('renders the mapped refusal on the row when the server refuses the role change', async () => {
+  // The row renders no billing step beside the refusal, so the caller's role
+  // picks between the owner-naming copy (a member) and the sentence that names
+  // the destination (a money role).
+  it('renders the owner-naming refusal to a member for a refused role change', async () => {
     mocks.hookFactory.mockImplementation(() =>
       hookMutations({
         updateMember: {
@@ -398,9 +428,24 @@ describe('MemberRow menu', () => {
         },
       })
     );
-    const view = await renderRow();
+    const view = await renderRow({ canManageBilling: false });
 
     expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('renders the destination refusal to a money role for a refused role change', async () => {
+    mocks.hookFactory.mockImplementation(() =>
+      hookMutations({
+        updateMember: {
+          isError: true,
+          error: { data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' } },
+        },
+      })
+    );
+    const view = await renderRow({ canManageBilling: true });
+
+    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEndedBillingAtKiloAi'));
+    expect(textsOf(view)).not.toContain(i18n.t('common.organizationTrialEnded'));
   });
 
   it('states a refused removal carried by the screen, after the row remounted', async () => {
@@ -460,7 +505,8 @@ describe('MemberRow menu', () => {
 
     expect(onRemovalStarted).toHaveBeenCalledWith('membership-1');
     // The mapped sentence for the recognized server message, not the generic
-    // fallback: this is what tells the mapping from a bare restore.
+    // fallback: this is what tells the mapping from a bare restore. The
+    // harness reads as a member, so the owner-naming copy is the mapped one.
     expect(settled).toEqual({
       kind: 'removal-refused',
       message: i18n.t('common.organizationTrialEnded'),

@@ -81,7 +81,11 @@ export function buildAppReturnOutcomeView(input: {
     input.error === 'shared_installation_disabled' ||
     input.error === 'incompatible_workflow' ||
     input.error === 'installation_unavailable' ||
-    input.error === 'multiple_installations_disabled';
+    input.error === 'multiple_installations_disabled' ||
+    // The start route refused to mint an install state for this reader's
+    // organization role, so no retry can mint one either; the card names who
+    // can start it instead of offering a press that fails the same way.
+    input.error === 'installation_start_refused';
   const returnQuery = isSuccess
     ? 'github_install=success'
     : isPending
@@ -108,11 +112,13 @@ export function buildAppReturnOutcomeView(input: {
               ? 'That GitHub installation has an existing workflow that is not yet compatible with shared access.'
               : input.error === 'multiple_installations_disabled'
                 ? 'This Kilo organization can currently connect only one GitHub organization.'
-                : input.error === 'installation_unavailable'
-                  ? INSTALLATION_UNAVAILABLE_MESSAGE
-                  : input.error === 'install_state_user_mismatch'
-                    ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-                    : 'The installation did not complete. Try again or return to the Kilo App.';
+                : input.error === 'installation_start_refused'
+                  ? 'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they can manage it in GitHub.'
+                  : input.error === 'installation_unavailable'
+                    ? INSTALLATION_UNAVAILABLE_MESSAGE
+                    : input.error === 'install_state_user_mismatch'
+                      ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
+                      : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {

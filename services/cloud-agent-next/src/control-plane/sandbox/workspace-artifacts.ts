@@ -1,4 +1,4 @@
-import { asc, count, eq, inArray, lte } from 'drizzle-orm';
+import { asc, count, eq, inArray } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/durable-sqlite';
 import { z } from 'zod';
 import {
@@ -12,7 +12,6 @@ import {
   WORKSPACE_ARTIFACT_MAX_FILES,
   WORKSPACE_ARTIFACT_MAX_TOTAL_BYTES,
   WORKSPACE_ARTIFACT_RESERVATION_TTL_MS,
-  WORKSPACE_ARTIFACT_RETENTION_MS,
   type CommitWorkspaceArtifactResult,
   type DeleteWorkspaceArtifactForUserResult,
   type ReserveWorkspaceArtifactUploadResult,
@@ -48,8 +47,6 @@ type WorkspaceArtifactTransaction = Parameters<
 >[0];
 
 export type WorkspaceArtifactIndex = ReturnType<typeof createWorkspaceArtifactIndex>;
-
-type Outcome<T> = { result: T; revision: number; changed: boolean };
 
 export function createWorkspaceArtifactIndex(input: {
   db: WorkspaceArtifactDatabase;
@@ -123,20 +120,6 @@ export function createWorkspaceArtifactIndex(input: {
     );
   }
 
-  function pruneExpired(tx: WorkspaceArtifactTransaction, at: number): number {
-    const before = revision();
-    const cutoff = at - WORKSPACE_ARTIFACT_RETENTION_MS;
-    const expired = tx
-      .select({ objectKey: workspaceArtifacts.object_key })
-      .from(workspaceArtifacts)
-      .where(lte(workspaceArtifacts.updated_at, cutoff))
-      .all();
-    if (expired.length === 0) return before;
-    for (const row of expired) writeOrphan(tx, row.objectKey, at);
-    tx.delete(workspaceArtifacts).where(lte(workspaceArtifacts.updated_at, cutoff)).run();
-    return bumpRevision();
-  }
-
   function entryFromRow(row: typeof workspaceArtifacts.$inferSelect): WorkspaceArtifactEntry {
     return {
       relativePath: row.relative_path,
@@ -144,7 +127,6 @@ export function createWorkspaceArtifactIndex(input: {
       sizeBytes: row.size_bytes,
       contentType: row.content_type,
       updatedAt: row.updated_at,
-      expiresAt: row.updated_at + WORKSPACE_ARTIFACT_RETENTION_MS,
     };
   }
 
@@ -189,11 +171,6 @@ export function createWorkspaceArtifactIndex(input: {
     return totals(tx).count + queued < WORKSPACE_ARTIFACT_MAX_FILES;
   }
 
-  function finish<T>(outcome: Outcome<T>): T {
-    if (outcome.changed) input.onChanged?.(outcome.revision);
-    return outcome.result;
-  }
-
   function clearRows(): number {
     return input.db.transaction(tx => {
       const queued = tx
@@ -228,9 +205,7 @@ export function createWorkspaceArtifactIndex(input: {
       const parsed = workspaceArtifactReserveInputSchema.safeParse(reserveInput);
       if (!parsed.success) return { status: 'invalid_path' };
       const at = now();
-      const outcome: Outcome<ReserveWorkspaceArtifactUploadResult> = input.db.transaction(tx => {
-        const before = revision();
-        const pruned = pruneExpired(tx, at);
+      return input.db.transaction(tx => {
         const existing = tx
           .select({ sizeBytes: workspaceArtifacts.size_bytes })
           .from(workspaceArtifacts)
@@ -241,11 +216,7 @@ export function createWorkspaceArtifactIndex(input: {
           !withinQuota(tx, parsed.data.sizeBytes, previousSizeBytes) ||
           !withinReservationQuota(tx, existing !== undefined)
         ) {
-          return {
-            result: { status: 'quota_exceeded' },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'quota_exceeded' };
         }
         // In-flight uploads already occupy bucket storage, so they count against
         // the byte quota. Exceeding it is transient: the caller retries later.
@@ -254,22 +225,13 @@ export function createWorkspaceArtifactIndex(input: {
           active.count >= WORKSPACE_ARTIFACT_MAX_ACTIVE_RESERVATIONS ||
           !withinQuota(tx, parsed.data.sizeBytes, previousSizeBytes, active.bytes)
         ) {
-          return {
-            result: { status: 'busy' },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'busy' };
         }
         const objectKey = workspaceArtifactObjectKey(input.sandboxId, crypto.randomUUID());
         writeOrphan(tx, objectKey, at);
         writeReservation(objectKey, at, parsed.data.sizeBytes);
-        return {
-          result: { status: 'ok', objectKey },
-          revision: pruned,
-          changed: pruned !== before,
-        };
+        return { status: 'ok', objectKey };
       });
-      return finish(outcome);
     },
 
     commit(commitInput: WorkspaceArtifactCommitInput): CommitWorkspaceArtifactResult {
@@ -282,9 +244,7 @@ export function createWorkspaceArtifactIndex(input: {
       const { relativePath, objectKey, contentHash, sizeBytes, contentType } = parsed.data;
       if (!objectKey.startsWith(`${input.sandboxId}/`)) return { status: 'invalid_path' };
       const at = now();
-      const outcome: Outcome<CommitWorkspaceArtifactResult> = input.db.transaction(tx => {
-        const before = revision();
-        const pruned = pruneExpired(tx, at);
+      const result = input.db.transaction((tx): CommitWorkspaceArtifactResult => {
         const existing = tx
           .select()
           .from(workspaceArtifacts)
@@ -299,11 +259,7 @@ export function createWorkspaceArtifactIndex(input: {
           tx.delete(workspaceArtifactOrphans)
             .where(eq(workspaceArtifactOrphans.object_key, objectKey))
             .run();
-          return {
-            result: { status: 'unchanged', revision: pruned },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'unchanged', revision: revision() };
         }
         const reservation = readReservation(objectKey);
         if (
@@ -312,20 +268,12 @@ export function createWorkspaceArtifactIndex(input: {
           !hasOrphan(tx, objectKey)
         ) {
           if (reservation !== null) deleteReservation(objectKey);
-          return {
-            result: { status: 'reservation_missing' },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'reservation_missing' };
         }
         if (reservation.expiresAt <= at) {
           // Leave the reservation for the alarm to claim and delete; deleting
           // it here would hide the expired object until the orphan grace.
-          return {
-            result: { status: 'reservation_expired' },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'reservation_expired' };
         }
         if (existing?.content_hash === contentHash) {
           deleteReservation(objectKey);
@@ -334,19 +282,11 @@ export function createWorkspaceArtifactIndex(input: {
               .where(eq(workspaceArtifactOrphans.object_key, objectKey))
               .run();
           }
-          return {
-            result: { status: 'unchanged', revision: pruned },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'unchanged', revision: revision() };
         }
         if (!withinQuota(tx, sizeBytes, existing?.size_bytes ?? null)) {
           deleteReservation(objectKey);
-          return {
-            result: { status: 'quota_exceeded' },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'quota_exceeded' };
         }
         if (existing !== undefined && existing.object_key !== objectKey) {
           writeOrphan(tx, existing.object_key, at);
@@ -375,14 +315,10 @@ export function createWorkspaceArtifactIndex(input: {
             },
           })
           .run();
-        const next = bumpRevision();
-        return {
-          result: { status: 'committed', revision: next },
-          revision: next,
-          changed: true,
-        };
+        return { status: 'committed', revision: bumpRevision() };
       });
-      return finish(outcome);
+      if (result.status === 'committed') input.onChanged?.(result.revision);
+      return result;
     },
 
     deleteForUser(deleteInput: {
@@ -392,80 +328,47 @@ export function createWorkspaceArtifactIndex(input: {
       const parsed = workspaceArtifactDeleteInputSchema.safeParse(deleteInput);
       if (!parsed.success) return { status: 'absent', revision: revision() };
       const at = now();
-      const outcome: Outcome<DeleteWorkspaceArtifactForUserResult> = input.db.transaction(tx => {
-        const before = revision();
-        const pruned = pruneExpired(tx, at);
+      const result = input.db.transaction((tx): DeleteWorkspaceArtifactForUserResult => {
         const existing = tx
           .select()
           .from(workspaceArtifacts)
           .where(eq(workspaceArtifacts.relative_path, parsed.data.relativePath))
           .get();
         if (existing === undefined) {
-          return {
-            result: { status: 'absent', revision: pruned },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'absent', revision: revision() };
         }
         if (existing.content_hash !== parsed.data.expectedHash) {
-          return {
-            result: { status: 'hash_mismatch', revision: pruned },
-            revision: pruned,
-            changed: pruned !== before,
-          };
+          return { status: 'hash_mismatch', revision: revision() };
         }
         writeOrphan(tx, existing.object_key, at);
         tx.delete(workspaceArtifacts)
           .where(eq(workspaceArtifacts.relative_path, parsed.data.relativePath))
           .run();
-        const next = bumpRevision();
-        return {
-          result: { status: 'deleted', revision: next },
-          revision: next,
-          changed: true,
-        };
+        return { status: 'deleted', revision: bumpRevision() };
       });
-      return finish(outcome);
+      if (result.status === 'deleted') input.onChanged?.(result.revision);
+      return result;
     },
 
     list(): WorkspaceArtifactList {
-      const at = now();
-      const outcome: Outcome<WorkspaceArtifactList> = input.db.transaction(tx => {
-        const before = revision();
-        const pruned = pruneExpired(tx, at);
-        const entries = tx
+      return {
+        revision: revision(),
+        entries: input.db
           .select()
           .from(workspaceArtifacts)
           .orderBy(asc(workspaceArtifacts.relative_path))
           .all()
-          .map(entryFromRow);
-        return {
-          result: { revision: pruned, entries },
-          revision: pruned,
-          changed: pruned !== before,
-        };
-      });
-      return finish(outcome);
+          .map(entryFromRow),
+      };
     },
 
     get(relativePath: string): WorkspaceArtifactEntryLookup | null {
-      const at = now();
-      const outcome: Outcome<WorkspaceArtifactEntryLookup | null> = input.db.transaction(tx => {
-        const before = revision();
-        const pruned = pruneExpired(tx, at);
-        const row = tx
-          .select()
-          .from(workspaceArtifacts)
-          .where(eq(workspaceArtifacts.relative_path, relativePath))
-          .get();
-        return {
-          result:
-            row === undefined ? null : { objectKey: row.object_key, entry: entryFromRow(row) },
-          revision: pruned,
-          changed: pruned !== before,
-        };
-      });
-      return finish(outcome);
+      const row = input.db
+        .select()
+        .from(workspaceArtifacts)
+        .where(eq(workspaceArtifacts.relative_path, relativePath))
+        .get();
+      return row === undefined ? null : { objectKey: row.object_key, entry: entryFromRow(row) };
     },
 
     /**

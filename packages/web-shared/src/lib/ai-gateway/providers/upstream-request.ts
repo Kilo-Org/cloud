@@ -25,7 +25,14 @@ import {
   rejectDisallowedUpstreamUrls,
   rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import {
+  UpstreamAddressUnverifiedError,
+  upstreamDispatcherFor,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-connection';
+import type { Dispatcher } from 'undici';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -113,6 +120,14 @@ function getProviderTargetHost(apiUrl: string): string {
   }
 }
 
+function getProviderOrigin(apiUrl: string): string {
+  try {
+    return new URL(apiUrl).origin;
+  } catch {
+    return 'invalid_provider_api_url';
+  }
+}
+
 function getErrorName(error: unknown): string {
   if (error instanceof Error) return error.name;
   if (
@@ -185,6 +200,27 @@ function createLoggedFetchFailure(errorName: string, errorMessage: string): Erro
   const loggedError = new Error(errorMessage);
   loggedError.name = errorName;
   return loggedError;
+}
+
+/**
+ * The gateway refuses a connection whose target it could not verify (see
+ * `upstream-connection.ts`): before the fetch, or inside the connection when the
+ * pinned address is gone. undici reports the second as a fetch error whose cause
+ * is the refusal, so the cause chain is followed.
+ */
+function findUpstreamAddressUnverified(error: unknown): UpstreamAddressUnverifiedError | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth += 1) {
+    if (current instanceof UpstreamAddressUnverifiedError) return current;
+    try {
+      current = 'cause' in current ? current.cause : undefined;
+    } catch {
+      // A cause that a wrapped error refuses to read is not a refusal; the fetch
+      // failure handling below then reports the error it already reports.
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 function classifyUpstreamFetchFailure({
@@ -427,7 +463,7 @@ async function sendUpstreamFetch({
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.
     const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
-    const urlRejection = enforceUrlPolicy
+    const urlPolicy = enforceUrlPolicy
       ? await rejectDisallowedUpstreamUrls({
           urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
           providerId: provider.type,
@@ -435,18 +471,31 @@ async function sendUpstreamFetch({
           signal: combinedSignal,
         })
       : null;
-    if (urlRejection) {
+    if (urlPolicy?.rejected) {
       budgetSignal.removeEventListener('abort', onBudgetExceeded);
-      return { type: 'error', response: urlRejection };
+      return { type: 'error', response: urlPolicy.rejected };
     }
 
-    const requestOptions: RequestInit & { duplex: 'half' } = {
+    // The request below dials the hop this process opens, so it connects to the
+    // addresses the policy checked for that exact URL. The secure-proxy
+    // `targetUrl` is a body field the relay dials itself, so only the policy
+    // check applies to it.
+    const dispatcher = urlPolicy
+      ? upstreamDispatcherFor(
+          urlPolicy.dialed.hostname,
+          urlPolicy.dialed.addresses,
+          urlPolicy.dialed.expiresAt
+        )
+      : undefined;
+
+    const requestOptions: RequestInit & { duplex: 'half'; dispatcher?: Dispatcher } = {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
       redirect: enforceUrlPolicy ? 'manual' : 'follow',
       duplex: 'half',
       signal: combinedSignal,
+      ...(dispatcher ? { dispatcher } : {}),
     };
     const response =
       provider.type === 'claude-billing'
@@ -475,6 +524,37 @@ async function sendUpstreamFetch({
     // No response body to bound; a later fallback attempt must not be blamed
     // for this attempt's budget.
     budgetSignal.removeEventListener('abort', onBudgetExceeded);
+    // A refused connection is the gateway's own decision, not a provider fault,
+    // so it is reported apart from the upstream fetch failures. The client
+    // answer stays the generic upstream failure response.
+    const unverified = findUpstreamAddressUnverified(error);
+    if (unverified) {
+      try {
+        const metadata = {
+          providerId: provider.type,
+          targetHost: getProviderTargetHost(apiUrl),
+          path,
+          code: unverified.code,
+          ...(vercelRequestId && { vercelRequestId }),
+        };
+        errorExceptInTest('AI gateway upstream connection refused', metadata);
+        captureException(unverified, {
+          level: 'error',
+          tags: {
+            source: 'ai-gateway-upstream-connection',
+            provider: provider.type,
+            code: unverified.code,
+          },
+          extra: metadata,
+        });
+      } catch {
+        // The failure must remain caller-visible even when reporting fails.
+      }
+      return {
+        type: 'error',
+        response: upstreamFetchFailureResponse('unknown', vercelRequestId, reasoningEffort),
+      };
+    }
     // The caller passes the incoming request signal, so a client that goes away
     // aborts this fetch as well. Those aborts are client-side cancellations and
     // must not be reported (or alerted on) as upstream failures.
@@ -607,14 +687,31 @@ export async function upstreamRequest({
   });
 }
 
+/**
+ * Origins whose generation endpoint `fetchGeneration` may call. The request
+ * skips the upstream URL policy and carries the provider key, so it only goes
+ * to these fixed hosts.
+ */
+const GENERATION_LOOKUP_ORIGINS: ReadonlySet<string> = new Set(
+  [OPENROUTER.apiUrl, VERCEL_AI_GATEWAY.apiUrl].map(apiUrl => new URL(apiUrl).origin)
+);
+
 export async function fetchGeneration(messageId: string, provider: Provider) {
+  if (!GENERATION_LOOKUP_ORIGINS.has(getProviderOrigin(provider.apiUrl))) {
+    captureMessage('Skipped generation lookup for a provider outside the gateway origins', {
+      level: 'warning',
+      tags: { source: `${provider.type}_generation_fetch` },
+      extra: { targetHost: getProviderTargetHost(provider.apiUrl) },
+    });
+    return;
+  }
   // We have to delay, openrouter doesn't have the cost immediately
   await new Promise(res => setTimeout(res, 200));
   //ref: https://openrouter.ai/docs/api-reference/get-a-generation
   let response: Response;
   try {
     response = await fetchWithBackoff(
-      `${provider.apiUrl}/generation?id=${messageId}`,
+      `${provider.apiUrl}/generation?id=${encodeURIComponent(messageId)}`,
       {
         method: 'GET',
         headers: {

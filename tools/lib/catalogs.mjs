@@ -11,8 +11,10 @@
  * allowlists, wording and exit behavior, including what it does with a key that
  * is not a plural category.
  */
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { regularFileState } from './fs-entries.mjs';
 
 /** The plural categories i18next selects from, as they end a catalog key. */
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -30,29 +32,46 @@ export function pluralParts(key) {
 }
 
 /**
+ * The kind of a `.json`-named entry of `dir`: 'file' names a regular file,
+ * 'unreadable' an entry stat cannot follow (stat threw), and 'other' an
+ * entry that exists but is not a regular file, such as a directory named
+ * like a catalog.
+ *
+ * The follow-symlink decision itself is `regularFileState`'s, shared with the
+ * source walk, so the two audits cannot disagree on what a file is.
+ */
+export function catalogEntryKind(dir, name) {
+  return regularFileState(join(dir, name));
+}
+
+/**
+ * The `.json`-named entries of `dir`, sorted, without the `.json` extension,
+ * leaving out every entry whose `catalogEntryKind` is `excludedKind`.
+ *
+ * The two readers of a catalog folder reject a different kind on purpose: the
+ * tag set keeps an entry it cannot stat, so the audit's own later read reports
+ * the problem, while the membership rule names such an entry as a stray.
+ */
+export function catalogEntryNames(dir, excludedKind) {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(
+      entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== excludedKind
+    )
+    .map(entry => entry.name.replace(/\.json$/, ''))
+    .sort();
+}
+
+/**
  * The locale tags on disk in `dir`, sorted, without the `.json` extension.
  *
  * The tag's path must name a regular file, following symlinks: a directory
  * named like a catalog is not a catalog, and reading it as one would end the
  * audit in a stack trace, while a symlink to a real catalog audits like the
- * file it names.
+ * file it names. An entry stat cannot follow is kept as a tag anyway,
+ * deliberately: the audit's own later read of that path reports the problem.
  */
 export function catalogTags(dir) {
-  return readdirSync(dir, { withFileTypes: true })
-    .filter(entry => {
-      if (!entry.name.endsWith('.json')) {
-        return false;
-      }
-      try {
-        return statSync(join(dir, entry.name)).isFile();
-      } catch {
-        // A link the filesystem cannot follow reaches the audit's own read,
-        // which reports it; the tag set still contains the tag.
-        return true;
-      }
-    })
-    .map(entry => entry.name.replace(/\.json$/, ''))
-    .sort();
+  return catalogEntryNames(dir, 'other');
 }
 
 /**
@@ -145,10 +164,10 @@ export function familiesOwedByEveryLocale(english) {
  * A family the locale declares itself — a member key with a category suffix —
  * must carry every category its tag selects, whatever English ships. A family
  * English declares and every locale owes (`familiesOwedByEveryLocale`) is
- * mandatory only when the locale carries the family's flat base key; a locale
- * whose copy inflects no word keeps that one string and renders it at every
- * count. Every other family is not this locale's problem: a locale that lacks
- * an owed family's base key is a key-parity finding, not a category finding.
+ * mandatory when the locale carries the family's flat base key, and then every
+ * category the tag selects must be present. Every other family is not this
+ * locale's problem: a locale that lacks an owed family's base key is a
+ * key-parity finding, not a category finding.
  *
  * A complete family is absent from the Map, so an empty Map means the locale is
  * complete. Both audits ask this question, so the answer lives here and neither

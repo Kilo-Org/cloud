@@ -167,6 +167,7 @@ vi.mock('react-native', () => ({
       return { action: 'sharedAction' };
     },
   },
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));

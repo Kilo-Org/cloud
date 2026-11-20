@@ -6,8 +6,13 @@
 import { createStore } from 'jotai';
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
-import { createSessionManager, formatError, formatErrorDetail } from './session-manager';
-import type { FetchedSessionData, SessionManagerConfig } from './session-manager';
+import {
+  createSessionManager,
+  formatError,
+  formatErrorDetail,
+  type SessionManagerConfig,
+} from './session-manager';
+import type { FetchedSessionData } from './types';
 import type {
   AgentStatus,
   CloudStatus,
@@ -22,6 +27,7 @@ import { kiloId, cloudAgentId } from './test-helpers';
 
 const EXPECTED_COPY: Record<SdkStatusMessageCode, string> = {
   'agent-connection-lost': 'Agent connection lost',
+  'agent-connection-reconnecting': 'Reconnecting…',
   'session-stopped': 'Session stopped',
   'session-terminated': 'Session terminated',
   'setting-up-environment': 'Setting up environment…',
@@ -39,6 +45,7 @@ const EXPECTED_COPY: Record<SdkStatusMessageCode, string> = {
   'not-authorized': 'You are not authorized to use the Cloud Agent.',
   'service-unavailable': 'Service is unavailable right now. Please try again.',
   'previous-task-in-progress': 'Previous task is still finishing up. Please wait a moment.',
+  'workspace-deleting': 'This workspace is being deleted.',
   'service-temporarily-unavailable':
     'Service is temporarily unavailable. Please retry in a moment.',
   'generic-error': 'Something went wrong. Please retry in a moment.',
@@ -319,6 +326,17 @@ describe('session manager indicator copy codes', () => {
       )
     );
 
+    const reconnecting = createMockConfig();
+    mockSession.state.getStatus.mockReturnValue({ type: 'disconnected', reconnecting: true });
+    const reconnectingManager = createSessionManager(reconnecting);
+    await reconnectingManager.switchSession(kiloId('ses-1'));
+    recordIndicator(
+      atomValue<{ message: string; code?: SdkStatusMessageCode } | null>(
+        reconnecting.store,
+        reconnectingManager.atoms.statusIndicator
+      )
+    );
+
     const interrupted = createMockConfig();
     mockSession.state.getStatus.mockReturnValue({ type: 'interrupted' });
     const interruptedManager = createSessionManager(interrupted);
@@ -413,6 +431,11 @@ describe('formatErrorDetail pairs each error string with its code', () => {
     ['NOT_FOUND', { data: { code: 'NOT_FOUND' } }, 'service-unavailable'],
     ['CONFLICT', { data: { code: 'CONFLICT' } }, 'previous-task-in-progress'],
     ['409 status', { data: { httpStatus: 409 } }, 'previous-task-in-progress'],
+    [
+      'workspace deletion conflict',
+      Object.assign(new Error('workspace_deleting'), { data: { code: 'CONFLICT' } }),
+      'workspace-deleting',
+    ],
     [
       'SERVICE_UNAVAILABLE',
       { data: { code: 'SERVICE_UNAVAILABLE' } },

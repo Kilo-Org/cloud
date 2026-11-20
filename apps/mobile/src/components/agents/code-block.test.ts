@@ -8,10 +8,12 @@ import { CodeBlock } from './code-block';
 import {
   chunkTokenLines,
   clearFenceWalkCacheForTests,
-  CODE_CHUNK_MOUNT_BATCH,
   CODE_CHUNK_TOKENS,
-  CODE_FIRST_PAINT_CHUNKS,
   fenceWalkCacheStatsForTests,
+} from './code-block-fence-walk';
+import {
+  CODE_CHUNK_MOUNT_BATCH,
+  CODE_FIRST_PAINT_CHUNKS,
   tokenizeCodeLines,
 } from './code-block-model';
 import { type MonoScrollTextMode } from './mono-scroll-block-model';
@@ -451,6 +453,81 @@ describe('CodeBlock', () => {
     });
     expect(codeLines(renderer.root).length).toBeGreaterThanOrEqual(mounted);
     await unmount(renderer);
+  });
+
+  it('keeps an already-mounted chunk’s tree across a streamed append', async () => {
+    // Regression: the fence rebuilt the element tree of every mounted chunk on
+    // each mount batch and each append, so a streaming fence re-rendered the
+    // chunks it had already mounted. The chunk view is memoized on a shared
+    // completed-chunk array (see `extendFenceChunkWalk`), so the first chunk's
+    // rendered children keep their identity while only the rebuilt tail and the
+    // newly mounted chunks construct trees.
+    clearFenceWalkCacheForTests();
+    const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = mountFirstCommit(blockElement({ code, language: 'typescript' }));
+    const before = codeLines(renderer.root)[0];
+    if (!before) {
+      throw new Error('expected a first chunk');
+    }
+    const beforeChildren = propOf(before, 'children');
+    // A full chunk of lines, so the assertion covers a real element tree.
+    expect(chunkLineCount(before)).toBe(32);
+
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root)).toHaveLength(expectedChunkCount(code, 'typescript'));
+    // The mount batches mounted the rest of the fence without rebuilding the
+    // tree of the chunk the first paint already had.
+    const [afterBatches] = codeLines(renderer.root);
+    expect(propOf(afterBatches, 'children')).toBe(beforeChildren);
+
+    const appended = Array.from({ length: 100 }, (_, index) => `const later${index} = ${index};`);
+    const extended = `${code}\n${appended.join('\n')}`;
+    updateFirstCommit(renderer, blockElement({ code: extended, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+
+    const chunks = codeLines(renderer.root);
+    expect(chunks).toHaveLength(expectedChunkCount(extended, 'typescript'));
+    // The first chunk's children are the same array: the memo skipped its
+    // render, so an append cannot rebuild a chunk whose lines are final.
+    expect(propOf(chunks[0], 'children')).toBe(beforeChildren);
+    // The appended text rendered, in the chunk past the shared prefix.
+    const lastChunk = chunks.at(-1);
+    if (!lastChunk) {
+      throw new Error('expected a last chunk');
+    }
+    expect(renderedStrings(propOf(lastChunk, 'children')).join('')).toContain('later99');
+    await unmount(renderer);
+  });
+
+  it('carries the fence walk and mount progress across a streamed append', async () => {
+    // The append must extend the walk the mounted block already holds instead
+    // of caching a second, restarted copy: the block keeps every mount it had,
+    // and one walk is retained while it stays on screen.
+    clearFenceWalkCacheForTests();
+    const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = mountFirstCommit(blockElement({ code, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+    const mountedBefore = codeLines(renderer.root).length;
+    expect(mountedBefore).toBe(expectedChunkCount(code, 'typescript'));
+    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 1, held: 1 });
+
+    const extended = `${code}\nconst appendedTail = true;`;
+    updateFirstCommit(renderer, blockElement({ code: extended, language: 'typescript' }));
+    // The append keeps the mounts it already had rather than restarting at the
+    // bounded first paint.
+    expect(codeLines(renderer.root)).toHaveLength(mountedBefore);
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root)).toHaveLength(expectedChunkCount(extended, 'typescript'));
+
+    // One walk, still held by the mounted block: the extension replaced the
+    // cached prefix instead of leaving a second copy of the fence behind.
+    expect(fenceWalkCacheStatsForTests()).toMatchObject({ entries: 1, held: 1 });
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0, held: 0 });
   });
 
   it('costs no token span for an untagged run in a selectable fence', async () => {

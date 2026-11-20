@@ -268,6 +268,7 @@ describe('createWorktreeChat', () => {
     ['FORBIDDEN', 'Session access denied', 'Worktree chat request failed'],
     ['NOT_FOUND', 'Private checkout /srv/secret', 'Worktree chat request failed'],
     ['CONFLICT', 'creation_in_progress', 'creation_in_progress'],
+    ['CONFLICT', 'workspace_deleting', 'workspace_deleting'],
     ['CONFLICT', 'operation_key_reuse_mismatch', 'operation_key_reuse_mismatch'],
     ['SERVICE_UNAVAILABLE', 'Bearer sensitive-worker-token', 'Worktree chat request failed'],
     [

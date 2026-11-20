@@ -37,6 +37,8 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
@@ -62,6 +64,7 @@ vi.mock('@/components/ui/text', async () => {
   };
 });
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   Bot: 'Bot',
   ChevronRight: 'ChevronRight',
   ChevronDown: 'ChevronDown',
@@ -77,6 +80,7 @@ vi.mock('@/components/ui/spinning-icon', () => ({
   SpinningIcon: 'SpinningIcon',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#999999',
   useThemeColors: () => ({}),
 }));
 vi.mock('@shopify/flash-list', async () => {

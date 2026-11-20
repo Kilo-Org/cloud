@@ -240,8 +240,7 @@ function removeLogoutCleanupRecord(
 }
 
 /**
- * Persists the record list, dropping records with nothing left to retry. An
- * empty list removes the key.
+ * Persists the record list, dropping records with nothing left to retry.
  *
  * Mutating callers must run read → change → write inside
  * `chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY)`; `chainLogoutCleanupRecords` does
@@ -251,7 +250,6 @@ export async function writeLogoutCleanupRecords(
   records: readonly LogoutCleanupRecord[]
 ): Promise<void> {
   const live = dedupeByOwner(records.filter(record => hasLogoutCleanupObligation(record)));
-  // An empty list removes the key; a non-empty one replaces the payload.
   await (live.length === 0
     ? SecureStore.deleteItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY)
     : SecureStore.setItemAsync(

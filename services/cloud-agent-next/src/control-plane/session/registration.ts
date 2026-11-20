@@ -258,6 +258,10 @@ export function buildControlPlaneSessionRegistration(
   // carry the trusted review skill that the Code Reviewer attaches.
   const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
   const encryptedSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.encryptedSecrets;
+  const networkSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.networkSecrets;
+  if (Object.keys(networkSecrets ?? {}).length > 0 && sandboxProvider !== 'cloudflare-containers') {
+    throw new Error('Network secrets require a Cloudflare sandbox');
+  }
   const hasEncryptedSecrets =
     encryptedSecrets !== undefined && Object.keys(encryptedSecrets).length > 0;
   const profile = readProfileBundle(metadata);
@@ -273,6 +277,17 @@ export function buildControlPlaneSessionRegistration(
     profile.builtinAgents &&
     Object.keys(profile.builtinAgents).length > 0
       ? { builtinAgents: profile.builtinAgents }
+      : {}),
+    ...(!readOnlyBitbucketReview &&
+    profile.modelContextLimits &&
+    Object.keys(profile.modelContextLimits).length > 0
+      ? { modelContextLimits: profile.modelContextLimits }
+      : {}),
+    ...(!metadata.identity.orgId && profile.webSearchDisabled
+      ? { webSearchDisabled: profile.webSearchDisabled }
+      : {}),
+    ...(!metadata.identity.orgId && profile.webSearchProvider
+      ? { webSearchProvider: profile.webSearchProvider }
       : {}),
     ...(!readOnlyBitbucketReview && profile.kiloCommands?.length
       ? { kiloCommands: profile.kiloCommands }
@@ -362,6 +377,7 @@ export function buildControlPlaneSessionRegistration(
     scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
     ...(encryptedMcpServers === undefined ? {} : { mcpServers: encryptedMcpServers }),
     ...(encryptedSecrets === undefined ? {} : { encryptedSecrets }),
+    ...(networkSecrets === undefined ? {} : { networkSecrets }),
   };
   return {
     sandboxId,

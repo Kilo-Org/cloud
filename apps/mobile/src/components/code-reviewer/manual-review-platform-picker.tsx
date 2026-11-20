@@ -1,12 +1,11 @@
-import { selectionHaptic } from '@/lib/haptics';
-import { Check } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { RadioGroup } from '@/components/ui/radio-group';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 import { MANUAL_REVIEW_PLATFORMS, type ManualReviewPlatform } from './manual-review-platform';
@@ -20,7 +19,8 @@ type ManualReviewPlatformPickerProps = {
 /**
  * The manual-review form's platform radio group. Selecting a platform clears
  * the URL field (the placeholder and validation are platform-shaped), so the
- * picker owns the selection haptic and the caller's reset through `onSelect`.
+ * picker runs the caller's reset through `onSelect`; `ChoiceRow` owns the
+ * selection haptic.
  *
  * The screen replaces this group with `ManualReviewSkeleton` while the provider
  * statuses load, so the group renders the choices only; a second loading shape
@@ -32,63 +32,55 @@ export function ManualReviewPlatformPicker({
   onSelect,
 }: Readonly<ManualReviewPlatformPickerProps>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   return (
-    <RadioGroup label={t('common.platform')} className="overflow-hidden rounded-lg bg-secondary">
-      {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
-        const connected = isConnected(option);
-        const platformLabel = PLATFORM_CAPABILITIES[option].label;
-        return (
-          <Pressable
-            key={option}
-            disabled={!connected}
-            className={cn(
-              'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-              index < MANUAL_REVIEW_PLATFORMS.length - 1 && 'border-b-[0.5px] border-hair-soft'
-            )}
-            onPress={() => {
-              selectionHaptic();
-              onSelect(option);
-            }}
-            {...radioItemA11y({
+    <RadioGroup label={t('common.platform')}>
+      <RowGroup>
+        {MANUAL_REVIEW_PLATFORMS.map(option => {
+          const connected = isConnected(option);
+          const platformLabel = PLATFORM_CAPABILITIES[option].label;
+          return (
+            <ChoiceRow
+              key={option}
               // A disabled radio keeps its reason in its own name: the visible
               // `Not connected` line below is a sibling of the control, not
               // part of it, so a screen reader would otherwise announce the
               // platform and its disabled state with no explanation. The row's
               // children are hidden from accessibility below, so the reason is
               // announced once, from inside the control.
-              label: connected ? platformLabel : `${platformLabel}, ${t('common.notConnected')}`,
-              checked: connected && platform === option,
-              disabled: !connected,
-            })}
-          >
-            <View
-              // The control above owns this row's accessible name; leaving the
-              // visible label and its reason focusable too would read the
-              // platform name and the reason a second time.
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
+              accessibleName={
+                connected ? platformLabel : `${platformLabel}, ${t('common.notConnected')}`
+              }
+              selected={connected && platform === option}
+              disabled={!connected}
+              onPress={() => {
+                onSelect(option);
+              }}
             >
-              <Text className={cn('text-sm font-medium', !connected && 'text-muted-foreground')}>
-                {platformLabel}
-              </Text>
-              {!connected && (
-                // The row dims only its label. This line is the only place
-                // that says why the option cannot be picked, so it keeps the
-                // muted token's own 4.5:1 on the `bg-secondary` card instead
-                // of inheriting a row-level opacity that halves it.
-                <Text variant="muted" className="text-xs">
-                  {t('common.notConnected')}
+              <View
+                // The control above owns this row's accessible name; leaving
+                // the visible label and its reason focusable too would read the
+                // platform name and the reason a second time.
+                className="flex-1"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                <Text className={cn('text-sm font-medium', !connected && 'text-muted-foreground')}>
+                  {platformLabel}
                 </Text>
-              )}
-            </View>
-            <Check
-              size={18}
-              color={connected && platform === option ? colors.foreground : 'transparent'}
-            />
-          </Pressable>
-        );
-      })}
+                {!connected && (
+                  // The row dims only its label. This line is the only place
+                  // that says why the option cannot be picked, so it keeps the
+                  // muted token's own 4.5:1 on the row surface instead of
+                  // inheriting a row-level opacity that halves it.
+                  <Text variant="muted" className="mt-0.5 text-xs">
+                    {t('common.notConnected')}
+                  </Text>
+                )}
+              </View>
+            </ChoiceRow>
+          );
+        })}
+      </RowGroup>
     </RadioGroup>
   );
 }

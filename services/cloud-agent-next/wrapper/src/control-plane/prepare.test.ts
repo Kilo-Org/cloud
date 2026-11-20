@@ -36,6 +36,7 @@ import {
   createKiloRuntimes,
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  KiloWorktreePolicyMismatchError,
   liveRuntimeClient,
   type KiloRuntime,
 } from './kilo-runtime.js';
@@ -765,9 +766,11 @@ type Harness = {
   abortCalls: string[];
   stopProcessCalls: string[];
   childrenCalls: string[];
+  preparedRoutes: ControlPlaneRouteSpec[];
   setChildren: (sessionId: string, children: Array<{ id: string; directory: string }>) => void;
   setChildrenHung: (sessionId: string) => void;
   setAbortHung: (sessionId: string) => void;
+  setCleanupGate: (sessionId: string, gate: Promise<void>) => void;
   setCleanupFailure: (value: boolean) => void;
   setEnsureSessionError: (value: unknown) => void;
   ensureSessionCalls: () => number;
@@ -787,6 +790,8 @@ type Harness = {
   setUnavailable: (key: string, value: boolean) => void;
   setRuntimeRestarting: (value: boolean) => void;
   setStamp: (value: WorkspaceStamp | null) => void;
+  /** Seeds one directory's stamp, so a test can force a stored root to be adopted. */
+  setStampFor: (directory: string, value: WorkspaceStamp | null) => void;
   stamp: () => WorkspaceStamp | null;
   setHasGit: (value: boolean) => void;
   setSetupResult: (value: ExecResult) => void;
@@ -831,8 +836,10 @@ function createHarness(
   const abortCalls: string[] = [];
   const stopProcessCalls: string[] = [];
   const childrenCalls: string[] = [];
+  const preparedRoutes: ControlPlaneRouteSpec[] = [];
   const childrenBySession = new Map<string, Array<{ id: string; directory: string }>>();
   const childrenHung = new Set<string>();
+  const cleanupGates = new Map<string, Promise<void>>();
   const abortHung = new Set<string>();
   let cleanupFailure = false;
   let ensureSessionError: unknown;
@@ -861,6 +868,16 @@ function createHarness(
     | undefined;
   let stamp: WorkspaceStamp | null = null;
   let hasGitState = options.hasGit ?? false;
+  /**
+   * A route's roots each keep their own stamp and repository flag. `setStamp`
+   * hands its value to the first directory inspected or written, so a test that
+   * seeds one stamp reaches the directory it prepares; every other directory
+   * reads no stamp and has no repository until a clone creates one.
+   */
+  let pendingStamp: WorkspaceStamp | null = null;
+  let hasPendingStamp = false;
+  const stampsByDirectory = new Map<string, WorkspaceStamp>();
+  const repositoryDirectories = new Set<string>();
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
@@ -889,6 +906,20 @@ function createHarness(
           signal?: AbortSignal;
         }) => {
           abortCalls.push(opts.sessionId);
+          const gate = cleanupGates.get(opts.sessionId);
+          if (gate) {
+            const waiting = Promise.withResolvers<void>();
+            const aborted = (): void => waiting.reject(new Error('aborted'));
+            if (opts.signal?.aborted) aborted();
+            else {
+              opts.signal?.addEventListener('abort', aborted, { once: true });
+              void gate.then(() => {
+                opts.signal?.removeEventListener('abort', aborted);
+                waiting.resolve();
+              });
+            }
+            await waiting.promise;
+          }
           if (cleanupFailure) throw new Error('abort failed');
           if (abortHung.has(opts.sessionId)) {
             await new Promise<void>((_resolve, reject) => {
@@ -970,6 +1001,7 @@ function createHarness(
     emit: frame => frames.push(frame),
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
+    onPreparedRoute: spec => preparedRoutes.push(spec),
     runtimes,
     runSkillInstall: options.runSkillInstall,
     spawnSetup: options.spawnSetup,
@@ -981,9 +1013,17 @@ function createHarness(
     ...(options.releaseCleanupDeadlineMs === undefined
       ? {}
       : { releaseCleanupDeadlineMs: options.releaseCleanupDeadlineMs }),
-    hasGit: async () => hasGitState,
-    readStamp: async () => stamp,
-    writeStamp: async (_directory, value) => {
+    hasGit: async directory => repositoryDirectories.has(directory) || hasGitState,
+    readStamp: async directory => {
+      const recorded = stampsByDirectory.get(directory);
+      if (recorded !== undefined) return recorded;
+      if (!hasPendingStamp) return null;
+      hasPendingStamp = false;
+      if (pendingStamp !== null) stampsByDirectory.set(directory, pendingStamp);
+      return pendingStamp;
+    },
+    writeStamp: async (directory, value) => {
+      stampsByDirectory.set(directory, value);
       stamp = value;
     },
     mkdir: async () => undefined,
@@ -994,7 +1034,10 @@ function createHarness(
       gitCalls.push(args);
       if (customGit) return customGit(args, options);
       if (args[0] === 'clone') {
-        hasGitState = true;
+        // The last argument is the clone target: that directory is a repository
+        // from now on, and only that directory.
+        const target = args.at(-1);
+        if (target !== undefined) repositoryDirectories.add(target);
         activeClones += 1;
         maxActiveClones = Math.max(maxActiveClones, activeClones);
         try {
@@ -1030,6 +1073,7 @@ function createHarness(
     abortCalls,
     stopProcessCalls,
     childrenCalls,
+    preparedRoutes,
     setChildren: (sessionId, children) => {
       childrenBySession.set(sessionId, children);
     },
@@ -1038,6 +1082,9 @@ function createHarness(
     },
     setAbortHung: sessionId => {
       abortHung.add(sessionId);
+    },
+    setCleanupGate: (sessionId, gate) => {
+      cleanupGates.set(sessionId, gate);
     },
     setCleanupFailure: value => {
       cleanupFailure = value;
@@ -1083,6 +1130,12 @@ function createHarness(
     },
     setStamp: value => {
       stamp = value;
+      pendingStamp = value;
+      hasPendingStamp = true;
+    },
+    setStampFor: (directory, value) => {
+      if (value === null) stampsByDirectory.delete(directory);
+      else stampsByDirectory.set(directory, value);
     },
     stamp: () => stamp,
     setHasGit: value => {
@@ -1339,6 +1392,26 @@ describe('createPreparationManager', () => {
     expect(harness.ensureCalls()).toBe(1);
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
     expect(harness.frames.find(frame => frame.type === 'session.failed')).toBeDefined();
+  });
+
+  it('fails a shared-runtime route without retrying on an authorization-policy mismatch', async () => {
+    const harness = createHarness();
+    harness.setEnsureError(new KiloWorktreePolicyMismatchError());
+    const spec = routeSpec();
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+    expect(
+      harness.frames.some(
+        frame => frame.type === 'session.ready' && frame.sessionId === spec.sessionId
+      )
+    ).toBe(false);
+    const failed = harness.frames.find(frame => frame.type === 'session.failed');
+    expect(failed?.type === 'session.failed' ? failed.reason : undefined).toBe(
+      'invalid_configuration'
+    );
   });
 
   it('suppresses failed and runtime retries after release during a rejected startup', async () => {
@@ -2297,6 +2370,15 @@ describe('createPreparationManager', () => {
     // history to restore, so the route creates the Kilo session.
     expect(harness.restoreCalls()).toBe(1);
     expect(harness.ensureSessionCalls()).toBe(1);
+    expect(harness.frames.filter(frame => frame.type === 'session.restore_attempt')).toEqual([
+      expect.objectContaining({
+        outcome: 'fallback',
+        reason: 'not_found',
+        durationMs: expect.any(Number),
+        attempt: 1,
+        willRetry: false,
+      }),
+    ]);
   });
 
   it('restores from the legacy ingest export when the session is missing', async () => {
@@ -2338,6 +2420,20 @@ describe('createPreparationManager', () => {
       subtype: 'kilo_import_failed',
     });
     expect(harness.ensureSessionCalls()).toBe(0);
+    expect(harness.frames.filter(frame => frame.type === 'session.restore_attempt')).toEqual([
+      expect.objectContaining({
+        outcome: 'failed',
+        reason: 'download',
+        attempt: 1,
+        willRetry: true,
+      }),
+      expect.objectContaining({
+        outcome: 'failed',
+        reason: 'download',
+        attempt: 2,
+        willRetry: false,
+      }),
+    ]);
   });
 
   it('creates the Kilo session when the ingest export is an empty snapshot', async () => {
@@ -2380,6 +2476,9 @@ describe('createPreparationManager', () => {
     expect(harness.logs).toContain(
       `bootstrap restore incomplete kiloSessionId=${spec.kiloSessionId} skipped=1 total=2 reasons=conflict paths=a.ts`
     );
+    expect(harness.frames.filter(frame => frame.type === 'session.restore_attempt')).toEqual([
+      expect.objectContaining({ outcome: 'partial', attempt: 1, willRetry: false }),
+    ]);
     expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
   });
 
@@ -2399,6 +2498,7 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(routeSpec());
 
     expect(restoreCalls).toBe(0);
+    expect(harness.frames.some(frame => frame.type === 'session.restore_attempt')).toBe(false);
     expect(harness.ensureSessionCalls()).toBe(0);
     expect(lastFrame(harness.frames)?.type).toBe('session.ready');
   });
@@ -2539,6 +2639,300 @@ describe('createPreparationManager', () => {
       sessionId: spec.sessionId,
       workspace: 'same',
     });
+  });
+
+  it('prepares the new roots when the re-prepare adds a repository', async () => {
+    const harness = createHarness();
+    // A launch repository and the session's commands, so the first preparation
+    // is a real one that runs the commands in the route directory.
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      setupCommands: ['npm install'],
+      startCommands: ['serve'],
+    });
+    await harness.manager.prepare(spec);
+    expect(harness.ensureCalls()).toBe(1);
+    // The commands ran once, on the preparation that created this workspace.
+    expect(harness.setupCalls).toEqual(['npm install', 'serve']);
+    harness.frames.length = 0;
+    harness.preparedRoutes.length = 0;
+    harness.gitCalls.length = 0;
+
+    const app = path.join(spec.directory, 'app');
+    const lib = path.join(spec.directory, 'lib');
+    const incoming: ControlPlaneRouteSpec = {
+      ...spec,
+      roots: [
+        {
+          directory: app,
+          repoFullName: 'acme/app',
+          git: { url: 'https://github.com/acme/app.git', platform: 'github' },
+          branch: 'kilo/generated',
+          branchMode: 'working',
+        },
+        {
+          directory: lib,
+          repoFullName: 'acme/lib',
+          git: { url: 'https://github.com/acme/lib.git', platform: 'github' },
+          branch: 'kilo/generated',
+          branchMode: 'working',
+        },
+      ],
+    };
+
+    await harness.manager.prepare(incoming);
+
+    // Neither root is on disk, so the full path clones each one at its own
+    // directory and the ready frame reports the clone.
+    expect(harness.gitCalls.filter(args => args[0] === 'clone').map(args => args.at(-1))).toEqual([
+      app,
+      lib,
+    ]);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId, workspace: 'cloned' },
+    ]);
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.logs.some(line => line.includes('re-prepare prepares new roots'))).toBe(true);
+    expect(harness.preparedRoutes.at(-1)!.roots).toEqual(incoming.roots);
+    // The workspace was already prepared, so its setup and start commands do not
+    // run again; a start command would launch a second server beside the first.
+    // The recorder still holds the first preparation's runs, so each command
+    // appears exactly once across both preparations.
+    expect(harness.setupCalls).toEqual(['npm install', 'serve']);
+    expect(harness.logs.some(line => line.includes('workspace setup skipped'))).toBe(true);
+  });
+
+  it('runs the commands again when a re-prepare removes a prepared root', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ setupCommands: ['npm install'], startCommands: ['serve'] });
+    const app = {
+      directory: path.join(spec.directory, 'app'),
+      repoFullName: 'acme/app',
+      git: { url: 'https://github.com/acme/app.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const lib = {
+      directory: path.join(spec.directory, 'lib'),
+      repoFullName: 'acme/lib',
+      git: { url: 'https://github.com/acme/lib.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const roots: NonNullable<ControlPlaneRouteSpec['roots']> = [app, lib];
+    await harness.manager.prepare({ ...spec, roots });
+    expect(harness.setupCalls).toEqual(['npm install', 'serve']);
+    harness.frames.length = 0;
+    harness.preparedRoutes.length = 0;
+    harness.gitCalls.length = 0;
+
+    // `lib` is gone from the route: the workspace the commands ran in is no
+    // longer the one this route names, so they run again.
+    await harness.manager.prepare({ ...spec, roots: [app] });
+
+    expect(harness.setupCalls).toEqual(['npm install', 'serve', 'npm install', 'serve']);
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toEqual([]);
+    expect(harness.logs.some(line => line.includes('workspace setup skipped'))).toBe(false);
+    expect(harness.logs.some(line => line.includes('workspace setup repeated'))).toBe(true);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' },
+    ]);
+  });
+
+  it('runs the commands again when a re-prepare adopts a prepared root', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ setupCommands: ['npm install'], startCommands: ['serve'] });
+    const app = {
+      directory: path.join(spec.directory, 'app'),
+      repoFullName: 'acme/app',
+      git: { url: 'https://github.com/acme/app.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const lib = {
+      directory: path.join(spec.directory, 'lib'),
+      repoFullName: 'acme/lib',
+      git: { url: 'https://github.com/acme/lib.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const extra = {
+      directory: path.join(spec.directory, 'extra'),
+      repoFullName: 'acme/extra',
+      git: { url: 'https://github.com/acme/extra.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const roots: NonNullable<ControlPlaneRouteSpec['roots']> = [app, lib];
+    await harness.manager.prepare({ ...spec, roots });
+    expect(harness.setupCalls).toEqual(['npm install', 'serve']);
+    harness.frames.length = 0;
+    harness.preparedRoutes.length = 0;
+    harness.gitCalls.length = 0;
+
+    // A stamp from another allocation makes reconcileRoots adopt `app`, a root
+    // the stored route had prepared, so the workspace is reconciled again.
+    harness.setStampFor(app.directory, { allocationId: 'alloc-builder', commit: 'old-commit' });
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') return result(1);
+      if (args[0] === 'rev-parse') return { stdout: 'new-commit\n', stderr: '', exitCode: 0 };
+      return result(0);
+    });
+
+    await harness.manager.prepare({ ...spec, roots: [app, lib, extra] });
+
+    expect(harness.logs.some(line => line.includes('workspace adopt done'))).toBe(true);
+    expect(harness.setupCalls).toEqual(['npm install', 'serve', 'npm install', 'serve']);
+    expect(harness.logs.some(line => line.includes('workspace setup skipped'))).toBe(false);
+    expect(harness.logs.some(line => line.includes('workspace setup repeated'))).toBe(true);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId, workspace: 'cloned' },
+    ]);
+  });
+
+  it('keeps the fast path for a re-prepare that names the same roots', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git' } });
+    const roots: NonNullable<ControlPlaneRouteSpec['roots']> = [
+      {
+        directory: path.join(spec.directory, 'app'),
+        repoFullName: 'acme/app',
+        git: { url: 'https://github.com/acme/app.git', platform: 'github' },
+        branch: 'kilo/generated',
+        branchMode: 'working',
+      },
+      {
+        directory: path.join(spec.directory, 'lib'),
+        repoFullName: 'acme/lib',
+        git: { url: 'https://github.com/acme/lib.git', platform: 'github' },
+        branch: 'kilo/generated',
+        branchMode: 'working',
+      },
+    ];
+    await harness.manager.prepare({ ...spec, roots });
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(2);
+    harness.frames.length = 0;
+    harness.preparedRoutes.length = 0;
+
+    // An equal root array, not the same objects: the roots match field for field.
+    const incoming: ControlPlaneRouteSpec = {
+      ...spec,
+      roots: roots.map(root => ({ ...root })),
+    };
+    await harness.manager.prepare(incoming);
+
+    // Every root is already checked out, so nothing is inspected or cloned and
+    // the acknowledgement stays the prepared route's own.
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(2);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' },
+    ]);
+    expect(harness.preparedRoutes).toEqual([incoming]);
+  });
+
+  it('keeps the fast path and registers the incoming spec when only the attempt changes', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    harness.preparedRoutes.length = 0;
+
+    const incoming: ControlPlaneRouteSpec = {
+      ...spec,
+      attemptId: 'attempt-2',
+      githubReviewTarget: {
+        repo: 'acme/widgets',
+        pullRequestNumber: 43,
+        appType: 'lite',
+        botUserId: 'bot-2',
+      },
+    };
+    await harness.manager.prepare(incoming);
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(
+      harness.frames.filter(frame => frame.type === 'session.ready' && frame.workspace === 'same')
+    ).toHaveLength(1);
+    expect(harness.preparedRoutes).toEqual([incoming]);
+  });
+
+  it('prepares again when the re-prepare names another native session', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    expect(harness.ensureCalls()).toBe(1);
+
+    // The prepared route serves the previous native session, so this binding is
+    // prepared in its own right.
+    await harness.manager.prepare({ ...spec, kiloSessionId: 'ses_22222222222222222222222222' });
+
+    expect(harness.ensureCalls()).toBe(2);
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    expect(harness.manager.preparedRoute(spec.sessionId)?.roots).toEqual([
+      { directory: spec.directory, repoFullName: undefined, requestedBranch: undefined },
+    ]);
+  });
+
+  it('prepares again and releases the old runtime when the re-prepare names another directory', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    const prepared = harness.manager.preparedRoute(spec.sessionId);
+    if (prepared === null) throw new Error('The first prepare did not record a route');
+
+    await harness.manager.prepare({ ...spec, directory: '/tmp/prepare-test-other' });
+
+    expect(harness.ensureCalls()).toBe(2);
+    // The previous checkout's runtime is no route's any more.
+    expect(harness.releaseCalls).toEqual([prepared.runtimeKey]);
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    expect(harness.manager.preparedRoute(spec.sessionId)?.directory).toBe(
+      '/tmp/prepare-test-other'
+    );
+  });
+
+  it('prepares a per-session route again when only its directory changes', async () => {
+    // Per-session isolation keys the runtime by session id, so a directory change
+    // keeps the key. The prepared runtime is rooted in the old directory and must
+    // not be handed back for the new one.
+    const harness = createHarness();
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    await harness.manager.prepare(spec);
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.ensureInputs[0]?.key).toBe(spec.sessionId);
+    expect(harness.releaseCalls).toEqual([]);
+
+    await harness.manager.prepare({ ...spec, directory: '/tmp/prepare-test-other' });
+
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.ensureInputs[1]?.key).toBe(spec.sessionId);
+    expect(harness.ensureInputs[1]?.directory).toBe('/tmp/prepare-test-other');
+    // The old runtime was released before the new one was ensured, so the new
+    // binding starts on a runtime rooted in its own directory.
+    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+    expect(harness.manager.preparedRoute(spec.sessionId)?.directory).toBe(
+      '/tmp/prepare-test-other'
+    );
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+  });
+
+  it('prepares again when the re-prepare asks for another runtime isolation', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    const prepared = harness.manager.preparedRoute(spec.sessionId);
+    if (prepared === null) throw new Error('The first prepare did not record a route');
+    harness.frames.length = 0;
+
+    await harness.manager.prepare({ ...spec, runtimeIsolation: 'per-session' });
+
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.releaseCalls).toEqual([prepared.runtimeKey]);
+    expect(harness.manager.preparedRoute(spec.sessionId)?.runtimeKey).toBe(spec.sessionId);
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    // The binding change is logged with every identity component it compares.
+    expect(harness.logs.some(line => line.includes('re-prepare binding changed'))).toBe(true);
   });
 
   it('installs refreshed Git and Kilo credentials into the running route and runtime', async () => {
@@ -4560,6 +4954,121 @@ describe('release cleanup and last-route accounting', () => {
     const started = harness.abortCalls.length + harness.stopProcessCalls.length;
     await new Promise(resolve => setTimeout(resolve, 20));
     expect(harness.abortCalls.length + harness.stopProcessCalls.length).toBe(started);
+  });
+
+  it('settles a same-binding cleanup when that binding is prepared again', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    // The walk parks on this gate until the abort reaches its signal.
+    harness.setCleanupGate(rootA, Promise.withResolvers<void>().promise);
+
+    harness.manager.release(specA.sessionId);
+    await waitFor(() => harness.abortCalls.includes(rootA));
+
+    // The incoming binding is the one the walk releases (same runtime key,
+    // directory and native session), so the prepare aborts and awaits it rather
+    // than resolving the same native session underneath it. The aborted walk
+    // reports its incomplete result.
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await waitFor(() =>
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId
+      )
+    );
+    expect(
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId &&
+          diagnostic.fields.ok === false
+      )
+    ).toBe(true);
+  });
+
+  it('settles an older cleanup of the same session after a rapid binding change', async () => {
+    const harness = createHarness();
+    const rootC = 'ses_dddddddddddddddddddddddddd';
+    // A sibling keeps the runtime key, so each released binding walks its own
+    // native session instead of releasing the runtime.
+    const keeper = sharedSpec('ses_keeper', rootB);
+    await harness.manager.prepare(keeper, credentialsFor(keeper, proxyHandle(exp)));
+    const specA = sharedSpec('ses_a', rootA);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    // A's walk resolves only once its abort signal fires.
+    const gate = Promise.withResolvers<void>();
+    harness.setCleanupGate(rootA, gate.promise);
+
+    // A → C queues a cleanup for A, which keeps walking.
+    const specC = sharedSpec('ses_a', rootC);
+    await harness.manager.prepare(specC, credentialsFor(specC, proxyHandle(exp)));
+    expect(harness.abortCalls).toContain(rootA);
+
+    // C → A queues a cleanup for C and must still settle A's walk, not mistake
+    // the session's newest cleanup for the one it is about to replace.
+    harness.frames.length = 0;
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    expect(
+      harness.nativeDiagnostics.filter(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId &&
+          diagnostic.fields.ok === false
+      )
+    ).toHaveLength(1);
+    // The aborted walk settled only because this prepare aborted it, and the
+    // prepare reported ready only after it settled.
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: specA.sessionId },
+    ]);
+    gate.resolve();
+  });
+
+  it('leaves a superseded binding cleanup running when another binding is prepared', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    const gate = Promise.withResolvers<void>();
+    harness.setCleanupGate(rootA, gate.promise);
+
+    // Naming another native session supersedes the prepared binding and queues
+    // a walk for the old native session on the still-shared runtime.
+    const superseding = sharedSpec('ses_a', 'ses_dddddddddddddddddddddddddd');
+    await harness.manager.prepare(superseding, credentialsFor(superseding, proxyHandle(exp)));
+    expect(harness.abortCalls).toContain(rootA);
+
+    // The new prepare names a different native session, so it must not abort the
+    // walk: the old native session is released only by its own cleanup.
+    gate.resolve();
+    await waitFor(() =>
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId
+      )
+    );
+    expect(
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId &&
+          diagnostic.fields.ok === true
+      )
+    ).toBe(true);
+    expect(harness.logs.some(log => log.includes('control-plane release cleanup incomplete'))).toBe(
+      false
+    );
   });
 
   it('releases a legacy shared key so a later modern route gets a fresh runtime', async () => {

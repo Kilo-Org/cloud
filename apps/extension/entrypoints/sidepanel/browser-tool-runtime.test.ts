@@ -2,9 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { BROWSER_TOOL_MESSAGE } from '@/src/shared/tab-debugger';
 import { createToolCall } from '@/src/shared/agent-conversation';
 import type { BrowserCaller } from '@/src/shared/browser-caller';
+import {
+  answerTabTakeOver,
+  currentTabTakeOver,
+  subscribeTabTakeOver,
+} from './browser-tab-takeover';
+import type { TabTakeOverPrompt } from './browser-tab-takeover';
 
 const mocks = vi.hoisted(() => ({
-  requestTabTakeOver: vi.fn(),
   sendMessage: vi.fn(),
 }));
 
@@ -15,11 +20,6 @@ vi.mock('#imports', () => ({
       sendMessage: mocks.sendMessage,
     },
   },
-}));
-
-// eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
-vi.mock('./browser-tab-takeover', () => ({
-  requestTabTakeOver: mocks.requestTabTakeOver,
 }));
 
 // eslint-disable-next-line import/first
@@ -38,6 +38,31 @@ const clickCall = () =>
     tabId: 7,
   });
 
+const takeOverAsked = {
+  ok: true,
+  takeOver: {
+    holderKind: 'agent',
+    sessionTitle: 'Kilo CLI session Price check',
+    tabId: 7,
+  },
+  type: BROWSER_TOOL_MESSAGE,
+};
+
+/** Resolves with the card the next take-over request shows. */
+const nextCard = (): Promise<TabTakeOverPrompt> => {
+  const { promise, resolve } = Promise.withResolvers<TabTakeOverPrompt>();
+  const unsubscribe = subscribeTabTakeOver(() => {
+    const shown = currentTabTakeOver();
+
+    if (shown !== undefined) {
+      unsubscribe();
+      resolve(shown);
+    }
+  });
+
+  return promise;
+};
+
 describe('side panel browser tool caller', () => {
   it('sends the tool name, arguments and caller identity verbatim and returns the background result', async () => {
     mocks.sendMessage.mockReset();
@@ -54,6 +79,7 @@ describe('side panel browser tool caller', () => {
     expect(mocks.sendMessage).toHaveBeenCalledWith({
       arguments: { target: 'e5' },
       caller,
+      safeMode: false,
       tabId: 7,
       takeOver: false,
       tool: 'kilo_browser_click',
@@ -93,35 +119,24 @@ describe('side panel browser tool caller', () => {
 
   it('re-sends with takeOver after the panel confirms, and leaves the agent call to end with tab_taken', async () => {
     mocks.sendMessage.mockReset();
-    mocks.requestTabTakeOver.mockReset();
-    mocks.requestTabTakeOver.mockResolvedValueOnce(true);
-    mocks.sendMessage
-      .mockResolvedValueOnce({
-        ok: true,
-        takeOver: {
-          holderKind: 'agent',
-          sessionTitle: 'Kilo CLI session Price check',
-          tabId: 7,
-        },
-        type: BROWSER_TOOL_MESSAGE,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        result: { ok: true, value: 'Clicked "e5".' },
-        type: BROWSER_TOOL_MESSAGE,
-      });
-
-    await expect(executeKiloBrowserToolCall(clickCall(), caller)).resolves.toStrictEqual({
+    mocks.sendMessage.mockResolvedValueOnce(takeOverAsked).mockResolvedValueOnce({
       ok: true,
-      value: 'Clicked "e5".',
+      result: { ok: true, value: 'Clicked "e5".' },
+      type: BROWSER_TOOL_MESSAGE,
     });
-    expect(mocks.requestTabTakeOver).toHaveBeenCalledWith({
-      sessionTitle: 'Kilo CLI session Price check',
-      tabId: 7,
-    });
+    const card = nextCard();
+
+    const call = executeKiloBrowserToolCall(clickCall(), caller);
+    const shown = await card;
+
+    expect(shown).toMatchObject({ sessionTitle: 'Kilo CLI session Price check', tabId: 7 });
+    answerTabTakeOver(shown.requestId, true);
+
+    await expect(call).resolves.toStrictEqual({ ok: true, value: 'Clicked "e5".' });
     expect(mocks.sendMessage).toHaveBeenLastCalledWith({
       arguments: { target: 'e5' },
       caller,
+      safeMode: false,
       tabId: 7,
       takeOver: true,
       tool: 'kilo_browser_click',
@@ -131,24 +146,48 @@ describe('side panel browser tool caller', () => {
 
   it('does not take the tab when the panel cancels the confirmation', async () => {
     mocks.sendMessage.mockReset();
-    mocks.requestTabTakeOver.mockReset();
-    mocks.requestTabTakeOver.mockResolvedValueOnce(false);
-    mocks.sendMessage.mockResolvedValueOnce({
-      ok: true,
-      takeOver: {
-        holderKind: 'agent',
-        sessionTitle: 'Kilo CLI session Price check',
-        tabId: 7,
-      },
-      type: BROWSER_TOOL_MESSAGE,
-    });
+    mocks.sendMessage.mockResolvedValueOnce(takeOverAsked);
+    const card = nextCard();
 
-    await expect(executeKiloBrowserToolCall(clickCall(), caller)).resolves.toStrictEqual({
+    const call = executeKiloBrowserToolCall(clickCall(), caller);
+    const shown = await card;
+
+    answerTabTakeOver(shown.requestId, false);
+
+    await expect(call).resolves.toStrictEqual({
       error:
         'The tab stays with Kilo CLI session Price check. Ask the user to stop that session or choose another tab.',
       ok: false,
     });
     // No second send with takeOver: the panel never took the tab.
+    expect(mocks.sendMessage.mock.calls.at(1)).toBeUndefined();
+  });
+
+  it('ends the wait on the card when the turn stops, and a late Take over runs nothing', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce(takeOverAsked).mockResolvedValueOnce({
+      ok: true,
+      result: { ok: true, value: 'Clicked "e5".' },
+      type: BROWSER_TOOL_MESSAGE,
+    });
+    const stop = new AbortController();
+    const card = nextCard();
+
+    const call = executeKiloBrowserToolCall(clickCall(), caller, stop.signal);
+    const shown = await card;
+
+    stop.abort();
+
+    expect(currentTabTakeOver()).toBeUndefined();
+    await expect(call).resolves.toStrictEqual({
+      error: 'Stopped before the tab was taken over.',
+      ok: false,
+    });
+
+    answerTabTakeOver(shown.requestId, true);
+    await Promise.resolve();
+
+    // Only the first send: the stopped call never asked the background to take the tab.
     expect(mocks.sendMessage.mock.calls.at(1)).toBeUndefined();
   });
 

@@ -12,7 +12,6 @@ import {
 // native icon package, and the icons are not what this suite asserts.
 vi.mock('@/components/ui/icons', () => ({
   Cpu: 'Cpu',
-  FileText: 'FileText',
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
@@ -20,7 +19,13 @@ vi.mock('@/components/ui/icons', () => ({
   Server: 'Server',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
-  Users: 'Users',
+  UsersRound: 'UsersRound',
+}));
+
+// The request-logs row mirrors its glyph with the screen that owns it, so the
+// row table reads the direction-aware wrapper rather than the raw icon.
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalLogs: 'DirectionalLogs',
 }));
 
 // Every row is an absolute web URL, so the suite needs the base the app bakes
@@ -145,6 +150,10 @@ describe('visibleInAppSettingsRows', () => {
     expect(byArea.get('requestLogs')?.href).toBe(
       '/(app)/(tabs)/(3_profile)/organization/request-logs'
     );
+    // The row and the screen's empty state draw one glyph, and it mirrors in
+    // right-to-left, so neither reads as a different list from the other.
+    expect(byArea.get('requestLogs')?.icon).toBe('DirectionalLogs');
+    expect(byArea.get('auditLogs')?.icon).toBe('ScrollText');
     expect(byArea.get('providersAndModels')?.href).toBe(
       '/(app)/(tabs)/(3_profile)/organization/providers-and-models'
     );

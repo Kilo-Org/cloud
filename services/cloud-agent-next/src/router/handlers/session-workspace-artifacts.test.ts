@@ -34,7 +34,6 @@ const entry: WorkspaceArtifactEntry = {
   sizeBytes: 1_024,
   contentType: 'application/pdf',
   updatedAt: 1_760_000_000_000,
-  expiresAt: 1_760_000_000_000 + 14 * 24 * 60 * 60 * 1_000,
 };
 const list: ListWorkspaceArtifactsOutput = { revision: 3, entries: [entry] };
 const metadata = {

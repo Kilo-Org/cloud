@@ -118,24 +118,42 @@ const mockPrepare = jest.fn();
 const mockOnSessionReady = jest.fn();
 let membershipAvailable = true;
 
-function run(platformIntegration: PlatformIntegration, inputUser = user) {
-  return runBotAgent({
-    thread: {
-      adapter: { name: 'slack' },
-      startTyping: jest.fn(),
-      postEphemeral: jest.fn(async () => undefined),
-    } as unknown as Thread,
-    message: {
-      id: 'message-1',
-      text: 'Audit dependencies',
-      author: { userId: user.id, userName: 'Owner', fullName: 'Owner', isBot: false, isMe: false },
-    },
-    platformIntegration,
-    user: inputUser,
-    botRequestId: 'request-1',
-    prompt: 'Audit dependencies',
-    onSessionReady: mockOnSessionReady,
-  });
+async function run(platformIntegration: PlatformIntegration, inputUser = user) {
+  // Workflow control tokens stamp their `env` claim from process.env.NODE_ENV,
+  // which is `production` in the deployed web app the Worker admits against.
+  const previousNodeEnv = process.env.NODE_ENV;
+  Object.assign(process.env, { NODE_ENV: 'production' });
+  try {
+    return await runBotAgent({
+      thread: {
+        adapter: { name: 'slack' },
+        startTyping: jest.fn(),
+        postEphemeral: jest.fn(async () => undefined),
+      } as unknown as Thread,
+      message: {
+        id: 'message-1',
+        text: 'Audit dependencies',
+        author: {
+          userId: user.id,
+          userName: 'Owner',
+          fullName: 'Owner',
+          isBot: false,
+          isMe: false,
+        },
+      },
+      platformIntegration,
+      user: inputUser,
+      botRequestId: 'request-1',
+      prompt: 'Audit dependencies',
+      onSessionReady: mockOnSessionReady,
+    });
+  } finally {
+    if (previousNodeEnv === undefined) {
+      Reflect.deleteProperty(process.env, 'NODE_ENV');
+    } else {
+      Reflect.set(process.env, 'NODE_ENV', previousNodeEnv);
+    }
+  }
 }
 
 beforeEach(() => {
@@ -151,6 +169,7 @@ beforeEach(() => {
         connectionString: 'postgres://unused',
         resourceKind: 'cloud-agent-next',
         resourceId: 'workspace_test',
+        environment: 'production',
         organizationId: input.kilocodeOrganizationId,
         adapters: {
           getPrincipal: async ({ userId }) =>

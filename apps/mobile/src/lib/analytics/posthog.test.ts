@@ -1,55 +1,31 @@
 /* oxlint-disable max-lines */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const hoisted = vi.hoisted(() => {
-  const client = {
-    register: vi.fn(),
-    setPersonPropertiesForFlags: vi.fn(),
-    onFeatureFlags: vi.fn(),
-    capture: vi.fn(),
-    screen: vi.fn(),
-    identify: vi.fn(),
-    reloadFeatureFlags: vi.fn(),
-    getFeatureFlag: vi.fn(),
-    reset: vi.fn(),
-    setPersistedProperty: vi.fn(),
-    optOut: vi.fn().mockResolvedValue(undefined),
-    shutdown: vi.fn(),
-    flush: vi.fn(),
-  };
-  const holder: { options?: Record<string, unknown> } = {};
-  const device = { deviceType: null as number | null };
-  const controller = {
-    allowsMandatory: vi.fn().mockReturnValue(true),
-    allowsOptional: vi.fn().mockReturnValue(true),
-    currentGeneration: vi.fn().mockReturnValue(0),
-  };
-  const storage = {
-    sealPostHogStorage: vi.fn(),
-    unsealPostHogStorage: vi.fn(),
-    purgePostHogPersistence: vi.fn(),
-    // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
-    posthogCustomStorage: {} as Record<string, unknown>,
-  };
-  return { client, holder, device, controller, storage };
-});
+// The helper's vi.hoisted object merges into file scope at the same import
+// position the local hoisted block used, so the vi.mock factories below reach
+// it the same way they reached the local doubles.
+import {
+  posthogMockConstructor,
+  postHogPersistedProperty,
+  posthogTestDouble,
+} from './posthog-test-double';
+
+const device = { deviceType: null as number | null };
+
+// File-local `device` joins the shared double so every `hoisted.device.*`
+// reference (mock getters and tests) keeps working, while the merged object
+// keeps the full type without mutating the shared double.
+const hoisted = { ...posthogTestDouble, device };
 
 vi.mock('posthog-react-native', () => ({
-  default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
-    hoisted.holder.options = options;
-    return hoisted.client;
-  }),
-  PostHogPersistedProperty: {
-    Queue: 'queue',
-    LogsQueue: 'logs_queue',
-    AiQueue: 'ai_queue',
-  },
+  default: posthogMockConstructor,
+  PostHogPersistedProperty: postHogPersistedProperty,
 }));
 
 vi.mock('expo-device', () => ({
   DeviceType: { UNKNOWN: 0, PHONE: 1, TABLET: 2, DESKTOP: 3, TV: 4 },
   get deviceType() {
-    return hoisted.device.deviceType;
+    return device.deviceType;
   },
 }));
 
@@ -90,12 +66,6 @@ function readCustomAppProperties(): (
   return fn as (properties: Record<string, unknown>) => Record<string, unknown>;
 }
 
-async function loadInitPostHog() {
-  vi.resetModules();
-  const module = await import('./posthog');
-  return module.initPostHog;
-}
-
 // oxlint-disable-next-line require-await -- async required by promise-function-async
 async function loadModule() {
   vi.resetModules();
@@ -122,7 +92,7 @@ describe('initPostHog device_form_factor', () => {
     'maps deviceType $deviceType to device_form_factor $expected',
     async ({ deviceType, expected }) => {
       hoisted.device.deviceType = deviceType;
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const customAppProperties = readCustomAppProperties();
@@ -135,7 +105,7 @@ describe('initPostHog device_form_factor', () => {
 
   it('registers platform: mobile once', async () => {
     hoisted.device.deviceType = 1;
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.client.register).toHaveBeenCalledTimes(1);
@@ -144,7 +114,7 @@ describe('initPostHog device_form_factor', () => {
 
   it('constructs PostHog only once when init is called twice', async () => {
     hoisted.device.deviceType = 1;
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     const posthogModule = await import('posthog-react-native');
     const PostHog = posthogModule.default;
 
@@ -155,7 +125,7 @@ describe('initPostHog device_form_factor', () => {
   });
 
   it('passes customStorage to PostHog', async () => {
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options?.customStorage).toBe(hoisted.storage.posthogCustomStorage);
@@ -173,7 +143,7 @@ describe('initPostHog gate', () => {
 
   it('returns early when no account decision exists', async () => {
     hoisted.controller.allowsMandatory.mockReturnValue(false);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -182,7 +152,7 @@ describe('initPostHog gate', () => {
 
   it('initializes when optional consent is true', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -194,7 +164,7 @@ describe('initPostHog gate', () => {
     // account, but every switch that would send analytics on its own is off and
     // the SDK starts opted out, so capture is dropped.
     hoisted.controller.allowsOptional.mockReturnValue(false);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -212,7 +182,7 @@ describe('initPostHog gate', () => {
 
   it('keeps capture on when optional consent is given', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options).toMatchObject({
@@ -230,7 +200,7 @@ describe('initPostHog gate', () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
     vi.stubGlobal('__DEV__', true);
     try {
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const posthogModule = await import('posthog-react-native');
@@ -247,7 +217,7 @@ describe('initPostHog gate', () => {
     vi.stubGlobal('__DEV__', true);
     process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://10.0.2.2:8123';
     try {
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const posthogModule = await import('posthog-react-native');
@@ -606,7 +576,7 @@ describe('initPostHog constructor options', () => {
   });
 
   it('passes disableGeoip: true to the constructor', async () => {
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options?.disableGeoip).toBe(true);
@@ -834,9 +804,8 @@ describe('discard serialization', () => {
     captureEvent('recovery-test');
     expect(hoisted.client.capture).toHaveBeenCalledWith('recovery-test', undefined);
 
-    // The recovered client must not be opted out — optOut was called on the
-    // old client, not the new one. The new client's optOut has never been
-    // called.
+    // The mock factory returns one shared client for every construction, so
+    // toHaveBeenCalledTimes(1) pins the single optOut from the first discard.
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
   });
 });

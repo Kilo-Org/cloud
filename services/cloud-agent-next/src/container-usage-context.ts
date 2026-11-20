@@ -1,4 +1,5 @@
 import { computeMemberMetadata } from '@kilocode/worker-utils/compute-member';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   billingActorSchema,
   billingSubjectSchema,
@@ -180,7 +181,12 @@ export type SandboxBillingAdmissionResult =
   | { success: true }
   | {
       success: false;
-      code: 'insufficient_credits' | 'meter_unavailable' | 'stopping' | 'invalid_configuration';
+      code:
+        | 'container_limit_reached'
+        | 'insufficient_credits'
+        | 'meter_unavailable'
+        | 'stopping'
+        | 'invalid_configuration';
       message: string;
       remainingMicrodollars?: number;
       minimumRequiredMicrodollars?: number;
@@ -254,7 +260,8 @@ export function buildSandboxBillingInput(
       ? {
           metadata: {
             origin: normalizedOrigin(metadata.identity.billingOrigin),
-            ...(metadata.workspace?.sandboxProvider === 'cloudflare-containers' &&
+            ...(metadata.workspace?.sandboxProvider !== undefined &&
+            providerSupports(metadata.workspace.sandboxProvider, 'meteredBilling') &&
             subject.type === 'org'
               ? computeMemberMetadata(actor, metadata.identity.userId)
               : {}),
@@ -350,6 +357,9 @@ export function billingAdmissionFailureFromError(error: unknown): SandboxBilling
     };
   }
   if (error instanceof ContainerUsageAdmissionError) {
+    if (error.code === 'container_limit_reached') {
+      return { success: false, code: error.code, message: error.message };
+    }
     if (error.code === 'insufficient_credits') {
       return {
         success: false,

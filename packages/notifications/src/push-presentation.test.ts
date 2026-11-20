@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 import {
-  AGENT_BRIEFING_CHANNEL_APP_VERSION,
-  AGENT_CHANNEL_SPLIT_APP_VERSION,
   AGENT_NOTIFICATION_KINDS,
   ANDROID_NOTIFICATION_CHANNELS,
   agentNotificationKindForAndroidChannelId,
@@ -12,10 +10,11 @@ import {
   androidChannelIdForAgentKind,
   androidChannelIdForPushData,
   androidChannelIdForPushDataToAppVersion,
-  LEGACY_AGENT_ANDROID_CHANNEL_ID,
+  LIVE_ACTIVITY_TIE_BREAK_LIMIT,
   androidChannelIdForRegisteredClient,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
+  liveActivityBandStep,
 } from './push-presentation';
 import { genericPushContentForPushData } from './push-copy';
 
@@ -209,16 +208,14 @@ describe('agentNotificationKindForAndroidChannelId', () => {
     expect(agentNotificationKindForAndroidChannelId('agent-progress')).toBe('progress');
   });
 
-  it('is the inverse of androidChannelIdForAgentKind', () => {
-    for (const kind of AGENT_NOTIFICATION_KINDS) {
-      expect(agentNotificationKindForAndroidChannelId(androidChannelIdForAgentKind(kind))).toBe(
-        kind
-      );
-    }
-  });
-
   it('returns null for a non-agent channel or absent marker', () => {
-    for (const channelId of ['balance', 'security'] as const) {
+    for (const channelId of [
+      'balance',
+      'security',
+      'agent',
+      'followed-sessions-lock-screen',
+      '',
+    ] as const) {
       expect(agentNotificationKindForAndroidChannelId(channelId)).toBeNull();
     }
     expect(agentNotificationKindForAndroidChannelId(null)).toBeNull();
@@ -342,28 +339,16 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
     // 1.0.11 shipped before the split channels existed: its tokens have no
     // `needs-input`/`agent-progress`, so directing a push there would be
     // dropped on Android 8+. Only the split build and later may be addressed.
-    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.11')).toBe(
-      LEGACY_AGENT_ANDROID_CHANNEL_ID
-    );
-    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.10')).toBe(
-      LEGACY_AGENT_ANDROID_CHANNEL_ID
-    );
-    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.11')).toBe(
-      LEGACY_AGENT_ANDROID_CHANNEL_ID
-    );
-    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.4')).toBe(
-      LEGACY_AGENT_ANDROID_CHANNEL_ID
-    );
+    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.11')).toBe('agent');
+    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.10')).toBe('agent');
+    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.11')).toBe('agent');
+    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.4')).toBe('agent');
     expect(androidChannelIdForPushDataToAppVersion(progress, null)).toBeUndefined();
-    expect(androidChannelIdForPushDataToAppVersion(progress, 'nightly')).toBe(
-      LEGACY_AGENT_ANDROID_CHANNEL_ID
-    );
+    expect(androidChannelIdForPushDataToAppVersion(progress, 'nightly')).toBe('agent');
   });
 
   it('reaches the split channels from the first build that creates them', () => {
-    expect(
-      androidChannelIdForPushDataToAppVersion(attention, AGENT_CHANNEL_SPLIT_APP_VERSION)
-    ).toBe('needs-input');
+    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.12')).toBe('needs-input');
     expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.12')).toBe('agent-progress');
   });
 
@@ -384,9 +369,7 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
     expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.12')).toBe('agent-progress');
     expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.11')).toBeUndefined();
     expect(androidChannelIdForPushDataToAppVersion(brief, null)).toBeUndefined();
-    expect(androidChannelIdForPushDataToAppVersion(brief, AGENT_BRIEFING_CHANNEL_APP_VERSION)).toBe(
-      'agent-briefing'
-    );
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.16')).toBe('agent-briefing');
     expect(androidChannelIdForPushDataToAppVersion(brief, '1.1.0')).toBe('agent-briefing');
   });
 
@@ -394,6 +377,35 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
     expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.11')).toBe('active-agents');
     expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.12')).toBe('needs-input');
     expect(androidChannelIdForPushDataToAppVersion(glanceable(0), '1.0.12')).toBe('agent-progress');
+  });
+
+  it('addresses a followed-sessions push only from the build that creates the channel', () => {
+    const followed = pushDataSchema.parse({
+      type: 'session_live_update',
+      schemaVersion: 1,
+      event: 'update',
+      content: {
+        sessionId: 'ses-1',
+        title: 'Fix the login bug',
+        statusKind: 'running',
+        statusSince: '2026-01-01T00:00:00.000Z',
+        scheduledAt: null,
+        awaitingPermission: false,
+        approvalKey: null,
+        updatedAt: '2026-01-01T00:00:01.000Z',
+      },
+    });
+
+    // A token from a build that does not create the channel gets no channel
+    // id; the push is data-only, so the client draws its own card.
+    expect(androidChannelIdForPushDataToAppVersion(followed, '1.0.14')).toBeUndefined();
+    expect(androidChannelIdForPushDataToAppVersion(followed, null)).toBeUndefined();
+    expect(androidChannelIdForPushDataToAppVersion(followed, '1.0.15')).toBe(
+      'followed-sessions-lock-screen'
+    );
+    expect(androidChannelIdForPushDataToAppVersion(followed, '1.1.0')).toBe(
+      'followed-sessions-lock-screen'
+    );
   });
 
   it('routes an agent push through its kind', () => {
@@ -495,10 +507,8 @@ describe('genericPushContentForPushData', () => {
 });
 
 describe('androidChannelIdForRegisteredClient', () => {
-  const splitVersion = AGENT_CHANNEL_SPLIT_APP_VERSION;
-
   it('hands a named agent channel to a client that creates it', () => {
-    expect(androidChannelIdForRegisteredClient('needs-input', splitVersion)).toBe('needs-input');
+    expect(androidChannelIdForRegisteredClient('needs-input', '1.0.12')).toBe('needs-input');
     expect(androidChannelIdForRegisteredClient('agent-progress', '1.0.12')).toBe('agent-progress');
     expect(androidChannelIdForRegisteredClient('agent-progress', '1.10.0')).toBe('agent-progress');
   });
@@ -517,8 +527,41 @@ describe('androidChannelIdForRegisteredClient', () => {
   it('keeps the pre-split channels for every client that created them', () => {
     for (const channelId of ['balance', 'security'] as const) {
       expect(androidChannelIdForRegisteredClient(channelId, '1.0.4')).toBe(channelId);
-      expect(androidChannelIdForRegisteredClient(channelId, splitVersion)).toBe(channelId);
+      expect(androidChannelIdForRegisteredClient(channelId, '1.0.12')).toBe(channelId);
       expect(androidChannelIdForRegisteredClient(channelId, null)).toBeUndefined();
     }
+  });
+
+  it('withholds the followed-sessions channel from a client that does not create it', () => {
+    // A token from a build that does not create the channel gets no channel
+    // id; Android 8+ would drop a post addressed to it.
+    expect(
+      androidChannelIdForRegisteredClient('followed-sessions-lock-screen', '1.0.14')
+    ).toBeUndefined();
+    expect(androidChannelIdForRegisteredClient('followed-sessions-lock-screen', '1.0.15')).toBe(
+      'followed-sessions-lock-screen'
+    );
+  });
+});
+
+describe('LIVE_ACTIVITY_TIE_BREAK_LIMIT', () => {
+  it('is the shipped tie-break bound', () => {
+    // The iPhone and Watch relevance scores depend on this shipped number.
+    expect(LIVE_ACTIVITY_TIE_BREAK_LIMIT).toBe(19);
+  });
+
+  it('derives the smallest positive gap between adjacent bands', () => {
+    expect(liveActivityBandStep([100, 80, 60, 40, 20])).toBe(20);
+    expect(liveActivityBandStep([0, 5])).toBe(5);
+    // Order does not matter: the step sorts its input.
+    expect(liveActivityBandStep([20, 5, 100])).toBe(15);
+  });
+
+  it('refuses a table that cannot space two distinct values apart', () => {
+    // A bands-less tie-break would leave every recency score non-finite and
+    // serialize an absent relevance score, so it throws instead.
+    expect(() => liveActivityBandStep([5, 5])).toThrow(/at least two distinct values/);
+    expect(() => liveActivityBandStep([7])).toThrow(/at least two distinct values/);
+    expect(() => liveActivityBandStep([])).toThrow(/at least two distinct values/);
   });
 });

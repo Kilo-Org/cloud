@@ -1,8 +1,10 @@
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import {
   type inferRouterInputs,
   type inferRouterOutputs,
   type MobileRouter,
 } from '@kilocode/trpc/mobile';
+import * as z from 'zod';
 
 type OrgModeOutput =
   inferRouterOutputs<MobileRouter>['organizations']['modes']['list']['modes'][number];
@@ -44,6 +46,34 @@ export type OrgModeFormValues = Readonly<{
   editRestrictionLabel: string;
 }>;
 
+/**
+ * A mode form's durable draft: the whole typed form, so a restored draft seeds
+ * every field — not a per-field patch a person would have to reconcile.
+ */
+export type OrgModeFormDraft = OrgModeFormValues;
+
+/**
+ * The draft's stored shape. Strict on purpose: a value that carries any other
+ * key was written by a build with a different form, so the caller reads it as no
+ * draft and leaves it stored rather than coercing a shape it does not know.
+ */
+const orgModeFormDraftSchema = z.strictObject({
+  name: z.string(),
+  slug: z.string(),
+  roleDefinition: z.string(),
+  description: z.string(),
+  whenToUse: z.string(),
+  customInstructions: z.string(),
+  groups: z.array(z.enum(MODE_TOOL_GROUPS)),
+  editFileRegex: z.string(),
+  editRestrictionLabel: z.string(),
+});
+
+/** Shape guard for a stored mode form draft; another build's value is refused. */
+export function isOrgModeFormDraft(value: unknown): value is OrgModeFormDraft {
+  return orgModeFormDraftSchema.safeParse(value).success;
+}
+
 export type OrgModeFormErrorCode =
   | 'nameRequired'
   | 'identifierRequired'
@@ -67,9 +97,7 @@ export type OrgModeFormErrors = Readonly<{
 /** The server's mode-name bound. */
 export const ORG_MODE_NAME_MAX_LENGTH = 100;
 
-/** The server's mode-slug bound and character set. */
-export const ORG_MODE_SLUG_MAX_LENGTH = 50;
-
+/** The server's mode-slug character set; the length bound lives with the derivation. */
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 
 /** Whether a file pattern the person typed compiles as a regular expression. */
@@ -80,18 +108,6 @@ function isValidRegExp(source: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * The slug the create form derives from a name, as the web form derives it:
- * lowercase, every run of other characters folded to one hyphen, no leading or
- * trailing hyphen. A derived slug is a suggestion the person can replace.
- */
-export function modeSlugFromName(name: string): string {
-  return name
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '');
 }
 
 /**
@@ -112,7 +128,7 @@ export function validateOrgModeForm(
   let slugError: OrgModeFormErrorCode | undefined = undefined;
   if (slug.length === 0) {
     slugError = 'identifierRequired';
-  } else if (!SLUG_PATTERN.test(slug) || slug.length > ORG_MODE_SLUG_MAX_LENGTH) {
+  } else if (!SLUG_PATTERN.test(slug) || slug.length > MODE_SLUG_MAX_LENGTH) {
     slugError = 'identifierInvalid';
   } else if (existingModes.some(mode => mode.slug === slug && mode.id !== editingModeId)) {
     slugError = 'identifierTaken';
@@ -134,18 +150,20 @@ export function validateOrgModeForm(
 
 /**
  * The values a save reads. A create whose identifier the person left empty
- * follows the name, as the web form derives one; an update derives nothing, so
- * clearing the identifier is reported as missing instead of silently renaming a
- * mode whose slug overrides a built-in or carries an Organization Auto route.
+ * follows the name, as the web form derives one — counting past the slugs the
+ * organization's other modes hold; an update derives nothing, so clearing the
+ * identifier is reported as missing instead of silently renaming a mode whose
+ * slug overrides a built-in or carries an Organization Auto route.
  */
 export function orgModeFormSaveValues(
   values: OrgModeFormValues,
-  mode: 'create' | 'update'
+  mode: 'create' | 'update',
+  takenSlugs: readonly string[]
 ): OrgModeFormValues {
   if (mode === 'update' || values.slug.trim().length > 0) {
     return values;
   }
-  return { ...values, slug: modeSlugFromName(values.name) };
+  return { ...values, slug: modeSlugFromName(values.name, takenSlugs) };
 }
 
 /**

@@ -583,18 +583,28 @@ describe('syncDirectByokModels database snapshots', () => {
   });
 
   test('re-sync removes previously synced OpenCode Go models served only over the Gemini API', async () => {
-    await db.insert(direct_byok_model_lists).values({
-      provider_id: 'opencode-go',
-      models: [
-        {
-          id: 'gemini-4-argon-contributor',
-          name: 'Gemini 4 Argon Contributor',
-          context_length: 1_048_576,
-          max_completion_tokens: 65_536,
-        },
-      ],
-      synced_at: oldSyncedAt,
-    });
+    const previouslySyncedModels = [
+      {
+        id: 'gemini-4-argon-contributor',
+        name: 'Gemini 4 Argon Contributor',
+        context_length: 1_048_576,
+        max_completion_tokens: 65_536,
+      },
+    ];
+    // `syncDirectByokModels` starts every provider at once, so a sync that rejects for one
+    // provider can still write another provider's row after the test that started it ends.
+    // This seed therefore overwrites whatever row exists instead of failing on it.
+    await db
+      .insert(direct_byok_model_lists)
+      .values({
+        provider_id: 'opencode-go',
+        models: previouslySyncedModels,
+        synced_at: oldSyncedAt,
+      })
+      .onConflictDoUpdate({
+        target: direct_byok_model_lists.provider_id,
+        set: { models: previouslySyncedModels, synced_at: oldSyncedAt },
+      });
     openCodeGoModels = {
       'glm-5.3': { id: 'glm-5.3', name: 'GLM-5.3' },
       'gemini-4-argon-contributor': {

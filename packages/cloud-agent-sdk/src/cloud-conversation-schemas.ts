@@ -9,7 +9,7 @@ import {
   customerBillingFailureSchema,
 } from '@kilocode/session-ingest-contracts';
 import { preparationStepSchema } from './preparation-step';
-import { readKilo2Messages } from './kilo2-source-messages';
+import { projectKilo2Message } from './kilo2-source-messages';
 import type {
   CloudAgentSessionId,
   CloudSessionSnapshotPage,
@@ -159,6 +159,9 @@ const cloudMessageSchema = z.discriminatedUnion('role', [
   kiloSdkAssistantMessageSchema,
 ]);
 
+// The worker sends a user Stop as this string (worker-utils `user_interrupt`), not a structured error.
+const USER_INTERRUPT_ERROR = /^(\[BYOK\] )?The message was interrupted by the user$/;
+
 export function normalizeAssistantMessageError(value: unknown): unknown {
   if (
     typeof value !== 'object' ||
@@ -177,13 +180,12 @@ export function normalizeAssistantMessageError(value: unknown): unknown {
     decoded = undefined;
   }
   const parsed = kiloSdkAssistantMessageSchema.shape.error.safeParse(decoded);
-  return {
-    ...value,
-    error:
-      parsed.success && parsed.data !== undefined
-        ? parsed.data
-        : { name: 'UnknownError', data: { message: value.error } },
-  };
+  let error: unknown;
+  if (parsed.success && parsed.data !== undefined) error = parsed.data;
+  else if (USER_INTERRUPT_ERROR.test(value.error))
+    error = { name: 'MessageAbortedError', data: { message: value.error } };
+  else error = { name: 'UnknownError', data: { message: value.error } };
+  return { ...value, error };
 }
 
 export const cloudMessageInfoSchema = z.preprocess(
@@ -325,15 +327,14 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
           omittedItemCount++;
           continue;
         }
-        const display = readKilo2Messages(native.source.session, [parsed.data])[0];
+        // The per-message guard keeps a projection failure from failing the whole page.
+        const display = projectKilo2Message(native.source.session, parsed.data, item.parentID);
         if (!display) {
           // A compaction still in progress is shown once it completes; any
           // other message the projection cannot show is an omitted item.
           if (parsed.data.type !== 'compaction' && parsed.data.type !== 'shell') omittedItemCount++;
           continue;
         }
-        if (display.info.role === 'assistant' && item.parentID !== undefined)
-          display.info.parentID = item.parentID;
         messages.push(display);
       }
       const { source, ...metadata } = native;
@@ -363,6 +364,7 @@ export const cloudSessionMessagesPageSchema = cloudSessionMessagesPageWireSchema
       }
       messages.push({ info: info.data, parts });
     }
-    return { ...page, messages, omittedItemCount };
+    const { source: _wireSource, ...metadata } = v1;
+    return { ...metadata, sourceVersion: 'v1', messages, omittedItemCount };
   }
 ) satisfies z.ZodType<CloudSessionSnapshotPage | null>;

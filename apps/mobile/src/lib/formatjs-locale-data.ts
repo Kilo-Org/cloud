@@ -216,6 +216,16 @@ const PLURAL_RULES_LOCALE_LOADERS = {
   de: () => void require('@formatjs/intl-pluralrules/locale-data/de.js'),
   el: () => void require('@formatjs/intl-pluralrules/locale-data/el.js'),
   gu: () => void require('@formatjs/intl-pluralrules/locale-data/gu.js'),
+  // The released packages carry no `ht` file, and CLDR gives `ht` no
+  // plural-rules block of its own: it inherits the root rule, whose
+  // selection (`one` only for n = 1) the `en` data file carries — the same
+  // reasoning the number and list tables follow for their French choice, but
+  // with the root shape rather than the French one, because the ht catalog's
+  // plural families carry only `_one` and `_other` (no `_many` for exact
+  // millions). `intl-cache.ts` re-registers that dataset under `ht` itself:
+  // the polyfill resolves a requested locale against whichever data modules
+  // have registered, and without the pin `ht` would silently follow the
+  // French categories once the French data loads for another language.
   ht: () => void require('@formatjs/intl-pluralrules/locale-data/en.js'),
   ha: () => void require('@formatjs/intl-pluralrules/locale-data/ha.js'),
   he: () => void require('@formatjs/intl-pluralrules/locale-data/he.js'),

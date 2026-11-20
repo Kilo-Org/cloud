@@ -1,5 +1,12 @@
 import type { ErrorEvent, StackFrame } from '@sentry/core';
 
+export type CloudAgentSentryIdentity = {
+  userId?: string;
+  orgId?: string;
+  sessionId?: string;
+  sandboxId?: string;
+};
+
 type SentryConfigKey = 'CLOUD_AGENT_SENTRY_DSN' | 'CLOUD_AGENT_SENTRY_ENVIRONMENT';
 const warnedConfigKeys = new Set<SentryConfigKey>();
 
@@ -100,15 +107,21 @@ function sanitizeFrame(frame: StackFrame): StackFrame {
   };
 }
 
-export function sanitizeSentryEvent(event: ErrorEvent): ErrorEvent | null {
+function safeIdentifier(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-zA-Z0-9_.:/-]{1,256}$/.test(value);
+}
+
+export function sanitizeSentryEvent(
+  event: ErrorEvent,
+  { userId, orgId }: Pick<CloudAgentSentryIdentity, 'userId' | 'orgId'> = {}
+): ErrorEvent | null {
   if (!event.exception?.values?.length) return null;
-  const context: Record<string, string | number> = {};
+  const context: Partial<Record<(typeof CONTEXT_KEYS)[number], string>> & { exitCode?: number } =
+    {};
   const cloudAgent = event.contexts?.cloud_agent;
   for (const key of CONTEXT_KEYS) {
     const value = cloudAgent?.[key];
-    if (typeof value === 'string' && /^[a-zA-Z0-9_.:/-]{1,256}$/.test(value)) {
-      context[key] = value;
-    }
+    if (safeIdentifier(value)) context[key] = value;
   }
   if (typeof cloudAgent?.exitCode === 'number' && Number.isInteger(cloudAgent.exitCode)) {
     context.exitCode = cloudAgent.exitCode;
@@ -124,10 +137,20 @@ export function sanitizeSentryEvent(event: ErrorEvent): ErrorEvent | null {
     environment: event.environment,
     sdk: event.sdk,
     debug_meta: event.debug_meta,
+    ...(safeIdentifier(userId) ? { user: { id: userId } } : {}),
     contexts: { cloud_agent: context },
     tags: {
       ...(context.component ? { component: context.component } : {}),
       ...(context.operation ? { operation: context.operation } : {}),
+      ...(orgId === '(personal)' || (safeIdentifier(orgId) && orgId.length <= 200)
+        ? { orgId }
+        : {}),
+      ...(context.sessionId && context.sessionId.length <= 200
+        ? { sessionId: context.sessionId }
+        : {}),
+      ...(context.sandboxId && context.sandboxId.length <= 200
+        ? { sandboxId: context.sandboxId }
+        : {}),
     },
     exception: {
       values: event.exception.values.map(exception => ({
@@ -156,5 +179,5 @@ export const SENTRY_ERROR_OPTIONS = {
   enableLogs: false,
   tracesSampleRate: 0,
   maxBreadcrumbs: 0,
-  beforeSend: sanitizeSentryEvent,
+  beforeSend: (event: ErrorEvent) => sanitizeSentryEvent(event),
 } as const;

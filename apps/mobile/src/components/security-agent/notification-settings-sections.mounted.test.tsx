@@ -5,9 +5,11 @@
 // so a heading is the only thing that tells the two of them apart.
 
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Section } from '@/components/ui/section';
 import { i18n } from '@/i18n';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { NotificationSettingsScreen } from './notification-settings-screen';
@@ -34,7 +36,8 @@ vi.mock('expo-router', () => ({
   useFocusEffect: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
+vi.mock('@/components/ui/icons', () => ({ Bell: 'Bell', Check: 'Check', Clock3: 'Clock3' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
@@ -43,6 +46,26 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     primary: '#00f',
   }),
 }));
+const loadedConfig: Record<string, unknown> = {
+  isEnabled: true,
+  newFindingNotificationsEnabled: true,
+  newFindingNotificationMinSeverity: 'high',
+  slaNotificationsEnabled: true,
+  slaNotificationMinSeverity: 'medium',
+  slaNotificationWarningDays: 7,
+};
+
+const config = vi.hoisted(() => ({
+  data: null as Record<string, unknown> | null,
+  isLoading: false,
+  isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  error: null as unknown,
+  refetch: vi.fn(),
+}));
+const platformError = vi.hoisted(() => ({ props: null as Record<string, unknown> | null }));
+
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => ({
     canManage: true,
@@ -52,19 +75,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
     isError: false,
     refetch: vi.fn(),
   }),
-  useSecurityAgentConfig: () => ({
-    data: {
-      isEnabled: true,
-      newFindingNotificationsEnabled: true,
-      newFindingNotificationMinSeverity: 'high',
-      slaNotificationsEnabled: true,
-      slaNotificationMinSeverity: 'medium',
-      slaNotificationWarningDays: 7,
-    },
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useSecurityAgentConfig: () => config,
   useSaveSecurityAgentConfig: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
@@ -82,6 +93,10 @@ vi.mock('@/components/destructive-confirm-dialog', () => ({
   DestructiveConfirmDialog: () => null,
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
+// `PreferenceRow` puts its busy spinner in the row's tile; the shared
+// indicator reaches the reduced-motion policy (expo-battery, reanimated), so
+// the row's graph needs it stubbed to load under the test renderer.
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/radio-group', () => ({
@@ -102,17 +117,32 @@ vi.mock('@/components/ui/radio-group', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: 'PlatformErrorScreen',
+  PlatformErrorScreen: (props: Record<string, unknown>) => {
+    platformError.props = props;
+    return null;
+  },
 }));
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: () => null,
 }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 
 const PERSONAL_SCOPE = 'personal';
 const ORGANIZATION_SCOPE = '00000000-0000-4000-8000-000000000001';
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+beforeEach(() => {
+  config.data = loadedConfig;
+  config.isError = false;
+  config.fetchStatus = 'idle';
+  config.isPending = false;
+  config.error = null;
+  platformError.props = null;
+});
 
 afterEach(() => {
   act(() => {
@@ -157,12 +187,20 @@ describe('personal scope', () => {
     expect(sectionHeadings(screen)).toEqual([]);
   });
 
-  it('separates the two switch groups by a break wider than the steps inside one', () => {
+  it('separates the two switch groups by the section gap', () => {
     const screen = mount(PERSONAL_SCOPE);
 
+    // One contract body for every scope: the 21pt section gap separates the two
+    // switch groups, while the blocks inside one section sit 10.5pt apart.
     expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
-      'px-6 pt-4 gap-7'
+      SCREEN_BODY_CLASS
     );
+    // Each switch is its own `Section`; the severity pickers add their own, so
+    // only the sections that hold a switch count here.
+    const switchSections = screen.root
+      .findAllByType(Section)
+      .filter(section => section.findAllByType('Switch').length > 0);
+    expect(switchSections).toHaveLength(2);
   });
 });
 
@@ -184,8 +222,40 @@ describe('organization scope', () => {
   it('keeps the standard group gap, next to its headings', () => {
     const screen = mount(ORGANIZATION_SCOPE);
 
+    // The same contract body the personal scope uses: a labelled section adds
+    // its eyebrow, not a different inset or gap.
     expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
-      'px-6 pt-4 gap-6'
+      SCREEN_BODY_CLASS
     );
+  });
+});
+
+describe('config load failure', () => {
+  beforeEach(() => {
+    config.data = null;
+    config.isError = true;
+    config.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    platformError.props = null;
+  });
+
+  afterEach(() => {
+    config.data = loadedConfig;
+    config.isError = false;
+    config.error = null;
+    platformError.props = null;
+  });
+
+  it('titles the failure with the screen and leaves the description to the variant', () => {
+    mount(ORGANIZATION_SCOPE);
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('failed first read did not render the failure screen');
+    }
+    // The failed read is named once, in the error's own title. A message here
+    // would repeat the same words above the variant's cause.
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.notifications.couldNotLoad'));
+    expect(error.message).toBeUndefined();
+    expect(error.variant).toBe('server');
   });
 });

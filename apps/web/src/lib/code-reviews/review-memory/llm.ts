@@ -59,6 +59,7 @@ type GenerateReviewMemoryStructuredOutputInput<OUTPUT> = {
   schema: z.ZodType<OUTPUT>;
   wireSchema?: z.ZodType;
   validate: (output: OUTPUT) => OUTPUT;
+  abortSignal?: AbortSignal;
 };
 
 export async function resolveReviewMemoryActor(owner: ReviewMemoryOwner): Promise<User> {
@@ -177,6 +178,7 @@ ${JSON.stringify(transformedProviderSchema)}`;
       schema: wireSchema,
       name: input.schemaName,
     }),
+    abortSignal: input.abortSignal,
   });
 
   return {

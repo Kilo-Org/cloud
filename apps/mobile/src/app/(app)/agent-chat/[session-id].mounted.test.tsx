@@ -106,6 +106,10 @@ const confirmationRequests = vi.hoisted(() => ({
 }));
 
 const navigationRoutes = ['session-detail'];
+// The header's back press with history: the route's own pop.
+const routerBack = vi.fn(() => {
+  navigationRoutes.pop();
+});
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The New-session composer mounts only from its own route; this suite asserts
 // the session route never puts it on screen for a `session-id` param. The
@@ -121,6 +125,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
   // The session route's system Back listener registers on mount. These tests
@@ -136,6 +142,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
   DirectionalChevronLeft: 'ChevronLeft',
   DirectionalChevronRight: 'ChevronRight',
 }));
@@ -151,8 +158,12 @@ vi.mock('@/lib/user-web-connection-lifecycle', () => ({
   createNativeUserWebConnectionLifecycleHooks: () => ({}),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#999999',
+  useThemeColors: () => ({}),
+}));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
   Clock: 'Clock',
@@ -186,6 +197,16 @@ vi.mock('@/components/agents/chat-markdown-text', () => ({
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
+  // The stack the route is rendered in: the exit rule reads its index to tell
+  // a dismissal from the only-route case.
+  useNavigation: () => ({
+    getState: () => ({
+      index: navigationRoutes.length - 1,
+      routes: navigationRoutes.map((name, index) => ({ name, key: `route-${index}` })),
+    }),
+    // The stack-safe replacement listens for its push's transition end.
+    addListener: () => () => undefined,
+  }),
   useRouter: useRouterMock,
   // The session route's Back listener runs while the route is focused, which
   // for these tests is its mount lifetime.
@@ -243,6 +264,12 @@ vi.mock('@/lib/trpc', () => ({
 
 vi.mock('@/components/invalid-route-state', () => ({
   InvalidRouteState: 'InvalidRouteState',
+}));
+
+// The real bubble draws a failed preparation group, whose output block pulls in
+// react-native-gesture-handler; the stored transcripts here carry no attempts.
+vi.mock('@/components/agents/preparation-group', () => ({
+  PreparationGroup: 'PreparationGroup',
 }));
 
 vi.mock('@/lib/hooks/use-session-mutations', () => ({
@@ -543,13 +570,23 @@ beforeEach(() => {
   useRouteForegroundRefreshMock.mockClear();
   cliSessionGetQueryKeyMock.mockClear();
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  routerBack.mockClear();
   useRouterMock.mockReturnValue({
     canGoBack: () => navigationRoutes.length > 1,
-    back: () => {
-      navigationRoutes.pop();
-    },
+    back: routerBack,
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
+    },
+    // The stack-safe replacement pushes its destination, then retires the route
+    // it came from once that push settles: the end state is the one `replace`
+    // produces, so the source is gone from the modelled stack.
+    push: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? href : href.pathname;
+      const source = navigationRoutes.length - 1;
+      navigationRoutes.push(path);
+      if (source >= 0) {
+        navigationRoutes.splice(source, 1);
+      }
     },
     // The POP_TO end state the component relies on: find the destination at or
     // below the current index, truncate everything above it; with no match,
@@ -793,11 +830,15 @@ describe('SessionDetailScreen display scope', () => {
         expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
         expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
       } else if (state !== 'pending') {
-        expect(Boolean(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry'))).toBe(false);
-        const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
-          findByType(button, 'Text').flatMap(node => node.children)
+        // The terminal body repeats no exit: the header's back chevron is the
+        // only one, and a permanent denial draws no body action.
+        const error = findByType(renderer.root, 'QueryError')[0];
+        expect(Boolean(propOf(error, 'onRetry'))).toBe(false);
+        expect(propOf(error, 'action')).toBeUndefined();
+        expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+        expect(propOf(renderer.root.findByType(ScreenHeader), 'onBack')).toEqual(
+          expect.any(Function)
         );
-        expect(buttonLabels).toEqual(['Copy', 'Back to sessions']);
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
@@ -1551,7 +1592,10 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(propOf(error, 'variant')).toBe(variant);
     expect(propOf(error, 'onRetry')).toBeUndefined();
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    expect(findByType(renderer.root, 'Button')).toHaveLength(2);
+    // The exit is the header's back chevron: the terminal body repeats no way
+    // out, and a permanent denial has no action to draw at all.
+    expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+    expect(propOf(error, 'action')).toBeUndefined();
   });
 });
 
@@ -1666,7 +1710,7 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     });
 
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
     );
     expect(rootRequests).toEqual([]);
   });
@@ -1771,7 +1815,9 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       await Promise.resolve();
     });
     expect(transcriptText(renderer)).toContain('Could not load your account');
-    expect(transcriptText(renderer)).toContain('Back to sessions');
+    // The header's back chevron is the only way out; the retryable card owns
+    // its Retry and repeats no exit of the screen's.
+    expect(transcriptText(renderer)).not.toContain('Back to sessions');
     expect(propOf(retryControl(renderer), 'accessibilityState')).toMatchObject({
       disabled: false,
       busy: false,
@@ -1803,22 +1849,43 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     expect(transcriptText(renderer)).toBe('Account B child row');
   });
 
-  it('leaves failed confirmation through Back to sessions', async () => {
+  it('leaves a failed confirmation through the header back', async () => {
     confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
-    // The composer-under-session shape the fix exists for: the not-found
-    // screen sits above the New session composer, and "Back to sessions" must
-    // remove both rather than reveal what was below.
+    // The composer-under-session shape: the terminal body draws no exit of its
+    // own, so the header's back press is the route's own history and returns to
+    // the composer that opened the session.
     navigationRoutes.unshift('agent-chat/new');
     const renderer = await mountRoute();
-    const back = findByType(renderer.root, 'Button').find(button =>
-      findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
-    );
     act(() => {
-      pressControl(back);
+      pressControl(
+        findByType(renderer.root.findByType(ScreenHeader), 'Pressable').find(
+          node => propOf(node, 'accessibilityLabel') === 'Go back'
+        )
+      );
     });
 
-    // Truncated to the tabs entry: the composer is no longer on the stack.
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
+    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(navigationRoutes).toEqual(['agent-chat/new']);
+    expect(rootRequests).toEqual([]);
+  });
+
+  it('lands on the sessions list when the session route has nothing beneath it', async () => {
+    confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
+    // The only-route shape: a cold open leaves the session as the stack's only
+    // screen, so the header back has no history to pop. The press must still
+    // land on the sessions list, which the stack-safe replacement pushes over
+    // this route before retiring it.
+    const renderer = await mountRoute();
+    act(() => {
+      pressControl(
+        findByType(renderer.root.findByType(ScreenHeader), 'Pressable').find(
+          node => propOf(node, 'accessibilityLabel') === 'Go back'
+        )
+      );
+    });
+
+    expect(routerBack).not.toHaveBeenCalled();
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(rootRequests).toEqual([]);
   });
 

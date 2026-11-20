@@ -19,12 +19,13 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
+  catalogEntryNames,
   catalogTags,
   countPlaceholderBases,
   flattenCatalog,
@@ -59,7 +60,11 @@ function catalogsOf(root) {
       dir: join(root, 'apps/mobile/src/i18n/locales'),
       sourceRoots: [join(root, 'apps/mobile/src')],
       baseKeyOf: pluralBaseKey,
-      englishCopyRules: [checkEnglishCopies, checkMobileEnglishIdentical],
+      englishCopyRules: [
+        checkEnglishCopies,
+        checkMobileEnglishIdentical,
+        checkMobileLocaleEnglishCopy,
+      ],
       calledKeyOf: mobileCalledKey,
       keyPrefixOf: null,
       collectsDestructiveKeys: true,
@@ -88,6 +93,9 @@ function catalogsOf(root) {
  * The value records why the split is real. Adding an entry claims the call sites
  * mean different things; removing one promises the copy means the same thing
  * everywhere it appears.
+ *
+ * Each key is the copy compared through `wording()`, so it is trimmed, case
+ * folded and stripped of trailing sentence punctuation.
  */
 const TWO_SENSE_COPY = new Map([
   [
@@ -95,6 +103,18 @@ const TWO_SENSE_COPY = new Map([
     'the verb on a button and an alert action, versus the state of a pull request, a finding and an invoice, versus the state of a review-memory proposal awaiting a decision',
   ],
   ['comment', 'the verb on a button, versus the noun on a row label and a badge'],
+  [
+    'outdated',
+    "the discussion thread's staleness badge, versus the same label the thread's anchor line renders beside the file and line range",
+  ],
+  [
+    'contact support',
+    'the recovery action beside a Code Reviewer alert, versus the support contact beside the AI Guardrails availability notice',
+  ],
+  [
+    'terms of service',
+    "the document's own title on the Legal screen and the PR-discussion alert, versus the form the sign-in consent sentence's verb governs in an inflected language",
+  ],
   [
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
@@ -182,7 +202,9 @@ const WORDED_COUNTS = new Set([
   'agentChat.contextUsage.stepsCount:one:ar',
   'agentChat.contextUsage.stepsCount:two:ar',
   'agentChat.contextUsage.modelsCount:two:ar',
+  'nativeRemote.recoveryGaps:two:ar',
   'prReview.discussion.comment:two:ar',
+  'prReview.tabs.discussionAccessibility:two:ar',
   'prReview.hunkRows.fileLoadedCount:two:ar',
   'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
   'organization.kiloPass.paidSeat:one:ar',
@@ -263,10 +285,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A placeholder-only accessibility label: the list's name and its open
   // counter joined by a comma, so a catalog may keep English punctuation.
   'todos.lists.rowA11y',
-  // Format-only briefing values: a lower-bound marker and a time range built
-  // from localized placeholders, with no translatable words.
+  // Format-only values with no translatable words: the briefing's lower-bound
+  // marker, and the `{{start}} – {{end}}` join the brief window and the
+  // organization request-logs window both read. The join is a separator
+  // between two placeholders already formatted in the reader's locale, so
+  // every catalog keeps English punctuation here.
   'agentBriefing.atLeast',
-  'agentBriefing.window',
+  'common.timeRange',
   // The organization plan's own tier names. They are product names, so every
   // catalog keeps them as the billing pages and the invoices spell them.
   'organization.hub.planTeams',
@@ -283,6 +308,23 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A product name has nothing to translate, so every catalog keeps the spelling
   // the gateway and its documentation publish.
   'organizationModelAccess.openrouter',
+  // The review thread's line markers: format-only `L<n>` / `L<start>–L<end>`
+  // patterns whose `L` marker and en dash are the universal diff-anchor
+  // spelling, so every catalog keeps the English pattern. The words around
+  // them live in the sentence keys (`lineOnPathLineSide`, …).
+  'prReview.discussion.anchor.line',
+  'prReview.discussion.anchor.lineRange',
+  // The consent screen's analytics sentence ends in the processor's own
+  // product name and domain, so every catalog spells it the same way.
+  'consent.gatewayWho',
+  // Duration unit symbols and the per-hour rate format: a short unit a
+  // catalog writes in its own language (`sa`, `saac`, `ชม.`) is that
+  // catalog's decision and reads on the screen this key renders, so the
+  // audit does not judge whether the symbol matches English; `{{rate}}/h` is
+  // a value already formatted in the reader's locale.
+  'common.durationHourShort',
+  'common.durationMinuteShort',
+  'cloudAgent.compute.perHour',
 ]);
 
 /**
@@ -319,6 +361,328 @@ const NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS = {
 };
 
 /**
+ * Mobile English copy one catalog keeps on purpose, each entry with the reason
+ * it is the finished copy there: a borrowed technical term the locale really
+ * writes in English, for instance.
+ *
+ * Shape: tag → { English value: reason }. `checkMobileLocaleEnglishCopy` skips
+ * a value this map holds for that tag, so the entry is the only place that
+ * promises the English word is correct for the catalog; the reason is what a
+ * reviewer reads instead of re-deriving the decision. The value must match
+ * `en.json` exactly, because the rule compares whole strings.
+ */
+const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
+  af: {
+    '{{count}} agent':
+      'Afrikaans counts the borrowed "agent" noun (profiles.agents section reads "Agent naam", "Voeg agent by"), so the singular count label matches',
+    '{{itemCount}} item; {{last}}':
+      'Afrikaans singular of the borrowed "item" noun is "item" (toolCard.filesBadge_one reads "{{displayCount}} item"), so the label matches',
+    '{{itemCount}} items; {{last}}':
+      'Afrikaans plural of the borrowed "item" noun is "items", so the condensed label keeps English word shape (toolRun.sheetTitle is native "Nutsmiddel-oproepe")',
+    'Medium sandbox':
+      'Afrikaans delegates sandbox tiers to English: the catalog\'s own large tier reads "Groot sandbox" (cloudAgent.compute.largeSandbox), so the medium tier matches with the borrowed "Medium sandbox"',
+  },
+  az: {
+    '{{count}} agent':
+      'Azerbaijani "agent" is the same word (borrowed agent = agent, profiles.agents uses it natively), so the one-category count label matches',
+    'Agent slug':
+      'Azerbaijani keeps the technical slug noun (slugPlaceholder "my-agent-1" is untouched), so the label stays "Agent slug" with the agent word natively spelled',
+    'Bearer token':
+      'Azerbaijani keeps the auth scheme name "Bearer token" (the HTTP authentication scheme is a proper product term), matching the sibling mcpOAuth tokens',
+    token: 'Azerbaijani borrows "token" (plural "tokenlər"), so the one-category value matches',
+  },
+  bs: {
+    '{{count}} agent': 'Bosnian spells agent the same way in the singular (Agenti, agenta)',
+    'Bearer token':
+      'Bearer is the HTTP authorization scheme name and Bosnian borrows token unchanged',
+    'merge request':
+      "GitLab's Bosnian locale leaves Merge request untranslated, and this catalog uses it as a declined loan noun everywhere (merge requesta, merge requestu)",
+    'Merge request':
+      "GitLab's Bosnian locale leaves Merge request untranslated, and this catalog uses it as a declined loan noun everywhere (merge requesta, merge requestu)",
+    'Merge request !{{number}}':
+      "GitLab's Bosnian locale leaves Merge request untranslated, and this catalog uses it as a declined loan noun everywhere (merge requesta, merge requestu)",
+    token: 'Bosnian keeps the singular token unchanged; its plural is tokena',
+  },
+  ca: {
+    '{{count}} agent': 'Catalan spells agent the same way in the singular',
+    '{{count}} agents': 'Catalan spells the plural agents the same way',
+    '{{count}} secret': 'Catalan spells secret the same way in the singular',
+    '{{count}} secrets': 'Catalan spells the plural secrets the same way',
+  },
+  cs: {
+    '{{count}} agent':
+      'Czech singular "1 agent" is spelled identically (profiles.agents section declined "agent" natively), so the one-category value matches',
+    'merge request':
+      'GitLab\'s own Czech locale file (locale/cs_CZ/gitlab.po, msgid "Merge request") leaves "Merge request" untranslated while translating merge as sloučit/sloučení ("Tento merge request byl sloučen."); our capitalized-copy convention keeps "Merge request" in all three mergeRequest keys',
+    'Merge request':
+      'GitLab\'s own Czech locale file (locale/cs_CZ/gitlab.po, msgid "Merge request") leaves "Merge request" untranslated; our capitalized-copy convention keeps "Merge request" in all three mergeRequest keys',
+    'Merge request !{{number}}':
+      'GitLab\'s own Czech locale file (locale/cs_CZ/gitlab.po, msgid "Merge request") leaves "Merge request" untranslated; the !{{number}} suffix is GitLab\'s own URL convention (merge_requests/!123)',
+    token:
+      'Czech singular "1 token" matches (plural "tokenů" already translated in tokens_other), so the one-category value matches',
+  },
+  da: {
+    '{{count}} agent': 'Danish spells agent the same way in the singular; its plural is agenter',
+    'Download model':
+      "download is the Danish verb downloade in the imperative; the catalog's other labels read Download model til enheden",
+    'Send review':
+      'Send is the Danish imperative of sende and review is the borrowed noun this block already uses (Review sendt til agenten)',
+  },
+  de: {
+    'Name (optional)':
+      'German spells both words identically: "Name" is the German word and "(optional)" is a natively German loan adjective, matching the catalog\'s own "API-Schlüssel (optional)" and "Zusammenfassung (optional)" unnamed labels elsewhere',
+  },
+  et: {
+    '{{count}} agent': 'Estonian "agent" is the same word, so the one-category count label matches',
+    dollar:
+      'Estonian "dollar" is the same word (agents.sessionRow dollar/dollar area, gen. "dollarit" elsewhere), so the one-category value matches',
+    token: 'Estonian borrows "token" (plural "tokenid"), so the one-category value matches',
+  },
+  eu: {
+    token: 'Basque "token" is a loaned root (plural "tokenak"), so the one-category value matches',
+  },
+  fi: {
+    token: 'Finnish keeps the nominative singular token unchanged; its partitive is tokenia',
+  },
+  fil: {
+    '{{count}} tool':
+      'Filipino counts the English-loan noun bare: the catalog\'s own phrase "Mga available na tool: {{count}}" (modelChat.mcp.available) keeps the tool noun untranslated',
+    '{{itemCount}} item; {{last}}':
+      'Filipino keeps the borrowed "item" noun here (plural "mga item" elsewhere in the catalog) and the native `;` between them, so the family stays one form',
+    'Access key ID':
+      'Filipino keeps AWS field names in English, as the whole profile.providerKeys section does around accessKeyId',
+    'API key':
+      'Filipino keeps this technical term in English: the catalog\'s own keys read "ang key" (profile.providerKeys.add)',
+    'Audit log':
+      'Filipino borrows this term as Taglish: the audit actions around it are Taglish but this section title reads like the borrowed noun the catalog uses for log entries',
+    'Auto top-up':
+      'Filipino keeps this already-loanword term untranslated: "auto top-up" recurs in organization.billing.manageAutoTopUp ("Pamahalaan ang auto top-up") and setupAutoTopUp ("I-set up ang auto top-up")',
+    'AWS region':
+      'Filipino keeps the AWS product name in English (profile.providerKeys.accessKeyId keeps AWS field names)',
+    'Bearer token':
+      'Filipino keeps the technical terms in English: modelChat.mcpOAuth.fieldToken leaves "Token" untranslated next to authBearer',
+    commit:
+      'Filipino keeps the Git noun in English: the family\'s other form reads "na commit" (prReview.overview.commit_other) and mergedAgo="Na-merge {{time}}"',
+    'Context window: {{value}}':
+      'Filipino keeps the technical context-window term in English: agentChat.contextUsage.ofWindowTokens says "sa {{window}} na token"',
+    'Deployment name':
+      'Filipino keeps the English technical term: profile.providerKeys.incompleteMapping says "... at deployment name"',
+    'Download code':
+      'Filipino treats the verb as English loan (mag-download) and the label names the code: profile.dataExport.codePlaceholder="Code mula sa email" and getCodeA11y="I-email sa akin ang download code"',
+    'Gateway model slug':
+      'Filipino keeps this three-term technical slug in English: profile.providerKeys.incompleteMapping="Kailangan ng Mapping {{number}} ang parehong gateway model slug at deployment name."',
+    'Google Cloud project':
+      'Filipino keeps the Google Cloud product name in English: profile.providerKeys fields are translated around it (clientEmail="Email ng service account") while the product name stays',
+    'Kilo app':
+      '"Kilo app" names the product and is used untranslated in deviceSessions.signInScopeNote',
+    'Kilo app · Android':
+      '"Kilo app" is the untranslated product name; Android is the unchanged system name (deviceSessions.kiloCli="Kilo CLI" stays English)',
+    'Kilo app · iOS':
+      '"Kilo app" is the untranslated product name; iOS is the unchanged system name (deviceSessions.kiloCli="Kilo CLI" stays English)',
+    'Kilo system':
+      '"Kilo" is the product name, so the value names the system and cannot be translated (securityAgent.auditReport actors elsewhere say "Tagapangasiwa ng Kilo", keeping the name)',
+    'merge request':
+      'Filipino keeps GitLab\'s merge request in English: GitLab\'s Filipino translation catalog translates only ~29% of strings, and the catalog itself mixes both (codeReviewer.manualReview.mergeRequestUrl="URL ng merge request")',
+    'Merge request':
+      'Filipino keeps GitLab\'s merge request in English (GitLab Filipino translation coverage is ~29%): the catalog mixes both (prReview.merge.terminal.closedMergeRequest="Nakasara ang merge request na ito")',
+    'Merge request !{{number}}':
+      'Filipino keeps GitLab\'s merge request in English (GitLab Filipino translation coverage is ~29%): the catalog mirrors it in codeReviewer.manualReview.mergeRequestUrl="URL ng merge request"',
+    'Prompt injection':
+      'Filipino keeps the technical term in English: organizationGuardrails.detector.promptInjection.description says "Nade-detect ang mga pagtatangka"',
+    'Secret access key':
+      'Filipino keeps AWS field names in English (profile.providerKeys.accessKeyId)',
+    token:
+      'Filipino keeps the technical token noun in English: agentChat.contextUsage.ofWindowTokens="sa {{window}} na token" and plural form tokensWithPercentage keep it',
+  },
+  fr: {
+    '{{count}} agent':
+      'French "agent" is spelled the same (singular), so the count label is correct French',
+    '{{count}} agents':
+      'French spells "agents" identically (plural of agent); the count label is correct French (profiles.agents.limitReached uses "{{max}} agents" too)',
+    '{{count}} secret':
+      'French "secret" is spelled the same (singular); the MCP count label reads correctly',
+    '{{count}} secrets':
+      'French plural "secrets" is spelled the same, so the MCP count label matches',
+  },
+  hr: {
+    '{{count}} agent':
+      "Croatian spells the noun 'agent' identically; plural inflects ('{{count}} agenata')",
+    'Bearer token':
+      "Croatian keeps the OAuth scheme name 'Bearer token' as an English technical term; the family counts with the loanword (tokens_other 'tokena')",
+    token:
+      "Croatian uses the loanword token; the counted singular is identical, the plural is 'tokena'",
+  },
+  ht: {
+    'merge request':
+      'GitLab has no Haitian Creole locale, and this catalog names the GitLab object in English in every sibling string (Pataje merge request la)',
+    'Merge request':
+      'GitLab has no Haitian Creole locale, and this catalog names the GitLab object in English in every sibling string (Merge request la pa disponib)',
+    'Merge request !{{number}}':
+      'GitLab has no Haitian Creole locale, and this catalog names the GitLab object in English in every sibling string (Merge request la pa disponib)',
+  },
+  hu: {
+    cent: "Hungarian spells the currency subunit 'cent' identically to English (MNB coin/cash naming); the sessionRow family already renders cent/cent_other as 'cent'",
+    commit:
+      "Hungarian developer copy keeps the Git noun 'commit' unchanged, as the same catalog does in the prReview.overview commit/commit_other rows and in agents.triggers.autoCommit context",
+    token:
+      "Hungarian borrowed technical term 'token': the established loanword here (sibling contextUsage tokens/tokens_other/tokensWithPercentage and reviewDetail.tokens all keep 'token')",
+  },
+  id: {
+    'Edit server: {{name}}':
+      'The accessibility twin of the same row label, so it keeps the borrowed "Edit server" wording the block uses everywhere',
+    'Edit server':
+      'Bahasa Indonesia borrows the verb-edit + server noun as-is: the whole mcp block reads "Tambah server MCP", "Hapus server", "URL server", and KBBI records "server" as the standard loan',
+    commit:
+      "Bahasa Indonesia keeps the Git noun at every count ('komit' is not this catalog's wording; overview commit/commit_other and toolRun labels read 'commit')",
+    token:
+      "Bahasa Indonesia writes the LLM/context unit as the loanword 'token' (KBBI has no replacement; the catalog renders the concept identically in 5 sibling keys: contextUsage tokens, tokens_other, tokensWithPercentage, reviewDetail.tokens, usage.entrySubtitle)",
+  },
+  ig: {
+    'Gateway model slug':
+      'Igbo borrows the slug/deployment field names: this catalog\'s own provider-key sentences keep "slug" and "deployment name" untranslated inside Igbo sentences',
+  },
+  it: {
+    '{{displayCount}} file':
+      "Italian 'file' is an invariable loanword (garzantina: il file / i file) and this catalog's own common.file, prReview.fileList and filesBadge_other rows keep it",
+    commit:
+      "Italian developer copy uses the English Git noun 'commit' (Treccani/Zingarelli loanword for the VCS entry), matching this catalog's own prReview.overview.commit rows",
+    'merge request':
+      "Italian keeps GitLab's English product name (GitLab docs in Italian use 'merge request'; sibling codeReviewer.manualReview.invalidMergeRequestUrl 'URL valido di una merge request' and mergeRequestUrl 'URL della merge request')",
+    'Merge request': 'Same product-name loanword, capitalised as a UI heading like the English',
+    'Merge request !{{number}}':
+      'Same product-name loanword with the GitLab ref marker, as English',
+    token:
+      "Italian loanword for the session/LLM unit; the catalog renders this concept with 'token' in five sibling keys (contextUsage tokens*, tokensWithPercentage, reviewDetail.tokens)",
+  },
+  mg: {
+    commit:
+      'Malagasy borrows the Git noun "commit"; the counted singular matches the family\'s English-identical loan form',
+    'Gateway model slug':
+      'Malagasy borrows the technical slug term: the catalog\'s own provider-key sentences keep "slug" and "deployment name" in English inside Malagasy sentences',
+  },
+  ms: {
+    token:
+      "Bahasa Melayu writes the LLM/context unit as the loanword 'token' (DBP kamus lists no replacement; the catalog renders the concept identically in sibling keys contextUsage tokens, tokens_other, tokensWithPercentage, reviewDetail.tokens)",
+  },
+  nb: {
+    '{{count}} agent': 'Norwegian spells agent the same way in the singular',
+    token: 'Norwegian keeps the singular token unchanged; its plural is tokener',
+  },
+  nl: {
+    '{{count}} agent':
+      "Dutch spells the noun 'agent' identically; the plural inflects to '{{count}} agenten'",
+    '{{count}} open':
+      "Dutch spells the adjective 'open' identically; todos.lists counts open items",
+    '{{displayCount}} open':
+      "Dutch spells the adjective 'open' identically; sibling dashboard lines render '{{displayCount}} kritiek' and '{{displayCount}} hoog'",
+    commit: "Dutch lowercases the Git noun 'commit' exactly as English does",
+    'Online hosts':
+      "Dutch keeps the loanword host (sibling nativeRemote.hostsEmpty says 'Geen online hosts') and online is the same word in Dutch",
+  },
+  pl: {
+    '{{count}} agent':
+      "Polish spells the noun 'agent' identically; plural inflects ('{{count}} agentow' and 'agenta')",
+    token: "Polish uses the loanword token; counted singular identical, plural 'tokeny'/'tokenow'",
+  },
+  pt: {
+    commit:
+      "Portuguese developer copy uses the English Git noun 'commit'; the catalog's own prReview.overview.commit_other also equals the loanword for the same concept",
+  },
+  'pt-BR': {
+    '{{itemCount}} item; {{last}}':
+      'Counted item list; "item" is the catalog\'s own word for a tool-run entry ("itens" in the plural members)',
+    commit:
+      'The pt-BR catalog\'s commit-count family reads "alterações registradas" for plurals and keeps "commit" as the noun elsewhere (prReview.headLine "commit de origem {{sha}}")',
+    'merge request':
+      '"Merge request" is the catalog\'s established borrowed term for the GitLab noun across all 21 MR keys ("Compartilhar merge request", "Merge request indisponível")',
+    'Merge request':
+      '"Merge request" is the catalog\'s established borrowed term for the GitLab noun across all 21 MR keys',
+    'Merge request !{{number}}':
+      "Same borrowed term with the reference suffix; the catalog's mergeRequestUnavailable/accessDenied keys use it identically",
+  },
+  ro: {
+    '{{count}} agent':
+      'Romanian "agent" is the same Latin loanword spelled identically (catalog: "Agent", "Agenți"); {{count}} agent is correct copy',
+    '{{count}} secret':
+      'Romanian "secret" is the same Latin loanword spelled identically (catalog: "secret", "secrete"); {{count}} secret is correct copy',
+    'Agent slug':
+      'The ro catalog\'s slug family borrows the term ("Introduceți un slug de agent"); the label reads as the catalog does elsewhere',
+    commit:
+      'Romanian GitLab keeps the Git noun (ro_RO gitlab.po: "Commit" → "Commit"); the ro catalog itself renders "de commituri"',
+    'Deployment name':
+      'This ro catalog consistently borrows "deployment name" in the same section (modelMappingsDescription, incompleteMapping), so changing one key would split the wording',
+    'Gateway model slug':
+      'The ro catalog borrows the term verbatim in the same section (modelMappingsDescription, incompleteMapping); slug stays English as in ro_RO gitlab.po ("Project slug" → "Slug de proiect")',
+    'merge request':
+      'Romanian GitLab UI keeps the English term (locale/ro_RO gitlab.po, 249 translated MR strings all write "merge request"/"merge request-uri")',
+    'Merge request':
+      'Romanian GitLab UI keeps the English term, capitalised as in English (ro_RO gitlab.po: "Merge request" → "Merge request")',
+    'Merge request !{{number}}':
+      'Same GitLab English term with the reference suffix, as the catalog renders the standard-type headings',
+    token:
+      'Romanian GitLab keeps the noun (ro_RO gitlab.po: "Access Token" → "Token de acces"); the ro catalog itself renders "tokenuri"',
+  },
+  sk: {
+    '{{count}} agent':
+      'Slovak counts the model-word forms bare (profiles.counts.agents_other="{{count}} agentov", profiles.agents.limitReached="najviac {{max}} agentov"): singular "{{count}} agent" matches them',
+    'merge request':
+      'Slovak keeps GitLab\'s term untranslated: the whole sk catalog already uses "merge request" (prReview.connect.gitlabInstanceMismatchDescription="...ale tento merge request je na {{requested}}")',
+    'Merge request':
+      'Slovak keeps GitLab\'s untranslated "merge request" term throughout its catalog (prReview.terms.mergeRequestUnavailable="Merge request nie je dostupný")',
+    'Merge request !{{number}}':
+      'Slovak keeps GitLab\'s untranslated "merge request" term throughout its catalog (codeReviewer.manualReview.mergeRequestUrl="URL adresa merge requestu")',
+    token:
+      'Slovak keeps the technical token noun: plurals are "tokeny/tokenu/tokenov" (agentChat.contextUsage.tokens_*), so the singular "token" matches',
+  },
+  sl: {
+    '{{count}} agent':
+      'Slovenian "agent" is the same loanword (catalog: "Agent"); {{count}} agent is correct copy',
+  },
+  sq: {
+    token:
+      "Albanian borrows the noun unchanged: family is 'token' (one) vs 'tokene' (other); the counted singular is identical to English",
+  },
+  sr: {
+    'Bearer token':
+      'The HTTP scheme name "Bearer" plus the catalog\'s own "Token" noun (fieldToken "Token", tokens_other "tokeni"), so the auth row reads the scheme the way siblings spell it',
+    '{{count}} agent':
+      'Serbian "agent" is the same loanword (catalog: "Agent"); {{count}} agent is correct copy',
+    token:
+      'Serbian dev usage keeps "token"; the catalog itself renders "Token", "tokeni", "tokena"',
+  },
+  sv: {
+    '{{count}} agent': 'Swedish spells agent the same way in the singular',
+    cent: 'Swedish writes cent the same way',
+    dollar: 'Swedish writes dollar the same way',
+    'merge request':
+      "GitLab's Swedish locale leaves Merge request untranslated, and this catalog inflects it as a Swedish loan noun (merge requesten)",
+    'Merge request':
+      "GitLab's Swedish locale leaves Merge request untranslated, and this catalog inflects it as a Swedish loan noun (den här merge requesten)",
+    'Merge request !{{number}}':
+      "GitLab's Swedish locale leaves Merge request untranslated, and this catalog inflects it as a Swedish loan noun (den här merge requesten)",
+    token: 'Swedish leaves the singular token unchanged and uses the same form for the plural',
+  },
+  th: {
+    'merge request':
+      "GitLab's Thai locale has no translated string, and this catalog names the GitLab object in English in every sibling string (แชร์ merge request)",
+    'Merge request':
+      "GitLab's Thai locale has no translated string, and this catalog names the GitLab object in English in every sibling string (เปิด merge request ไม่ได้)",
+    'Merge request !{{number}}':
+      "GitLab's Thai locale has no translated string, and this catalog names the GitLab object in English in every sibling string (เปิด merge request ไม่ได้)",
+  },
+  uz: {
+    '{{count}} agent':
+      "Uzbek spells the noun 'agent' identically; the count word 'ta' carries the number",
+    token:
+      'Uzbek uses the loanword token identical to English; the counted singular is the same form',
+  },
+  vi: {
+    commit: 'Vietnamese dev usage keeps "commit"; the vi catalog renders "commit" at every count',
+    token: 'Vietnamese dev usage keeps "token"; the vi catalog renders "token" at every count',
+  },
+};
+
+/**
  * Counted bucket phrases that two dashboard lines render. The repository row
  * and the deadline breakdown name the same bucket in their own wording (pt-BR
  * says "críticas" on the row and "críticos" in the breakdown), so those keys
@@ -336,47 +700,69 @@ const PER_LINE_BUCKET_PHRASES = new Set([
   'securityAgent.dashboardMetrics.breakdownHigh',
 ]);
 
-/** The supported tags, read from the one source of truth. */
+/**
+ * The supported tags, read from the one source of truth.
+ *
+ * A `null` tag list means the list could not be read, which is not the same as
+ * an empty list: the rule that compares catalog files against the list then has
+ * nothing to compare, so it reports nothing instead of one line per file. Its
+ * caller reads `null` as "skip that rule" and still runs every other rule. Each
+ * early return below reports the one cause it stopped at.
+ */
 function supportedLanguages(root) {
-  const problems = [];
   const file = join(root, 'apps/mobile/src/i18n/languages.ts');
   if (!existsSync(file)) {
-    problems.push(`mobile: no supported-language list at ${relativePath(root, file)}`);
-    return { tags: [], problems };
+    return {
+      tags: null,
+      problems: [`mobile: no supported-language list at ${relativePath(root, file)}`],
+    };
   }
-  const entry = parseSourceEntry(root, root, file, readFileSync(file, 'utf8'));
-  for (const problem of entry.problems) {
-    problems.push(problem);
+  const read = readAuditText(file, 'mobile', 'the supported-language list');
+  if (read.text === null) {
+    return { tags: null, problems: read.problems };
   }
-  const tags = [];
-  let declared = false;
+  const entry = parseSourceEntry(root, root, file, read.text);
+  if (entry.problems.length > 0) {
+    // The tree a failed parse yields is not the one the walk below reads, so
+    // "not declared" would repeat the cause the parse error already names.
+    return { tags: null, problems: entry.problems };
+  }
+  const declarations = [];
   walk(entry.program, node => {
     if (
-      node.type !== 'VariableDeclarator' ||
-      node.id.type !== 'Identifier' ||
-      node.id.name !== 'SUPPORTED_LANGUAGES'
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      node.id.name === 'SUPPORTED_LANGUAGES'
     ) {
-      return;
+      declarations.push(node);
     }
-    declared = true;
+  });
+  if (declarations.length === 0) {
+    return { tags: null, problems: [`${entry.path}: SUPPORTED_LANGUAGES is not declared`] };
+  }
+  const tags = [];
+  for (const node of declarations) {
     const init = node.init === null ? null : unwrap(node.init);
     if (init?.type !== 'ArrayExpression') {
-      problems.push(`${entry.path}: SUPPORTED_LANGUAGES is not an array literal`);
-      return;
+      return {
+        tags: null,
+        problems: [`${entry.path}: SUPPORTED_LANGUAGES is not an array literal`],
+      };
     }
     for (const element of init.elements) {
       const value = element === null ? null : unwrap(element);
+      // An element the walker cannot decode leaves the list incomplete, so
+      // every tag it may hold would read as an unsupported language.
       if (value?.type !== 'Literal' || typeof value.value !== 'string') {
-        problems.push(`${entry.path}: SUPPORTED_LANGUAGES has an element this check cannot read`);
-        continue;
+        return {
+          tags: null,
+          problems: [`${entry.path}: SUPPORTED_LANGUAGES has an element this check cannot read`],
+        };
       }
       tags.push(value.value);
     }
-  });
-  if (!declared) {
-    problems.push(`${entry.path}: SUPPORTED_LANGUAGES is not declared`);
   }
-  return { tags, problems };
+  return { tags, problems: [] };
 }
 
 /**
@@ -433,6 +819,25 @@ function scanCatalogKeys(text) {
 }
 
 /**
+ * Read one hand-written audit input, reporting a read the filesystem refuses.
+ *
+ * These inputs are edited by hand, so a path `existsSync` accepts can still
+ * refuse a read: a directory, a missing file, or a permission the process
+ * lacks. One named problem line lets the rest of the audit report, the way an
+ * unreadable catalog does.
+ *
+ * Returns the text, or `null` with the problem to report.
+ */
+function readAuditText(file, label, what) {
+  try {
+    return { text: readFileSync(file, 'utf8'), problems: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { text: null, problems: [`${label}: cannot audit ${what}: ${message}`] };
+  }
+}
+
+/**
  * Parse a catalog and report a key that appears twice in one object. JSON.parse
  * keeps the last duplicate silently, so the raw text is the only witness.
  *
@@ -443,14 +848,12 @@ function scanCatalogKeys(text) {
  */
 function parseCatalog(file, label) {
   const problems = [];
-  let text;
-  try {
-    text = readFileSync(file, 'utf8');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    problems.push(`${label}: cannot audit catalog: ${message}`);
+  const read = readAuditText(file, label, 'catalog');
+  problems.push(...read.problems);
+  if (read.text === null) {
     return { catalog: null, problems };
   }
+  const text = read.text;
   const { duplicates, readable } = scanCatalogKeys(text);
   if (!readable) {
     problems.push(`${label}: cannot audit catalog: its strings and braces do not balance`);
@@ -483,14 +886,16 @@ const VISIBILITY_KEYS = [
 ];
 
 /**
- * Agent-editor labels that read the same in every catalog, aside from the
- * separator shape above: `profiles.agents.topP` is the sampling parameter's
- * published name, so a translated word would hide which parameter the field
- * sets. This list is the only registration such a key needs: `checkVerbatimLabels`
- * requires the key to read English everywhere, and the untranslated check
- * exempts the same key from the "equals English everywhere" failure.
+ * Catalog values that read the same in every language. `profiles.agents.topP`
+ * is the sampling parameter's published name, so a translated word would hide
+ * which parameter the field sets; `profiles.mcp.jsonPlaceholder` is the JSON
+ * sample the multiline field shows the reader, and a translated one stops
+ * demonstrating the shape. A key listed here reads English in every catalog:
+ * `checkVerbatimLabels` requires it, and `ENGLISH_IDENTICAL_ALLOWLIST` and,
+ * for the JSON sample, `JSON_SAMPLE_EXEMPT_KEYS` exempt the same key from the
+ * rules that would otherwise reject the identical or serialized value.
  */
-const VERBATIM_KEYS = ['profiles.agents.topP'];
+const VERBATIM_KEYS = ['profiles.agents.topP', 'profiles.mcp.jsonPlaceholder'];
 
 function checkVerbatimLabels(values, english, label) {
   const problems = [];
@@ -533,6 +938,84 @@ function checkAgentEditorCopy(values, english, label) {
  */
 const MISCASED_PULL_REQUEST_TERM =
   /(?<![A-Za-zÀ-ÿ])pR(?![A-Za-zÀ-ÿ])|(?<![A-Za-zÀ-ÿ])pull-Request(?![A-Za-zÀ-ÿ])/;
+
+/**
+ * The list conjunction `Intl.ListFormat` puts between two items in `tag`, read
+ * from the formatter itself rather than a hand-written table: the sentence and
+ * every catalog's own list join have to agree on one separator, and only the
+ * platform knows it. Two sentinels that no label can contain isolate the
+ * junction: the run between them is what the conjunction writes, spaces and
+ * all (" and ", " und ", " و", "和").
+ */
+const listConjunctions = new Map();
+function listConjunctionOf(tag) {
+  if (!listConjunctions.has(tag)) {
+    let conjunction = null;
+    try {
+      const joined = new Intl.ListFormat(tag, { style: 'long', type: 'conjunction' }).format([
+        '\u0001\u0001',
+        '\u0002\u0002',
+      ]);
+      conjunction = joined.split('\u0001\u0001')[1]?.split('\u0002\u0002')[0] ?? null;
+    } catch {
+      // A tag `Intl` refuses is reported once, by the catalog loop.
+      conjunction = null;
+    }
+    listConjunctions.set(tag, conjunction === '' ? null : conjunction);
+  }
+  return listConjunctions.get(tag);
+}
+
+/**
+ * The catalog keys the changelog sentence names as areas. `changelog-screen.ts`
+ * maps eight areas; three are product names it writes itself, and the rest
+ * render from these keys, so each of them becomes one item of the list.
+ */
+const CHANGELOG_AREA_KEYS = [
+  'common.chat',
+  'common.notifications',
+  'integrations.title',
+  'profile.changelogAreas.signIn',
+  'profile.changelogAreas.profileOrganizations',
+];
+
+/**
+ * The tag the app builds its formatters with. `lib/intl-cache.ts` names the
+ * script or the region for two catalogs whose bare tag resolves to other data,
+ * so a rule that reads the raw catalog name would judge the wrong conjunction
+ * for them.
+ */
+const FORMATTER_TAGS = new Map([
+  ['pt', 'pt-PT'],
+  ['sr', 'sr-Latn'],
+]);
+
+/**
+ * The changelog screen names the areas a release's fixes touched as one
+ * `Intl.ListFormat` sentence, so each area label is one item of that list. A
+ * label that carries the catalog's own list conjunction doubles it and the
+ * reader cannot tell where one area ends: Hindi read "Cloud Agent, Security
+ * Agent और प्रोफ़ाइल और संगठन" for three areas. The label joins its two nouns
+ * with the language's own compound form instead (an ampersand, "व", "与"), and
+ * the list supplies the only conjunction in the sentence.
+ */
+function checkChangelogAreaLabels(tag, values, label) {
+  const problems = [];
+  const conjunction = listConjunctionOf(FORMATTER_TAGS.get(tag) ?? tag);
+  if (conjunction === null) {
+    return problems;
+  }
+  for (const key of CHANGELOG_AREA_KEYS) {
+    const value = values.get(key);
+    if (value === undefined || !value.includes(conjunction)) {
+      continue;
+    }
+    problems.push(
+      `${label}: "${key}" contains the list conjunction "${conjunction.trim()}"; the changelog sentence joins the areas itself, so join this label's nouns another way`
+    );
+  }
+  return problems;
+}
 
 /** Reject the miscased pull-request term, in English and in every locale. */
 function checkPullRequestTerm(values, label) {
@@ -608,14 +1091,9 @@ function placeholderTokens(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
 }
 
-/** The `{{token}}` set of one string, as a sorted, counted signature. */
-function placeholders(value) {
-  return placeholderTokens(value).sort().join(',');
-}
-
-/** The tokens of a `placeholders` signature. */
-function signatureTokens(signature) {
-  return signature === '' ? [] : signature.split(',');
+/** The sorted, comma-joined signature the diagnostics print for one token list. */
+function signature(tokens) {
+  return tokens.slice().sort().join(',');
 }
 
 /** The `$t(key)` set of one string. A copy names a label; it never spells it. */
@@ -630,6 +1108,22 @@ function nestingRefs(value) {
  */
 function expansionTokens(value) {
   return [...value.matchAll(/\$[A-Z][A-Z0-9_]*/g)].map(match => match[0]).sort();
+}
+
+/**
+ * Whether one value still carries prose: a word of its own that starts with a
+ * lowercase letter. Placeholders, `$t()` references and `$TOKEN` expansions are
+ * removed first, so a value built only from them says nothing of its own, and an
+ * acronym or a capitalised product name starts no lowercase letter and reads
+ * the same in every language. The lookbehind keeps a lowercase letter inside a
+ * word (`e.g.`, `iOS`) from counting as a word start.
+ */
+function carriesEnglishProse(value) {
+  const stripped = value
+    .replace(/\{\{[^}]*\}\}/g, ' ')
+    .replace(/\$t\([^)]*\)/g, ' ')
+    .replace(/\$[A-Z][A-Z0-9_]*/g, ' ');
+  return /(?<![\p{L}\p{N}_-])\p{Ll}/u.test(stripped);
 }
 
 /** The leading and trailing whitespace of one string, as a signature. */
@@ -657,10 +1151,20 @@ const LOCALE_SEPARATED_KEYS = new Set([
   // The sentence and list joiners are the catalog's own statement about how it
   // closes a sentence and separates two items, so both carry their own edges: a
   // space after the mark nearly everywhere, none where the mark alone separates
-  // ("ja", "zh-Hans", "zh-Hant").
+  // ("ja", "zh-Hans", "zh-Hant"), and none at all where the catalog writes no
+  // mark ("th" separates its sentences with a bare space).
   'common.sentenceJoiner',
   'common.listJoiner',
 ]);
+
+/**
+ * The catalogs that close no sentence with a mark: Thai separates its
+ * sentences with a bare space, so its `common.sentenceJoiner` is that space
+ * and nothing else. Every other catalog's joiner carries its sentence
+ * terminator, so a whitespace-only joiner there stays an untranslated string
+ * the empty-value rule rejects.
+ */
+const MARKLESS_SENTENCE_TAGS = new Set(['th']);
 
 /**
  * The counted clause the review-submit message renders before its stale
@@ -749,6 +1253,18 @@ function holdsLabel(values, run) {
   return false;
 }
 
+/**
+ * The catalog key a node names as a plain string: unwrapped from its
+ * TypeScript-only wrappers, a `Literal` string, and non-empty. Any other node,
+ * including a template literal and an empty string, names no key here.
+ */
+function staticStringKey(node) {
+  const value = unwrap(node);
+  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
+    ? value.value
+    : null;
+}
+
 /** The catalog key a property's value translates, when it is `t('literal')`. */
 function propertyTranslation(property) {
   const value = unwrap(property.value);
@@ -759,10 +1275,7 @@ function propertyTranslation(property) {
   if (first === undefined) {
     return null;
   }
-  const key = unwrap(first);
-  return key.type === 'Literal' && typeof key.value === 'string' && key.value !== ''
-    ? key.value
-    : null;
+  return staticStringKey(first);
 }
 
 /**
@@ -891,10 +1404,12 @@ function scanSource(catalog, root) {
   }
   // A key the source builds from the catalog has no literal of its own, so the
   // literals beside it stand in for it: `generic.body.` plus `chatMessage` is
-  // `generic.body.chatMessage`. The set is copied because the expansion grows
-  // it while it runs.
+  // `generic.body.chatMessage`. The literals are snapshotted once: a second
+  // head must not prefix a key an earlier head already synthesized, since
+  // `a.` then `b.` over the literal `c` would also yield `b.a.c`.
+  const literals = [...referenced];
   for (const prefix of keyPrefixes) {
-    for (const value of [...referenced]) {
+    for (const value of literals) {
       referenced.add(`${prefix}${value}`);
     }
   }
@@ -920,13 +1435,7 @@ function mobileCalledKey(call, file) {
     problems.push(`${file}: t() called with a template literal; the key check cannot see it`);
     return { key: null, problems };
   }
-  return {
-    key:
-      key.type === 'Literal' && typeof key.value === 'string' && key.value !== ''
-        ? key.value
-        : null,
-    problems,
-  };
+  return { key: staticStringKey(first), problems };
 }
 
 /**
@@ -941,6 +1450,20 @@ function pushCalledKeyOf(call) {
 }
 
 /**
+ * The key node of a `translatePush(locale, key, …)` call, unwrapped from its
+ * TypeScript-only wrappers, or null when the call is not one or passes no key.
+ * One reader decides what a translatePush call is, so the two key shapes below
+ * cannot drift apart; each narrows the node it accepts.
+ */
+function translatePushKey(call) {
+  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+    return null;
+  }
+  const key = call.arguments[1];
+  return key === undefined ? null : unwrap(key);
+}
+
+/**
  * The key one `translatePush(locale, key, …)` call names, or null when the call
  * is not one or its key is not a plain string.
  *
@@ -951,17 +1474,11 @@ function pushCalledKeyOf(call) {
  * same tree.
  */
 function pushCalledKey(call) {
-  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+  const value = translatePushKey(call);
+  if (value === null) {
     return null;
   }
-  const key = call.arguments[1];
-  if (key === undefined) {
-    return null;
-  }
-  const value = unwrap(key);
-  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
-    ? value.value
-    : null;
+  return staticStringKey(value);
 }
 
 /**
@@ -973,14 +1490,10 @@ function pushCalledKey(call) {
  * empty — names no parent and returns null.
  */
 function pushKeyPrefix(call) {
-  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+  const value = translatePushKey(call);
+  if (value === null) {
     return null;
   }
-  const key = call.arguments[1];
-  if (key === undefined) {
-    return null;
-  }
-  const value = unwrap(key);
   if (value.type !== 'TemplateLiteral' || value.expressions.length === 0) {
     return null;
   }
@@ -1112,11 +1625,13 @@ const SCRIPT_PATTERNS = {
   Ethiopic: /\p{Script=Ethiopic}/u,
 };
 
+const SCRIPT_ENTRIES = Object.entries(SCRIPT_PATTERNS);
+
 /** Languages whose own orthography needs more than one script. */
 const MULTI_SCRIPT_LANGUAGES = { ja: ['Hiragana', 'Katakana', 'Han'] };
 
 function scriptOf(char) {
-  for (const [name, pattern] of Object.entries(SCRIPT_PATTERNS)) {
+  for (const [name, pattern] of SCRIPT_ENTRIES) {
     if (pattern.test(char)) {
       return name;
     }
@@ -1144,7 +1659,7 @@ function wording(value, language = 'en') {
     .trim()
     .toLocaleUpperCase(language)
     .toLocaleLowerCase(language)
-    .replace(/[.!:。！：]+$/u, '');
+    .replace(/[.!:。！：।॥]+$/u, '');
 }
 
 function pluralBaseKey(key) {
@@ -1206,16 +1721,17 @@ function familyVisibleCounts(english, base) {
 
 /**
  * Whether a plural category's placeholder set is English's plus tokens from its
- * own family. Returns false for a non-plural key, for a dropped required token,
- * and for a token no value of the family uses.
+ * own family. `actualTokens` and `expectedTokens` are the category's own
+ * `{{token}}` lists, one element per placeholder. Returns false for a non-plural
+ * key, for a dropped required token, and for a token no value of the family uses.
  */
-function addsFamilyPlaceholderOnly(english, key, actual, expected) {
+function addsFamilyPlaceholderOnly(english, key, actualTokens, expectedTokens) {
   const parts = pluralParts(key);
   if (!parts) {
     return false;
   }
-  const required = new Set(signatureTokens(expected));
-  const used = new Set(signatureTokens(actual));
+  const required = new Set(expectedTokens);
+  const used = new Set(actualTokens);
   if (used.size <= required.size) {
     return false;
   }
@@ -1236,12 +1752,14 @@ function addsFamilyPlaceholderOnly(english, key, actual, expected) {
 /**
  * The push runtime resolves a token locale and reads translations from one
  * registry. Its imports and that registry are hand-written, so this check holds
- * them together with the catalog folder: every catalog file is imported, every
- * import is in the registry, and the registry names nothing else. A catalog
- * that only sat in the folder used to render in English with no gate saying so;
- * a registry entry with no import would translate nothing.
+ * them together with the catalog folder: every catalog file of a supported
+ * language is imported, every import is in the registry, and the registry names
+ * nothing else. A tag outside the supported-language list is the membership
+ * rule's finding, so it is owed neither an import nor a registry entry. A
+ * catalog that only sat in the folder used to render in English with no gate
+ * saying so; a registry entry with no import would translate nothing.
  */
-function checkPushLocaleRegistry({ root, catalog }) {
+function checkPushLocaleRegistry({ root, catalog, present, supported }) {
   const problems = [];
   const catalogDir = catalog.dir;
   const localeModule = catalog.localeRegistry;
@@ -1252,9 +1770,12 @@ function checkPushLocaleRegistry({ root, catalog }) {
     problems.push(`${catalog.name}: no push locale registry at ${relativeModule}`);
     return problems;
   }
-  const present = new Set(catalogTags(catalogDir));
-  const text = readFileSync(localeModule, 'utf8');
-  const entry = parseSourceEntry(root, root, localeModule, text);
+  const read = readAuditText(localeModule, catalog.name, 'the push locale registry');
+  problems.push(...read.problems);
+  if (read.text === null) {
+    return problems;
+  }
+  const entry = parseSourceEntry(root, root, localeModule, read.text);
   for (const problem of entry.problems) {
     problems.push(problem);
   }
@@ -1328,6 +1849,9 @@ function checkPushLocaleRegistry({ root, catalog }) {
   }
 
   for (const tag of [...present].sort()) {
+    if (supported !== null && !supported.has(tag)) {
+      continue;
+    }
     if (!imported.has(tag)) {
       problems.push(`${catalog.name}: catalog "${tag}.json" has no import in ${relativeModule}`);
     }
@@ -1347,13 +1871,13 @@ function checkPushLocaleRegistry({ root, catalog }) {
   )) {
     if (!imported.has(tag)) {
       problems.push(
-        `notifications: the push locale registry names "${tag}" with no catalog import`
+        `${catalog.name}: the push locale registry names "${tag}" with no catalog import`
       );
       continue;
     }
     if (binding !== imported.get(tag)) {
       problems.push(
-        `notifications: the push locale registry binds "${tag}" to "${binding}" instead of the "${tag}" catalog import`
+        `${catalog.name}: the push locale registry binds "${tag}" to "${binding}" instead of the "${tag}" catalog import`
       );
     }
   }
@@ -1385,36 +1909,14 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
   }
   // `catalogTags` counts only regular files, so a directory named like a
   // catalog would vanish from `present` and from this rule without a trace.
-  // Naming it here keeps the stray entry a reported problem instead.
-  for (const name of nonFileCatalogEntries(dir)) {
+  // Naming it here keeps the stray entry a reported problem instead, which is
+  // why this reader rejects the other kind.
+  for (const name of catalogEntryNames(dir, 'file')) {
     problems.push(
       `${catalogName}: catalog "${name}.json" is not a regular file; remove it or make it a catalog`
     );
   }
   return problems;
-}
-
-/**
- * The `.json`-named entries of `dir` that are not regular files, sorted.
- *
- * The same stat-based definition `catalogTags` filters by, so an entry can
- * never fall out of one set without a line in the other: a directory named
- * like a catalog and a symlink the filesystem cannot follow are named here.
- */
-function nonFileCatalogEntries(dir) {
-  return readdirSync(dir, { withFileTypes: true })
-    .filter(entry => {
-      if (!entry.name.endsWith('.json')) {
-        return false;
-      }
-      try {
-        return !statSync(join(dir, entry.name)).isFile();
-      } catch {
-        return true;
-      }
-    })
-    .map(entry => entry.name.replace(/\.json$/, ''))
-    .sort();
 }
 
 function checkEnglishCopies({ catalogName, english }) {
@@ -1442,18 +1944,59 @@ function checkEnglishCopies({ catalogName, english }) {
   // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
   // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
-    if (
-      keys.length < 2 ||
-      TWO_SENSE_COPY.has(wording(value)) ||
-      keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
-    ) {
+    if (keys.length < 2 || keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))) {
       continue;
     }
+    const folded = wording(value);
+    if (TWO_SENSE_COPY.has(folded)) {
+      continue;
+    }
+    // The remedy prints the folded form, because that is the one the exemption
+    // lookup compares; adding the raw copy would not exempt it.
+    const foldNote =
+      folded === value
+        ? ''
+        : ' (entries are compared after trimming, case folding and dropping trailing sentence punctuation)';
     problems.push(
-      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add the string to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs with the two senses it carries.`
+      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add "${folded}" to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs${foldNote} with the two senses it carries.`
     );
   }
   return problems;
+}
+
+/**
+ * Whether a value is serialized JSON rather than the copy it should read:
+ * JSON.parse accepts the trimmed text. A scalar ("42", "true", "null") parses
+ * too, and a label one of those encodes is a storage slip all the same. A
+ * `{{placeholder}}` carries braces but never parses, so copy keeps it.
+ */
+function isSerializedJson(value) {
+  try {
+    JSON.parse(value.trim());
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Catalog values whose text is literally a JSON sample the reader types
+ * beside: the MCP form's multiline config placeholder shows the shape the
+ * stored value takes, so its braces and quoted key are the content, not a
+ * storage slip. The same key is registered in VERBATIM_KEYS (whose
+ * checkVerbatimLabels requires the English text) and in
+ * ENGLISH_IDENTICAL_ALLOWLIST (which exempts it from the "equals English
+ * everywhere" failure), so a maintainer registering a sister key lists it in
+ * all three.
+ */
+const JSON_SAMPLE_EXEMPT_KEYS = new Set(['profiles.mcp.jsonPlaceholder']);
+
+/** Reject a catalog value that a JSON encoder wrote instead of a label. */
+function checkSerializedJson(label, key, value) {
+  if (JSON_SAMPLE_EXEMPT_KEYS.has(key) || !isSerializedJson(value)) {
+    return [];
+  }
+  return [`${label}: "${key}" is serialized JSON; write the label text`];
 }
 
 /** The value rules English itself must pass. */
@@ -1463,6 +2006,7 @@ function checkEnglishValues({ catalogName, english, englishValues }) {
     if (value.trim() === '') {
       problems.push(`${catalogName}/en: "${key}" is empty`);
     }
+    problems.push(...checkSerializedJson(`${catalogName}/en`, key, value));
     for (const ref of nestingRefs(value)) {
       if (!english.has(ref)) {
         problems.push(
@@ -1490,6 +2034,7 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
     ...checkEnglishValues({ catalogName, english, englishValues }),
     ...checkAgentEditorCopy(english, english, label),
     ...checkPullRequestTerm(english, label),
+    ...checkChangelogAreaLabels('en', english, label),
   ];
 }
 
@@ -1547,60 +2092,14 @@ function checkPluralCategories({ label, tag, english, translated }) {
   return problems;
 }
 
-/** The placeholders and visible counts of the plural forms a locale adds. */
-function checkPluralFormPlaceholders({
-  label,
-  tag,
-  english,
-  translated,
-  englishFamilies,
-  englishCountedBases,
-}) {
-  const problems = [];
-  for (const [key, value] of translated) {
-    if (english.has(key)) {
-      continue;
-    }
-    const parts = pluralParts(key);
-    if (!isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
-      continue;
-    }
-    const englishRef =
-      english.get(`${parts.base}_${parts.category}`) ??
-      english.get(`${parts.base}_other`) ??
-      english.get(parts.base);
-    const allowed = new Set(placeholderTokens(englishRef ?? ''));
-    for (const ph of placeholderTokens(value)) {
-      if (!allowed.has(ph)) {
-        problems.push(
-          `${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`
-        );
-      }
-    }
-    // Every form keeps the family's visible count unless the reviewed list
-    // names it: a form without a numeral reads as an age only when the
-    // language spells the number out. A zero form is the exception — "none
-    // required" reads better than a numeral beside a noun, and several
-    // catalogs already word it that way.
-    if (parts.category !== 'zero' && !WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)) {
-      for (const ph of familyVisibleCounts(english, parts.base)) {
-        if (!placeholderTokens(value).includes(ph)) {
-          problems.push(
-            `${label}: "${key}" drops {{${ph}}} without a reviewed worded form (WORDED_COUNTS)`
-          );
-        }
-      }
-    }
-  }
-  return problems;
-}
-
 /** The value rules every translated key passes, in emission order. */
 function checkTranslatedValues({
   label,
   tag,
   english,
   translated,
+  englishFamilies,
+  englishCountedBases,
   englishValues,
   mustTranslateKeys,
   destructiveChecks,
@@ -1608,7 +2107,24 @@ function checkTranslatedValues({
   const problems = [];
   const ownValues = new Set(translated.values());
   for (const [key, value] of translated) {
+    // The serialized-JSON rule needs no English reference: a locale's own
+    // plural category (`agents.liveCount_few` of ar) never appears in en.json,
+    // but a JSON object stored in it is the same storage slip.
+    problems.push(...checkSerializedJson(label, key, value));
     if (!english.has(key)) {
+      problems.push(
+        ...checkAddedPluralForm({
+          label,
+          tag,
+          english,
+          key,
+          value,
+          englishFamilies,
+          englishCountedBases,
+          englishValues,
+          ownValues,
+        })
+      );
       continue;
     }
     const englishValue = english.get(key);
@@ -1631,6 +2147,55 @@ function checkTranslatedValues({
   return problems;
 }
 
+/**
+ * A plural form the locale adds — a category English does not ship — passes the
+ * same value rules as an English-keyed form, read against the family's English
+ * reference for that category. A key that is not an admitted family member is
+ * the extra-key rule's finding and passes nothing here.
+ */
+function checkAddedPluralForm({
+  label,
+  tag,
+  english,
+  key,
+  value,
+  englishFamilies,
+  englishCountedBases,
+  englishValues,
+  ownValues,
+}) {
+  const problems = [];
+  const parts = pluralParts(key);
+  if (!isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
+    return problems;
+  }
+  const englishRef =
+    english.get(`${parts.base}_${parts.category}`) ??
+    english.get(`${parts.base}_other`) ??
+    english.get(parts.base) ??
+    '';
+  // Such a key is always a plural category, so no separator exemption applies:
+  // an empty form renders nothing at that count.
+  if (value.trim() === '') {
+    problems.push(`${label}: "${key}" is empty`);
+  }
+  problems.push(
+    ...checkValuePlaceholders({
+      label,
+      english,
+      key,
+      value,
+      englishValue: englishRef,
+      countsMayBeWorded:
+        parts.category === 'zero' || WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`),
+      requiredCounts: familyVisibleCounts(english, parts.base),
+    })
+  );
+  problems.push(...checkValueEdges({ label, key, value, englishValue: englishRef }));
+  problems.push(...checkQuotedLabels({ label, key, value, englishValues, ownValues }));
+  return problems;
+}
+
 /** Every rule one translated key is read against. */
 function checkTranslatedValue({
   label,
@@ -1646,7 +2211,11 @@ function checkTranslatedValue({
   mustTranslateKeys,
 }) {
   const problems = [];
-  if (value.trim() === '') {
+  // A catalog that writes no sentence mark may hold nothing but the space it
+  // separates sentences with; any other whitespace-only value is untranslated.
+  const separatorOnly =
+    key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
+  if (value.trim() === '' && !separatorOnly) {
     problems.push(`${label}: "${key}" is empty`);
   }
   if (rejectContainingCancel !== undefined) {
@@ -1659,10 +2228,33 @@ function checkTranslatedValue({
   if (mustTranslateKeys.has(key) && value === englishValue) {
     problems.push(`${label}: "${key}" must be translated`);
   }
-  problems.push(...checkValuePlaceholders({ label, tag, english, key, value, englishValue }));
+  const parts = pluralParts(key);
+  problems.push(
+    ...checkValuePlaceholders({
+      label,
+      english,
+      key,
+      value,
+      englishValue,
+      // Only a reviewed (key, category, locale) entry may say its number as a
+      // word; every other form keeps its language's exact placeholder set.
+      countsMayBeWorded: Boolean(
+        parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
+      ),
+      requiredCounts: new Set(),
+    })
+  );
   problems.push(...checkValueEdges({ label, key, value, englishValue }));
-  // A quoted English label. The copy must name the label's key with
-  // `$t(key)`, or the message points at a button this user never sees.
+  problems.push(...checkQuotedLabels({ label, key, value, englishValues, ownValues }));
+  return problems;
+}
+
+/**
+ * A quoted English label. The copy must name the label's key with `$t(key)`, or
+ * the message points at a button this user never sees.
+ */
+function checkQuotedLabels({ label, key, value, englishValues, ownValues }) {
+  const problems = [];
   for (const run of quotedRuns(value)) {
     if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
       problems.push(`${label}: "${key}" quotes the English label "${run}"; name its key with $t()`);
@@ -1671,25 +2263,64 @@ function checkTranslatedValue({
   return problems;
 }
 
-/** The placeholder set, `$t()` references and `$TOKEN` tokens of one value. */
-function checkValuePlaceholders({ label, tag, english, key, value, englishValue }) {
+/**
+ * The placeholder set, `$t()` references and `$TOKEN` tokens of one value.
+ *
+ * One rule reads both an English-keyed form and a plural form the locale adds,
+ * and its two exemptions are explicit parameters rather than a second
+ * implementation: `countsMayBeWorded` allows a dropped visible count (the
+ * `zero` category, or a form `WORDED_COUNTS` reviewed), and `requiredCounts`
+ * names the counts a form of the family must still carry. English-keyed keys
+ * pass an empty set, so a dropped count is only ever the mismatch below.
+ */
+function checkValuePlaceholders({
+  label,
+  english,
+  key,
+  value,
+  englishValue,
+  countsMayBeWorded,
+  requiredCounts,
+}) {
   const problems = [];
-  const expected = placeholders(englishValue);
-  const actual = placeholders(value);
-  const expectedSet = placeholderTokens(englishValue);
-  const actualSet = placeholderTokens(value);
-  // Only a reviewed (key, category, locale) entry may say its number as a
-  // word; every other form keeps its language's exact placeholder set.
-  const parts = pluralParts(key);
-  const wordedForm = Boolean(parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`));
-  const droppedCount = expectedSet
-    .filter(name => !actualSet.includes(name))
-    .every(name => COUNT_PLACEHOLDERS.has(name));
-  const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
+  const expectedTokens = placeholderTokens(englishValue);
+  const actualTokens = placeholderTokens(value);
+  const expected = signature(expectedTokens);
+  const actual = signature(actualTokens);
+  const dropped = expectedTokens.filter(name => !actualTokens.includes(name));
+  const added = actualTokens.some(name => !expectedTokens.includes(name));
+  // A visible count the form must show and does not. `requiredCounts` comes
+  // from the whole family, not from the reference, because a reference may
+  // spell its own numeral out ("1 live session") while a sibling carries the
+  // placeholder. The count reads as an age only when the language spells the
+  // number out, so a form that drops it needs the reviewed worded form that
+  // names its key, category and locale. A form that also uses a token the
+  // family never uses is the mismatch below instead: its signature names both.
+  const missingCounts =
+    countsMayBeWorded || added
+      ? []
+      : [...requiredCounts].filter(name => !actualTokens.includes(name));
+  for (const name of missingCounts) {
+    problems.push(
+      `${label}: "${key}" drops {{${name}}} without a reviewed worded form (WORDED_COUNTS)`
+    );
+  }
+  // The set differs from the reference unless the difference is one the rules
+  // already explain: a family token the form adds, a count it words under an
+  // exemption, or a missing count the loop above has named. One defect keeps
+  // one line, and the specific count line wins. An English-keyed key passes no
+  // required count, so any drop is still this message.
+  const explained =
+    missingCounts.length > 0 ||
+    (dropped.length > 0 &&
+      !added &&
+      dropped.every(name =>
+        countsMayBeWorded ? COUNT_PLACEHOLDERS.has(name) : requiredCounts.has(name)
+      ));
   if (
     actual !== expected &&
-    !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
-    !(wordedForm && droppedCount && !addedPlaceholder)
+    !addsFamilyPlaceholderOnly(english, key, actualTokens, expectedTokens) &&
+    !explained
   ) {
     problems.push(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
   }
@@ -1699,10 +2330,10 @@ function checkValuePlaceholders({ label, tag, english, key, value, englishValue 
       `${label}: "${key}" $t() references differ from English (${expectedRefs || 'none'})`
     );
   }
-  const expectedTokens = expansionTokens(englishValue).join(',');
-  if (expansionTokens(value).join(',') !== expectedTokens) {
+  const expectedExpansions = expansionTokens(englishValue).join(',');
+  if (expansionTokens(value).join(',') !== expectedExpansions) {
     problems.push(
-      `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedTokens || 'none'})`
+      `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedExpansions || 'none'})`
     );
   }
   return problems;
@@ -1866,10 +2497,15 @@ function checkSharedWordings({ label, tag, translated, sharedWordings, wordingEx
   return problems;
 }
 
-/** Every locale of one catalog, in the folder's order. */
+/**
+ * Every locale of one catalog that the supported-language list names, in the
+ * folder's order. A tag outside that list is the membership rule's finding, not
+ * this audit's, so it is not read here.
+ */
 function checkCatalogLocales({
   catalog,
   present,
+  supported,
   english,
   englishFamilies,
   englishCountedBases,
@@ -1884,10 +2520,20 @@ function checkCatalogLocales({
   const localeValues = new Map();
 
   for (const tag of present) {
-    if (tag === 'en') {
+    if (tag === 'en' || (supported !== null && !supported.has(tag))) {
       continue;
     }
     const label = `${catalogName}/${tag}`;
+    // A tag `Intl` refuses is structurally invalid, not merely unknown: the
+    // same tag makes `wording()`'s `toLocaleUpperCase(tag)` throw, so nothing
+    // locale-sensitive may receive it. One line, then the tag is skipped.
+    try {
+      new Intl.PluralRules(tag);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      problems.push(`${label}: cannot audit catalog: ${message}`);
+      continue;
+    }
     const parsed = parseCatalog(join(catalog.dir, `${tag}.json`), label);
     problems.push(...parsed.problems);
     const translated = parsed.catalog;
@@ -1898,6 +2544,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a
     // category suffix. The English `_one`/`_other` siblings of a family
@@ -1916,21 +2563,13 @@ function checkCatalogLocales({
     );
     problems.push(...checkPluralCategories({ label, tag, english, translated }));
     problems.push(
-      ...checkPluralFormPlaceholders({
+      ...checkTranslatedValues({
         label,
         tag,
         english,
         translated,
         englishFamilies,
         englishCountedBases,
-      })
-    );
-    problems.push(
-      ...checkTranslatedValues({
-        label,
-        tag,
-        english,
-        translated,
         englishValues,
         mustTranslateKeys,
         destructiveChecks,
@@ -1969,6 +2608,40 @@ function checkMobileEnglishIdentical({ catalogName, english, localeValues }) {
     }
     if (allEqual) {
       problems.push(`${catalogName}: "${key}" equals English in every locale`);
+    }
+  }
+  return problems;
+}
+
+function checkMobileLocaleEnglishCopy({ catalogName, english, localeValues }) {
+  const problems = [];
+  // The every-locale rule above stays silent about a key that one catalog
+  // translated and another left in English, because the value differs between
+  // locales. Judge each catalog on its own: a value that still equals English
+  // and carries prose of its own was not translated there, unless the key is
+  // allowlisted or the catalog lists that exact value in
+  // MOBILE_ENGLISH_COPY_EXCEPTIONS. An unreadable catalog carries no values, so
+  // it says nothing here.
+  if (localeValues.size === 0) {
+    return problems;
+  }
+  for (const [tag, translated] of localeValues) {
+    for (const [key, englishValue] of english) {
+      if (translated.get(key) !== englishValue) {
+        continue;
+      }
+      if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
+        continue;
+      }
+      if (!carriesEnglishProse(englishValue)) {
+        continue;
+      }
+      if (Object.hasOwn(MOBILE_ENGLISH_COPY_EXCEPTIONS[tag] ?? {}, englishValue)) {
+        continue;
+      }
+      problems.push(
+        `${catalogName}/${tag}: "${key}" is English; translate it, or list the value for "${tag}" in MOBILE_ENGLISH_COPY_EXCEPTIONS`
+      );
     }
   }
   return problems;
@@ -2109,6 +2782,9 @@ export function checkCatalogs(root = ROOT) {
   const { wordingExceptions } = wordingExceptionsRead;
   const { tags, problems: languageProblems } = supportedLanguages(root);
   problems.push(...languageProblems);
+  // A tag list this check could not read leaves the set null: every present tag
+  // is then audited, as it was before the list existed.
+  const supported = tags === null ? null : new Set(tags);
 
   const catalogs = catalogsOf(root);
   const unscannable = new Set();
@@ -2124,17 +2800,39 @@ export function checkCatalogs(root = ROOT) {
     }
   }
   const scannable = catalogs.filter(catalog => !unscannable.has(catalog));
+  // The tag set of each catalog folder serves both the registry checks and the
+  // per-catalog checks, so one refused listing reports one line here and skips
+  // the rules that need the set.
+  const presentByCatalog = new Map();
   for (const catalog of scannable) {
-    if (catalog.localeRegistry) {
-      problems.push(...checkPushLocaleRegistry({ root, catalog }));
+    try {
+      presentByCatalog.set(catalog, new Set(catalogTags(catalog.dir)));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      problems.push(`${catalog.name}: cannot audit the catalog folder: ${message}`);
+      presentByCatalog.set(catalog, null);
+    }
+  }
+  for (const catalog of scannable) {
+    const present = presentByCatalog.get(catalog);
+    if (catalog.localeRegistry && present !== null) {
+      problems.push(...checkPushLocaleRegistry({ root, catalog, present, supported }));
     }
   }
 
   for (const catalog of scannable) {
     const catalogName = catalog.name;
-    const present = new Set(catalogTags(catalog.dir));
+    const present = presentByCatalog.get(catalog);
+    if (present === null) {
+      // The folder line above already names why this catalog cannot be read.
+      continue;
+    }
 
-    problems.push(...checkCatalogMembership({ catalogName, tags, present, dir: catalog.dir }));
+    // A tag list this could not read would report every catalog file as an
+    // unsupported language and bury the one line that names the real cause.
+    if (tags !== null) {
+      problems.push(...checkCatalogMembership({ catalogName, tags, present, dir: catalog.dir }));
+    }
 
     const parsedEnglish = parseCatalog(join(catalog.dir, 'en.json'), `${catalogName}/en`);
     problems.push(...parsedEnglish.problems);
@@ -2179,6 +2877,7 @@ export function checkCatalogs(root = ROOT) {
     const locales = checkCatalogLocales({
       catalog,
       present,
+      supported,
       english,
       englishFamilies,
       englishCountedBases,
@@ -2200,14 +2899,15 @@ export function checkCatalogs(root = ROOT) {
     );
   }
 
-  return { problems, languages: tags.length };
+  return { problems, languages: tags === null ? null : tags.length };
 }
 
 /** The whole audit, reported the way CI reads it. */
 function run() {
   const { problems: found, languages } = checkCatalogs();
   if (found.length > 0) {
-    const limit = Number(process.env.I18N_CHECK_LIMIT ?? '50');
+    const parsedLimit = Number(process.env.I18N_CHECK_LIMIT ?? '50');
+    const limit = Number.isInteger(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 50;
     const shown = found.slice(0, limit);
     for (const problem of shown) {
       console.error(problem);
@@ -2216,7 +2916,10 @@ function run() {
       console.error(`... and ${found.length - shown.length} more`);
     }
     console.error(`\ncheck-catalogs: ${found.length} problem(s)`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   console.log(`check-catalogs: ${languages} languages, every catalog matches en.json`);

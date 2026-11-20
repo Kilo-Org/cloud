@@ -33,7 +33,7 @@ import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
-import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
+import { setCodeReviewEnabled } from '@/lib/code-reviews/enable-code-review';
 import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
 import {
@@ -1310,22 +1310,15 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           } else {
             didChange = false;
           }
-        } else if (existingConfig) {
-          await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
-          // Re-toggling to the same value is a no-op and must not be audited.
-          didChange = existingConfig.is_enabled !== input.isEnabled;
-        } else if (input.isEnabled) {
-          await upsertAgentConfig({
-            organizationId: input.organizationId,
-            agentType: 'code_review',
-            platform,
-            isEnabled: true,
-            createdBy: ctx.user.id,
-            config: createDefaultCodeReviewConfig(),
-          });
-          didChange = true;
         } else {
-          didChange = false;
+          const toggle = await setCodeReviewEnabled({
+            owner,
+            platform,
+            isEnabled: input.isEnabled,
+            createdBy: ctx.user.id,
+          });
+          // Re-toggling to the same value is a no-op and must not be audited.
+          didChange = toggle.changed;
         }
         await clearCodeReviewActionRequiredState({ owner, platform });
 

@@ -31,7 +31,15 @@ async function errorMessage(result: Promise<unknown>) {
     return error instanceof Error ? error.message : String(error);
   }
 }
-function apiFor(jobs: unknown[], parentID = 'ses_root'): Kilo2Api {
+function apiFor(
+  jobs: unknown[],
+  parentID = 'ses_root',
+  shells: unknown[] = jobs.flatMap(job =>
+    job && typeof job === 'object' && 'shellID' in job
+      ? [{ id: job.shellID, status: 'running' }]
+      : []
+  )
+): Kilo2Api {
   return {
     request: async () => {
       throw new Error('Unexpected session enumeration');
@@ -45,6 +53,11 @@ function apiFor(jobs: unknown[], parentID = 'ses_root'): Kilo2Api {
           status: 'running',
         });
         return jobs;
+      }
+      if (path.startsWith('/api/shell?')) {
+        const query = new URL(path, 'http://localhost').searchParams;
+        expect(query.get('location[directory]')).toBe('/workspace/app');
+        return shells;
       }
       if (path.startsWith('/api/form?'))
         return [{ id: 'form_child', sessionID: 'ses_child', title: 'Choose', fields: [] }];
@@ -81,6 +94,22 @@ test('reads the pinned inventory, includes descendant work and excludes sibling 
   expect(result.sessions.map(session => session.id)).toEqual(['ses_root', 'ses_child']);
 });
 
+test('only reports shell jobs that still have a running shell in the current runtime', async () => {
+  const live = { ...shell, id: 'job_live', shellID: 'sh_live' };
+  const exited = { ...shell, id: 'job_exited', shellID: 'sh_exited' };
+  const result = await readKilo2BackgroundActivity(
+    apiFor([shell, live, exited, agent], 'ses_root', [
+      { id: live.shellID, status: 'running' },
+      { id: exited.shellID, status: 'exited' },
+      { id: 'sh_unrelated', status: 'running' },
+    ]),
+    'ses_root',
+    '/workspace/app',
+    new AbortController().signal
+  );
+  expect(result.jobs).toEqual([live, agent]);
+});
+
 test('drops sibling inventory even if the native filter returns it', async () => {
   const result = await readKilo2BackgroundActivity(
     apiFor([{ ...shell, sessionID: 'ses_sibling' }, agent]),
@@ -90,6 +119,42 @@ test('drops sibling inventory even if the native filter returns it', async () =>
   );
   expect(result.jobs).toEqual([agent]);
   expect(result.sessions.map(session => session.id)).not.toContain('ses_sibling');
+});
+
+test('keeps subagents and waits when the shell inventory read fails', async () => {
+  const api = apiFor([shell, agent]);
+  const data = api.data;
+  api.data = async (path, options) => {
+    if (path.startsWith('/api/shell?')) throw new Error('shell inventory unavailable');
+    return data(path, options);
+  };
+  const result = await readKilo2BackgroundActivity(
+    api,
+    'ses_root',
+    '/workspace/app',
+    new AbortController().signal
+  );
+  expect(result.jobs).toEqual([agent]);
+  expect(result.waits).toEqual([{ sessionID: 'ses_child', kind: 'question' }]);
+});
+
+test('propagates caller cancellation during the shell inventory read', async () => {
+  const api = apiFor([shell, agent]);
+  const controller = new AbortController();
+  const cancelled = new Error('background read cancelled');
+  const data = api.data;
+  api.data = async (path, options) => {
+    if (path.startsWith('/api/shell?')) {
+      controller.abort(cancelled);
+      throw cancelled;
+    }
+    return data(path, options);
+  };
+  expect(
+    await readKilo2BackgroundActivity(api, 'ses_root', '/workspace/app', controller.signal).catch(
+      (error: unknown) => error
+    )
+  ).toBe(cancelled);
 });
 
 test('drops an agent whose child does not belong to its owning chat', async () => {

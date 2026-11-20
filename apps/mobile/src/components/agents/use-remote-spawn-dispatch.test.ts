@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSessionId, type ModelSelection } from '@kilocode/cloud-agent-sdk';
 import { CommandDeliveredError } from '@kilocode/cloud-agent-sdk/user-web-connection';
 
+import type * as ReactI18next from 'react-i18next';
+
 import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
@@ -41,10 +43,11 @@ const useRemoteInstanceSpawnMock = vi.hoisted(() =>
 );
 
 const routerReplace = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: routerReplace }),
+  useRouter: () => ({ replace: routerReplace, push: routerPush }),
 }));
 
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -114,6 +117,30 @@ vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({ data: organizationsListMock.data }),
 }));
 
+// The fake hook dispatcher below has no context dispatcher, so `useTranslation`
+// stands in for the catalog read the billing step's label needs. Everything else
+// is the real module, so `@/i18n` still initializes.
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => i18n.t(key), i18n }),
+  };
+});
+
+// The role read behind the trial refusal's sentence and its billing step. The
+// real hooks reach the navigation stack and the Expo runtime, so this suite
+// stands in for the two primitives `useCanManageBilling` needs and keeps the
+// predicate the app itself classifies with.
+const orgRoleMock = vi.hoisted(() => ({ role: undefined as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await import('@kilocode/app-shared/organizations');
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: orgRoleMock.role }),
+  };
+});
+
 type ReactInternals = {
   __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
     H: unknown;
@@ -139,6 +166,9 @@ const INSTANCE: InstancePickerInstance = {
 
 /** Stub spawned session id for the watchdog's late-success case. */
 const SESSION_ID = 'ses_12345678901234567890123456' as KiloSessionId;
+
+/** Stub session id for the newest attempt after a retry. */
+const SECOND_SESSION_ID = 'ses_22345678901234567890123456' as KiloSessionId;
 
 /**
  * A spawn promise the test resolves by hand, for the watchdog's
@@ -338,6 +368,8 @@ function rerenderLastHook() {
 
 beforeEach(() => {
   organizationsListMock.data = undefined;
+  orgRoleMock.role = undefined;
+  routerPush.mockClear();
 });
 
 describe('useRemoteSpawnDispatch spawn input chain', () => {
@@ -596,7 +628,60 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
       retryable: false,
       message: i18n.t('common.organizationTrialEnded'),
     });
+    // The reader who cannot change the plan keeps the copy alone.
+    expect(rerenderLastHook().remoteSpawnFailure?.action).toBeUndefined();
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('hands a billing role the refusal that carries the plan step', () => {
+    organizationsListMock.data = [
+      { organizationId: 'org-xyz', isTrialExpiredForEnforcement: true },
+    ];
+    orgRoleMock.role = 'owner';
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+    });
+
+    onStart();
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(onSpawnAdmitted).not.toHaveBeenCalled();
+    const failure = rerenderLastHook().remoteSpawnFailure;
+    expect(failure).toEqual({
+      retryable: false,
+      message: i18n.t('common.organizationTrialEndedBilling'),
+      action: { label: i18n.t('organization.hub.manageBilling'), onPress: expect.any(Function) },
+    });
+    // The step opens the in-app billing screen for the organization whose role
+    // the spawn resolved.
+    failure?.action?.onPress();
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=org-xyz'
+    );
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the attachments refusal actionless for a billing role', () => {
+    orgRoleMock.role = 'owner';
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      getSubmitPayload: () => filesPayload,
+      runOnInstance: { ...INSTANCE, capabilities: { attachments: false } },
+    });
+
+    onStart();
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: false,
+      message: remoteSpawnFilesNotSupportedToast(),
+    });
+    expect(rerenderLastHook().remoteSpawnFailure?.action).toBeUndefined();
+    expect(routerPush).not.toHaveBeenCalled();
   });
 
   it('spawns for an organization the gate keeps entitled', async () => {
@@ -1208,5 +1293,55 @@ describe('useRemoteSpawnDispatch stall watchdog', () => {
       retryable: true,
       message: remoteSpawnRetryableToast(),
     });
+  });
+
+  it('a superseded attempt late success cannot navigate or publish the success callbacks', async () => {
+    const stale = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => stale.promise);
+    const onSpawnReady = vi.fn();
+    const onSpawnSucceeded = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      onSpawnReady: () => {
+        onSpawnReady();
+      },
+      onSpawnSucceeded: sessionId => {
+        onSpawnSucceeded(sessionId);
+      },
+    });
+
+    // The stall overruns the budget: the form flips to the retryable failure
+    // while this attempt's spawn promise is still pending.
+    onStart();
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS);
+    expect(rerenderLastHook().isSpawningRemote).toBe(false);
+
+    // Retry while the first attempt is still hanging.
+    const retried = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => retried.promise);
+    onStart();
+
+    // The stale attempt settles ready afterward: its outcome must publish
+    // nothing — no navigation to its session, no success callbacks.
+    stale.resolve({ status: 'ready', sessionID: SESSION_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(onSpawnReady).not.toHaveBeenCalled();
+    expect(onSpawnSucceeded).not.toHaveBeenCalled();
+
+    // The newest attempt owns the terminal state: it navigates once and
+    // fires both success callbacks.
+    retried.resolve({ status: 'ready', sessionID: SECOND_SESSION_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(typeof calledWith).toBe('string');
+    expect(calledWith).toContain('ses_22345678901234567890123456');
+    expect(calledWith).not.toContain('ses_12345678901234567890123456');
+    expect(onSpawnReady).toHaveBeenCalledTimes(1);
+    expect(onSpawnSucceeded).toHaveBeenCalledExactlyOnceWith(SECOND_SESSION_ID);
   });
 });

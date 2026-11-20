@@ -59,6 +59,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
     getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
+    getWebSearchPreference: async () => 'default',
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });

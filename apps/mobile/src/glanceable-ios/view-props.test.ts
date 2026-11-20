@@ -2,6 +2,7 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
   type GlanceableSessionRow,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { emptyHomeWidgetDetails, type HomeWidgetData } from '@kilocode/app-shared/home-widget';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -34,7 +35,7 @@ afterEach(() => {
 
 function snapshotFor(
   sessions: readonly GlanceableSessionRow[] = [],
-  status?: GlanceableAgentsSnapshot['status']
+  status?: GlanceableSnapshotStatusOverride
 ): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
     sessions,
@@ -88,9 +89,7 @@ describe('newestTitleFor', () => {
     // Empty offers no in-place action, so its slot stays blank rather than
     // carrying a stale title.
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
-    expect(
-      buildGlanceableViewProps(snapshotFor([], 'empty'), {}, translate).newestTitle
-    ).toBeNull();
+    expect(buildGlanceableViewProps(snapshotFor([]), {}, translate).newestTitle).toBeNull();
   });
 });
 
@@ -294,6 +293,16 @@ describe('Home-only presentation and timeline', () => {
       primaryCount: 1,
       stale: true,
     });
+    // The update claim is bounded: past the retry deadline the wake stays a
+    // past instant, so the layout names the clock time that was due.
+    const afterRetry = buildGlanceableViewProps(
+      snapshot,
+      {},
+      translate,
+      data,
+      Date.parse(wake) + 16 * 60_000
+    );
+    expect(afterRetry.home).toMatchObject({ scheduledAt: wake, awaitingUpdate: false });
   });
 
   it('omits nested nulls at the UserDefaults boundary, without deleting list entries', () => {

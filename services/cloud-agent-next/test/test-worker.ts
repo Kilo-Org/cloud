@@ -22,6 +22,8 @@ import type {
 import { createTestSessionIngestDouble } from './integration/helpers/session-ingest-double.js';
 import { isSandboxControlId } from '../src/sandbox-control/stub';
 import { admitSandboxWrapperUpgrade } from '../src/sandbox-control/socket-admission.js';
+import { admitPreviewTunnelUpgrade } from '../src/preview-tunnel/tunnel-admission.js';
+import { PREVIEW_TUNNEL_PATH_PREFIX } from '../src/shared/preview-tunnel-protocol.js';
 import { SandboxControlV2 } from '../src/control-plane/sandbox/sandbox-do';
 import { SandboxSessionV2 } from '../src/control-plane/session/session-do';
 import { getSandboxSessionStub } from '../src/sandbox-session/session-stub';
@@ -75,16 +77,19 @@ export class UserKiloFacade extends RealUserKiloFacade {
 // The test Worker binds the production `SANDBOX_CONTROL`/`SANDBOX_SESSION`
 // names to the control-plane V2 classes, matching production after the C1c flip.
 export { SandboxControlV2, SandboxSessionV2 };
+export { CloudAgentWorkspaceDO } from '../src/control-plane/workspace/workspace-do.js';
 export { EnvironmentBuild } from '../src/environment-build/environment-build-do.js';
 export { SandboxContainers } from '../src/sandbox-containers/SandboxContainers.js';
 export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js';
 export {
+  SentryBillingAdmissionContainer,
   SentrySessionProbe,
   SentryLegacySessionProbe,
   SentrySandboxControlProbe,
   SentrySandboxContainerProbe,
   SentryDisabledProbe,
 } from './integration/helpers/sentry-durable-object.js';
+export { PreviewTunnel } from '../src/preview-tunnel/preview-tunnel-do.js';
 
 type TestEnv = {
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
@@ -92,6 +97,7 @@ type TestEnv = {
   SANDBOX_CONTROL: Env['SANDBOX_CONTROL'];
   SANDBOX_SESSION: Env['SANDBOX_SESSION'];
   NEXTAUTH_SECRET: Env['NEXTAUTH_SECRET'];
+  PREVIEW_TUNNEL: Env['PREVIEW_TUNNEL'];
 };
 
 function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): Promise<Response> {
@@ -135,6 +141,11 @@ export default {
     if (url.pathname.startsWith('/sandbox-control/')) {
       const sandboxId = decodeURIComponent(url.pathname.slice('/sandbox-control/'.length));
       return admitSandboxWrapperUpgrade(request, env, sandboxId);
+    }
+
+    if (url.pathname.startsWith(PREVIEW_TUNNEL_PATH_PREFIX)) {
+      const sandboxId = decodeURIComponent(url.pathname.slice(PREVIEW_TUNNEL_PATH_PREFIX.length));
+      return admitPreviewTunnelUpgrade(request, env, sandboxId);
     }
 
     if (url.pathname.startsWith('/sandbox-control-v2/')) {

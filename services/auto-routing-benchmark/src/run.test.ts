@@ -5,11 +5,11 @@ import {
   BenchmarkJobMessageSchema,
   buildClassifierMessages,
   computeEngineIdentity,
-  deciderCasesForRouter,
   getDeciderContainerInstanceName,
   runCasesWithConcurrency,
   summarize,
 } from './run';
+import { deciderCasesForRouter, ENGINE_IDENTITY_REVISION } from './measurement-revision';
 import { pickClassifierWinner } from './winner';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 
@@ -35,6 +35,10 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     output_prefix: null,
     event_count: null,
     last_event_types: null,
+    tool_calls: null,
+    tool_names: null,
+    step_count: null,
+    final_finish_reason: null,
     rep: 0,
     timed_out: 0,
     prompt_revision: 2,
@@ -345,6 +349,11 @@ describe('computeEngineIdentity', () => {
     expect(computeEngineIdentity('classifier')).not.toBe(computeEngineIdentity('decider'));
   });
 
+  it('keeps the deployed identities, so a measurement revision re-measures only its cases', () => {
+    expect(computeEngineIdentity('decider', 'efficient')).toBe('efficient:v1:6649fed2');
+    expect(computeEngineIdentity('decider', 'frontier')).toBe('frontier:v1:a80048f2');
+  });
+
   it('is versioned (carries the engine version prefix)', () => {
     expect(computeEngineIdentity('decider')).toMatch(/^efficient:v\d+:[0-9a-f]{8}$/);
     expect(computeEngineIdentity('classifier')).toMatch(/^efficient:v1:[0-9a-f]{8}$/);
@@ -358,13 +367,13 @@ describe('computeEngineIdentity', () => {
   });
 
   it('selects the frontier dataset and hashes every selected input', () => {
-    expect(deciderCasesForRouter()).toBe(DECIDER_CASES);
-    expect(deciderCasesForRouter('frontier')).toBe(FRONTIER_CASES);
+    expect(deciderCasesForRouter('efficient', ENGINE_IDENTITY_REVISION)).toBe(DECIDER_CASES);
+    expect(deciderCasesForRouter('frontier', ENGINE_IDENTITY_REVISION)).toBe(FRONTIER_CASES);
     expect(FRONTIER_CASES.every(c => c.tier === 'frontier')).toBe(true);
     expect(computeEngineIdentity('decider', 'frontier')).not.toBe(computeEngineIdentity('decider'));
     for (const router of ['efficient', 'frontier'] as const) {
       let hash = 0x811c9dc5;
-      const signature = JSON.stringify(deciderCasesForRouter(router));
+      const signature = JSON.stringify(deciderCasesForRouter(router, ENGINE_IDENTITY_REVISION));
       for (let i = 0; i < signature.length; i++) {
         hash ^= signature.charCodeAt(i);
         hash = Math.imul(hash, 0x01000193);
@@ -382,6 +391,10 @@ describe('pickClassifierWinner', () => {
     routeKey: '*' as const,
     accuracy,
     avgCostUsd,
+    avgInputTokens: null,
+    avgCachedInputTokens: null,
+    avgOutputTokens: null,
+    avgReasoningTokens: null,
     avgLatencyMs: 100,
     p50LatencyMs: 90,
     p95LatencyMs: 90,
@@ -433,6 +446,10 @@ describe('pickClassifierWinner', () => {
     routeKey: '*' as const,
     accuracy,
     avgCostUsd,
+    avgInputTokens: null,
+    avgCachedInputTokens: null,
+    avgOutputTokens: null,
+    avgReasoningTokens: null,
     avgLatencyMs: 100,
     p50LatencyMs: 80,
     p95LatencyMs: p95,

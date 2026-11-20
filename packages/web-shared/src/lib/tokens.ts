@@ -77,12 +77,14 @@ const boundedInternalServiceAudienceSet: ReadonlySet<string> = new Set(
 const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;
 const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
 const ONE_HOUR_IN_SECONDS = 60 * 60;
+const FIFTEEN_MINUTES_IN_SECONDS = 15 * 60;
 const FIVE_MINUTES_IN_SECONDS = 5 * 60;
 
 export const TOKEN_EXPIRY = {
   default: FIVE_YEARS_IN_SECONDS,
   thirtyDays: THIRTY_DAYS_IN_SECONDS,
   oneHour: ONE_HOUR_IN_SECONDS,
+  fifteenMinutes: FIFTEEN_MINUTES_IN_SECONDS,
   fiveMinutes: FIVE_MINUTES_IN_SECONDS,
 } as const;
 
@@ -180,7 +182,7 @@ export function generateOrganizationApiToken(
   organizationId: string,
   organizationRole: OrganizationRole
 ) {
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+  const expiresAt = new Date(Date.now() + FIFTEEN_MINUTES_IN_SECONDS * 1000);
 
   const token = jwt.sign(
     {
@@ -194,7 +196,7 @@ export function generateOrganizationApiToken(
     NEXTAUTH_SECRET,
     {
       algorithm: jwtSigningAlgorithm,
-      expiresIn: '15m',
+      expiresIn: FIFTEEN_MINUTES_IN_SECONDS,
     }
   );
 
@@ -299,7 +301,7 @@ export function validateAuthorizationHeader(
     warnExceptInTest('Authorization header missing or invalid');
     return {
       error: 'Unauthorized - authentication required',
-      reason: 'missing_credentials',
+      reason: ANONYMOUS_FALL_THROUGH_REASON,
     };
   }
 
@@ -308,7 +310,7 @@ export function validateAuthorizationHeader(
   if (token === ANONYMOUS_BEARER_SENTINEL) {
     return {
       error: 'Unauthorized - authentication required',
-      reason: 'missing_credentials',
+      reason: ANONYMOUS_FALL_THROUGH_REASON,
     };
   }
 
@@ -363,6 +365,9 @@ export function validateAuthorizationHeader(
     }
   }
 
+  // Only the Cloud Agent runtime credential proxy can attest this claim, so a
+  // verified one proves the request came through that proxy.
+  let cloudAgentRuntimeProxied = false;
   if (
     typeof payload.runtimeAuthorization === 'object' &&
     payload.runtimeAuthorization !== null &&
@@ -379,6 +384,7 @@ export function validateAuthorizationHeader(
         reason: 'runtime_attestation_required',
       };
     }
+    cloudAgentRuntimeProxied = true;
   }
 
   return {
@@ -392,11 +398,8 @@ export function validateAuthorizationHeader(
     tokenSource: payload.tokenSource,
     deviceSessionId: payload.deviceSessionId,
     cloudAgentAuthority,
+    cloudAgentRuntimeProxied,
   };
-}
-
-export function generateCloudAgentToken(user: User) {
-  return generateApiToken(user, { tokenSource: 'cloud-agent' });
 }
 
 /**
@@ -407,6 +410,41 @@ function assertMintablePepper(pepper: string | null, message: string): void {
   if (pepper !== null && !pepper) {
     throw new Error(message);
   }
+}
+
+/** The optional claims `buildModernKiloTokenPayload` accepts beside the core fields. */
+type WorkflowTokenExtra = NonNullable<Parameters<typeof buildModernKiloTokenPayload>[0]['extra']>;
+
+/**
+ * Mints a modern Kilo token for a server-side workflow. The invariant skeleton
+ * lives here once: the pepper guard that precedes the mint, the issue time, the
+ * shared claim set with `credentialExchange: false`, and the HS256 signature.
+ * Each caller keeps its policy gate, its expiry clamp, its refusal order, its
+ * audience, its extra claims and its error text.
+ */
+function signWorkflowKiloToken(options: {
+  user: Pick<User, 'id' | 'api_token_pepper'>;
+  /** The pepper this issuer refuses last, immediately before the mint. */
+  pepper: { value: string | null; message: string };
+  audience: string;
+  expiresIn: number;
+  tokenPurpose: 'internal-service' | 'delegated-workload';
+  extra: WorkflowTokenExtra;
+}): string {
+  assertMintablePepper(options.pepper.value, options.pepper.message);
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId: options.user.id,
+    pepper: options.user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: options.audience,
+    issuedAt,
+    expiresAt: issuedAt + options.expiresIn,
+    tokenPurpose: options.tokenPurpose,
+    credentialExchange: false,
+    extra: options.extra,
+  });
+  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
 }
 
 export function generateCloudAgentWorkflowToken(
@@ -436,25 +474,20 @@ export function generateCloudAgentWorkflowToken(
     user.api_token_pepper,
     'Workflow control tokens require a current user pepper'
   );
-  const expiresIn = Math.min(options.expiresIn, 60 * 60);
+  const expiresIn = Math.min(options.expiresIn, ONE_HOUR_IN_SECONDS);
   if (expiresIn <= 0) {
     throw new Error('Workflow control token expiry must be positive');
   }
   const authorizationUser = options.authorizationUser ?? user;
-  assertMintablePepper(
-    authorizationUser.api_token_pepper,
-    'Workflow control tokens require a current authorization pepper'
-  );
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const payload = buildModernKiloTokenPayload({
-    userId: user.id,
-    pepper: user.api_token_pepper,
-    env: process.env.NODE_ENV,
+  return signWorkflowKiloToken({
+    user,
+    pepper: {
+      value: authorizationUser.api_token_pepper,
+      message: 'Workflow control tokens require a current authorization pepper',
+    },
     audience: 'cloud-agent-next',
-    issuedAt,
-    expiresAt: issuedAt + expiresIn,
+    expiresIn,
     tokenPurpose: 'internal-service',
-    credentialExchange: false,
     extra: {
       organizationId: options.organizationId,
       tokenSource: options.tokenSource,
@@ -467,7 +500,6 @@ export function generateCloudAgentWorkflowToken(
       },
     },
   });
-  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
 }
 
 /**
@@ -497,24 +529,18 @@ export function generateWorkflowGatewayToken(
       { expiresIn }
     );
   }
-  assertMintablePepper(
-    user.api_token_pepper,
-    'Workflow gateway tokens require a current user pepper'
-  );
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const payload = buildModernKiloTokenPayload({
-    userId: user.id,
-    pepper: user.api_token_pepper,
-    env: process.env.NODE_ENV,
+  return signWorkflowKiloToken({
+    user,
+    pepper: {
+      value: user.api_token_pepper,
+      message: 'Workflow gateway tokens require a current user pepper',
+    },
     audience: KILO_GATEWAY_AUDIENCE,
-    issuedAt,
-    expiresAt: issuedAt + expiresIn,
+    expiresIn,
     tokenPurpose: 'delegated-workload',
-    credentialExchange: false,
     extra: {
       organizationId: options.organizationId,
       tokenSource: options.tokenSource,
     },
   });
-  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
 }

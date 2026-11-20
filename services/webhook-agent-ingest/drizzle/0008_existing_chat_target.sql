@@ -1,0 +1,1 @@
+ALTER TABLE `trigger_config` ADD `cloud_agent_session_id` text;

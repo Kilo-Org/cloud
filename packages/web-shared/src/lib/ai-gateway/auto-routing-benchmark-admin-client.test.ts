@@ -2,6 +2,7 @@ import {
   getBenchmarkConfig,
   updateBenchmarkConfig,
   listBenchmarkRuns,
+  getBenchmarkRunSummaries,
   startBenchmarkRun,
   getBenchmarkRoutingTable,
   getBenchmarkRegistry,
@@ -44,9 +45,9 @@ const runsResponse = {
       startedAt: '2026-06-01T00:00:00Z',
       completedAt: '2026-06-01T01:00:00Z',
       error: null,
-      summaries: [],
     },
   ],
+  runningRunIds: [],
 };
 
 describe('auto routing benchmark admin client', () => {
@@ -80,6 +81,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/config?router=efficient',
       {
         method: 'PUT',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
@@ -88,6 +90,18 @@ describe('auto routing benchmark admin client', () => {
         body: JSON.stringify(configResponse.config),
       }
     );
+  });
+
+  it('keeps the save warnings the worker returns with the saved config', async () => {
+    const saved = {
+      ...configResponse,
+      warnings: [{ kind: 'routing_table_publish_failed', message: 'publish failed' }],
+    };
+    mockFetch.mockResolvedValue({ status: 200, ok: true, json: () => Promise.resolve(saved) });
+
+    await expect(
+      updateBenchmarkConfig(configResponse.config, 'admin@kilocode.ai')
+    ).resolves.toMatchObject({ status: 200, body: { warnings: saved.warnings } });
   });
 
   it('lists benchmark runs', async () => {
@@ -106,6 +120,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/runs?router=efficient',
       {
         method: 'GET',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
         },
@@ -124,6 +139,56 @@ describe('auto routing benchmark admin client', () => {
       status: 401,
       body: { error: 'unauthorized' },
     });
+  });
+
+  it('drops the summaries an older worker still embeds in the run list', async () => {
+    const [run] = runsResponse.runs;
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ runs: [{ ...run, summaries: [{ model: 'm' }] }] }),
+    });
+
+    await expect(listBenchmarkRuns()).resolves.toEqual({ status: 200, body: { runs: [run] } });
+  });
+
+  it('fetches one run’s summaries by encoded run id and router', async () => {
+    const summaries = {
+      summaries: [
+        {
+          model: 'openai/gpt-5-mini',
+          variant: null,
+          routeKey: 'debugging/bug_fixing',
+          accuracy: 0.9,
+          avgCostUsd: 0.001,
+          avgLatencyMs: 1200,
+          p50LatencyMs: 1100,
+          p95LatencyMs: 2000,
+          cases: 10,
+          errors: 0,
+          timeouts: 0,
+          routeAccuracy: null,
+          avgInputTokens: null,
+          avgCachedInputTokens: null,
+          avgOutputTokens: null,
+          avgReasoningTokens: null,
+        },
+      ],
+    };
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(summaries),
+    });
+
+    await expect(getBenchmarkRunSummaries('decider/1', 'frontier')).resolves.toEqual({
+      status: 200,
+      body: summaries,
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/runs/decider%2F1/summaries?router=frontier',
+      expect.objectContaining({ method: 'GET' })
+    );
   });
 
   it('starts a benchmark run with the given kind, force flag and queue', async () => {
@@ -148,6 +213,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/runs?router=efficient',
       {
         method: 'POST',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
@@ -184,6 +250,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/runs?router=efficient',
       {
         method: 'POST',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
@@ -215,6 +282,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/routing-table?router=efficient',
       {
         method: 'GET',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
         },

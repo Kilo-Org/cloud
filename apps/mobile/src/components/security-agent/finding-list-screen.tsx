@@ -9,7 +9,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
+import { ShieldCheck, SlidersHorizontal, X } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
 import { View, type ViewStyle } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -17,7 +17,7 @@ import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
@@ -27,10 +27,7 @@ import {
   FindingRowSkeleton,
 } from '@/components/security-agent/finding-row-skeleton';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   useSecurityAgentConfig,
   useSecurityAgentRepositories,
@@ -39,10 +36,16 @@ import {
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { isSecurityFindingAnalyzable, type SecurityFinding } from '@/lib/security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type FindingListScreenProps = {
   scope: string;
@@ -56,12 +59,15 @@ function FindingsListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <FindingRowSkeleton index={0} />;
+    // The footer placeholder stands in for the page's last row, so it draws no
+    // hairline under itself.
+    return <FindingRowSkeleton last />;
   }
   if (error) {
     return (
       <QueryError
         placement="top"
+        inset="gutter"
         message={t('securityAgent.findingList.couldNotLoadMore')}
         onRetry={onRetry}
       />
@@ -70,28 +76,21 @@ function FindingsListFooter({
   return null;
 }
 
-// FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
-// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
-// `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`. The old container `gap` also
-// sat between the header and the first row and between the last row and the
-// footer; FlashList's separator only spans items, so those two boundaries carry
-// the same 12px as a pad on the header (`pb-3`) and on the footer (`pt-3`).
+// FlashList takes `contentContainerStyle` (no className), so the body keeps
+// only the top pad: the 14pt page gutter lives on the rows, their hairlines and
+// the header/footer bands, never on the scroller.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
-  paddingHorizontal: 24,
-  paddingTop: 16,
+  paddingTop: 12,
 } satisfies ViewStyle;
-
-const FindingRowSeparator = () => <View className="h-3" />;
 
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
   const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { t } = useTranslation();
   // Filters live in this route's params: the sheet is pushed with them and
   // writes them back on apply, so the URL, the visible list and the sheet's
@@ -129,7 +128,8 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   // Only a delivered page may claim there are no open findings: a read that is
   // paused, never started, or whose pages were cleared has not answered. An
   // unsettled connectivity keeps the skeleton instead of naming the connection.
-  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const connectivity = useCommittedConnectivityStatus();
+  const connectivityKnown = connectivity !== 'unknown';
   const body = classifyListBody({
     rowCount: items.length,
     hasDeliveredData: (findings.data?.pages.length ?? 0) > 0,
@@ -139,19 +139,56 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     fetchStatus: findings.fetchStatus,
     connectivityKnown,
   });
+  // This screen reads through two calls (the repositories list and the rows),
+  // and either one failing leaves the reader with nothing to act on. One kind
+  // over BOTH failures names the surface once: the old shape drew a card per
+  // read, so a permission refusal showed two "Something went wrong" cards with
+  // a Retry that could only be refused again.
+  const failureErrors = [findings.error, repositories.error].filter(
+    (error): error is Error => error != null
+  );
+  const failureKind = classifyReadFailureKind({
+    errors: failureErrors,
+    isPaused: findings.fetchStatus === 'paused' && connectivityKnown,
+    connectivity,
+  });
+  const failureRetryable = readFailureKindIsRetryable(failureKind);
+  const failureVariant = readFailureKindVariant(failureKind);
+  // Which read left the screen with nothing: the rows own the body, the
+  // repositories only decorate the list. A repositories failure with rows or a
+  // settled empty list is a notice above them; either failure with nothing
+  // delivered owns the surface.
+  const findingsFailed = body.status === 'error';
+  const failureOwnsBody = findingsFailed;
+  const failureVisible = findingsFailed || repositories.isError;
+  // A retryable failure keeps the screen's own sentence, naming the read that
+  // failed. The other three take their copy from the variant alone, which names
+  // the refusal, the missing item, or the connection instead of blaming the
+  // server for all of them. `offline` is retryable but still takes the
+  // variant's copy: its description is the connection's own sentence, and
+  // overriding it would describe a missing network as a failed read.
+  const failureMessage =
+    failureKind === 'retryable'
+      ? t(
+          findingsFailed
+            ? 'securityAgent.findingList.couldNotLoad'
+            : 'common.couldNotLoadRepositories'
+        )
+      : undefined;
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
   // `renderItem` and `extraData` by identity before re-rendering a row.
   const renderItem = useCallback(
-    ({ item }: { item: SecurityFinding }) => (
+    ({ item, index }: { item: SecurityFinding; index: number }) => (
       <FindingRow
         finding={item}
         scope={scope}
         slaEnabled={slaEnabled}
         capacityState={capacity.state}
+        last={index === items.length - 1}
       />
     ),
-    [scope, slaEnabled, capacity.state]
+    [scope, slaEnabled, capacity.state, items.length]
   );
   const rowExtraData = useMemo(
     () => ({ scope, slaEnabled, capacityState: capacity.state }),
@@ -183,7 +220,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('common.findings')}
         // One 48dp icon target from IconButton; declaring its width keeps the
         // one-line title's readable minimum when the row is narrow.
@@ -206,34 +242,40 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         }
       />
 
-      {repositories.isError ? (
+      {/* ONE error surface for the screen. Both reads feed the same kind, so a
+          permission refusal never describes itself as a server fault and a
+          terminal failure offers no Retry. A failure with rows to show is a
+          notice above them; a failure with nothing to show owns the body. */}
+      {failureVisible && (
         <QueryError
-          placement="top"
-          message={t('common.couldNotLoadRepositories')}
-          onRetry={() => void repositories.refetch()}
-          isRetrying={repositories.isFetching}
+          variant={failureVariant}
+          placement={failureOwnsBody ? 'center' : 'top'}
+          inset={failureOwnsBody ? undefined : 'gutter'}
+          message={failureMessage}
+          onRetry={
+            failureRetryable
+              ? () => {
+                  void findings.refetch();
+                  if (repositories.isError) {
+                    void repositories.refetch();
+                  }
+                }
+              : undefined
+          }
+          isRetrying={findings.isFetching || repositories.isFetching}
+          refreshControl={failureOwnsBody ? refreshControl : undefined}
         />
-      ) : null}
+      )}
 
       {body.status === 'loading' && (
-        <View style={listStyle}>
+        <View style={[listStyle, sideInsetMarginStyle]}>
           <View style={listContentContainerStyle}>
-            {/* The loaded list's `ListHeaderComponent` band, so the first card
+            {/* The loaded list's `ListHeaderComponent` band, so the first row
                 lands where the first placeholder row stood. */}
-            <View className="pb-3" />
+            <View className="h-3" />
             <FindingListSkeletonRows />
           </View>
         </View>
-      )}
-
-      {body.status === 'error' && (
-        <QueryError
-          variant={body.cause === 'offline' ? 'offline' : 'neutral'}
-          message={t('securityAgent.findingList.couldNotLoad')}
-          onRetry={() => void findings.refetch()}
-          isRetrying={body.isRetrying}
-          refreshControl={refreshControl}
-        />
       )}
 
       {body.status === 'empty' && (
@@ -252,15 +294,13 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }
           action={
             filtersActive ? (
-              <Button
-                className={STATE_ACTION_CLASS}
-                variant="outline"
+              <StateAction
+                label={t('common.clearFilters')}
+                icon={X}
                 onPress={() => {
                   router.setParams(toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS));
                 }}
-              >
-                <Text>{t('common.clearFilters')}</Text>
-              </Button>
+              />
             ) : undefined
           }
         />
@@ -268,22 +308,20 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
 
       {body.status === 'rows' && (
         <FlashList<SecurityFinding>
-          style={listStyle}
+          style={[listStyle, sideInsetMarginStyle]}
           data={items}
           keyExtractor={item => item.id}
           renderItem={renderItem}
           getItemType={() => 'finding'}
-          ItemSeparatorComponent={FindingRowSeparator}
           extraData={rowExtraData}
           contentContainerStyle={listContentContainerStyle}
           ListHeaderComponent={
-            // The former container gap also separated the header from the first
-            // row, which the item separator does not cover.
-            <View className="pb-3">
+            // The header band carries the page gutter itself: the rows own
+            // theirs, so the scroller must not inset them twice.
+            <View className="px-4 pb-3">
               <RefreshProgress refreshControl={refreshControl} />
               {hasAnalyzableRow ? (
                 <AnalysisCapacityNotice
-                  className="pt-2"
                   state={capacity.state}
                   onRetry={() => void capacity.refetch()}
                 />
@@ -298,16 +336,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            // The former container gap also separated the last row from the
-            // footer (skeleton / error / bottom spacer).
-            <View className="pt-3">
+            <>
               <FindingsListFooter
                 loading={findings.isFetchingNextPage}
                 error={findings.isFetchNextPageError}
                 onRetry={() => void findings.fetchNextPage()}
               />
               <View style={{ height: paddingBottom }} pointerEvents="none" />
-            </View>
+            </>
           }
         />
       )}

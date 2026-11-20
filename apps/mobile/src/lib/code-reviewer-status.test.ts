@@ -270,7 +270,7 @@ describe('classifyPermission', () => {
   });
 
   it('grants edit for owner and billing_manager roles once loaded', () => {
-    for (const role of ['owner', 'billing_manager']) {
+    for (const role of ['owner', 'billing_manager'] as const) {
       expect(
         classifyPermission({
           isPersonal: false,
@@ -286,7 +286,7 @@ describe('classifyPermission', () => {
   });
 
   it('grants manage (provider app install) to owner and admin only', () => {
-    for (const role of ['owner', 'admin']) {
+    for (const role of ['owner', 'admin'] as const) {
       expect(
         classifyPermission({
           isPersonal: false,
@@ -299,7 +299,7 @@ describe('classifyPermission', () => {
         })
       ).toEqual({ status: 'ready', canEdit: true, canManage: true });
     }
-    for (const role of ['billing_manager', 'member']) {
+    for (const role of ['billing_manager', 'member'] as const) {
       expect(
         classifyPermission({
           isPersonal: false,

@@ -2,13 +2,12 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import '@/i18n';
 
 import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
+import { i18n } from '@/i18n';
 import { type KiloPassSubscription } from '@/lib/kilo-pass/state';
 
-const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
-const mockClearance = vi.hoisted(() => ({ windowTop: 0 }));
+const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn() }));
 const mocks = vi.hoisted(() => ({
   state: {
     data: undefined as unknown,
@@ -65,13 +64,23 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ Crown: 'Crown' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The row primitives notify a selection through the haptic bridge, which loads
+// the expo runtime; the suite asserts structure, not feedback.
+vi.mock('@/lib/haptics', () => ({
+  impactHaptic: () => undefined,
+  notificationHaptic: () => undefined,
+  selectionHaptic: () => undefined,
+}));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 // The body's blocks have their own suites. The screen owns which state it
 // shows and when it prints the page, so they render as hosts here.
 vi.mock('@/components/kilo-pass/kilo-pass-management', () => ({
@@ -86,7 +95,7 @@ vi.mock('@/lib/hooks/use-kilo-pass-history', () => ({
   useKiloPassBillingHistory: () => mocks.ledgers.billing,
 }));
 vi.mock('@/lib/form-sheet', () => ({
-  useSheetHeaderTopClearance: () => mockClearance.windowTop,
+  modalSheetSurfaceClass: () => 'bg-background dark:bg-card',
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -163,7 +172,6 @@ function nodesOfType(
 
 describe('KiloPassSubscriptionScreen', () => {
   beforeEach(() => {
-    mockClearance.windowTop = 0;
     mocks.state.isPending = false;
     mocks.state.isError = false;
     mocks.state.data = { subscription: null, isEligibleForFirstMonthPromo: true };
@@ -185,11 +193,14 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('tells an account without a pass that the app does not offer one', async () => {
+  it('names the reason an account without a pass cannot buy one here', async () => {
     const renderer = await renderScreen();
     const emptyState = nodesOfType(renderer, 'EmptyState');
     expect(emptyState).toHaveLength(1);
-    expect(emptyState[0]?.props.title).toBe("Kilo Pass isn't available in the app.");
+    // The title is the reason, not a status: "Not subscribed" beside "isn't
+    // available in the app" left the reader with nothing to act on.
+    expect(emptyState[0]?.props.title).toBe(i18n.t('kiloPass.notAvailableTitle'));
+    expect(emptyState[0]?.props.description).toBe(i18n.t('kiloPass.noPassDescription'));
     // A finished message with no action: the app sells nothing here.
     expect(emptyState[0]?.props.action).toBeUndefined();
     renderer.unmount();
@@ -284,7 +295,6 @@ describe('KiloPassSubscriptionScreen', () => {
       ["This month's usage", '$12.50 / $58.80'],
       ['Available free bonus', '$9.80'],
     ]);
-    expect(rows.at(-1)?.props.last).toBe(true);
 
     // No button exists on the details surface: managing, cancelling, and
     // buying a pass are web-only.
@@ -369,27 +379,20 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('clears the window top inset itself when the modal surface reaches the window top', async () => {
-    mockClearance.windowTop = 51.8;
+  it('closes the modal from the sheet header', async () => {
     const renderer = await renderScreen();
-    const header = nodesOfType(renderer, 'ScreenHeader')[0];
-    expect(header?.props.safeAreaTop).toBe(false);
-    expect(String(header?.props.className)).toContain('pt-2');
-    // `safeAreaTop: false` only stops the header drawing the inset; the surface
-    // that owns the window top pads it, or the header sits under the status bar.
-    const padded = nodesOfType(renderer, 'View').filter(
-      node => (node.props.style as { paddingTop?: number } | undefined)?.paddingTop === 51.8
-    );
-    expect(padded).toHaveLength(1);
-    renderer.unmount();
-    mockClearance.windowTop = 0;
-  });
-
-  it('keeps the header inset when the sheet presents below the window top', async () => {
-    const renderer = await renderScreen();
-    const header = nodesOfType(renderer, 'ScreenHeader')[0];
-    expect(header?.props.safeAreaTop).toBe(true);
-    expect(header?.props.className).toBeUndefined();
+    const header = nodesOfType(renderer, 'SheetHeader')[0];
+    // The route is a modal: the header's one control is the X that closes it,
+    // and on Android, where the modal reaches the window top, the header clears
+    // the status bar itself.
+    expect(header?.props.variant).toBe('close');
+    expect(header?.props.topInset).toBe('android-window-top');
+    expect(header?.props.surfaceClassName).toBe('bg-background dark:bg-card');
+    const onDone = header?.props.onDone as (() => void) | undefined;
+    act(() => {
+      onDone?.();
+    });
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
 });

@@ -98,8 +98,8 @@ const waitingAskSchema = z.object({
  * every dated row, so a row whose wait cannot be timed never displaces one that
  * can, and still wins when it is the only row waiting.
  */
-function readStatusTime(statusUpdatedAt: string | undefined): number {
-  if (statusUpdatedAt === undefined) {
+function readStatusTime(statusUpdatedAt: string | null | undefined): number {
+  if (statusUpdatedAt == null) {
     return Number.POSITIVE_INFINITY;
   }
   const at = Date.parse(statusUpdatedAt);

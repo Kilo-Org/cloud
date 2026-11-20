@@ -20,7 +20,7 @@
     // Stall hedge to the global queue: README.md#stall-hedge-to-the-global-queue.
     "USAGE_INGEST_HEDGE_MODE": "on",
     "USAGE_INGEST_HEDGE_DELAY_MS": "1000",
-    "USAGE_INGEST_HEDGE_PERCENT": "50",
+    "USAGE_INGEST_HEDGE_PERCENT": "100",
   },
   "queues": {
     "producers": [
@@ -28,6 +28,11 @@
       // Unused by the Worker: exposes the matching DLQ to queue preparation.
       { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-eu" },
       { "binding": "USAGE_INGEST_HEDGE_QUEUE", "queue": "usage-ingest-processing" },
+      // Enkrypt and Exa fallback usage share a dedicated source, consumer and DLQ; the names predate
+      // Exa joining it: README.md#dedicated-tagged-queue-enkrypt-and-exa-fallback.
+      { "binding": "USAGE_INGEST_ENKRYPT_QUEUE", "queue": "usage-ingest-enkrypt-eu" },
+      // Unused by the Worker: exposes the matching DLQ to queue preparation.
+      { "binding": "USAGE_INGEST_ENKRYPT_DLQ", "queue": "usage-ingest-enkrypt-dlq-eu" },
     ],
     "consumers": [
       {
@@ -50,6 +55,18 @@
         "max_concurrency": 25,
         "dead_letter_queue": "usage-ingest-processing-dlq",
       },
+      // Single-message batches with one cap shared by Enkrypt and Exa fallback: a tagged writer
+      // rejection fails only its own invocation and scales only this consumer. A configured
+      // ceiling, not measured capacity; the shared writer and database are unchanged.
+      {
+        "queue": "usage-ingest-enkrypt-eu",
+        "max_batch_size": 1,
+        "max_batch_timeout": 0,
+        "max_retries": 20,
+        "retry_delay": 60,
+        "max_concurrency": 50,
+        "dead_letter_queue": "usage-ingest-enkrypt-dlq-eu",
+      },
     ],
   },
   "env": {
@@ -68,6 +85,11 @@
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging-eu" },
           { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-staging-eu" },
           { "binding": "USAGE_INGEST_HEDGE_QUEUE", "queue": "usage-ingest-processing-staging" },
+          { "binding": "USAGE_INGEST_ENKRYPT_QUEUE", "queue": "usage-ingest-enkrypt-staging-eu" },
+          {
+            "binding": "USAGE_INGEST_ENKRYPT_DLQ",
+            "queue": "usage-ingest-enkrypt-dlq-staging-eu",
+          },
         ],
         "consumers": [
           {
@@ -87,6 +109,15 @@
             "retry_delay": 60,
             "max_concurrency": 25,
             "dead_letter_queue": "usage-ingest-processing-dlq-staging",
+          },
+          {
+            "queue": "usage-ingest-enkrypt-staging-eu",
+            "max_batch_size": 1,
+            "max_batch_timeout": 0,
+            "max_retries": 20,
+            "retry_delay": 60,
+            "max_concurrency": 10,
+            "dead_letter_queue": "usage-ingest-enkrypt-dlq-staging-eu",
           },
         ],
       },

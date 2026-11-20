@@ -220,6 +220,72 @@ it('migration 0345 preserves retry safety around its concurrent indexes', () => 
   expect(statements[0]).toMatch(/END IF;\s*END \$\$;$/);
 });
 
+it('migration 0370 keeps one busy-table lock per transaction', () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0370_anthropic_user_profiles.sql'),
+    'utf8'
+  );
+  const chunks = migration
+    .split('--> statement-breakpoint')
+    .map(chunk => chunk.replace(/^\s*--.*$/gm, '').trim())
+    .filter(Boolean);
+
+  // Replay the transaction boundaries the migrator executes. It opens the first
+  // transaction itself, so chunks before the first COMMIT share one transaction,
+  // and every chunk outside a transaction is its own implicit transaction.
+  const transactions: string[][] = [[]];
+  let open = true;
+  for (const chunk of chunks) {
+    if (chunk === 'COMMIT;') {
+      open = false;
+      continue;
+    }
+    if (chunk === 'BEGIN;') {
+      transactions.push([]);
+      open = true;
+      continue;
+    }
+    if (open) transactions.at(-1)!.push(chunk);
+    else transactions.push([chunk]);
+  }
+
+  // The migrator inserts the recording row inside the transaction this last BEGIN opens.
+  expect(chunks.at(-1)).toBe('BEGIN;');
+
+  for (const statements of transactions) {
+    const alteredTables = ['kilocode_users', 'organizations'].filter(table =>
+      statements.some(statement => statement.includes(`ALTER TABLE "${table}"`))
+    );
+    // Waiting for a second busy table while holding a lock on the first deadlocks
+    // with live traffic that locks the same tables in the opposite order.
+    expect(alteredTables.length).toBeLessThanOrEqual(1);
+    if (alteredTables.length === 1) {
+      const lockTimeout = statements.findIndex(statement =>
+        statement.startsWith('SET LOCAL lock_timeout')
+      );
+      const alter = statements.findIndex(statement => statement.includes('ALTER TABLE'));
+      expect(lockTimeout).toBeGreaterThan(-1);
+      expect(lockTimeout).toBeLessThan(alter);
+    }
+  }
+
+  const alterStatements = chunks.filter(chunk =>
+    chunk.includes('ADD COLUMN "anthropic_user_profile_id" text;')
+  );
+  expect(alterStatements).toHaveLength(2);
+  for (const statement of alterStatements) {
+    // A guard on the column itself skips a retry without taking a lock on the table.
+    expect(statement).toContain('pg_attribute');
+    expect(statement).toContain('IF EXISTS');
+    expect(statement).toMatch(/END \$\$;$/);
+  }
+
+  const createTables = chunks.find(chunk =>
+    chunk.includes('CREATE TABLE "anthropic_user_profile_cleanup_state"')
+  );
+  expect(createTables).not.toContain('ALTER TABLE');
+});
+
 it('migration 0345 backfills old owners and folders to activity and copies built-in agent overrides', async () => {
   const migration = fs.readFileSync(
     path.join(__dirname, 'migrations/0345_cloud_agent_stacked_workspaces.sql'),

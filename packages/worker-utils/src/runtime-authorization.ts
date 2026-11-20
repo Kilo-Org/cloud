@@ -6,10 +6,11 @@ import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-policy.js';
 import { sha256Hex } from './sha256.js';
-import type { RuntimeAuthorization } from './runtime-authorization-contract.js';
+import type { RuntimeAuthorization, RuntimeEnvironment } from './runtime-authorization-contract.js';
 import {
   RuntimeAuthorizationSchema,
   runtimeAuthorizationMaximumLifetimeMs,
+  RuntimeEnvironmentSchema,
   RuntimeResourceKindSchema,
 } from './runtime-authorization-contract.js';
 export { RuntimeAuthorizationSchema };
@@ -60,6 +61,17 @@ export type RuntimeAuthorizationBindingRejectionReason =
 
 type BindingDiagnostics = {
   onBindingRejected?: (reason: RuntimeAuthorizationBindingRejectionReason) => void;
+};
+
+/**
+ * Admission refusal reasons a runtime operator must be able to tell apart from
+ * a generic refusal, because they report a deployment configuration problem
+ * rather than a bad credential.
+ */
+export type RuntimeAuthorizationAdmissionRejectionReason = 'environment_mismatch';
+
+type AdmissionDiagnostics = {
+  onAdmissionRejected?: (reason: RuntimeAuthorizationAdmissionRejectionReason) => void;
 };
 
 type CommonInput = {
@@ -252,16 +264,28 @@ async function requireBindings(
 
 export async function createRuntimeAuthorization(
   input: CommonInput &
+    AdmissionDiagnostics &
     BindingDiagnostics & {
       token: string;
       resourceKind: RuntimeAuthorization['resourceKind'];
       resourceId: string;
+      environment: RuntimeEnvironment;
       organizationId?: string;
+      /** A shorter delegation than the resource maximum; local expiry tests only. */
+      lifetimeMs?: number;
       now?: Date;
     }
 ): Promise<{ authorization: RuntimeAuthorization; token: string; expiresAt: string }> {
   const resourceKind = RuntimeResourceKindSchema.parse(input.resourceKind);
   const resourceId = z.string().min(1).parse(input.resourceId);
+  const environment = RuntimeEnvironmentSchema.parse(input.environment);
+  const lifetimeMs = z
+    .number()
+    .int()
+    .positive()
+    .max(runtimeAuthorizationMaximumLifetimeMs(resourceKind))
+    .default(runtimeAuthorizationMaximumLifetimeMs(resourceKind))
+    .parse(input.lifetimeMs);
   const auth = await verifyKiloTokenForPolicy(input.token, input.secret, {
     audience: resourceKind,
     mode: 'allow-legacy',
@@ -289,6 +313,17 @@ export async function createRuntimeAuthorization(
     input.organizationId !== claims.organizationId
   )
     throw new Error('Invalid runtime admission');
+  // The token names another deployment environment. That is a configuration
+  // mismatch rather than a bad credential, so it reports a distinct diagnostic
+  // while the public error stays generic.
+  if (claims.env !== environment) {
+    try {
+      input.onAdmissionRejected?.('environment_mismatch');
+    } catch {
+      // Diagnostics must not replace the authorization rejection.
+    }
+    throw new Error('Invalid runtime admission');
+  }
   const user = await getPrincipal(input, claims.kiloUserId);
   const authorizationUser = await getPrincipal(input, admission.authorizationUserId);
   if (
@@ -342,9 +377,7 @@ export async function createRuntimeAuthorization(
     authorizationUserId: authorizationUser.id,
     organizationId: input.organizationId,
     issuedAt: now.toISOString(),
-    delegationExpiresAt: new Date(
-      now.getTime() + runtimeAuthorizationMaximumLifetimeMs(resourceKind)
-    ).toISOString(),
+    delegationExpiresAt: new Date(now.getTime() + lifetimeMs).toISOString(),
     state: 'active',
     bindings: {
       userPepperDigest: await digest(user.apiTokenPepper),
@@ -359,7 +392,7 @@ export async function createRuntimeAuthorization(
       createdOnPlatform: claims.createdOnPlatform,
       admissionSource: admission.source,
     },
-    env: claims.env,
+    env: environment,
   });
   const signed = await issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
   return { authorization, ...signed };

@@ -267,16 +267,14 @@ describe('sandbox allocation contract', () => {
 });
 
 describe('multi-repository allocation support', () => {
-  const unsupported = ['vercel-small', 'vercel-large'];
-
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('%s', allocation => {
-    expect(allocationSupportsMultiRepository(allocation)).toBe(!unsupported.includes(allocation));
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('%s holds several repositories', allocation => {
+    expect(allocationSupportsMultiRepository(allocation)).toBe(true);
   });
 
-  it('rejects exactly Vercel among selectable allocations', () => {
-    const rejected = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+  it('rejects exactly the shared sandbox among all allocations', () => {
+    const rejected = sandboxAllocationSchema.options.filter(
       allocation => !allocationSupportsMultiRepository(allocation)
     );
-    expect(rejected).toEqual(unsupported);
+    expect(rejected).toEqual(['cloudflare-shared']);
   });
 });

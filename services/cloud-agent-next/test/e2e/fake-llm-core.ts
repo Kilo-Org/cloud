@@ -15,9 +15,16 @@
 
 import { createHash } from 'node:crypto';
 
+import {
+  LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
+  LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS,
+  type LocalFakeTranscriptionModelId,
+} from '@kilocode/app-shared/local-fake-llm';
+
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
 import { backgroundActivityScenario } from './fake-llm-background-activity.js';
+import { agentBoardChildScenario, agentBoardScenario } from './fake-llm-agent-board.js';
 import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
@@ -540,13 +547,18 @@ export function normalizeToolResult(raw: string): ToolResultNormalization {
 
 export type ReadResultPath = { ok: true; path: string | null } | { ok: false; message: string };
 
+// Kilo v2-104 renders the path and selected line range as a plain-text header.
+const NATIVE_READ_FILE_HEADER = /^Read file (.+), (?:0 lines|lines \d+-\d+)(?:\r?\n|$)/;
+
 /**
- * The read tool's reported path: an envelope field or a `<path>` element in the
- * unwrapped output. The two sources must agree; a conflicting pair is rejected
- * rather than silently preferring one, so a result can never be relabelled.
+ * The read tool reports its path in a native header or a legacy XML element.
+ * If the envelope also has a path, the two sources must agree.
  */
 function readResultPath(normalized: NormalizedToolResult): ReadResultPath {
-  const inner = normalized.output.match(/<path>\s*([^<]+?)\s*<\/path>/)?.[1] ?? null;
+  const inner =
+    normalized.output.match(NATIVE_READ_FILE_HEADER)?.[1] ??
+    normalized.output.match(/<path>\s*([^<]+?)\s*<\/path>/)?.[1] ??
+    null;
   if (normalized.envelopePath !== null && inner !== null && normalized.envelopePath !== inner) {
     return { ok: false, message: 'conflicting read result path metadata' };
   }
@@ -834,7 +846,13 @@ function supportsRequiredArguments(
 function resolveTool(
   tools: AdvertisedTool[],
   kind: ToolKind,
-  input: { path?: string; contents?: string; replacement?: string; question?: string }
+  input: {
+    path?: string;
+    contents?: string;
+    replacement?: string;
+    question?: string;
+    optionCount?: number;
+  }
 ): { tool: AdvertisedTool; arguments: Record<string, unknown> } | null {
   const names: Record<ToolKind, string[]> = {
     write: ['write', 'write_file', 'write_to_file'],
@@ -849,18 +867,29 @@ function resolveTool(
 
   const args: Record<string, unknown> = {};
   if (kind === 'question') {
+    // The default path must stay byte-identical (single `Continue` option) so
+    // existing assertions on the emitted option list keep passing.
+    const optionCount = input.optionCount ?? 1;
+    const defaultOption = { label: 'Continue', description: 'Continue the E2E scenario' };
+    const options =
+      optionCount === 1
+        ? [defaultOption]
+        : Array.from({ length: optionCount }, (_, index) => ({
+            label: `Option ${index + 1}`,
+            description: `Option ${index + 1} of ${optionCount} emitted by the E2E fake`,
+          }));
     if ('questions' in properties && input.question !== undefined) {
       args.questions = [
         {
           question: input.question,
           header: 'E2E',
-          options: [{ label: 'Continue', description: 'Continue the E2E scenario' }],
+          options,
         },
       ];
     } else if ('question' in properties && input.question !== undefined) {
       args.question = input.question;
       if ('options' in properties) {
-        args.options = [{ label: 'Continue', description: 'Continue the E2E scenario' }];
+        args.options = options;
       }
     } else {
       return null;
@@ -919,8 +948,14 @@ function readFileContents(result: string): string {
   } catch {
     content = result;
   }
-  const enclosed = content.match(/<(?:content|file)>\s*\n?([\s\S]*?)\n?<\/(?:content|file)>/);
-  if (enclosed?.[1] !== undefined) content = enclosed[1];
+  if (NATIVE_READ_FILE_HEADER.test(content)) {
+    content = content
+      .replace(NATIVE_READ_FILE_HEADER, '')
+      .replace(/\r?\n\[Output truncated\. Continue reading with offset: \d+\]\s*$/, '');
+  } else {
+    const enclosed = content.match(/<(?:content|file)>\s*\n?([\s\S]*?)\n?<\/(?:content|file)>/);
+    if (enclosed?.[1] !== undefined) content = enclosed[1];
+  }
   return content
     .split(/\r?\n/)
     .filter(line => !/^\s*\((?:End of file|Showing lines)/.test(line))
@@ -945,7 +980,7 @@ function readFileContents(result: string): string {
  * this model as `kilo/fake-deterministic` (provider prefix + bare id).
  */
 const FAKE_MODEL = {
-  id: 'fake-deterministic',
+  id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
   name: 'Fake Deterministic',
   description: 'Deterministic fake model for cloud-agent E2E harness.',
   context_length: 200000,
@@ -969,24 +1004,48 @@ function modelsCatalogue(): { data: Array<typeof FAKE_MODEL> } {
 
 /**
  * Speech-to-text catalogue served for `GET /api/openrouter/models` with
- * `output_modalities=transcription`. Two ids: the happy path the mobile e2e
- * scenarios address, and a broken one whose transcription request 404s so the
- * non-retryable unhappy state is provable without an upstream key.
+ * `output_modalities=transcription`. The ids come from the shared list the web
+ * gateway routes to this fake, so a rename cannot leave a stale copy here; the
+ * metadata record below must name every shared id, and only those.
+ *
+ * Field order matches the previously served bytes: `name` and `description`
+ * are taken by name because the shared record holds them without `created`
+ * between them.
  */
-const TRANSCRIPTION_MODELS = [
-  {
-    id: 'fake-transcribe',
+const TRANSCRIPTION_MODEL_METADATA: Record<
+  LocalFakeTranscriptionModelId,
+  { name: string; description: string }
+> = {
+  'fake-transcribe': {
     name: 'Fake Transcribe',
-    context_length: 128000,
-    pricing: { prompt: '0', completion: '0' },
+    description: 'Deterministic fake speech-to-text model for cloud-agent E2E harness.',
   },
-  {
-    id: 'fake-transcribe-broken',
+  'fake-transcribe-broken': {
     name: 'Broken Transcriber',
+    description: 'Fake speech-to-text model whose transcription request 404s.',
+  },
+};
+
+const TRANSCRIPTION_MODELS = LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS.map(id => {
+  const metadata = TRANSCRIPTION_MODEL_METADATA[id];
+  return {
+    id,
+    name: metadata.name,
+    created: 0,
+    description: metadata.description,
+    architecture: {
+      input_modalities: ['audio'],
+      output_modalities: ['text'],
+      tokenizer: 'fake',
+    },
+    top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
-  },
-];
+  };
+});
+
+/** The shared id whose transcription request 404s. */
+const BROKEN_TRANSCRIPTION_MODEL_ID: LocalFakeTranscriptionModelId = 'fake-transcribe-broken';
 
 type ToolCallDelta = {
   index: number;
@@ -1110,6 +1169,17 @@ export const MAX_REALISTIC_PIECES = 512;
  * silently smaller stream.
  */
 export const MAX_TOOL_STREAM_BYTES = 1024 * 1024;
+
+/**
+ * Upper bound for the opt-in `question:<tag>:<count>:<question text>` option
+ * count. The product schema (`SESSION_QUESTION_MAX_OPTIONS`) caps one question
+ * at 32 options, and the purpose of the count form is to emit MORE than that,
+ * so the bound comfortably exceeds 32: it covers the exact legal boundary (32)
+ * and over-limit probes (33+) while keeping the generated tool-call arguments
+ * bounded for the streamed fake. A request beyond it is an invalid directive
+ * (HTTP 402) rather than a silently smaller list.
+ */
+export const MAX_QUESTION_DIRECTIVE_OPTIONS = 64;
 
 /**
  * Upper bound for the `slow:<n>:<ms>:<bytes>` per-chunk delay. Without it a
@@ -1320,7 +1390,13 @@ function runToolScenario(
   ctx: ScenarioContext,
   tag: string,
   kind: ToolKind,
-  input: { path?: string; contents?: string; replacement?: string; question?: string }
+  input: {
+    path?: string;
+    contents?: string;
+    replacement?: string;
+    question?: string;
+    optionCount?: number;
+  }
 ): void {
   const resolved = resolveTool(ctx.tools, kind, input);
   if (!resolved) {
@@ -1801,14 +1877,30 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       );
       return;
     }
-    const [, tag, question] = parsed;
+    // Opt-in count form: `question:<tag>:<count>:<question text>` emits
+    // `<count>` options. A digits-only whole segment directly after the tag is
+    // treated as a count; anything else — including text that merely starts
+    // with digits — keeps the original single-option form.
+    const countMatch = parsed[2].match(/^(\d+):([\s\S]+)$/);
+    const optionCount = countMatch ? Number.parseInt(countMatch[1] ?? '0', 10) : 1;
+    const question = countMatch ? (countMatch[2] ?? '') : parsed[2];
+    if (countMatch && (optionCount < 1 || optionCount > MAX_QUESTION_DIRECTIVE_OPTIONS)) {
+      writeJsonError(
+        ctx.emit,
+        402,
+        `question option count must be between 1 and ${MAX_QUESTION_DIRECTIVE_OPTIONS}, got ${optionCount}`,
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag] = parsed;
     if (ctx.tools.length === 0) {
       writeAssistantResponse(ctx, `done-${tag}`);
       return;
     }
     const results = toolResults(ctx.body, tag, ctx.state);
     if (!results.some(result => result.id === toolCallId(tag, 'question'))) {
-      runToolScenario(ctx, tag, 'question', { question });
+      runToolScenario(ctx, tag, 'question', { question, optionCount });
       return;
     }
     writeAssistantResponse(ctx, `done-${tag}`);
@@ -1822,6 +1914,8 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     runChildTask(args, ctx, true);
   },
   'background-activity': backgroundActivityScenario,
+  board: agentBoardScenario,
+  'board-child': agentBoardChildScenario,
 
   cron(args, ctx) {
     runSchedule(
@@ -2105,7 +2199,7 @@ async function handleAudioTranscriptions(
     fail(400, 'model field is required', 'invalid_request', 'missing-model');
     return;
   }
-  if (model === 'fake-transcribe-broken') {
+  if (model === BROKEN_TRANSCRIPTION_MODEL_ID) {
     fail(404, `model not found: ${model}`, 'model_not_found', 'model-not-found');
     return;
   }

@@ -22,6 +22,7 @@ export const ProviderTypeSchema = z.enum([
   'claude-billing',
   'custom',
   'custom-public',
+  'partner',
   'dev-tools',
 ]);
 

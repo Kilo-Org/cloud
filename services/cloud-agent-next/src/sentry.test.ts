@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as Sentry from '@sentry/cloudflare';
 import type { ErrorEvent } from '@sentry/core';
-import { TRPCError } from '@trpc/server';
+import { getTRPCErrorFromUnknown, TRPCError } from '@trpc/server';
 import { HTTPException } from 'hono/http-exception';
+import { logger, withLogTags } from './logger.js';
 import {
   captureCloudAgentException,
   cloudAgentSentryOptions,
@@ -66,6 +67,23 @@ describe('Cloud Agent exception policy', () => {
     expect(shouldCaptureCloudAgentException(new TypeError('Unexpected bug'))).toBe(true);
   });
 
+  it('does not report a lost client or Durable Object connection', () => {
+    expect(shouldCaptureCloudAgentException(new Error('Network connection lost.'))).toBe(false);
+  });
+
+  it('still reports server faults that resemble a connection loss', () => {
+    expect(shouldCaptureCloudAgentException(new Error('Network connection lost'))).toBe(true);
+    expect(shouldCaptureCloudAgentException(new Error('Network connection lost. Details'))).toBe(
+      true
+    );
+    expect(
+      shouldCaptureCloudAgentException(
+        new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Network connection lost.' })
+      )
+    ).toBe(true);
+    expect(shouldCaptureCloudAgentException(new HTTPException(500))).toBe(true);
+  });
+
   it('disables reporting when configuration is missing or malformed', () => {
     expect(cloudAgentSentryOptions({})).toMatchObject({ enabled: false, dsn: '' });
     expect(cloudAgentSentryOptions({ CLOUD_AGENT_SENTRY_DSN: 'not-a-dsn' })).toMatchObject({
@@ -81,6 +99,26 @@ describe('Cloud Agent exception policy', () => {
     expect(() =>
       captureCloudAgentException(new Error('Original bug'), { operation: 'http' })
     ).not.toThrow();
+  });
+
+  it('keeps the exception and known correlation ID if durable identity cannot be read', async () => {
+    const options = cloudAgentSentryOptions(
+      telemetryEnv,
+      'sandbox-control',
+      { sandboxId: 'sandbox_one' },
+      () => {
+        throw new Error('private-storage-failure');
+      }
+    );
+    const sent = await options.beforeSend?.(
+      { type: undefined, exception: { values: [{ value: 'private-exception' }] } },
+      {}
+    );
+    expect(sent?.tags).toEqual({ component: 'sandbox-control', sandboxId: 'sandbox_one' });
+    expect(sent).not.toHaveProperty('user');
+    expect(sent?.exception?.values?.[0]?.value).toBe(
+      'Cloud Agent internal error; inspect correlated logs for details'
+    );
   });
 });
 
@@ -115,13 +153,26 @@ describe('Cloud Agent Worker SDK capture', () => {
       };
       async function report(sessionId: string): Promise<void> {
         const call = sessionId === 'workspace_first' ? first : second;
-        call.started.resolve();
-        await call.release.promise;
-        captureCloudAgentException(new TypeError('private-request-failure'), {
-          operation: handler,
-          sessionId,
-          messageId: `${sessionId}_message`,
-        });
+        try {
+          await withLogTags({ source: handler }, async () => {
+            logger.setTags({
+              userId: call === first ? 'oauth/google:12345' : 'user-second',
+              orgId: call === first ? '(personal)' : 'org-second',
+              sessionId,
+              sandboxId: `${sessionId}_sandbox`,
+              email: 'private-email',
+              prompt: 'private-prompt',
+            });
+            call.started.resolve();
+            await call.release.promise;
+            throw new TypeError('private-request-failure');
+          });
+        } catch (error) {
+          captureCloudAgentException(getTRPCErrorFromUnknown(error), {
+            operation: handler,
+            messageId: `${sessionId}_message`,
+          });
+        }
       }
       const worker = instrumentCloudAgentWorker({
         async fetch(request: Request, _env: Env, _ctx: ExecutionContext) {
@@ -165,7 +216,6 @@ describe('Cloud Agent Worker SDK capture', () => {
       await secondCompletion;
       await Promise.all(second.pending);
       expect(events).toHaveLength(1);
-      expect(events[0]?.contexts?.cloud_agent?.sessionId).toBe('workspace_second');
       first.release.resolve();
       await firstCompletion;
       await Promise.all(first.pending);
@@ -175,13 +225,35 @@ describe('Cloud Agent Worker SDK capture', () => {
           component: 'worker',
           operation: handler,
           sessionId: 'workspace_second',
+          sandboxId: 'workspace_second_sandbox',
           messageId: 'workspace_second_message',
         },
         {
           component: 'worker',
           operation: handler,
           sessionId: 'workspace_first',
+          sandboxId: 'workspace_first_sandbox',
           messageId: 'workspace_first_message',
+        },
+      ]);
+      expect(events.map(event => event.user)).toEqual([
+        { id: 'user-second' },
+        { id: 'oauth/google:12345' },
+      ]);
+      expect(events.map(event => event.tags)).toEqual([
+        {
+          component: 'worker',
+          operation: handler,
+          orgId: 'org-second',
+          sessionId: 'workspace_second',
+          sandboxId: 'workspace_second_sandbox',
+        },
+        {
+          component: 'worker',
+          operation: handler,
+          orgId: '(personal)',
+          sessionId: 'workspace_first',
+          sandboxId: 'workspace_first_sandbox',
         },
       ]);
       expect(events.every(event => event.release === 'worker-version')).toBe(true);
@@ -235,6 +307,12 @@ describe('Cloud Agent Worker SDK capture', () => {
     const { events, options } = memoryOptions();
     const worker = Sentry.withSentry((_env: Env) => options, {
       async fetch(_request: Request, _env: Env, _ctx: ExecutionContext) {
+        Sentry.getCurrentScope().setUser({
+          id: 'private-sdk-user',
+          email: 'private-email',
+          username: 'private-username',
+          ip_address: '203.0.113.14',
+        });
         throw new TypeError('private-prompt-and-token');
       },
     });
@@ -248,11 +326,38 @@ describe('Cloud Agent Worker SDK capture', () => {
     ).rejects.toThrow('private-prompt-and-token');
     await Promise.all(pending);
     expect(events).toHaveLength(1);
+    expect(options.sendDefaultPii).toBe(false);
+    expect(events[0]).not.toHaveProperty('user');
+    expect(events[0]?.tags).not.toHaveProperty('orgId');
     expect(events[0]?.release).toBe('worker-version');
     expect(events[0]?.exception?.values?.[0]?.type).toBe('TypeError');
     expect(events[0]?.exception?.values?.[0]?.stacktrace?.frames?.length).toBeGreaterThan(0);
     expect(JSON.stringify(events)).not.toContain('private-');
+    expect(JSON.stringify(events)).not.toContain('203.0.113.14');
   });
+
+  it.each([
+    ['Network connection lost.', 0],
+    ['Internal defect', 1],
+  ] as const)(
+    'sends %j through the handled and unhandled capture paths only for a server fault',
+    async (message, expectedEvents) => {
+      const { events, options } = memoryOptions();
+      const error = new Error(message);
+      const worker = Sentry.withSentry((_env: Env) => options, {
+        async fetch(_request: Request, _env: Env, _ctx: ExecutionContext) {
+          captureCloudAgentException(error, { operation: 'http' });
+          throw error;
+        },
+      });
+      const { ctx, pending } = executionContext();
+      await expect(
+        worker.fetch(new Request('https://worker.example/trpc/send'), telemetryEnv as Env, ctx)
+      ).rejects.toThrow(message);
+      await Promise.all(pending);
+      expect(events).toHaveLength(expectedEvents);
+    }
+  );
 
   it('captures handled internal failures once and excludes expected tRPC failures', async () => {
     const { events, options } = memoryOptions();
@@ -262,8 +367,14 @@ describe('Cloud Agent Worker SDK capture', () => {
           operation: 'send',
         });
         const error = new Error('private-message');
-        captureCloudAgentException(error, { operation: 'send', sessionId: 'workspace_one' });
-        captureCloudAgentException(error, { operation: 'send', sessionId: 'workspace_one' });
+        const context = {
+          operation: 'send',
+          sessionId: 'workspace_one',
+          userId: 'authenticated-kilo-user',
+          orgId: 'validated-org',
+        };
+        captureCloudAgentException(error, context);
+        captureCloudAgentException(error, context);
         return new Response('Internal error', { status: 500 });
       },
     });
@@ -279,6 +390,8 @@ describe('Cloud Agent Worker SDK capture', () => {
     ).toBe(500);
     await Promise.all(pending);
     expect(events).toHaveLength(1);
+    expect(events[0]?.user).toEqual({ id: 'authenticated-kilo-user' });
+    expect(events[0]?.tags).toMatchObject({ orgId: 'validated-org', sessionId: 'workspace_one' });
     expect(events[0]?.contexts?.cloud_agent).toEqual({
       component: 'worker',
       operation: 'send',

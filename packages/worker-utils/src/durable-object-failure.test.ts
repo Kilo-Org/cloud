@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isTransientDurableObjectFailure,
   isDurableObjectRetryDeadline,
+  isNetworkConnectionLost,
 } from './durable-object-failure.js';
 
 describe('isTransientDurableObjectFailure', () => {
@@ -63,6 +64,38 @@ describe('isTransientDurableObjectFailure', () => {
     expect(
       isTransientDurableObjectFailure('Durable Object is overloaded. Too much data queued.')
     ).toBe(false);
+  });
+});
+
+describe('isNetworkConnectionLost', () => {
+  it('matches the exact platform connection-lost text', () => {
+    expect(isNetworkConnectionLost(new Error('Network connection lost.'))).toBe(true);
+  });
+
+  it('does not match near-miss or application messages', () => {
+    for (const message of [
+      'Network connection lost',
+      'Network connection lost. Retry later.',
+      'network connection lost.',
+      'Session not found',
+    ]) {
+      expect(isNetworkConnectionLost(new Error(message))).toBe(false);
+    }
+  });
+
+  it('does not match other transient platform failures', () => {
+    expect(
+      isNetworkConnectionLost(new Error('Durable Object reset because its code was updated.'))
+    ).toBe(false);
+    expect(isNetworkConnectionLost(Object.assign(new Error('busy'), { retryable: true }))).toBe(
+      false
+    );
+  });
+
+  it('rejects values that are not errors', () => {
+    expect(isNetworkConnectionLost(null)).toBe(false);
+    expect(isNetworkConnectionLost(undefined)).toBe(false);
+    expect(isNetworkConnectionLost('Network connection lost.')).toBe(false);
   });
 });
 

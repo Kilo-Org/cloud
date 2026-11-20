@@ -69,6 +69,7 @@ async function admission(options: {
     audience: 'cloud-agent-next',
     tokenPurpose: options.deviceSessionId === undefined ? 'human-api' : 'device-access',
     credentialExchange: false,
+    env: 'production',
     extra: {
       ...(options.deviceSessionId === undefined
         ? {}
@@ -96,6 +97,7 @@ describe('runtime authorization bindings', () => {
       connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: 'session',
+      environment: 'production',
     });
     expect(created.authorization.bindings.deviceSessionId).toBe(deviceSessionId);
 
@@ -142,6 +144,7 @@ describe('runtime authorization bindings', () => {
         connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: 'session',
+        environment: 'production',
       })
     ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
   });
@@ -161,6 +164,7 @@ describe('runtime authorization bindings', () => {
         connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: 'session',
+        environment: 'production',
       })
     ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
     const [session] = await client.db
@@ -181,6 +185,7 @@ describe('runtime authorization bindings', () => {
       connectionString,
       resourceKind: 'cloud-agent-next',
       resourceId: 'session',
+      environment: 'production',
     });
     expect(created.authorization.bindings).not.toHaveProperty('deviceSessionId');
 

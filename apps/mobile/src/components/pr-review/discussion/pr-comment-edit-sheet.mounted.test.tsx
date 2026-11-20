@@ -11,7 +11,7 @@ import { PrCommentEditSheet } from './pr-comment-edit-sheet';
 import {
   failureCopy,
   mount,
-  pressCancel,
+  pressClose,
   pressSave,
   saveButton,
   saveDisabled,
@@ -127,7 +127,7 @@ describe('PrCommentEditSheet', () => {
   it('asks once before discarding a changed body and dismisses on discard', async () => {
     const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
     typeBody(renderer, 'edited body');
-    pressCancel(renderer);
+    pressClose(renderer);
 
     expect(confirmRequests.at(-1)).toMatchObject({
       confirmLabel: i18n.t('common.discard'),
@@ -144,9 +144,7 @@ describe('PrCommentEditSheet', () => {
     const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
     typeBody(renderer, 'edited body');
 
-    act(() => {
-      (renderer.root.findByType('PrFormSheetHeader').props.onBack as () => void)();
-    });
+    pressClose(renderer);
     expect(confirmRequests).toHaveLength(1);
 
     act(() => {
@@ -157,7 +155,7 @@ describe('PrCommentEditSheet', () => {
 
   it('dismisses an unchanged body without a discard confirm', async () => {
     const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
-    pressCancel(renderer);
+    pressClose(renderer);
 
     expect(confirmRequests).toHaveLength(0);
     expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
@@ -184,7 +182,7 @@ describe('PrCommentEditSheet', () => {
     act(() => {
       (saveButton(renderer).props.onPress as () => void)();
     });
-    pressCancel(renderer);
+    pressClose(renderer);
 
     await act(async () => {
       roundTrip.resolve({ kind: 'accepted' });
@@ -206,7 +204,7 @@ describe('PrCommentEditSheet', () => {
     act(() => {
       (saveButton(renderer).props.onPress as () => void)();
     });
-    pressCancel(renderer);
+    pressClose(renderer);
     act(() => {
       (saveButton(renderer).props.onPress as () => void)();
     });
@@ -216,7 +214,7 @@ describe('PrCommentEditSheet', () => {
       await Promise.resolve();
     });
     expect(confirmRequests).toHaveLength(1);
-    pressCancel(renderer);
+    pressClose(renderer);
     expect(confirmRequests).toHaveLength(2);
 
     await act(async () => {
@@ -226,7 +224,7 @@ describe('PrCommentEditSheet', () => {
     expect(updateComment.mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('leaves Cancel live while the pre-submit Terms read is stalled', async () => {
+  it('leaves Close live while the pre-submit Terms read is stalled', async () => {
     const roundTrip = Promise.withResolvers<{ kind: string }>();
     gate.ensureTermsAcceptedOutcome.mockReturnValueOnce(roundTrip.promise);
     const renderer = await mount(createElement(PrCommentEditSheet, baseProps));
@@ -237,8 +235,8 @@ describe('PrCommentEditSheet', () => {
     });
     expect(saveDisabled(renderer)).toBe(true);
 
-    // The sheet owns no Cancel lock for the gate: the user can still leave.
-    pressCancel(renderer);
+    // The sheet owns no Close lock for the gate: the user can still leave.
+    pressClose(renderer);
     expect(confirmRequests.at(-1)?.confirmLabel).toBe(i18n.t('common.discard'));
 
     roundTrip.resolve({ kind: 'dismissed' });

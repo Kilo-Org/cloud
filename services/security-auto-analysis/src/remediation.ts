@@ -46,6 +46,7 @@ import {
   type SecurityRemediationAdmissionRejectionReason,
   type SecurityRemediationOrigin,
 } from '@kilocode/worker-utils/security-remediation-policy';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { and, asc, desc, eq, inArray, isNull, isNotNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -1351,7 +1352,7 @@ async function launchAttempt(params: {
   const authToken = await generateControlToken(
     params.actor,
     nextAuthSecret,
-    params.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+    resolveRuntimeEnvironment(params.env.ENVIRONMENT),
     params.env.SHARED_RESOURCE_TOKENS_ENABLED,
     params.owner.type === 'org' ? params.owner.id : undefined
   );
@@ -2767,7 +2768,7 @@ export async function cancelRemediation(params: {
     const authToken = await generateControlToken(
       actor,
       nextAuthSecret,
-      params.env.ENVIRONMENT,
+      resolveRuntimeEnvironment(params.env.ENVIRONMENT),
       params.env.SHARED_RESOURCE_TOKENS_ENABLED,
       owner.type === 'org' ? owner.id : undefined
     );

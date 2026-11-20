@@ -9,7 +9,11 @@ import type { SandboxSessionV2 } from '../../src/control-plane/session/session-d
 import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
 import { logger } from '../../src/logger.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import { createMessageId } from '../../src/session/message-id.js';
+import type {
+  ControlPlaneEvent,
+  ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { waitFor } from './wait-for.js';
@@ -120,13 +124,15 @@ async function readAlarm(stub: DurableObjectStub<SandboxSessionV2>): Promise<num
 
 async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   sessionId: string;
+  kiloSessionId: string;
   stub: DurableObjectStub<SandboxSessionV2>;
   peer: FakeSandboxPeer;
 }> {
   const sessionId = newSessionId();
+  const sessionKiloSessionId = kiloSessionId();
   const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}`;
   const stub = sessions.getByName(sessionId);
-  const sessionMetadata = metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId });
+  const sessionMetadata = metadata({ sessionId, kiloSessionId: sessionKiloSessionId, sandboxId });
   sessionMetadata.callback = { target: { url: callbackUrl } };
   await stub.registerSessionFromMetadata({
     metadata: sessionMetadata,
@@ -135,7 +141,7 @@ async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   const peer = new FakeSandboxPeer();
   peer.prepareView = peer.view('ready');
   await installPeer(stub, peer);
-  return { sessionId, stub, peer };
+  return { sessionId, kiloSessionId: sessionKiloSessionId, stub, peer };
 }
 
 afterEach(async () => {
@@ -224,6 +230,64 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect(peer.deliverCalls).toHaveLength(0);
     expect(captured.reports).toHaveLength(1);
     expect(captured.reports[0]?.run).toMatchObject({ status: 'failed', container });
+  });
+
+  it('logs a bounded reason when a preparing route becomes unknown', async () => {
+    const { stub, peer } = await setup();
+    const attemptId = peer.attemptId;
+    peer.prepareView = { state: 'preparing', attemptId };
+    await runInDurableObject(stub, async instance => {
+      const fields = vi.spyOn(logger, 'withFields');
+      try {
+        await instance.send(promptPayload('m1'));
+        await instance.onRoute({ state: 'unknown' });
+        expect(
+          fields.mock.calls
+            .map(([record]) => record)
+            .filter(
+              record =>
+                record.diagnosticEvent === 'session_startup_finished' &&
+                record.attemptId === attemptId
+            )
+        ).toEqual([
+          expect.objectContaining({ outcome: 'failed', reason: 'preparation_incomplete' }),
+        ]);
+      } finally {
+        fields.mockRestore();
+      }
+    });
+  });
+
+  it('logs one startup outcome for an immediate failure without a preparation row', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'byoc_credential_missing',
+    };
+    await runInDurableObject(stub, async instance => {
+      const fields = vi.spyOn(logger, 'withFields');
+      try {
+        await instance.send(promptPayload('m1'));
+        await instance.onRoute(peer.prepareView);
+        const startups = fields.mock.calls
+          .map(([record]) => record)
+          .filter(record => record.diagnosticEvent === 'session_startup_finished');
+        expect(startups).toEqual([
+          expect.objectContaining({
+            sessionId,
+            attemptId: peer.attemptId,
+            outcome: 'failed',
+            reason: 'byoc_credential_missing',
+            durationMs: expect.any(Number),
+          }),
+        ]);
+        expect(startups[0]).not.toHaveProperty('preparationMs');
+      } finally {
+        fields.mockRestore();
+      }
+    });
+    expect(await messageStatus(stub, 'm1')).toBe('failed');
   });
 
   it('captures a new immediate preparation failure after a previously failed attempt', async () => {
@@ -756,6 +820,67 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect(callbacks).toHaveLength(1);
   });
 
+  it('reports the last assistant message of the turn after a mid-turn synthetic message', async () => {
+    const { sessionId, kiloSessionId, stub } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const promptId = createMessageId();
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const conversationMessage = (
+      message: Record<string, unknown>,
+      parentID?: string
+    ): ControlPlaneEvent => ({
+      type: 'conversation.message.updated',
+      properties: {
+        sessionID: kiloSessionId,
+        source,
+        message,
+        ...(parentID === undefined ? {} : { parentID }),
+      },
+    });
+    const assistant = (id: string, text: string, parentID: string) =>
+      conversationMessage(
+        {
+          id,
+          type: 'assistant',
+          time: { created: 2, completed: 3 },
+          content: [{ type: 'text', text }],
+        },
+        parentID
+      );
+
+    await stub.send(promptPayload(promptId));
+    await waitFor(async () => expect(await messageStatus(stub, promptId)).toBe('running'));
+    await stub.onEvents({
+      events: [
+        conversationMessage({ id: promptId, type: 'user', time: { created: 1 }, text: 'hello' }),
+        assistant('msg_assistant_early', 'Start Docker in the background.', promptId),
+        conversationMessage({
+          id: 'msg_synthetic',
+          type: 'synthetic',
+          time: { created: 2 },
+          text: 'Background task finished.',
+        }),
+        assistant('msg_assistant_final', 'Final answer', 'msg_synthetic'),
+      ],
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: promptId });
+    await flush(stub);
+
+    expect(captured.callbacks).toHaveLength(1);
+    expect(captured.callbacks[0]?.payload).toMatchObject({
+      messageId: promptId,
+      status: 'completed',
+      lastAssistantMessageText: 'Final answer',
+    });
+  });
+
   it('attributes initial and follow-up turns to the runtime harness the connected wrapper reported', async () => {
     const { sessionId, stub, peer } = await setup();
     const captured = await installCapturedQueues(stub);
@@ -787,9 +912,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
         await running('follow-up');
         await instance.onOutcome({ sessionId, status: 'completed', lastMessageId: 'follow-up' });
         await instance.alarm();
-        return withFields.mock.calls
-          .map(call => call[0] as Record<string, unknown>)
-          .filter(fields => fields.diagnosticEvent === 'session_message_committed');
+        return withFields.mock.calls.map(call => call[0] as Record<string, unknown>);
       } finally {
         withFields.mockRestore();
         info.mockRestore();
@@ -803,9 +926,27 @@ describe('SandboxSessionV2 reports and callbacks', () => {
         captured.reports.find(report => report.run.messageId === messageId)?.run
       ).toMatchObject({ status: 'completed', container: connected });
       expect(committed).toContainEqual(
-        expect.objectContaining({ messageId, toState: 'completed', runtimeHarness: 'kilo2' })
+        expect.objectContaining({
+          diagnosticEvent: 'session_message_committed',
+          messageId,
+          toState: 'completed',
+          runtimeHarness: 'kilo2',
+        })
       );
     }
+    expect(
+      committed.filter(fields => fields.diagnosticEvent === 'session_startup_finished')
+    ).toEqual([
+      expect.objectContaining({
+        sessionId,
+        attemptId: peer.attemptId,
+        allocationId: connected.allocationId,
+        provider: connected.provider,
+        outcome: 'ready',
+        durationMs: expect.any(Number),
+        preparationMs: expect.any(Number),
+      }),
+    ]);
   });
 
   it('emits the session_message_committed diagnostic for accepted and terminal transitions', async () => {

@@ -1,4 +1,5 @@
 import { billingFailureFromAdmission } from '../billing-failure.js';
+import { ContainerUsageAdmissionError } from '@kilocode/container-usage';
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import {
@@ -107,6 +108,9 @@ export function createCloudflareContainersProviderAdapter(deps: {
       };
     }
     if (!admission.success) {
+      if (admission.code === 'container_limit_reached') {
+        throw new ContainerUsageAdmissionError(admission.code, admission.message);
+      }
       throw new ProviderCreationError(
         admission.code,
         admission.code === 'invalid_configuration'

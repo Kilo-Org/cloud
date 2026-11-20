@@ -11,6 +11,8 @@
  * path stays off, exactly as it did under the pre-1.4/2.3 packages, and the
  * later linkedom global patch-up in the test cannot re-enable it.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 if (typeof globalThis.HTMLFormElement === 'undefined') {
   Object.defineProperty(globalThis, 'HTMLFormElement', {
     value: class HTMLFormElement {
@@ -40,4 +42,16 @@ if (typeof globalThis.getComputedStyle === 'undefined') {
     // global between tests, so it must stay writable.
     writable: true,
   });
+}
+
+/**
+ * Next's server runtime reads `globalThis.AsyncLocalStorage` when it builds
+ * the request async stores and caches the store on `globalThis` under a
+ * versioned symbol. A store module that loads before this global is set
+ * caches a fake store whose `run` throws, and a later assignment cannot
+ * repair the cached fake. The node runtime has the real class, so install
+ * it here, before any test module's import chain reaches `next/server`.
+ */
+if (typeof globalThis.AsyncLocalStorage === 'undefined') {
+  globalThis.AsyncLocalStorage = AsyncLocalStorage;
 }

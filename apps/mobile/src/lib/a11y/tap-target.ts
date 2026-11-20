@@ -415,6 +415,15 @@ export const CHIP_HIT_SLOP = {
 } as const;
 
 /**
+ * Per-side vertical `hitSlop` of a transcript part row (`FixedPartRow`): its
+ * `py-2` frame around one `text-sm` line measures 31.6 dp on Android, and
+ * `31.6 + 7 + 7 = 45.6 dp` clears `DESIGN.md:364`'s 44pt target without making
+ * every tool row in a transcript taller. Vertical only: the row already spans
+ * the bubble's width.
+ */
+export const PART_ROW_HIT_SLOP = { top: 7, bottom: 7 } as const;
+
+/**
  * The box the credits screen's failed-balance retry renders, in dp. The box is
  * the touch target on its own node, as `DESIGN.md:364` measures: 46dp is past
  * the 44pt floor even after Android truncates the fractional layout to whole

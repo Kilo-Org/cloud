@@ -101,6 +101,15 @@ function findByTestID(
   return root.findAll(node => node.props.testID === testID);
 }
 
+/** The nearest host element above `node`: the native view it renders inside. */
+function hostParent(node: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance | null {
+  let parent = node.parent;
+  while (parent && typeof parent.type !== 'string') {
+    parent = parent.parent;
+  }
+  return parent;
+}
+
 function sheet(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   const found = findByType(root, 'BottomSheet');
   if (!found[0]) {
@@ -154,7 +163,7 @@ describe('SessionPageSheet mounted', () => {
     });
     const surfaces = findByType(renderer.root, 'StateSurface');
     expect(surfaces).toHaveLength(1);
-    expect(surfaces[0]?.parent).toBe(sheet(renderer.root));
+    expect(surfaces[0] && hostParent(surfaces[0])).toBe(sheet(renderer.root));
     expect(surfaces[0]?.props.className).toBe('flex-1 bg-background');
     expect(findByType(renderer.root, 'SheetHeader')[0]?.parent).toBe(surfaces[0]);
     expect(findByType(renderer.root, 'View')).toHaveLength(0);

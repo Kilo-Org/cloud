@@ -15,6 +15,7 @@ import { type RowEllipsizeMode } from '@/components/ui/row-value';
 import { renderRowTrailing, type RowTrailingSpec } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { ROW_FRAME_CONTENT_PRESS_CLASS } from '@/lib/a11y/tap-target';
+import { useIsLargeFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { NEUTRAL_TINT, type Tint } from '@/lib/agent-color';
 import { cn } from '@/lib/utils';
 
@@ -76,8 +77,8 @@ type RowFrameProps = Readonly<{
    * `content` presses only the leading cell and the text, so a trailing control
    * (a switch) owns its own touch and its own accessible node. A `content` press
    * is hidden from assistive technology unless `contentAccessibilityLabel`
-   * names it, because a preference row's trailing switch already carries the
-   * row's name.
+   * names it, so without that label the trailing control must carry the row's
+   * name itself (a preference row passes its title to the switch).
    */
   pressTarget?: 'row' | 'content';
   /**
@@ -159,6 +160,11 @@ export function RowFrame({
   stack = false,
   className,
 }: RowFrameProps) {
+  // The title keeps one line at the default scales. At a large font scale a
+  // name that no longer fits wraps to a second line instead of losing its
+  // tail: the largest Android font cut profile names such as "Design gate
+  // setup commands (at the cap)" even on a stacked row with the full width.
+  const titleLines = useIsLargeFontScale() ? 2 : 1;
   const leadingNode =
     leading ??
     (icon === undefined && iconContent === undefined ? null : (
@@ -173,7 +179,7 @@ export function RowFrame({
     if (title !== undefined) {
       const titleText = (
         <Text
-          numberOfLines={1}
+          numberOfLines={titleLines}
           ellipsizeMode="tail"
           className={cn(
             TITLE_CLASS,
@@ -227,10 +233,17 @@ export function RowFrame({
     // label (a preference row). A content press that opens a surface of its own
     // is named instead, so a reader reaches both controls.
     const contentOwnsName = contentAccessibilityLabel !== undefined;
+    // A label-only press leaves the accessibility tree on both platforms, and
+    // `focusable={false}` drops the native click listener `Pressable` installs by
+    // default: without it Android keeps a clickable, role-less node beside the
+    // switch (a second focus stop for a keyboard, and for any reader that
+    // includes views marked unimportant). The touch still reaches `onPress`.
     const contentProps = {
       onPress,
       disabled,
       accessible: contentOwnsName,
+      focusable: contentOwnsName,
+      accessibilityElementsHidden: !contentOwnsName,
       importantForAccessibility: contentOwnsName
         ? ('yes' as const)
         : ('no-hide-descendants' as const),

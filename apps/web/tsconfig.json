@@ -49,6 +49,10 @@
     // `pnpm --filter @kilocode/web-shared typecheck` covers the whole package.
     "../../packages/web-shared/src/types/*.d.ts",
     "tests/**/*",
+    // Next adds these two globs to `include` on every dev, build and typegen
+    // run. `exclude` drops them from the program; the generated
+    // `next-env.d.ts` imports `.next/types`, so the route types still join
+    // the program.
     ".next/types/**/*.ts",
     "jest.config.ts",
     "knip.ts",

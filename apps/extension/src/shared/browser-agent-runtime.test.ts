@@ -3,7 +3,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createBrowserTabGroupController } from './browser-tab-groups';
-import type { BrowserTabGroupController } from './browser-tab-groups';
+import type {
+  BrowserTabGroupController,
+  BrowserTabGroupPersistence,
+  PersistedTabGroupSession,
+} from './browser-tab-groups';
 import { createTabLeaseRegistry } from './browser-tab-leases';
 import type { TabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
@@ -658,6 +662,30 @@ describe('agent browser calls', () => {
       to: 'https://accounts.example.org',
     });
     expect(originChangedResultOf(outcome)).toBeDefined();
+  });
+
+  it('completes a redirect that lands on an origin the call was granted', async () => {
+    const { cdp, runtime } = await createHarness();
+    const destination = 'https://other.example.com';
+
+    cdp.setFrameUrl('https://accounts.example.org/login');
+
+    const outcome = await runtime.runTool({
+      agent: {
+        authorized: [
+          readGrant,
+          actGrant,
+          { class: 'navigate', origin: destination },
+          { class: 'read', origin: 'https://accounts.example.org' },
+        ],
+      },
+      arguments: { url: `${destination}/home` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    expect(outcome.kind).toBe('result');
   });
 
   it('needs a step token for a password field and accepts the retry that carries it', async () => {
@@ -2381,6 +2409,7 @@ describe('agent browser calls', () => {
           arguments: {},
           caller: panel(),
           tabId: TAB_ID,
+          takeOver: true,
           toolName: 'browser_snapshot',
         }),
         0
@@ -2394,6 +2423,12 @@ describe('agent browser calls', () => {
       await vi.advanceTimersByTimeAsync(0);
 
       expect(downloads.cancelled).toStrictEqual([141]);
+
+      // The session's first call after the take-over re-reads the page; the report waits for the call after it.
+      await expect(runTimed(shot(), 0)).resolves.toStrictEqual({
+        kind: 'result',
+        result: { error: TAB_TAKEN_ERROR, ok: false },
+      });
 
       const reported = await runTimed(shot(), 0);
 
@@ -4037,6 +4072,7 @@ describe('agent browser calls', () => {
       arguments: { function: '() => 1' },
       caller: panel(),
       tabId: fixture.newTab,
+      takeOver: true,
       toolName: 'browser_evaluate',
     });
 
@@ -4134,6 +4170,7 @@ describe('agent browser calls', () => {
         arguments: {},
         caller: panel(),
         tabId: fixture.newTab,
+        takeOver: true,
         toolName: 'browser_snapshot',
       });
 
@@ -4839,10 +4876,8 @@ describe('agent browser calls', () => {
     let announced = 0;
 
     for (const sessionHandle of ['session-1', 'session-2']) {
-      // eslint-disable-next-line no-await-in-loop -- one session per share, in order
+      // eslint-disable-next-line no-await-in-loop -- one session per open, in order
       await runtime.openSession({ controllerId: 'controller-1', sessionHandle, title: 'Work' });
-      // eslint-disable-next-line no-await-in-loop -- see above
-      await runtime.shareActiveTab({ sessionHandle, tabId: TAB_ID });
     }
 
     cdp.setHandlers({
@@ -4860,6 +4895,9 @@ describe('agent browser calls', () => {
 
     const click = async (sessionHandle: string, sensitive: readonly string[] = []) => {
       const caller = { controllerId: 'controller-1', kind: 'agent' as const, sessionHandle };
+
+      // A tab sits in one session's group at a time: the calling session shares it into its own group first.
+      await runtime.shareActiveTab({ sessionHandle, tabId: TAB_ID });
 
       try {
         return await runtime.runTool({
@@ -5250,6 +5288,7 @@ describe('agent browser calls', () => {
       arguments: {},
       caller: { conversationId: 'conversation-a', kind: 'panel', panelId: 'panel-1' },
       tabId: 88,
+      takeOver: true,
       toolName: 'browser_snapshot',
     });
 
@@ -5291,6 +5330,7 @@ describe('agent browser calls', () => {
 
     await expect(runtime.shareActiveTab({ sessionHandle: 'session-1' })).resolves.toStrictEqual({
       groupId: 42,
+      kind: 'shared',
       tabId: TAB_ID,
     });
 
@@ -5387,6 +5427,108 @@ describe('agent browser calls', () => {
     ).resolves.toMatchObject({ kind: 'result', result: { ok: false } });
   });
 
+  it('serves a session from a restarted worker on the tab its group had', async () => {
+    // `storage.session` as both workers share it.
+    const store: { sessions?: PersistedTabGroupSession[] } = {};
+    const persistence: BrowserTabGroupPersistence = {
+      read: async () => store.sessions,
+      write: async sessions => {
+        store.sessions = [...sessions];
+      },
+    };
+    const groupsOfWorker = () =>
+      createBrowserTabGroupController({
+        api: { tabQuery: async () => [{ active: true, id: TAB_ID }] },
+        persistence,
+      });
+    const before = await createHarness({ share: false, tabGroups: groupsOfWorker() });
+    const first = createRuntimeBrowserBridge({ runtime: () => before.runtime });
+
+    await first.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await first.shareActiveTab({ controllerId: 'controller-1', sessionHandle: 'session-1' });
+    await vi.waitFor(() => {
+      expect(store.sessions?.[0]?.tabs).toStrictEqual([TAB_ID]);
+    });
+
+    // The worker stops: nothing in memory survives, storage.session does.
+    const after = await createHarness({ share: false, tabGroups: groupsOfWorker() });
+    const second = createRuntimeBrowserBridge({ runtime: () => after.runtime });
+    const snapshot = await second.callTool('controller-1', {
+      arguments: {},
+      authorized: [readGrant],
+      name: 'browser_snapshot',
+      sessionHandle: 'session-1',
+    });
+
+    expect(snapshot).toMatchObject({ content: [{ type: 'text' }] });
+    expect(after.runtime.listSessions()).toStrictEqual([
+      { ended: false, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ]);
+  });
+
+  it('restores a session without the tab that closed while no worker ran', async () => {
+    const stored: PersistedTabGroupSession[] = [
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID, 99], title: 'Work' },
+    ];
+    const tab: BrowserTabInfo = { id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` };
+    const { runtime } = await createHarness({
+      share: false,
+      tabGroups: createBrowserTabGroupController({
+        api: {},
+        persistence: { read: async () => stored, write: async () => {} },
+      }),
+      tabsApi: {
+        get: async tabId => {
+          if (tabId !== TAB_ID) {
+            throw new Error(`No tab with id: ${tabId}.`);
+          }
+
+          return tab;
+        },
+        query: async () => [tab],
+      },
+    });
+
+    await runtime.restoreSessions();
+
+    expect(runtime.listSessions()).toStrictEqual([
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ]);
+  });
+
+  it('reads the stored sessions again after a failed read', async () => {
+    const stored: PersistedTabGroupSession[] = [
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ];
+    let readable = false;
+    const tab: BrowserTabInfo = { id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` };
+    const { runtime } = await createHarness({
+      share: false,
+      tabGroups: createBrowserTabGroupController({
+        api: {},
+        persistence: {
+          read: () =>
+            readable ? Promise.resolve(stored) : Promise.reject(new Error('storage busy')),
+          write: async () => {},
+        },
+      }),
+      tabsApi: { get: async () => tab, query: async () => [tab] },
+    });
+
+    await runtime.restoreSessions();
+    expect(runtime.listSessions()).toStrictEqual([]);
+
+    readable = true;
+    await runtime.restoreSessions();
+    expect(runtime.listSessions()).toStrictEqual([
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ]);
+  });
+
   it('drops console entries whose source is a withheld frame origin', async () => {
     const { cdp, runtime } = await createHarness();
 
@@ -5456,7 +5598,7 @@ describe('agent browser calls', () => {
   });
 
   it('keeps the panel caller unfiltered: its snapshot includes the iframe content', async () => {
-    const { runtime } = await createHarness();
+    const { runtime } = await createHarness({ share: false });
 
     const outcome = await runtime.runTool({
       arguments: {},

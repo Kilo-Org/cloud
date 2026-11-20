@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { SignJWT, decodeProtectedHeader } from 'jose';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import {
   kiloTokenPayload,
   KILO_TOKEN_VERSION,
@@ -222,6 +223,25 @@ describe('signKiloToken', () => {
       runtimeAuthorization: { ...claim, extraKey: true },
     });
     await expect(verifyKiloToken(widened, SECRET)).rejects.toThrow();
+  });
+
+  it.each(ORGANIZATION_ROLES)('round-trips the %s organization role', async role => {
+    const { token } = await signKiloToken({
+      userId: 'user-roles',
+      pepper: 'pepper-roles',
+      secret: SECRET,
+      expiresInSeconds: 60,
+      extra: {
+        organizationId: 'org-roles',
+        organizationRole: role,
+        orgMemberships: [{ orgId: 'org-roles', role }],
+      },
+    });
+
+    const payload = await verifyKiloToken(token, SECRET);
+
+    expect(payload.organizationRole).toBe(role);
+    expect(payload.orgMemberships?.[0]?.role).toBe(role);
   });
 });
 

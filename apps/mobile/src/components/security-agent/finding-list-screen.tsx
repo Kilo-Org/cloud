@@ -40,6 +40,7 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { isSecurityFindingAnalyzable, type SecurityFinding } from '@/lib/security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type FindingListScreenProps = {
   scope: string;
@@ -84,6 +85,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { t } = useTranslation();
   // Filters live in this route's params: the sheet is pushed with them and
   // writes them back on apply, so the URL, the visible list and the sheet's
@@ -209,7 +211,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       ) : null}
 
       {body.status === 'loading' && (
-        <View style={listStyle}>
+        <View style={[listStyle, sideInsetMarginStyle]}>
           <View style={listContentContainerStyle}>
             {/* The loaded list's `ListHeaderComponent` band, so the first row
                 lands where the first placeholder row stood. */}
@@ -259,7 +261,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
 
       {body.status === 'rows' && (
         <FlashList<SecurityFinding>
-          style={listStyle}
+          style={[listStyle, sideInsetMarginStyle]}
           data={items}
           keyExtractor={item => item.id}
           renderItem={renderItem}

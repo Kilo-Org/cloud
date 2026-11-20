@@ -414,6 +414,9 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   if (request.body.reasoning?.enabled === true) {
     return false;
   }
+  if (request.body.reasoning?.enabled === false) {
+    return true;
+  }
   return (
     (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none' ||
     request.body.enable_thinking === false || // Alibaba

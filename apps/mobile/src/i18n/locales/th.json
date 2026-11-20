@@ -19,7 +19,9 @@
     "presenceStatus": "โฮสต์: {{connection}}",
     "commandStatus": "การส่งคำสั่ง: {{status}}",
     "delivered": "ส่งถึงแล้ว",
-    "expired": "หมดอายุแล้ว"
+    "expired": "หมดอายุแล้ว",
+    "recoveryGaps_one": "ส่วน {{displayCount}} ของบันทึกนี้หายไป",
+    "recoveryGaps_other": "ส่วน {{displayCount}} ของบันทึกนี้หายไป"
   },
   "common": {
     "manageOnWeb": "จัดการบนเว็บ",
@@ -172,6 +174,7 @@
     "generating": "กำลังสร้าง…",
     "working": "กำลังทำงาน",
     "yourOwnRepositories": "คลังโค้ดของคุณเอง",
+    "organizationRepositories": "คลังโค้ดขององค์กร",
     "dismissed": "ละเว้นแล้ว",
     "agent": "เอเจนต์",
     "durationMinuteShort": "น.",
@@ -962,6 +965,8 @@
       "pendingComment": "ความคิดเห็นที่รอส่ง",
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_one": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_other": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitReview": "ส่งรีวิว",
       "partialPostedFresh": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
       "partialPostedFresh_one": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
@@ -1026,7 +1031,10 @@
     "tabs": {
       "overview": "ภาพรวม",
       "files": "ไฟล์",
-      "discussion": "การสนทนา"
+      "discussion": "การสนทนา",
+      "discussionAccessibility_one": "{{title}}: ความคิดเห็น 1 รายการ",
+      "discussionAccessibility": "{{title}}: ความคิดเห็น {{displayCount}} รายการ",
+      "discussionAccessibility_other": "{{title}}: ความคิดเห็น {{displayCount}} รายการ"
     },
     "fileStatus": {
       "modified": "แก้ไขแล้ว",
@@ -1223,7 +1231,7 @@
     },
     "instructions": {
       "title": "คำแนะนำที่กำหนดเอง",
-      "deprecation": "คำแนะนำที่กำหนดเองจะเลิกใช้งานในอนาคต ย้ายคำแนะนำเหล่านี้ไปไว้ในไฟล์ REVIEW.md ในคลังโค้ดแทน",
+      "deprecation": "คำแนะนำที่กำหนดเองจะถูกนำออก ย้ายคำแนะนำเหล่านี้ไปไว้ในไฟล์ REVIEW.md ในคลังโค้ดแทน",
       "placeholder": "เช่น ตรวจให้เป็นไปตามแนวทางการจัดการข้อผิดพลาดของเรา…",
       "clearTitle": "ลบคำแนะนำที่กำหนดเองหรือไม่",
       "clearMessage": "การบันทึกช่องที่ว่างเปล่าจะลบคำแนะนำที่กำหนดเองที่จัดเก็บไว้สำหรับตัวตรวจสอบนี้ออก"
@@ -1383,12 +1391,17 @@
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้"
+      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
+      "notConnectedReadOnlyPlan": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้ว เจ้าของจึงต้องอัปเดตการเรียกเก็บเงินที่ kilo.ai"
     },
     "bitbucketConnect": {
       "managedOnWeb": "การเชื่อมต่อ Bitbucket ของ {{organization}} ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
+      "managedOnWebTitle": "จัดการบนเว็บ",
+      "managedOnWebShort": "การเชื่อมต่อนี้ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
+      "managedOnWebRepositories": "เลือกที่เก็บสำหรับ {{organization}} บนเว็บจากคอมพิวเตอร์",
       "description": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานสำหรับ {{organization}} แล้ววางโทเค็นด้านล่าง",
       "descriptionReconnect": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานใหม่สำหรับ {{organization}} แล้ววางโทเค็นด้านล่าง",
+      "descriptionOverview": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานสำหรับ {{organization}} แล้ววางโทเค็นในหน้าจอถัดไป",
       "scopes": "บัญชี: อ่าน · คลังโค้ด: อ่าน/เขียน · PR: อ่าน · เว็บฮุก: อ่าน/เขียน",
       "tokenPlaceholder": "โทเค็นการเข้าถึงพื้นที่ทำงาน",
       "tokenRefused": "Bitbucket ไม่ยอมรับโทเค็นการเข้าถึงพื้นที่ทำงานนี้ ตรวจสอบว่ามีขอบเขตสิทธิ์ด้านบน แล้วลองอีกครั้ง"
@@ -1409,6 +1422,7 @@
     "platformList": {
       "checking": "กำลังตรวจสอบ…",
       "statusUnavailable": "ไม่สามารถดูสถานะได้",
+      "needsAttention": "ต้องดำเนินการ",
       "platforms": "แพลตฟอร์ม",
       "activity": "กิจกรรม"
     },
@@ -2779,6 +2793,8 @@
     "modelPicker": {
       "title": "เลือกโมเดล",
       "noModelsDescription": "ไม่มีโมเดลให้เลือก",
+      "allUnavailableTitle": "ไม่มีโมเดลใดใช้งานได้",
+      "allUnavailableDescription": "เพิ่มคีย์ผู้ให้บริการ แล้วลองอีกครั้ง",
       "favorites": "รายการโปรด"
     },
     "modelSelector": {
@@ -3183,6 +3199,8 @@
     "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
     "endedOn": "สิ้นสุดวันที่ {{date}}",
     "notAvailableInApp": "Kilo Pass ไม่พร้อมใช้งานในแอป",
+    "notAvailableTitle": "ไม่มี Kilo Pass ในแอป",
+    "noPassDescription": "บัญชีนี้ไม่มี Kilo Pass",
     "statusActive": "ใช้งานอยู่",
     "statusTrialing": "ช่วงทดลองใช้",
     "statusPastDue": "การชำระเงินเกินกำหนด",
@@ -3465,7 +3483,7 @@
       "retentionLimit": "กำลังแสดงใบแจ้งหนี้ล่าสุด"
     },
     "lowBalanceAlert": {
-      "enableA11y": "เปิดใช้การแจ้งเตือนยอดคงเหลือต่ำ",
+      "subtitle": "ส่งการแจ้งเตือนทางอีเมลไปยังที่อยู่ที่คุณระบุเมื่อยอดคงเหลือขององค์กรนี้ต่ำกว่าจำนวนที่คุณตั้งไว้",
       "notifyEmailsLabel": "อีเมลสำหรับการแจ้งเตือน",
       "permissionDenied": "คุณไม่มีสิทธิ์จัดการการแจ้งเตือนการเรียกเก็บเงิน",
       "separateEmailsHint": "หากมีหลายอีเมล ให้คั่นด้วยเครื่องหมายจุลภาค",
@@ -3610,10 +3628,9 @@
     },
     "hub": {
       "renameTitle": "เปลี่ยนชื่อองค์กร",
-      "renamePlaceholder": "ชื่อองค์กร",
+      "renamePlaceholder": "กรอกชื่อองค์กร",
       "balance": "ยอดคงเหลือ",
-      "organizationSeats": "สิทธิ์ใช้งานขององค์กร",
-      "plan": "แผนขององค์กร",
+      "plan": "แผน",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · สิ้นสุดลงแล้ว",
@@ -3647,7 +3664,8 @@
     "signupStepUp": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ใช้ '$t(login.moreSignInOptions)'",
     "signupStepUpApple": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ใช้ '$t(login.signInWithApple)'",
     "signupStepUpGoogle": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ใช้ '$t(login.signInWithGoogle)'",
-    "invalidCode": "รหัสนั้นไม่ถูกต้อง โปรดลองอีกครั้ง",
+    "signupStepUpBack": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ย้อนกลับไปแล้วใช้ '$t(login.moreSignInOptions)'.",
+    "invalidCode": "รหัสนั้นไม่ถูกต้องหรือหมดอายุแล้ว โปรดลองอีกครั้งหรือใช้ '$t(login.resendCode)'.",
     "codeInProgress": "กำลังประมวลผลรหัสของคุณ รอสักครู่แล้วลองอีกครั้ง",
     "tooManyAttempts": "ลองหลายครั้งเกินไป โปรดขอรหัสใหม่",
     "invalidToken": "เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง",
@@ -3916,6 +3934,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) จะส่งคำขออนุมานสั้น ๆ ไปยังปลายทางนี้โดยใช้โพรโทคอลและโมเดลที่เลือก ผู้ให้บริการอาจเรียกเก็บค่าบริการ",
       "connectionSucceeded": "โมเดลประมวลผลคำขอผ่านโพรโทคอลนี้สำเร็จ",
       "connectionFailed": "โมเดลไม่สามารถประมวลผลคำขอได้ ตรวจสอบ URL หลักของ API โพรโทคอล ข้อมูลรับรอง และรหัสโมเดล",
+      "requestTimedOut": "ปลายทางไม่ตอบกลับภายในเวลา ตรวจสอบ URL หลักของ API และการเชื่อมต่อของคุณ แล้วลองอีกครั้ง",
+      "requestUnauthorized": "ปลายทางปฏิเสธข้อมูลรับรอง ตรวจสอบคีย์ API และส่วนหัวที่กำหนดเอง แล้วลองอีกครั้ง",
+      "requestNotFound": "ไม่พบปลายทางหรือโมเดล ตรวจสอบ URL หลักของ API และรหัสโมเดล",
+      "requestRateLimited": "ปลายทางกำลังจำกัดคำขอ รอสักครู่แล้วลองอีกครั้ง",
+      "requestUnavailable": "ปลายทางไม่พร้อมใช้งานในขณะนี้ ลองอีกครั้งในอีกสักครู่",
+      "requestUnreachable": "ไม่สามารถเข้าถึงปลายทางได้ ตรวจสอบ URL หลักของ API และการเชื่อมต่อของคุณ",
+      "requestInvalidResponse": "ปลายทางตอบกลับในรูปแบบที่ไม่ใช่รูปแบบที่คาดไว้ ตรวจสอบว่า URL หลักของ API และโพรโทคอลตรงกับเซิร์ฟเวอร์ แล้วลองอีกครั้ง",
+      "discoveryNoModels": "ปลายทางไม่ได้แสดงรายการโมเดลใดเลย ป้อนโมเดลด้วยตนเอง",
+      "connectionIncomplete": "โมเดลตอบกลับแต่ไม่ได้ทำจนเสร็จ ลองอีกครั้ง หรือตรวจสอบรหัสโมเดลและโพรโทคอล",
       "invalidInput": "ป้อนชื่อแบ็กเอนด์ ส่วนหัวที่ถูกต้อง และโมเดลอย่างน้อยหนึ่งรายการ โดยแต่ละโมเดลต้องมีรหัสและชื่อที่ไม่ซ้ำกัน ขีดจำกัดโทเค็นต้องเป็นจำนวนเต็มบวก",
       "invalidUrl": "ป้อน URL หลักของ API ที่ใช้ HTTP หรือ HTTPS โดยไม่ใส่ข้อมูลรับรอง พารามิเตอร์การค้นหา หรือส่วนระบุย่อย",
       "publicHttp": "ไม่อนุญาตให้ใช้ปลายทาง HTTP สาธารณะ ให้ใช้ HTTPS หรือปลายทางภายในเครือข่ายส่วนตัว",
@@ -4054,10 +4081,20 @@
     "reasoningEffort": {
       "modelFlag": "โมเดลนี้รองรับระดับการใช้เหตุผล"
     },
-    "creditsRequired": "เครดิตไม่เพียงพอในการส่งข้อความนี้"
+    "creditsRequired": "เครดิตไม่เพียงพอในการส่งข้อความนี้",
+    "providerKeyRefused": "ผู้ให้บริการปฏิเสธข้อมูลรับรอง ตรวจสอบคีย์ API ของผู้ให้บริการ แล้วส่งอีกครั้ง",
+    "providerModelMissing": "แบ็กเอนด์นี้ไม่มีโมเดลนี้ให้บริการแล้ว เลือกตัวอื่น",
+    "providerRateLimited": "ผู้ให้บริการกำลังจำกัดคำขอ รอสักครู่แล้วส่งอีกครั้ง",
+    "providerUnavailable": "ผู้ให้บริการไม่พร้อมใช้งานในขณะนี้ ส่งอีกครั้งในอีกไม่ช้า"
   },
   "settingsTools": {
-    "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่"
+    "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่",
+    "guarded": {
+      "spendAlertsOff": "ปิดการแจ้งเตือนการใช้จ่ายหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเกี่ยวกับการข้ามเกณฑ์การใช้จ่ายและการพุ่งขึ้นรายชั่วโมง",
+      "balanceAlertsOff": "ปิดการแจ้งเตือนยอดคงเหลือหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเมื่อเครดิตของคุณเหลือน้อย",
+      "securityFindingsOff": "ปิดการแจ้งเตือนการค้นพบด้านความปลอดภัยหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเกี่ยวกับการค้นพบด้านความปลอดภัยใหม่",
+      "hideBalanceOn": "ซ่อนยอดคงเหลือของคุณหรือไม่ ยอดคงเหลือเครดิตจะไม่แสดงบนหน้าจอโปรไฟล์และศูนย์กลางขององค์กรอีกต่อไป"
+    }
   },
   "appActions": {
     "start": {
@@ -4429,6 +4466,7 @@
     "pickPackToBuyAgain": "เลือกแพ็กด้านบนเพื่อเริ่มการซื้อใหม่",
     "purchasePending": "สโตร์ยังคงดำเนินการชำระเงินนี้อยู่ เครดิตของคุณจะเข้าเมื่อสโตร์อนุมัติการเรียกเก็บเงิน",
     "buyAgain": "ซื้ออีกครั้ง",
+    "checkPurchase": "ตรวจสอบการซื้อ",
     "purchaseOwnedByAnotherAccount": "เครดิตใน Apple Account นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน",
     "purchaseOwnedByAnotherAccountPlay": "เครดิตในบัญชี Google Play นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน"
   },
@@ -4522,7 +4560,9 @@
     },
     "saveSheet": {
       "title": "บันทึกในรายการ",
-      "saved": "บันทึกใน {{list}} แล้ว"
+      "saved": "บันทึกใน {{list}} แล้ว",
+      "saveFailed": "บันทึกงานไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+      "saveRefused": "บันทึกงานในรายการนี้ไม่สำเร็จ โปรดเลือกรายการอื่น"
     }
   },
   "agentBriefing": {
@@ -4534,6 +4574,7 @@
     "empty": "ไม่มีกิจกรรมในช่วงเวลาของรายงานนี้",
     "emptyHint": "เซสชันเขียนโค้ดบนคลาวด์และ CLI ของคุณจะแสดงที่นี่เมื่อรายงานตามกำหนดการมีกิจกรรม",
     "loadError": "ไม่สามารถโหลดรายงานได้",
+    "estimateLoadError": "ไม่สามารถโหลดประมาณการได้",
     "view": "อ่านรายงาน",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4801,7 +4842,7 @@
   },
   "organizationGuardrails": {
     "title": "แนวป้องกัน AI",
-    "permissionDenied": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่จัดการแนวป้องกัน AI ได้",
+    "permissionDenied": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่จัดการแนวป้องกัน AI ได้ $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "แนวป้องกัน AI ยังไม่ได้เปิดใช้งาน",
     "unavailable": "Kilo เปิดใช้งานแนวป้องกัน AI ให้กับองค์กรตามคำขอ ติดต่อ {{supportEmail}} และทีม Kilo จะเปิดให้สำหรับองค์กรของคุณ",
     "contactSupport": "ติดต่อฝ่ายสนับสนุน",
@@ -4939,7 +4980,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "คุณสมบัติระดับองค์กร",
-    "enterpriseOnly": "นี่เป็นคุณสมบัติเฉพาะระดับองค์กร",
+    "enterpriseOnly": "ผู้ให้บริการและโมเดลพร้อมใช้งานในแพ็กเกจ Enterprise",
     "readOnly": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่เปลี่ยนการตั้งค่าเหล่านี้ได้",
     "loadError": "ไม่สามารถโหลดผู้ให้บริการและโมเดลได้",
     "tabModels": "โมเดล",
@@ -4953,6 +4994,7 @@
     "providersDescription": "ปิดผู้ให้บริการเพื่อหยุดการกำหนดเส้นทางของ Kilo ไปยังผู้ให้บริการนั้นสำหรับองค์กรนี้",
     "providersNeedCatalog": "สวิตช์ผู้ให้บริการจะเป็นแบบอ่านอย่างเดียวจนกว่าแค็ตตาล็อกโมเดลทั้งหมดจะโหลดเสร็จ แตะลองอีกครั้งด้านบนเพื่อแก้ไข",
     "providersEmpty": "ไม่มีผู้ให้บริการที่ตรงกับการค้นหานี้",
+    "providersNone": "ไม่มีผู้ให้บริการที่พร้อมใช้งานสำหรับองค์กรนี้",
     "allowAllShown": "อนุญาตทั้งหมดที่แสดง",
     "denyAllShown": "ปฏิเสธทั้งหมดที่แสดง",
     "gatewaysDescription": "Kilo กำหนดเส้นทางคำขอของโมเดลผ่าน Vercel AI Gateway หรือ OpenRouter เกตเวย์ที่ปิดใช้งานจะทำให้คำขอเหล่านั้นล้มเหลว",

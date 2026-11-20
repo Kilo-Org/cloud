@@ -72,8 +72,9 @@ function fakeSceneNavigation(initiallyFocused = true, sceneKey = 'scene-this') {
 async function mountScene(initiallyFocused: boolean, sceneKey = 'scene-this') {
   const scene = fakeSceneNavigation(initiallyFocused, sceneKey);
   // The fake supplies the fields the gate and the settle listener read; the
-  // Stack's route, options and theme are not part of this contract.
-  const props = { navigation: scene.navigation, children: createElement('Draft') };
+  // Stack's route and theme are not part of this contract, and a card scene
+  // hosts no toasts.
+  const props = { navigation: scene.navigation, options: {}, children: createElement('Draft') };
   const view = await renderWithProviders(
     createElement(appScreenLayout, props as unknown as ScreenLayoutProps)
   );
@@ -133,6 +134,7 @@ it('follows the scene navigation it is replaced with instead of the old one', as
   const sceneElement = (navigation: unknown) =>
     createElement(appScreenLayout, {
       navigation,
+      options: {},
       children: createElement('Draft'),
     } as unknown as ScreenLayoutProps);
   const view = await renderWithProviders(sceneElement(first.navigation));

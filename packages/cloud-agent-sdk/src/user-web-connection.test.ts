@@ -42,6 +42,7 @@ beforeEach(() => {
   // @ts-expect-error minimal WebSocket mock
   global.WebSocket = webSocketConstructor;
   (global.WebSocket as unknown as Record<string, number>).OPEN = 1;
+  (global.WebSocket as unknown as Record<string, number>).CONNECTING = 0;
   let nextId = 0;
   configureCloudAgentSdkRuntime({ randomUUID: () => `uuid-${++nextId}` });
 });
@@ -1159,6 +1160,62 @@ describe('createUserWebConnection', () => {
     client.destroy();
   });
 
+  it('releases the legacy retain when the callback during that retain disconnects', () => {
+    const getAuthToken = jest
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('auth unavailable');
+      })
+      .mockReturnValue('token');
+    const clientRef: { current: ReturnType<typeof createUserWebConnection> | null } = {
+      current: null,
+    };
+    const client = createUserWebConnection({
+      websocketUrl: WS_URL,
+      getAuthToken,
+      onError: () => clientRef.current?.disconnect(),
+    });
+    clientRef.current = client;
+
+    client.connect();
+
+    // The synchronous disconnect inside the retain must not leave a retained
+    // lifetime behind: the next connect takes a fresh retain that starts the
+    // connection, and its disconnect stops it.
+    expect(webSocketConstructor).not.toHaveBeenCalled();
+    client.connect();
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    client.disconnect();
+    expect(sockets[0].close).toHaveBeenCalledTimes(1);
+    client.destroy();
+  });
+
+  it('does not leak the legacy retain when the start throws', () => {
+    const getAuthToken = jest
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('auth unavailable');
+      })
+      .mockReturnValue('token');
+    const client = createUserWebConnection({
+      websocketUrl: WS_URL,
+      getAuthToken,
+      onError: () => {
+        throw new Error('onError exploded');
+      },
+    });
+
+    expect(() => client.connect()).toThrow('onError exploded');
+
+    // The failed start must not keep a lifetime: the next connect takes a
+    // fresh retain that starts the connection, and its disconnect stops it.
+    client.connect();
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    client.disconnect();
+    expect(sockets[0].close).toHaveBeenCalledTimes(1);
+    client.destroy();
+  });
+
   it('ref-counts subscribe and unsubscribe for one session and releases its connection lease', () => {
     const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
     const releaseA = client.subscribeToCliSession('ses-1');
@@ -2079,6 +2136,37 @@ describe('createUserWebConnection connection-state API', () => {
     expect(listener).toHaveBeenLastCalledWith(false);
 
     unsubscribe();
+    client.destroy();
+  });
+
+  it('reports the socket phase before the first inbound message and after close', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+
+    expect(client.socketPhase()).toBe('absent');
+    expect(client.isConnected()).toBe(false);
+
+    client.retain();
+    // The handshake is in flight: no socket is usable yet.
+    expect(client.socketPhase()).toBe('connecting');
+    expect(client.isConnected()).toBe(false);
+
+    open();
+    // The socket is OPEN but no inbound frame has been parsed yet: the
+    // transport works, the message-level readiness has not flipped.
+    expect(client.socketPhase()).toBe('open');
+    expect(client.isConnected()).toBe(false);
+
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(client.isConnected()).toBe(true);
+
+    // A closed socket reports `absent` from its readyState alone, before any
+    // onclose handler runs.
+    sockets[0].readyState = 3;
+    expect(client.socketPhase()).toBe('absent');
+
+    sockets[0].onclose?.({ code: 1006 } as CloseEvent);
+    expect(client.socketPhase()).toBe('absent');
+
     client.destroy();
   });
 

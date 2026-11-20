@@ -32,12 +32,11 @@ export function shouldIngestShareIntent(input: {
 }
 
 /**
- * Conjunction of the guards the auth effect in `_layout.tsx` passes before its
- * success tail. Consumed by BOTH the pending-share gate effect and the pending
- * deep-link consumer. Keep in lockstep with that effect — do not refactor either
- * in isolation.
+ * The guards `isShellReadyForShare` conjoins. The root layout builds this
+ * object once and feeds it to both the shell-readiness check and the bootstrap
+ * decision, so neither restates the guards.
  */
-export function isShellReadyForShare(input: {
+export type ShellReadyForShareInput = {
   hasToken: boolean;
   isLoading: boolean;
   updateRequired: boolean;
@@ -50,7 +49,15 @@ export function isShellReadyForShare(input: {
   needsConsent: boolean;
   onConsentRoute: boolean;
   onConsentReviewRoute: boolean;
-}): boolean {
+};
+
+/**
+ * Conjunction of the guards the auth effect in `_layout.tsx` passes before its
+ * success tail. Consumed by BOTH the pending-share gate effect and the pending
+ * deep-link consumer. Keep in lockstep with that effect — do not refactor either
+ * in isolation.
+ */
+export function isShellReadyForShare(input: ShellReadyForShareInput): boolean {
   return (
     !input.isLoading &&
     !input.updateRequired &&

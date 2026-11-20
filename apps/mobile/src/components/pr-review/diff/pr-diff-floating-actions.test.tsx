@@ -305,11 +305,11 @@ describe('PrDiffFloatingActions footer', () => {
   }
 
   it('pins the bar with the shared footer, leaving the band to it', () => {
-    // The bar is a screen footer, so its gutter, its bottom band and the
-    // landscape side insets come from the one primitive instead of a style
-    // object measured here.
+    // The bar is a screen footer, so its gutter, its bottom band, its hairline
+    // over the list and the landscape side insets come from the one primitive
+    // instead of a card or a style object measured here.
     const props = footerElement().props as { edge?: string; keyboard?: string };
-    expect(props.edge).toBe('background');
+    expect(props.edge ?? 'hairline').toBe('hairline');
     expect(props.keyboard).toBe('host');
   });
 

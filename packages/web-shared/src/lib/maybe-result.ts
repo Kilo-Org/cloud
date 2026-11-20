@@ -5,18 +5,50 @@ import { TRPCError } from '@trpc/server';
 // A result that carries no fields of its own.
 type NoFields = Record<never, never>;
 
-export type SuccessResult<TOk = NoFields> = { success: true } & TOk;
+/**
+ * The payload a success result may carry.
+ *
+ * `successResult` merges its payload with an object spread, which copies own
+ * enumerable properties only. Anything else loses the value its type promises:
+ * a primitive is dropped, an array arrives as index properties, and a function
+ * as an empty object. Objects such as `Date`, `Map` and `Promise` keep their
+ * state in internal slots, so they arrive as an empty object too.
+ */
+type SuccessFields = object;
+
+/**
+ * Rejects every payload the object spread would reshape or drop.
+ *
+ * The `Record<string, unknown>` member is the effective check: it admits only
+ * object types the spread copies faithfully. TypeScript gives that
+ * assignability to a `type` alias of an object literal type, not to an
+ * `interface` or a class instance: neither has an implicit index signature, and
+ * internal-slot state is not copied either. A payload declared as an interface
+ * must therefore become a type alias. Arrays and callables are checked first
+ * because they satisfy `Record` and would otherwise pass.
+ */
+type SpreadablePayload<TOk> = TOk extends readonly unknown[]
+  ? never
+  : TOk extends (...args: never[]) => unknown
+    ? never
+    : TOk extends Record<string, unknown>
+      ? TOk
+      : never;
+
+export type SuccessResult<TOk extends SuccessFields = NoFields> = { success: true } & TOk;
 export type CustomFailureResult<TErr> = { success: false } & TErr;
 export type FailureResult<TErr = void> = { success: false; error: TErr };
 
 /**
  *  equivalent to CustomResult<TOk, {error:TErr}>
  */
-export type Result<TOk, TErr> = SuccessResult<TOk> | FailureResult<TErr>;
+export type Result<TOk extends SuccessFields, TErr> = SuccessResult<TOk> | FailureResult<TErr>;
 
-export type CustomResult<TOk, TErr> = SuccessResult<TOk> | CustomFailureResult<TErr>;
+export type CustomResult<TOk extends SuccessFields, TErr> =
+  | SuccessResult<TOk>
+  | CustomFailureResult<TErr>;
 export type OptionalError<TErr> = Result<NoFields, TErr>;
-export type OptionalValue<TOk> = Result<TOk, void>;
+export type OptionalValue<TOk extends SuccessFields> = Result<TOk, void>;
 
 export function failureResult(): FailureResult<undefined>;
 export function failureResult<TErr>(error: TErr): FailureResult<TErr>;
@@ -38,17 +70,31 @@ export function trpcFailure(
   return failureResult(new TRPCError(...opts));
 }
 
-export function successResult(): SuccessResult<NoFields>;
-export function successResult<TOk>(okValue: TOk): SuccessResult<TOk>;
-export function successResult<TOk>(okValue?: TOk): SuccessResult<TOk | NoFields> {
+function mergeSuccessPayload<TOk extends SuccessFields>(
+  okValue: TOk | undefined
+): SuccessResult<TOk | NoFields> {
   return { ...okValue, success: true };
 }
 
-export function assertNoTrpcError<TOk>(result: Result<TOk, TRPCError>): SuccessResult<TOk> {
+export function successResult(): SuccessResult<NoFields>;
+export function successResult<TOk extends SuccessFields>(
+  okValue: TOk & SpreadablePayload<TOk>
+): SuccessResult<TOk>;
+export function successResult<TOk extends SuccessFields>(
+  okValue?: TOk
+): SuccessResult<TOk | NoFields> {
+  return mergeSuccessPayload(okValue);
+}
+
+export function assertNoTrpcError<TOk extends SuccessFields>(
+  result: Result<TOk, TRPCError>
+): SuccessResult<TOk> {
   if (result.success) return result;
   else throw result.error;
 }
-export function assertNoError<TOk, TErr>(result: CustomResult<TOk, TErr>): SuccessResult<TOk> {
+export function assertNoError<TOk extends SuccessFields, TErr>(
+  result: CustomResult<TOk, TErr>
+): SuccessResult<TOk> {
   if (result.success) return result;
   throw 'error' in result && result.error instanceof Error
     ? result.error
@@ -69,17 +115,17 @@ function serializeError(error: unknown) {
   return typeof error;
 }
 
-export function whenOkTry<TOk, TOk2, TErr>(
+export function whenOkTry<TOk extends SuccessFields, TOk2 extends SuccessFields, TErr>(
   result: Result<TOk, TErr>,
   map: (val: TOk) => Result<TOk2, TErr>
 ): Result<TOk2, TErr> {
   if (!result.success) return result;
   return map(result);
 }
-export function whenOk<TOk, TOk2, TErr>(
+export function whenOk<TOk extends SuccessFields, TOk2 extends SuccessFields, TErr>(
   result: Result<TOk, TErr>,
-  map: (val: TOk) => TOk2
+  map: (val: TOk) => TOk2 & SpreadablePayload<TOk2>
 ): Result<TOk2, TErr> {
   if (!result.success) return result;
-  return successResult(map(result));
+  return mergeSuccessPayload(map(result));
 }

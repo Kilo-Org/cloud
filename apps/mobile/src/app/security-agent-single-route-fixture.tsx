@@ -18,14 +18,12 @@ export default function SecurityAgentSingleRouteFixtureRoute() {
   const suffix = parseParam(params.suffix) ?? '';
 
   useEffect(() => {
-    if (!__DEV__) {
-      // A release build registers the route but must never run the fixture, and
-      // a screen that renders nothing would strand whoever opened it: send the
-      // reader to the app instead.
+    // This screen renders nothing, so every branch must navigate. A release
+    // build registers the route but must never run the fixture, and a dev link
+    // that lost its scope has no destination either: both send the reader to
+    // the app instead of stranding them on a blank screen.
+    if (!__DEV__ || scope === null) {
       router.replace('/(app)' as Href);
-      return;
-    }
-    if (scope === null) {
       return;
     }
     // `replace`, not `push`: a link that builds its destination swaps the

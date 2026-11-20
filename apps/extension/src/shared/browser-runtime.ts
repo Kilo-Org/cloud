@@ -34,6 +34,7 @@ import type {
   BrowserShareTabInput,
   BrowserShareTabResult,
   BrowserTabGroupController,
+  BrowserTabGroupAdoptResult,
   BrowserTabGroupOpenResult,
   BrowserTabGroupSessionSummary,
 } from './browser-tab-groups';
@@ -48,7 +49,7 @@ import type {
   BrowserToolSession,
   BrowserToolTabsApi,
 } from './browser-tool-session';
-import type { TabLeaseHolder, TabLeaseRegistry } from './browser-tab-leases';
+import type { TabLeaseRegistry, TabSessionOwner } from './browser-tab-leases';
 import { getInspectableTab, isInspectablePageUrl } from './tab-debugger';
 import type {
   BrowserScriptingApi,
@@ -86,8 +87,8 @@ export interface BrowserToolRunInput {
 
 export type BrowserToolRunOutcome =
   | {
-      readonly holder: TabLeaseHolder;
       readonly kind: 'needs_take_over';
+      readonly owner: TabSessionOwner;
     }
   | {
       readonly kind: 'result';
@@ -204,7 +205,7 @@ export interface BrowserTabClaimInput {
 
 export interface BrowserRuntime {
   /** Gives a session its tab group back after it ended (`/browser adopt`). */
-  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupOpenResult>;
+  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupAdoptResult>;
   /**
    * Takes the tab's lease before the caller's first command, so a workflow run
    * navigates under the lease rather than rewriting the page under its holder.
@@ -238,6 +239,11 @@ export interface BrowserRuntime {
   ) => Promise<{ readonly title: string; readonly url: string } | undefined>;
   /** Ends the caller's tab leases. Its refs survive, so the next turn can click by an earlier ref. */
   readonly releaseCaller: (caller: BrowserCaller) => number;
+  /**
+   * Brings back the sessions an earlier service worker stored, once, without
+   * the tabs that closed while no worker ran. Agent calls await it first.
+   */
+  readonly restoreSessions: () => Promise<void>;
   /** Drops this caller's lease on one tab only: one finished call must not free its session's other tabs. */
   readonly releaseTab: (input: { readonly caller: BrowserCaller; readonly tabId: number }) => void;
   readonly runTool: (input: BrowserToolRunInput) => Promise<BrowserToolRunOutcome>;
@@ -2574,6 +2580,22 @@ export const createBrowserRuntime = ({
     return lease.kind === 'granted';
   };
 
+  const liveSessionOwner = (tabId: number): TabSessionOwner | undefined => {
+    const sessionHandle = groups.sessionForTab(tabId);
+
+    if (sessionHandle === undefined) {
+      return undefined;
+    }
+
+    const title = groups
+      .listSessions()
+      .find(session => session.sessionHandle === sessionHandle)
+      ?.title.trim();
+
+    // A blank title names nobody: the card falls back to its generic session name.
+    return { sessionHandle, ...(title === undefined || title === '' ? {} : { title }) };
+  };
+
   const runTool = async ({
     agent,
     arguments: toolArguments,
@@ -2592,20 +2614,27 @@ export const createBrowserRuntime = ({
     }
 
     const lease = await leases.acquire(tabId, caller, {
+      owner: liveSessionOwner(tabId),
       ...(takeOver === undefined ? {} : { takeOver }),
       ...(title === undefined ? {} : { title }),
     });
 
     if (lease.kind === 'needs_take_over') {
-      return { holder: lease.holder, kind: 'needs_take_over' };
+      return { kind: 'needs_take_over', owner: lease.owner };
     }
 
     if (lease.kind === 'busy') {
       return { kind: 'result', result: { error: TAB_BUSY_ERROR, ok: false } };
     }
 
-    // The panel confirmed: the agent's in-flight call ends here and the panel's call waits for it to unwind.
-    inFlight.get(tabId)?.();
+    if (lease.kind === 'taken') {
+      return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
+    }
+
+    // Only a confirmed take-over ends the agent's in-flight call; a holder re-entering its own lease ends nothing.
+    if (lease.takeover !== undefined) {
+      inFlight.get(tabId)?.();
+    }
 
     return runExclusive(tabId, async () => {
       // A download an earlier call left for this session — stopped, kept, or only announced — has no result of its
@@ -3288,8 +3317,16 @@ export const createBrowserRuntime = ({
 
         // A download is not a document, so a navigate that became one never moved the tab.
         // An opaque or older origin there is the file's answer, not the redirect this check looks for.
-        if (preflight !== undefined && preflight.class === 'navigate' && keptText === undefined) {
-          const changed = await postAgentNavigate(runSession, preflight.origin);
+        if (
+          agentContext !== undefined &&
+          preflight?.class === 'navigate' &&
+          keptText === undefined
+        ) {
+          const changed = await postAgentNavigate(
+            runSession,
+            preflight.origin,
+            agentContext.authorized
+          );
 
           if (changed !== undefined) {
             return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };
@@ -3460,7 +3497,9 @@ export const createBrowserRuntime = ({
       tabId: created.id,
       title: created.title ?? '',
       url: 'about:blank',
-      ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
+      ...(shared.kind === 'shared' && shared.groupId !== undefined
+        ? { groupId: shared.groupId }
+        : {}),
     };
   };
 
@@ -3470,6 +3509,54 @@ export const createBrowserRuntime = ({
     const tab = await tabsApi.get?.(tabId);
 
     return tab === undefined ? undefined : { title: tab.title ?? '', url: tab.url ?? '' };
+  };
+
+  /** False when the tab is known to exist, or when this browser cannot say. */
+  const tabGone = async (tabId: number): Promise<boolean> => {
+    const get = tabsApi.get?.bind(tabsApi);
+
+    if (get === undefined) {
+      return false;
+    }
+
+    try {
+      return (await get(tabId)) === undefined;
+    } catch {
+      return true;
+    }
+  };
+
+  let restoring: Promise<void> | undefined = undefined;
+
+  /**
+   * The stored sessions, without the tabs closed while no worker ran: the
+   * `tabs.onRemoved` of those closes reached nobody, so the stored copy still
+   * names them.
+   */
+  const restoreSessions = (): Promise<void> => {
+    restoring ??= (async () => {
+      try {
+        if (!(await groups.restore())) {
+          // Storage could not be read: the next session operation reads it again.
+          restoring = undefined;
+          return;
+        }
+
+        const stored = new Set(groups.listSessions().flatMap(session => session.tabs));
+
+        await Promise.all(
+          [...stored].map(async tabId => {
+            if (await tabGone(tabId)) {
+              await disposeTab(tabId);
+            }
+          })
+        );
+      } catch (error) {
+        console.warn('Failed to restore browser agent sessions:', error);
+      }
+    })();
+
+    return restoring;
   };
 
   return {
@@ -3497,6 +3584,7 @@ export const createBrowserRuntime = ({
     releaseTab: ({ caller, tabId }) => {
       leases.release(tabId, caller);
     },
+    restoreSessions,
     runTool,
     shareActiveTab: input => groups.shareActiveTab(input),
     tabInfo,

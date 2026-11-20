@@ -3,7 +3,9 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { BackHandler, Platform, View } from 'react-native';
 
+import { SheetToastScope } from '@/components/sheet-toast-host';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SurfaceClearsSideInsets } from '@/lib/screen-insets';
 import { holdSheetTouch, SHEET_TOUCH_SETTLE_MS, useSheetTouchHold } from '@/lib/sheet-touch-guard';
 
 /**
@@ -370,40 +372,49 @@ export function Sheet({
   }
 
   return (
-    <BottomSheet
-      key={presentation}
-      index={visible && !dismissalPending ? 0 : -1}
-      snapPoints={snapPoints}
-      // The native sheet paints the platform surface color: without this a
-      // forced in-app dark theme still shows a light sheet behind themed text.
-      backgroundStyle={{ backgroundColor: background ?? colors.card }}
-      handleComponent={showHandle ? undefined : null}
-      enablePanDownToClose
-      dismissGestures={dismissGestures}
-      contentOwnsTopInset={contentOwnsTopInset}
-      // The iOS sheet draws the dimmed backdrop through its presentation, so the
-      // app's view tree cannot see that tap: the library reports it and this
-      // wrapper answers it the way Android Back is answered, `onRequestDismiss`
-      // included. The library only reports while `dismissGestures` is on, which
-      // keeps a draft-holding sheet's backdrop inert.
-      onBackdropTap={() => {
-        requestSelfDismissRef.current();
-      }}
-      onRequestDismiss={() => selfDismissRef.current()}
-      locale={i18n.language}
-      onClose={() => {
-        settleClose(presentation);
-      }}
-      onDismiss={() => {
-        settleDismiss(presentation);
-      }}
-    >
-      {Platform.OS === 'android' && !snapPoints?.length ? (
-        // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
-        <View className="w-full max-w-[640px] self-center">{children}</View>
-      ) : (
-        children
-      )}
-    </BottomSheet>
+    // The sheet clears the window's side insets on Android: its own dialog
+    // window is capped and centred, so its content takes only the gutter.
+    <SurfaceClearsSideInsets value>
+      <BottomSheet
+        key={presentation}
+        index={visible && !dismissalPending ? 0 : -1}
+        snapPoints={snapPoints}
+        // The native sheet paints the platform surface color: without this a
+        // forced in-app dark theme still shows a light sheet behind themed text.
+        backgroundStyle={{ backgroundColor: background ?? colors.card }}
+        handleComponent={showHandle ? undefined : null}
+        enablePanDownToClose
+        dismissGestures={dismissGestures}
+        contentOwnsTopInset={contentOwnsTopInset}
+        // The iOS sheet draws the dimmed backdrop through its presentation, so the
+        // app's view tree cannot see that tap: the library reports it and this
+        // wrapper answers it the way Android Back is answered, `onRequestDismiss`
+        // included. The library only reports while `dismissGestures` is on, which
+        // keeps a draft-holding sheet's backdrop inert.
+        onBackdropTap={() => {
+          requestSelfDismissRef.current();
+        }}
+        onRequestDismiss={() => selfDismissRef.current()}
+        locale={i18n.language}
+        onClose={() => {
+          settleClose(presentation);
+        }}
+        onDismiss={() => {
+          settleDismiss(presentation);
+        }}
+      >
+        {/* The sheet's own window covers the root Toaster, so the toasts raised
+          while it is presented draw in here. A dismissing sheet hands them
+          back, so a toast raised as it closes is not carried away with it. */}
+        <SheetToastScope hosting={!dismissing && !dismissalPending}>
+          {Platform.OS === 'android' && !snapPoints?.length ? (
+            // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
+            <View className="w-full max-w-[640px] self-center">{children}</View>
+          ) : (
+            children
+          )}
+        </SheetToastScope>
+      </BottomSheet>
+    </SurfaceClearsSideInsets>
   );
 }

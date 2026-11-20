@@ -77,6 +77,7 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
     },
     refetch: vi.fn(),
   }),
+  useRetrySecurityFinding: () => ({ retry: vi.fn(), isRetrying: false }),
   useDismissSecurityFinding: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -100,8 +101,12 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
     isLoading: false,
     isFetching: false,
     isError: false,
+    isPending: false,
+    fetchStatus: 'idle',
+    error: null,
     refetch: vi.fn(),
   }),
+  useRetrySecurityAgentCapability: () => ({ retry: vi.fn(), isRetrying: false }),
   useSecurityAgentConfig: () => ({
     data: {
       isEnabled: true,
@@ -170,6 +175,7 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
 }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => props.children ?? null,
+  SheetScrollView: (props: { children?: unknown }) => props.children ?? null,
 }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;

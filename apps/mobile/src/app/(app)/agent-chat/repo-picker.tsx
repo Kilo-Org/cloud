@@ -17,7 +17,7 @@ import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
@@ -33,6 +33,7 @@ export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const bottomClearance = useDetailScreenBottomPadding();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   // The input stays urgent; the filtered list trails behind so a typing burst
@@ -171,6 +172,7 @@ export default function RepoPickerScreen() {
         // scroll so its search field and rows share one tap contract — the first
         // tap on a row arrives even while the search keyboard is up.
         <ScrollView
+          style={sideInsetMarginStyle}
           className="flex-1"
           nestedScrollEnabled
           {...SEARCHABLE_PICKER_LIST_PROPS}
@@ -244,7 +246,7 @@ export default function RepoPickerScreen() {
       return null;
     }
     return (
-      <Card className="mx-3 mt-3">
+      <Card className="mx-4 mt-3">
         <Text className="text-sm font-semibold text-foreground">
           {t('agentChat.repoPicker.platformBitbucket')}
         </Text>

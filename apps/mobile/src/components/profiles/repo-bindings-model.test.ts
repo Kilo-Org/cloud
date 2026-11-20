@@ -59,6 +59,16 @@ describe('filterRepositoryOptions', () => {
     ]);
   });
 
+  it('matches an accented query against an unaccented full name', () => {
+    const repos = mergeRepositoryOptions([{ fullName: 'acme/repo-1', private: false }], []);
+    expect(filterRepositoryOptions(repos, 'rëpo').map(repo => repo.fullName)).toEqual([
+      'acme/repo-1',
+    ]);
+    expect(filterRepositoryOptions(repos, 'repo').map(repo => repo.fullName)).toEqual([
+      'acme/repo-1',
+    ]);
+  });
+
   it('returns no rows when nothing matches', () => {
     expect(filterRepositoryOptions(options, 'zzz')).toEqual([]);
   });

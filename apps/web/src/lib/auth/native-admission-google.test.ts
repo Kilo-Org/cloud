@@ -378,4 +378,173 @@ describe('verifyPlayIntegrity access token cache', () => {
     const result = await verifyPlayIntegrity('integrity-1', 'challenge-1');
     expect(result).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
   });
+
+  test('a credential the decode endpoint refuses is dropped, so the next admission mints a new token', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+    });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+    await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+      'Play Integrity API returned 401'
+    );
+
+    // A 401 is a credential refusal, so the next admission must not replay the
+    // rejected token: it mints a new one instead.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-two', expires_in: 3600 }),
+    });
+    const hash = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+    const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+    expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-two' }),
+      })
+    );
+
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(2);
+  });
+
+  test('a credential the decode endpoint forbids is dropped, so the next admission mints a new token', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+    });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+
+    await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+      'Play Integrity API returned 403'
+    );
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-two', expires_in: 3600 }),
+    });
+    const hash = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+    const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+    expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-two' }),
+      })
+    );
+
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(2);
+  });
+
+  test('a decode answer that is not a credential refusal keeps the cached token', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+    });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+      'Play Integrity API returned 500'
+    );
+
+    // A 500 is a provider condition, not a refused credential, so the cached
+    // token stays usable.
+    const hash = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+    const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+    expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-one' }),
+      })
+    );
+
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(1);
+  });
+
+  test('a decode 401 does not evict a token a concurrent refresh already replaced', async () => {
+    const flushMicrotasks = async (): Promise<void> => {
+      for (let i = 0; i < 32; i += 1) {
+        await Promise.resolve();
+      }
+    };
+
+    // Token 1 is minted with expires_in 240, inside the 5-minute margin, so its
+    // cached refreshAt is already in the past and the next admission refreshes.
+    const token1 = Promise.withResolvers<unknown>();
+    mockFetch.mockImplementationOnce(() => token1.promise);
+
+    // Admission A starts and takes token 1; hold its decode call unresolved.
+    const admissionA = verifyPlayIntegrity('integrity-1', 'challenge-1');
+    await flushMicrotasks();
+
+    const decodeA = Promise.withResolvers<unknown>();
+    mockFetch.mockImplementationOnce(() => decodeA.promise);
+
+    token1.resolve({
+      ok: true,
+      json: async () => ({ access_token: 'token-1', expires_in: 240 }),
+    });
+    // A now hangs on the held decode while still owning token 1.
+    await flushMicrotasks();
+
+    // Admission B starts while A's decode is pending: the margin-passed token 1
+    // forces B to mint token 2 and replace the cache entry.
+    const token2 = Promise.withResolvers<unknown>();
+    mockFetch.mockImplementationOnce(() => token2.promise);
+    const admissionB = verifyPlayIntegrity('integrity-2', 'challenge-2');
+    const hashB = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hashB));
+
+    token2.resolve({
+      ok: true,
+      json: async () => ({ access_token: 'token-2', expires_in: 3600 }),
+    });
+    await flushMicrotasks();
+    expect(await admissionB).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+
+    // A's decode finally resolves 401. The cache now holds token 2, so the
+    // rejected-token eviction must be a no-op and token 2 must survive.
+    decodeA.resolve({ ok: false, status: 401 });
+    await expect(admissionA).rejects.toThrow('Play Integrity API returned 401');
+
+    // Admission C must reuse token 2 with no new token call.
+    const hashC = createHash('sha256').update('challenge-3', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hashC));
+    const admissionC = await verifyPlayIntegrity('integrity-3', 'challenge-3');
+    expect(admissionC).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+
+    // The token endpoint was POSTed exactly twice: token 1, then token 2.
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(2);
+
+    const decodeCalls = mockFetch.mock.calls.filter(
+      ([url]) =>
+        url === 'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken'
+    );
+    expect(decodeCalls).toHaveLength(3);
+    expect(decodeCalls[decodeCalls.length - 1][1]).toEqual(
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-2' }),
+      })
+    );
+  });
 });

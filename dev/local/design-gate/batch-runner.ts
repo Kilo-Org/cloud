@@ -76,7 +76,7 @@ export const BATCHES_USAGE = `Usage: pnpm dev:mobile:design-gate batches <comman
       Writes <out>/<batch>/ (gate artifacts, targets.json, expectations.json, gate.log),
       <out>/summary.tsv and <out>/resolved-links.tsv (each batch's links as its device resolved them).
       --matrix overrides every batch's own matrix; --cell adds a cell the platform supports
-      (${CELL_IDS.join(', ')}; iOS has no compact, landscape or rtl-compact).
+      (${CELL_IDS.join(', ')}; iOS has no rtl-compact, and its compact cell needs an SE or mini device).
   seed --email <fake@example.com> --out <seed-map.json> [--manifest <file>] [--only <batch>,...] [--step <name> ...]
       Runs the seed steps (${SEED_STEPS.map(step => step.step).join(', ')}) that the manifest rows
       reference, narrowed to the --only batches, or exactly the --step names, for a signed-in fake

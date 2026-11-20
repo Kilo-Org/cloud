@@ -39,6 +39,7 @@ import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useReviewerBillingRefusal } from '@/lib/hooks/reviewer-refusal';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -112,6 +113,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const scopeTitle = useReviewerScopeTitle(scope);
   const colors = useThemeColors();
+  // Landscape clears the notch/sensor housing with a side safe area, and this
+  // screen's body is the scroller itself: its content container carries the
+  // page gutter, so the inset goes on the scroller's own style as a margin
+  // (a padding there does not narrow the scroll content). Portrait insets are
+  // zero and the style collapses to `undefined`, so portrait is unchanged.
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const statusFor = { github: githubStatus, gitlab: gitlabStatus };
@@ -353,6 +360,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         <ScrollView
           ref={scrollRef}
           className="flex-1"
+          style={sideInsetMarginStyle}
           contentContainerClassName={SCREEN_BODY_CLASS}
           automaticallyAdjustKeyboardInsets
           keyboardShouldPersistTaps="handled"

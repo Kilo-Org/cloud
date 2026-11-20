@@ -269,6 +269,18 @@ export default function AppLayout() {
                 headerShown: false,
               }}
             />
+            {/* The development-only Buy credits fixture renders the same screen
+                  as `credits`, so it takes the same presentation. Pushed, it
+                  would paint the sheet header at the window top — inside the
+                  top inset — and the design gate would measure that instead of
+                  the page sheet a reader actually gets from Profile. */}
+            <Stack.Screen
+              name="credits-pack-prices-fixture"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
             <Stack.Screen
               name="tour"
               options={{

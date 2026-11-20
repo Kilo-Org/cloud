@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2e4629a4-2573-44cd-9326-f6a0ce338c11",
+  "id": "208f35e0-3d53-48ca-9eda-59a61dd62842",
   "prevId": "9bdd7829-0931-402d-b458-24cf80f0697f",
   "tables": {
     "benchmark_config": {
@@ -1440,13 +1440,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "costed_cases": {
-          "name": "costed_cases",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "errors": {
           "name": "errors",
           "type": "integer",
@@ -1597,6 +1590,85 @@
             "rep"
           ],
           "name": "pending_decider_outputs_run_id_model_variant_case_id_rep_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "probe_activations": {
+      "name": "probe_activations",
+      "columns": {
+        "router": {
+          "name": "router",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "required_revision": {
+          "name": "required_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "variant": {
+          "name": "variant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "engine_identity": {
+          "name": "engine_identity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "repetitions": {
+          "name": "repetitions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "probe_activations_router_action_model_variant_engine_identity_repetitions_pk": {
+          "columns": [
+            "router",
+            "action",
+            "model",
+            "variant",
+            "engine_identity",
+            "repetitions"
+          ],
+          "name": "probe_activations_router_action_model_variant_engine_identity_repetitions_pk"
         }
       },
       "uniqueConstraints": {},

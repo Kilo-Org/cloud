@@ -65,8 +65,8 @@ export function OrganizationProvidersAndModelsScreen() {
   const catalog = useOrgModelCatalog(enterprise);
   const gateway = useOrgGatewaySettings(organizationId, enterprise);
   const providerNameRows = useProviderDisplayNames(enterprise);
-  // The Providers tab titles each row with the gateway's display name and shows
-  // the slug under it, so the rows look their name up by the slug they store.
+  // The Providers tab titles each row with the gateway's display name, so the
+  // rows look their name up by the slug they store.
   const providerNames = useMemo(
     () => Object.fromEntries((providerNameRows.data ?? []).map(row => [row.slug, row.displayName])),
     [providerNameRows.data]

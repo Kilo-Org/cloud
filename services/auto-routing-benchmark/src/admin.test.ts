@@ -233,8 +233,9 @@ const env = {
   KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
 
+const waitUntil = vi.fn<(promise: Promise<unknown>) => void>();
 const executionCtx = {
-  waitUntil: () => {},
+  waitUntil,
   passThroughOnException: () => {},
 } as unknown as ExecutionContext;
 
@@ -838,8 +839,11 @@ describe('PUT /admin/config', () => {
 
   it('returns the saved config and defers a drain that outlives its deadline', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
-    // The drain never answers, so only the save's own deadline can end the request.
-    vi.mocked(listPendingCurrentProfiles).mockImplementation(() => new Promise(() => {}));
+    // The drain answers only when the test lets it, so the save's own deadline is
+    // the only thing that ends the request.
+    const pendingGate =
+      Promise.withResolvers<{ model: string; variant: string; requested_at: string }[]>();
+    vi.mocked(listPendingCurrentProfiles).mockReturnValue(pendingGate.promise);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.useFakeTimers();
 
@@ -857,9 +861,42 @@ describe('PUT /admin/config', () => {
       expect(body.config.minAccuracy).toBe(TEST_CONFIG.minAccuracy);
       expect(body.warnings).toEqual([]);
       expect(body.drain).toEqual({ runId: null, entryCount: 0, skipped: 'timeout' });
+
+      // The drain is still running when the response goes out, so the save hands
+      // it to the request context: without that the runtime may end it between
+      // claiming a run and inserting it.
+      expect(waitUntil).toHaveBeenCalledOnce();
+      expect(insertRun).not.toHaveBeenCalled();
+
+      pendingGate.resolve([
+        { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+      ]);
+      await vi.mocked(waitUntil).mock.calls[0][0];
+
+      // The run the slow drain started is recorded after the save answered.
+      expect(insertRun).toHaveBeenCalledOnce();
+      expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('platform');
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('reports a platform queue with nothing pending as nothing_pending', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    // No run holds the slot and the registry has no current pending row: the
+    // queue waits for a registration, not for a run to end.
+    vi.mocked(getRunningRun).mockResolvedValue(undefined);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      warnings: [],
+      drain: { runId: null, entryCount: 0, skipped: 'nothing_pending' },
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(waitUntil).not.toHaveBeenCalled();
   });
 
   it('keeps the previous release’s admin config fields on the resolved policy values', async () => {

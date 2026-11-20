@@ -65,6 +65,7 @@ import {
   RunAlreadyActiveError,
   startRun,
   syncPlatformRegistry,
+  type DrainSkipReason,
 } from './run';
 import {
   countCurrentProfilesByStatus,
@@ -254,22 +255,45 @@ const CONFIG_SAVE_DRAIN_DEADLINE_MS = 5_000;
  * is left to it, and a drain that is slow or throws is reported in `drain`, never
  * in `warnings` — the save itself succeeded, and the per-minute scheduler is the
  * backstop for everything this misses.
+ *
+ * `keepAlive` is the request's `ctx.waitUntil`. A drain that outlives the
+ * deadline is still running when the response goes out, and the runtime may end
+ * that work with the request — right between claiming a run and inserting it.
+ * Handing the promise over lets it finish and record the run it started.
  */
 async function drainPlatformAfterConfigSave(
   env: Env,
-  router: AutoRouter
+  router: AutoRouter,
+  keepAlive: (promise: Promise<unknown>) => void
 ): Promise<BenchmarkConfigSaveDrain> {
   const timedOut = Promise.withResolvers<'timeout'>();
   const timer = setTimeout(() => timedOut.resolve('timeout'), CONFIG_SAVE_DRAIN_DEADLINE_MS);
   // A queue drain reports its own failure here instead of throwing: one wedged
   // queue must not fail the other, and the save must not fail either.
   const drainErrors: unknown[] = [];
+  // Why the drain started nothing; `active_run` and `nothing_pending` are
+  // different answers for the admin.
+  const skipped: DrainSkipReason[] = [];
+  const drain = drainQueues(env, 'platform', drainErrors, router, {
+    skipPlatformSync: true,
+    skipped,
+  });
   try {
-    const started = await Promise.race([
-      drainQueues(env, 'platform', drainErrors, router, { skipPlatformSync: true }),
-      timedOut.promise,
-    ]);
+    const started = await Promise.race([drain, timedOut.promise]);
     if (started === 'timeout') {
+      keepAlive(
+        drain.catch((error: unknown) => {
+          console.warn(
+            JSON.stringify({
+              event: 'benchmark_config_save_drain_deferred',
+              afterConfigSave: true,
+              router,
+              reason: 'failed_after_response',
+              ...formatError(error),
+            })
+          );
+        })
+      );
       console.warn(
         JSON.stringify({
           event: 'benchmark_config_save_drain_deferred',
@@ -282,11 +306,17 @@ async function drainPlatformAfterConfigSave(
     }
     const [run] = started;
     if (run) return { runId: run.runId, entryCount: run.entryCount, skipped: null };
-    // Nothing started: either the queue already holds a run, or the drain threw.
+    // Nothing started: either the queue already holds a run, nothing was
+    // pending, or the drain threw.
     return {
       runId: null,
       entryCount: 0,
-      skipped: drainErrors.length > 0 ? 'failed' : 'active_run',
+      skipped:
+        drainErrors.length > 0
+          ? 'failed'
+          : skipped.includes('active_run')
+            ? 'active_run'
+            : 'nothing_pending',
     };
   } catch (error) {
     console.warn(
@@ -362,7 +392,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       // rows to start; a failed sync has no rows and a failed publish is already
       // reported, so the cron owns that case.
       const drain =
-        warnings.length === 0 ? await drainPlatformAfterConfigSave(c.env, router) : undefined;
+        warnings.length === 0
+          ? await drainPlatformAfterConfigSave(c.env, router, promise =>
+              c.executionCtx.waitUntil(promise)
+            )
+          : undefined;
       return c.json({
         config: withLegacyAdminConfigFields(saved),
         policySettings: resolvePolicySettings(saved),

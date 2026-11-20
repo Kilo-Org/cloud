@@ -348,10 +348,16 @@ export const BenchmarkConfigSaveDrainSchema = z.object({
   runId: z.string().nullable(),
   entryCount: z.number().int(),
   // Set when the drain did not start a run in this request: `active_run` when
-  // the queue already had one, `timeout` when the bounded drain exceeded its
-  // deadline, `failed` when it threw. The per-minute scheduler picks the work
-  // up either way.
-  skipped: z.enum(['active_run', 'timeout', 'failed']).nullable(),
+  // the queue already had one, `nothing_pending` when the queue had nothing to
+  // claim (an owner run in flight, or every pair already measured), `timeout`
+  // when the bounded drain exceeded its deadline, `failed` when it threw. The
+  // per-minute scheduler picks the work up either way.
+  //
+  // This field is new in the release that added drain-on-save, so no released
+  // web parses it. When adding a member, remember a released web parses this
+  // object with its own enum: an unknown value fails its whole save, so a new
+  // member has to reach the web before the worker emits it.
+  skipped: z.enum(['active_run', 'nothing_pending', 'timeout', 'failed']).nullable(),
 });
 export type BenchmarkConfigSaveDrain = z.infer<typeof BenchmarkConfigSaveDrainSchema>;
 

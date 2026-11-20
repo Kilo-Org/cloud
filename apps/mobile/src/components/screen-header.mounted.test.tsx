@@ -587,14 +587,14 @@ describe('ScreenHeader mounted', () => {
     // reflow, and the title may wrap to a second line instead of losing its tail.
     const props: ScreenHeaderProps = {
       title: 'Past sessions',
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
       allowInlineActionsStacking: false,
     };
     Object.assign(layout, { width: 390, fontScale: 2 });
     const large = renderHeader(props);
     const stacked = large.root.findAll(isStackedActionsRow);
     expect(stacked).toHaveLength(1);
-    expect(stacked[0]?.children).toEqual(['ACTIONS']);
+    expect(stacked[0]?.children).toHaveLength(1);
     expect(large.root.findByProps({ accessibilityRole: 'header' }).props.numberOfLines).toBe(2);
 
     // Below the threshold the same header keeps both on one row, on one line.
@@ -690,9 +690,9 @@ describe('ScreenHeader mounted', () => {
     };
     const german: ScreenHeaderProps = {
       title: 'Unterhaltung',
-      titleAccessory: 'BETA',
+      titleAccessory: slotView(),
       size: 'large',
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
       allowInlineActionsStacking: false,
     };
 
@@ -709,7 +709,7 @@ describe('ScreenHeader mounted', () => {
       measure(renderer, { natural: NATURAL, box: CUT_BOX });
       const stacked = renderer.root.findAll(isStackedActionsRow);
       expect(stacked).toHaveLength(1);
-      expect(stacked[0]?.children).toEqual(['ACTIONS']);
+      expect(stacked[0]?.children).toHaveLength(1);
 
       // The full width the title gets on its own row does not move the cluster
       // back beside it.
@@ -773,11 +773,11 @@ describe('ScreenHeader mounted', () => {
     Object.assign(layout, { width: 360, fontScale: 1 });
     const renderer = renderHeader({
       title: 'Chat',
-      titleAccessory: 'BETA',
+      titleAccessory: slotView(),
       size: 'large',
       showBackButton: false,
-      headerRight: 'BACKEND',
-      inlineActions: 'ACTIONS',
+      headerRight: slotView(),
+      inlineActions: slotView(),
       allowInlineActionsStacking: false,
     });
 
@@ -796,7 +796,7 @@ describe('ScreenHeader mounted', () => {
     expect(headingBlock?.props.className).not.toContain('flex-1');
 
     // A header that keeps the reflow keeps the zero-basis heading.
-    const reflowing = renderHeader({ title: 'Chat', size: 'large', inlineActions: 'ACTIONS' });
+    const reflowing = renderHeader({ title: 'Chat', size: 'large', inlineActions: slotView() });
     expect(findInlineActionsWrapper(reflowing.root).props.className).not.toContain('shrink-[100]');
     expect(
       reflowing.root.findByProps({ accessibilityRole: 'header' }).parent?.parent?.props.className
@@ -812,7 +812,7 @@ describe('ScreenHeader mounted', () => {
       title: 'Agents',
       size: 'large',
       showBackButton: false,
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
       inlineActionsMinWidth: 48,
       allowInlineActionsStacking: false,
     });
@@ -823,7 +823,7 @@ describe('ScreenHeader mounted', () => {
     const reflowing = renderHeader({
       title: 'Agents',
       size: 'large',
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
       inlineActionsMinWidth: 48,
     });
     expect(findInlineActionsWrapper(reflowing.root).props.style).toBeUndefined();

@@ -1662,7 +1662,7 @@
       "keepSessionRunning": "सत्र चालू रखें",
       "restartExitFailed": "नया सत्र शुरू हुआ। पिछला सत्र अभी भी खुला है।",
       "exitNotSupported": "इस सत्र में रिमोट से बाहर निकलने की सुविधा नहीं है।",
-      "exitUnavailable": "अभी इस सत्र से रिमोट के ज़रिए बाहर नहीं निकल सकते।",
+      "exitUnavailable": "इस सत्र के लिए रिमोट सत्र से बाहर निकलना उपलब्ध नहीं है।",
       "exitNeedsNewerCli": "रिमोट स्लैश आदेश के लिए Kilo CLI का नया संस्करण चाहिए। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "newSession": {
@@ -1899,7 +1899,7 @@
     "repoPicker": {
       "title": "रिपॉज़िटरी चुनें",
       "searchLabel": "रिपॉज़िटरी की खोज",
-      "searchPlaceholder": "रिपॉज़िटरी की खोज",
+      "searchPlaceholder": "रिपॉज़िटरी खोजें…",
       "noMatches": "कोई मिलान नहीं",
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
       "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है।",
@@ -2093,15 +2093,15 @@
       "unreadableBody": "एजेंट एक अनुमति अनुरोध की प्रतीक्षा कर रहा है, जिसे यह ऐप दिखा नहीं सकता, इसलिए उसके लिए कोई कार्ड नहीं दिखाई देता। ऐप या CLI अपडेट करें, या जारी रखने के लिए CLI में अनुरोध का उत्तर दें।"
     },
     "questionCard": {
-      "title": "एजेंट को आपका उत्तर चाहिए",
+      "title": "एजेंट को इनपुट चाहिए",
       "skipQuestionsTitle": "प्रश्न छोड़ें?",
       "skipQuestionsMessage": "एजेंट यह चरण छोड़ देगा।",
-      "answerProgress": "{{total}} में से {{answered}} के उत्तर दिए गए",
+      "answerProgress": "उत्तर दिए गए: {{answered}}/{{total}}",
       "selectAllThatApply": "लागू होने वाले सभी विकल्प चुनें।",
-      "option": "विकल्प: {{label}}",
+      "option": "{{label}}",
       "optionSelected": "{{label}}, चयनित",
       "typeYourOwnAnswer": "अपना उत्तर टाइप करें",
-      "typeYourOwnAnswerPlaceholder": "आपका उत्तर…",
+      "typeYourOwnAnswerPlaceholder": "अपना उत्तर लिखें…",
       "skip": "छोड़ें",
       "retrySkip": "प्रश्न छोड़ने की फिर से कोशिश करें",
       "submitting": "भेजा जा रहा है…",
@@ -2272,7 +2272,7 @@
       "exitSession": "सत्र से बाहर निकलें",
       "clearSession": "यह सत्र समाप्त करें और नया शुरू करें",
       "compactDescription": "वर्तमान सत्र का संदर्भ संकुचित करें",
-      "goalDescription": "सत्र लक्ष्य की ओर काम जारी रखें। /goal <objective> या pause, resume, clear",
+      "goalDescription": "सत्र लक्ष्य की ओर काम जारी रखें। /goal <objective> या pause, resume, clear। लक्ष्य किसी निर्धारित वेकअप, क्रॉन कार्य या बैकग्राउंड प्रक्रिया की प्रतीक्षा कर सकता है: प्रतीक्षा लक्ष्य को तब तक निलंबित रखती है जब तक वह पूरा न हो, और फिर लक्ष्य स्वयं फिर से शुरू हो जाता है; /goal pause और /goal clear उसके सेट किए गए टाइमर रद्द कर देते हैं। यदि उद्देश्य किसी डिप्लॉय, बिल्ड या CI जॉब की प्रतीक्षा करना है, तो वह प्रतीक्षा तुरंत शेड्यूल करें; पहले रिपॉज़िटरी न देखें।",
       "initDescription": "निर्देशित AGENTS.md सेटअप",
       "resumeClaudeDescription": "Claude Code सत्र का ट्रांसक्रिप्ट आयात करें",
       "resumeCodexDescription": "OpenAI Codex सत्र का ट्रांसक्रिप्ट आयात करें",
@@ -4087,7 +4087,7 @@
       "promptRequired": "एजेंट शुरू करने के लिए प्रॉम्प्ट चाहिए। एक प्रॉम्प्ट जोड़ें और इसे फिर से चलाएँ।",
       "repositoryRequired": "एजेंट शुरू करने के लिए रिपॉज़िटरी चाहिए। Kilo खोलें और एक चुनें, फिर इसे दोबारा चलाएँ।",
       "repositoryUnknown": "Kilo, {{repository}} को GitHub या GitLab रिपॉज़िटरी के रूप में नहीं पहचानता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।",
-      "repositoryUnsupported": "{{repository}} एक Bitbucket रिपॉज़िटरी है — एजेंट शुरू करें अभी इसका उपयोग नहीं कर सकता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।"
+      "repositoryUnsupported": "{{repository}} एक Bitbucket रिपॉज़िटरी है — ‘एजेंट शुरू करें’ अभी इसका उपयोग नहीं कर सकता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।"
     }
   },
   "launcher": {

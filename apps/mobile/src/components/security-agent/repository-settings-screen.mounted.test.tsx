@@ -22,8 +22,12 @@ const config = vi.hoisted(() => ({
   data: null as Record<string, unknown> | null,
   isLoading: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  error: null as unknown,
   refetch: vi.fn(),
 }));
+const platformError = vi.hoisted(() => ({ props: null as Record<string, unknown> | null }));
 const repositories = vi.hoisted(() => ({
   data: undefined as readonly RepoRow[] | undefined,
   isLoading: false,
@@ -124,7 +128,10 @@ vi.mock('@/components/security-agent/orphaned-findings-card', () => ({
   OrphanedFindingsCard: 'OrphanedFindingsCard',
 }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: 'PlatformErrorScreen',
+  PlatformErrorScreen: (props: Record<string, unknown>) => {
+    platformError.props = props;
+    return null;
+  },
 }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
@@ -253,6 +260,8 @@ beforeEach(() => {
   config.data = configData('selected');
   config.isLoading = false;
   config.isError = false;
+  config.error = null;
+  platformError.props = null;
   repositories.data = THREE_REPOS;
   repositories.isLoading = false;
   repositories.isError = false;
@@ -526,5 +535,25 @@ describe('RepositorySettingsScreen repository picker', () => {
     );
     // The mode choice itself still renders.
     expect(renderer.root.findAll(node => String(node.type) === 'ChoiceRow')).toHaveLength(2);
+  });
+});
+
+describe('config load failure', () => {
+  it('titles the failure with the screen and leaves the description to the variant', async () => {
+    config.data = null;
+    config.isError = true;
+    config.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+
+    await mount();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('failed first read did not render the failure screen');
+    }
+    // The failed read is named once, in the error's own title. A message here
+    // would repeat the same words above the variant's cause.
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.repositories.couldNotLoad'));
+    expect(error.message).toBeUndefined();
+    expect(error.variant).toBe('server');
   });
 });

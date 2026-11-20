@@ -140,6 +140,7 @@
     "keepRunning": "চালিয়ে রাখুন",
     "newSession": "নতুন সেশন",
     "noModelsAvailable": "কোনো মডেল পাওয়া যাচ্ছে না",
+    "modelRetires": "অবসর হবে {{date}}",
     "notFound": "পাওয়া যায়নি।",
     "online": "অনলাইন",
     "open": "{{name}} খুলুন",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থা মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
     "privateRepositoryA11y": "{{name}}, ব্যক্তিগত রিপোজিটরি",
     "legalDocumentEnglishOnly": "এই নথিটি কেবল ইংরেজিতে উপলব্ধ।",
-    "organizationTrialEndedBilling": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। আপনি বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।"
+    "organizationTrialEndedBilling": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। আপনি বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
+    "organizationTrialEndedBillingAtKiloAi": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। আপনি kilo.ai-এ বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
+    "viewOnGitHub": "GitHub-এ PR দেখুন"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -277,6 +280,9 @@
     "credits": "ক্রেডিট",
     "failedToLoadBalance": "ব্যালেন্স লোড করা যায়নি। আবার চেষ্টা করতে ট্যাপ করুন।",
     "balanceLoadFailed": "ব্যালেন্স লোড করা যায়নি",
+    "balanceUnreachable": "সার্ভারে পৌঁছানো যায়নি। আবার চেষ্টা করুন।",
+    "balanceAccessDenied": "এই ব্যালেন্স দেখার অনুমতি আপনার নেই।",
+    "balanceUnavailable": "ব্যালেন্স লোড করা যায়নি।",
     "hideBalance": "ব্যালেন্স লুকান",
     "showBalance": "ব্যালেন্স দেখান",
     "balanceHidden": "ব্যালেন্স লুকানো আছে",
@@ -752,6 +758,9 @@
       "couldNotLoadMore": "আরও মন্তব্য লোড করা যায়নি।",
       "retryLoadingMore": "আরও মন্তব্য লোড করার চেষ্টা আবার করুন",
       "loadMoreComments": "আরও মন্তব্য লোড করুন",
+      "conversationTruncated": "শুধু প্রথম {{displayCount}}টি মন্তব্য দেখানো হচ্ছে।",
+      "conversationTruncated_one": "শুধু প্রথম {{displayCount}}টি মন্তব্য দেখানো হচ্ছে।",
+      "conversationTruncated_other": "শুধু প্রথম {{displayCount}}টি মন্তব্য দেখানো হচ্ছে।",
       "addReaction": "প্রতিক্রিয়া যোগ করুন",
       "reactionPill": "{{emoji}} প্রতিক্রিয়া, {{displayCount}} {{countLabel}}",
       "reaction_one": "প্রতিক্রিয়া",
@@ -881,7 +890,6 @@
       "noAccess": "এই রিপোজিটরির চেকগুলো দেখার অনুমতি আপনার নেই।",
       "couldNotLoad": "চেক লোড করা যায়নি।",
       "retryChecks": "চেক লোড করার চেষ্টা আবার করুন",
-      "viewOnGitHub": "GitHub-এ PR দেখুন",
       "noChecksReported": "কোনো চেকের তথ্য পাওয়া যায়নি",
       "passed": "{{displayCount}}টি পাস করেছে",
       "passed_one": "{{displayCount}}টি পাস করেছে",
@@ -936,9 +944,9 @@
       "checkFailedTitleGitLab": "GitLab সংযোগ পরীক্ষা করা যায়নি।",
       "checkFailedTitleBitbucket": "Bitbucket সংযোগ পরীক্ষা করা যায়নি।",
       "providerCheckFailedMessage": "প্রদানকারীতে পৌঁছানো যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
-      "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযোগ",
-      "reconnectTitleGitLab": "GitLab-এর সঙ্গে আবার সংযোগ",
-      "reconnectTitleBitbucket": "Bitbucket-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযুক্ত করুন",
+      "reconnectTitleGitLab": "GitLab-এর সঙ্গে আবার সংযুক্ত করুন",
+      "reconnectTitleBitbucket": "Bitbucket-এর সঙ্গে আবার সংযুক্ত করুন",
       "reconnectDescription": "আপনার GitHub সংযোগের অনুমতি বাতিল করা হয়েছে।",
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করুন",
       "gitlabInstanceMismatchTitle": "GitLab সংযোগটি অন্য একটি ইনস্ট্যান্সের জন্য",
@@ -1391,7 +1399,7 @@
     "followReviewMd": "REVIEW.md অনুসরণ করুন",
     "followReviewMdSubtitle": "প্রতিটি রিপোজিটরির REVIEW.md ফাইলের নির্দেশনা অনুসরণ করুন",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।"
+      "notConnectedReadOnlyPlan": "সংস্থার ট্রায়াল শেষ হয়েছে, তাই একজন মালিককে kilo.ai-এ বিলিং আপডেট করতে হবে।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-এর Bitbucket সংযোগ কম্পিউটার থেকে ওয়েবে পরিচালনা করা হয়।",
@@ -1400,7 +1408,7 @@
       "managedOnWebRepositories": "কম্পিউটার থেকে ওয়েবে {{organization}}-এর জন্য রিপোজিটরি বেছে নিন।",
       "description": "{{organization}}-এর জন্য একটি ওয়ার্কস্পেস অ্যাক্সেস টোকেন তৈরি করে নিচে পেস্ট করুন।",
       "descriptionReconnect": "{{organization}}-এর জন্য একটি নতুন ওয়ার্কস্পেস অ্যাক্সেস টোকেন তৈরি করে নিচে পেস্ট করুন।",
-      "descriptionOverview": "{{organization}}-এর জন্য একটি ওয়ার্কস্পেস অ্যাক্সেস টোকেন তৈরি করে পরের স্ক্রিনে পেস্ট করুন।",
+      "descriptionOverview": "একটি ওয়ার্কস্পেস অ্যাক্সেস টোকেন তৈরি করে পরের স্ক্রিনে পেস্ট করুন।",
       "scopes": "অ্যাকাউন্ট: পড়া · রিপোজিটরি: পড়া/লেখা · পুল রিকোয়েস্ট: পড়া · ওয়েবহুক: পড়া/লেখা।",
       "tokenPlaceholder": "ওয়ার্কস্পেস অ্যাক্সেস টোকেন",
       "tokenRefused": "Bitbucket এই ওয়ার্কস্পেস অ্যাক্সেস টোকেন গ্রহণ করেনি। এতে উপরে দেওয়া অনুমতিগুলো আছে কি না দেখে নিন, তারপর আবার চেষ্টা করুন।"
@@ -1724,7 +1732,7 @@
       "dueThisWeekDetail_one": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "dueThisWeekDetail_other": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "noDeadline": "কোনো সময়সীমা নেই",
-      "reviewSlaAssignment": "নির্ধারিত SLA পর্যালোচনা করুন",
+      "reviewSlaAssignment": "SLA নির্ধারণ পর্যালোচনা করুন",
       "allOpenFindingsTracked": "সব অমীমাংসিত ত্রুটি নজরদারিতে আছে"
     },
     "dismiss": {
@@ -1843,7 +1851,7 @@
       "couldNotLoadMore": "আরও ত্রুটি লোড করা যায়নি।",
       "noMatchesTitle": "ফিল্টারের সঙ্গে মেলে এমন কোনো ত্রুটি নেই",
       "noMatchesDescription": "নির্বাচিত ফিল্টারগুলো বদলে বা সরিয়ে দেখুন।",
-      "emptyTitle": "কোনো অমীমাংসিত ত্রুটি নেই",
+      "emptyTitle": "কোনো খোলা ত্রুটি নেই",
       "emptyDescription": "এখন নজর দেওয়ার মতো কোনো অমীমাংসিত ত্রুটি নেই।"
     },
     "findingRow": {
@@ -1985,7 +1993,7 @@
       "failedDescription": "নিরাপত্তা এজেন্ট বিশ্লেষণটি সম্পূর্ণ করতে পারেনি।",
       "extractionFailedDescription": "প্রযুক্তিগত রিপোর্টটিকে কাঠামোগত ফলাফলে রূপান্তর করা যায়নি।",
       "exploitableDescription": "অ্যাপ্লিকেশনের কোড থেকে ত্রুটিযুক্ত ফিচারটি ব্যবহার করা যায়।",
-      "notExploitable": "কোডে পৌঁছানোর পথ নেই",
+      "notExploitable": "প্রবেশযোগ্য কোডপথ নেই",
       "notExploitableDescription": "এই রিপোজিটরিতে ত্রুটিযুক্ত ফিচারটি ব্যবহারের কোনো কোডপথ পাওয়া যায়নি।",
       "unknown": "পর্যালোচনা প্রয়োজন",
       "unknownDescription": "নিরাপত্তা দুর্বলতাযুক্ত ফিচারটি কোড থেকে ব্যবহার করা যায় কি না, তা বিশ্লেষণে নিশ্চিত হওয়া যায়নি।",
@@ -2034,7 +2042,7 @@
     "remediationUnavailable": {
       "findingNotFound": "নিরাপত্তা ত্রুটির রেকর্ডটি আর নেই।",
       "approvalRequired": "স্বয়ংক্রিয় সমাধানের জন্য অনুমোদন প্রয়োজন। অনুমোদন দিতে নিজে সমাধানের কাজ শুরু করুন।",
-      "findingNotOpen": "ত্রুটিটি আর অমীমাংসিত অবস্থায় নেই।",
+      "findingNotOpen": "ত্রুটিটি আর খোলা নেই।",
       "repoNotInScope": "নিরাপত্তা এজেন্টের জন্য রিপোজিটরিটি নির্বাচিত নয়।",
       "analysisRequired": "সমাধান শুরু করার আগে কোডবেস বিশ্লেষণ চালান।",
       "staleAnalysis": "বিশ্লেষণের পরে ত্রুটিটি বদলেছে। সমাধান শুরু করার আগে আবার বিশ্লেষণ চালান।",
@@ -3627,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "সংস্থার নাম পরিবর্তন করুন",
-      "renamePlaceholder": "সংস্থার নাম",
+      "renamePlaceholder": "সংস্থার একটি নাম লিখুন",
       "balance": "ব্যালেন্স",
       "plan": "প্ল্যান",
       "planTeams": "Teams",
@@ -4853,12 +4861,15 @@
     "inputDescription": "টুলের ফলাফলসহ প্রতিটি ইনপুট Enkrypt AI দিয়ে স্ক্যান করে। Enkrypt উপলভ্য না থাকলে অনুরোধ প্রত্যাখ্যান করার বদলে স্ক্যান ছাড়াই পাঠানো হয়।",
     "outputTitle": "আউটপুট গার্ডরেল",
     "outputDescription": "সদস্যদের কাছে পৌঁছানোর আগে উত্তরগুলো Enkrypt AI দিয়ে স্ক্যান করে। আপনি চালু না করলে এটি বন্ধ থাকে।",
+    "outputUnavailable": "Kilo এই প্রতিষ্ঠানের জন্য আউটপুট স্ক্যানিং চালু করেনি, তাই উত্তরগুলো যাচাই করা হয় না এবং এখানে সেট করার মতো কিছু নেই। এটি অনুরোধ করতে {{supportEmail}}-এ যোগাযোগ করুন।",
     "detectorsHint": "ব্লক চিহ্নিত অনুরোধ প্রত্যাখ্যান করে। শুধু লগ অনুরোধে দেরি না করে সেটি রেকর্ড করে।",
     "detectorsHintOutput": "ব্লক চিহ্নিত উত্তর ব্যর্থ করে। শুধু লগ উত্তরে দেরি না করে সেটি রেকর্ড করে।",
     "choiceLog": "শুধু লগ",
     "applyTo": "যাদের জন্য প্রযোজ্য",
     "applyToAllMembers": "সব সদস্য",
     "applyKiloDefault": "Kilo ডিফল্ট প্রয়োগ করুন",
+    "applyKiloDefaultEnglishNote": "Kilo-র ডিফল্ট নীতির টেক্সট ইংরেজিতে, কারণ Kilo Gateway এটি লেখা অনুযায়ী হুবহু প্রয়োগ করে।",
+    "applyKiloDefaultReplaceMessage": "Kilo-র ডিফল্ট নীতি ইংরেজিতে লেখা এবং নীতি লঙ্ঘন অংশে আপনি যা সেট করেছেন তা প্রতিস্থাপন করে। নীতির টেক্সট ফিল্ডে আপনার দেওয়া টেক্সট ফিরিয়ে আনা যাবে না।",
     "invalidSavedTitle": "সংরক্ষিত ইনপুট ডিটেক্টর সেটিংস পড়া যাচ্ছে না",
     "invalidSavedBody": "ইনপুট ডিটেক্টরগুলো আবার সংরক্ষণ না করা পর্যন্ত অনুরোধ ব্লক থাকবে। নিচের ডিটেক্টরগুলো Kilo ডিফল্ট থেকে শুরু হয়।",
     "invalidSavedOutputTitle": "সংরক্ষিত আউটপুট ডিটেক্টর সেটিংস পড়া যাচ্ছে না",
@@ -4994,6 +5005,7 @@
     "providersNeedCatalog": "সম্পূর্ণ মডেল ক্যাটালগ লোড না হওয়া পর্যন্ত প্রোভাইডার সুইচগুলো শুধু পড়ার জন্য থাকবে। এগুলো সম্পাদনা করতে উপরের আবার চেষ্টা করুন বোতামে ট্যাপ করুন।",
     "providersEmpty": "এই অনুসন্ধানের সাথে কোনো প্রোভাইডার মেলেনি।",
     "providersNone": "এই প্রতিষ্ঠানের জন্য কোনো প্রোভাইডার উপলব্ধ নেই।",
+    "providersUnavailable": "প্রোভাইডার তালিকা লোড করা যায়নি।",
     "allowAllShown": "দেখানো সবগুলো অনুমোদন করুন",
     "denyAllShown": "দেখানো সবগুলো নিষিদ্ধ করুন",
     "gatewaysDescription": "Kilo মডেলের অনুরোধ Vercel AI Gateway বা OpenRouter-এর মাধ্যমে রাউট করে। কোনো গেটওয়ে বন্ধ থাকলে সেই অনুরোধগুলো ব্যর্থ হয়।",

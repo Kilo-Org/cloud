@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   filterOrgGroupMembers,
   isOrgGroupFormDirty,
+  isOrgGroupFormDraft,
   ORG_GROUP_NAME_MAX_LENGTH,
   orgGroupFormExit,
   orgGroupNameError,
@@ -203,5 +204,36 @@ describe('orgGroupFormExit', () => {
         listRouteName: LIST,
       })
     ).toEqual({ kind: 'push-list' });
+  });
+});
+
+describe('isOrgGroupFormDraft', () => {
+  it('accepts the whole form', () => {
+    expect(
+      isOrgGroupFormDraft({
+        name: 'Workshop',
+        description: 'The workshop group',
+        memberIds: ['user-1'],
+        memberQuery: 'am',
+      })
+    ).toBe(true);
+  });
+
+  it('refuses another build’s value instead of coercing it', () => {
+    expect(
+      isOrgGroupFormDraft({ name: 'Workshop', description: '', memberIds: [1], memberQuery: '' })
+    ).toBe(false);
+    // A draft that lost its search has another build's shape, not this one's.
+    expect(isOrgGroupFormDraft({ name: 'Workshop', description: '', memberIds: [] })).toBe(false);
+    expect(
+      isOrgGroupFormDraft({
+        name: 'Workshop',
+        description: '',
+        memberIds: [],
+        memberQuery: '',
+        extra: true,
+      })
+    ).toBe(false);
+    expect(isOrgGroupFormDraft(null)).toBe(false);
   });
 });

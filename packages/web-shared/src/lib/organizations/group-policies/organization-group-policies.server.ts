@@ -54,7 +54,19 @@ export function parseOrganizationGroupPolicies(
   value: unknown,
   context: { organizationId: string; groupId?: string; source: 'group' | 'default' }
 ): OrganizationGroupPolicies {
-  const parsed = OrganizationGroupPoliciesSchema.safeParse(value);
+  const parsed = OrganizationGroupPoliciesSchema.safeParse(
+    Array.isArray(value)
+      ? value.filter(
+          (policy: unknown) =>
+            !(
+              typeof policy === 'object' &&
+              policy !== null &&
+              'type' in policy &&
+              policy.type === 'client_access'
+            )
+        )
+      : value
+  );
   if (!parsed.success) {
     captureException(parsed.error, {
       tags: { domain: 'organization-groups', source: context.source },

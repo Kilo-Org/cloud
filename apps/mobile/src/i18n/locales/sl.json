@@ -142,10 +142,12 @@
     "keepRunning": "Nadaljuj izvajanje",
     "newSession": "Nova seja",
     "noModelsAvailable": "Ni razpoložljivih modelov",
+    "modelRetires": "Umakne se {{date}}",
     "notFound": "Vsebine ni mogoče najti.",
     "online": "Na spletu",
     "open": "Odpri {{name}}",
     "openPullRequest": "Odprta zahteva za združitev",
+    "viewOnGitHub": "Prikaži PR na GitHubu",
     "completed": "Dokončano",
     "pending": "Na čakanju",
     "running": "V teku",
@@ -185,7 +187,8 @@
     "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
     "privateRepositoryA11y": "{{name}}, zasebno skladišče",
     "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini.",
-    "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova."
+    "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova.",
+    "organizationTrialEndedBillingAtKiloAi": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš na kilo.ai, nato poskusi znova."
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -279,6 +282,9 @@
     "credits": "Krediti",
     "failedToLoadBalance": "Stanja ni bilo mogoče naložiti. Tapni za ponovni poskus.",
     "balanceLoadFailed": "Stanja ni bilo mogoče naložiti",
+    "balanceUnreachable": "Strežnik ni dosegljiv. Poskusite znova.",
+    "balanceAccessDenied": "Nimate dovoljenja za ogled tega stanja.",
+    "balanceUnavailable": "Stanja ni bilo mogoče naložiti.",
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
@@ -509,7 +515,7 @@
     "changelogFixesPolish": "Popravki in izboljšave v celotni aplikaciji.",
     "changelogAreas": {
       "signIn": "Prijava",
-      "profileOrganizations": "Profil in organizacije"
+      "profileOrganizations": "Profil & organizacije"
     }
   },
   "preferences": {
@@ -774,6 +780,11 @@
       "couldNotLoadMore": "Več komentarjev ni bilo mogoče naložiti.",
       "retryLoadingMore": "Poskusi znova naložiti več komentarjev",
       "loadMoreComments": "Naloži več komentarjev",
+      "conversationTruncated": "Prikazanih je le prvih {{displayCount}} komentarjev.",
+      "conversationTruncated_one": "Prikazanih je le prvih {{displayCount}} komentarjev.",
+      "conversationTruncated_other": "Prikazanih je le prvih {{displayCount}} komentarjev.",
+      "conversationTruncated_two": "Prikazanih je le prvih {{displayCount}} komentarjev.",
+      "conversationTruncated_few": "Prikazanih je le prvih {{displayCount}} komentarjev.",
       "addReaction": "Dodaj odziv",
       "reactionPill": "odziv {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "odziv",
@@ -909,7 +920,6 @@
       "noAccess": "Nimaš dostopa do preverjanj za ta repozitorij.",
       "couldNotLoad": "Preverjanj ni bilo mogoče naložiti.",
       "retryChecks": "Znova poskusi naložiti preverjanja",
-      "viewOnGitHub": "Prikaži PR na GitHubu",
       "noChecksReported": "Ni podatkov o preverjanjih",
       "passed": "uspešno: {{displayCount}}",
       "passed_one": "uspešno: {{displayCount}}",
@@ -972,9 +982,9 @@
       "checkFailedTitleGitLab": "Povezave z GitLabom ni bilo mogoče preveriti.",
       "checkFailedTitleBitbucket": "Povezave z Bitbucketom ni bilo mogoče preveriti.",
       "providerCheckFailedMessage": "Ni bilo mogoče vzpostaviti povezave s ponudnikom. Preveri povezavo in poskusi znova.",
-      "reconnectTitle": "Ponovna povezava z GitHubom",
-      "reconnectTitleGitLab": "Ponovna povezava z GitLabom",
-      "reconnectTitleBitbucket": "Ponovna povezava z Bitbucketom",
+      "reconnectTitle": "Ponovno poveži GitHub",
+      "reconnectTitleGitLab": "Ponovno poveži GitLab",
+      "reconnectTitleBitbucket": "Ponovno poveži Bitbucket",
       "reconnectDescription": "Tvoja povezava z GitHubom je bila preklicana.",
       "gitlabDescription": "Preglej zahteve za združitev na mobilni napravi",
       "gitlabInstanceMismatchTitle": "Povezava z GitLabom je za drugo instanco",
@@ -1443,7 +1453,7 @@
     "followReviewMd": "Upoštevaj REVIEW.md",
     "followReviewMdSubtitle": "Upoštevaj navodila iz datotek REVIEW.md v posameznih skladiščih",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja."
+      "notConnectedReadOnlyPlan": "Preizkusna doba organizacije se je končala, zato mora lastnik posodobiti obračun na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
@@ -1452,7 +1462,7 @@
       "managedOnWebRepositories": "Izberite repozitorije za {{organization}} v spletu z računalnika.",
       "description": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
       "descriptionReconnect": "Ustvari nov žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
-      "descriptionOverview": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi na naslednjem zaslonu.",
+      "descriptionOverview": "Ustvari žeton za dostop do delovnega prostora in ga prilepi na naslednjem zaslonu.",
       "scopes": "Račun: branje · Skladišča: branje/pisanje · Zahteve za združitev: branje · Spletni povratni klici: branje/pisanje",
       "tokenPlaceholder": "Žeton za dostop do delovnega prostora",
       "tokenRefused": "Bitbucket ni sprejel tega žetona za dostop do delovnega prostora. Preveri, ali ima zgoraj navedena dovoljenja, nato poskusi znova."
@@ -1478,9 +1488,9 @@
       "activity": "Dejavnost"
     },
     "providerConnect": {
-      "githubApp": "Aplikacija GitHub",
+      "githubApp": "aplikacija GitHub",
       "githubError": "Nastavitve povezave s platformo GitHub ni bilo mogoče odpreti. Poskusi znova.",
-      "gitlabAccount": "Račun GitLab",
+      "gitlabAccount": "račun GitLab",
       "gitlabError": "Nastavitve povezave s platformo GitLab ni bilo mogoče odpreti. Poskusi znova.",
       "description": "Za samodejne preglede zahtev za združitev vzpostavi povezavo s Kilo prek možnosti {{label}}."
     },
@@ -1802,7 +1812,7 @@
       "dueThisWeekDetail_few": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "dueThisWeekDetail_other": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "noDeadline": "Brez roka",
-      "reviewSlaAssignment": "Preglej dodeljene roke SLA",
+      "reviewSlaAssignment": "Preglej dodeljevanje rokov SLA",
       "allOpenFindingsTracked": "Spremljajo se vse odprte ugotovitve"
     },
     "dismiss": {
@@ -3751,7 +3761,7 @@
     },
     "hub": {
       "renameTitle": "Preimenuj organizacijo",
-      "renamePlaceholder": "Ime organizacije",
+      "renamePlaceholder": "Vnesite ime organizacije",
       "balance": "Stanje",
       "plan": "Načrt",
       "planTeams": "Teams",
@@ -5009,12 +5019,15 @@
     "inputDescription": "Pregleda vsak vhod z Enkrypt AI, vključno z rezultati orodij. Ko Enkrypt ni na voljo, se zahteve pošljejo nepregledane, namesto da bi bile zavrnjene.",
     "outputTitle": "Izhodna varovala",
     "outputDescription": "Pregleda odgovore z Enkrypt AI, preden jih prejmejo člani. Izklopljeno, razen če jih vklopite.",
+    "outputUnavailable": "Kilo za to organizacijo ni omogočil pregledovanja izhoda, zato se odgovori ne preverjajo in tu ni ničesar za nastaviti. Če želite to zahtevati, se obrnite na {{supportEmail}}.",
     "detectorsHint": "Blokiranje zavrne označeno zahtevo. Samo beleženje jo zabeleži, ne da bi zahtevo zakasnilo.",
     "detectorsHintOutput": "Blokiranje zavrne označeni odgovor. Samo beleženje ga zabeleži, ne da bi odgovor zakasnilo.",
     "choiceLog": "Samo beleženje",
     "applyTo": "Uporabi za",
     "applyToAllMembers": "Vsi člani",
     "applyKiloDefault": "Uporabi privzeto nastavitev Kilo",
+    "applyKiloDefaultEnglishNote": "Besedilo privzetega pravilnika Kilo je v angleščini, ker ga Kilo Gateway uporabi natanko tako, kot je napisano.",
+    "applyKiloDefaultReplaceMessage": "Privzeti pravilnik Kilo je napisan v angleščini in nadomesti, kar ste nastavili pri Kršitev pravilnika. Besedila, ki ste ga vnesli v polje besedila pravilnika, ni mogoče obnoviti.",
     "invalidSavedTitle": "Shranjenih nastavitev vhodnih detektorjev ni mogoče prebrati",
     "invalidSavedBody": "Zahteve so blokirane, dokler vhodni detektorji niso znova shranjeni. Spodnji detektorji se začnejo s privzeto nastavitvijo Kilo.",
     "invalidSavedOutputTitle": "Shranjenih nastavitev izhodnih detektorjev ni mogoče prebrati",
@@ -5150,6 +5163,7 @@
     "providersNeedCatalog": "Stikala ponudnikov ostanejo samo za branje, dokler se ne naloži celoten katalog modelov. Če jih želite urejati, zgoraj tapnite Poskusi znova.",
     "providersEmpty": "Noben ponudnik ne ustreza temu iskanju.",
     "providersNone": "Za to organizacijo ni na voljo nobenega ponudnika.",
+    "providersUnavailable": "Seznama ponudnikov ni bilo mogoče naložiti.",
     "allowAllShown": "Dovoli vse prikazane",
     "denyAllShown": "Zavrni vse prikazane",
     "gatewaysDescription": "Kilo usmerja zahteve modelov prek Vercel AI Gateway ali OpenRouter. Če je prehod onemogočen, te zahteve ne uspejo.",

@@ -18,6 +18,8 @@ export type DeciderCase = {
   check: DeciderCheck;
   tier?: 'efficient' | 'frontier';
   longContext?: { generator: string; seed: number; targetTokens: number };
+  /** Fewer tool calls in the measured run than this scores 0, whatever the answer. */
+  requiredToolCalls?: number;
 };
 
 const CODE_SYS =

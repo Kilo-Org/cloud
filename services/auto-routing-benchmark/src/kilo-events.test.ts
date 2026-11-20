@@ -102,4 +102,43 @@ describe('parseKiloRunEvents', () => {
     ];
     expect(parseKiloRunEvents(lines)).toMatchObject({ text: '', costUsd: null });
   });
+
+  const event = (type: string, part: Record<string, unknown> = {}) =>
+    JSON.stringify({ type, timestamp: 1, sessionID: 'ses_1', part });
+
+  it('counts every tool call of a long run, not only the last three events', () => {
+    const lines = [
+      event('step_start'),
+      event('tool_use', { tool: 'bash', state: { status: 'completed' } }),
+      event('tool_use', { tool: 'read', state: { status: 'completed' } }),
+      event('step_finish', { reason: 'tool-calls', cost: 0.001 }),
+      event('step_start'),
+      event('tool_use', { tool: 'bash', state: { status: 'error' } }),
+      event('step_finish', { reason: 'tool-calls', cost: 0.001 }),
+      event('step_start'),
+      event('text', { text: '{"total":15}', time: { end: 2 } }),
+      event('step_finish', { reason: 'stop', cost: 0.001 }),
+    ];
+
+    const result = parseKiloRunEvents(lines);
+
+    expect(result.lastEventTypes).toEqual(['step_start', 'text', 'step_finish']);
+    expect(result.tools).toEqual({
+      calls: 3,
+      names: ['bash', 'read'],
+      steps: 3,
+      finalFinishReason: 'stop',
+    });
+  });
+
+  it('reports a turn that narrates its next step and stops as zero tool calls', () => {
+    const result = parseKiloRunEvents([
+      event('step_start'),
+      event('text', { text: "Next I'll run the tests.", time: { end: 2 } }),
+      event('step_finish', { reason: 'stop', cost: 0.0004 }),
+    ]);
+
+    expect(result.text).toBe("Next I'll run the tests.");
+    expect(result.tools).toEqual({ calls: 0, names: [], steps: 1, finalFinishReason: 'stop' });
+  });
 });

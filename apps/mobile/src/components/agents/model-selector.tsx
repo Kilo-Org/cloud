@@ -27,7 +27,7 @@ import {
   FIELD_TRIGGER_FRAME_CLASS,
 } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
-import { formatList } from '@/lib/format';
+import { formatDate, formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -194,14 +194,17 @@ export function ModelSelector({
       >
         {/* The bar stands in for the label line and takes that line's own box:
             `text-sm` sets one 17.5 dp line, which is the scale's `h-5`, so the
-            pill is the height it will have once the model arrives. Its width is
-            the nearest spacing step rather than the arriving label's measured
-            width: that width belongs to the label, and a pinned bar would be a
-            pixel value the contract does not allow. `bg-muted-soft` for the
-            reason recorded on the repository loading row: the default
-            `bg-skeleton-fill` equals this pill's `bg-secondary` in the light
-            palette and would paint nothing. The wrapper keeps the busy label for
-            assistive tech without a text node that reads as a resolved value. */}
+            pill is the height it will have once the model arrives. The field
+            presentation's value line is `text-base`, and the bar sits inside
+            the fixed `FIELD_TRIGGER_BODY_CLASS` 48 dp box, so the arriving line
+            cannot move that box. Its width is the nearest spacing step rather
+            than the arriving label's measured width: that width belongs to the
+            label, and a pinned bar would be a pixel value the contract does not
+            allow. It fills with `bg-muted-soft` for the reason recorded on the
+            repository loading row: the default `bg-skeleton-fill` equals this
+            pill's `bg-secondary` in the light palette and would paint nothing.
+            The wrapper keeps the busy label for assistive tech without a text
+            node that reads as a resolved value. */}
         <Skeleton className="h-5 w-20 bg-muted-soft" />
         <View className="opacity-50">
           <ChevronDown size={presentation === 'field' ? 16 : 14} color={colors.mutedForeground} />
@@ -297,9 +300,13 @@ export function ModelSelector({
 
   const selectorBody = (
     <View className="min-w-0 shrink flex-row items-center gap-1.5">
+      {/* The field presentation renders the value at the shared field-select
+          size, so the model line matches the other pickers in the form. The
+          chip keeps its own `text-sm` line. */}
       <Text
         className={cn(
-          'shrink text-sm font-medium',
+          'shrink font-medium',
+          presentation === 'field' ? 'text-base' : 'text-sm',
           nothingChosen ? 'text-muted-foreground' : 'text-foreground'
         )}
         numberOfLines={1}
@@ -420,7 +427,23 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData, tools, images } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
+  // The retirement note states a fact about the model beside its name, worded
+  // in the app language from `retires_on`, and is absent when the entry carries
+  // no date. It renders on its own muted line under the id: kept out of the
+  // name, the name stays the row's primary text and an RTL reading order never
+  // moves the localized sentence ahead of the Latin name. The chip's
+  // selected-model label stays without it: the picker row is where the fact
+  // matters.
   const name = autoModelLabel(option.displayId, option.name);
+  const retirementNote = option.retires_on
+    ? t('common.modelRetires', {
+        date: formatDate(new Date(`${option.retires_on}T00:00:00Z`), i18n.language, {
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        }),
+      })
+    : undefined;
   // The name may already state the fact ("… (free)", "Auto Free" in every
   // locale), so the badge and its accessibility phrase only render when it
   // does not. The free Auto model is decided by id too: nine catalogs name it
@@ -430,6 +453,7 @@ export function ModelPickerOptionRow({
     [
       option.provider?.name,
       name,
+      retirementNote,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       showFreeBadge ? freeModelFreeLabel() : undefined,
@@ -494,6 +518,9 @@ export function ModelPickerOptionRow({
               >
                 {option.displayId}
               </Text>
+            ) : null}
+            {retirementNote ? (
+              <Text className="text-xs text-muted-foreground">{retirementNote}</Text>
             ) : null}
             {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
             {option.unavailable ? (

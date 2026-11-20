@@ -42,6 +42,12 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     email: data?.email,
     isLoading,
     isError: data === undefined && (isError || (isLoading && isFetched)),
+    /**
+     * The last attempt's error, for a surface that must name WHAT failed: a
+     * refusal and a terminal code are not transient failures, and the card that
+     * reads this identity must not offer a retry for them.
+     */
+    error,
     // True when the latest attempt failed even though a cached identity is
     // still present. `isError` deliberately stays false there (a refetch
     // failure must not read as "signed out"), but a surface that presents the

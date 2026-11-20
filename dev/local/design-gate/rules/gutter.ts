@@ -322,9 +322,18 @@ function centered(node: LayoutNode, page: Page): boolean {
  * centres a stack of content, and the text inside that stack begins where the
  * stack does. That is the block's own placement, not the page column, and the
  * stack's own padding is an inner inset the block owns.
+ *
+ * A centred block only explains content aligned with the column the block
+ * itself started: the description paragraph under a centred heading, not a card
+ * painted flush to the page edge somewhere below it. So a candidate qualifies
+ * only when it is the centred box, or when every box between this node and it
+ * begins where that box's column begins — which is what a stack of left-aligned
+ * children inside a centred container looks like.
  */
 function insideCenteredBlock(nodes: readonly LayoutNode[], page: Page): boolean {
-  return nodes.some(candidate => centered(candidate, page));
+  const block = nodes.findIndex(candidate => centered(candidate, page));
+  if (block < 0) return false;
+  return nodes.slice(0, block).every(candidate => alignedToContentStart(candidate, page));
 }
 
 /**
@@ -374,6 +383,15 @@ export function checkGutter(tree: LayoutTree): Finding[] {
     if (fullBleed(node, page)) continue;
     const offset = startOffset(layoutRect(node), page.box, page);
 
+    // A centred block is the content's own placement, not the page column, and
+    // that holds on both sides of the gutter: the block's own padding is an
+    // inner inset it owns. It has to be answered before the inside-gutter test,
+    // because a landscape page box starts at the safe-area inset — a box centred
+    // in the window (63 dp of window edge, 63 dp of page edge on a 874 pt phone
+    // with 62 pt insets) then reads as 1 dp from the page edge, and the centred
+    // empty state that is the block's whole content was reported as an error.
+    if (insideCenteredBlock(nodes, page)) continue;
+
     // Nothing may sit closer to the page edge than the gutter: an edge on the
     // page's own start, or outdented past it, is inside the gutter too.
     if (offset < SCREEN_GUTTER_DP - GUTTER_TOLERANCE_DP) {
@@ -405,7 +423,6 @@ export function checkGutter(tree: LayoutTree): Finding[] {
     if (visibleWidth < width - TOLERANCE_DP || visibleHeight < height - TOLERANCE_DP) continue;
     if (insidePaintedBlock(nodes, page)) continue;
     if (!alignedToContentStart(node, page)) continue;
-    if (insideCenteredBlock(nodes, page)) continue;
     // A screen header's lines share one x: the title's, after the back control,
     // or the page gutter when the header has no control. They are that header's
     // column, not the page's — a line anywhere else is the page's, off its

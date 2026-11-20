@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   serverOptions: undefined as undefined | ServerOptions,
   spawn: vi.fn(),
   mkdtemp: vi.fn(),
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
   rm: vi.fn(),
   close: vi.fn(),
   exit: vi.fn<typeof process.exit>(),
@@ -36,6 +38,8 @@ vi.mock('node:http', () => ({
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
 vi.mock('node:fs/promises', () => ({
   mkdtemp: mocks.mkdtemp,
+  mkdir: mocks.mkdir,
+  writeFile: mocks.writeFile,
   rm: mocks.rm,
 }));
 
@@ -145,6 +149,8 @@ beforeEach(() => {
   mocks.children = [];
   mocks.spawn.mockReset().mockImplementation(createChild);
   mocks.mkdtemp.mockReset().mockResolvedValue('/tmp/benchmark-auth-test');
+  mocks.mkdir.mockReset().mockResolvedValue(undefined);
+  mocks.writeFile.mockReset().mockResolvedValue(undefined);
   mocks.rm.mockReset().mockResolvedValue(undefined);
   mocks.close.mockReset();
   mocks.exit.mockReset();
@@ -201,6 +207,30 @@ it('/run sends the prompt on stdin and disables automatic ingest while preservin
   });
   mocks.children[0].emit('close', 0);
   expect((await pending.done).status).toBe(200);
+});
+
+it.each([
+  ['an ordinary case keeps the inherited working directory', {}, '/app'],
+  ['an isolated case runs in its own workspace', { isolated: true }, '/tmp/benchmark-auth-test'],
+])('/run: %s', async (_kind, isolation, pwd) => {
+  vi.stubEnv('PWD', '/app');
+  await loadServer();
+  const pending = request('/run', { ...runBody, ...isolation });
+  await flushServer();
+  const options = mocks.spawn.mock.calls[0][2];
+  expect(options.cwd).toBe('/tmp/benchmark-auth-test');
+  expect(options.env.PWD).toBe(pwd);
+  mocks.children[0].emit('close', 0);
+  expect((await pending.done).status).toBe(200);
+});
+
+it('/run rejects a non-boolean isolation flag', async () => {
+  await loadServer();
+  expect(await request('/run', { ...runBody, isolated: 'yes' }).done).toEqual({
+    status: 400,
+    body: { error: 'isolated must be a boolean when provided' },
+  });
+  expect(mocks.spawn).not.toHaveBeenCalled();
 });
 
 it.each([

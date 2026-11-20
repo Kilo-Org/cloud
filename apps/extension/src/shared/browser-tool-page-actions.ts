@@ -109,7 +109,10 @@ export interface BrowserToolPageActionSession {
 /** `chrome.tabs` plus the create/remove calls the browser_tabs actions need. */
 export interface BrowserToolPageTabsApi extends BrowserTabsApi {
   readonly create?:
-    | ((properties: { readonly url?: string }) => Promise<BrowserTabInfo> | BrowserTabInfo)
+    | ((properties: {
+        readonly active?: boolean;
+        readonly url?: string;
+      }) => Promise<BrowserTabInfo> | BrowserTabInfo)
     | undefined;
   readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
 }
@@ -616,27 +619,57 @@ const closeTab = async (
   return done('Closed the tab.');
 };
 
-const WITHHELD_TAB_URL = '[origin withheld]';
-
 const grantsOrigin = (origins: readonly string[], url: string | undefined): boolean => {
   const origin = toBrowserOrigin(url);
 
   return origin !== undefined && origins.some(pattern => originPatternMatches(pattern, origin));
 };
 
-const tabReadable = (
-  access: BrowserAgentAccess,
-  tab: { readonly id: number; readonly url?: string | undefined }
-): boolean =>
-  access.groupTabs?.includes(tab.id) === true || grantsOrigin(access.readableOrigins, tab.url);
+/**
+ * The tabs an agent caller can reach, which is the D9 boundary: its session's
+ * group (the tabs the user dragged in or shared). Acting on any other tab is
+ * refused, and a grant for that origin is not an allowance, so listing one
+ * would only report the user's other tabs — with their count — and hand out an
+ * index that select and close must refuse. A panel caller reaches every tab.
+ */
+const reachableTabs = (
+  tabs: readonly InspectableTab[],
+  access: BrowserAgentAccess | undefined
+): readonly InspectableTab[] =>
+  access === undefined ? tabs : tabs.filter(tab => access.groupTabs?.includes(tab.id) === true);
+
+type ReachableTabResolution =
+  | { readonly ok: true; readonly tab: InspectableTab }
+  | { readonly error: string; readonly ok: false };
 
 /**
- * Acting on another tab is the D9 boundary: the session's group (which includes
- * tabs the user shared) is the only allowance; a grant for that origin is not.
+ * The tab at a listed index. `list` numbers only the reachable tabs, so select
+ * and close resolve the same way. Every index past that list is one refusal
+ * when the caller is an agent: a different answer for a browser tab the list
+ * omits would report how many tabs the browser holds. Without agent access
+ * the list is the browser's, so a past index names nothing.
  */
-const tabActable = (access: BrowserAgentAccess, tab: { readonly id: number }): boolean =>
-  access.groupTabs?.includes(tab.id) === true;
+const reachableTabAt = (
+  tabs: readonly InspectableTab[],
+  access: BrowserAgentAccess | undefined,
+  index: number
+): ReachableTabResolution => {
+  const tab = reachableTabs(tabs, access)[index];
 
+  if (tab !== undefined) {
+    return { ok: true, tab };
+  }
+
+  return access === undefined
+    ? { error: `No tab at index ${String(index)}.`, ok: false }
+    : { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false };
+};
+
+/**
+ * The tab tools: `list` reports the tabs this caller may reach, `select` and
+ * `close` address that same list by index, and `new` opens a tab behind the
+ * user's.
+ */
 const runTabs = async (
   args: Record<string, unknown>,
   session: BrowserToolPageActionSession | undefined,
@@ -655,13 +688,27 @@ const runTabs = async (
       return fail('The browser tab API is unavailable.');
     }
 
-    return done({
-      tabs: tabs.map((tab, index) =>
-        options.agentAccess !== undefined && !tabReadable(options.agentAccess, tab)
-          ? { index, selected: tab.id === options.tabId, title: '', url: WITHHELD_TAB_URL }
-          : { index, selected: tab.id === options.tabId, title: tab.title, url: tab.url }
-      ),
-    });
+    // The index counts only the tabs this caller can reach, so a listed index is always one it may select or close.
+    const listed = reachableTabs(tabs, options.agentAccess).map((tab, index) => ({
+      index,
+      selected: tab.id === options.tabId,
+      title: tab.title,
+      url: tab.url,
+    }));
+
+    // An agent reads Playwright MCP's own list shape, `- 1: (current) [Title](url)`.
+    // One prompt then works on either backend, and the list costs lines instead of JSON per tab.
+    // The panel keeps the tab objects it renders from.
+    return done(
+      options.agentAccess === undefined
+        ? { tabs: listed }
+        : listed
+            .map(
+              tab =>
+                `- ${String(tab.index)}: ${tab.selected ? '(current) ' : ''}[${tab.title}](${tab.url})`
+            )
+            .join('\n')
+    );
   }
 
   if (action === 'new') {
@@ -681,7 +728,8 @@ const runTabs = async (
       return fail(`Opening a tab at ${url} needs a navigate grant for that origin (blocked).`);
     }
 
-    const tab = await create(url === undefined ? {} : { url });
+    // A tool call never takes the user's foreground: the tab opens behind the one they are looking at (D9).
+    const tab = await create(url === undefined ? { active: false } : { active: false, url });
 
     if (tab?.id !== undefined) {
       options.noteTabCreated?.(tab.id, options.tabId);
@@ -701,17 +749,14 @@ const runTabs = async (
 
     if (index !== undefined) {
       const tabs = await listInspectableTabs(options.tabsApi);
-      const tab = tabs?.[index];
+      const found =
+        tabs === undefined ? undefined : reachableTabAt(tabs, options.agentAccess, index);
 
-      if (tab === undefined) {
-        return fail(`No tab at index ${String(index)}.`);
+      if (found === undefined || !found.ok) {
+        return fail(found?.error ?? `No tab at index ${String(index)}.`);
       }
 
-      if (options.agentAccess !== undefined && !tabActable(options.agentAccess, tab)) {
-        return fail(AGENT_TAB_OUTSIDE_GROUP_ERROR);
-      }
-
-      tabId = tab.id;
+      tabId = found.tab.id;
     }
 
     if (tabId === undefined) {
@@ -734,15 +779,13 @@ const runTabs = async (
     }
 
     const tabs = await listInspectableTabs(options.tabsApi);
-    const tab = tabs?.[index];
+    const found = tabs === undefined ? undefined : reachableTabAt(tabs, options.agentAccess, index);
 
-    if (tab === undefined) {
-      return fail(`No tab at index ${String(index)}.`);
+    if (found === undefined || !found.ok) {
+      return fail(found?.error ?? `No tab at index ${String(index)}.`);
     }
 
-    if (options.agentAccess !== undefined && !tabActable(options.agentAccess, tab)) {
-      return fail(AGENT_TAB_OUTSIDE_GROUP_ERROR);
-    }
+    const { tab } = found;
 
     const update = options.tabsApi?.update?.bind(options.tabsApi);
 

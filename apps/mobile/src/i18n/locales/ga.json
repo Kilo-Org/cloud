@@ -143,6 +143,7 @@
     "keepRunning": "Fág ag rith é",
     "newSession": "Seisiún nua",
     "noModelsAvailable": "Níl aon samhail ar fáil",
+    "modelRetires": "Dáta scoir: {{date}}",
     "notFound": "Níor aimsíodh é.",
     "online": "Ar líne",
     "open": "Oscail {{name}}",
@@ -186,7 +187,9 @@
     "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
     "privateRepositoryA11y": "{{name}}, stór príobháideach",
     "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin.",
-    "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís."
+    "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís.",
+    "organizationTrialEndedBillingAtKiloAi": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
+    "viewOnGitHub": "Féach ar an PR ar GitHub"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -280,6 +283,9 @@
     "credits": "Creidmheasanna",
     "failedToLoadBalance": "Níorbh fhéidir an t-iarmhéid a lódáil. Tapáil chun triail eile a bhaint as.",
     "balanceLoadFailed": "Níorbh fhéidir an t-iarmhéid a lódáil",
+    "balanceUnreachable": "Níorbh fhéidir an freastalaí a bhaint amach. Triail arís.",
+    "balanceAccessDenied": "Níl cead agat an iarmhéid seo a fheiceáil.",
+    "balanceUnavailable": "Níorbh fhéidir an t-iarmhéid a lódáil.",
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
@@ -510,7 +516,7 @@
     "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
     "changelogAreas": {
       "signIn": "Síniú isteach",
-      "profileOrganizations": "Próifíl agus eagraíochtaí"
+      "profileOrganizations": "Próifíl & eagraíochtaí"
     }
   },
   "preferences": {
@@ -781,6 +787,12 @@
       "comment_one": "1 trácht",
       "comment": "{{displayCount}} trácht",
       "comment_other": "{{displayCount}} trácht",
+      "conversationTruncated": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_one": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_two": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_few": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_many": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_other": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
       "startedRelative": " · tosaithe {{relative}}",
       "couldNotLoadMore": "Níorbh fhéidir tuilleadh tráchtanna a lódáil.",
       "retryLoadingMore": "Bain triail as tuilleadh tráchtanna a lódáil arís",
@@ -923,7 +935,6 @@
       "noAccess": "Níl rochtain agat ar sheiceálacha an stóir seo.",
       "couldNotLoad": "Níorbh fhéidir na seiceálacha a lódáil.",
       "retryChecks": "Bain triail as na seiceálacha arís",
-      "viewOnGitHub": "Féach ar an PR ar GitHub",
       "noChecksReported": "Níor tuairiscíodh aon seiceáil",
       "passed": "{{displayCount}} rathúil",
       "passed_one": "{{displayCount}} rathúil",
@@ -990,9 +1001,9 @@
       "checkFailedTitleGitLab": "Níorbh fhéidir an nasc GitLab a sheiceáil.",
       "checkFailedTitleBitbucket": "Níorbh fhéidir an nasc Bitbucket a sheiceáil.",
       "providerCheckFailedMessage": "Níorbh fhéidir nasc leis an soláthraí a dhéanamh. Seiceáil do nasc agus bain triail as arís.",
-      "reconnectTitle": "Athnasc GitHub",
-      "reconnectTitleGitLab": "Athnasc GitLab",
-      "reconnectTitleBitbucket": "Athnasc Bitbucket",
+      "reconnectTitle": "Ceangail le GitHub arís",
+      "reconnectTitleGitLab": "Ceangail le GitLab arís",
+      "reconnectTitleBitbucket": "Ceangail le Bitbucket arís",
       "reconnectDescription": "Cúlghaireadh do nasc GitHub.",
       "gitlabDescription": "Athbhreithnigh iarratais chumaisc ar fhón",
       "gitlabInstanceMismatchTitle": "Baineann nasc GitLab le hásc eile",
@@ -1469,7 +1480,7 @@
     "followReviewMd": "Lean REVIEW.md",
     "followReviewMdSubtitle": "Lean na treoracha sna comhaid REVIEW.md i ngach stór",
     "bitbucket": {
-      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal."
+      "notConnectedReadOnlyPlan": "Tá tréimhse trialach na heagraíochta thart, mar sin caithfidh úinéir an billeáil a nuashonrú ag kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
@@ -1478,7 +1489,7 @@
       "managedOnWebRepositories": "Roghnaigh stórais do {{organization}} ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh thíos é.",
       "descriptionReconnect": "Cruthaigh comhartha rochtana nua don spás oibre do {{organization}} agus greamaigh thíos é.",
-      "descriptionOverview": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh é ar an gcéad scáileán eile.",
+      "descriptionOverview": "Cruthaigh comhartha rochtana don spás oibre agus greamaigh é ar an gcéad scáileán eile.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
       "tokenPlaceholder": "Comhartha rochtana don spás oibre",
       "tokenRefused": "Níor ghlac Bitbucket leis an gcomhartha rochtana spáis oibre seo. Seiceáil go bhfuil na scóip thuas aige, ansin triail arís."
@@ -3813,7 +3824,7 @@
     },
     "hub": {
       "renameTitle": "Athainmnigh an eagraíocht",
-      "renamePlaceholder": "Ainm na heagraíochta",
+      "renamePlaceholder": "Cuir isteach ainm eagraíochta",
       "balance": "Iarmhéid",
       "plan": "Plean",
       "planTeams": "Teams",
@@ -5087,12 +5098,15 @@
     "inputDescription": "Scanann sé gach ionchur le Enkrypt AI, lena n-áirítear torthaí uirlisí. Nuair nach bhfuil Enkrypt ar fáil, seoltar iarratais gan scanadh seachas iad a dhiúltú.",
     "outputTitle": "Ráillí cosanta aschuir",
     "outputDescription": "Scanann sé freagraí le Enkrypt AI sula bhfaigheann comhaltaí iad. Tá sé as mura gcuireann tú ar siúl é.",
+    "outputUnavailable": "Níor chumasaigh Kilo scanadh aschuir don eagraíocht seo, mar sin ní dhéantar freagraí a sheiceáil agus níl aon rud le socrú anseo. Déan teagmháil le {{supportEmail}} chun é a iarraidh.",
     "detectorsHint": "Diúltaíonn Bloc d’iarratas atá marcáilte. Ní dhéanann Logáil amháin ach é a thaifeadadh gan moill a chur ar an iarratas.",
     "detectorsHintOutput": "Diúltaíonn Bloc d’fhreagra atá marcáilte. Ní dhéanann Logáil amháin ach é a thaifeadadh gan moill a chur ar an bhfreagra.",
     "choiceLog": "Logáil amháin",
     "applyTo": "Cuir i bhfeidhm ar",
     "applyToAllMembers": "Gach comhalta",
     "applyKiloDefault": "Cuir Réamhshocrú Kilo i bhfeidhm",
+    "applyKiloDefaultEnglishNote": "Tá téacs pholasaí réamhshocraithe Kilo i mBéarla, toisc go gcuireann Kilo Gateway i bhfeidhm é go díreach mar atá sé scríofa.",
+    "applyKiloDefaultReplaceMessage": "Tá polasaí réamhshocraithe Kilo scríofa i mBéarla agus cuireann sé in ionad an méid a shocraigh tú i Sárú polasaí. Ní féidir an téacs a chuir tú isteach sa réimse téacs polasaí a aisghabháil.",
     "invalidSavedTitle": "Ní féidir socruithe brathadóra ionchuir atá sábháilte a léamh",
     "invalidSavedBody": "Cuirtear bac ar iarratais go dtí go sábháiltear na brathadóirí ionchuir arís. Tosaíonn na brathadóirí thíos ó Réamhshocrú Kilo.",
     "invalidSavedOutputTitle": "Ní féidir socruithe brathadóra aschuir atá sábháilte a léamh",
@@ -5228,6 +5242,7 @@
     "providersNeedCatalog": "Fanann lasca na soláthraithe inléite amháin go dtí go lódálfar an catalóg iomlán samhlacha. Bain triail eile as thuas chun iad a chur in eagar.",
     "providersEmpty": "Níl aon soláthraí ag teacht leis an gcuardach seo.",
     "providersNone": "Níl aon soláthraí ar fáil don eagraíocht seo.",
+    "providersUnavailable": "Níorbh fhéidir liosta na soláthraithe a lódáil.",
     "allowAllShown": "Ceadaigh gach rud atá le feiceáil",
     "denyAllShown": "Diúltaigh do gach rud atá le feiceáil",
     "gatewaysDescription": "Ródálann Kilo iarratais samhla trí Vercel AI Gateway nó OpenRouter. Teipeann geata atá múchta ar na hiarratais sin.",

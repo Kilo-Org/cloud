@@ -461,6 +461,74 @@ describe('handleKiloClawSubscriptionDeleted', () => {
     );
   });
 
+  it.each([null, 'auto', 'user'] as const)(
+    'converts a final Commit row to credits only with explicit Standard consent (scheduled by %s)',
+    async scheduledBy => {
+      const { instance, subscription: existing } = await insertFinalCommitFixture({
+        stripeSubscriptionId: 'sub_deleted_without_consent',
+      });
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({
+          payment_source: 'credits',
+          pending_conversion: true,
+          scheduled_plan: scheduledBy === null ? null : 'standard',
+          scheduled_by: scheduledBy,
+        })
+        .where(eq(kiloclaw_subscriptions.id, existing.id));
+      const subscription = makeStripeSubscription({
+        id: 'sub_deleted_without_consent',
+        metadata: {
+          type: 'kiloclaw',
+          plan: 'commit',
+          kiloUserId: user.id,
+          instanceId: instance.id,
+        },
+        status: 'canceled',
+        cancel_at_period_end: true,
+        priceId: 'price_commit',
+      });
+
+      await handleKiloClawSubscriptionDeleted({
+        eventId: 'evt_deleted_without_consent',
+        subscription,
+      });
+
+      const [row] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.id, existing.id));
+      const hasConsent = scheduledBy === 'user';
+      expect(row).toEqual(
+        expect.objectContaining({
+          status: hasConsent ? 'active' : 'canceled',
+          plan: 'commit',
+          payment_source: 'credits',
+          stripe_subscription_id: hasConsent ? null : 'sub_deleted_without_consent',
+          credit_renewal_at: hasConsent ? row.current_period_end : null,
+          pending_conversion: false,
+          cancel_at_period_end: false,
+          scheduled_plan: hasConsent ? 'standard' : null,
+          scheduled_by: hasConsent ? 'user' : null,
+        })
+      );
+      const changeLogs = await db
+        .select()
+        .from(kiloclaw_subscription_change_log)
+        .where(eq(kiloclaw_subscription_change_log.subscription_id, existing.id));
+      expect(changeLogs).toEqual([
+        expect.objectContaining(
+          hasConsent
+            ? {
+                action: 'payment_source_changed',
+                reason: 'stripe_subscription_deleted_convert_to_credits',
+              }
+            : { action: 'canceled', reason: 'stripe_subscription_deleted' }
+        ),
+      ]);
+    }
+  );
+
   it('converts a transferred Stripe predecessor on the current successor and preserves successor price version', async () => {
     const oldInstance = await createKiloclawInstance(user.id, '2026-04-01T00:00:00.000Z');
     const newInstance = await createKiloclawInstance(user.id);
@@ -1392,7 +1460,7 @@ describe('handleKiloClawScheduleEvent', () => {
   });
 });
 
-describe('handleKiloClawInvoicePaid affiliate events', () => {
+describe('handleKiloClawInvoicePaid', () => {
   let handleKiloClawInvoicePaid: (params: {
     eventId: string;
     invoice: Stripe.Invoice;
@@ -1402,6 +1470,73 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
     const mod = await import('@/lib/kiloclaw/stripe-handlers');
     handleKiloClawInvoicePaid = mod.handleKiloClawInvoicePaid;
   });
+
+  it.each([
+    { plan: 'standard', localStatus: 'canceled', stripeStatus: 'active', expected: 'active' },
+    { plan: 'trial', localStatus: 'canceled', stripeStatus: 'active', expected: 'active' },
+    { plan: 'standard', localStatus: 'canceled', stripeStatus: 'canceled', expected: 'canceled' },
+    { plan: 'trial', localStatus: 'canceled', stripeStatus: 'canceled', expected: 'canceled' },
+    { plan: 'standard', localStatus: 'past_due', stripeStatus: 'active', expected: 'active' },
+    { plan: 'standard', localStatus: 'past_due', stripeStatus: 'canceled', expected: 'past_due' },
+  ] as const)(
+    'settles a $localStatus $plan row as $expected when Stripe is $stripeStatus',
+    async ({ plan, localStatus, stripeStatus, expected }) => {
+      const instance = await createKiloclawInstance(user.id);
+      const stripeSubscriptionId = 'sub_invoice_paid_after_local_cancel';
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        instance_id: instance.id,
+        stripe_subscription_id: stripeSubscriptionId,
+        payment_source: 'stripe',
+        plan,
+        status: localStatus,
+        past_due_since: localStatus === 'past_due' ? '2026-04-16T00:00:00.000Z' : null,
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue(
+        makeStripeSubscription({
+          id: stripeSubscriptionId,
+          metadata: { type: 'kiloclaw', plan: 'standard', kiloUserId: user.id },
+          status: stripeStatus,
+          priceId: 'price_standard',
+        })
+      );
+
+      await handleKiloClawInvoicePaid({
+        eventId: 'evt_invoice_paid_after_local_cancel',
+        invoice: {
+          id: 'in_invoice_paid_after_local_cancel',
+          amount_paid: 900,
+          parent: { subscription_details: { subscription: stripeSubscriptionId } },
+          lines: {
+            data: [
+              {
+                pricing: { price_details: { price: 'price_standard' } },
+                period: {
+                  start: Date.parse('2026-05-01T00:00:00.000Z') / 1000,
+                  end: Date.parse('2026-06-01T00:00:00.000Z') / 1000,
+                },
+              },
+            ],
+          },
+        } as Stripe.Invoice,
+      });
+
+      await expect(
+        db
+          .select()
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+      ).resolves.toEqual([
+        expect.objectContaining({
+          status: expected,
+          past_due_since: expected === 'past_due' ? '2026-04-16 00:00:00+00' : null,
+          plan: 'standard',
+          payment_source: 'credits',
+          current_period_end: '2026-06-01 00:00:00+00',
+        }),
+      ]);
+    }
+  );
 
   it('enqueues sale affiliate events for delivered attributed users', async () => {
     const paidAt = new Date('2026-04-09T10:00:00.000Z');
@@ -2023,6 +2158,7 @@ describe('applyStripeFundedKiloClawPeriod', () => {
       userId: user.id,
       metadataInstanceId: instance.id,
       stripeSubscriptionId: 'sub_settlement_resume',
+      stripeSubscriptionStatus: 'active',
       stripePaymentId: 'ch_settlement_resume',
       plan: 'standard',
       priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
@@ -2113,6 +2249,7 @@ describe('applyStripeFundedKiloClawPeriod', () => {
       userId: user.id,
       metadataInstanceId: oldInstance.id,
       stripeSubscriptionId: 'sub_settlement_cycle',
+      stripeSubscriptionStatus: 'active',
       stripePaymentId: 'ch_settlement_cycle',
       plan: 'standard',
       priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
@@ -2182,6 +2319,7 @@ describe('applyStripeFundedKiloClawPeriod', () => {
       userId: user.id,
       metadataInstanceId: instance.id,
       stripeSubscriptionId: 'sub_settlement_resume_failed',
+      stripeSubscriptionStatus: 'active',
       stripePaymentId: 'ch_settlement_resume_failed',
       plan: 'standard',
       priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,

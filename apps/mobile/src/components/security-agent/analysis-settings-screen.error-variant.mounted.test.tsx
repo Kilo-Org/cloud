@@ -1,13 +1,14 @@
 // A failed first config read names its cause: a transport rejection renders
 // the offline presentation, a server answer (tRPC FORBIDDEN) the server one.
-// PlatformErrorScreen is mounted unmocked, so the assertion reads the variant
-// through the real screen's contract with QueryError.
+// PlatformErrorScreen is mounted unmocked, so the assertions read the variant
+// and the error title through the real screen's contract with QueryError.
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
+import { i18n } from '@/i18n';
 import { AnalysisSettingsScreen } from './analysis-settings-screen';
 
 const config = vi.hoisted(() => ({
@@ -147,6 +148,8 @@ describe('AnalysisSettingsScreen config load failure variant', () => {
 
     const screen = errorVariantScreen(renderer);
     expect(screen.props.variant).toBe('offline');
+    expect(screen.props.title).toBe(i18n.t('securityAgent.analysisSettings.couldNotLoad'));
+    expect(screen.props.message).toBeUndefined();
   });
 
   it('names the server when the config read answered FORBIDDEN', async () => {
@@ -159,6 +162,8 @@ describe('AnalysisSettingsScreen config load failure variant', () => {
 
     const screen = errorVariantScreen(renderer);
     expect(screen.props.variant).toBe('server');
+    expect(screen.props.title).toBe(i18n.t('securityAgent.analysisSettings.couldNotLoad'));
+    expect(screen.props.message).toBeUndefined();
   });
 });
 

@@ -64,3 +64,37 @@ describe('formatGitUrlProject (percent-decoded segments)', () => {
     expect(formatGitUrlProject('')).toBe('');
   });
 });
+
+describe('formatGitUrlProject (one project-path pipeline)', () => {
+  it('strips one `.git` from a doubled suffix in an https URL', () => {
+    expect(formatGitUrlProject('https://github.com/owner/repo.git.git')).toBe('owner/repo.git');
+  });
+
+  it('strips one `.git` from a doubled suffix in an ssh URL', () => {
+    expect(formatGitUrlProject('git@github.com:owner/repo.git.git')).toBe('owner/repo.git');
+  });
+
+  it('drops a trailing slash in an https URL', () => {
+    expect(formatGitUrlProject('https://github.com/owner/repo/')).toBe('owner/repo');
+  });
+
+  it('drops a trailing slash in an ssh URL', () => {
+    expect(formatGitUrlProject('git@github.com:owner/repo/')).toBe('owner/repo');
+  });
+
+  it('ends the project path at a `/-/` suffix in an https URL', () => {
+    expect(formatGitUrlProject('https://github.com/owner/repo/-/tree/main')).toBe('owner/repo');
+  });
+
+  it('ends the project path at a `/-/` suffix in an ssh URL', () => {
+    expect(formatGitUrlProject('git@github.com:owner/repo/-/tree/main')).toBe('owner/repo');
+  });
+
+  it('formats the https and ssh spelling of a repository identically', () => {
+    for (const path of ['owner/repo.git.git', 'owner/repo/', 'owner/repo/-/tree/main']) {
+      expect(formatGitUrlProject(`https://github.com/${path}`)).toBe(
+        formatGitUrlProject(`git@github.com:${path}`)
+      );
+    }
+  });
+});

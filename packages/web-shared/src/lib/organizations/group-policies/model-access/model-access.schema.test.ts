@@ -177,6 +177,19 @@ describe('model access policy catalog limits', () => {
     ]);
   });
 
+  it('parses every policy mode through both schemas', () => {
+    const policies = [
+      { type: 'model_access', data: { mode: 'all' } },
+      { type: 'model_access', data: { mode: 'none' } },
+      selectedPolicy(1),
+    ] satisfies OrganizationGroupModelAccessPolicy[];
+
+    for (const policy of policies) {
+      expect(OrganizationGroupModelAccessPolicySchema.parse(policy)).toEqual(policy);
+      expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
+    }
+  });
+
   it('parses a stored policy independently of the write bounds', () => {
     const policy = {
       type: 'model_access',

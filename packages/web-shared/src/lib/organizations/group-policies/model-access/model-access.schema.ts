@@ -9,19 +9,52 @@ export const MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH = 64;
 export const MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES = 256 * 1024;
 const utf8 = new TextEncoder();
 
-export const OrganizationGroupModelAccessPolicyDataSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('all') }).strict(),
-  z.object({ mode: z.literal('none') }).strict(),
-  z
+const modelIdEntry = (maxLength: number | undefined) => {
+  const entry = z.string().trim().min(1);
+  return maxLength === undefined ? entry : entry.max(maxLength);
+};
+
+const providerSlugEntry = (maxLength: number | undefined) => {
+  const entry = z.string().trim().min(1);
+  return maxLength === undefined ? entry : entry.max(maxLength);
+};
+
+/**
+ * The `mode` union, built once per entry bound. The stored reader passes no
+ * lengths, and the write schema passes the documented ones, so a mode added
+ * here reaches both and neither can drift from the other.
+ */
+function modelAccessPolicyData(bounds: {
+  modelIdLength?: number;
+  providerSlugLength?: number;
+  maxBytes?: number;
+}) {
+  const selected = z
     .object({
       mode: z.literal('selected'),
-      model_allow_list: z.array(z.string().trim().min(1)).max(MAX_ORGANIZATION_GROUP_MODEL_IDS),
+      model_allow_list: z
+        .array(modelIdEntry(bounds.modelIdLength))
+        .max(MAX_ORGANIZATION_GROUP_MODEL_IDS),
       provider_allow_list: z
-        .array(z.string().trim().min(1))
+        .array(providerSlugEntry(bounds.providerSlugLength))
         .max(MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS),
     })
-    .strict(),
-]);
+    .strict();
+  const maxBytes = bounds.maxBytes;
+  return z.discriminatedUnion('mode', [
+    z.object({ mode: z.literal('all') }).strict(),
+    z.object({ mode: z.literal('none') }).strict(),
+    maxBytes === undefined
+      ? selected
+      : selected.refine(
+          data => utf8.encode(JSON.stringify(data)).length <= maxBytes,
+          'Policy too large'
+        ),
+  ]);
+}
+
+/** The reader for a stored policy document. */
+export const OrganizationGroupModelAccessPolicyDataSchema = modelAccessPolicyData({});
 
 export const OrganizationGroupModelAccessPolicySchema = z
   .object({
@@ -48,27 +81,12 @@ export type _AssertModelAccessMatchesDb = AssertTrue<
     : false
 >;
 
-export const OrganizationGroupModelAccessPolicyWriteDataSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('all') }).strict(),
-  z.object({ mode: z.literal('none') }).strict(),
-  z
-    .object({
-      mode: z.literal('selected'),
-      model_allow_list: z
-        .array(z.string().trim().min(1).max(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH))
-        .max(MAX_ORGANIZATION_GROUP_MODEL_IDS),
-      provider_allow_list: z
-        .array(z.string().trim().min(1).max(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH))
-        .max(MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS),
-    })
-    .strict()
-    .refine(
-      data =>
-        utf8.encode(JSON.stringify(data)).length <=
-        MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES,
-      'Policy too large'
-    ),
-]);
+/** The bounds a new policy document must satisfy. */
+export const OrganizationGroupModelAccessPolicyWriteDataSchema = modelAccessPolicyData({
+  modelIdLength: MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH,
+  providerSlugLength: MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH,
+  maxBytes: MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES,
+});
 
 export const OrganizationGroupModelAccessPolicyWriteSchema = z
   .object({

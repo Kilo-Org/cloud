@@ -10,9 +10,10 @@ import { formatList } from '@/lib/format';
  * imperatives, the open pull-request badge read as a command and asked the
  * reader to open it, the permission subjects carried a direct infinitive that
  * "की अनुमति दें?" cannot govern, and the generic failure line said no reply
- * arrived instead of that the response failed. The attachment warning and the
- * "Your Profiles" heading stayed plural at a count of one, the "Used" row was
- * a finished-event clause rather than a label, and the spoken loading cost
+ * arrived instead of that the response failed. The attachment warning repeated
+ * its plural noun in the one-file form, the "Your Profiles" heading named a
+ * single profile where the screen lists several, the "Used" row was a
+ * finished-event clause rather than a label, and the spoken loading cost
  * dropped the qualifier that marks it as still growing.
  *
  * The changelog sentence joins the areas a release touched with

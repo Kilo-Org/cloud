@@ -69,6 +69,7 @@ function element(
   providerAllowList: readonly string[] | undefined,
   overrides: {
     catalogUnavailable?: boolean;
+    catalogIsFetching?: boolean;
     onRetryCatalog?: () => void;
     modelDenyList?: readonly string[];
     catalog?: readonly CatalogModel[];
@@ -80,7 +81,7 @@ function element(
     models: [],
     catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
     catalogUnavailable: overrides.catalogUnavailable === true,
-    catalogIsFetching: false,
+    catalogIsFetching: overrides.catalogIsFetching ?? false,
     onRetryCatalog: overrides.onRetryCatalog ?? (() => undefined),
     providerAllowList,
     modelDenyList: overrides.modelDenyList ?? [],
@@ -95,6 +96,7 @@ function render(
   providerAllowList: readonly string[] | undefined,
   overrides: {
     catalogUnavailable?: boolean;
+    catalogIsFetching?: boolean;
     onRetryCatalog?: () => void;
     modelDenyList?: readonly string[];
     catalog?: readonly CatalogModel[];
@@ -161,6 +163,19 @@ async function pressSave(root: ReactTestInstance) {
 
 function statusMessage(root: ReactTestInstance): unknown {
   return root.findByType('AccessibleStatus' as never).props.message;
+}
+
+/** The one button that carries `label`, so a state's way out is unambiguous. */
+function buttonWithLabel(root: ReactTestInstance, label: string) {
+  const button = root
+    .findAllByType('Button' as never)
+    .find(node =>
+      node.findAllByType('Text' as never).some(child => child.props.children === label)
+    );
+  if (button === undefined) {
+    throw new Error(`button ${label} missing`);
+  }
+  return button;
 }
 
 afterEach(() => {
@@ -277,7 +292,10 @@ describe('ModelAccessForm without the catalog', () => {
   });
 
   it('locks the Providers tab and saves no provider list while the catalog is unavailable', async () => {
-    const root = render(undefined, { catalogUnavailable: true });
+    // A saved slug is what gives the locked tab a row to hold: without the
+    // catalog and without a saved list the tab has no rows at all, so it renders
+    // no list at all.
+    const root = render(['anthropic'], { catalogUnavailable: true });
 
     selectTab(root, 'providers');
     expect(list(root, 'ProviderAllowList').props.disabled).toBe(true);
@@ -397,5 +415,53 @@ describe('ModelAccessForm save copy', () => {
     await pressSave(root);
 
     expect(String(statusMessage(root))).toBe(i18n.t('organizationGuardrails.statusFailed'));
+  });
+});
+
+describe('ModelAccessForm with no provider rows', () => {
+  // The rows come from the gateway catalog plus the saved list, so an empty row
+  // set means that data has not arrived. The screen must say so at the top and
+  // offer the catalog retry, and the Providers tab must not render a list whose
+  // only row would read as an organization policy that allows no provider.
+  it('offers the catalog retry at the top and no empty provider list', async () => {
+    const onRetryCatalog = vi.fn<() => void>();
+    const root = render(undefined, { catalog: [], onRetryCatalog });
+
+    // The notice is screen-level, so it is on the default tab already.
+    const caption = root
+      .findAllByType('Text' as never)
+      .find(node => node.props.children === i18n.t('organizationModelAccess.providersUnavailable'));
+    expect(caption?.props.variant).toBe('caption');
+    expect(root.findAllByType('Text' as never).map(node => node.props.children)).not.toContain(
+      i18n.t('organizationModelAccess.providersNone')
+    );
+
+    selectTab(root, 'providers');
+    expect(root.findAllByType('ProviderAllowList' as never)).toHaveLength(0);
+
+    const retry = buttonWithLabel(root, i18n.t('common.retry'));
+    expect(retry.props.loading).toBe(false);
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(onRetryCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the retry as loading while the catalog request runs', () => {
+    const root = render(undefined, { catalog: [], catalogIsFetching: true });
+
+    expect(buttonWithLabel(root, i18n.t('common.retry')).props.loading).toBe(true);
+  });
+
+  it('keeps a saved provider row the catalog does not name', () => {
+    const root = render(['anthropic'], { catalog: [] });
+
+    selectTab(root, 'providers');
+
+    expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic']);
+    expect(root.findAllByType('Text' as never).map(node => node.props.children)).not.toContain(
+      i18n.t('organizationModelAccess.providersUnavailable')
+    );
   });
 });

@@ -4992,6 +4992,7 @@
     "providersNeedCatalog": "전체 모델 카탈로그가 로드될 때까지 공급자 스위치는 읽기 전용입니다. 편집하려면 위에서 다시 시도를 누르세요.",
     "providersEmpty": "이 검색과 일치하는 공급자가 없습니다.",
     "providersNone": "이 조직에서 사용할 수 있는 공급자가 없습니다.",
+    "providersUnavailable": "공급자 목록이 아직 로드되지 않았습니다. 로드하려면 다시 시도하세요.",
     "allowAllShown": "표시된 항목 모두 허용",
     "denyAllShown": "표시된 항목 모두 거부",
     "gatewaysDescription": "Kilo는 모델 요청을 Vercel AI Gateway 또는 OpenRouter를 통해 라우팅합니다. 비활성화된 게이트웨이는 해당 요청을 실패 처리합니다.",

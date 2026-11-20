@@ -159,6 +159,10 @@ export function ModelAccessForm({
     available: models,
     savedAllowList: providerAllowList,
   });
+  // The rows come from the catalog plus the saved list, so an empty row set
+  // means the gateway's provider data has not arrived; an organization policy
+  // cannot produce it, because a saved list always adds its slugs.
+  const providersEmpty = providers.length === 0;
   const serverDraft = initialDraft(
     { provider_allow_list: providerAllowList, model_deny_list: modelDenyList },
     providers
@@ -260,6 +264,21 @@ export function ModelAccessForm({
             </Button>
           </View>
         ) : null}
+        {!catalogUnavailable && providersEmpty ? (
+          <View className="flex-row items-center gap-3 rounded-md bg-muted-soft px-3 py-2">
+            <Text variant="caption" className="flex-1">
+              {t('organizationModelAccess.providersUnavailable')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              loading={catalogIsFetching}
+              onPress={onRetryCatalog}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        ) : null}
         <SegmentedControl
           options={[
             { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
@@ -306,7 +325,9 @@ export function ModelAccessForm({
           disabled={!canEdit || saving}
         />
       ) : null}
-      {tab === 'providers' ? (
+      {/* An empty row set shows the screen-level notice above instead of a list
+          whose only row would be a misleading empty-policy message. */}
+      {tab === 'providers' && !providersEmpty ? (
         <View className="flex-1">
           {catalogUnavailable ? (
             <Text variant="caption" className="px-4 pb-2">

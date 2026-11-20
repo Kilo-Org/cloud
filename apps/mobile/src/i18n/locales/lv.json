@@ -5069,6 +5069,7 @@
     "providersNeedCatalog": "Nodrošinātāju slēdži paliek tikai lasāmi, līdz tiek ielādēts pilns modeļu katalogs. Lai tos rediģētu, augstāk nospiediet Mēģināt vēlreiz.",
     "providersEmpty": "Neviens nodrošinātājs neatbilst šim meklējumam.",
     "providersNone": "Šai organizācijai nav pieejams neviens nodrošinātājs.",
+    "providersUnavailable": "Nodrošinātāju saraksts vēl nav ielādēts. Lai to ielādētu, nospiediet Mēģināt vēlreiz.",
     "allowAllShown": "Atļaut visus redzamos",
     "denyAllShown": "Liegt visus redzamos",
     "gatewaysDescription": "Kilo maršrutē modeļu pieprasījumus caur Vercel AI Gateway vai OpenRouter. Atspējota vārteja liek šiem pieprasījumiem neizdoties.",

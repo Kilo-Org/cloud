@@ -5223,6 +5223,7 @@
     "providersNeedCatalog": "Fanann lasca na soláthraithe inléite amháin go dtí go lódálfar an catalóg iomlán samhlacha. Bain triail eile as thuas chun iad a chur in eagar.",
     "providersEmpty": "Níl aon soláthraí ag teacht leis an gcuardach seo.",
     "providersNone": "Níl aon soláthraí ar fáil don eagraíocht seo.",
+    "providersUnavailable": "Níl liosta na soláthraithe lódáilte fós. Bain triail eile as chun é a lódáil.",
     "allowAllShown": "Ceadaigh gach rud atá le feiceáil",
     "denyAllShown": "Diúltaigh do gach rud atá le feiceáil",
     "gatewaysDescription": "Ródálann Kilo iarratais samhla trí Vercel AI Gateway nó OpenRouter. Teipeann geata atá múchta ar na hiarratais sin.",

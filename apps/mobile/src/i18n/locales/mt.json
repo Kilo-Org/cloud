@@ -5223,6 +5223,7 @@
     "providersNeedCatalog": "Is-swiċċijiet tal-fornituri jibqgħu biss għall-qari sakemm jitgħabba l-katalgu sħiħ tal-mudelli. Agħfas Erġa' pprova hawn fuq biex teditjahom.",
     "providersEmpty": "Ebda fornitur ma jaqbel ma' din it-tfittxija.",
     "providersNone": "M'hemm l-ebda fornitur disponibbli għal din l-organizzazzjoni.",
+    "providersUnavailable": "Il-lista tal-fornituri għadha ma tgħabbietx. Erġa' pprova biex titgħabba.",
     "allowAllShown": "Ippermetti kollha li jidhru",
     "denyAllShown": "Irrifjuta kollha li jidhru",
     "gatewaysDescription": "Kilo jidderieġi t-talbiet tal-mudelli permezz ta' Vercel AI Gateway jew OpenRouter. Portal mitfi jfalli dawk it-talbiet.",

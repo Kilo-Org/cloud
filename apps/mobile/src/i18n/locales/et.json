@@ -4992,6 +4992,7 @@
     "providersNeedCatalog": "Teenusepakkujate lülitid on kirjutuskaitstud, kuni kogu mudelikataloog on laaditud. Nende muutmiseks puuduta ülal nuppu Proovi uuesti.",
     "providersEmpty": "Sellele otsingule ei vasta ükski teenusepakkuja.",
     "providersNone": "Sellele organisatsioonile ei ole ühtegi teenusepakkujat saadaval.",
+    "providersUnavailable": "Teenusepakkujate nimekiri ei ole veel laaditud. Proovi uuesti, et see laadida.",
     "allowAllShown": "Luba kõik kuvatud",
     "denyAllShown": "Keela kõik kuvatud",
     "gatewaysDescription": "Kilo suunab mudelipäringud läbi Vercel AI Gateway või OpenRouteri. Kui lüüs on välja lülitatud, need päringud nurjuvad.",

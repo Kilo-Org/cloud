@@ -4992,6 +4992,7 @@
     "providersNeedCatalog": "Anbieter-Schalter bleiben schreibgeschützt, bis der vollständige Modellkatalog geladen ist. Tippe oben auf Erneut versuchen, um sie zu bearbeiten.",
     "providersEmpty": "Keine Anbieter entsprechen dieser Suche.",
     "providersNone": "Für diese Organisation sind keine Anbieter verfügbar.",
+    "providersUnavailable": "Die Anbieterliste wurde noch nicht geladen. Versuche es erneut, um sie zu laden.",
     "allowAllShown": "Alle angezeigten zulassen",
     "denyAllShown": "Alle angezeigten sperren",
     "gatewaysDescription": "Kilo leitet Modellanfragen über Vercel AI Gateway oder OpenRouter weiter. Bei einem deaktivierten Gateway schlagen diese Anfragen fehl.",

@@ -181,7 +181,10 @@ const capture = async (extensionPath: string, outPath: string): Promise<void> =>
        */
       colorScheme: 'dark',
       deviceScaleFactor: SIDE_PANEL_PROOF_DEVICE_SCALE_FACTOR,
-      ...(executablePath === undefined || executablePath === '' ? {} : { executablePath }),
+      // The full Chromium channel supports unpacked extensions in headless mode.
+      ...(executablePath === undefined || executablePath === ''
+        ? { channel: 'chromium' }
+        : { executablePath }),
       headless: true,
       ignoreDefaultArgs: ['--enable-automation'],
       locale: 'en-US',

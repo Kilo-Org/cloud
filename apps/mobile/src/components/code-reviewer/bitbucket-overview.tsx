@@ -169,7 +169,7 @@ export function BitbucketOverview({
               ? t('codeReviewer.bitbucketConnect.descriptionOverview', {
                   organization: organizationName,
                 })
-              : t('codeReviewer.bitbucket.notConnectedReadOnly')
+              : t('prReview.connect.adminOnlyConnectDescription')
           }
           action={
             canConnect && repair !== null ? (

@@ -199,6 +199,8 @@ overrides:
   expo-application: 58.1.2
   expo-constants: 58.0.16
   '@expo/spawn-async': 1.8.0
+  get-uri@6.0.5>basic-ftp: 6.2.6
+  eas-cli@27.9.0>ts-deepmerge: 8.0.0
 
 packageExtensionsChecksum: sha256-4VOdk6qTUHv8033DHUo0mVKYsDsR7hVjr+J4jX+smuo=
 
@@ -208,6 +210,7 @@ patchedDependencies:
   '@expo/ui@58.0.28': 99af3c8e07fb9059895e550aa57b74f9785a4a8123ab115b4c8da35c4ead71ee
   '@sentry/cloudflare@10.69.0': 8b0dd1b1c534b6ac3e13b1a85cbf1d5ab5b7ad5dda6c74a65d3b7b3f6a975802
   '@shopify/flash-list@2.3.3': 0788a743245aad9c9a54369df351e79faacc757717d0d3d87f1954e2e61bec65
+  eas-cli@27.9.0: c3f24e15c4ec8b5842f449f37fbd99380ea17cbe2209fa0923b9d8f97614831c
   expo-dev-launcher@58.0.20: 7ba3ff7110dbe4563648e254e484f69ad1e550adc93f6ac1436f5ebf222000ac
   expo-modules-autolinking@58.1.0: e71b820244f5318be036266aec0760ab6db134827f76458bb538833c7bfd1195
   expo-modules-core@58.1.0: b5de0ecedbbbe839cf9b2a8ea1ca22588981fb765435ed21bd62b8e792d39a47
@@ -596,7 +599,7 @@ importers:
         version: 1.5.2(@types/react@19.3.0)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@sentry/react-native':
         specifier: ~8.34.0
-        version: 8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.12(typescript@7.0.2))(@expo/env@2.6.0)(bufferutil@4.2.0)(dotenv@18.0.10)(expo-router@58.0.31)(expo@58.0.25)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
+        version: 8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.12(typescript@7.0.2))(@expo/env@2.6.0)(bufferutil@4.2.0)(dotenv@18.0.10)(expo-router@58.0.31)(expo@58.0.25)(metro-config@0.87.1(bufferutil@4.2.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(patch_hash=0788a743245aad9c9a54369df351e79faacc757717d0d3d87f1954e2e61bec65)(@babel/runtime@7.29.7)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -885,7 +888,7 @@ importers:
         version: 0.31.11
       eas-cli:
         specifier: 27.9.0
-        version: 27.9.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.2.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
+        version: 27.9.0(patch_hash=c3f24e15c4ec8b5842f449f37fbd99380ea17cbe2209fa0923b9d8f97614831c)(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.2.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
       knip:
         specifier: 6.41.0
         version: 6.41.0
@@ -13303,8 +13306,8 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
-  basic-ftp@5.3.1:
-    resolution: {integrity: sha512-bopVNp6ugyA150DDuZfPFdt1KZ5a94ZDiwX4hMgZDzF+GttD80lEy8kj98kbyhLXnPvhtIo93mdnLIjpCAeeOw==}
+  basic-ftp@6.2.6:
+    resolution: {integrity: sha512-0EjZCaodOz6yiokv2JA1VyKGNdGxULZ+GGlPgG9tm4d+T/bHtX1hUch8CumDneBfpIbiSdn7TaCGwpM+gwsOlw==}
     engines: {node: '>=10.0.0'}
 
   before-after-hook@4.0.0:
@@ -20882,8 +20885,8 @@ packages:
     resolution: {integrity: sha512-q5W7tVM71e2xjHZTlgfTDoPF/SmqKG5hddq9SzR49CH2hayqRKJtQ4mtRlSxKaJlR/+9rEM+mnBHf7I2/BQcpQ==}
     engines: {node: '>=6.10'}
 
-  ts-deepmerge@6.2.0:
-    resolution: {integrity: sha512-2qxI/FZVDPbzh63GwWIZYE7daWKtwXZYuyc8YNq0iTmMUwn4mL0jRLsp6hfFlgbdRSR4x2ppe+E86FnvEpN7Nw==}
+  ts-deepmerge@8.0.0:
+    resolution: {integrity: sha512-133O+10nJmVI8w5xeVZPEv5PIrv7iaUae07wv1aH8XJH95Ur6YIhWAPhPyP1YPlbPS9fCVcNIZTu7m8urRVF0A==}
     engines: {node: '>=14.13.1'}
 
   ts-interface-checker@0.1.13:
@@ -30078,7 +30081,7 @@ snapshots:
       '@sentry/conventions': 0.32.0
       '@sentry/core': 11.12.0
 
-  '@sentry/react-native@8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.12(typescript@7.0.2))(@expo/env@2.6.0)(bufferutil@4.2.0)(dotenv@18.0.10)(expo-router@58.0.31)(expo@58.0.25)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
+  '@sentry/react-native@8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.12(typescript@7.0.2))(@expo/env@2.6.0)(bufferutil@4.2.0)(dotenv@18.0.10)(expo-router@58.0.31)(expo@58.0.25)(metro-config@0.87.1(bufferutil@4.2.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.1(patch_hash=eda4d41142e7c3c832f873dd7af8d1047aad17d81998878902d4daf782593b7e)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 58.0.9(typescript@7.0.2)
       '@sentry/browser': 10.78.0
@@ -33442,7 +33445,7 @@ snapshots:
 
   baseline-browser-mapping@2.11.20: {}
 
-  basic-ftp@5.3.1: {}
+  basic-ftp@6.2.6: {}
 
   before-after-hook@4.0.0: {}
 
@@ -34717,7 +34720,7 @@ snapshots:
 
   duplexer@0.1.2: {}
 
-  eas-cli@27.9.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.2.0)(typescript@7.0.2)(utf-8-validate@6.0.6):
+  eas-cli@27.9.0(patch_hash=c3f24e15c4ec8b5842f449f37fbd99380ea17cbe2209fa0923b9d8f97614831c)(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(bufferutil@4.2.0)(typescript@7.0.2)(utf-8-validate@6.0.6):
     dependencies:
       '@expo/apple-utils': 2.3.0
       '@expo/code-signing-certificates': 0.0.5
@@ -34804,7 +34807,7 @@ snapshots:
       tar: 7.5.22
       tar-stream: 3.1.7
       terminal-link: 2.1.1
-      ts-deepmerge: 6.2.0
+      ts-deepmerge: 8.0.0
       tslib: 2.6.2
       turndown: 7.1.2
       untildify: 4.0.0
@@ -36629,7 +36632,7 @@ snapshots:
 
   get-uri@6.0.5:
     dependencies:
-      basic-ftp: 5.3.1
+      basic-ftp: 6.2.6
       data-uri-to-buffer: 6.0.2
       debug: 4.4.3(supports-color@8.1.1)
     transitivePeerDependencies:
@@ -43541,7 +43544,7 @@ snapshots:
 
   ts-dedent@2.2.0: {}
 
-  ts-deepmerge@6.2.0: {}
+  ts-deepmerge@8.0.0: {}
 
   ts-interface-checker@0.1.13: {}
 

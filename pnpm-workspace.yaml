@@ -297,6 +297,12 @@ overrides:
   # ^1.8.0, which leaves two copies of the same spawn helper in the tree. The
   # 1.8.0 API is a superset of 1.7.2, so align every dependent on it.
   '@expo/spawn-async': 1.8.0
+  # get-uri requests basic-ftp 5; 6 denies separate PASV transfer hosts by
+  # default to prevent FTP bounce attacks.
+  'get-uri@6.0.5>basic-ftp': 6.2.6
+  # EAS pins ts-deepmerge 6 and uses its removed default export. The patch below
+  # adapts EAS to the named export in the security-fixed 8.x release.
+  'eas-cli@27.9.0>ts-deepmerge': 8.0.0
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false). An injected
@@ -327,6 +333,7 @@ packageExtensions:
     peerDependencies:
       '@types/react': '*'
 patchedDependencies:
+  eas-cli@27.9.0: patches/eas-cli@27.9.0.patch
   # Reinitializing Sentry's async context at each cold DO loses in-flight scopes.
   '@sentry/cloudflare@10.69.0': patches/@sentry+cloudflare@10.69.0.patch
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useSaveOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { configKey, draftsEqual } from '@/lib/organization/guardrails-config-key';
@@ -22,12 +23,15 @@ import {
   applyKiloDefaultPreset,
   buildUpdateInput,
   type GuardrailsDraft,
+  isGuardrailsFormDraft,
   type OrgGuardrails,
   type OrgGuardrailsConfig,
   toDraft,
 } from '@/lib/organization/guardrails-draft';
 import { guardrailsIssues } from '@/lib/organization/guardrails-issues';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
+import { orgGuardrailsFormDraftKey } from '@/lib/persist/drafts';
+import { useFormDraft } from '@/lib/persist/use-form-draft';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 
 /**
@@ -39,6 +43,13 @@ import { knownServerErrorMessage } from '@/lib/server-error-copy';
  * dirty state to it, the same shape mode-form's `syncDirty` uses for its
  * event-driven form; Back while the draft holds edits asks Keep editing /
  * Discard, and a settled save (or Cancel) disarms it.
+ *
+ * The draft also lives in the account-scoped encrypted store: a device language
+ * change that flips the text direction reloads the bundle, which kills this tree
+ * without running its cleanup, and the typed configuration would come back
+ * empty. The form has the server's configuration to show, so it renders from
+ * that at once and applies a restored draft once, only while the person has
+ * typed nothing.
  */
 export function GuardrailsForm({
   organizationId,
@@ -84,14 +95,46 @@ export function GuardrailsForm({
     setDraftGeneration(generation => generation + 1);
   };
 
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const formDraft = useFormDraft<GuardrailsDraft>({
+    userId,
+    isIdentityLoading,
+    entityKey: orgGuardrailsFormDraftKey(organizationId),
+    validate: isGuardrailsFormDraft,
+  });
+  // An edit owns the form: a stored draft that lands later never replaces typed
+  // fields, and a restore runs once per mount.
+  const touchedRef = useRef(false);
+  const restoredRef = useRef(false);
+  const restoredDraft = formDraft.kind === 'ready' ? formDraft.value : null;
+
   // A save already in flight owns the route: a Back press is dropped instead of
   // offered a Discard, because the write lands even if the screen popped first.
   const saving = feedback.status === 'pending';
 
   // Declared before the rebase block below, which reports on every render that
   // takes it.
-  const guard = useMetadataLeaveGuard({ enabled: true, saving });
+  const guard = useMetadataLeaveGuard({
+    enabled: true,
+    saving,
+    // A confirmed Discard is the person dropping the draft on purpose, whether
+    // or not the store has answered: `clear` writes through while loading.
+    onDiscard: formDraft.clear,
+  });
   const { confirm, dialog: presetDialog } = useConfirmDialog();
+
+  // The restore writes through `replaceDraft`, which is rebuilt every render
+  // now that it also keeps `draftRef` in step; `restoredRef` already makes this
+  // effect run at most once, so it needs no dependency slot of its own.
+  useEffect(() => {
+    if (restoredDraft === null || touchedRef.current || restoredRef.current) {
+      return;
+    }
+    restoredRef.current = true;
+    replaceDraft(restoredDraft);
+    guard.handleDirtyChange(!draftsEqual(restoredDraft, baseline, outputAvailable));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [restoredDraft, guard, baseline, outputAvailable]);
 
   // A refetch that moved the server's configuration rebases the form, unless
   // the form holds edits of its own: those win, and the next save replaces the
@@ -116,7 +159,13 @@ export function GuardrailsForm({
     clearWhere(() => true);
     const next = update(draftRef.current);
     draftRef.current = next;
+    // An edit owns the form: a stored draft that lands later must not replace
+    // the fields the person has already typed into.
+    touchedRef.current = true;
     setDraft(next);
+    // The whole draft, on every edit: a reload may follow any of them, and the
+    // hook writes through while it still reports `loading`.
+    formDraft.save(next);
     guard.handleDirtyChange(!draftsEqual(next, baseline, outputAvailable));
   };
 
@@ -172,6 +221,9 @@ export function GuardrailsForm({
       const savedDraft = toDraft(saved);
       setBaseline(savedDraft);
       replaceDraft(savedDraft);
+      // The draft became the saved record; nothing is left to restore.
+      restoredRef.current = true;
+      formDraft.clear();
       guard.handleDirtyChange(false);
       attempt.succeed();
     } catch (error) {
@@ -247,6 +299,9 @@ export function GuardrailsForm({
             disabled={!dirty || saving}
             onPress={() => {
               clearWhere(() => true);
+              // Cancel drops the draft on purpose, so the stored copy goes too.
+              touchedRef.current = true;
+              formDraft.clear();
               replaceDraft(baseline);
               guard.handleDirtyChange(false);
             }}

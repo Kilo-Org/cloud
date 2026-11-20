@@ -9,6 +9,7 @@ import {
   denyListRowNote,
   draftsEqual,
   initialDraft,
+  isModelAccessFormDraft,
   matchesSearch,
   modelAccessSave,
   normalizeModelId,
@@ -313,5 +314,21 @@ describe('matchesSearch', () => {
     expect(matchesSearch(['Mistrál Large'], 'mistral')).toBe(true);
     expect(matchesSearch(['Mistrál Large'], 'MISTRAL LARGE')).toBe(true);
     expect(matchesSearch([undefined, 'Mistrál Large'], 'minstral')).toBe(false);
+  });
+});
+
+describe('isModelAccessFormDraft', () => {
+  it('accepts the draft the form starts from', () => {
+    expect(
+      isModelAccessFormDraft(initialDraft({ model_deny_list: ['openai/gpt:free'] }, ['anthropic']))
+    ).toBe(true);
+  });
+
+  it('rejects a foreign shape: a string list, a nested list, and a missing list', () => {
+    const stringList = { providerAllowList: 'anthropic', modelDenyList: [] };
+    expect(isModelAccessFormDraft('anthropic')).toBe(false);
+    expect(isModelAccessFormDraft(stringList)).toBe(false);
+    expect(isModelAccessFormDraft({ providerAllowList: [], modelDenyList: [7] })).toBe(false);
+    expect(isModelAccessFormDraft({ providerAllowList: [] })).toBe(false);
   });
 });

@@ -7,7 +7,16 @@ const UsageSchema = z
     input_tokens: z.number().nullish(),
     output_tokens: z.number().nullish(),
     input_tokens_details: z.object({ cached_tokens: z.number().nullish() }).nullish(),
-    output_tokens_details: z.object({ reasoning_tokens: z.number().nullish() }).nullish(),
+    output_tokens_details: z
+      .object({
+        reasoning_tokens: z.number().nullish(),
+        // The Messages API counts the thinking part of the output under this name.
+        thinking_tokens: z.number().nullish(),
+      })
+      .nullish(),
+    // The Messages API reports the cached prefixes beside the uncached input.
+    cache_creation_input_tokens: z.number().nullish(),
+    cache_read_input_tokens: z.number().nullish(),
     prompt_tokens: z.number().nullish(),
     completion_tokens: z.number().nullish(),
     prompt_tokens_details: z.object({ cached_tokens: z.number().nullish() }).nullish(),
@@ -140,15 +149,25 @@ export type ProbeUsage = {
 };
 
 function tokensOf(usage: z.infer<typeof UsageSchema> | null | undefined): ProbeUsage {
+  const inputBase = usage?.input_tokens ?? usage?.prompt_tokens ?? null;
+  const cacheRead = usage?.cache_read_input_tokens ?? null;
+  const cacheWrite = usage?.cache_creation_input_tokens ?? null;
   return {
-    inputTokens: usage?.input_tokens ?? usage?.prompt_tokens ?? null,
+    // Chat and Responses report one input count that already covers the cached part; the
+    // Messages API reports the uncached input beside the cache read and written prefixes,
+    // and the CLI's usage counts all three as input.
+    inputTokens:
+      inputBase === null && cacheRead === null && cacheWrite === null
+        ? null
+        : (inputBase ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0),
     cachedInputTokens:
       usage?.input_tokens_details?.cached_tokens ??
       usage?.prompt_tokens_details?.cached_tokens ??
-      null,
+      cacheRead,
     outputTokens: usage?.output_tokens ?? usage?.completion_tokens ?? null,
     reasoningTokens:
       usage?.output_tokens_details?.reasoning_tokens ??
+      usage?.output_tokens_details?.thinking_tokens ??
       usage?.completion_tokens_details?.reasoning_tokens ??
       null,
     costUsd: usage?.cost ?? null,
@@ -224,7 +243,8 @@ function parseChat(data: string[], reply: MutableReply): void {
         const index = call.index ?? streamed.size;
         const current = streamed.get(index) ?? { name: '', arguments: '' };
         streamed.set(index, {
-          name: call.function?.name ?? current.name,
+          // Some providers send the name once and an empty name on every argument chunk.
+          name: call.function?.name ? call.function.name : current.name,
           arguments: current.arguments + (call.function?.arguments ?? ''),
         });
       }
@@ -373,9 +393,12 @@ function parseAnthropic(data: string[], reply: MutableReply): void {
       }
       case 'message_delta': {
         if (event.usage) {
+          // The closing usage is the message's cumulative one: the gateway fills in the
+          // input and cache counts only here, so it wins over `message_start`.
           const usage = tokensOf(event.usage);
           reply.usage = {
-            ...reply.usage,
+            inputTokens: usage.inputTokens ?? reply.usage.inputTokens,
+            cachedInputTokens: usage.cachedInputTokens ?? reply.usage.cachedInputTokens,
             outputTokens: usage.outputTokens ?? reply.usage.outputTokens,
             reasoningTokens: usage.reasoningTokens ?? reply.usage.reasoningTokens,
             costUsd: usage.costUsd ?? reply.usage.costUsd,

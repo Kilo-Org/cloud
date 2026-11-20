@@ -99,6 +99,12 @@ describe('stripQueryString', () => {
     expect(stripQueryString(url)).toBe(`https://${HOST}`);
   });
 
+  it('reads a pathless single-label authority with a port as userinfo', () => {
+    const url = `https://host:3000?email=${MEMBER}`;
+
+    expect(stripQueryString(url)).toBe(`https://${HOST}`);
+  });
+
   it('keeps origin and path when the userinfo spans a separator and a delimiter', () => {
     const userinfo = ['user', ['ab', 'cd'].join('/')].join(':');
     const url = `https://${userinfo}?${['ef', HOST].join('@')}${TRPC_PATH_FIXTURE}`;

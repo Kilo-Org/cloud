@@ -698,6 +698,37 @@ describe('ModelAccessForm with a catalog that names no provider', () => {
   });
 });
 
+describe('ModelAccessForm with a catalog that names every provider', () => {
+  it('keeps a provider saved off as a row with its switch off, and allows it again', async () => {
+    // The finding's own promise: the catalog names the provider, so turning it
+    // off writes the list without it while the row stays, switched off, and the
+    // same row turns it back on.
+    const root = render(['anthropic', 'openai']);
+
+    selectTab(root, 'providers');
+    const start = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    changeProviders(root, toggleProvider(start, 'openai', false));
+    await pressSave(root);
+
+    // The form rebases on the saved policy, and the row the provider lost is
+    // still there: rows come from the catalog plus the saved list. A row's
+    // switch reads the draft, so the row listed without `openai` is the switch
+    // drawn off.
+    expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic', 'openai']);
+    const off = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    expect(off.providerAllowList).toEqual(['anthropic']);
+
+    changeProviders(root, toggleProvider(off, 'openai', true));
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls.at(-1)?.[0]).toEqual({
+      organizationId: 'org-1',
+      provider_allow_list: ['anthropic', 'openai'],
+      model_deny_list: [],
+    });
+  });
+});
+
 describe('ModelAccessForm durable draft', () => {
   it('seeds an untouched form from the stored draft', () => {
     const stored = { providerAllowList: ['openai'], modelDenyList: ['anthropic/claude'] };

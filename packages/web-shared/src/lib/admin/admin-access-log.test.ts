@@ -468,6 +468,30 @@ describe('privileged access telemetry', () => {
     });
   });
 
+  test('records a resolved non-admin caller by id and email but without a tier', () => {
+    const user = defineTestUser({ is_admin: false });
+
+    emitPrivilegedAccessEvent({
+      surface: 'rest',
+      user,
+      credential: 'human_bearer',
+      outcome: 'denied',
+      actionClass: 'support_read',
+      tokenSource: null,
+      route: '/admin/api/users',
+      method: null,
+      ip: null,
+    });
+
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      kiloUserId: user.id,
+      email: user.google_user_email,
+      adminTier: null,
+      outcome: 'denied',
+    });
+  });
+
   test('records real membership and the planned-policy wouldBlock signal', async () => {
     await recordKiloAdminElevation(
       {

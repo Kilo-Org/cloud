@@ -95,16 +95,38 @@ catalogs:
     '@vitest/ui': 5.1.0
     vitest: 5.1.0
 
+# Minutes. A new release must be published for this window, about 4.75 days
+# (114 hours), before the workspace installs it, so a compromised or withdrawn
+# release is caught before it is adopted.
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
+  # A dlx resolution outside this workspace, such as the Vercel CLI resolving
+  # tsx through its own backend, fails the age gate with ERR_PNPM_MISSING_TIME:
+  # pnpm needs the release dates before it can match an exact version, and that
+  # path does not carry them. Exempted by name, so the script runner and those
+  # resolutions both install.
   - tsx
+  # expo-dev-client must match the version the installed Expo SDK expects in its
+  # `bundledNativeModules` map, or `expo-doctor`, which
+  # `apps/mobile/AGENTS.md` requires after a dependency change, reports the
+  # mismatch, so it moves with the SDK before the window.
   - expo-dev-client
+  # Expo publishes these together with each SDK as transitive dependencies of
+  # expo-dev-client and its launcher, so they move with it in the same install.
   - expo-dev-launcher
   - expo-dev-menu
   - expo-dev-menu-interface
   - expo-manifests
   - expo-updates-interface
+  # Reached through expo-dev-launcher, @expo/cli, expo-router and
+  # expo-build-properties, not directly through expo-dev-client, and released
+  # with the same SDK, so it moves in that same install.
   - '@expo/schema-utils'
+  # The workspace typechecks with this native compiler preview's `tsgo` binary.
+  # Each dev build publishes its seven platform packages as optionalDependencies
+  # at that same exact version, so the set can only move together. Exempt by name
+  # rather than per version, so each bump does not have to add eight entries
+  # naming the new build.
   - '@typescript/native-preview'
   - '@typescript/native-preview-darwin-arm64'
   - '@typescript/native-preview-darwin-x64'
@@ -471,6 +493,7 @@ patchedDependencies:
   # already drew, so the parent's layout effect and the collection's commit no
   # longer re-enter each other until React's nested update limit. Remove once an
   # upstream release carries every guard.
+  # The version in the key must equal the `minimumReleaseAgeExclude` entry above.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
   # NativeWind's `react-native` proxy names only the exports its wrapper components
   # need; every other export, such as the `AssetRegistry` that expo-asset reads, was

@@ -31,6 +31,7 @@ import {
   issueAdmissionChallenge,
   verifyAdmissionAsync,
   persistAttestedKey,
+  reportAttestedKeyCollision,
   DEV_SENTINEL_PAYLOAD,
   MAX_ADMISSION_PAYLOAD_CHARS,
   ChallengeRateLimitError,
@@ -681,8 +682,16 @@ describe('issueAdmissionChallenge', () => {
 // ── Async admission verification ───────────────────────────────────────────
 
 describe('verifyAdmissionAsync', () => {
+  // Refusal tests force flushes at fixed 6.x million-ms instants, so each test
+  // pins the clock itself; the aggregate refresh spy would otherwise be wiped
+  // by restoreAllMocks in sibling describes.
+  let now: jest.Spied<() => number>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(6_000_000);
+    resetAdmissionCountersForTests();
   });
 
   test('returns error when challenge is already consumed', async () => {
@@ -847,7 +856,18 @@ describe('verifyAdmissionAsync', () => {
         proofKind: 'attestation',
       },
     });
-    expect(mockCaptureMessage).toHaveBeenCalledWith('apple_attestation_failed: CERT_CHAIN_INVALID');
+    // A client-shaped refusal is counted, never reported per event.
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_061_000);
+    countAdmissionCondition('native_admission_missing');
+    // The verifier's fixed enum value lands in the metric name, so the cause
+    // is one bounded metric like the Play Integrity counters.
+    const lines = aggregateLines().filter(
+      line => line.metric === 'apple_attestation_failed:CERT_CHAIN_INVALID'
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 
   // ── iOS assertion ──────────────────────────────────────────────────────
@@ -884,7 +904,13 @@ describe('verifyAdmissionAsync', () => {
         proofKind: 'assertion',
       },
     });
-    expect(mockCaptureMessage).toHaveBeenCalledWith('apple_assertion_unknown_key');
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_121_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(line => line.metric === 'apple_assertion_unknown_key');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 
   test('names no recovery for an invalid assertion against a stored key', async () => {
@@ -928,7 +954,16 @@ describe('verifyAdmissionAsync', () => {
         proofKind: 'assertion',
       },
     });
-    expect(mockCaptureMessage).toHaveBeenCalledWith('apple_assertion_failed: INVALID_ASSERTION');
+    // A client-shaped refusal is counted, never reported per event.
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_303_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(
+      line => line.metric === 'apple_assertion_failed:INVALID_ASSERTION'
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 
   test('ios assertion fails when sign count is not increasing', async () => {
@@ -970,9 +1005,16 @@ describe('verifyAdmissionAsync', () => {
         proofKind: 'assertion',
       },
     });
-    expect(mockCaptureMessage).toHaveBeenCalledWith(
-      'apple_assertion_stale_or_replayed: asserted 5 rejected'
+    // A client-shaped refusal is counted, never reported per event.
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_181_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(
+      line => line.metric === 'apple_assertion_stale_or_replayed'
     );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 1 });
   });
 
   test('ios assertion succeeds and proves the database sign_count < asserted predicate', async () => {
@@ -1101,13 +1143,19 @@ describe('verifyAdmissionAsync', () => {
           proofKind: 'assertion',
         },
       });
-      expect(mockCaptureMessage).toHaveBeenCalledWith(
-        `apple_assertion_stale_or_replayed: asserted ${staleCount} rejected`
-      );
       // The higher stored count is never overwritten.
       expect(getStored()).toBe(12);
     }
     expect(setMock).toHaveBeenCalledTimes(2);
+
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+    now.mockReturnValue(6_241_000);
+    countAdmissionCondition('native_admission_missing');
+    const lines = aggregateLines().filter(
+      line => line.metric === 'apple_assertion_stale_or_replayed'
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 2 });
   });
 
   // ── Android ─────────────────────────────────────────────────────────────
@@ -1178,6 +1226,21 @@ describe('verifyAdmissionAsync', () => {
         },
       },
     });
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    // The verifier counts its own reason metric (pinned against the real
+    // verifyPlayIntegrity in native-admission-google.test.ts); the admission
+    // layer adds no coarse play_integrity_failed count, so one refusal is
+    // reported exactly once. The mocked verifier emits nothing here, so the
+    // forced flush must carry no Play Integrity metric at all.
+    now.mockReturnValue(6_301_000);
+    countAdmissionCondition('native_admission_missing');
+    now.mockReturnValue(6_361_000);
+    countAdmissionCondition('native_admission_missing');
+
+    expect(aggregateLines().filter(line => line.metric.startsWith('play_integrity_'))).toHaveLength(
+      0
+    );
   });
 
   test('android attestation kind is refused', async () => {
@@ -1265,6 +1328,8 @@ describe('persistAttestedKey', () => {
         publicKey: 'base64pubkey',
       })
     ).rejects.toThrow(KeyCollisionError);
+    // The caller that catches the collision is the single reporting point.
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
   test('refreshes last_used_at on assertion without rewriting the sign count', async () => {
@@ -1394,6 +1459,94 @@ describe('countAdmissionCondition', () => {
         at: new Date(2_061_000).toISOString(),
       },
     ]);
+  });
+});
+
+// ── Cross-user collision reporting ─────────────────────────────────────────
+
+describe('reportAttestedKeyCollision', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetAdmissionCountersForTests();
+  });
+
+  afterEach(() => {
+    resetAdmissionCountersForTests();
+    jestGlobal.restoreAllMocks();
+  });
+
+  test('emits one message and counts the refusal in the open window', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(7_000_000);
+
+    reportAttestedKeyCollision();
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+    // Counts stay in the window until later traffic closes it.
+    expect(aggregateLines()).toStrictEqual([]);
+
+    now.mockReturnValue(7_061_000);
+    countAdmissionCondition('native_admission_missing');
+
+    const lines = aggregateLines();
+    expect(
+      lines.filter(line => line.metric === 'native_attested_key_cross_user_collision')
+    ).toStrictEqual([
+      {
+        event: 'native_admission_aggregate',
+        metric: 'native_attested_key_cross_user_collision',
+        count: 1,
+        intervalMs: 60_000,
+        windowStart: new Date(7_000_000).toISOString(),
+        at: new Date(7_061_000).toISOString(),
+      },
+    ]);
+    expect(lines.filter(line => line.metric === 'native_admission_refused')).toStrictEqual([
+      {
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_refused',
+        count: 1,
+        intervalMs: 60_000,
+        windowStart: new Date(7_000_000).toISOString(),
+        at: new Date(7_061_000).toISOString(),
+      },
+    ]);
+  });
+
+  test('stays silent for a repeat inside the interval but still counts it', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(8_000_000);
+
+    reportAttestedKeyCollision();
+    now.mockReturnValue(8_030_000);
+    reportAttestedKeyCollision();
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(8_061_000);
+    countAdmissionCondition('native_admission_missing');
+
+    const lines = aggregateLines().filter(
+      line => line.metric === 'native_attested_key_cross_user_collision'
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 2 });
+  });
+
+  test('reports again once the interval has elapsed', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(9_000_000);
+
+    reportAttestedKeyCollision();
+    now.mockReturnValue(9_060_000);
+    reportAttestedKeyCollision();
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(2);
+    expect(mockCaptureMessage).toHaveBeenNthCalledWith(
+      2,
+      'native_attested_key_cross_user_collision'
+    );
   });
 });
 

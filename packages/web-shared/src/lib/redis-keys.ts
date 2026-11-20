@@ -37,6 +37,10 @@ export const codingPlanUsageRedisKey = (input: {
 /** `digest` is a hex SHA-256 over the envelope and its KMS context; see `data-key-cache.ts`. */
 export const byokDataKeyRedisKey = (digest: string) => redisKey(`byok-data-key:v1:${digest}`);
 
+/** `digest` is a hex SHA-256 over the caller, partner and prompt cache key; see `partner-upstream-error-cache.ts`. */
+export const partnerUpstreamErrorRedisKey = (digest: string) =>
+  redisKey(`partner-upstream-error:v1:${digest}`);
+
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'
 );

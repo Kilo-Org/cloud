@@ -107,6 +107,11 @@ import {
   resolveTranscriptionRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
 import {
+  getPartnerSession,
+  hasRecentPartnerUpstreamError,
+  rememberPartnerUpstreamError,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/partner-upstream-error-cache';
+import {
   removePaidServerFeatures,
   requestsPaidServerFeatures,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
@@ -136,6 +141,8 @@ export type ProviderRoute = {
   /** The provider the organization policy checks when a direct BYOK key serves the request (see
    *  `getDirectByokPolicyProviderId`). */
   directByokPolicyProviderId?: string;
+  /** Called when the route's upstream answers with a failure the client did not cause by leaving. */
+  onUpstreamFailure?: () => void;
 };
 
 /** Resolves a route. A BYOK key is decrypted only when its route is resolved. */
@@ -455,6 +462,9 @@ async function resolvePartnerRoute(
   if (input.boundedSpending) return 'bounded-spending';
   // Implied by an inference region, which admits only Kilo's Vercel AI Gateway route.
   if (input.openRouterDisabled) return 'openrouter-disabled';
+  const session = getPartnerSession(input.request, input.taskId, input.user.id, partner.public_id);
+  // Started now so the Redis read overlaps the provider settings lookups. It never rejects.
+  const recentUpstreamError = session ? hasRecentPartnerUpstreamError(session) : null;
   const providerConfig = withIgnoredProviders(
     await input.getRoutingProviderConfig(),
     input.kiloIgnoredProviders ?? []
@@ -466,6 +476,9 @@ async function resolvePartnerRoute(
   if (requestsUnsupportedReasoningEffort(partner, input.request)) {
     return 'unsupported-reasoning-effort';
   }
+  // Once the session's prompt cache sits with Kilo's route, returning to the partner would
+  // discard it, and the partner may still be failing.
+  if (await recentUpstreamError) return 'recent-upstream-error';
   // Unlike a custom LLM that owns its id, a partner has a fallback, so unusable
   // credentials skip it instead of failing the request.
   let auth: DirectUpstreamAuth;
@@ -488,6 +501,7 @@ async function resolvePartnerRoute(
     isFree: isFreeModel(input.requestedModel),
     bypassAccessCheck: false,
     customLlmPricing: definition.pricing,
+    ...(session ? { onUpstreamFailure: () => rememberPartnerUpstreamError(session) } : {}),
   };
 }
 
@@ -538,6 +552,8 @@ export type GetProviderInput = {
   isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
+  /** The `x-kilocode-taskid` header, from which the upstream prompt cache key is derived. */
+  taskId?: string | null;
   /** Receives the steps and BYOK candidates behind the result, when the call returns. */
   onDecision?: (decision: ProviderRoutingDecision) => void;
 };

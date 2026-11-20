@@ -12,7 +12,7 @@ import {
   releaseSignInCode,
   consumeSignInCode,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
-import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { consumeSignInTicket, readSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
@@ -34,9 +34,11 @@ jest.mock('@/lib/auth/native-id-tokens', () => ({
 jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
 jest.mock('@/lib/auth/passkey', () => ({
   consumeSignInTicket: jest.fn(),
+  readSignInTicket: jest.fn(),
 }));
 jest.mock('@/lib/user');
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id');
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 jest.mock('@kilocode/web-shared/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
 jest.mock('@/lib/auth/native-admission', () => ({
@@ -60,6 +62,12 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: jest.fn(),
+  logExceptInTest: jest.fn(),
+  errorExceptInTest: jest.fn(),
+  sentryLogger: jest.fn(() => jest.fn()),
 }));
 
 // eslint-disable-next-line no-var
@@ -87,6 +95,8 @@ import {
   verifyAdmissionAsync,
   persistAttestedKey,
   KeyCollisionError,
+  countAdmissionCondition,
+  resetAdmissionCountersForTests,
 } from '@/lib/auth/native-admission';
 import {
   createDeviceSession,
@@ -95,6 +105,7 @@ import {
   createDeviceSessionWithCredentials,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   isNativeTokenAddressRateLimited,
   isNativeTokenUserRateLimited,
@@ -106,6 +117,32 @@ import {
   summarizePendingLink,
 } from '@/lib/auth/pending-link';
 
+const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
+
+/**
+ * The admission aggregate flushes on wall-clock window boundaries, so refusal
+ * tests pin the clock and force a flush at a later instant.
+ */
+const now = jest.spyOn(Date, 'now');
+
+/** The aggregate telemetry line the admission module writes once per window. */
+type AggregateLine = {
+  event: 'native_admission_aggregate';
+  metric: string;
+  count: number;
+  intervalMs: number;
+  windowStart: string;
+  at: string;
+};
+
+/** Aggregate lines written to the warn sink so far, in emission order. */
+function aggregateLines(): AggregateLine[] {
+  return mockWarnExceptInTest.mock.calls.flatMap(([message]: unknown[]) => {
+    const parsed = JSON.parse(String(message)) as { event?: string };
+    return parsed.event === 'native_admission_aggregate' ? [parsed as AggregateLine] : [];
+  });
+}
+
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
 const mockExchangeNativeGoogleAuthCode = jest.mocked(exchangeNativeGoogleAuthCode);
@@ -114,6 +151,7 @@ const mockCommitSignInCode = jest.mocked(commitSignInCode);
 const mockReleaseSignInCode = jest.mocked(releaseSignInCode);
 const mockConsumeSignInCode = jest.mocked(consumeSignInCode);
 const mockConsumeSignInTicket = jest.mocked(consumeSignInTicket);
+const mockReadSignInTicket = jest.mocked(readSignInTicket);
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockFindUserById = jest.mocked(findUserById);
 const mockFindUserBySignInCodeEmail = jest.mocked(findUserBySignInCodeEmail);
@@ -123,10 +161,29 @@ const mockCheckDomainSignInEligibility = jest.mocked(checkDomainSignInEligibilit
 const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
 const mockPersistAttestedKey = jest.mocked(persistAttestedKey);
-const mockCreateDeviceSession = jest.mocked(createDeviceSession);
+const mockCreateDeviceSession = createDeviceSession as unknown as jest.MockedFunction<
+  (params: {
+    userId: string;
+    userAgent?: string;
+    claim?: (tx: DrizzleTransaction) => Promise<unknown>;
+  }) => Promise<string | null>
+>;
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
-const mockCreateDeviceSessionWithCredentials = jest.mocked(createDeviceSessionWithCredentials);
+const mockCreateDeviceSessionWithCredentials =
+  createDeviceSessionWithCredentials as unknown as jest.MockedFunction<
+    (params: {
+      userId: string;
+      userAgent?: string;
+      user: User;
+      claim?: (tx: DrizzleTransaction) => Promise<unknown>;
+    }) => Promise<{
+      token: string;
+      refreshToken: string;
+      expiresIn: number;
+      sessionId: string;
+    } | null>
+  >;
 const mockIsNativeTokenAddressRateLimited = jest.mocked(isNativeTokenAddressRateLimited);
 const mockIsNativeTokenUserRateLimited = jest.mocked(isNativeTokenUserRateLimited);
 const mockRevokeDeviceSession = jest.mocked(revokeDeviceSession);
@@ -140,6 +197,16 @@ const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 const actualRequireAdmissionPayload = jest.requireActual<{
   requireAdmissionPayload: typeof requireAdmissionPayload;
 }>('@/lib/auth/native-admission').requireAdmissionPayload;
+
+/** One live passkey ticket row: read and redeemed by the same request. */
+const liveSignInTicket = () => ({
+  id: 'ticket-row-1',
+  ticket_hash: 'hash',
+  kilo_user_id: fakeUser.id,
+  expires_at: new Date(Date.now() + 60_000).toISOString(),
+  consumed_at: null,
+  created_at: new Date().toISOString(),
+});
 
 describe('POST /api/auth/native/token', () => {
   const createRequest = (body: unknown) =>
@@ -158,6 +225,8 @@ describe('POST /api/auth/native/token', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    now.mockReturnValue(6_000_000);
+    resetAdmissionCountersForTests();
     mockCreateOrUpdateUser.mockResolvedValue({
       success: true,
       user: fakeUser,
@@ -194,6 +263,8 @@ describe('POST /api/auth/native/token', () => {
     mockCommitSignInCode.mockResolvedValue(true);
     mockReleaseSignInCode.mockResolvedValue(undefined);
     mockConsumeSignInCode.mockResolvedValue(true);
+    mockReadSignInTicket.mockResolvedValue(liveSignInTicket());
+    mockConsumeSignInTicket.mockResolvedValue(liveSignInTicket());
     mockIsNativeTokenAddressRateLimited.mockResolvedValue(false);
     mockIsNativeTokenUserRateLimited.mockResolvedValue(false);
     mockRevokeDeviceSession.mockResolvedValue(undefined);
@@ -1583,6 +1654,13 @@ describe('POST /api/auth/native/token', () => {
       // Code must NOT be committed — ownership check happens before commit.
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The ownership mismatch is an expected refusal: counted beside the
+      // per-event report, like the collision refusals.
+      now.mockReturnValue(6_181_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
     });
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
@@ -1617,6 +1695,13 @@ describe('POST /api/auth/native/token', () => {
       // Code must NOT be committed — attestation ownership is checked pre-commit.
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The ownership mismatch is an expected refusal: counted beside the
+      // per-event report, like the collision refusals.
+      now.mockReturnValue(6_241_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
     });
 
     // ── Fix 3: KeyCollisionError during persistence does not burn the code ─
@@ -1656,7 +1741,19 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       // Code must be released so it remains usable.
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The collision is counted and reported once per interval, so the
+      // per-event report survives a window this instance never closes.
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+      now.mockReturnValue(6_061_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_attested_key_cross_user_collision')
+      ).toHaveLength(1);
+      // The collision is also a refusal: both routes count the same pair.
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
     });
 
     it('refuses key collision during persistence without burning the sign-in code (email, no supportsRefresh)', async () => {
@@ -1689,7 +1786,21 @@ describe('POST /api/auth/native/token', () => {
       expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The collision is counted and reported once per interval, so the
+      // per-event report survives a window this instance never closes.
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+      // The refusal lands in the pinned window; the next counted condition
+      // closes it with this refusal as one count on the metric's line.
+      now.mockReturnValue(6_121_000);
+      countAdmissionCondition('native_admission_missing');
+      const collisionLine = aggregateLines().find(
+        line => line.metric === 'native_attested_key_cross_user_collision'
+      );
+      expect(collisionLine).toMatchObject({ count: 1 });
+      // The collision is also a refusal: both routes count the same pair.
+      const refusedLine = aggregateLines().find(line => line.metric === 'native_admission_refused');
+      expect(refusedLine).toMatchObject({ count: 1 });
     });
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
@@ -1762,6 +1873,54 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('counts the apple-path ownership mismatch without touching persistence', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockRequireAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      // The key is bound to another account, so the post-settlement ownership
+      // check refuses this sign-in before any credential is persisted.
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+        existingKeyUserId: 'other-user',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          nonce: 'test-nonce',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      // Refused before any credential persistence runs.
+      expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      // The ownership mismatch keeps its per-event report and is counted.
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
+      // The refusal lands in the pinned window; the next counted condition
+      // closes it with this refusal as one count on the metric's line.
+      now.mockReturnValue(6_121_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
     });
 
     // ── Fix 6: attestation key + session in one transaction ────────────
@@ -2109,23 +2268,27 @@ describe('POST /api/auth/native/token', () => {
   describe('passkey', () => {
     const ticketBody = { provider: 'passkey', ticket: 'ticket-1' } as const;
 
+    // The tx stub is opaque: the route only forwards it to the claim, and the
+    // real helper owns its construction.
+    const stubTx = {} as never;
+
     beforeEach(() => {
-      mockConsumeSignInTicket.mockResolvedValue({
-        id: 'ticket-row-1',
-        ticket_hash: 'hash',
-        kilo_user_id: fakeUser.id,
-        expires_at: new Date(Date.now() + 60_000).toISOString(),
-        consumed_at: null,
-        created_at: new Date().toISOString(),
-      });
       mockFindUserById.mockResolvedValue(fakeUser);
-      mockCreateDeviceSession.mockResolvedValue('device-session-1');
-      mockCreateDeviceSessionWithCredentials.mockResolvedValue({
-        token: 'session-jwt',
-        refreshToken: 'session-refresh',
-        expiresIn: 3600,
-        sessionId: 'device-session-1',
-      });
+      // The mocked factories honor the real helpers' contract: the claim runs
+      // after the (mocked) insert, and a falsy claim result resolves null.
+      mockCreateDeviceSession.mockImplementation(async params =>
+        params.claim && !(await params.claim(stubTx)) ? null : 'legacy-session-1'
+      );
+      mockCreateDeviceSessionWithCredentials.mockImplementation(async params =>
+        params.claim && !(await params.claim(stubTx))
+          ? null
+          : {
+              token: 'session-jwt',
+              refreshToken: 'session-refresh',
+              expiresIn: 3600,
+              sessionId: 'refresh-session-1',
+            }
+      );
     });
 
     it('exchanges a valid ticket for a device session without touching settlement or the OTP path', async () => {
@@ -2138,13 +2301,18 @@ describe('POST /api/auth/native/token', () => {
         expiresIn: 3600,
         created: false,
       });
-      expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1');
+      expect(mockReadSignInTicket).toHaveBeenCalledWith('ticket-1');
       expect(mockFindUserById).toHaveBeenCalledWith(fakeUser.id);
+      // The redemption is the claim the mock runs inside the session
+      // transaction; the route itself never spends the ticket post-insert.
       expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
         userId: fakeUser.id,
         userAgent: undefined,
         user: fakeUser,
+        claim: expect.any(Function),
       });
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+      expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1', expect.anything());
       expect(mockCreateDeviceSession).not.toHaveBeenCalled();
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       // The ticket is the identity proof: no account settlement.
@@ -2167,30 +2335,78 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCreateDeviceSession).toHaveBeenCalledWith({
         userId: fakeUser.id,
         userAgent: undefined,
+        claim: expect.any(Function),
       });
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+      expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1', expect.anything());
       expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
-        deviceSessionId: 'device-session-1',
+        deviceSessionId: 'legacy-session-1',
       });
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     });
 
-    it('refuses a replayed ticket with 401 INVALID_TICKET and mints no second session', async () => {
+    it('resolves the pending link only after the redemption settles', async () => {
+      let pendingLinkAskedBeforeClaim = -1;
+      mockResolvePendingLink.mockImplementation(async () => {
+        pendingLinkAskedBeforeClaim = mockConsumeSignInTicket.mock.calls.length;
+        return undefined;
+      });
+
+      const response = await POST(
+        createRequest({ ...ticketBody, pendingLinkToken: 'pending-secret', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        token: 'session-jwt',
+        refreshToken: 'session-refresh',
+        expiresIn: 3600,
+        created: false,
+      });
+      // The claim runs inside the helper's transaction before the helper
+      // reports a session, so by the time the route asks for the pending link
+      // the redemption has already settled.
+      expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledTimes(1);
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+      expect(pendingLinkAskedBeforeClaim).toBe(1);
+      expect(mockResolvePendingLink).toHaveBeenCalledWith('pending-secret', fakeUser.id);
+    });
+
+    it('does not resolve the pending link when the redemption loses the race', async () => {
+      mockCreateDeviceSessionWithCredentials.mockResolvedValueOnce(null);
+
+      const response = await POST(
+        createRequest({ ...ticketBody, pendingLinkToken: 'pending-secret', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockResolvePendingLink).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+      // The insert rolled back, so there is no session row left to compensate.
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith('native_token_session_cleanup_failed');
+    });
+
+    it('refuses a replayed ticket with 401 INVALID_TICKET and leaves nothing to revoke', async () => {
       const first = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
       expect(first.status).toBe(200);
-
-      // The ticket row is consumed atomically, so the replay finds no row.
-      mockConsumeSignInTicket.mockResolvedValue(null);
+      // The claim ran once for the delivered session (the contract stub runs
+      // it). The replay loses the redemption: with the ticket spent its claim
+      // returns null, and the helper rolls the session back instead of
+      // delivering credentials.
+      mockConsumeSignInTicket.mockResolvedValueOnce(null);
       const replayed = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
 
       expect(replayed.status).toBe(401);
       expect(await replayed.json()).toEqual({ error: 'INVALID_TICKET' });
-      expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledTimes(1);
-      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
-      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
     });
 
-    it('refuses an expired ticket with 401 INVALID_TICKET and mints no session', async () => {
-      mockConsumeSignInTicket.mockResolvedValue(null);
+    it('refuses an expired ticket with 401 INVALID_TICKET and redeems nothing', async () => {
+      mockReadSignInTicket.mockResolvedValue(null);
 
       const response = await POST(
         createRequest({ provider: 'passkey', ticket: 'expired', supportsRefresh: true })
@@ -2198,8 +2414,142 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(401);
       expect(await response.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
       expect(mockCreateDeviceSession).not.toHaveBeenCalled();
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('keeps the ticket usable when the domain check refuses', async () => {
+      mockCheckDomainSignInEligibility.mockResolvedValue({
+        ok: false,
+        status: 503,
+        errorCode: 'SSO_ERROR',
+      });
+
+      const refused = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(refused.status).toBe(503);
+      expect(await refused.json()).toEqual({ error: 'SSO_ERROR' });
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
+
+      // The same ticket still signs in once the domain check recovers.
+      mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: true });
+      const retried = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(retried.status).toBe(200);
+      expect(await retried.json()).toEqual({
+        token: 'session-jwt',
+        refreshToken: 'session-refresh',
+        expiresIn: 3600,
+        created: false,
+      });
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the ticket usable when the domain check throws', async () => {
+      mockCheckDomainSignInEligibility.mockRejectedValueOnce(new Error('policy db down'));
+
+      await expect(POST(createRequest({ ...ticketBody, supportsRefresh: true }))).rejects.toThrow(
+        'policy db down'
+      );
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
+
+      mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: true });
+      const retried = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(retried.status).toBe(200);
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the ticket usable when the account is refused by the rate limit', async () => {
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
+
+      const refused = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(refused.status).toBe(429);
+      expect(await refused.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
+
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(false);
+      const retried = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(retried.status).toBe(200);
+      expect(mockConsumeSignInTicket).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a loser of the ticket race on both paths and leaves nothing to revoke', async () => {
+      // The read finds the row, so this request reaches session creation; the
+      // redemption is what a concurrent request already won, and the helper
+      // reports it by resolving null with nothing committed.
+      mockCreateDeviceSessionWithCredentials.mockResolvedValueOnce(null);
+
+      const refreshed = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(refreshed.status).toBe(401);
+      expect(await refreshed.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith('native_token_session_cleanup_failed');
+
+      mockCreateDeviceSession.mockResolvedValueOnce(null);
+      const legacy = await POST(createRequest(ticketBody));
+
+      expect(legacy.status).toBe(401);
+      expect(await legacy.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith('native_token_session_cleanup_failed');
+    });
+
+    it('keeps the route catch harmless when the claim itself throws', async () => {
+      // The helper's contract stub runs the claim after its insert; a claim
+      // that THROWS (a real error, not a lost claim) propagates out of the
+      // helper while no session id was assigned, and the route's catch must
+      // not mask the error with a revoke of nothing.
+      mockConsumeSignInTicket.mockRejectedValueOnce(new Error('claim db down'));
+
+      await expect(POST(createRequest({ ...ticketBody, supportsRefresh: true }))).rejects.toThrow(
+        'claim db down'
+      );
+
+      // The stub never returned credentials, so the route never assigned a
+      // session id; there is nothing for the catch to revoke, and the thrown
+      // error propagates unchanged.
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+    });
+
+    it('revokes the session when a later throw arrives after the session was assigned', async () => {
+      // Simulate the session helper succeeding, but a later step inside the
+      // try (pendingLink resolution) throwing.
+      mockResolvePendingLink.mockRejectedValueOnce(new Error('pending link db down'));
+
+      await expect(
+        POST(
+          createRequest({
+            ...ticketBody,
+            pendingLinkToken: 'pending-secret',
+            supportsRefresh: true,
+          })
+        )
+      ).rejects.toThrow('pending link db down');
+
+      expect(mockRevokeDeviceSession).toHaveBeenCalledWith(
+        'refresh-session-1',
+        'sign_in_not_completed'
+      );
+    });
+
+    it('does not spend the ticket when the session cannot be created', async () => {
+      mockCreateDeviceSessionWithCredentials.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(POST(createRequest({ ...ticketBody, supportsRefresh: true }))).rejects.toThrow(
+        'db down'
+      );
+
+      // The helper throws before its transaction can run the claim.
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
     });
 
     it('rejects a blocked user without minting a session', async () => {
@@ -2339,14 +2689,6 @@ describe('POST /api/auth/native/token', () => {
     });
 
     it('refuses a rate-limited account on the passkey path without minting a session', async () => {
-      mockConsumeSignInTicket.mockResolvedValue({
-        id: 'ticket-row-1',
-        ticket_hash: 'hash',
-        kilo_user_id: fakeUser.id,
-        expires_at: new Date(Date.now() + 60_000).toISOString(),
-        consumed_at: null,
-        created_at: new Date().toISOString(),
-      });
       mockFindUserById.mockResolvedValue(fakeUser);
       mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
 
@@ -2356,6 +2698,7 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(429);
       expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
       expect(mockCreateDeviceSession).not.toHaveBeenCalled();
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     });

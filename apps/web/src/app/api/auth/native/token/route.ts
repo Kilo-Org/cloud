@@ -18,7 +18,7 @@ import {
   hosted_domain_specials,
   SIGNUP_STEP_UP_METHODS,
 } from '@kilocode/web-shared/lib/auth/constants';
-import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { consumeSignInTicket, readSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
@@ -35,6 +35,7 @@ import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
   classifyAdmissionPayload,
   countAdmissionCondition,
+  reportAttestedKeyCollision,
   requireAdmissionPayload,
   verifyAdmissionAsync,
   persistAttestedKey,
@@ -51,6 +52,7 @@ import {
   createDeviceSessionWithAttestedKey,
   createDeviceSessionWithCredentials,
   revokeDeviceSession,
+  type DeviceSessionClaim,
 } from '@/lib/auth/device-sessions';
 import {
   isNativeTokenAddressRateLimited,
@@ -379,10 +381,11 @@ async function runNativeTokenExchange(
   let autoLinkToExistingUser: boolean;
 
   if (data.provider === 'passkey') {
-    // The ticket is single-use and short-lived, and was minted only after a
-    // WebAuthn assertion verified against a server-stored challenge, so
-    // redeeming it is the identity proof. A replay consumes no row.
-    const ticket = await consumeSignInTicket(data.ticket);
+    // The ticket is the identity proof: it was minted only after a WebAuthn
+    // assertion verified against a server-stored challenge. It is read here and
+    // redeemed only once this request is going to succeed, so a refusal or a
+    // provider fault below leaves the client's only proof usable.
+    const ticket = await readSignInTicket(data.ticket);
     if (!ticket) {
       return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
     }
@@ -412,15 +415,28 @@ async function runNativeTokenExchange(
     let sessionId: string | undefined;
 
     try {
-      const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+      // The redemption is the session's claim: it runs after the insert (and
+      // the cap enforcement) inside the session's transaction, so a lost
+      // redemption rolls the session back and resolves to null with nothing
+      // left to revoke — the session-limit eviction rides the same rollback.
+      const claim: DeviceSessionClaim = tx => consumeSignInTicket(data.ticket, tx);
 
       if (data.supportsRefresh) {
         const credentials = await createDeviceSessionWithCredentials({
           userId: user.id,
           userAgent: request.headers.get('user-agent') ?? undefined,
           user,
+          claim,
         });
+        if (!credentials) {
+          return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+        }
         sessionId = credentials.sessionId;
+        // The pending link is resolved only after the redemption settled and
+        // the session committed — the email branch's ordering, so the link is
+        // claimed by the request that owns the ticket.
+        const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+
         return NextResponse.json(
           {
             token: credentials.token,
@@ -433,10 +449,16 @@ async function runNativeTokenExchange(
         );
       }
 
-      sessionId = await createDeviceSession({
+      const session = await createDeviceSession({
         userId: user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
+        claim,
       });
+      if (!session) {
+        return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+      }
+      sessionId = session;
+      const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
 
       return legacyTokenResponse({
         user,
@@ -613,6 +635,7 @@ async function runNativeTokenExchange(
         admissionVerification.existingKeyUserId !== result.user.id
       ) {
         captureMessage('native_attested_key_ownership_mismatch');
+        countAdmissionCondition('native_admission_refused');
         phase = 'release';
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
@@ -645,7 +668,7 @@ async function runNativeTokenExchange(
           };
         } catch (err) {
           if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
+            reportAttestedKeyCollision();
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
@@ -657,7 +680,7 @@ async function runNativeTokenExchange(
           await persistAttestedKey(result.user.id, admissionVerification);
         } catch (err) {
           if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
+            reportAttestedKeyCollision();
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
@@ -772,6 +795,7 @@ async function runNativeTokenExchange(
     admissionVerification.existingKeyUserId !== result.user.id
   ) {
     captureMessage('native_attested_key_ownership_mismatch');
+    countAdmissionCondition('native_admission_refused');
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
@@ -797,7 +821,7 @@ async function runNativeTokenExchange(
         };
       } catch (err) {
         if (err instanceof KeyCollisionError) {
-          captureMessage('native_attested_key_cross_user_collision');
+          reportAttestedKeyCollision();
           return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
         }
         captureMessage('native_attested_key_persist_failed_after_settlement');
@@ -807,7 +831,7 @@ async function runNativeTokenExchange(
         await persistAttestedKey(result.user.id, admissionVerification);
       } catch (err) {
         if (err instanceof KeyCollisionError) {
-          captureMessage('native_attested_key_cross_user_collision');
+          reportAttestedKeyCollision();
           return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
         }
         captureMessage('native_attested_key_persist_failed_after_settlement');

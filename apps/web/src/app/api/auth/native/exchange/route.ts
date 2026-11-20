@@ -11,6 +11,7 @@ import {
 import {
   requireAdmissionPayload,
   countAdmissionCondition,
+  reportAttestedKeyCollision,
   verifyAdmissionAsync,
   KeyCollisionError,
   type VerifyAdmissionOk,
@@ -107,8 +108,7 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
       );
     } catch (error) {
       if (error instanceof KeyCollisionError) {
-        captureMessage('native_attested_key_cross_user_collision');
-        countAdmissionCondition('native_admission_refused');
+        reportAttestedKeyCollision();
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
       // Without the key row the client would hold an id the server cannot

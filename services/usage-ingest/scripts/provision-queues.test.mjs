@@ -227,6 +227,8 @@ async function createFixture(
         result.settings.message_retention_period = 600;
       if (f.fault === 'created enkrypt paused' && body.queue_name === enkryptSource)
         result.settings.delivery_paused = true;
+      if (f.fault === 'created enkrypt malformed delivery' && body.queue_name === enkryptSource)
+        result.settings.delivery_paused = null;
       if (
         f.fault === 'created foreign consumer' &&
         [source, globalSource, enkryptSource].includes(body.queue_name)
@@ -246,7 +248,13 @@ async function createFixture(
         result_info = { total_pages: result.length ? 1 : 0 };
         if (f.fault === 'ambiguous') result = [result[0], result[0]];
         if (f.fault === 'incomplete') result_info = undefined;
-      } else result = [...queues.values()].find(q => q.queue_id === url.pathname.split('/').at(-1));
+      } else {
+        result = [...queues.values()].find(q => q.queue_id === url.pathname.split('/').at(-1));
+        if (f.fault === 'omitted enkrypt delivery pause' && result?.queue_name === enkryptSource) {
+          result = structuredClone(result);
+          delete result.settings.delivery_paused;
+        }
+      }
     }
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ success: true, result, result_info }));
@@ -1115,8 +1123,31 @@ for (const environment of ['staging', 'production'])
         }
       });
 
-      test('an existing Enkrypt source with paused or unreadable delivery stops before any write', async t => {
-        for (const paused of [true, undefined, 'false']) {
+      for (const existingSource of [true, false])
+        test(`omitted delivery_paused in Get Queue permits preparation (${existingSource ? 'existing source' : 'creation readback'})`, async t => {
+          const existing = [...shared, enkryptDlq, ...(existingSource ? [enkryptSource] : [])];
+          const f = await committed(t, existing);
+          for (const name of [dlq, globalDlq, enkryptDlq])
+            f.queues.get(name).settings.message_retention_period = maxRetention;
+          f.fault = 'omitted enkrypt delivery pause';
+          const before = structuredClone([...f.queues.values()]);
+          await f.cli();
+          const tagged = f.queues.get(enkryptSource);
+          assert.equal(tagged.jurisdiction, 'eu');
+          assert.equal(tagged.settings.message_retention_period, 345_600);
+          assert.deepEqual(tagged.consumers, []);
+          assert.deepEqual(
+            writes(f).map(c => [c.method, c.body]),
+            existingSource ? [] : [['POST', { queue_name: enkryptSource, jurisdiction: 'eu' }]]
+          );
+          assert.deepEqual([...f.queues.values()].slice(0, before.length), before);
+          const callsBeforeRerun = f.calls.length;
+          await f.cli();
+          assert.ok(f.calls.slice(callsBeforeRerun).every(c => c.method === 'GET'));
+        });
+
+      test('an existing Enkrypt source with paused or malformed delivery stops before any write', async t => {
+        for (const paused of [true, 'false', 'true', null, 0, 1, {}, []]) {
           const f = await committed(t, [...shared, enkryptSource]);
           f.queues.get(enkryptSource).settings.delivery_paused = paused;
           const before = structuredClone(f.queues.get(enkryptSource));
@@ -1133,6 +1164,7 @@ for (const environment of ['staging', 'production'])
           ['created enkrypt dlq consumer', /has or may have a consumer/],
           ['created enkrypt short retention', /four-day retention/],
           ['created enkrypt paused', /delivery is unpaused/],
+          ['created enkrypt malformed delivery', /delivery is unpaused/],
         ]) {
           const f = await committed(t, shared);
           f.fault = fault;

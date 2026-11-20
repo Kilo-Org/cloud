@@ -353,6 +353,7 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     countryCode,
+    taskId: headers.taskId,
     boundedSpending: requestCostLimit !== null,
     providerMetadataCapture,
     effectivePrivacy,

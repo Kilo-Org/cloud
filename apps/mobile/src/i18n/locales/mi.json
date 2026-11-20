@@ -1427,9 +1427,9 @@
       "activity": "Ngā mahi"
     },
     "providerConnect": {
-      "githubApp": "Taupānga GitHub",
+      "githubApp": "taupānga GitHub",
       "githubError": "Kāore i taea te whakatuwhera i te whakarite GitHub. Whakamātau anō.",
-      "gitlabAccount": "Pūkete GitLab",
+      "gitlabAccount": "pūkete GitLab",
       "gitlabError": "Kāore i taea te whakatuwhera i te whakarite GitLab. Whakamātau anō.",
       "description": "Honohonotia te {{label}} a Kilo hei arotake aunoa i ngā tono kume."
     },

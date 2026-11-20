@@ -1427,9 +1427,9 @@
       "activity": "Aktiviteti"
     },
     "providerConnect": {
-      "githubApp": "Aplikacioni GitHub",
+      "githubApp": "aplikacioni GitHub",
       "githubError": "Nuk u hap konfigurimi i GitHub. Provo përsëri.",
-      "gitlabAccount": "Llogaria GitLab",
+      "gitlabAccount": "llogaria GitLab",
       "gitlabError": "Nuk u hap konfigurimi i GitLab. Provo përsëri.",
       "description": "Lidh Kilo me {{label}} për të shqyrtuar automatikisht PR."
     },

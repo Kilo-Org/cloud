@@ -79,22 +79,26 @@ export function InputGuardrailsSection({
       onEnabledChange={next => {
         onChange(current => ({ ...current, inputEnabled: next }));
       }}
+      intro={
+        <>
+          <RowGroup>
+            <SettingsValueRow
+              label={t('organizationGuardrails.applyTo')}
+              value={selectedGroupName}
+              disabled={disabled}
+              onPress={
+                groups.length > 0 || draft.groupId != null
+                  ? () => {
+                      setGroupPickerOpen(true);
+                    }
+                  : undefined
+              }
+            />
+          </RowGroup>
+          <Text variant="caption">{t('organizationGuardrails.detectorsHint')}</Text>
+        </>
+      }
     >
-      <RowGroup>
-        <SettingsValueRow
-          label={t('organizationGuardrails.applyTo')}
-          value={selectedGroupName}
-          disabled={disabled}
-          onPress={
-            groups.length > 0 || draft.groupId != null
-              ? () => {
-                  setGroupPickerOpen(true);
-                }
-              : undefined
-          }
-        />
-      </RowGroup>
-      <Text variant="caption">{t('organizationGuardrails.detectorsHint')}</Text>
       {INPUT_DETECTOR_IDS.map(id => {
         const copy = INPUT_DETECTOR_COPY[id];
         return (

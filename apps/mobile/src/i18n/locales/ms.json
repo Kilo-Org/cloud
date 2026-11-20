@@ -1427,9 +1427,9 @@
       "activity": "Aktiviti"
     },
     "providerConnect": {
-      "githubApp": "Apl GitHub",
+      "githubApp": "apl GitHub",
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
-      "gitlabAccount": "Akaun GitLab",
+      "gitlabAccount": "akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
       "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik."
     },

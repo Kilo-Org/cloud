@@ -750,9 +750,9 @@
     },
     "providerConnect": {
       "description": "Conecta la {{label}} de Kilo para revisar PR automáticamente.",
-      "githubApp": "Aplicación de GitHub",
+      "githubApp": "aplicación de GitHub",
       "githubError": "No se pudo abrir la configuración de GitHub. Inténtalo de nuevo.",
-      "gitlabAccount": "Cuenta de GitLab",
+      "gitlabAccount": "cuenta de GitLab",
       "gitlabError": "No se pudo abrir la configuración de GitLab. Inténtalo de nuevo."
     },
     "reviewDetail": {

@@ -1453,9 +1453,9 @@
       "activity": "Aktivnost"
     },
     "providerConnect": {
-      "githubApp": "Aplikaciju GitHub",
+      "githubApp": "aplikaciju GitHub",
       "githubError": "Nije moguće otvoriti postavljanje za GitHub. Pokušaj ponovno.",
-      "gitlabAccount": "Račun na GitLabu",
+      "gitlabAccount": "račun na GitLabu",
       "gitlabError": "Nije moguće otvoriti postavljanje za GitLab. Pokušaj ponovno.",
       "description": "Poveži {{label}} s uslugom Kilo za automatski pregled zahtjeva za spajanje."
     },

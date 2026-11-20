@@ -1479,9 +1479,9 @@
       "activity": "Aktivita"
     },
     "providerConnect": {
-      "githubApp": "Aplikáciu GitHub",
+      "githubApp": "aplikáciu GitHub",
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
-      "gitlabAccount": "Účet GitLab",
+      "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
       "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky."
     },

@@ -1427,9 +1427,9 @@
       "activity": "Δραστηριότητα"
     },
     "providerConnect": {
-      "githubApp": "Εφαρμογή GitHub",
+      "githubApp": "εφαρμογή GitHub",
       "githubError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitHub. Δοκίμασε ξανά.",
-      "gitlabAccount": "Λογαριασμός GitLab",
+      "gitlabAccount": "λογαριασμός GitLab",
       "gitlabError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitLab. Δοκίμασε ξανά.",
       "description": "Κάνε τη σύνδεση με το Kilo ({{label}}) για να ελέγχονται αυτόματα τα PR."
     },

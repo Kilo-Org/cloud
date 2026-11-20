@@ -5330,9 +5330,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         adoptCandidate && replacingCanonical ? setAllMemberHandles(seeded, finalHandle) : seeded;
       // A served handle must resolve at the facade for this fence, so a member row
       // that already holds the string is returned only while the accepted set
-      // still carries it. Otherwise the claim continues to verification and the
-      // accepted-entry transaction below, keeping the member rows, the accepted
-      // set and the adoption marker consistent.
+      // still carries it. A live handle keeps its own unexpired entry, so this
+      // normally returns at once; the membership test is the local guarantee that
+      // the rows, the accepted set and the adoption marker agree. Otherwise the
+      // claim continues to verification and the accepted-entry transaction below.
       const finalDigest = candidateDigest ?? (await digestRuntimeProxyHandle(finalHandle));
       if (updated === grant && acceptedDigests.has(finalDigest))
         return { kind: 'handle', handle: finalHandle };
@@ -5347,7 +5348,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const match = await lookupAcceptedHandle(this.ctx.storage, finalHandle, fence, now);
         if (match === undefined || match.scopeGrantId !== scopeKey) return { kind: 'fail' };
       }
-      if (!(await this.applyCandidateGrantPolicy(updated))) return { kind: 'fail' };
+      // A grant the rows do not change needs no policy refresh: the member rows
+      // already carry the handle, and the maintenance path skips the same call
+      // for an unchanged grant so a transient provider failure cannot fail a
+      // preparation that writes no new shaping.
+      if (updated !== grant && !(await this.applyCandidateGrantPolicy(updated))) {
+        return { kind: 'fail' };
+      }
 
       const entry =
         adoptCandidate && candidate !== null && candidateDigest !== null

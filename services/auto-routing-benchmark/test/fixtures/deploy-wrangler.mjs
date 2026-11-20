@@ -321,8 +321,17 @@ try {
         db.prepare(
           'INSERT INTO fixture_deployments (version_id, message, created_on) VALUES (?, ?, ?)'
         ).run(randomUUID(), message, Date.now());
-        if (!skipRollout && process.env.BENCHMARK_DEPLOY_FIXTURE_IMAGE_PUSH_FAIL === '1') {
-          event('deploy_failed');
+        const halfApply = process.env.BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY;
+        const halfApplied =
+          !skipRollout &&
+          (halfApply === 'always' ||
+            (halfApply === 'once' && count('deploy_containers_configured') === 1));
+        if (
+          halfApplied ||
+          (!skipRollout && process.env.BENCHMARK_DEPLOY_FIXTURE_IMAGE_PUSH_FAIL === '1')
+        ) {
+          event('deploy_half_applied');
+          failWithWranglerOutput();
           process.exitCode = 1;
         } else {
           if (!skipRollout) {

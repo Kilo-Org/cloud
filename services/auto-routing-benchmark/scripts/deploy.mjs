@@ -416,6 +416,28 @@ async function deploy() {
    * application leaves it unchanged, so its marker is never trusted. Anything
    * unreadable or ambiguous is unknown.
    */
+  const markerOf = async versionId => {
+    const version = await readJson(
+      ['versions', 'view', versionId, '--json'],
+      workerVersion,
+      commandTimeoutMs
+    );
+    const message = version?.annotations?.['workers/message'];
+    return message?.startsWith(CONTAINER_INPUTS_PREFIX)
+      ? message.slice(CONTAINER_INPUTS_PREFIX.length)
+      : undefined;
+  };
+  const liveDeployment = async () => {
+    const deployments = await readJson(
+      ['deployments', 'list', '--json'],
+      workerDeployments,
+      commandTimeoutMs
+    );
+    const newest = deployments?.sort((a, b) => b.created_on - a.created_on)[0];
+    return newest?.versions.length === 1 && newest.versions[0].percentage === 100
+      ? newest
+      : undefined;
+  };
   const rolledOutContainerInputs = async () => {
     const tracked = await trackedApplications(commandTimeoutMs);
     if (!tracked) return undefined;
@@ -429,15 +451,35 @@ async function deploy() {
       ?.filter(deployment => deployment.created_on <= changedAt)
       .sort((a, b) => b.created_on - a.created_on)[0];
     if (live?.versions.length !== 1 || live.versions[0].percentage !== 100) return undefined;
-    const version = await readJson(
-      ['versions', 'view', live.versions[0].version_id, '--json'],
-      workerVersion,
-      commandTimeoutMs
-    );
-    const message = version?.annotations?.['workers/message'];
-    return message?.startsWith(CONTAINER_INPUTS_PREFIX)
-      ? message.slice(CONTAINER_INPUTS_PREFIX.length)
-      : undefined;
+    return markerOf(live.versions[0].version_id);
+  };
+  /**
+   * A deploy that failed after its Worker version went live leaves new code beside
+   * the previous container image. When this deploy's marker is the live version and
+   * the containers never took it, re-run the container step once: `wrangler deploy`
+   * is the only command that applies the container configuration, and with the
+   * image already pushed it only restarts the rollout.
+   */
+  const recoverHalfApplied = async error => {
+    const live = await liveDeployment();
+    const liveMarker = live && (await markerOf(live.versions[0].version_id));
+    const applied = await rolledOutContainerInputs();
+    const state = marker =>
+      marker === undefined ? 'unknown' : marker === inputs.hash ? 'ours' : 'other';
+    report('deploy_failure_state', { live: state(liveMarker), applied: state(applied) });
+    if (liveMarker !== inputs.hash || applied === inputs.hash) throw error;
+    report('half_applied', { rollout: 'rerun' });
+    try {
+      await runWrangler(deployArgs, deployTimeoutMs);
+      await awaitRollout();
+      deployed = true;
+      report('half_applied', { rollout: 'rerun-ok' });
+    } catch (rerun) {
+      if (abort.signal.aborted) throw rerun;
+      report('half_applied', { rollout: 'rerun-failed' });
+      printCommandOutput(rerun);
+    }
+    throw error;
   };
   const rollingApplications = async timeoutMs => {
     const tracked = await trackedApplications(timeoutMs);
@@ -625,9 +667,15 @@ async function deploy() {
     await renew();
     phase = 'deploy';
     report('started', { containersRollout: skipRollout ? 'none' : 'configured' });
-    if (!(skipRollout && (await deployWithoutRollout()))) {
-      if (skipRollout) await renew();
-      await runWrangler(deployArgs, deployTimeoutMs);
+    try {
+      if (!(skipRollout && (await deployWithoutRollout()))) {
+        if (skipRollout) await renew();
+        await runWrangler(deployArgs, deployTimeoutMs);
+      }
+    } catch (error) {
+      if (!(error instanceof DeploymentError) || error.code !== 'command_failed') throw error;
+      phase = 'recover';
+      await recoverHalfApplied(error);
     }
     report('completed');
     deployed = true;

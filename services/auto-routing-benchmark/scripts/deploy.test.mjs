@@ -669,17 +669,69 @@ test(
 );
 
 test(
+  're-runs the container rollout once when the Worker is live but the rollout did not apply',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'once' });
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows.filter(row => row.event === 'benchmark_deploy_half_applied').map(row => row.rollout),
+      ['rerun', 'rerun-ok']
+    );
+    assert.equal(state.count('deploy_half_applied'), 1);
+    assert.equal(state.count('deploy_completed'), 1);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+    released(state);
+
+    const next = await state.start();
+    assert.equal(next.code, 0, next.stdout);
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+  }
+);
+
+test(
+  'reports a failed rollout re-run and does not let the next deploy trust the marker',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'always' });
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows.filter(row => row.event === 'benchmark_deploy_half_applied').map(row => row.rollout),
+      ['rerun', 'rerun-failed']
+    );
+    assert.equal(state.count('deploy_completed'), 0);
+    released(state);
+
+    const next = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: '' });
+    assert.equal(next.code, 0, next.stdout);
+    const nextRows = diagnostics(next);
+    assert.ok(
+      nextRows.some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed !== 'unchanged'
+      )
+    );
+    assert.equal(state.count('deploy_containers_none'), 0);
+  }
+);
+
+test(
   'does not trust the marker of a deploy whose image never reached the containers',
   { timeout: 15_000 },
   async t => {
     const state = fixture(t);
     state.rollOut(`container-inputs:${'0'.repeat(64)}`);
-    const failed = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_IMAGE_PUSH_FAIL: '1' });
-    assert.equal(failed.code, 1);
+    const failedRun = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_IMAGE_PUSH_FAIL: '1' });
+    assert.equal(failedRun.code, 1);
     assert.match(state.deployedMessages().at(-1), CONTAINER_MARKER);
+    diagnostics(failedRun, { commandOutput: true });
     const result = await state.start();
     assert.equal(result.code, 0, result.stdout);
-    assert.equal(state.count('deploy_containers_configured'), 2);
+    assert.equal(state.count('deploy_containers_configured'), 3);
     assert.equal(state.count('deploy_containers_none'), 0);
     assert.ok(
       diagnostics(result).some(

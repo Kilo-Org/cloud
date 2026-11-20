@@ -64,34 +64,36 @@ export function SessionListHeader({
         // fixed glyph, so neither can shrink; the picker's label truncates.
         inlineActionsMinWidth={(headerAction ? ICON_TARGET_DP : 0) + CONTEXT_CONTROL_INLINE_MIN_DP}
       />
-      <View style={sideInsetStyle} className={SCREEN_GUTTER_CLASS}>
-        <View
-          className={cn(
-            ROW_TARGET_CLASS,
-            'flex-row items-center justify-between',
-            onOpenSearch && 'border-b-[0.5px] border-hair-soft'
-          )}
-        >
-          {onOpenSearch ? tabHeader : search}
-          <View className="shrink-0 flex-row items-center">
-            {onOpenSearch ? (
-              <IconButton
-                accessibilityLabel={t('agents.search.searchSessions')}
-                accessibilityState={{ expanded: searchOpen }}
-                testID="agents-open-search"
-                onPress={onOpenSearch}
-              >
-                <Search size={20} color={colors.mutedForeground} />
-              </IconButton>
-            ) : null}
-            {canFilter ? (
-              <SessionFilterButton
-                activeCount={activeFilterCount}
-                testID="agents-open-filters"
-                hitSlop={0}
-                onPress={onOpenFilters}
-              />
-            ) : null}
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_GUTTER_CLASS}>
+          <View
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-row items-center justify-between',
+              onOpenSearch && 'border-b-[0.5px] border-hair-soft'
+            )}
+          >
+            {onOpenSearch ? tabHeader : search}
+            <View className="shrink-0 flex-row items-center">
+              {onOpenSearch ? (
+                <IconButton
+                  accessibilityLabel={t('agents.search.searchSessions')}
+                  accessibilityState={{ expanded: searchOpen }}
+                  testID="agents-open-search"
+                  onPress={onOpenSearch}
+                >
+                  <Search size={20} color={colors.mutedForeground} />
+                </IconButton>
+              ) : null}
+              {canFilter ? (
+                <SessionFilterButton
+                  activeCount={activeFilterCount}
+                  testID="agents-open-filters"
+                  hitSlop={0}
+                  onPress={onOpenFilters}
+                />
+              ) : null}
+            </View>
           </View>
         </View>
       </View>

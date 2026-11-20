@@ -140,10 +140,12 @@
     "keepRunning": "繼續執行",
     "newSession": "新增工作階段",
     "noModelsAvailable": "沒有可用的模型",
+    "modelRetires": "於 {{date}} 退役",
     "notFound": "找不到項目。",
     "online": "在線上",
     "open": "開啟 {{name}}",
     "openPullRequest": "開啟提取要求",
+    "viewOnGitHub": "在 GitHub 上檢視 PR",
     "completed": "已完成",
     "pending": "待處理",
     "running": "執行中",
@@ -697,7 +699,8 @@
     },
     "autoReviews": "自動審查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。"
+      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。",
+      "notConnectedReadOnlyPlan": "組織的試用期已結束，因此擁有者必須前往 kilo.ai 更新帳單資訊。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
@@ -1272,7 +1275,7 @@
       "couldNotLoad": "無法載入資安問題。",
       "couldNotLoadMore": "無法載入更多資安問題。",
       "emptyDescription": "目前沒有需要處理的未解決資安問題。",
-      "emptyTitle": "沒有未解決的資安問題",
+      "emptyTitle": "沒有開啟的資安問題",
       "noMatchesDescription": "請嘗試調整或清除已選取的篩選條件。",
       "noMatchesTitle": "沒有符合篩選條件的資安問題"
     },
@@ -1475,7 +1478,7 @@
     "remediationUnavailable": {
       "findingNotFound": "這項資安問題已不存在。",
       "approvalRequired": "自動修復需要核准。手動開始修復，即表示核准這次修復。",
-      "findingNotOpen": "這項資安問題已不再處於未解決狀態。",
+      "findingNotOpen": "這項資安問題已不再開啟。",
       "repoNotInScope": "此存放庫未納入資安代理程式的監控範圍。",
       "analysisRequired": "開始修復前，請先執行程式碼庫分析。",
       "staleAnalysis": "這項資安問題在分析後有變更。開始修復前，請重新執行分析。",
@@ -2783,7 +2786,6 @@
       "skipped_one": "{{displayCount}} 項略過",
       "skipped_other": "{{displayCount}} 項略過",
       "title": "檢查",
-      "viewOnGitHub": "在 GitHub 上檢視 PR",
       "checkDetails": "檢查詳細資料"
     },
     "composer": {
@@ -2847,6 +2849,9 @@
       "couldNotLoad": "無法載入討論。",
       "couldNotLoadMore": "無法載入更多留言。",
       "loadMoreComments": "載入更多留言",
+      "conversationTruncated": "僅顯示前 {{displayCount}} 則留言。",
+      "conversationTruncated_one": "僅顯示前 {{displayCount}} 則留言。",
+      "conversationTruncated_other": "僅顯示前 {{displayCount}} 則留言。",
       "loading": "正在載入討論",
       "moderation": {
         "block": {

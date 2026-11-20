@@ -208,6 +208,18 @@ const SCREEN_HEADER_LARGE_TITLE_CLASS =
  */
 const blankEyebrow = '\u00A0';
 
+/**
+ * An element for one of the header's node slots, each rendered inside a `View`.
+ *
+ * The slot excludes strings: a string child of a `View` trips React Native's
+ * `Text strings must be rendered within a <Text> component.` invariant, and the
+ * strings the header paints inside a `Text` are already its string props
+ * (`title`, `eyebrow`, `subtitle`).
+ *
+ * Gated controls stay type-legal: `false` and the nullish pair flow the
+ * truthiness checks (`headerRight && !stackActions`) and render as nothing.
+ */
+export type ScreenHeaderSlot = ReactElement | false | null | undefined;
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
@@ -222,13 +234,13 @@ type ScreenHeaderProps = {
    * them rather than inventing a second title style, and anything that sits
    * beside the title belongs in `titleAccessory`.
    */
-  titleContent?: React.ReactNode;
+  titleContent?: ScreenHeaderSlot;
   /**
    * A badge or control on the title's own line, after the title and centred
    * with it (the Chat tab's BETA pill). The title keeps its own typography, so
    * an accessory never has to restate it through `titleContent`.
    */
-  titleAccessory?: React.ReactNode;
+  titleAccessory?: ScreenHeaderSlot;
   /**
    * The title Text itself, for a caller that drives TalkBack's reading order
    * from it (a screen that moves focus to the heading once its body resolves).
@@ -279,7 +291,7 @@ type ScreenHeaderProps = {
    * neither the placeholder nor the arriving text moves the body. The caller
    * supplies the node, so the header itself pulls in no loading surface.
    */
-  subtitlePlaceholder?: React.ReactNode;
+  subtitlePlaceholder?: ScreenHeaderSlot;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
    * line. When set the eyebrow ellipsizes in the middle: the repo name is the
@@ -310,11 +322,11 @@ type ScreenHeaderProps = {
    * passes none, leaving the reserved line blank. `eyebrowHeaderProps` maps the
    * caller's `HeaderEyebrow` state to all three props.
    */
-  eyebrowPlaceholder?: React.ReactNode;
+  eyebrowPlaceholder?: ScreenHeaderSlot;
   centerTitle?: boolean;
   /** Use the large 30pt root-title style (tab roots). Default `text-lg` (15.75pt). */
   size?: 'default' | 'large';
-  headerRight?: React.ReactNode;
+  headerRight?: ScreenHeaderSlot;
   /**
    * Width the `headerRight` cluster lays out at, in dp. The stacking decision
    * reserves it (see `shouldStackHeaderActions`), so a wide cluster reflows the
@@ -361,7 +373,7 @@ type ScreenHeaderProps = {
    * their full width instead of the `headerRight` half-row cap wrapping them.
    * Pass `inlineActionsWidth` for a cluster wide enough to squeeze the title:
    * the row then drops beneath the title once the two cannot share. */
-  inlineActions?: React.ReactNode;
+  inlineActions?: ScreenHeaderSlot;
   /**
    * Width the `inlineActions` cluster lays out at, in dp. The stacking decision
    * reserves it (see `shouldStackHeaderActions`) exactly as `headerRightWidth`
@@ -559,7 +571,7 @@ export function ScreenHeader({
   // title's readable minimum (see `headerRightWidth`).
   const stackActions =
     allowHeaderRightStacking &&
-    headerRight != null &&
+    Boolean(headerRight) &&
     shouldStackHeaderActions(windowWidth, fontScale, {
       headerRightWidth: headerRightWidth ?? 0,
       titleMinWidth,
@@ -585,7 +597,7 @@ export function ScreenHeader({
   // the wider room the title gets says nothing about the row, so the title
   // never moves back and forth. A new layout (another language, a rotation)
   // returns the cluster to the row until the remounted copy measures again.
-  const measuresTitleFit = inlineActions != null && title != null && !titleContent && !largeFont;
+  const measuresTitleFit = inlineActions ? title != null && !titleContent && !largeFont : false;
   const titleFitKey = JSON.stringify([title, windowWidth, fontScale]);
   const [titleFit, setTitleFit] = useState<TitleFit>(UNMEASURED_TITLE_FIT);
   const titleNaturalRef = useRef<TextInstance>(null);
@@ -600,7 +612,7 @@ export function ScreenHeader({
   // "Notific…ngs lab" and the title to "Past sessi…". On its own row the
   // cluster has the header's full width and the title keeps the row it heads.
   const stackInlineActions =
-    inlineActions != null &&
+    Boolean(inlineActions) &&
     (largeFont ||
       titleOverflows ||
       (allowInlineActionsStacking &&
@@ -649,7 +661,7 @@ export function ScreenHeader({
   // first, and the title keeps its own width until the controls have nothing
   // left to give. The heading then sits on its content's basis instead of a
   // zero one (see `inlineActionsSlot`).
-  const pinnedInlineActions = inlineActions != null && !allowInlineActionsStacking;
+  const pinnedInlineActions = inlineActions && !allowInlineActionsStacking;
 
   // Which of the heading's lines the header paints, which decides whether the
   // header centres a leading spacer opposite the back control.
@@ -766,7 +778,7 @@ export function ScreenHeader({
           {titleContent}
         </View>
       );
-    } else if (titleAccessory != null) {
+    } else if (titleAccessory) {
       titleText = (
         <View className={cn('flex-row items-center gap-2', centerTitle && 'justify-center')}>
           {titleLabel}

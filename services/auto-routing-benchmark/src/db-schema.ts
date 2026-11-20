@@ -318,7 +318,9 @@ export const schedulerExecutions = sqliteTable(
  * it reads live occupancy and claims; another dispatcher that finds the lease held
  * returns immediately and the next completion or cron wake retries. Model and slot
  * caps are only exact if one pass at a time reads occupancy.
- * Row 2, created on first use, serializes run initialization passes.
+ * Row 2, created on first use, serializes run initialization passes. Row 3 is a
+ * production deploy's intent: while its lease is unexpired, no new dispatch pass takes
+ * row 1, so the deploy takes row 1 when the current pass ends.
  */
 export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
   id: integer('id').primaryKey(),

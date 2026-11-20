@@ -72,6 +72,22 @@ describe('toModelOptions', () => {
       'c/schematron',
     ]);
   });
+
+  it('keeps a date-only retires_on on the option and drops an off-contract one', () => {
+    const options = toModelOptions(
+      {
+        data: [
+          { id: 'a', name: 'A', retires_on: '2026-07-01' },
+          { id: 'b', name: 'B', retires_on: '2026-07-01T00:00:00Z' },
+        ],
+      },
+      'en'
+    );
+    const byId = new Map(options.map(option => [option.id, option]));
+    expect(byId.get('a')?.retires_on).toBe('2026-07-01');
+    expect(byId.get('b')).toBeDefined();
+    expect(byId.get('b')?.retires_on).toBeUndefined();
+  });
 });
 
 describe('OpenRouterModelsResponseSchema', () => {
@@ -103,6 +119,24 @@ describe('OpenRouterModelsResponseSchema', () => {
       data: [{ id: 'a', name: 'A', someUnknown: true }],
     });
     expect(parsed.data[0]).toEqual({ id: 'a', name: 'A' });
+  });
+
+  it('parses a date-only retires_on unchanged', () => {
+    const parsed = OpenRouterModelsResponseSchema.parse({
+      data: [{ id: 'a', name: 'A', retires_on: '2026-07-01' }],
+    });
+    expect(parsed.data[0]).toEqual({ id: 'a', name: 'A', retires_on: '2026-07-01' });
+  });
+
+  it('drops a non-string retires_on instead of rejecting the catalog', () => {
+    const parsed = OpenRouterModelsResponseSchema.parse({
+      data: [
+        { id: 'a', name: 'A', retires_on: null },
+        { id: 'b', name: 'B', retires_on: 42 },
+      ],
+    });
+    expect(parsed.data.map(entry => entry.id)).toEqual(['a', 'b']);
+    expect(parsed.data.map(entry => entry.retires_on)).toEqual([undefined, undefined]);
   });
 });
 

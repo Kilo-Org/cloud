@@ -154,6 +154,7 @@ import {
   insertRun,
   getRunWithModels,
   listPendingCurrentProfiles,
+  markProfilesFailedForRun,
   markProfilesRunningForRun,
   listReadyCurrentProfilesForEntries,
   getSummariesForRuns,
@@ -217,7 +218,12 @@ const env = {
   BENCH_DB: undefined,
   BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
-  AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn(), delete: vi.fn() },
+  AUTO_ROUTING_CONFIG: {
+    put: vi.fn(),
+    get: vi.fn(),
+    getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+    delete: vi.fn(),
+  },
   KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
 
@@ -842,10 +848,24 @@ describe('GET /admin/runs', () => {
     await expect(res.json()).resolves.toEqual({ runs: [], hasRunningRun: false });
   });
 
-  it('sweeps stale runs before listing so a wedged run is recovered', async () => {
-    await authedGet('/admin/runs');
-    // sweepStaleRuns → markStaleRunsFailed runs on list, independent of starting.
-    expect(markStaleRunsFailed).toHaveBeenCalledTimes(1);
+  it('lists runs without writing, leaving the stale-run sweep to the cron', async () => {
+    const target = env.BENCH_DB;
+    const statements: string[] = [];
+    env.BENCH_DB = {
+      prepare(sql: string) {
+        statements.push(sql);
+        return target.prepare(sql);
+      },
+      batch: (list: D1PreparedStatement[]) => target.batch(list),
+      exec: (sql: string) => target.exec(sql),
+    } as D1Database;
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    expect(statements.filter(sql => /^\s*(insert|update|delete|replace)\b/i.test(sql))).toEqual([]);
+    expect(listStaleRunningDeciderRuns).not.toHaveBeenCalled();
+    expect(markStaleRunsFailed).not.toHaveBeenCalled();
   });
 
   it('attaches live progress to running runs only', async () => {
@@ -1201,7 +1221,7 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'platform' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
@@ -1223,17 +1243,18 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     // Owner-requested work must not silently re-admit platform models.
     expect(syncPlatformRegistryRows).not.toHaveBeenCalled();
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('user');
-    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
-      runId: expect.any(String),
-      entries: [{ model: 'owner/a', variant: 'high' }],
-      repetitions: 3,
-      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
-      chunkSize: 1,
+    const [, run] = vi.mocked(insertRun).mock.calls[0];
+    expect(queueSend).toHaveBeenCalledExactlyOnceWith({
+      runId: run.id,
+      kind: 'decider',
+      model: 'owner/a',
+      schedulerWake: true,
     });
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
@@ -1290,18 +1311,15 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const [, run, modelRows] = vi.mocked(insertRun).mock.calls[0];
     expect(modelRows).toHaveLength(100);
     expect(run).toMatchObject({ repetitions: 3, max_concurrency: 0, router: 'efficient' });
     expect(modelRows[0].model).toBe('m/0');
-    expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
-      runId: run.id,
-      entries: modelRows.map(row => ({ model: row.model, variant: null })),
-      repetitions: 3,
-      caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
-      chunkSize: 1,
-    });
+    expect(queueSend).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ runId: run.id, schedulerWake: true })
+    );
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
@@ -1314,7 +1332,7 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const body = (await res.json()) as {
       startedRuns: { purpose: string; entryCount: number }[];
       drainErrors: string[];
@@ -1322,9 +1340,32 @@ describe('POST /admin/runs', () => {
     expect(body.startedRuns).toEqual([expect.objectContaining({ purpose: 'user', entryCount: 1 })]);
     expect(body.drainErrors).toEqual([]);
     expect(insertRun).toHaveBeenCalledOnce();
-    expect(scheduleRunChunks).toHaveBeenCalledOnce();
-    expect(claimScheduledChunks).toHaveBeenCalled();
-    expect(queueSend).not.toHaveBeenCalled();
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(claimScheduledChunks).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: 'decider', model: 'm/1', schedulerWake: true })
+    );
+  });
+
+  it('returns the started run as 202 when the scheduler wake cannot be sent', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    queueSend.mockRejectedValueOnce(new Error('D1 DB is overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(202);
+    const [, run] = vi.mocked(insertRun).mock.calls[0];
+    await expect(res.json()).resolves.toMatchObject({
+      runId: run.id,
+      startedRuns: [{ runId: run.id, purpose: 'user', entryCount: 1 }],
+      drainErrors: [],
+    });
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(markProfilesFailedForRun).not.toHaveBeenCalled();
   });
 
   it('reports a wedged queue alongside the queue that did start', async () => {
@@ -1338,7 +1379,7 @@ describe('POST /admin/runs', () => {
 
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'both' });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const body = (await res.json()) as {
       startedRuns: { purpose: string }[];
       drainErrors: string[];

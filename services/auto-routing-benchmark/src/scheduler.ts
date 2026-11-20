@@ -158,6 +158,7 @@ const SCHEDULER_CLAIM_BATCH = 50;
 const SCHEDULER_MATERIALIZE_BATCH = 50;
 const DISPATCH_LEASE_ID = 1;
 const INIT_LEASE_ID = 2;
+const DEPLOY_INTENT_ID = 3;
 
 export type SchedulerClaim = {
   id: string;
@@ -191,6 +192,14 @@ type SchedulerLiveChunk = {
   slot: number | null;
   share: string;
 };
+
+export async function hasScheduledChunks(db: D1Database, runId: string): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT 1 FROM scheduler_chunks WHERE run_id = ? LIMIT 1')
+    .bind(runId)
+    .first();
+  return row !== null;
+}
 
 /** Rows each lane of a run already holds; exported for the query-plan regression test. */
 export const SCHEDULER_MATERIALIZED_LANES_SQL = `
@@ -418,7 +427,11 @@ function selectScheduledChunks(input: {
   return selected;
 }
 
-/** Takes a scheduler lease row, or reports that another pass holds it. */
+/**
+ * Takes a scheduler lease row, or reports that another pass holds it. The dispatch
+ * lease is not taken while a deploy's intent row is unexpired, so a deploy waiting
+ * for the lease gets it once the current pass ends.
+ */
 async function acquireLease(
   db: D1Database,
   id: number,
@@ -431,9 +444,11 @@ async function acquireLease(
     INSERT INTO scheduler_dispatch_lock (id, token, lease_until) VALUES (?1, ?2, ?3)
     ON CONFLICT (id) DO UPDATE SET token = ?2, lease_until = ?3
     WHERE scheduler_dispatch_lock.lease_until <= ?4
+      AND (?1 != ?5 OR NOT EXISTS (
+        SELECT 1 FROM scheduler_dispatch_lock WHERE id = ?6 AND lease_until > ?4))
     RETURNING token
   `)
-    .bind(id, token, until, now)
+    .bind(id, token, until, now, DISPATCH_LEASE_ID, DEPLOY_INTENT_ID)
     .first<{ token: string }>();
   return acquired !== null;
 }
@@ -684,7 +699,82 @@ export async function failScheduledEntry(
   ]);
 }
 
+/**
+ * Failed chunks of running runs whose lane death is not recorded yet. Starts from the
+ * running runs, so it reads only their failed chunks rather than every failed chunk kept
+ * until pruning. Exported, like the prune statements below, for the query-plan test.
+ */
+export const SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL = `
+  SELECT chunk.* FROM benchmark_runs AS run
+  CROSS JOIN scheduler_chunks AS chunk
+  WHERE run.status = 'running' AND chunk.run_id = run.id AND chunk.status = 'failed'
+    AND NOT EXISTS (SELECT 1 FROM run_lane_failures WHERE run_id = chunk.run_id
+      AND model = chunk.model AND variant = chunk.variant AND rep = chunk.rep)
+  LIMIT 250
+`;
+
+// Terminal runs past the retention window, found from their few scheduler markers rather
+// than by scanning benchmark_runs.
+const STALE_MARKED_RUNS_CTE = `
+  stale_run(run_id) AS MATERIALIZED (
+    SELECT marker.run_id FROM scheduler_runs AS marker
+    CROSS JOIN benchmark_runs AS run
+    WHERE run.id = marker.run_id AND run.status != 'running' AND run.completed_at < ?
+    LIMIT 100
+  )
+`;
+
+export const SCHEDULER_PRUNE_EXECUTIONS_SQL = `
+  WITH ${STALE_MARKED_RUNS_CTE}
+  DELETE FROM scheduler_executions WHERE rowid IN (
+    SELECT execution.rowid FROM scheduler_executions AS execution
+    WHERE execution.run_id IN (SELECT run_id FROM stale_run)
+      AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = execution.run_id AND status = 'active')
+    LIMIT 1000
+  )
+`;
+
+/**
+ * A run that stopped before its initialization finished holds chunks but never got a
+ * marker, so chunk owners are walked one distinct run id at a time instead. Such a run
+ * failed by the stale sweep has no completion time, so it ages from its start.
+ */
+export const SCHEDULER_PRUNE_CHUNKS_SQL = `
+  WITH RECURSIVE chunk_run(run_id) AS (
+    SELECT * FROM (SELECT run_id FROM scheduler_chunks ORDER BY run_id LIMIT 1)
+    UNION ALL
+    SELECT (SELECT c.run_id FROM scheduler_chunks AS c
+      WHERE c.run_id > chunk_run.run_id ORDER BY c.run_id LIMIT 1)
+    FROM chunk_run WHERE chunk_run.run_id IS NOT NULL
+  ),
+  stale_run(run_id) AS MATERIALIZED (
+    SELECT chunk_run.run_id FROM chunk_run
+    CROSS JOIN benchmark_runs AS run
+    WHERE run.id = chunk_run.run_id AND run.status != 'running'
+      AND COALESCE(run.completed_at, run.started_at) < ?
+    LIMIT 100
+  )
+  DELETE FROM scheduler_chunks WHERE id IN (
+    SELECT chunk.id FROM scheduler_chunks AS chunk
+    WHERE chunk.run_id IN (SELECT run_id FROM stale_run)
+      AND chunk.status IN ('completed', 'failed')
+    LIMIT 1000
+  )
+`;
+
+export const SCHEDULER_PRUNE_MARKERS_SQL = `
+  WITH ${STALE_MARKED_RUNS_CTE}
+  DELETE FROM scheduler_runs WHERE run_id IN (
+    SELECT marker.run_id FROM scheduler_runs AS marker
+    WHERE marker.run_id IN (SELECT run_id FROM stale_run)
+      AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = marker.run_id)
+      AND NOT EXISTS (SELECT 1 FROM scheduler_executions WHERE run_id = marker.run_id)
+    LIMIT 1000
+  )
+`;
+
 export async function recoverChunks(db: D1Database, now: number): Promise<SchedulerClaim[]> {
+  const pruneBefore = new Date(now - 24 * 3600_000).toISOString();
   const results = await db.batch<SchedulerClaim>([
     db.prepare(`WITH RECURSIVE busy_run(run_id) AS (
         SELECT * FROM (
@@ -716,54 +806,10 @@ export async function recoverChunks(db: D1Database, now: number): Promise<Schedu
       slot = NULL, token = NULL, lease_until = 0
       WHERE status IN ('queued', 'active') AND lease_until <= ?`)
       .bind(SCHEDULER_MAX_ATTEMPTS, now),
-    db.prepare(`SELECT * FROM scheduler_chunks WHERE status = 'failed' AND EXISTS (
-      SELECT 1 FROM benchmark_runs WHERE id = scheduler_chunks.run_id AND status = 'running')
-      AND NOT EXISTS (SELECT 1 FROM run_lane_failures WHERE run_id = scheduler_chunks.run_id
-        AND model = scheduler_chunks.model AND variant = scheduler_chunks.variant AND rep = scheduler_chunks.rep)
-      LIMIT 250`),
-    db
-      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
-      SELECT marker.run_id FROM scheduler_runs AS marker
-      JOIN benchmark_runs AS run ON run.id = marker.run_id
-      WHERE run.status != 'running' AND run.completed_at < ?
-      LIMIT 100
-    )
-    DELETE FROM scheduler_executions WHERE rowid IN (
-      SELECT execution.rowid FROM scheduler_executions AS execution
-      WHERE execution.run_id IN (SELECT run_id FROM stale_run)
-        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = execution.run_id AND status = 'active')
-      LIMIT 1000
-    )`)
-      .bind(new Date(now - 24 * 3600_000).toISOString()),
-    db
-      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
-      SELECT marker.run_id FROM scheduler_runs AS marker
-      JOIN benchmark_runs AS run ON run.id = marker.run_id
-      WHERE run.status != 'running' AND run.completed_at < ?
-      LIMIT 100
-    )
-    DELETE FROM scheduler_chunks WHERE id IN (
-      SELECT chunk.id FROM scheduler_chunks AS chunk
-      WHERE chunk.run_id IN (SELECT run_id FROM stale_run)
-        AND chunk.status IN ('completed', 'failed')
-      LIMIT 1000
-    )`)
-      .bind(new Date(now - 24 * 3600_000).toISOString()),
-    db
-      .prepare(`WITH stale_run(run_id) AS MATERIALIZED (
-      SELECT marker.run_id FROM scheduler_runs AS marker
-      JOIN benchmark_runs AS run ON run.id = marker.run_id
-      WHERE run.status != 'running' AND run.completed_at < ?
-      LIMIT 100
-    )
-    DELETE FROM scheduler_runs WHERE run_id IN (
-      SELECT marker.run_id FROM scheduler_runs AS marker
-      WHERE marker.run_id IN (SELECT run_id FROM stale_run)
-        AND NOT EXISTS (SELECT 1 FROM scheduler_chunks WHERE run_id = marker.run_id)
-        AND NOT EXISTS (SELECT 1 FROM scheduler_executions WHERE run_id = marker.run_id)
-      LIMIT 1000
-    )`)
-      .bind(new Date(now - 24 * 3600_000).toISOString()),
+    db.prepare(SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL),
+    db.prepare(SCHEDULER_PRUNE_EXECUTIONS_SQL).bind(pruneBefore),
+    db.prepare(SCHEDULER_PRUNE_CHUNKS_SQL).bind(pruneBefore),
+    db.prepare(SCHEDULER_PRUNE_MARKERS_SQL).bind(pruneBefore),
     db.prepare('DELETE FROM scheduler_cooldowns WHERE until <= ?').bind(now),
   ]);
   return results[2]?.results ?? [];

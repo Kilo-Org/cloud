@@ -25,6 +25,7 @@ import {
   type SkillCustomInput,
   type SkillUpdateInput,
 } from './contracts/skills';
+import { acceptedSkillCompanionFiles } from './contracts/skill-companion-files';
 import { skillsShInputSchema, parseSkillsShSourceUrl, type SkillsShInput } from './skills-sh';
 
 export {
@@ -312,7 +313,9 @@ export async function getSkillsForSession(
     return {
       name: skill.name,
       rawMarkdown: skill.rawMarkdown,
-      files: skill.files ?? {},
+      // Stored rows keep their accepted entries; entries outside the path rule
+      // are dropped.
+      files: acceptedSkillCompanionFiles(skill.files ?? {}),
     };
   });
 }

@@ -140,6 +140,7 @@
     "keepRunning": "Continuar a execución",
     "newSession": "Nova sesión",
     "noModelsAvailable": "Non hai modelos dispoñibles",
+    "modelRetires": "Retírase o {{date}}",
     "notFound": "Non se atopou o elemento.",
     "online": "En liña",
     "open": "Abrir {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo.",
     "privateRepositoryA11y": "{{name}}, repositorio privado",
     "legalDocumentEnglishOnly": "Este documento só está dispoñible en inglés.",
-    "organizationTrialEndedBilling": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación e despois tentalo de novo."
+    "organizationTrialEndedBilling": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación e despois tentalo de novo.",
+    "viewOnGitHub": "Ver a PR en GitHub"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Correccións e melloras en toda a aplicación.",
     "changelogAreas": {
       "signIn": "Inicio de sesión",
-      "profileOrganizations": "Perfil e organizacións"
+      "profileOrganizations": "Perfil & organizacións"
     }
   },
   "preferences": {
@@ -748,6 +750,9 @@
       "comment_one": "1 comentario",
       "comment": "{{displayCount}} comentarios",
       "comment_other": "{{displayCount}} comentarios",
+      "conversationTruncated": "Só se amosan os primeiros {{displayCount}} comentarios.",
+      "conversationTruncated_one": "Só se amosan os primeiros {{displayCount}} comentarios.",
+      "conversationTruncated_other": "Só se amosan os primeiros {{displayCount}} comentarios.",
       "startedRelative": " · comezou {{relative}}",
       "couldNotLoadMore": "Non se puideron cargar máis comentarios.",
       "retryLoadingMore": "Volver cargar máis comentarios",
@@ -881,7 +886,6 @@
       "noAccess": "Non tes acceso ás comprobacións deste repositorio.",
       "couldNotLoad": "Non se puideron cargar as comprobacións.",
       "retryChecks": "Volver cargar as comprobacións",
-      "viewOnGitHub": "Ver a PR en GitHub",
       "noChecksReported": "Non hai comprobacións rexistradas",
       "passed": "{{displayCount}} superadas",
       "passed_one": "{{displayCount}} superadas",
@@ -1391,7 +1395,8 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respecta as instrucións do ficheiro REVIEW.md de cada repositorio",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo."
+      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo.",
+      "notConnectedReadOnlyPlan": "O período de proba da organización rematou, polo que un propietario debe actualizar a facturación en kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A conexión de Bitbucket con {{organization}} xestiónase na web desde un ordenador.",
@@ -1426,9 +1431,9 @@
       "activity": "Actividade"
     },
     "providerConnect": {
-      "githubApp": "Aplicación de GitHub",
+      "githubApp": "aplicación de GitHub",
       "githubError": "Non se puido abrir a configuración de GitHub. Téntao de novo.",
-      "gitlabAccount": "Conta de GitLab",
+      "gitlabAccount": "conta de GitLab",
       "gitlabError": "Non se puido abrir a configuración de GitLab. Téntao de novo.",
       "description": "Conecta a {{label}} de Kilo para revisar as solicitudes de cambios automaticamente."
     },

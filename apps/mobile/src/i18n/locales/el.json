@@ -140,6 +140,7 @@
     "keepRunning": "Συνέχιση εκτέλεσης",
     "newSession": "Νέα συνεδρία",
     "noModelsAvailable": "Δεν υπάρχουν διαθέσιμα μοντέλα",
+    "modelRetires": "Αποσύρεται στις {{date}}",
     "notFound": "Δεν βρέθηκε.",
     "online": "Σε σύνδεση",
     "open": "Άνοιγμα {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Ένας ιδιοκτήτης οργανισμού μπορεί να ενημερώσει τη χρέωση στο kilo.ai και μετά να δοκιμάσει ξανά.",
     "privateRepositoryA11y": "{{name}}, ιδιωτικό αποθετήριο",
     "legalDocumentEnglishOnly": "Αυτό το έγγραφο είναι διαθέσιμο μόνο στα αγγλικά.",
-    "organizationTrialEndedBilling": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Μπορείτε να ενημερώσετε τη χρέωση και μετά να δοκιμάσετε ξανά."
+    "organizationTrialEndedBilling": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Μπορείτε να ενημερώσετε τη χρέωση και μετά να δοκιμάσετε ξανά.",
+    "viewOnGitHub": "Προβολή PR στο GitHub"
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Διορθώσεις και βελτιώσεις σε όλη την εφαρμογή.",
     "changelogAreas": {
       "signIn": "Σύνδεση",
-      "profileOrganizations": "Προφίλ και οργανισμοί"
+      "profileOrganizations": "Προφίλ & οργανισμοί"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Δεν ήταν δυνατή η φόρτωση περισσότερων σχολίων.",
       "retryLoadingMore": "Νέα προσπάθεια φόρτωσης περισσότερων σχολίων",
       "loadMoreComments": "Φόρτωση περισσότερων σχολίων",
+      "conversationTruncated": "Εμφανίζονται μόνο τα πρώτα {{displayCount}} σχόλια.",
+      "conversationTruncated_one": "Εμφανίζονται μόνο τα πρώτα {{displayCount}} σχόλια.",
+      "conversationTruncated_other": "Εμφανίζονται μόνο τα πρώτα {{displayCount}} σχόλια.",
       "addReaction": "Προσθήκη αντίδρασης",
       "reactionPill": "αντίδραση {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "αντίδραση",
@@ -881,7 +886,6 @@
       "noAccess": "Δεν έχεις πρόσβαση στους ελέγχους αυτού του αποθετηρίου.",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των ελέγχων.",
       "retryChecks": "Νέα προσπάθεια φόρτωσης ελέγχων",
-      "viewOnGitHub": "Προβολή PR στο GitHub",
       "noChecksReported": "Δεν αναφέρθηκαν έλεγχοι",
       "passed": "{{displayCount}} επιτυχείς",
       "passed_one": "{{displayCount}} επιτυχής",
@@ -936,9 +940,9 @@
       "checkFailedTitleGitLab": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το GitLab.",
       "checkFailedTitleBitbucket": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το Bitbucket.",
       "providerCheckFailedMessage": "Δεν ήταν δυνατή η σύνδεση με τον πάροχο. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
-      "reconnectTitle": "Επανασύνδεση με το GitHub",
-      "reconnectTitleGitLab": "Επανασύνδεση με το GitLab",
-      "reconnectTitleBitbucket": "Επανασύνδεση με το Bitbucket",
+      "reconnectTitle": "Σύνδεσε ξανά το GitHub",
+      "reconnectTitleGitLab": "Σύνδεσε ξανά το GitLab",
+      "reconnectTitleBitbucket": "Σύνδεσε ξανά το Bitbucket",
       "reconnectDescription": "Η σύνδεσή σου με το GitHub ανακλήθηκε.",
       "gitlabDescription": "Έλεγχος αιτημάτων συγχώνευσης στο κινητό",
       "gitlabInstanceMismatchTitle": "Η σύνδεση με το GitLab αφορά άλλη εγκατάσταση",
@@ -1391,7 +1395,8 @@
     "followReviewMd": "Τήρηση του REVIEW.md",
     "followReviewMdSubtitle": "Ακολουθεί τις οδηγίες του αρχείου REVIEW.md σε κάθε αποθετήριο",
     "bitbucket": {
-      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν."
+      "notConnectedReadOnly": "Το Bitbucket δεν είναι συνδεδεμένο. Μόνο οι κάτοχοι του οργανισμού, οι διαχειριστές και οι διαχειριστές χρέωσης μπορούν να το συνδέσουν.",
+      "notConnectedReadOnlyPlan": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει, οπότε ένας ιδιοκτήτης πρέπει να ενημερώσει τη χρέωση στο kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Η σύνδεση του Bitbucket για {{organization}} γίνεται από τον ιστότοπο, σε υπολογιστή.",
@@ -1426,9 +1431,9 @@
       "activity": "Δραστηριότητα"
     },
     "providerConnect": {
-      "githubApp": "Εφαρμογή GitHub",
+      "githubApp": "εφαρμογή GitHub",
       "githubError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitHub. Δοκίμασε ξανά.",
-      "gitlabAccount": "Λογαριασμός GitLab",
+      "gitlabAccount": "λογαριασμός GitLab",
       "gitlabError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του GitLab. Δοκίμασε ξανά.",
       "description": "Κάνε τη σύνδεση με το Kilo ({{label}}) για να ελέγχονται αυτόματα τα PR."
     },

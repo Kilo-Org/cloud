@@ -7,6 +7,8 @@ vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
     ...actual,
+    copyRemeasureBaselines: vi.fn(),
+    reuseDeciderCaseResults: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     getRunWithModels: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),

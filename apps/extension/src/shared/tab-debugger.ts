@@ -352,6 +352,11 @@ export type TabDebuggerRequest =
       readonly agent?: BrowserToolAgentContext | undefined;
       readonly arguments: Record<string, unknown>;
       readonly caller: BrowserCaller;
+      /**
+       * The panel's mode, when it has one: safe mode exposes only the read-only
+       * tools, so a modal state must not name an answer the caller cannot call.
+       */
+      readonly safeMode?: boolean | undefined;
       readonly tabId: number;
       readonly takeOver?: boolean;
       readonly tool: string;
@@ -524,6 +529,12 @@ const tabDebuggerRequestSchema = z.union([
       .optional(),
     arguments: z.record(z.string(), z.unknown()),
     caller: browserCallerSchema,
+    /**
+     * The panel's mode when it has one: safe mode exposes only the read-only
+     * tools, so a modal state must not name an answer the caller cannot call.
+     * Absent for a CLI agent, whose tool set always has the handler.
+     */
+    safeMode: z.boolean().optional(),
     tabId: z.number(),
     takeOver: z.boolean().optional(),
     tool: z.string(),

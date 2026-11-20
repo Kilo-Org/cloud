@@ -11,11 +11,13 @@ import {
   downloadStoppedWithoutPermissionError,
   downloadTierOf,
   hashBrowserToolArguments,
+  isOriginGranted,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
   parseToolArguments,
   SENSITIVE_REASON,
   STEP_TOKEN_TTL_MS,
+  toBrowserOrigin,
 } from './browser-agent-checks';
 import type {
   BrowserGrant,
@@ -70,10 +72,19 @@ import type {
 import { browserCallerKey, TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import { clearBrowserToolResize } from './browser-tool-page-actions';
+import {
+  BrowserToolDialogOpenError,
+  dialogRefusalText,
+  isHandleDialogTool,
+  modalStateText,
+  watchForDialog,
+  withModalState,
+} from './browser-tool-dialog';
 import { runKiloBrowserTool } from './browser-tool-dispatch';
 import type { BrowserToolDispatchOptions } from './browser-tool-dispatch';
 import { createBrowserToolSession } from './browser-tool-session';
 import type {
+  BrowserToolDialog,
   BrowserToolDownload,
   BrowserToolSession,
   BrowserToolTabsApi,
@@ -110,6 +121,12 @@ export interface BrowserToolRunInput {
   readonly tabId: number;
   /** A panel sets this only after its take-over confirmation. */
   readonly takeOver?: boolean;
+  /**
+   * The caller's mode, when it has one: safe mode exposes only the read-only
+   * tools, so a modal state must not name an answer it cannot call. Absent for a
+   * CLI agent, whose tool set always has `browser_handle_dialog`.
+   */
+  readonly safeMode?: boolean;
   readonly title?: string;
   readonly toolName: string;
 }
@@ -489,6 +506,27 @@ const argumentText = (value: unknown): string | undefined => {
 
   return parsed.success ? parsed.data : undefined;
 };
+
+/**
+ * The origin a dialog's answer is judged by, and whose grant decides whether
+ * its message is readable: the frame's own recorded origin, which the browser
+ * computes (so an `about:blank` child of a cross-origin frame carries that
+ * frame's origin, not the tab's). A dialog whose frame the browser never named
+ * or whose origin was never reported names none, and no grant can cover it.
+ */
+const dialogOriginOf = (dialog: BrowserToolDialog): string =>
+  dialog.origin === undefined ? 'opaque:null' : (toBrowserOrigin(dialog.origin) ?? 'opaque:null');
+
+/**
+ * Whether a caller may read a dialog's message. A panel reads every page; an
+ * agent reads the message only from an origin it holds a `read` grant for, as a
+ * snapshot shows only those frames — judged by the same origin its answer acts in.
+ */
+const dialogMessageReadable = (
+  dialog: BrowserToolDialog,
+  agent: BrowserAgentCallContext | undefined
+): boolean =>
+  agent === undefined || isOriginGranted(agent.authorized, 'read', dialogOriginOf(dialog));
 
 /** The tab a guard attributes a download to: its id and the page url a referrer is compared with. */
 const guardTabOf = async (
@@ -2776,6 +2814,29 @@ export const createBrowserRuntime = ({
     return withheldFramesOf(frames, readable).map(frame => frame.origin);
   };
 
+  /**
+   * The frames a dialog answer is judged by. The page cannot report them while
+   * its dialog is open, but the session recorded the frame that opened the
+   * dialog and the security origin the browser computed for that frame — an
+   * `about:blank` child of a cross-origin frame inherits that frame's origin,
+   * not the tab's. That origin is what the answer acts in. When the event named
+   * no frame or its origin was never reported, the dialog is attributed to no
+   * frame at all (`opaque:null`), which fails closed.
+   */
+  const dialogFrameInventory = async (
+    tabId: number,
+    dialog: BrowserToolDialog
+  ): Promise<AgentFrameInventory> => {
+    const tab = await tabsApi.get?.(tabId);
+    const url = dialog.url ?? tab?.url ?? '';
+
+    return {
+      childSessions: new Map(),
+      complete: false,
+      frames: [{ id: 'main', origin: dialogOriginOf(dialog), url }],
+    };
+  };
+
   /** The refusal every sensitive step shares: the items to approve, and what the call already did. */
   const needsPermissionOutcome = (
     items: readonly BrowserPermissionItem[],
@@ -2980,12 +3041,21 @@ export const createBrowserRuntime = ({
     arguments: toolArguments,
     caller,
     options,
+    safeMode,
     step: stepInput,
     tabId,
     takeOver,
     title,
     toolName,
   }: BrowserToolRunInput): Promise<BrowserToolRunOutcome> => {
+    // A safe-mode caller has only the read-only tools, so its modal state says the dialog is the user's to answer.
+    const dialogReading = (
+      dialog: BrowserToolDialog,
+      context: BrowserAgentCallContext | undefined
+    ) => ({
+      answerable: safeMode !== true,
+      messageReadable: dialogMessageReadable(dialog, context),
+    });
     // An agent reaches only its own session's tabs; the group is the boundary (D9).
     // A session with nothing shared yet is refused too: no group means no reach.
     if (caller.kind === 'agent' && !groups.isTabAllowed(caller.sessionHandle, tabId)) {
@@ -3088,6 +3158,20 @@ export const createBrowserRuntime = ({
 
       try {
         const agentContext = caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined;
+        // An open dialog blocks the page: until it is answered, no tool but its answer can run on this tab.
+        const openDialog = session.pendingDialog();
+        const dialogRefusal = (dialog: BrowserToolDialog): BrowserToolRunOutcome => ({
+          kind: 'result',
+          result: {
+            error: dialogRefusalText(dialog, toolName, dialogReading(dialog, agentContext)),
+            ok: false,
+          },
+        });
+
+        if (openDialog !== undefined && !isHandleDialogTool(toolName)) {
+          return dialogRefusal(openDialog);
+        }
+
         const argsRecord = parseToolArguments(toolArguments);
         // Every step token is bound to the calling session, the tab, the tool and the exact arguments.
         const sessionKey = caller.kind === 'agent' ? caller.sessionHandle : '';
@@ -3172,7 +3256,10 @@ export const createBrowserRuntime = ({
           // With the permission granted, the item stream is the record of what became of each file: a stale
           // Announcement is the earlier call's, and its own ledger entry already names it.
 
-          await ensureFrameAutoAttach(session, tabId);
+          // The page cannot answer the auto-attach while its dialog is open; the next call after the answer turns it on.
+          if (openDialog === undefined) {
+            await ensureFrameAutoAttach(session, tabId);
+          }
         }
 
         const preflight =
@@ -3182,12 +3269,23 @@ export const createBrowserRuntime = ({
                 args: argsRecord,
                 authorized: agentContext.authorized,
                 consumeStepToken: (token, binding) => tokens.consume(token, binding),
+                // The page cannot report its frames while a dialog blocks it, so the answer is judged against the frame that opened the dialog: its handler resumes there.
+                ...(openDialog === undefined
+                  ? {}
+                  : { readFrames: () => dialogFrameInventory(tabId, openDialog) }),
                 session,
                 sessionHandle: sessionKey,
                 stepTokens: agentContext.sensitive ?? [],
                 tabId,
                 toolName,
               });
+        const openedDuringPreflight = session.pendingDialog();
+
+        // A dialog that opened while the preflight read the page blocked those reads.
+        // The call is refused for the dialog, not for whatever the reads could not see.
+        if (openedDuringPreflight !== undefined && !isHandleDialogTool(toolName)) {
+          return dialogRefusal(openedDuringPreflight);
+        }
 
         if (preflight !== undefined && !preflight.ok) {
           if (preflight.failure.kind === 'blocked') {
@@ -3780,6 +3878,10 @@ export const createBrowserRuntime = ({
           );
         };
 
+        // The page action that opens a dialog is not answered until the dialog is closed.
+        // The call returns when the dialog opens; the action finishes on its own once the dialog is answered.
+        const dialogWatch = watchForDialog(runSession.watchDialogs);
+
         try {
           dispatched = true;
 
@@ -3830,7 +3932,11 @@ export const createBrowserRuntime = ({
             toolName: runToolName,
           });
 
-          result = await Promise.race([call, takenAway.then(() => null)]);
+          result = await Promise.race([
+            call,
+            takenAway.then(() => null),
+            dialogWatch.opened,
+          ]).finally(dialogWatch.stop);
 
           // A load the browser answered as a file: the attachment never became a document, and its item follows.
           navigatedToFile =
@@ -4105,6 +4211,34 @@ export const createBrowserRuntime = ({
           });
         }
 
+        // A dialog the call left open holds the page: no frame or redirect read can run until it is answered,
+        // So the dialog is what the caller acts on next, ahead of the step's own text or the tab it opened.
+        const dialogAfterCall = runSession.pendingDialog();
+
+        if (dialogAfterCall !== undefined) {
+          const modalState = modalStateText(
+            dialogAfterCall,
+            toolName,
+            dialogReading(dialogAfterCall, agentContext)
+          );
+
+          // A guarded `browser_tabs new` names the tab it opened even when the dialog swallowed its answer:
+          // Its id and url are how the caller answers the dialog on that tab, and they were lost before.
+          const openedInfo = openedForStep === undefined ? undefined : await tabInfo(runTabId);
+          // `tabInfo` answers `''` for a tab it cannot read a url from, the same as the branch below treats it.
+          const openedUrl =
+            openedInfo?.url === undefined || openedInfo.url === '' ? undefined : openedInfo.url;
+          const openedNote =
+            openedForStep === undefined
+              ? ''
+              : `\n\nThe call opened tab ${String(runTabId)} (${openedUrl ?? openedForStep.url}).`;
+
+          return {
+            kind: 'result',
+            result: withModalState(settled, `${modalState}${openedNote}`),
+          };
+        }
+
         // A guarded `browser_tabs new` answers with what the tool itself would: the tab it opened, at its new url.
         if (openedForStep !== undefined) {
           if (intercepted.stopped.length > 0) {
@@ -4255,6 +4389,27 @@ export const createBrowserRuntime = ({
         // A throw before the tool ran leaves the tab this call opened unused: close it rather than orphan it.
         if (!dispatched && stepOpenedTab !== null) {
           await closeOpenedTab(stepOpenedTab);
+        }
+
+        // A dialog that opened while the call's checks read the page stopped those reads.
+        // The caller is told to answer the dialog, not handed a transport failure.
+        const blocking = session.pendingDialog();
+
+        if (error instanceof BrowserToolDialogOpenError && blocking !== undefined) {
+          return {
+            kind: 'result',
+            result: {
+              error: dialogRefusalText(
+                blocking,
+                toolName,
+                dialogReading(
+                  blocking,
+                  caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined
+                )
+              ),
+              ok: false,
+            },
+          };
         }
 
         throw error;

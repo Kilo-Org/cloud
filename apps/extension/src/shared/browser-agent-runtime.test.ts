@@ -68,7 +68,7 @@ type CdpHandler = (
   params: Record<string, unknown> | undefined,
   /** The tab the command was sent to: a deferred answer can be scoped to the tab a call drives. */
   target?: { readonly tabId: number }
-) => Promise<Record<string, unknown>> | Record<string, unknown> | undefined;
+) => Promise<Record<string, unknown> | undefined> | Record<string, unknown> | undefined;
 
 type AgentResult = Extract<EvalTabResult, { readonly ok: true }>;
 
@@ -115,6 +115,8 @@ interface FakeCdp {
   readonly emit: (method: string, params: Record<string, unknown>) => void;
   /** One event from a child (out-of-process frame) session, the way chrome.debugger reports it. */
   readonly emitFrom: (method: string, params: Record<string, unknown>, sessionId: string) => void;
+  /** One event on a named tab, for a call that drives a tab the call itself opened. */
+  readonly emitOn: (tabId: number, method: string, params: Record<string, unknown>) => void;
   readonly setHandlers: (handlers: Record<string, CdpHandler>) => void;
   readonly setFrameUrl: (url: string) => void;
   readonly setProbe: (probe: Record<string, unknown>) => void;
@@ -361,6 +363,11 @@ const createFakeCdp = (): FakeCdp => {
     emitFrom: (method, params, sessionId) => {
       for (const listener of eventListeners) {
         listener({ sessionId, tabId: TAB_ID }, method, params);
+      }
+    },
+    emitOn: (tabId, method, params) => {
+      for (const listener of eventListeners) {
+        listener({ tabId }, method, params);
       }
     },
     sent: () => sent,
@@ -3719,6 +3726,10 @@ describe('agent browser calls', () => {
       readonly plain?: boolean;
       /** The Downloads permission is gone by the time the guard is armed: revoked after the pre-open check. */
       readonly revokeAfterOpen?: boolean;
+      /** The opened tab reports an empty url, as Chrome does without the `tabs` permission. */
+      readonly unreadableTabUrl?: boolean;
+      /** No file is in the browser's download history, so the guard's search cannot claim one. */
+      readonly noSeededFile?: boolean;
     } = {}
   ) => {
     const downloads = createFakeDownloads();
@@ -3765,8 +3776,13 @@ describe('agent browser calls', () => {
         }
 
         // A blank tab is one whose navigate never committed a document: the guard cannot see the page move.
-        return options.blankTab === true
-          ? { id: newTab, title: '', url: 'about:blank' }
+        if (options.blankTab === true) {
+          return { id: newTab, title: '', url: 'about:blank' };
+        }
+
+        // A tab Chrome will not describe without the `tabs` permission: the url is empty, not `about:blank`.
+        return options.unreadableTabUrl === true
+          ? { id: newTab, title: '', url: '' }
           : { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt` };
       },
       onCreated: {
@@ -3815,8 +3831,11 @@ describe('agent browser calls', () => {
       tabsApi,
     });
 
-    // The file the approved repeat keeps, as the browser reports it once it is written.
-    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+    // The file the approved repeat keeps, as the browser reports it once it is written. A case about the answer's
+    // Text rather than the download leaves the history empty, so the guard's search cannot claim a file.
+    if (options.noSeededFile !== true) {
+      downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+    }
 
     /**
      * A navigate the test answers by hand, so two calls can be interleaved on purpose. One waiter per navigate, in
@@ -4523,6 +4542,78 @@ describe('agent browser calls', () => {
     }
 
     expect(outcome.withheldFrames).toStrictEqual([FRAME_ORIGIN]);
+  });
+
+  it('names the tab a guarded tabs-new opened when the navigation leaves a dialog open on it', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+
+    // The destination page opens a dialog as it loads, and nothing answers it.
+    fixture.cdp.setHandlers({
+      'Page.navigate': () => {
+        // The document commits, then its script opens the dialog: the frame tree reports the origin it committed with.
+        fixture.cdp.emitOn(fixture.newTab, 'Page.frameNavigated', {
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/report.txt` },
+        });
+        fixture.cdp.emitOn(fixture.newTab, 'Page.javascriptDialogOpening', {
+          // The frame that opened it is the tab's own document; the harness's frame tree reports its origin.
+          frameId: 'main',
+          message: 'Saved',
+          type: 'alert',
+          // `url` is required by the protocol: the page that opened the dialog.
+          url: `${MAIN_ORIGIN}/report.txt`,
+        });
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await fixture.run(agent());
+
+    if (outcome.kind !== 'result') {
+      throw new Error(`expected a result, got ${outcome.kind}`);
+    }
+
+    // The dialog is what the caller acts on next, and the tab it acted on stays named: its id and url are how the
+    // Caller answers the dialog on that tab.
+    expect(outcome.result.ok ? outcome.result.value : '').toBe(
+      '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by browser_handle_dialog\n\n' +
+        `The call opened tab ${String(fixture.newTab)} (${MAIN_ORIGIN}/report.txt).`
+    );
+    // The page cannot report its frames while its dialog is open, so this answer claims nothing about them.
+    expect(outcome).not.toHaveProperty('withheldFrames');
+  });
+
+  it('falls back to the url the step opened when the tab reports an empty one under its dialog', async () => {
+    const fixture = await tabsNewFixture({
+      noSeededFile: true,
+      plain: true,
+      unreadableTabUrl: true,
+    });
+
+    fixture.cdp.setHandlers({
+      'Page.navigate': () => {
+        fixture.cdp.emitOn(fixture.newTab, 'Page.javascriptDialogOpening', {
+          message: 'Saved',
+          type: 'alert',
+          url: `${MAIN_ORIGIN}/report.txt`,
+        });
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await fixture.run(agent());
+
+    if (outcome.kind !== 'result') {
+      throw new Error(`expected a result, got ${outcome.kind}`);
+    }
+
+    const text = outcome.result.ok ? String(outcome.result.value) : '';
+
+    // A tab Chrome reports without a url must not print an empty pair of brackets: the guarded step opens it blank,
+    // And that url is what the branch below already falls back to.
+    expect(text).toContain(`The call opened tab ${String(fixture.newTab)} (about:blank).`);
+    expect(text).not.toContain('()');
   });
 
   const refusalSchema = z.object({
@@ -5874,6 +5965,558 @@ describe('agent browser calls', () => {
   });
 });
 
+/** Page commands the renderer cannot answer while a JavaScript dialog is open, as measured on Chromium. */
+const RENDERER_COMMANDS = [
+  'Accessibility.getFullAXTree',
+  'DOM.describeNode',
+  'DOM.getBoxModel',
+  'DOM.getDocument',
+  'DOM.querySelectorAll',
+  'DOM.resolveNode',
+  'DOM.scrollIntoViewIfNeeded',
+  'Emulation.setFocusEmulationEnabled',
+  'Page.captureScreenshot',
+  'Page.getFrameTree',
+  'Page.getLayoutMetrics',
+  'Runtime.callFunctionOn',
+  'Runtime.evaluate',
+  'Target.setAutoAttach',
+] as const;
+
+/**
+ * Chrome around a JavaScript dialog: the page opens it from a click's handler
+ * (or, with `opener`, from another command), and from then on neither that
+ * command nor any renderer command answers until `Page.handleJavaScriptDialog`
+ * closes the dialog.
+ */
+const pageDialog = (
+  cdp: FakeCdp,
+  dialog: {
+    /** `null` emits no frame id, the case where the browser named no frame. */
+    readonly frameId?: string | null;
+    readonly message: string;
+    readonly type: string;
+    readonly url?: string;
+  },
+  opener = 'Input.dispatchMouseEvent'
+) => {
+  // The dialog the page holds open, closed by its answer.
+  const page: { open?: PromiseWithResolvers<void> } = {};
+  const answers: Record<string, unknown>[] = [];
+  const handlers: Record<string, CdpHandler> = {};
+  // Declines to answer itself, so the fake's own answer follows once the dialog is closed.
+  const blocked: CdpHandler = async () => {
+    await page.open?.promise;
+  };
+
+  for (const method of RENDERER_COMMANDS) {
+    handlers[method] = blocked;
+  }
+
+  handlers[opener] = async params => {
+    await page.open?.promise;
+
+    // A click's handler runs on the release; any other opener opens the dialog on its own.
+    if (opener === 'Input.dispatchMouseEvent' && params?.['type'] !== 'mouseReleased') {
+      return;
+    }
+
+    const opened = Promise.withResolvers<void>();
+
+    page.open = opened;
+    // Chrome reports the frame that opened the dialog; its origin comes from the frame tree the browser computed.
+    const { frameId = 'main', ...rest } = dialog;
+
+    cdp.emit('Page.javascriptDialogOpening', {
+      ...(frameId === null ? {} : { frameId }),
+      url: `${MAIN_ORIGIN}/dashboard`,
+      ...rest,
+    });
+    await opened.promise;
+  };
+  handlers['Page.handleJavaScriptDialog'] = params => {
+    answers.push(params ?? {});
+    cdp.emit('Page.javascriptDialogClosed', { result: params?.['accept'] === true });
+    page.open?.resolve();
+    delete page.open;
+
+    return {};
+  };
+  cdp.setHandlers(handlers);
+
+  return { answers, blocked };
+};
+
+const ALERT_STATE =
+  '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by browser_handle_dialog';
+
+describe('agent browser calls on a page with a JavaScript dialog', () => {
+  const call = (runtime: BrowserRuntime, toolName: string, args: Record<string, unknown> = {}) =>
+    runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: args,
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName,
+    });
+
+  it('answers a click that opens a dialog with the modal state instead of waiting for the click', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: { ok: true, value: ALERT_STATE },
+    });
+  });
+
+  it('refuses every other tool on the tab until the dialog is answered, without touching the page', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+    await call(runtime, 'browser_click', { target: '#save' });
+    const sentBefore = cdp.commands().length;
+
+    await expect(call(runtime, 'browser_snapshot')).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        error: `Tool "browser_snapshot" does not handle the modal state.\n\n${ALERT_STATE}`,
+        ok: false,
+      },
+    });
+    await expect(
+      call(runtime, 'browser_navigate', { url: `${MAIN_ORIGIN}/next` })
+    ).resolves.toMatchObject({ result: { ok: false } });
+    expect(cdp.commands()).toHaveLength(sentBefore);
+  });
+
+  it('accepts a prompt with the text given, and the tab takes other tools again', async () => {
+    const { cdp, runtime } = await createHarness();
+    const dialog = pageDialog(cdp, { message: 'Your name?', type: 'prompt' });
+
+    await call(runtime, 'browser_click', { target: '#ask' });
+
+    await expect(
+      call(runtime, 'browser_handle_dialog', { accept: true, promptText: 'Ada' })
+    ).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'prompt' } },
+    });
+    expect(dialog.answers).toStrictEqual([{ accept: true, promptText: 'Ada' }]);
+    expect(String(expectResult(await call(runtime, 'browser_snapshot')).result.value)).toContain(
+      'Pay now'
+    );
+  });
+
+  it('dismisses a confirm', async () => {
+    const { cdp, runtime } = await createHarness();
+    const dialog = pageDialog(cdp, { message: 'Delete it?', type: 'confirm' });
+
+    await call(runtime, 'browser_click', { target: '#delete' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: false })).resolves.toMatchObject({
+      result: { ok: true, value: { accepted: false, type: 'confirm' } },
+    });
+    expect(dialog.answers).toStrictEqual([{ accept: false }]);
+  });
+
+  it('answers any call during which the page opens a dialog, not only a click', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' }, 'Accessibility.getFullAXTree');
+
+    await expect(call(runtime, 'browser_snapshot')).resolves.toStrictEqual({
+      kind: 'result',
+      result: { ok: true, value: ALERT_STATE },
+    });
+  });
+
+  it('withholds the message of a dialog from a frame the agent may not read', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The widget frame (f1) is cross-origin and the agent holds no read grant for it.
+    pageDialog(cdp, {
+      frameId: 'f1',
+      message: 'Card declined',
+      type: 'alert',
+      url: `${FRAME_ORIGIN}/widget`,
+    });
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog (message withheld: no read permission for the frame that opened it)]: can be handled by browser_handle_dialog',
+      },
+    });
+  });
+
+  it('withholds the message of an about:blank dialog whose creating frame is cross-origin', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Pay now?', type: 'confirm', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // The browser reports the blank frame's origin as the pay frame's, which is what decides both the reading and the answer.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+            { frame: { id: 'blank', securityOrigin: payOrigin, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+
+    await expect(call(runtime, 'browser_click', { target: '#pay' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["confirm" dialog (message withheld: no read permission for the frame that opened it)]: can be handled by browser_handle_dialog',
+      },
+    });
+  });
+
+  it('shows an about:blank dialog’s message when its creating frame is an origin the agent may read', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The blank frame the top page created carries the tab's origin, which the harness's read grant covers.
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'blank', securityOrigin: MAIN_ORIGIN, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+
+    const shown = await call(runtime, 'browser_click', { target: '#save' });
+
+    expect(shown.kind === 'result' && shown.result.ok ? String(shown.result.value) : '').toContain(
+      'dialog with message "Saved"'
+    );
+  });
+
+  it('judges a dialog answer by the origin of the frame that opened it, not the tab’s document', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    // A confirm opened by a cross-origin frame: its handler resumes in that frame when answered.
+    pageDialog(
+      cdp,
+      { frameId: 'pay', message: 'Pay now?', type: 'confirm', url: `${payOrigin}/checkout` },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    // The tab's own act grant covers nothing here: the answer acts in the frame's origin.
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: payOrigin }],
+      kind: 'needs_permission',
+      result: {
+        error: NEEDS_PERMISSION_ERROR,
+        ok: false,
+      },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+  });
+
+  it('answers an about:blank dialog from a frame the top page created with the tab’s own grant', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // A blank frame the top document created inherits the tab's origin; the browser says so in its frame tree.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'blank', securityOrigin: MAIN_ORIGIN, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'alert' } },
+    });
+  });
+
+  it('requires the cross-origin creator’s grant for an about:blank dialog it opened, not the tab’s', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Pay now?', type: 'confirm', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // The pay frame created the blank frame, so the browser reports the blank frame's origin as the pay one.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+            { frame: { id: 'blank', securityOrigin: payOrigin, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    // The tab's act grant covers nothing here: the answer resumes a handler in the pay origin.
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: payOrigin }],
+      kind: 'needs_permission',
+      result: { error: NEEDS_PERMISSION_ERROR, ok: false },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+
+    // Granted on the creator's origin, the same answer goes through.
+    await expect(
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant, { class: 'act', origin: payOrigin }] },
+        arguments: { accept: true },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_handle_dialog',
+      })
+    ).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'confirm' } },
+    });
+  });
+
+  it('refuses a dialog whose frame the browser never named, rather than guessing from its url', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(
+      cdp,
+      // A blank url alone would look like the tab's own origin; without the frame it is unknowable.
+      { frameId: null, message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toMatchObject({
+      items: [{ class: 'act', origin: 'opaque:null' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('still refuses a dialog from a genuinely opaque frame, which inherits nothing', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, {
+      frameId: null,
+      message: 'Saved',
+      type: 'alert',
+      url: 'data:text/html,<p>hi</p>',
+    });
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: 'opaque:null' }],
+      kind: 'needs_permission',
+      result: { error: NEEDS_PERMISSION_ERROR, ok: false },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+  });
+
+  it('answers a dialog a granted frame opened once that frame’s origin is granted', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(
+      cdp,
+      { frameId: 'pay', message: 'Pay now?', type: 'confirm', url: `${payOrigin}/checkout` },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    const answered = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'act', origin: payOrigin }] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+
+    expect(answered).toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'confirm' } },
+    });
+  });
+
+  it('tells a safe-mode panel the dialog is the user’s to answer, naming no tool it cannot call', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(
+      runtime.runTool({
+        arguments: { target: '#save' },
+        caller: panel(),
+        safeMode: true,
+        tabId: TAB_ID,
+        // The agent session holds this tab, so the panel's call is a take-over first.
+        takeOver: true,
+        toolName: 'kilo_browser_click',
+      })
+    ).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog with message "Saved"]: answer it on the page; this mode cannot answer dialogs',
+      },
+    });
+  });
+
+  it('names the panel’s own answering tool to the panel', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(
+      runtime.runTool({
+        arguments: { target: '#save' },
+        caller: panel(),
+        tabId: TAB_ID,
+        // The agent session holds this tab, so the panel's call is a take-over first.
+        takeOver: true,
+        toolName: 'kilo_browser_click',
+      })
+    ).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by kilo_browser_handle_dialog',
+      },
+    });
+  });
+
+  it('refuses, rather than asks about, a call whose page checks a dialog interrupted', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The page opens the dialog while the call's own checks read it, before the click runs.
+    pageDialog(cdp, { message: 'Saved', type: 'alert' }, 'Runtime.callFunctionOn');
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        error: `Tool "browser_click" does not handle the modal state.\n\n${ALERT_STATE}`,
+        ok: false,
+      },
+    });
+  });
+
+  it('keeps the approval of a sensitive step that an open dialog refused', async () => {
+    const { cdp, runtime } = await createHarness();
+    const type = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#cc', text: 'hunter2' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_type',
+      });
+
+    cdp.setProbe({ fields: [{ kind: 'password' }], paymentFormSubmit: false });
+    const stepToken = expectStepToken(await type([]));
+
+    cdp.emit('Page.javascriptDialogOpening', {
+      frameId: 'main',
+      message: 'Saved',
+      type: 'alert',
+      url: `${MAIN_ORIGIN}/dashboard`,
+    });
+    await expect(type([stepToken])).resolves.toMatchObject({ result: { ok: false } });
+    await call(runtime, 'browser_handle_dialog', { accept: true });
+
+    // The refusal ran no check, so the approval is still there for the step it was given for.
+    await expect(type([stepToken])).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true },
+    });
+  });
+
+  it('turns frame auto-attach on after a dialog that was open at the session’s first call is answered', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The panel's snapshot meets the dialog, so the agent's first call finds it open.
+    const dialog = pageDialog(
+      cdp,
+      { message: 'Saved', type: 'alert' },
+      'Accessibility.getFullAXTree'
+    );
+    await runtime.runTool({
+      arguments: {},
+      caller: panel(),
+      tabId: TAB_ID,
+      toolName: 'kilo_browser_snapshot',
+    });
+    runtime.releaseCaller(panel());
+    await call(runtime, 'browser_handle_dialog', { accept: true });
+    cdp.setHandlers({ 'Accessibility.getFullAXTree': dialog.blocked });
+    await call(runtime, 'browser_snapshot');
+
+    expect(cdp.commands().filter(method => method === 'Target.setAutoAttach')).toHaveLength(1);
+  });
+});
+
 describe('the download hold on a real call', () => {
   /** A hold over the fake downloads, with the reports it queued in order. */
   const holdOver = (downloads: FakeDownloads) => {
@@ -6546,8 +7189,14 @@ describe('a download the dialog answer starts', () => {
     return { hold, reports };
   };
 
+  // Chrome always names the frame that opened the dialog, and the answer is judged against that frame's origin.
   const dialogOpened = (cdp: FakeCdp): void => {
-    cdp.emit('Page.javascriptDialogOpening', { message: 'Leave this page?', type: 'confirm' });
+    cdp.emit('Page.javascriptDialogOpening', {
+      frameId: 'main',
+      message: 'Leave this page?',
+      type: 'confirm',
+      url: `${MAIN_ORIGIN}/dashboard`,
+    });
   };
 
   /** The tab's session records a dialog only once it exists, and a read is what creates it. */
@@ -6697,6 +7346,107 @@ describe('a download the dialog answer starts', () => {
     expect(downloads.cancelled).toStrictEqual([81, 82]);
     expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
     expect(suggested).toStrictEqual([81, 81, 82]);
+  });
+
+  it('holds a file the resumed click handler starts after the click already returned with the modal state', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+
+    // The click returns as soon as the dialog opens; its handler resumes only when the answer lands.
+    pageDialog(cdp, { message: 'Download the report?', type: 'confirm' });
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        hold.handle(
+          { id: 91, referrer: `${MAIN_ORIGIN}/dashboard`, url: `${MAIN_ORIGIN}/report.txt` },
+          () => {}
+        );
+
+        return {};
+      },
+    });
+
+    const clicked = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#report' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect(clicked).toMatchObject({ kind: 'result', result: { ok: true } });
+
+    // Two calls later the answer resumes the handler, and the file it starts is held without an approval.
+    const refused = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    // Held before Chrome named a file: the guard cancelled the item.
+    expect(downloads.cancelled).toStrictEqual([91]);
+  });
+
+  it('holds a file an answered dialog loads as an attachment when the response interceptor is the guard', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    // The click returns with the modal state; the answer is what resumes the handler that loads the file.
+    pageDialog(cdp, { message: 'Download the report?', type: 'confirm' });
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'dialog-2',
+          responseHeaders: [
+            { name: 'Content-Disposition', value: 'attachment; filename="report.txt"' },
+            { name: 'Content-Type', value: 'text/plain' },
+          ],
+          responseStatusCode: 200,
+        });
+
+        return {};
+      },
+    });
+
+    await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#report' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    const refused = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+    const answers = cdp
+      .sent()
+      .filter(
+        command =>
+          command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+      )
+      .map(command => [command.method, command.params?.['requestId']]);
+
+    // The interceptor armed with the dialog open, so the answer's own attachment is failed rather than kept.
+    expect(answers).toStrictEqual([['Fetch.failRequest', 'dialog-2']]);
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
   });
 
   it('answers a dialog that starts no download without waiting for the hold’s timeout', async () => {

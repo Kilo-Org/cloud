@@ -3337,24 +3337,17 @@ export const createBrowserRuntime = ({
           // A guarded `browser_tabs new` names the tab it opened even when the dialog swallowed its answer:
           // Its id and url are how the caller answers the dialog on that tab, and they were lost before.
           const openedInfo = openedForStep === undefined ? undefined : await tabInfo(runTabId);
+          // `tabInfo` answers `''` for a tab it cannot read a url from, the same as the branch below treats it.
+          const openedUrl =
+            openedInfo?.url === undefined || openedInfo.url === '' ? undefined : openedInfo.url;
           const openedNote =
             openedForStep === undefined
               ? ''
-              : `\n\nThe call opened tab ${String(runTabId)} (${openedInfo?.url ?? openedForStep.url}).`;
+              : `\n\nThe call opened tab ${String(runTabId)} (${openedUrl ?? openedForStep.url}).`;
 
           return {
             kind: 'result',
             result: withModalState(settled, `${modalState}${openedNote}`),
-            // A tab this call opened is the one place a result carries withheld frames: the page cannot report
-            // Them while its dialog is open, so the tab's own document is the inventory.
-            ...(agentContext === undefined || openedForStep === undefined
-              ? {}
-              : {
-                  withheldFrames: await withheldOriginsFor(
-                    () => dialogFrameInventory(runTabId),
-                    agentContext.authorized
-                  ),
-                }),
           };
         }
 

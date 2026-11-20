@@ -3421,6 +3421,8 @@ describe('agent browser calls', () => {
       readonly plain?: boolean;
       /** The Downloads permission is gone by the time the guard is armed: revoked after the pre-open check. */
       readonly revokeAfterOpen?: boolean;
+      /** The opened tab reports an empty url, as Chrome does without the `tabs` permission. */
+      readonly unreadableTabUrl?: boolean;
     } = {}
   ) => {
     const downloads = createFakeDownloads();
@@ -3467,8 +3469,13 @@ describe('agent browser calls', () => {
         }
 
         // A blank tab is one whose navigate never committed a document: the guard cannot see the page move.
-        return options.blankTab === true
-          ? { id: newTab, title: '', url: 'about:blank' }
+        if (options.blankTab === true) {
+          return { id: newTab, title: '', url: 'about:blank' };
+        }
+
+        // A tab Chrome will not describe without the `tabs` permission: the url is empty, not `about:blank`.
+        return options.unreadableTabUrl === true
+          ? { id: newTab, title: '', url: '' }
           : { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt` };
       },
       onCreated: {
@@ -4259,8 +4266,37 @@ describe('agent browser calls', () => {
       '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by browser_handle_dialog\n\n' +
         `The call opened tab ${String(fixture.newTab)} (${MAIN_ORIGIN}/report.txt).`
     );
-    // The page cannot report its frames while its dialog is open, so the tab's own document is the inventory.
-    expect(outcome.withheldFrames).toStrictEqual([]);
+    // The page cannot report its frames while its dialog is open, so this answer claims nothing about them.
+    expect(outcome).not.toHaveProperty('withheldFrames');
+  });
+
+  it('falls back to the url the step opened when the tab reports an empty one under its dialog', async () => {
+    const fixture = await tabsNewFixture({ plain: true, unreadableTabUrl: true });
+
+    fixture.cdp.setHandlers({
+      'Page.navigate': () => {
+        fixture.cdp.emitOn(fixture.newTab, 'Page.javascriptDialogOpening', {
+          message: 'Saved',
+          type: 'alert',
+          url: `${MAIN_ORIGIN}/report.txt`,
+        });
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await fixture.run(agent());
+
+    if (outcome.kind !== 'result') {
+      throw new Error(`expected a result, got ${outcome.kind}`);
+    }
+
+    const text = outcome.result.ok ? String(outcome.result.value) : '';
+
+    // A tab Chrome reports without a url must not print an empty pair of brackets: the guarded step opens it blank,
+    // And that url is what the branch below already falls back to.
+    expect(text).toContain(`The call opened tab ${String(fixture.newTab)} (about:blank).`);
+    expect(text).not.toContain('()');
   });
 
   const refusalSchema = z.object({

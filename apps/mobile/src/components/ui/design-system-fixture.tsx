@@ -131,6 +131,9 @@ export function DesignSystemFixture() {
                 value: switchOn,
                 onValueChange: setSwitchOn,
                 testID: 'fixture-row-switch',
+                // A label-only content press is hidden from assistive
+                // technology, so the switch carries the row's name.
+                accessibilityLabel: 'Switch with its own handle',
               }}
               pressTarget="content"
             />

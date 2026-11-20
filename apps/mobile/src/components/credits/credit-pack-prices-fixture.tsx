@@ -22,7 +22,10 @@ import {
 // row is unpriced there. The fixture mounts the real screen against fixed store
 // answers and never reaches the network. `state=priced` prices every pack,
 // `state=partly-priced` leaves the largest pack unpriced, which is the only
-// state that renders a row-level price status beside a priced row, and
+// state that renders a row-level price status beside a priced row,
+// `state=priced-expiring` prices every pack from the backend's expiring Play
+// catalog at the same fixed prices, so every pack grants credits that expire one
+// calendar year after purchase while the empty credit-block answer stays, and
 // `state=completing` prices every pack and starts a purchase on the first one,
 // which an emulator cannot reach without a store. The remaining states seed the
 // money-safety surfaces with inert exits: `unresolved` restores an earlier
@@ -35,6 +38,7 @@ import {
 export type CreditPackPricesFixtureState =
   | 'priced'
   | 'partly-priced'
+  | 'priced-expiring'
   | 'completing'
   | 'unresolved'
   | 'legacy-unresolved'
@@ -46,6 +50,7 @@ export type CreditPackPricesFixtureState =
 const FIXTURE_STATES = [
   'priced',
   'partly-priced',
+  'priced-expiring',
   'completing',
   'unresolved',
   'legacy-unresolved',
@@ -65,6 +70,7 @@ export function isCreditPackPricesFixtureState(
 const WAIT_KIND_BY_STATE = {
   priced: null,
   'partly-priced': null,
+  'priced-expiring': null,
   completing: null,
   unresolved: null,
   'legacy-unresolved': null,
@@ -109,6 +115,21 @@ const backends: RouterOutputs['credits']['getMobileStoreProducts'] = {
   ],
 };
 
+/**
+ * The same four packs from the backend's expiring Play catalog: each
+ * `googleProductId` carries the `_1year_v2` suffix of the verified SKU shape,
+ * and every pack grants credits that expire one calendar year after purchase.
+ */
+const EXPIRING_BACKENDS: typeof backends = {
+  appAccountToken: backends.appAccountToken,
+  products: backends.products.map(product => ({
+    amountUsd: product.amountUsd,
+    appleProductId: product.appleProductId,
+    googleProductId: `${product.googleProductId}_1year_v2`,
+    creditExpiryPolicy: 'one_year' as const,
+  })),
+};
+
 const creditBlocks: RouterOutputs['user']['getCreditBlocks'] = {
   creditBlocks: [],
   deductions: [],
@@ -139,15 +160,21 @@ function fixtureResponse(value: unknown): Response {
   });
 }
 
+/** The catalog a state answers with. */
+function backendProductsFor(state: CreditPackPricesFixtureState): typeof backends {
+  return state === 'priced-expiring' ? EXPIRING_BACKENDS : backends;
+}
+
 function listings(state: CreditPackPricesFixtureState): StoreCreditProductListing[] {
-  const priced = state === 'partly-priced' ? backends.products.slice(0, 3) : backends.products;
+  const catalog = backendProductsFor(state);
+  const priced = state === 'partly-priced' ? catalog.products.slice(0, 3) : catalog.products;
   // The join key differs per store, so each listing carries the id of the
   // storefront the app reports. A Play id would join to nothing on the other
   // store, and the state would silently render as store-unavailable.
   const idKey = getCreditStorefront() === 'play' ? 'googleProductId' : 'appleProductId';
   return priced.map(product => ({
     id: product[idKey],
-    displayPrice: PLAY_PRICES[backends.products.indexOf(product)] ?? '',
+    displayPrice: PLAY_PRICES[catalog.products.indexOf(product)] ?? '',
   }));
 }
 
@@ -156,7 +183,8 @@ function listings(state: CreditPackPricesFixtureState): StoreCreditProductListin
  * constants above; no request leaves the device, and a write is refused before
  * any mutation function runs.
  */
-function createFixtureClient() {
+function createFixtureClient(state: CreditPackPricesFixtureState) {
+  const catalog = backendProductsFor(state);
   return createTRPCClient<MobileRouter>({
     links: [
       httpLink({
@@ -185,7 +213,7 @@ function createFixtureClient() {
             return fixtureResponse(creditBlocks);
           }
           if (url.includes('/credits.getMobileStoreProducts')) {
-            return fixtureResponse(backends);
+            return fixtureResponse(catalog);
           }
           throw new Error(`Read not provided by credits price fixture: ${url}`);
         },
@@ -203,6 +231,7 @@ function SeededScreen({ state }: { state: CreditPackPricesFixtureState }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   useState(() => {
+    const catalog = backendProductsFor(state);
     const me = trpc.user.getMe.queryOptions();
     queryClient.setQueryData(me.queryKey, meResponse);
     const balance = trpc.user.getContextBalance.queryOptions({});
@@ -212,8 +241,8 @@ function SeededScreen({ state }: { state: CreditPackPricesFixtureState }) {
     queryClient.setQueryData(
       creditStoreProductsKey(meResponse.id),
       joinStoreCreditProducts({
-        appAccountToken: backends.appAccountToken,
-        backendProducts: backends.products,
+        appAccountToken: catalog.appAccountToken,
+        backendProducts: catalog.products,
         storeProducts: listings(state),
         storefront: getCreditStorefront(),
       })
@@ -231,7 +260,7 @@ function FixtureSession({ state }: { state: CreditPackPricesFixtureState }) {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
   );
-  const trpcClient = useMemo(() => createFixtureClient(), []);
+  const trpcClient = useMemo(() => createFixtureClient(state), [state]);
   return (
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>

@@ -19,7 +19,9 @@
     "presenceStatus": "主機：{{connection}}",
     "commandStatus": "命令傳送狀態：{{status}}",
     "delivered": "已送達",
-    "expired": "已過期"
+    "expired": "已過期",
+    "recoveryGaps_one": "此對話記錄缺少 {{displayCount}} 個部分。",
+    "recoveryGaps_other": "此對話記錄缺少 {{displayCount}} 個部分。"
   },
   "common": {
     "manageOnWeb": "在網頁上管理",
@@ -699,6 +701,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
+      "managedOnWebTitle": "在網頁版管理",
+      "managedOnWebShort": "此連線需在電腦上透過網頁版管理。",
+      "managedOnWebRepositories": "請在電腦上透過網頁版為 {{organization}} 選擇儲存庫。",
       "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
       "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
       "descriptionOverview": "為 {{organization}} 建立工作區存取權杖，然後在下一個畫面貼上。",
@@ -737,6 +742,7 @@
     "platformList": {
       "activity": "活動",
       "checking": "正在檢查…",
+      "needsAttention": "需要處理",
       "platforms": "平台",
       "statusUnavailable": "無法取得狀態"
     },
@@ -2227,6 +2233,8 @@
     "modelPicker": {
       "title": "選取模型",
       "noModelsDescription": "沒有可選取的模型。",
+      "allUnavailableTitle": "沒有可使用的模型",
+      "allUnavailableDescription": "請新增供應商金鑰，然後再試一次。",
       "favorites": "我的最愛"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "供應商目前無法使用。請稍後再重新傳送。"
   },
   "settingsTools": {
-    "confirmTitle": "確認此變更？"
+    "confirmTitle": "確認此變更？",
+    "guarded": {
+      "spendAlertsOff": "要關閉支出警示嗎？你將不再收到支出超過門檻和每小時飆升的通知。",
+      "balanceAlertsOff": "要關閉餘額警示嗎？當你的額度偏低時，你將不再收到通知。",
+      "securityFindingsOff": "要關閉安全性發現嗎？你將不再收到有關新安全性發現的通知。",
+      "hideBalanceOn": "要隱藏你的餘額嗎？額度餘額將不再顯示於個人資料畫面和組織中心。"
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
     "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
     "providersEmpty": "沒有符合此搜尋的供應商。",
+    "providersNone": "此組織沒有可用的供應商。",
     "allowAllShown": "允許所有顯示項目",
     "denyAllShown": "拒絕所有顯示項目",
     "gatewaysDescription": "Kilo 會透過 Vercel AI Gateway 或 OpenRouter 路由模型請求。停用的閘道會使這些請求失敗。",

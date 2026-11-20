@@ -23,6 +23,7 @@ import {
   SyncBenchmarkSubscriptionsRequestSchema,
   type BenchmarkConfig,
   type BenchmarkConfigAdminResponseConfig,
+  type BenchmarkConfigSaveWarning,
   type BenchmarkRegistryQueue,
   type BenchmarkIdentity,
   resolveBenchmarkIdentity,
@@ -30,6 +31,9 @@ import {
   resolveEffectivePolicy,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
+  type BenchmarkRunAdminResponseRun,
+  type BenchmarkRunsResponse,
+  type BenchmarkRunSummariesResponse,
   type BenchmarkSchedulerConfigResponse,
   type BenchmarkSchedulerSetting,
   type BenchmarkRunProgress,
@@ -54,6 +58,7 @@ import {
   BenchmarkRunConfigError,
   computeEngineIdentity,
   drainQueues,
+  PLATFORM_SYNC_SCHEDULE,
   publishPlatformRoutingTable,
   resolveRunIdentity,
   RunAlreadyActiveError,
@@ -63,9 +68,11 @@ import {
 } from './run';
 import {
   countCurrentProfilesByStatus,
+  existsRunningRun,
   listCurrentPlatformProfileStatuses,
   getClassifierWinner,
   getLatestRoutingTable,
+  getRunSummariesForRouter,
   listRuns,
   requeueFailedCurrentProfiles,
 } from './db';
@@ -156,6 +163,71 @@ const SchedulerOverridesRequestSchema = z
   })
   .transform(({ slots, modelConcurrency }) => ({ slots, modelConcurrency }));
 
+/**
+ * The previous web release parses the run list with a contract that still
+ * requires `summaries` on every run (ADR 0003 invariant 7: workers deploy
+ * before web promotion). Serve an empty array; the per-run summaries route
+ * serves the rows. Remove once that release is promoted.
+ */
+function withLegacyAdminRunFields(run: BenchmarkRun): BenchmarkRunAdminResponseRun {
+  return { ...run, summaries: [] };
+}
+
+const RETRY_AFTER_SAVE = `The scheduled platform sync (${PLATFORM_SYNC_SCHEDULE}) retries it; save again to retry now.`;
+
+/**
+ * Registry sync, then routing-table publish, for a config that is already
+ * saved. A failed step does not undo the save; it comes back as a warning so
+ * the admin learns what did not happen. A failed sync skips the publish.
+ */
+async function syncRegistryAfterConfigSave(
+  env: Env,
+  router: AutoRouter
+): Promise<BenchmarkConfigSaveWarning[]> {
+  try {
+    await syncPlatformRegistry(env, fetch, router);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'platform_registry_sync_failed',
+        afterConfigSave: true,
+        router,
+        ...formatError(error),
+      })
+    );
+    return [
+      {
+        kind: 'registry_sync_failed',
+        message: `Platform registry sync failed (${errorMessage(error)}), so newly added decider models have no pending benchmark entries and the routing table was not republished. ${RETRY_AFTER_SAVE}`,
+      },
+    ];
+  }
+  try {
+    // A save also flushes an unchanged table: an earlier save may have written
+    // it but failed the flush, and the version check would otherwise skip it.
+    await publishPlatformRoutingTable(env, fetch, router, { flushUnchangedTable: true });
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'routing_table_publish_skipped',
+        afterConfigSave: true,
+        error: errorMessage(error),
+      })
+    );
+    return [
+      {
+        kind: 'routing_table_publish_failed',
+        message: `Routing table publish failed (${errorMessage(error)}), so the gateway keeps serving the previous table. ${RETRY_AFTER_SAVE}`,
+      },
+    ];
+  }
+  return [];
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   // Every /admin/* route below requires the worker-wide authMiddleware
   // (./auth), which src/index.ts mounts with app.use('*', ...) before it calls
@@ -209,19 +281,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         { ...body, router, deciderModels },
         updatedBy
       );
-      await syncPlatformRegistry(c.env, fetch, router);
-      await publishPlatformRoutingTable(c.env, fetch, router).catch(error => {
-        console.warn(
-          JSON.stringify({
-            event: 'routing_table_publish_skipped',
-            afterConfigSave: true,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        );
-      });
+      const warnings = await syncRegistryAfterConfigSave(c.env, router);
       return c.json({
         config: withLegacyAdminConfigFields(saved),
         policySettings: resolvePolicySettings(saved),
+        warnings,
       });
     }
   );
@@ -261,11 +325,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     const limit = Math.min(Number(c.req.query('limit') ?? 20) || 20, 100);
     const kind = BenchmarkKindSchema.safeParse(c.req.query('kind'));
     const purpose = BenchmarkRunPurposeSchema.safeParse(c.req.query('purpose'));
-    const runs: BenchmarkRun[] = await listRuns(c.env.BENCH_DB, limit, {
-      kind: kind.success ? kind.data : undefined,
-      purpose: purpose.success ? purpose.data : undefined,
-      router: kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c),
-    });
+    const listRouter =
+      kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c);
+    const [runs, hasRunningRun] = await Promise.all([
+      listRuns(c.env.BENCH_DB, limit, {
+        kind: kind.success ? kind.data : undefined,
+        purpose: purpose.success ? purpose.data : undefined,
+        router: listRouter,
+      }),
+      existsRunningRun(c.env.BENCH_DB, requestRouter(c)),
+    ]);
     // Progress is display-only: a failed count query must not hide the run list.
     const progressByRunId = await loadRunProgress(
       c.env.BENCH_DB,
@@ -279,9 +348,20 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     return c.json({
       runs: runs.map(run => {
         const progress = progressByRunId.get(run.id);
-        return progress ? { ...run, progress } : run;
+        return withLegacyAdminRunFields(progress ? { ...run, progress } : run);
       }),
-    });
+      hasRunningRun,
+    } satisfies BenchmarkRunsResponse);
+  });
+
+  app.get('/admin/runs/:runId/summaries', async c => {
+    const summaries = await getRunSummariesForRouter(
+      c.env.BENCH_DB,
+      c.req.param('runId'),
+      requestRouter(c)
+    );
+    if (summaries === null) return c.json({ error: 'Run not found' }, 404);
+    return c.json({ summaries } satisfies BenchmarkRunSummariesResponse);
   });
 
   app.post(

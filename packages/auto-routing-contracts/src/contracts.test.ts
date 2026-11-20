@@ -18,6 +18,7 @@ import {
   BENCHMARK_SCHEDULER_SETTING_KEYS,
   BenchmarkConfigSchema,
   BenchmarkConfigAdminLegacyFieldsSchema,
+  BenchmarkRunAdminLegacyFieldsSchema,
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
   BenchmarkProfileStatusesRequestSchema,
@@ -283,6 +284,13 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(
       BenchmarkConfigAdminLegacyFieldsSchema.safeParse({ ...canonical, classifierRepetitions: 7 })
         .success
+    ).toBe(false);
+  });
+
+  it('accepts only an empty transitional summaries array on admin runs', () => {
+    expect(BenchmarkRunAdminLegacyFieldsSchema.parse({ summaries: [] })).toEqual({ summaries: [] });
+    expect(
+      BenchmarkRunAdminLegacyFieldsSchema.safeParse({ summaries: [{ model: 'm' }] }).success
     ).toBe(false);
   });
 

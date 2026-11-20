@@ -277,6 +277,16 @@ export function glanceableStatusKind(status: string): GlanceableStatusKind {
 }
 
 /**
+ * The one scheduled-membership rule: the scheduled count, the soonest-wake
+ * selector, and the widget's scheduled list all read it, so no surface can
+ * disagree about which rows are scheduled. It reads `glanceableStatusKind`, so
+ * a status folded into the scheduled kind is picked up everywhere at once.
+ */
+export function isScheduledSessionRow(session: GlanceableSessionRow): boolean {
+  return glanceableStatusKind(session.status) === 'scheduled';
+}
+
+/**
  * Map session rows to the glanceable counts. `busy` → running,
  * `question`/`permission`/`retry` → needs-input, `idle` → idle, the literal
  * `scheduled` → scheduled, and any other status (starting, empty, unknown,
@@ -287,6 +297,10 @@ export function glanceableStatusKind(status: string): GlanceableStatusKind {
  * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
  * disconnects while that session was waiting on an answer, and the CLI writes
  * it while backing off after a provider error.
+ *
+ * The scheduled count and `isScheduledSessionRow` are the same membership
+ * rule, so a row counted as scheduled is one the wake selector and the
+ * widget's scheduled list also admit.
  */
 export function countGlanceableSessions(
   sessions: readonly GlanceableSessionRow[]
@@ -299,18 +313,31 @@ export function countGlanceableSessions(
 }
 
 /**
+ * The one approvable-status rule: a `permission` wait is the only needs-input
+ * kind the user can clear without choosing an option, so a `question` or
+ * `retry` row is never approvable, whatever else it carries. The `needsApproval`
+ * count, the Home widget's approving row and the server's front-permission row
+ * all read this one rule, so they cannot drift.
+ */
+export function isApprovableGlanceableStatus(status: string): boolean {
+  return status === 'permission';
+}
+
+/**
  * The number of session rows whose status is exactly `permission`. A
  * permission wait is the one needs-input kind the user can clear without
  * choosing an option, so the wrist control offers Approve only against this
  * count.
  *
  * Deliberately narrower than `needsInput`: a `question` needs an answer, and a
- * `retry` needs the provider to come back, so neither is approvable.
+ * `retry` needs the provider to come back, so neither is approvable. It reads
+ * `isApprovableGlanceableStatus`, the same rule the Home widget's approving row
+ * reads, so the count and that row cannot drift.
  */
 export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow[]): number {
   let approvals = 0;
   for (const session of sessions) {
-    if (session.status === 'permission') {
+    if (isApprovableGlanceableStatus(session.status)) {
       approvals += 1;
     }
   }
@@ -402,7 +429,7 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
 export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): string | null {
   const soonest = extremeTimestampRow(
     sessions,
-    session => session.status === 'scheduled',
+    isScheduledSessionRow,
     session => session.scheduledAt,
     'earliest'
   );
@@ -454,7 +481,10 @@ export function buildOpaqueScopeKey(input: {
   organizationId: string | null;
 }): string {
   // Length-delimited by a NUL separator so `user=ab,org=c` and `user=a,org=bc`
-  // cannot hash to the same key.
+  // cannot hash to the same key. A missing or empty organization id is the
+  // personal scope, and `buildGlanceableSnapshot` normalizes both to null
+  // before it derives `organizationBound`, so the key and the flag cannot
+  // disagree.
   const joined = `${input.userId}\u0000${input.organizationId ?? ''}`;
   const hash = fnv1a32(joined);
   return hash.toString(16).padStart(8, '0');
@@ -482,6 +512,9 @@ export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
+  // One normalization: a missing or empty organization id is the personal
+  // scope, so the key and the bound flag cannot read the input differently.
+  const organizationId = input.organizationId || null;
   // Idle and scheduled counts: a connected agent doing nothing, or one that
   // will wake later, is still something the user wants on the Lock Screen.
   const eligible = isEligibleGlanceableWork(counts);
@@ -494,9 +527,9 @@ export function buildGlanceableSnapshot(
     revision: (input.previousRevision ?? 0) + 1,
     updatedAt,
     expiresAt: epochMsToIso(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS),
-    scopeKey: buildOpaqueScopeKey({ userId: input.userId, organizationId: input.organizationId }),
+    scopeKey: buildOpaqueScopeKey({ userId: input.userId, organizationId }),
     ...(input.accountEpoch === undefined ? {} : { accountEpoch: input.accountEpoch }),
-    organizationBound: typeof input.organizationId === 'string',
+    organizationBound: organizationId !== null,
     status: input.status ?? (eligible ? 'happy' : 'empty'),
     running: counts.running,
     needsInput: counts.needsInput,

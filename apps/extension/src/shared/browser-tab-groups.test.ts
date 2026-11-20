@@ -4,11 +4,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   BROWSER_TAB_GROUP_COLOR,
+  TAB_GROUP_SESSIONS_STORAGE_KEY,
   browserTabGroupEndedTitle,
   browserTabGroupTitle,
   createBrowserTabGroupController,
+  createStorageSessionTabGroupPersistence,
 } from './browser-tab-groups';
-import type { BrowserTabGroupUpdate } from './browser-tab-groups';
+import type {
+  BrowserTabGroupPersistence,
+  BrowserTabGroupUpdate,
+  PersistedTabGroupSession,
+} from './browser-tab-groups';
 
 const createGroupMock = (id: number) =>
   vi.fn(async (_options: { readonly tabIds: number[] }) => id);
@@ -466,5 +472,196 @@ describe('browser tab groups', () => {
 
     expect(controller.tabsForSession('s1')).toStrictEqual([81]);
     expect(controller.isTabAllowed('s1', 82)).toBe(false);
+  });
+});
+
+/** `storage.session` as two service workers share it: the second one starts with nothing in memory. */
+const createSessionStore = () => {
+  let stored: PersistedTabGroupSession[] | undefined = undefined;
+  const persistence: BrowserTabGroupPersistence = {
+    read: async () => stored,
+    write: async sessions => {
+      stored = [...sessions];
+    },
+  };
+
+  return { persistence, stored: () => stored };
+};
+
+describe('browser tab groups across a service-worker restart', () => {
+  it('gives a new worker the sessions, groups and tabs the old one stored', async () => {
+    const store = createSessionStore();
+    const before = createBrowserTabGroupController({
+      api: { group: createGroupMock(9), update: createUpdateMock() },
+      persistence: store.persistence,
+    });
+    await before.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' });
+    await before.shareActiveTab({ sessionHandle: 's1', tabId: 7 });
+
+    await vi.waitFor(() => {
+      expect(store.stored()).toStrictEqual([
+        { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' },
+      ]);
+    });
+
+    const after = createBrowserTabGroupController({ api: {}, persistence: store.persistence });
+    await after.restore();
+
+    expect(after.listSessions()).toStrictEqual([
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' },
+    ]);
+    expect(after.isTabAllowed('s1', 7)).toBe(true);
+  });
+
+  it('keeps an ended group adoptable after the restart', async () => {
+    const store = createSessionStore();
+    const before = createBrowserTabGroupController({
+      api: { group: createGroupMock(9), update: createUpdateMock() },
+      persistence: store.persistence,
+    });
+    await before.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' });
+    await before.shareActiveTab({ sessionHandle: 's1', tabId: 7 });
+    await before.closeSession({ sessionHandle: 's1' });
+
+    await vi.waitFor(() => {
+      expect(store.stored()?.[0]?.ended).toBe(true);
+    });
+
+    const after = createBrowserTabGroupController({
+      api: { update: createUpdateMock() },
+      persistence: store.persistence,
+    });
+    await after.restore();
+
+    await expect(after.adoptEnded({ sessionHandle: 's2' })).resolves.toStrictEqual({
+      groupId: 9,
+      kind: 'adopted',
+    });
+    expect(after.tabsForSession('s2')).toStrictEqual([7]);
+  });
+
+  it('writes nothing before the stored sessions are read, and keeps a tab closed meanwhile closed', async () => {
+    const read = Promise.withResolvers<PersistedTabGroupSession[] | undefined>();
+    const writes: PersistedTabGroupSession[][] = [];
+    const after = createBrowserTabGroupController({
+      api: {},
+      persistence: {
+        read: () => read.promise,
+        write: async sessions => {
+          writes.push([...sessions]);
+        },
+      },
+    });
+
+    after.noteTabRemoved(7);
+    await after.openSession({ controllerId: 'c2', sessionHandle: 's2', title: 'New' });
+    await Promise.resolve();
+
+    // Writing now would replace the stored session with this worker's empty view.
+    expect(writes).toStrictEqual([]);
+
+    read.resolve([
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7, 8], title: 'Report' },
+    ]);
+    await after.restore();
+
+    const expected = [
+      { ended: false, sessionHandle: 's2', tabs: [], title: 'New' },
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [8], title: 'Report' },
+    ];
+
+    expect(after.listSessions()).toStrictEqual(expected);
+    await vi.waitFor(() => {
+      expect(writes.at(-1)).toStrictEqual(expected);
+    });
+  });
+
+  it('restores nothing from unreadable storage, and still answers', async () => {
+    const items = new Map<string, unknown>([[TAB_GROUP_SESSIONS_STORAGE_KEY, [{ tabs: 'x' }]]]);
+    const persistence = createStorageSessionTabGroupPersistence({
+      getItem: key => items.get(key),
+      setItem: (key, value) => {
+        items.set(key, value);
+      },
+    });
+    const failing = createBrowserTabGroupController({
+      api: {},
+      persistence: { read: () => Promise.reject(new Error('storage gone')), write: async () => {} },
+    });
+    const garbled = createBrowserTabGroupController({ api: {}, persistence });
+
+    await expect(failing.restore()).resolves.toBe(false);
+    await expect(garbled.restore()).resolves.toBe(true);
+    expect(failing.listSessions()).toStrictEqual([]);
+    expect(garbled.listSessions()).toStrictEqual([]);
+  });
+
+  it('keeps the stored sessions through a failed read: writes wait, and the next call reads again', async () => {
+    let reads = 0;
+    const later = Promise.withResolvers<PersistedTabGroupSession[] | undefined>();
+    const writes: PersistedTabGroupSession[][] = [];
+    const after = createBrowserTabGroupController({
+      api: {},
+      persistence: {
+        read: () => {
+          reads += 1;
+
+          return reads === 1 ? Promise.reject(new Error('storage busy')) : later.promise;
+        },
+        write: async sessions => {
+          writes.push([...sessions]);
+        },
+      },
+    });
+
+    await expect(after.restore()).resolves.toBe(false);
+    // The change asks for a write, and the write asks for the read again.
+    await after.openSession({ controllerId: 'c2', sessionHandle: 's2', title: 'New' });
+    await Promise.resolve();
+
+    // This worker's view alone would erase s1.
+    expect(reads).toBe(2);
+    expect(writes).toStrictEqual([]);
+
+    later.resolve([{ ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' }]);
+    await expect(after.restore()).resolves.toBe(true);
+
+    const expected = [
+      { ended: false, sessionHandle: 's2', tabs: [], title: 'New' },
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' },
+    ];
+
+    expect(after.listSessions()).toStrictEqual(expected);
+    await vi.waitFor(() => {
+      expect(writes.at(-1)).toStrictEqual(expected);
+    });
+  });
+
+  it('keeps only the newest 64 ended sessions', async () => {
+    const store = createSessionStore();
+    const controller = createBrowserTabGroupController({
+      api: {},
+      persistence: store.persistence,
+    });
+
+    for (let index = 0; index < 70; index += 1) {
+      const sessionHandle = `s${index}`;
+
+      // eslint-disable-next-line no-await-in-loop -- sessions end in order
+      await controller.openSession({ controllerId: 'c1', sessionHandle, title: sessionHandle });
+      // eslint-disable-next-line no-await-in-loop -- see above
+      await controller.closeSession({ sessionHandle });
+    }
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'live', title: 'Live' });
+
+    const handles = controller.listSessions().map(session => session.sessionHandle);
+
+    expect(handles).toHaveLength(65);
+    expect(handles).not.toContain('s5');
+    expect(handles).toContain('s6');
+    expect(handles).toContain('live');
+    await vi.waitFor(() => {
+      expect(store.stored()).toHaveLength(65);
+    });
   });
 });

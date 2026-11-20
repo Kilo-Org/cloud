@@ -1,6 +1,10 @@
 import { kilo2AssetKey, readKilo2Messages } from './kilo2-source-messages';
 import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
-import { readNativeConversation, reduceNativePendingRequests } from './native-conversation-source';
+import {
+  readNativeConversation,
+  reduceNativePendingRequests,
+  retryableGapCount,
+} from './native-conversation-source';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import type { NativeSnapshotMessage } from './native-sync-snapshot';
 
@@ -295,7 +299,8 @@ test('incomplete native values never become a complete empty transcript and rese
   const before = readNativeConversation({ ...state, messages });
   expect(before.messages).toEqual([]);
   expect(before.incompleteMessageIDs).toEqual(['msg_answer']);
-  expect(before.error).toContain('incomplete');
+  expect(before.recoveryGaps).toBe(1);
+  expect(before.error).toBeUndefined();
   const after = applyNativeEvent(
     messages,
     frame('session.message.content.updated', {
@@ -315,6 +320,40 @@ test('incomplete native values never become a complete empty transcript and rese
   expect(
     readNativeConversation({ ...state, connection: 'disconnected', error: 'forbidden' }).error
   ).toBe('forbidden');
+  // A projection failure is a real error and charges no gap count: Retry
+  // cannot fill parts a broken projection dropped, so the count stays at the
+  // genuinely incomplete identities. The split lives in retryableGapCount —
+  // the projector's throws are unreachable through this boundary (the
+  // unresolved-asset filter subsumes them), so the helper is pinned directly.
+  expect(
+    retryableGapCount(
+      [
+        {
+          seq: 1,
+          incomplete: true,
+          message: { id: 'msg_a', type: 'assistant', time: { created: 1 } },
+        },
+      ],
+      ['msg_b'],
+      new Set(['msg_c']),
+      true
+    )
+  ).toBe(2);
+  expect(retryableGapCount([], undefined, new Set(['msg_c']), true)).toBe(0);
+  expect(
+    retryableGapCount(
+      [
+        {
+          seq: 1,
+          incomplete: true,
+          message: { id: 'msg_a', type: 'assistant', time: { created: 1 } },
+        },
+      ],
+      ['msg_b'],
+      new Set(['msg_c']),
+      false
+    )
+  ).toBe(3);
 });
 
 test('authoritative content replacement retains metadata and resets only obsolete source ordinals', () => {
@@ -468,6 +507,64 @@ test('unreadable permission notices replace cards, clear on reply and yield to a
   ).toEqual([{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
 });
 
+const emptyPending = { permissions: [], questions: [], unreadablePermissions: [] };
+
+test('replayed permissions keep their card in place and a new request appends at the tail', () => {
+  let next = reduceNativePendingRequests(
+    emptyPending,
+    frame('permission.asked', { id: 'perm-1', action: 'shell', resources: ['build'] })
+  );
+  next = reduceNativePendingRequests(
+    next,
+    frame('permission.asked', { id: 'perm-2', action: 'edit', resources: ['file'] })
+  );
+  // The wrapper replays its pending list after a snapshot: the first request
+  // keeps the head of the oldest-first list and its card.
+  const replayed = reduceNativePendingRequests(
+    next,
+    frame('permission.asked', { id: 'perm-1', action: 'shell', resources: ['build again'] })
+  );
+  expect(replayed.permissions.map(item => item.id)).toEqual(['perm-1', 'perm-2']);
+  expect(replayed.permissions[0]?.resources).toEqual(['build again']);
+  const appended = reduceNativePendingRequests(
+    replayed,
+    frame('permission.asked', { id: 'perm-3', action: 'read', resources: ['log'] })
+  );
+  expect(appended.permissions.map(item => item.id)).toEqual(['perm-1', 'perm-2', 'perm-3']);
+});
+
+test('replayed questions keep their card in place and a new form appends at the tail', () => {
+  const form = (id: string, title: string) => ({
+    id,
+    title,
+    metadata: { kind: 'question' },
+    fields: [{ type: 'text', key: 'answer' }],
+  });
+  let next = reduceNativePendingRequests(
+    emptyPending,
+    frame('form.created', { form: form('question-1', 'First') })
+  );
+  next = reduceNativePendingRequests(
+    next,
+    frame('form.created', { form: form('question-2', 'Second') })
+  );
+  const replayed = reduceNativePendingRequests(
+    next,
+    frame('form.created', { form: form('question-1', 'First again') })
+  );
+  expect(replayed.questions.map(item => item.id)).toEqual(['question-1', 'question-2']);
+  expect(replayed.questions[0]?.title).toBe('First again');
+  const appended = reduceNativePendingRequests(
+    replayed,
+    frame('form.created', { form: form('question-3', 'Third') })
+  );
+  expect(appended.questions.map(item => item.id)).toEqual([
+    'question-1',
+    'question-2',
+    'question-3',
+  ]);
+});
+
 test('native live reduction shares untouched content, ignores late deltas and flags missing ordinals', () => {
   const messages: NativeSnapshotMessage[] = [
     {
@@ -520,7 +617,10 @@ test('native live reduction shares untouched content, ignores late deltas and fl
     })
   );
   expect(missing[0]?.incomplete).toBe(true);
-  expect(readNativeConversation({ ...state, messages: missing }).error).toContain('incomplete');
+  expect(readNativeConversation({ ...state, messages: missing })).toMatchObject({
+    recoveryGaps: 1,
+    error: undefined,
+  });
 });
 
 test('a socket handshake is still loading until its native snapshot read completes', () => {
@@ -530,6 +630,16 @@ test('a socket handshake is still loading until its native snapshot read complet
   expect(
     readNativeConversation({ ...state, snapshot: undefined, session: undefined }).error
   ).toBeUndefined();
+  // A dropped connection before the first snapshot still owes the reader a progress skeleton.
+  expect(
+    readNativeConversation({
+      ...state,
+      connection: 'disconnected',
+      runnerConnected: false,
+      snapshot: undefined,
+      session: undefined,
+    }).loading
+  ).toBe(true);
   expect(readNativeConversation({ ...state, messages: [] }).loading).toBe(false);
 });
 
@@ -632,7 +742,8 @@ test('native session model and metadata changes preserve complete values, replac
   expect(replaced?.['metadata']).toEqual({ nested: { exact: 'new' } });
   const pendingMove = readNativeConversation({ ...state, pendingSnapshotMessageIDs: ['msg_move'] });
   expect(pendingMove.incompleteMessageIDs).toEqual(['msg_move']);
-  expect(pendingMove.error).toContain('incomplete');
+  expect(pendingMove.recoveryGaps).toBe(1);
+  expect(pendingMove.error).toBeUndefined();
 });
 
 test('unresolved live media stays explicit without hiding other messages or crashing the renderer', () => {
@@ -660,7 +771,8 @@ test('unresolved live media stays explicit without hiding other messages or cras
   ];
   const unresolved = readNativeConversation({ ...state, messages });
   expect(unresolved.incompleteMessageIDs).toEqual(['msg_media']);
-  expect(unresolved.error).toContain('incomplete');
+  expect(unresolved.recoveryGaps).toBe(1);
+  expect(unresolved.error).toBeUndefined();
   expect(unresolved.messages.map(item => item.info.id)).toEqual(['msg_other']);
   const bytes = 'data:image/png;base64,aW1hZ2U=';
   const resolved = readNativeConversation({

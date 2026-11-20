@@ -66,8 +66,6 @@ import { connectLoopbackSocket } from './websocket';
 
 const WATCHDOG_PERIOD_MINUTES = 0.5;
 const NATIVE_ENDPOINT_ID = 'native';
-/** Enough stopped handles to answer a CLI that raced its own revoke, and nothing more. */
-const STOPPED_SESSION_LIMIT = 256;
 const sessionHandleParamSchema = z.string().min(1);
 
 export type LocalAgentAlarmsApi = {
@@ -277,24 +275,9 @@ export const startLocalAgentsHost = (
   /* Fragment key per connection attempt, so only the connection that proved it can consume it. */
   const pairingKeysByConnection = new WeakMap<LocalAgentConnection, string>();
   const ready = Promise.withResolvers<void>();
-  /* Handles a stop, a switch-off or a disconnect ended: a late call answers `user_stopped`, not `unknown handle`. */
-  const stoppedSessions = new Set<string>();
   let enabled = false;
   let settingsLoaded = false;
   let stopped = false;
-
-  /** Bounded: the last few hundred stopped handles are enough for a CLI that raced the revoke. */
-  const rememberStopped = (sessions: readonly { readonly sessionHandle: string }[]): void => {
-    for (const session of sessions) {
-      stoppedSessions.add(session.sessionHandle);
-
-      const [oldest] = stoppedSessions;
-
-      if (stoppedSessions.size > STOPPED_SESSION_LIMIT && oldest !== undefined) {
-        stoppedSessions.delete(oldest);
-      }
-    }
-  };
 
   const publishStatus = (): Promise<void> =>
     publish(async () => {
@@ -345,10 +328,10 @@ export const startLocalAgentsHost = (
     }
 
     try {
-      // A handle the user stopped answers `user_stopped` even before the dispatcher looks for its row.
+      // A handle the user stopped answers `user_stopped` even before the dispatcher looks for its row, and after a worker restart.
       const stoppedParam = sessionHandleParamSchema.safeParse(message.params['sessionHandle']);
 
-      if (stoppedParam.success && stoppedSessions.has(stoppedParam.data)) {
+      if (stoppedParam.success && (await registry.wasStopped(stoppedParam.data))) {
         throw new LocalAgentRpcError(
           LOCAL_AGENT_ERROR_CODES.userStopped,
           'The user stopped this agent session.'
@@ -367,6 +350,11 @@ export const startLocalAgentsHost = (
     connection: LocalAgentConnection,
     envelope: LocalAgentIncomingEnvelope
   ): void => {
+    // Its arrival already reset Chrome's idle timer for this worker; there is nothing to do.
+    if (envelope.type === 'hub.keepalive') {
+      return;
+    }
+
     if (envelope.type === 'controller.connected') {
       runTask(async () => {
         await ensureController(connection, envelope.controllerId);
@@ -391,8 +379,9 @@ export const startLocalAgentsHost = (
   };
 
   /**
-   * A dropped connection ends its controllers' sessions: the hub assigns a new
-   * controllerId per CLI socket, so the old rows can never be resumed.
+   * A dropped connection ends its controllers' sessions: the hub may come back
+   * with new controllerIds, so the old rows could never be resumed. A CLI that
+   * is still there gets `session_lost` for the old handle and opens a new session.
    */
   const forgetControllersOf = async (connection: LocalAgentConnection): Promise<void> => {
     const controllerIds: string[] = [];
@@ -408,8 +397,7 @@ export const startLocalAgentsHost = (
         controllerConnections.delete(controllerId);
         const removed = await registry.removeController(controllerId);
 
-        // A dropped connection's sessions cannot resume: their groups end like a Stop all.
-        rememberStopped(removed?.sessions ?? []);
+        // A dropped connection's sessions cannot resume: their groups end like a Stop all, but the user did not stop them.
         await bridge.endSessions(
           (removed?.sessions ?? []).map(session => ({
             controllerId,
@@ -488,8 +476,6 @@ export const startLocalAgentsHost = (
     const revoked = await registry.takeAllSessions();
 
     // Every stopped session ends in the runtime too: its group turns grey (D12) and its leases are released.
-    rememberStopped(revoked);
-
     try {
       await bridge.endSessions(revoked);
     } finally {
@@ -509,10 +495,9 @@ export const startLocalAgentsHost = (
 
     // Unmapped before the registry write: a call racing the click asks the registry, which refuses it.
     controllerConnections.delete(controllerId);
+    // The registry remembers the ended handles as stopped by the user: a late call answers `user_stopped`, also after a restart.
     const removed = await registry.revokeController(controllerId);
     const sessions = removed?.sessions ?? [];
-
-    rememberStopped(sessions);
 
     try {
       await bridge.endSessions(

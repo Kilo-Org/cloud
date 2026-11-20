@@ -16,6 +16,7 @@ import {
   provisionEnkryptUsagePartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/usage-partitions';
+import { provisionWebhookEventPartitions } from '@/lib/integrations/db/webhook-event-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { shutdownPosthog } from '@kilocode/web-shared/lib/posthog';
@@ -86,6 +87,14 @@ beforeAll(async () => {
       const [{ name, error }] = enkryptPartitionErrors;
       throw new Error(
         `Failed to create Enkrypt usage partition ${name}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    const { errors: webhookPartitionErrors } = await provisionWebhookEventPartitions(testDb);
+    if (webhookPartitionErrors.length > 0) {
+      const [{ name, error }] = webhookPartitionErrors;
+      throw new Error(
+        `Failed to create webhook event partition ${name}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   } finally {

@@ -1,5 +1,6 @@
 import { SignJWT } from 'jose';
 import { z } from 'zod';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
 import { RuntimeAdmissionSchema } from './runtime-authorization-contract';
@@ -10,7 +11,7 @@ import {
 } from './kilo-token-verification';
 
 export const KILO_TOKEN_VERSION = 3;
-const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
+const organizationRole = z.enum(ORGANIZATION_ROLES);
 
 /**
  * All known fields that can appear in a Kilo user JWT, sourced from

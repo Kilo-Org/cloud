@@ -157,8 +157,8 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     homeWidgetDetails: homeWidgetDetailsSchema.optional(),
   }),
   // One followed session's Android ongoing notification; see
-  // `sessionLiveUpdateShape` above.
-  z.object(sessionLiveUpdateShape).superRefine(refineSessionLiveUpdate),
+  // `sessionLiveUpdateSchema` above.
+  sessionLiveUpdateSchema.superRefine(refineSessionLiveUpdate),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

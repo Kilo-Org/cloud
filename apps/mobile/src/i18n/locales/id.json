@@ -19,7 +19,9 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Pengiriman perintah: {{status}}",
     "delivered": "Terkirim",
-    "expired": "Kedaluwarsa"
+    "expired": "Kedaluwarsa",
+    "recoveryGaps_one": "{{displayCount}} bagian transkrip ini tidak ada.",
+    "recoveryGaps_other": "{{displayCount}} bagian transkrip ini tidak ada."
   },
   "common": {
     "manageOnWeb": "Kelola di web",
@@ -699,6 +701,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
+      "managedOnWebTitle": "Dikelola di web",
+      "managedOnWebShort": "Koneksi ini dikelola di web melalui komputer.",
+      "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web dari komputer.",
       "description": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionReconnect": "Buat token akses ruang kerja baru untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionOverview": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di layar berikutnya.",
@@ -737,6 +742,7 @@
     "platformList": {
       "activity": "Aktivitas",
       "checking": "Memeriksa…",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "statusUnavailable": "Status tidak tersedia"
     },
@@ -2227,6 +2233,8 @@
     "modelPicker": {
       "title": "Pilih model",
       "noModelsDescription": "Tidak ada model yang dapat dipilih.",
+      "allUnavailableTitle": "Tidak ada model yang dapat digunakan",
+      "allUnavailableDescription": "Tambah kunci penyedia, lalu coba lagi.",
       "favorites": "Favorit"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Penyedia tidak tersedia saat ini. Kirim lagi sebentar lagi."
   },
   "settingsTools": {
-    "confirmTitle": "Konfirmasi perubahan ini?"
+    "confirmTitle": "Konfirmasi perubahan ini?",
+    "guarded": {
+      "spendAlertsOff": "Matikan peringatan pengeluaran? Anda tidak akan lagi menerima notifikasi saat melewati ambang batas pengeluaran dan saat terjadi lonjakan per jam.",
+      "balanceAlertsOff": "Matikan peringatan saldo? Anda tidak akan lagi menerima notifikasi saat kredit Anda menipis.",
+      "securityFindingsOff": "Matikan temuan keamanan? Anda tidak akan lagi menerima notifikasi tentang temuan keamanan baru.",
+      "hideBalanceOn": "Sembunyikan saldo Anda? Saldo kredit tidak akan lagi muncul di layar profil dan hub organisasi."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
+    "providersNone": "Tidak ada penyedia yang tersedia untuk organisasi ini.",
     "allowAllShown": "Izinkan semua yang ditampilkan",
     "denyAllShown": "Tolak semua yang ditampilkan",
     "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",

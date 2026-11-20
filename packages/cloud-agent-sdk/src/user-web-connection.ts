@@ -184,9 +184,7 @@ function createEdgeSignal(): EdgeSignal {
   };
 }
 
-function createUserWebConnection(
-  config: UserWebConnectionConfig
-): UserWebConnection & { retain: () => () => void } {
+function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnection {
   const connectionId = cloudAgentSdkRuntime.randomUUID();
   let token = '';
   let baseConnection: Connection | null = null;
@@ -293,6 +291,16 @@ function createUserWebConnection(
     initialAuthRetryAttempt = 0;
   }
 
+  /**
+   * Restart the pre-socket attempt series: drop the pending retry timer and its
+   * spent budget, clear exhaustion, and ask for a token again.
+   */
+  function restartPreSocketAttemptSeries(): void {
+    clearInitialAuthRetry();
+    exhaustionSignal.set(false);
+    startConnection(false);
+  }
+
   function scheduleInitialAuthRetry(expectedGeneration: number): void {
     if (destroyed || !hasLifetime() || expectedGeneration !== generation) return;
 
@@ -314,9 +322,7 @@ function createUserWebConnection(
     // Mirrors the base connection's resume paths: a fresh network or visibility
     // signal restarts the attempt series and clears exhaustion before the probe,
     // so the surface reads "reconnecting" rather than terminal while it tries.
-    clearInitialAuthRetry();
-    exhaustionSignal.set(false);
-    startConnection(false);
+    restartPreSocketAttemptSeries();
   }
 
   function addPreSocketLifecycleListeners(): void {
@@ -587,7 +593,8 @@ function createUserWebConnection(
       // reconnects: once the cap is reached, publish the exhaustion edge so the
       // recovery surface renders instead of retrying silently forever. The
       // counter stays spent here; only `retryConnection()` or a lifecycle
-      // resume restarts the series, and both go through `clearInitialAuthRetry`.
+      // resume restarts the series, and both go through
+      // `restartPreSocketAttemptSeries`.
       if (initialAuthRetryAttempt + 1 >= maxInitialAuthAttempts) {
         exhaustionSignal.set(true);
         return;
@@ -771,9 +778,7 @@ function createUserWebConnection(
       // No base connection yet means the failure was token acquisition, which
       // the wrapper owns: clear that state, restart the attempt budget, and ask
       // for a token again so the user can recover after signing in again.
-      clearInitialAuthRetry();
-      exhaustionSignal.set(false);
-      if (!started && !connectPromise) startConnection(false);
+      restartPreSocketAttemptSeries();
     },
     subscribeToCliSession(sessionId) {
       if (destroyed) return () => {};

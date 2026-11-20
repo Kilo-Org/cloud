@@ -1,8 +1,11 @@
 import { type ReactNode, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, useWindowDimensions } from 'react-native';
 
 import { readLiveFontScale, subscribeToFontScale } from '@/lib/font-scale/native-font-scale';
-import { SystemFontScaleContext } from '@/lib/font-scale/system-font-scale-context';
+import {
+  LayoutFontScaleContext,
+  SystemFontScaleContext,
+} from '@/lib/font-scale/system-font-scale-context';
 
 /**
  * The system font scale as the app currently needs it.
@@ -17,6 +20,7 @@ import { SystemFontScaleContext } from '@/lib/font-scale/system-font-scale-conte
  */
 export function SystemFontScaleProvider({ children }: { readonly children: ReactNode }) {
   const [fontScale, setFontScale] = useState<number | null>(readLiveFontScale);
+  const { fontScale: windowFontScale } = useWindowDimensions();
 
   useEffect(() => {
     const subscription = subscribeToFontScale(setFontScale);
@@ -34,6 +38,10 @@ export function SystemFontScaleProvider({ children }: { readonly children: React
   }, []);
 
   return (
-    <SystemFontScaleContext.Provider value={fontScale}>{children}</SystemFontScaleContext.Provider>
+    <SystemFontScaleContext.Provider value={fontScale}>
+      <LayoutFontScaleContext.Provider value={fontScale ?? windowFontScale}>
+        {children}
+      </LayoutFontScaleContext.Provider>
+    </SystemFontScaleContext.Provider>
   );
 }

@@ -390,6 +390,7 @@ function MessageBubbleImpl({
           <Pressable
             onLongPress={handleLongPress}
             accessible={a11y.accessible}
+            focusable={a11y.focusable}
             className="px-4 py-1"
           >
             {a11y.accessibilityActions.length > 0 ? (
@@ -400,7 +401,7 @@ function MessageBubbleImpl({
                 accessibilityHint={a11y.accessibilityHint}
                 accessibilityActions={a11y.accessibilityActions}
                 onAccessibilityAction={handleAccessibilityAction}
-                className="absolute inset-0 opacity-0"
+                className="absolute inset-0"
                 pointerEvents="none"
               />
             ) : null}
@@ -492,7 +493,12 @@ function MessageBubbleImpl({
   return (
     <View>
       {visibleParts.length > 0 ? (
-        <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
+        <Pressable
+          className="px-4 py-1"
+          onLongPress={handleLongPress}
+          accessible={a11y.accessible}
+          focusable={a11y.focusable}
+        >
           {a11y.accessibilityActions.length > 0 ? (
             <View
               accessible
@@ -501,7 +507,7 @@ function MessageBubbleImpl({
               accessibilityHint={a11y.accessibilityHint}
               accessibilityActions={a11y.accessibilityActions}
               onAccessibilityAction={handleAccessibilityAction}
-              className="absolute inset-0 opacity-0"
+              className="absolute inset-0"
               pointerEvents="none"
             />
           ) : null}

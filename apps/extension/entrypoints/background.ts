@@ -7,7 +7,10 @@ import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
 import { createBrowserRuntime } from '@/src/shared/browser-runtime';
 import type { BrowserDownloadsApi, BrowserRuntime } from '@/src/shared/browser-runtime';
-import { createBrowserTabGroupController } from '@/src/shared/browser-tab-groups';
+import {
+  createBrowserTabGroupController,
+  createStorageSessionTabGroupPersistence,
+} from '@/src/shared/browser-tab-groups';
 import type { BrowserTabGroupsApi } from '@/src/shared/browser-tab-groups';
 import {
   createStorageSessionLeasePersistence,
@@ -156,11 +159,12 @@ export const getBrowserRuntime = ({
     scriptingApi,
     // Every session gets its group `Kilo · <title>`; an ended one collapses, greys and stays adoptable (D12).
     // `tabs.group` lives on the tabs API and the rest of the group surface on `chrome.tabGroups`.
-    ...(tabGroupsApi === undefined
-      ? {}
-      : {
-          tabGroups: createBrowserTabGroupController({
-            api: {
+    // Without the group API sessions track their tabs by id. Either way they outlive a worker restart in `storage.session`.
+    tabGroups: createBrowserTabGroupController({
+      api:
+        tabGroupsApi === undefined
+          ? { tabQuery: query => tabsApi.query(query) }
+          : {
               ...(tabsApi.group === undefined ? {} : { group: tabsApi.group.bind(tabsApi) }),
               tabGroupOf: async tabId => {
                 const tab = await tabsApi.get?.(tabId);
@@ -176,8 +180,8 @@ export const getBrowserRuntime = ({
                     },
                   }),
             },
-          }),
-        }),
+      persistence: createStorageSessionTabGroupPersistence(storage),
+    }),
     tabsApi,
   });
 

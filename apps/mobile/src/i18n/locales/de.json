@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Befehlszustellung: {{status}}",
     "delivered": "Zugestellt",
-    "expired": "Abgelaufen"
+    "expired": "Abgelaufen",
+    "recoveryGaps_one": "{{displayCount}} Teil dieses Transkripts fehlt.",
+    "recoveryGaps_other": "{{displayCount}} Teile dieses Transkripts fehlen."
   },
   "common": {
     "manageOnWeb": "Im Web verwalten",
@@ -699,6 +701,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
+      "managedOnWebTitle": "Im Web verwaltet",
+      "managedOnWebShort": "Diese Verbindung wird im Web über einen Computer verwaltet.",
+      "managedOnWebRepositories": "Wähle die Repositories für {{organization}} im Web über einen Computer aus.",
       "description": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "descriptionReconnect": "Erstelle ein neues Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "descriptionOverview": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es auf dem nächsten Bildschirm ein.",
@@ -737,6 +742,7 @@
     "platformList": {
       "activity": "Aktivität",
       "checking": "Wird geprüft …",
+      "needsAttention": "Aktion erforderlich",
       "platforms": "Plattformen",
       "statusUnavailable": "Status nicht verfügbar"
     },
@@ -2227,6 +2233,8 @@
     "modelPicker": {
       "title": "Modell wählen",
       "noModelsDescription": "Es stehen keine Modelle zur Auswahl.",
+      "allUnavailableTitle": "Kein Modell kann verwendet werden",
+      "allUnavailableDescription": "Füge einen Anbieterschlüssel hinzu und versuche es erneut.",
       "favorites": "Favoriten"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Der Anbieter ist derzeit nicht verfügbar. Sende in Kürze erneut."
   },
   "settingsTools": {
-    "confirmTitle": "Diese Änderung bestätigen?"
+    "confirmTitle": "Diese Änderung bestätigen?",
+    "guarded": {
+      "spendAlertsOff": "Ausgabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr über Überschreitungen der Ausgabenschwellen und stündliche Spitzen erhalten.",
+      "balanceAlertsOff": "Guthabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr erhalten, wenn Ihr Guthaben knapp wird.",
+      "securityFindingsOff": "Sicherheitsbefunde ausschalten? Sie würden keine Benachrichtigungen mehr über neue Sicherheitsbefunde erhalten.",
+      "hideBalanceOn": "Guthaben ausblenden? Ihre Guthaben würden dann nicht mehr auf den Profilseiten und im Organisations-Hub angezeigt."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "Deaktiviere einen Anbieter, damit Kilo für diese Organisation nicht mehr an ihn weiterleitet.",
     "providersNeedCatalog": "Anbieter-Schalter bleiben schreibgeschützt, bis der vollständige Modellkatalog geladen ist. Tippe oben auf Erneut versuchen, um sie zu bearbeiten.",
     "providersEmpty": "Keine Anbieter entsprechen dieser Suche.",
+    "providersNone": "Für diese Organisation sind keine Anbieter verfügbar.",
     "allowAllShown": "Alle angezeigten zulassen",
     "denyAllShown": "Alle angezeigten sperren",
     "gatewaysDescription": "Kilo leitet Modellanfragen über Vercel AI Gateway oder OpenRouter weiter. Bei einem deaktivierten Gateway schlagen diese Anfragen fehl.",

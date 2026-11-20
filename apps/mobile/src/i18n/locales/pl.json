@@ -19,7 +19,11 @@
     "presenceStatus": "Hosty: {{connection}}",
     "commandStatus": "Dostarczenie polecenia: {{status}}",
     "delivered": "Dostarczono",
-    "expired": "Wygasło"
+    "expired": "Wygasło",
+    "recoveryGaps_one": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_few": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_many": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_other": "Brakuje {{displayCount}} części tego transkryptu."
   },
   "common": {
     "manageOnWeb": "Zarządzaj w przeglądarce",
@@ -699,6 +703,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
+      "managedOnWebTitle": "Zarządzane w przeglądarce",
+      "managedOnWebShort": "To połączenie jest zarządzane w przeglądarce na komputerze.",
+      "managedOnWebRepositories": "Wybierz repozytoria dla {{organization}} w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "descriptionOverview": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go na następnym ekranie.",
@@ -737,6 +744,7 @@
     "platformList": {
       "activity": "Aktywność",
       "checking": "Sprawdzanie…",
+      "needsAttention": "Wymaga uwagi",
       "platforms": "Platformy",
       "statusUnavailable": "Status niedostępny"
     },
@@ -2279,7 +2287,9 @@
     "modelPicker": {
       "title": "Wybór modelu",
       "favorites": "Ulubione",
-      "noModelsDescription": "Brak modeli do wyboru."
+      "noModelsDescription": "Brak modeli do wyboru.",
+      "allUnavailableTitle": "Nie można użyć żadnego modelu",
+      "allUnavailableDescription": "Dodaj klucz dostawcy, a następnie spróbuj ponownie."
     },
     "modelSelector": {
       "provider": "Dostawca {{id}}",
@@ -4201,7 +4211,13 @@
     "providerUnavailable": "Dostawca jest teraz niedostępny. Wyślij ponownie za chwilę."
   },
   "settingsTools": {
-    "confirmTitle": "Potwierdzić tę zmianę?"
+    "confirmTitle": "Potwierdzić tę zmianę?",
+    "guarded": {
+      "spendAlertsOff": "Wyłączyć alerty wydatków? Przestaniesz otrzymywać powiadomienia o przekroczeniu progów wydatków i skokach godzinowych.",
+      "balanceAlertsOff": "Wyłączyć alerty salda? Przestaniesz otrzymywać powiadomienia, gdy środki będą się kończyć.",
+      "securityFindingsOff": "Wyłączyć ustalenia dotyczące bezpieczeństwa? Przestaniesz otrzymywać powiadomienia o nowych ustaleniach dotyczących bezpieczeństwa.",
+      "hideBalanceOn": "Ukryć Twoje salda? Salda środków nie będą już wyświetlane na ekranach profilu i w centrum organizacji."
+    }
   },
   "appActions": {
     "start": {
@@ -5129,6 +5145,7 @@
     "providersDescription": "Wyłącz dostawcę, aby Kilo przestało kierować do niego żądania w tej organizacji.",
     "providersNeedCatalog": "Przełączniki dostawców pozostają tylko do odczytu, dopóki nie wczyta się pełny katalog modeli. Aby je edytować, dotknij przycisku Spróbuj ponownie powyżej.",
     "providersEmpty": "Żaden dostawca nie pasuje do tego wyszukiwania.",
+    "providersNone": "Żaden dostawca nie jest dostępny dla tej organizacji.",
     "allowAllShown": "Zezwól na wszystkie widoczne",
     "denyAllShown": "Zablokuj wszystkie widoczne",
     "gatewaysDescription": "Kilo kieruje żądania modeli przez Vercel AI Gateway lub OpenRouter. Wyłączona brama powoduje niepowodzenie tych żądań.",

@@ -691,7 +691,7 @@ function i18nSyncCase(): DeciderCase {
       '4. Run `node scripts/check-locales.js` again; it must print "OK: all locales in sync with en".',
       '5. Compute the SHA-256 of the concatenation of locales/de.json, locales/es.json and locales/fr.json in that order (e.g. `cat locales/de.json locales/es.json locales/fr.json | sha256sum`).',
       '',
-      'Final answer: compact JSON with exactly these keys in this order: {"added":{"de":<keys added to de>,"es":<keys added to es>,"fr":<keys added to fr>},"removed":<keys removed across all three>,"sha256":"<lowercase hex SHA-256 from step 5>"}',
+      'Final answer: compact JSON with exactly these keys in this order: {"added":{"de":<count>,"es":<count>,"fr":<count>},"removed":<count>,"sha256":"<lowercase hex SHA-256 from step 5>"}. Every <count> is an integer, not a list of keys: "added" is an object with one count per locale, in the order de, es, fr, giving the number of keys you added to that catalog; "removed" is the total number of keys you deleted across all three catalogs.',
     ].join('\n'),
     requiredToolCalls: 1,
     continuation: {

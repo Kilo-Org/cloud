@@ -1041,6 +1041,108 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(deferChunk).toHaveBeenCalled();
   });
 
+  function schedulerWaitEvent(calls: unknown[][]): unknown {
+    const line = calls
+      .map(([first]) => String(first))
+      .find(text => text.includes('"event":"benchmark_scheduler_wait"'));
+    return line === undefined ? undefined : JSON.parse(line);
+  }
+
+  it('defers a case whose container was never reached instead of waiting on its output', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(runDeciderCaseViaCli).mockRejectedValueOnce(
+      new Error(
+        'container /run failed: HTTP 503 container not reached: Error proxying request to container: The container just exited'
+      )
+    );
+
+    await processJob(env, deciderMessage());
+
+    const attemptStartedAt =
+      vi.mocked(runDeciderCaseViaCli).mock.calls[0]?.[1].resultCallback?.execution.attemptStartedAt;
+    expect(clearUnbilledCase).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ runId, model, caseId: benchCase.id, attemptStartedAt })
+    );
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    const wait = schedulerWaitEvent(warn.mock.calls);
+    expect(wait).toMatchObject({
+      reason: 'container_capacity',
+      errorCategory: 'container_not_reached',
+      waitingForOutput: false,
+    });
+  });
+
+  it('grades the first attempt when its empty-output retry never reaches the container', async () => {
+    const first = {
+      ...successfulCliResult,
+      text: '',
+      exitCode: -1,
+      eventCount: 0,
+      lastEventTypes: [],
+      costUsd: 0.01,
+    };
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce(first)
+      .mockRejectedValueOnce(
+        new Error(
+          'container /run failed: HTTP 503 container not reached: Error proxying request to container: The container is not running, consider calling start()'
+        )
+      );
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(2);
+    const retryStartedAt =
+      vi.mocked(runDeciderCaseViaCli).mock.calls[1]?.[1].resultCallback?.execution.attemptStartedAt;
+    expect(savePendingDeciderOutput).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      { run_id: runId, model, variant: '', rep: 0, case_id: benchCase.id },
+      { result: first, retried: false, attemptStartedAt: retryStartedAt }
+    );
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ score: 0, cost_usd: 0.01, retried: false, exit_code: -1 })
+    );
+    expect(clearUnbilledCase).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+  });
+
+  it('releases a claim the ledger refuses without counting a lane failure', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(beginPaidCase).mockResolvedValueOnce(false);
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    const wait = schedulerWaitEvent(warn.mock.calls);
+    expect(wait).toMatchObject({ reason: 'claim_lost', waitingForOutput: false });
+  });
+
+  it('waits on the ledgered execution when another opener won the paid-case insert', async () => {
+    const openedAt = Date.now() - 1_000;
+    vi.mocked(beginPaidCase).mockResolvedValueOnce(false);
+    vi.mocked(getPaidCaseStartedAt).mockResolvedValueOnce(null).mockResolvedValueOnce(openedAt);
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(deferChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledWith(deciderMessage(), { delaySeconds: 30 });
+  });
+
   it.each([
     { persisted: false, text: '', lastEventTypes: ['error'], stderrTail: 'HTTP 429 rate limited' },
     { persisted: true, text: '', lastEventTypes: ['error'], stderrTail: 'HTTP 429 rate limited' },
@@ -1558,11 +1660,13 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(clearUnbilledCase).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
 
-    vi.mocked(beginPaidCase).mockResolvedValue(false);
+    vi.mocked(getPaidCaseStartedAt).mockResolvedValue(Date.now() - 1_000);
     await processJob(env, deciderMessage());
 
     expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
-    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledWith(deciderMessage(), { delaySeconds: 30 });
     expect(upsertCaseResult).not.toHaveBeenCalled();
   });
 });

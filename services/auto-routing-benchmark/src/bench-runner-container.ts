@@ -1,5 +1,6 @@
 import { Container } from '@cloudflare/containers';
 import { withCallerCancellation } from './caller-cancellation';
+import { CONTAINER_NOT_REACHED_PREFIX, isContainerNotReachedBody } from './cli-runner';
 
 export class BenchRunnerContainer extends Container<Env> {
   defaultPort = 3000;
@@ -15,6 +16,13 @@ export class BenchRunnerContainer extends Container<Env> {
       await this.destroy();
       return new Response('destroyed');
     }
-    return super.fetch(withCallerCancellation(request));
+    const response = await super.fetch(withCallerCancellation(request));
+    if (response.status !== 500) return response;
+    const body = await response.text();
+    // A request that never reached the server cannot have started a paid call, so it
+    // takes the same retryable 503 as a missing instance.
+    return isContainerNotReachedBody(body)
+      ? new Response(`${CONTAINER_NOT_REACHED_PREFIX}${body}`, { status: 503 })
+      : new Response(body, response);
   }
 }

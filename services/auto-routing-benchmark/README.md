@@ -201,8 +201,20 @@ A separate paid-execution ledger records when each paid case started and prevent
 repetition if a worker disappears after inference may have started but before an output was
 saved. The container posts every completed case to the worker before returning its HTTP
 response, then posts `not_started` for accepted cases that provably did not spawn the CLI.
-Each callback carries the paid attempt's start time, so a stale callback cannot replace a
-newer empty-output retry.
+If the first post fails, the container answers the HTTP request and keeps posting with
+backoff for up to about 5.5 minutes. Each callback carries the paid attempt's start time,
+so a stale callback cannot replace a newer empty-output retry.
+
+A request that never reached the container server is not a paid call. `BenchRunnerContainer`
+turns the `@cloudflare/containers` 500s that precede forwarding ("Failed to start container",
+and the runtime's "The container just exited" or "The container is not running" refusals)
+into a 503 with `errorCategory` `container_not_reached`, which takes the container-capacity
+path: the unbilled ledger row is cleared and the chunk is deferred. Other proxy failures
+("Container suddenly disconnected", a closed port connection) can follow a delivered request
+and stay ambiguous. When an empty-output retry cannot reach its container, the first
+attempt's output is graded instead. A case the ledger refuses to open because the chunk lost
+its lease, its lane already failed or its run stopped is not ambiguous either: the chunk is
+released (`claim_lost`) without recording a lane failure.
 
 Output that arrives after its lane failed or its run became terminal is graded later by a
 single-case recovery message. Recovery never starts inference. A per-case grading lease
@@ -217,7 +229,7 @@ A chunk that finds a ledgered case without output waits for it instead of failin
 It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
 claim is redelivered every 30 seconds to recheck. The wait ends when the output arrives,
 which the chunk then grades, or once the decider case timeout (180 seconds) plus the
-container's delivery window (90 seconds) has passed since the case's latest paid call started
+container's delivery window (7 minutes) has passed since the case's latest paid call started
 (an empty-output retry restarts it in the ledger). Only then does the case count as genuinely
 ambiguous (a container hard-killed mid-flight, or a lost delivery): it fails its measurement
 lane as infrastructure uncertainty instead of inventing a score or issuing another paid call.

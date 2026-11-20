@@ -818,8 +818,8 @@ describe('ModelPickerContent thinking effort availability', () => {
     variants: ['low', 'high'],
   };
 
-  // The commit itself runs on the sheet's focus-effect cleanup, which this
-  // harness mocks out (see `expo-router`); the close is what the route owns.
+  // Done is the one close that commits a pick; this harness mocks the focus
+  // effect out (see `expo-router`), so the commit is whatever the close does.
   function mountWith(acceptsVariant: boolean) {
     slotState.bridge = {
       ...makeBridge(),
@@ -899,8 +899,9 @@ describe('ModelPickerContent thinking effort availability', () => {
   });
 
   // The sheet stays open after a tap on a model with several efforts, so that
-  // pick is pending until the sheet closes. The focus cleanup commits it only
-  // after Done; this block runs that cleanup for real to tell the exits apart.
+  // pick is pending until the sheet closes. Done is the one close that commits
+  // it, and this block runs the route's focus effect for real so the exits can
+  // be told apart.
   describe('closing with a pending pick', () => {
     const otherOption: SessionModelOption = { ...makeOption(1), id: 'other-model' };
 

@@ -47,6 +47,10 @@ describe('Hindi to-do copy', () => {
     expect(i18n.t('todos.lists.openCount', { count: 1 })).toBe('1 खुला');
     expect(i18n.t('todos.lists.openCount', { count: 3 })).toBe('3 खुले');
   });
+
+  it('keeps the plural wording for an empty list, which CLDR routes into the one category', () => {
+    expect(i18n.t('todos.lists.openCount', { count: 0 })).toBe('0 खुले');
+  });
 });
 
 describe('Hindi trusted-host and voice copy', () => {

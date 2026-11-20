@@ -4476,6 +4476,7 @@
       "couldNotLoad": "सूचियाँ लोड नहीं हो सकीं",
       "noRepository": "कोई रिपॉज़िटरी नहीं",
       "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_zero": "{{count}} खुले",
       "openCount_one": "{{count}} खुला",
       "openCount_other": "{{count}} खुले",
       "archived_one": "संग्रहित ({{count}})",

@@ -1,5 +1,6 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import type {
   IntegrationPermissions,
   Owner,
@@ -257,6 +258,12 @@ export async function connectVerifiedGitHubInstallation(
     const otherOwnerAssociations = existingMatches.filter(
       association => association.id !== existing?.id
     );
+    // The role follows the associations that can still act for the
+    // installation: the same health condition runtime authorization and the
+    // owner slot check apply. An association that is not active, is suspended,
+    // whose authorization expired, or that is locally disconnected does not
+    // count.
+    const otherOwnerHolders = otherOwnerAssociations.filter(isPlatformIntegrationHealthy);
 
     if (
       existing &&
@@ -288,9 +295,29 @@ export async function connectVerifiedGitHubInstallation(
     }
     const role: 'workflow' | 'agent_only' =
       existing?.github_connection_role ??
-      (otherOwnerAssociations.length > 0 ? 'agent_only' : 'workflow');
+      (otherOwnerHolders.length > 0 ? 'agent_only' : 'workflow');
     if (!existing && role === 'agent_only' && owner.type !== 'org') {
       return { ok: false, reason: 'claimed_by_other_owner' };
+    }
+
+    if (role === 'workflow') {
+      // The workflow role is single per installation identity
+      // (`UQ_platform_integrations_github_workflow_identity`), so the other
+      // associations of the identity become secondary when this one takes the
+      // role. A secondary association keeps its canonical link, which is the
+      // authority its owner has when it connects again; an unbound association
+      // carries no role.
+      for (const association of otherOwnerAssociations) {
+        if (association.github_connection_role !== 'workflow') continue;
+        if (isPlatformIntegrationHealthy(association)) continue;
+        await tx
+          .update(platform_integrations)
+          .set({
+            github_connection_role: association.github_installation_id ? 'agent_only' : null,
+            updated_at: now,
+          })
+          .where(eq(platform_integrations.id, association.id));
+      }
     }
 
     const requiresSharingAdmission =
@@ -300,7 +327,7 @@ export async function connectVerifiedGitHubInstallation(
         return { ok: false, reason: 'shared_installation_disabled' };
       }
       if (
-        otherOwnerAssociations.some(
+        otherOwnerHolders.some(
           association => !association.github_installation_id || !association.github_connection_role
         )
       ) {

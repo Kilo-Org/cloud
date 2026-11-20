@@ -1719,7 +1719,7 @@ describe('GitHub installation persistence', () => {
     ).resolves.toEqual({ ok: false, reason: 'claimed_by_other_owner' });
   });
 
-  test('does not transfer workflow authority to a new personal owner after disconnect', async () => {
+  test('gives the workflow role to the next verified personal owner of the installation', async () => {
     const first = await connectVerifiedGitHubInstallation(
       { type: 'user', id: ownerId },
       data('990104')
@@ -1727,14 +1727,33 @@ describe('GitHub installation persistence', () => {
     if (!first.ok) throw new Error('Expected the first personal owner to connect');
     await disconnectGitHubInstallation({ type: 'user', id: ownerId }, first.integrationId);
 
-    // A purely disconnected other-owner row has relinquished the
-    // installation, so it is not an active incumbent and must not force a
-    // claimed_by_other_owner rejection for a new personal claimant.
+    // The role follows the associations that can still act for the
+    // installation. The earlier association is locally disconnected, so the
+    // verified owner becomes the workflow connection and the installation
+    // keeps exactly one workflow association.
     const second = await connectVerifiedGitHubInstallation(
       { type: 'user', id: otherOwnerId },
       { ...data('990104'), kiloUserId: otherOwnerId }
     );
-    expect(second).toEqual({ ok: false, reason: 'claimed_by_other_owner' });
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected the new personal owner to take the installation');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '990104'));
+    expect(rows).toHaveLength(2);
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      github_connection_role: 'agent_only',
+      github_installation_id: expect.any(String),
+      github_disconnected_at: expect.any(String),
+    });
+    expect(rows.find(row => row.id === second.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+      github_disconnected_at: null,
+      integration_status: 'active',
+    });
+    expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
   });
 
   test('still requires sharing admission for an organization attaching as a new second tenant', async () => {
@@ -1797,7 +1816,7 @@ describe('GitHub installation persistence', () => {
     });
   });
 
-  test('still requires secondary admission after the workflow owner disconnects', async () => {
+  test('gives the workflow role to an organization that connects an available installation', async () => {
     const organizationA = await createTestOrganization('First tenant disconnect A', ownerId, 0);
     const organizationB = await createTestOrganization(
       'First tenant disconnect B',
@@ -1812,21 +1831,195 @@ describe('GitHub installation persistence', () => {
     await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
 
     // organizationB is not in GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS.
-    // A fully disconnected prior tenant is no longer an active incumbent,
-    // so this must succeed as an ordinary (non-shared) attach rather than
-    // being forced through sharing admission.
+    // It becomes the workflow connection of the installation: the earlier
+    // association is locally disconnected and does not occupy it.
     expect(process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS).toBeFalsy();
     const second = await connectVerifiedGitHubInstallation(
       { type: 'org', id: organizationB.id },
       { ...data('881010'), kiloUserId: otherOwnerId }
     );
-    expect(second).toEqual({ ok: false, reason: 'shared_installation_disabled' });
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected the destination organization to connect');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '881010'));
+    expect(rows).toHaveLength(2);
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      github_connection_role: 'agent_only',
+      github_disconnected_at: expect.any(String),
+    });
+    expect(rows.find(row => row.id === second.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+      github_disconnected_at: null,
+      integration_status: 'active',
+    });
 
     const [canonical] = await db
       .select({ sharingMode: github_app_installations.sharing_mode })
       .from(github_app_installations)
       .where(eq(github_app_installations.installation_id, '881010'));
     expect(canonical?.sharingMode).toBe('exclusive');
+  });
+
+  test('gives the workflow role to the next owner when the earlier authorization expired', async () => {
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('990106')
+    );
+    if (!first.ok) throw new Error('Expected the first personal owner to connect');
+    await db
+      .update(platform_integrations)
+      .set({ auth_invalid_at: new Date().toISOString() })
+      .where(eq(platform_integrations.id, first.integrationId));
+
+    // An association whose GitHub authorization expired cannot act for the
+    // installation although its status is still active, so the verified owner
+    // becomes the workflow connection and the earlier association keeps
+    // secondary access.
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: otherOwnerId },
+      { ...data('990106'), kiloUserId: otherOwnerId }
+    );
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected the new personal owner to take the installation');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '990106'));
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      github_connection_role: 'agent_only',
+      integration_status: 'active',
+      auth_invalid_at: expect.any(String),
+    });
+    expect(rows.find(row => row.id === second.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+      auth_invalid_at: null,
+    });
+    expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
+  });
+
+  test('reconnects an earlier shared-installation organization as a secondary association', async () => {
+    const organizationA = await createTestOrganization('Takeover predecessor org', ownerId, 0);
+    const organizationB = await createTestOrganization('Takeover successor org', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationA.id;
+
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('881011')
+    );
+    if (!first.ok) throw new Error('Expected the predecessor organization to connect');
+    await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
+
+    const successor = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('881011'), kiloUserId: otherOwnerId }
+    );
+    expect(successor).toMatchObject({ ok: true });
+    if (!successor.ok)
+      throw new Error('Expected the successor organization to take the workflow role');
+
+    // Connecting again onto its own association follows the second-owner
+    // rules: the earlier organization is on the shared-installation allowlist,
+    // so sharing admission grants it secondary access to the installation.
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationA.id },
+        { ...data('881011'), kiloUserId: ownerId }
+      )
+    ).resolves.toEqual({ ok: true, integrationId: first.integrationId });
+
+    const [predecessor] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, first.integrationId));
+    expect(predecessor).toMatchObject({
+      github_connection_role: 'agent_only',
+      github_disconnected_at: null,
+      integration_status: 'active',
+    });
+    const [successorRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, successor.integrationId));
+    expect(successorRow).toMatchObject({
+      github_connection_role: 'workflow',
+      github_disconnected_at: null,
+    });
+  });
+
+  test('keeps a personal association on the sharing admission path after an organization holds the role', async () => {
+    const organization = await createTestOrganization(
+      'Personal takeover successor org',
+      otherOwnerId,
+      0
+    );
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('881012')
+    );
+    if (!first.ok) throw new Error('Expected the personal predecessor to connect');
+    await disconnectGitHubInstallation({ type: 'user', id: ownerId }, first.integrationId);
+
+    const successor = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      { ...data('881012'), kiloUserId: otherOwnerId }
+    );
+    expect(successor).toMatchObject({ ok: true });
+
+    // A personal association has no sharing path, so it stays on the admission
+    // rule even when it reuses its own row and the installation has a healthy
+    // workflow association.
+    expect(process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS).toBeFalsy();
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data('881012'))
+    ).resolves.toEqual({ ok: false, reason: 'shared_installation_disabled' });
+
+    const [predecessor] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, first.integrationId));
+    expect(predecessor).toMatchObject({
+      github_connection_role: 'agent_only',
+      github_disconnected_at: expect.any(String),
+    });
+  });
+
+  test('authorizes runtime use through the current workflow association', async () => {
+    const organization = await createTestOrganization(
+      'Runtime takeover successor',
+      otherOwnerId,
+      0
+    );
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('990108')
+    );
+    if (!first.ok) throw new Error('Expected the personal owner to connect');
+    await disconnectGitHubInstallation({ type: 'user', id: ownerId }, first.integrationId);
+    await expect(assertGitHubInstallationRuntimeAuthorized('990108', 'standard')).rejects.toThrow(
+      'GitHub installation is unavailable for runtime use'
+    );
+
+    const successor = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      { ...data('990108'), kiloUserId: otherOwnerId }
+    );
+    expect(successor).toMatchObject({ ok: true });
+    if (!successor.ok)
+      throw new Error('Expected the successor organization to take the workflow role');
+
+    // The workflow association is the only runtime candidate: the other
+    // association is disconnected and agent-only, so it neither competes with
+    // nor ambiguates the resolution.
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('990108', 'standard')
+    ).resolves.toBeUndefined();
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('990108', 'standard', successor.integrationId)
+    ).resolves.toBeUndefined();
   });
 
   test('allows uninstalling an already locally disconnected sole association', async () => {

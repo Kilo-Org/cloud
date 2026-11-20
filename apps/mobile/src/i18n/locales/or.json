@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "ପ୍ରତ୍ୟେକ ରିପୋଜିଟୋରୀର REVIEW.md ଫାଇଲ୍‌ରେ ଥିବା ନିର୍ଦ୍ଦେଶ ମାନନ୍ତୁ",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।",
-      "notConnectedReadOnlyPlan": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଜଣେ ସଂଗଠନ ମାଲିକ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ।"
+      "notConnectedReadOnlyPlan": "ସଂଗଠନର ଟ୍ରାୟଲ୍ ଅବଧି ଶେଷ ହୋଇଛି, ତେଣୁ ମାଲିକଙ୍କୁ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିବାକୁ ହେବ।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}ର Bitbucket ସଂଯୋଗ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",

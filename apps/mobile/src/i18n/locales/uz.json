@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
-      "notConnectedReadOnlyPlan": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilashi mumkin."
+      "notConnectedReadOnlyPlan": "Tashkilotning sinov muddati tugadi, shuning uchun egasi kilo.ai saytida hisob-kitobni yangilashi kerak."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",

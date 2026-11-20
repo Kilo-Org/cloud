@@ -695,7 +695,7 @@
     "autoReviews": "مراجعات تلقائية",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
-      "notConnectedReadOnlyPlan": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على ⁨kilo.ai⁩."
+      "notConnectedReadOnlyPlan": "انتهت الفترة التجريبية للمؤسسة، لذا يجب على المالك تحديث الفوترة على ⁨kilo.ai⁩."
     },
     "bitbucketConnect": {
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",

@@ -1407,7 +1407,7 @@
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
-      "notConnectedReadOnlyPlan": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai."
+      "notConnectedReadOnlyPlan": "Organizācijas izmēģinājuma periods ir beidzies, tāpēc īpašniekam ir jāatjaunina norēķini vietnē kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",

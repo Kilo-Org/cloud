@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
       "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen.",
-      "notConnectedReadOnlyPlan": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai."
+      "notConnectedReadOnlyPlan": "Organisationens provperiod har löpt ut, så en ägare måste uppdatera faktureringen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",

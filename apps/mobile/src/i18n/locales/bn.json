@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "প্রতিটি রিপোজিটরির REVIEW.md ফাইলের নির্দেশনা অনুসরণ করুন",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
-      "notConnectedReadOnlyPlan": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থার মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন।"
+      "notConnectedReadOnlyPlan": "সংস্থার ট্রায়াল শেষ হয়েছে, তাই একজন মালিককে kilo.ai-এ বিলিং আপডেট করতে হবে।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-এর Bitbucket সংযোগ কম্পিউটার থেকে ওয়েবে পরিচালনা করা হয়।",

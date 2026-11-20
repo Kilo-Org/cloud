@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
-      "notConnectedReadOnlyPlan": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai."
+      "notConnectedReadOnlyPlan": "Organisaation kokeilujakso on päättynyt, joten omistajan on päivitettävä laskutus osoitteessa kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",

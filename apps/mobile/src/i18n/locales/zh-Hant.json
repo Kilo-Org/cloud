@@ -695,7 +695,7 @@
     "autoReviews": "自動審查",
     "bitbucket": {
       "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。",
-      "notConnectedReadOnlyPlan": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊。"
+      "notConnectedReadOnlyPlan": "組織的試用期已結束，因此擁有者必須前往 kilo.ai 更新帳單資訊。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",

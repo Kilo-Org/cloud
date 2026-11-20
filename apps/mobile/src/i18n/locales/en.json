@@ -1475,7 +1475,7 @@
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it.",
-      "notConnectedReadOnlyPlan": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai."
+      "notConnectedReadOnlyPlan": "The organization's trial has ended, so an owner must update billing at kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",

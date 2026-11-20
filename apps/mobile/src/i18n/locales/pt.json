@@ -1430,7 +1430,7 @@
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
       "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
-      "notConnectedReadOnlyPlan": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai."
+      "notConnectedReadOnlyPlan": "O período de teste da organização terminou, por isso um proprietário tem de atualizar a faturação em kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",

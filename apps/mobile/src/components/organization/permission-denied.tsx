@@ -7,7 +7,12 @@ import { EmptyState, StateAction } from '@/components/empty-state';
 import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 
 type PermissionDeniedProps = Readonly<{
-  description: string;
+  /**
+   * The denial's copy, muted under the title. A node when the denial carries
+   * more than one reason as its own block (the Bitbucket sheet's role sentence
+   * over its lapsed-plan line), the same contract as `EmptyState`.
+   */
+  description: ReactNode;
   /**
    * Whether the denial draws its own way back. A caller that paints the screen's
    * header above it already owns the back affordance, so the state must not

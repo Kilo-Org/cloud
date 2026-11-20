@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
-      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کر سکتا ہے۔"
+      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے، اس لیے مالک کو ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کرنی ہوگی۔"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",

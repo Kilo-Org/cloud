@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "Respekte fichye enstriksyon REVIEW.md nan chak depo",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
-      "notConnectedReadOnlyPlan": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai."
+      "notConnectedReadOnlyPlan": "Esè òganizasyon an fini, kidonk yon pwopriyetè dwe mete ajou faktirasyon sou kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",

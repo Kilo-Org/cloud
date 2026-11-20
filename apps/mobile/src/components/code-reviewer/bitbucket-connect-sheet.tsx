@@ -21,7 +21,6 @@ import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
 import { notificationHaptic } from '@/lib/haptics';
 import { useBitbucketIntegrationStatus, useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
-import { joinSentences } from '@/lib/i18n/join-sentences';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
@@ -106,6 +105,11 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !(status.isError && status.data == null);
   let title = t('agentChat.repoPicker.platformBitbucket');
   let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+  // The lapsed plan's own line under the role sentence, and `undefined` in every
+  // denial that has one reason only. The two are unrelated blockers, so they
+  // stay two blocks instead of one dense paragraph the reader takes as a single
+  // claim.
+  let deniedPlanLine: string | undefined = undefined;
   // The denial's way out, offered only where the sheet joins the two refusals
   // below: a retry here re-reads the three answers the page was decided from.
   let deniedAction: ReactNode = undefined;
@@ -116,15 +120,13 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       title = t('common.connectBitbucket');
       const roleDenial = t('codeReviewer.bitbucket.notConnectedReadOnly');
       // The same organization's lapsed plan refuses every organization change,
-      // so a member must not read the role as the only blocker: the second
-      // sentence names the owner and the billing step that unblocks it. It is
-      // this sheet's own key because the retry below carries the step the
+      // so a member must not read the role as the only blocker: the plan line
+      // under the role names the owner and the billing step that unblocks it.
+      // It is this sheet's own key because the retry below carries the step the
       // shared ended-plan sentence keeps for the surfaces that have no control.
       if (org?.isTrialExpiredForEnforcement === true) {
-        deniedDescription = joinSentences([
-          roleDenial,
-          t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'),
-        ]);
+        deniedDescription = roleDenial;
+        deniedPlanLine = t('codeReviewer.bitbucket.notConnectedReadOnlyPlan');
         deniedAction = (
           <StateAction
             label={t('common.retry')}
@@ -210,8 +212,28 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     }
 
     if (!canManage) {
+      // The role sentence stays the state's description. The plan line is a
+      // second block under it, one type step down in the same muted token, so
+      // the reader sees two reasons rather than one run-on paragraph.
       return (
-        <PermissionDenied description={deniedDescription} showBack={false} action={deniedAction} />
+        <PermissionDenied
+          description={
+            deniedPlanLine === undefined ? (
+              deniedDescription
+            ) : (
+              <>
+                <Text variant="muted" className="text-center">
+                  {deniedDescription}
+                </Text>
+                <Text variant="caption" className="text-center">
+                  {deniedPlanLine}
+                </Text>
+              </>
+            )
+          }
+          showBack={false}
+          action={deniedAction}
+        />
       );
     }
 

@@ -4,12 +4,12 @@
 // it is managed, without offering a form the server would reject. Both suites
 // import the same doubles from `bitbucket-connect-sheet.test-helpers`.
 
-import { type ReactElement } from 'react';
+import { type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { joinSentences } from '@/lib/i18n/join-sentences';
 import { act, type ReactTestRenderer } from '@/test/renderer';
+import { renderWithProviders } from '@/test/render-with-providers';
 
 import {
   BOUNDARY,
@@ -42,6 +42,26 @@ function rendersText(root: ReactTestRenderer['root'], value: string): boolean {
   return root
     .findAll(node => Object.is(node.type, 'Text'))
     .some(node => node.children.includes(value));
+}
+
+/**
+ * The text blocks a state's description renders, top to bottom, with the type
+ * token each one carries. The denial is a host element in this suite, so the
+ * description reaches it as a prop; rendering that prop is what shows the sheet
+ * built two blocks rather than one paragraph.
+ */
+async function descriptionBlocks(
+  description: ReactNode
+): Promise<{ text: string; variant: unknown }[]> {
+  const { renderer, unmount } = await renderWithProviders(<>{description}</>);
+  const blocks = renderer.root
+    .findAll(node => Object.is(node.type, 'Text'))
+    .map(node => ({
+      text: node.children.map(child => (typeof child === 'string' ? child : '')).join(''),
+      variant: node.props.variant,
+    }));
+  unmount();
+  return blocks;
 }
 
 beforeEach(resetSheetMocks);
@@ -112,7 +132,7 @@ describe('BitbucketConnectSheet', () => {
     expect(denied?.props.description).toBe(i18n.t('integrations.managedByOwner'));
   });
 
-  it('names the lapsed plan beside the role when a member cannot connect a workspace', async () => {
+  it('names the lapsed plan under the role in its own line when a member cannot connect', async () => {
     state.role = 'member';
     state.isTrialExpiredForEnforcement = true;
     state.status.data = { method: 'workspace_access_token', integrationId: null };
@@ -120,15 +140,15 @@ describe('BitbucketConnectSheet', () => {
 
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
     // The role is not the only blocker: the same organization's lapsed plan
-    // refuses the connection too, so the description carries both sentences.
-    // The second one is this sheet's own key: the shared ended-plan sentence
-    // keeps the "then try again" clause for the surfaces with no control.
-    expect(denied?.props.description).toBe(
-      joinSentences([
-        i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'),
-        i18n.t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'),
-      ])
-    );
+    // refuses the connection too. The reasons are unrelated, so the state keeps
+    // them apart — the role sentence is the description, and the plan line sits
+    // under it one type step down — instead of one dense paragraph. The plan
+    // line is this sheet's own key: the shared ended-plan sentence keeps the
+    // "then try again" clause for the surfaces with no control.
+    expect(await descriptionBlocks(denied?.props.description as ReactNode)).toEqual([
+      { text: i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'), variant: 'muted' },
+      { text: i18n.t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'), variant: 'caption' },
+    ]);
     // The plan is the blocker the reader cannot clear by role, so the denial
     // carries the retry that re-reads the state once the owner updates billing.
     const action = denied?.props.action as
@@ -147,26 +167,18 @@ describe('BitbucketConnectSheet', () => {
     expect(refetchMock.status).toHaveBeenCalledTimes(1);
   });
 
-  it('offers no action when the plan does not block the connection', async () => {
+  it('keeps the role sentence alone, with no action, when the plan does not block', async () => {
     state.role = 'member';
     state.isTrialExpiredForEnforcement = false;
     state.status.data = { method: 'workspace_access_token', integrationId: null };
     const root = await mount();
 
-    // The role alone refuses the connection, and a retry changes nothing, so
-    // the denial offers no control.
-    const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
-    expect(denied?.props.action).toBeUndefined();
-  });
-
-  it('keeps the role sentence alone when the plan does not block the connection', async () => {
-    state.role = 'member';
-    state.isTrialExpiredForEnforcement = false;
-    state.status.data = { method: 'workspace_access_token', integrationId: null };
-    const root = await mount();
-
+    // The role alone refuses the connection, so the description stays that one
+    // sentence — a second block would name a blocker this state does not have —
+    // and a retry changes nothing, so the denial offers no control.
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
     expect(denied?.props.description).toBe(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(denied?.props.action).toBeUndefined();
   });
 
   it('leaves the managed denial unchanged for a lapsed plan', async () => {

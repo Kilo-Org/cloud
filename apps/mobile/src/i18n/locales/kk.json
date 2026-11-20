@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "Әр репозиторийдегі REVIEW.md файлының нұсқауларын орындау",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
-      "notConnectedReadOnlyPlan": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Ұйым иесі kilo.ai сайтында төлем ақпаратын жаңарта алады."
+      "notConnectedReadOnlyPlan": "Ұйымның сынақ мерзімі аяқталды, сондықтан иесі kilo.ai сайтында төлемді жаңартуы керек."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} үшін Bitbucket қосылымы компьютерден веб арқылы басқарылады.",

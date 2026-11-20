@@ -1453,7 +1453,7 @@
     "followReviewMdSubtitle": "Lean na treoracha sna comhaid REVIEW.md i ngach stór",
     "bitbucket": {
       "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
-      "notConnectedReadOnlyPlan": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai."
+      "notConnectedReadOnlyPlan": "Tá tréimhse trialach na heagraíochta thart, mar sin caithfidh úinéir an billeáil a nuashonrú ag kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",

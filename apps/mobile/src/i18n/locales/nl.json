@@ -695,7 +695,7 @@
     "autoReviews": "Automatische reviews",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
-      "notConnectedReadOnlyPlan": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai."
+      "notConnectedReadOnlyPlan": "De proefperiode van de organisatie is afgelopen, dus een eigenaar moet de facturering bijwerken op kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",

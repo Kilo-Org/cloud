@@ -662,7 +662,7 @@
     "autoReviews": "Revues automatiques",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
-      "notConnectedReadOnlyPlan": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai."
+      "notConnectedReadOnlyPlan": "L'essai de l'organisation a pris fin, donc un propriétaire doit mettre à jour la facturation sur kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",

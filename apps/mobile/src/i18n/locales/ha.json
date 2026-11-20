@@ -1384,7 +1384,7 @@
     "followReviewMdSubtitle": "Bi umarnin fayil ɗin REVIEW.md na kowace ma'ajiya",
     "bitbucket": {
       "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
-      "notConnectedReadOnlyPlan": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai."
+      "notConnectedReadOnlyPlan": "Gwajin ƙungiyar ya ƙare, don haka dole ne mai shi ya sabunta lissafin kuɗi a kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",

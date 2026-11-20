@@ -144,8 +144,8 @@ describe('activateLanguage', () => {
   });
 
   // i18next emits `languageChanged` synchronously inside `changeLanguage`,
-  // after it stored the bundle and set the language. The iOS glanceable
-  // refreshes re-register WidgetKit and ActivityKit surfaces from that
+  // after it stored the bundle and set the language. The native glanceable
+  // refreshes re-register widget and live-activity surfaces from that
   // listener, and a native host function that throws there rejects
   // `changeLanguage` with the new catalog already active. Reporting `failed`
   // for that state sends the startup path to its English fallback, which

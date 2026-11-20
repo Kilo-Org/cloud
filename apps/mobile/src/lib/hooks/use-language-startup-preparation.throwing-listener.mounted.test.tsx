@@ -1,8 +1,8 @@
 // The startup language step must end on the resolved language even when a
 // `languageChanged` listener throws. i18next emits that event synchronously
-// inside `changeLanguage`, after the catalog is in the store — the iOS
-// glanceable refreshes re-register WidgetKit and ActivityKit surfaces from
-// that listener, and a native host function that throws rejects the change.
+// inside `changeLanguage`, after the catalog is in the store — the native
+// glanceable refreshes re-register widget and live-activity surfaces from the
+// listener, and a native host function that throws rejects the change.
 // Treating that rejection as a catalog failure applied English instead, so a
 // device set to a non-English language painted the whole app in English after
 // a relaunch.

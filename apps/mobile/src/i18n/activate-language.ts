@@ -33,12 +33,13 @@ export async function activateLanguage(
     await instance.changeLanguage(language);
   } catch {
     // A `languageChanged` listener can throw through `changeLanguage` after
-    // i18next has already stored the bundle and set the language: the iOS
-    // glanceable refreshes re-register WidgetKit and ActivityKit surfaces
+    // i18next has already stored the bundle and set the language: the native
+    // glanceable refreshes re-register widget and live-activity surfaces
     // synchronously inside the emit, and those host functions throw. The
     // store decides, not the rejection — reporting `failed` there would send
-    // the startup path to its English fallback with Arabic already applied,
-    // which is a mirrored English UI for the whole process.
+    // the startup path to its English fallback with the resolved catalog
+    // already applied, which is an English interface on a device whose
+    // language is not English.
     return isActive(instance, language) ? 'loaded' : 'failed';
   }
   if (!instance.hasResourceBundle(language, 'translation')) {

@@ -21,7 +21,13 @@ export function getInitialsFromName(name: string): string {
 
 /**
  * Formats a Unix timestamp in seconds as a US date, so the server render and the
- * browser render the same text whatever locale each runtime carries.
+ * browser render the same digits whatever locale each runtime carries.
+ *
+ * The calendar day is the viewer's local one, like the other timestamp
+ * formatters in this module (only date-only strings are pinned to UTC): a
+ * timestamp near local midnight can therefore name a different day on a server
+ * whose time zone differs from the viewer's. That is intentional — a purchase
+ * belongs on the day the buyer made it — so this helper does not pin a zone.
  */
 export function formatDate(timestamp: number) {
   return new Date(timestamp * 1000).toLocaleDateString('en-US');

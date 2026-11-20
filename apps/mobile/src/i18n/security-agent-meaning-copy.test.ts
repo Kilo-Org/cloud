@@ -22,7 +22,9 @@ import { i18n } from '@/i18n';
  * wording. Locales are grouped by the key they fix.
  */
 
-const CASES: Array<{ locale: string; key: string; value: string }> = [
+type Case = { locale: string; key: string; value: string };
+
+const CASES: Case[] = [
   // The unreachable object is the path, not the code.
   { locale: 'hi', key: 'securityAgent.analysisState.notExploitable', value: 'पहुँच योग्य पथ नहीं' },
   { locale: 'be', key: 'securityAgent.analysisState.notExploitable', value: 'Недасягальны шлях' },

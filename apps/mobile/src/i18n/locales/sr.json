@@ -190,13 +190,13 @@
     "markdownA11y": {
       "list": {
         "bulletPoint": "Tačka spiska",
-        "nestedBulletPoint": "Ugniežđena tačka spiska",
+        "nestedBulletPoint": "Ugnježđena tačka spiska",
         "orderedItem": "Stavka spiska {n}",
-        "nestedOrderedItem": "Ugniežđena stavka spiska {n}"
+        "nestedOrderedItem": "Ugnježđena stavka spiska {n}"
       },
       "blockquote": {
         "quote": "Citat",
-        "nestedQuote": "Ugniežđeni citat"
+        "nestedQuote": "Ugnježđeni citat"
       },
       "table": {
         "row": "Red {n}: {content}"

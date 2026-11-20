@@ -50,7 +50,10 @@ const EXPECTED_TOKENS: Record<(typeof KEYS)[number], string[]> = {
 };
 
 function tokens(text: string): string[] {
-  return [...text.matchAll(/\{[a-zA-Z]+\}/g)].map(match => match[0]).sort();
+  // The lookarounds keep a `{{n}}` from reading as `{n}`: i18next would leave
+  // the double-brace form untouched (no such variable is passed), and native
+  // would then substitute only the inner braces and speak a stray `}`.
+  return [...text.matchAll(/(?<!\{)\{[a-zA-Z]+\}(?!\})/g)].map(match => match[0]).sort();
 }
 
 /** The label one language renders, after falling back to English. */

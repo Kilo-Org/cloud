@@ -101,6 +101,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => ({ canManage: true }),
   useSecurityAgentConfig: () => config,
   useRetrySecurityAgentConfig: () => ({ retry: vi.fn(), isRetrying: false }),
+  useRetrySecurityAgentSettings: () => ({ retry: vi.fn(), isRetrying: false }),
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
@@ -109,6 +110,9 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
     models: [],
     isLoading: false,
     isError: false,
+    // The screen's catalogue classifier treats a delivered read as rows-empty
+    // rather than loading, so the fixture must say the read finished.
+    isFetched: true,
     refetch: vi.fn(),
   }),
 }));

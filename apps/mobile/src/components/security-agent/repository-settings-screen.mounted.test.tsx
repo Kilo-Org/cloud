@@ -34,6 +34,7 @@ const repositories = vi.hoisted(() => ({
   isError: false,
   isFetching: false,
   fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  error: null as unknown,
   refetch: vi.fn(),
 }));
 const connectivity = vi.hoisted(() => ({ known: true }));
@@ -267,6 +268,7 @@ beforeEach(() => {
   repositories.isError = false;
   repositories.isFetching = false;
   repositories.fetchStatus = 'idle';
+  repositories.error = null;
   connectivity.known = true;
   capability.canManage = true;
   save.isPending = false;
@@ -362,7 +364,10 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
   });
 
-  it('keeps the retryable QueryError in the header without mounting rows', async () => {
+  it('keeps the retryable QueryError in the header when nothing was delivered', async () => {
+    // A failed read that delivered no rows is a body failure: the error owns
+    // the section and no rows mount under it.
+    repositories.data = undefined;
     repositories.isError = true;
     const { renderer } = await mount();
 
@@ -370,6 +375,41 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect((error.props as { placement: string }).placement).toBe('top');
     expect(typeof (error.props as { onRetry: unknown }).onRetry).toBe('function');
     expect(repoRows(renderer)).toHaveLength(0);
+  });
+
+  it('keeps the delivered rows under a failed refetch with the banner above them', async () => {
+    // A failed refetch that still holds the delivered row set must not blank
+    // the picker: a tRPC answer proves the server was reachable, so the banner
+    // keeps the system wording while the rows stay selectable.
+    repositories.data = THREE_REPOS;
+    repositories.isError = true;
+    repositories.isFetching = false;
+    repositories.error = Object.assign(new Error('boom'), {
+      data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+    });
+    const { renderer } = await mount();
+
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect((error.props as { variant: string }).variant).toBe('server');
+    expect(repoRows(renderer)).toHaveLength(3);
+    expect((listOf(renderer).props as { data: RepoRow[] }).data).toHaveLength(3);
+    // The validation line belongs to the rows it is about, so it rides with
+    // them instead of disappearing with the failure.
+    expect(textContents(renderer)).toContain(i18n.t('securityAgent.repositories.selectAtLeastOne'));
+  });
+
+  it('names the connection on a failed refetch that never reached the server', async () => {
+    // A transport rejection carries no server answer, so the banner names the
+    // connection — and the delivered rows still mount under it.
+    repositories.data = THREE_REPOS;
+    repositories.isError = true;
+    repositories.isFetching = false;
+    repositories.error = new TypeError('Network request failed');
+    const { renderer } = await mount();
+
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect((error.props as { variant: string }).variant).toBe('offline');
+    expect(repoRows(renderer)).toHaveLength(3);
   });
 
   it('keeps the EmptyState with Manage access in the header', async () => {
@@ -418,9 +458,11 @@ describe('RepositorySettingsScreen repository picker', () => {
       0
     );
 
-    // A `[]` still cached under a failed refetch is not the settled empty grant:
-    // the section must not render a label with no state and no control under it.
-    repositories.data = [];
+    // A read that delivered nothing under a failed refetch is not the settled
+    // empty grant: the section must not render a label with no state and no
+    // control under it. (`[]` is delivered data, so it renders the EmptyState
+    // with Manage access — a control — which is not what this case asserts.)
+    repositories.data = undefined;
     repositories.isLoading = false;
     repositories.isError = true;
     const failed = await mount();

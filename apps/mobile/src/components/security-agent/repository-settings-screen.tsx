@@ -210,7 +210,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const repositoriesBody = classifyListBody({
     rowCount: repositoryCount,
     hasDeliveredData: repositories.data !== undefined,
-    isError: repositories.isError,
+    // Only a failed read with nothing delivered is a body failure: a delivered
+    // row set keeps the rows and the banner above them.
+    isError: repositories.isError && repositories.data === undefined,
     isFetching: repositories.isFetching,
     fetchStatus: repositories.fetchStatus,
     connectivityKnown: connectivity !== 'unknown',
@@ -227,9 +229,10 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // nothing accessible there is nothing to select and nothing to sync whichever
   // mode is stored, and widening the app's access is the only way out. Naming it
   // only in `selected` mode left the disabled agent's "Select repositories" row
-  // landing on a screen whose only controls were the two mode choices. Only the
-  // classifier's delivered-empty answer reaches the section in `all` mode, so a
-  // cached `[]` under a failed read cannot render a label with no control.
+  // landing on a screen whose only controls were the two mode choices. Only a
+  // delivered empty answer reaches the section in `all` mode — a cached `[]`
+  // counts as delivered and renders the state with its Manage access control —
+  // so a read that delivered nothing still cannot draw a label with no control.
   const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
 
   // The GitHub settings page is where installation access is widened on the
@@ -290,11 +293,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           )}
           {repositoriesFailed && (
             <QueryError
-              variant={
-                repositoriesBody.status === 'error' && repositoriesBody.cause === 'offline'
-                  ? 'offline'
-                  : 'server'
-              }
+              variant={classifyReadFailureVariant({
+                errors: repositories.error ? [repositories.error] : [],
+                isPaused: repositories.fetchStatus === 'paused',
+                connectivity,
+              })}
               placement="top"
               title={t('common.couldNotLoadRepositories')}
               onRetry={() => void repositories.refetch()}
@@ -325,8 +328,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const listFooter: ReactNode =
     showRepositoryStates &&
-    !repositories.isLoading &&
-    !repositories.isError &&
+    // Keyed on the rows the body shows, so a delivered row set under a failed
+    // refetch keeps the "select at least one" line beside them.
+    repositoriesBody.status === 'rows' &&
     hasRepositories &&
     selectedIds.length === 0 ? (
       <Text className="px-4 pt-3 text-xs text-destructive">
@@ -336,10 +340,12 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   // The ScrollView cannot hold a virtualized list, so the picker's rows live in
   // this FlashList and stop mounting every repository in one commit. Its data
-  // is empty outside selected mode (or while loading / errored), leaving only
-  // the header's states visible.
+  // is the delivered row set whenever the body has one to show — including
+  // under a failed refetch, where the banner rides above the rows — and is
+  // empty only outside selected mode or before a read delivered.
   const listData =
-    showRepositoryStates && !repositories.isLoading && !repositories.isError
+    showRepositoryStates &&
+    (repositoriesBody.status === 'rows' || repositoriesBody.status === 'empty')
       ? (repositories.data ?? [])
       : [];
 

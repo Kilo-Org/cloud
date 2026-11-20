@@ -138,3 +138,28 @@ describe('PrMergeSheet submission', () => {
     expect(state.merge.mutateAsync).not.toHaveBeenCalled();
   });
 });
+
+describe('PrMergeSheet body side insets', () => {
+  const LANDSCAPE_LEFT = 51;
+
+  it('clears the landscape cutout on the form body', async () => {
+    state.insets.left = LANDSCAPE_LEFT;
+    const renderer = await mount();
+
+    // One wrapper around the form body. `PrFormSheetFooter` clears the same
+    // insets on its own bar (a real `ScreenFooter` in the app), so a second
+    // padding around both would push the CTAs a cutout width into the column.
+    const padded = renderer.root.findAll(node => {
+      if (String(node.type) !== 'View') {
+        return false;
+      }
+      const style: unknown = node.props.style;
+      return typeof style === 'object' && style !== null && 'paddingLeft' in style;
+    });
+    expect(padded.map(node => node.props.style)).toEqual([
+      { paddingLeft: LANDSCAPE_LEFT, paddingRight: 8 },
+    ]);
+
+    state.insets.left = 0;
+  });
+});

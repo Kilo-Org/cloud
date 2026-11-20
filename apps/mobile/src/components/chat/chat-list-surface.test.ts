@@ -11,6 +11,7 @@ const answered: ChatListSurfaceInputs = {
   hasPlace: true,
   catalogAnswered: true,
   catalogLoading: false,
+  catalogStartable: true,
   offline: false,
 };
 
@@ -34,23 +35,53 @@ describe('selectChatListSurface', () => {
   });
 
   it('names the offline catalog rather than an empty list', () => {
-    expect(selectChatListSurface({ ...answered, catalogAnswered: false, offline: true })).toEqual({
-      kind: 'catalog-error',
-      offline: true,
-    });
+    expect(
+      selectChatListSurface({
+        ...answered,
+        catalogAnswered: false,
+        catalogStartable: false,
+        offline: true,
+      })
+    ).toEqual({ kind: 'catalog-error', offline: true });
   });
 
   it('names a catalog failure that is not offline', () => {
-    expect(selectChatListSurface({ ...answered, catalogAnswered: false })).toEqual({
-      kind: 'catalog-error',
-      offline: false,
-    });
+    expect(
+      selectChatListSurface({ ...answered, catalogAnswered: false, catalogStartable: false })
+    ).toEqual({ kind: 'catalog-error', offline: false });
   });
 
-  it('waits while the catalog is in flight', () => {
+  it('waits while the catalog is in flight and nothing can start a chat', () => {
+    expect(
+      selectChatListSurface({
+        ...answered,
+        catalogAnswered: false,
+        catalogLoading: true,
+        catalogStartable: false,
+      })
+    ).toEqual({ kind: 'loading' });
+  });
+
+  it('keeps answered rows when the catalog fails', () => {
+    // The list is the device's own answer; a catalog failure must not replace
+    // readable rows (or the New-chat button) with a full-screen error.
+    expect(selectChatListSurface({ ...answered, chatCount: 2, catalogAnswered: false })).toEqual({
+      kind: 'rows',
+    });
+    expect(
+      selectChatListSurface({ ...answered, chatCount: 2, catalogAnswered: false, offline: true })
+    ).toEqual({ kind: 'rows' });
+  });
+
+  it('keeps the empty state when a model is already known', () => {
+    // Cached rows, a backend or an on-device model still start a chat, so the
+    // catalog's failure changes nothing the person can do.
+    expect(selectChatListSurface({ ...answered, catalogAnswered: false })).toEqual({
+      kind: 'empty',
+    });
     expect(
       selectChatListSurface({ ...answered, catalogAnswered: false, catalogLoading: true })
-    ).toEqual({ kind: 'loading' });
+    ).toEqual({ kind: 'empty' });
   });
 
   it('is empty only on an answered empty list', () => {

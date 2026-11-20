@@ -195,6 +195,11 @@ function ScopedChatListScreen() {
     hasPlace: place !== null,
     catalogAnswered: modelsFetched && !modelsFailed,
     catalogLoading: modelsLoading,
+    // The model a New chat would start on. A catalog that cannot load does not
+    // remove a model that is already known (cached rows, a backend, an
+    // on-device model), so an answered list keeps its empty state and its
+    // button instead of a full-screen catalog error.
+    catalogStartable: selectedModel !== undefined,
     offline: connectivity === 'offline',
   });
   const empty = surface.kind === 'empty';

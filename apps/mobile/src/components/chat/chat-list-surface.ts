@@ -33,18 +33,35 @@ export type ChatListSurfaceInputs = {
   /** The catalog read answered with models (it settled, and not as a failure). */
   readonly catalogAnswered: boolean;
   readonly catalogLoading: boolean;
+  /**
+   * A model a chat can start on is already known — cached catalog rows, a
+   * configured backend or an on-device model. The catalog's own read failing
+   * does not take that away, and `defaultChatModel` never waits for a catalog
+   * that cannot load.
+   */
+  readonly catalogStartable: boolean;
   /** The device's confirmed connectivity, the app-wide offline banner's state. */
   readonly offline: boolean;
 };
 
 export function selectChatListSurface(input: ChatListSurfaceInputs): ChatListSurface {
   const { chatCount, listAnswered, listFailed, listLoading } = input;
-  const { hasPlace, catalogAnswered, catalogLoading, offline } = input;
+  const { hasPlace, catalogAnswered, catalogLoading, catalogStartable, offline } = input;
   // A list read that cannot run is not an empty list. Nothing scopes it without
   // a chat place, so it would stay pending forever; the card names it, and its
   // Retry re-reads as soon as the scope arrives.
   if (listFailed || (!hasPlace && !listAnswered)) {
     return { kind: 'list-error' };
+  }
+  // An answered list is the device's own truth and outranks the catalog: rows
+  // stay readable (and startable) while the catalog read fails. Only the empty
+  // state needs the catalog's answer, and even then a model that is already
+  // known is enough to start a chat.
+  if (listAnswered && chatCount > 0) {
+    return { kind: 'rows' };
+  }
+  if (listAnswered && catalogStartable) {
+    return { kind: 'empty' };
   }
   // A catalog still in flight can land; one that has not answered and is not
   // fetching cannot. Offline that is the connection, not a server fault, so the

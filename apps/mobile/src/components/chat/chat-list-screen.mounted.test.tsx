@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
+/* eslint-disable max-lines -- one mount harness; the list-provenance matrix is the point */
 import { createElement, type ElementType } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,6 +36,11 @@ const state = vi.hoisted(() => ({
   catalogAnswered: true,
   catalogLoading: false,
   catalogFailed: false,
+  models: [{ id: 'm1', name: 'One', isPreferred: true }] as {
+    id: string;
+    name: string;
+    isPreferred: boolean;
+  }[],
   connectivity: 'online' as BannerState,
 }));
 
@@ -60,7 +66,7 @@ vi.mock('@/lib/organization-context', () => ({
 }));
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({
-    models: [{ id: 'm1', name: 'One', isPreferred: true }],
+    models: state.models,
     isLoading: state.catalogLoading,
     isError: state.catalogFailed,
     isFetched: state.catalogAnswered,
@@ -138,6 +144,7 @@ beforeEach(() => {
   state.catalogAnswered = true;
   state.catalogLoading = false;
   state.catalogFailed = false;
+  state.models = [{ id: 'm1', name: 'One', isPreferred: true }];
   state.connectivity = 'online';
   state.newChat.mockResolvedValue('session-1');
 });
@@ -206,10 +213,12 @@ describe('the list body names what it knows', () => {
   });
 
   it('draws the offline card, not the empty state, when the catalog cannot answer offline', async () => {
-    // Offline is not loading: the catalog never answered, so a chat cannot
-    // start and the tab must say why instead of offering an inert empty state.
+    // Offline is not loading: the catalog never answered and no model is known,
+    // so a chat cannot start and the tab must say why instead of offering an
+    // inert empty state.
     state.connectivity = 'offline';
     state.catalogAnswered = false;
+    state.models = [];
     const tree = await mount();
     const [error] = bodyNodes(tree, 'QueryError');
     expect(error?.props.variant).toBe('offline');
@@ -219,8 +228,10 @@ describe('the list body names what it knows', () => {
     expect(tree.root.findAllByProps({ testID: 'chat-new-fab' })).toHaveLength(0);
   });
 
-  it('names a catalog failure with Retry', async () => {
+  it('names a catalog failure with Retry when nothing can start a chat', async () => {
     state.catalogFailed = true;
+    state.catalogAnswered = false;
+    state.models = [];
     const tree = await mount();
     const [error] = bodyNodes(tree, 'QueryError');
     expect(error?.props.variant).toBe('server');
@@ -236,6 +247,32 @@ describe('the list body names what it knows', () => {
     // The one true empty state still invites the person to start a chat, with
     // an action that can run: an answered list and an answered catalog.
     expect(empty?.props.title).toBe(i18n.t('modelChat.empty.title'));
+    expect(empty?.props.action).toBeDefined();
+  });
+
+  it('keeps answered rows, and the button that starts one, when the catalog fails', async () => {
+    // The list is the device's own answer. A failed catalog read must not
+    // replace readable chats — or the way to start another — with a card.
+    state.chats = [{ sessionId: 's1', model: 'm1', title: 'First chat', updatedAt: 1 }];
+    state.catalogFailed = true;
+    state.catalogAnswered = false;
+    const tree = await mount();
+    // The list is a FlashList (stubbed here), so its data is the readable rows.
+    expect(bodyNodes(tree, 'FlashList')[0]?.props.data).toHaveLength(1);
+    expect(bodyNodes(tree, 'QueryError')).toHaveLength(0);
+    expect(bodyNodes(tree, 'EmptyState')).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'chat-new-fab' }).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the empty state and its action when the catalog fails but a model is known', async () => {
+    // Cached catalog rows, a configured backend or an on-device model still
+    // start a chat, so the empty state keeps the one thing it offers.
+    state.catalogFailed = true;
+    state.catalogAnswered = false;
+    const tree = await mount();
+    const [empty] = bodyNodes(tree, 'EmptyState');
+    expect(bodyNodes(tree, 'EmptyState')).toHaveLength(1);
+    expect(bodyNodes(tree, 'QueryError')).toHaveLength(0);
     expect(empty?.props.action).toBeDefined();
   });
 

@@ -492,6 +492,17 @@ describe('Home-only widget policy', () => {
       expect(homeWidgetRefreshAt(data, now)).toBe(now + 30 * 60 * 1000);
     }
   });
+
+  it('keeps a terminal snapshot quiet and unstale even when its counts survive', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Private' }],
+    });
+    data.snapshot.status = 'signed_out';
+    expect(homeWidgetRefreshAt(data, now)).toBe(now + 2 * 60 * 60 * 1000);
+    expect(buildHomeWidgetPresentation(data, now).stale).toBe(false);
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([now]);
+  });
 });
 
 describe('native Home presentation timeline', () => {

@@ -16,6 +16,7 @@ import {
   GLANCEABLE_STATUS_KINDS,
   GLANCEABLE_TITLE_LIMIT,
   glanceableStatusKind,
+  isScheduledSessionRow,
   isStartableGlanceableWork,
   isTerminalGlanceableStatus,
   type BuildGlanceableSnapshotInput,
@@ -152,7 +153,13 @@ const QUIET_REFRESH_MS = 2 * 60 * 60 * 1000;
 // asks for the wake plus this delay is the instant the widget can fetch.
 const WAKE_RETRY_MS = 15 * 60 * 1000;
 
+/**
+ * The one cadence rule: every caller that needs a snapshot's refresh interval
+ * reads this function. A terminal snapshot is quiet regardless of the counts
+ * that survive beside it, so auth/privacy termination cannot keep polling.
+ */
 function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
+  if (isTerminalGlanceableStatus(snapshot.status)) return QUIET_REFRESH_MS;
   return snapshot.status === 'waiting' ||
     snapshot.status === 'stale' ||
     snapshot.status === 'expired' ||
@@ -218,7 +225,7 @@ export function buildHomeWidgetDetails(
       byStatusUpdatedAt(a.row, b.row)
   );
   const scheduled = sessions
-    .filter(row => glanceableStatusKind(row.status) === 'scheduled')
+    .filter(isScheduledSessionRow)
     .sort(compareSessionInstant(row => row.scheduledAt, 'earliest'));
   const primaryKind = primaryKindOf(countGlanceableSessions(sessions));
   const primary =
@@ -389,7 +396,7 @@ export function buildHomeWidgetPresentation(
 export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
   const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
-  const next = now + (terminal !== null ? QUIET_REFRESH_MS : refreshInterval(snapshot));
+  const next = now + refreshInterval(snapshot);
   const wake = scheduledWake(snapshot, terminal).at;
   const retry = wakeRetryAt(snapshot, terminal);
   // Both instants come from the snapshot, so a passed wake cannot create a busy refresh loop.

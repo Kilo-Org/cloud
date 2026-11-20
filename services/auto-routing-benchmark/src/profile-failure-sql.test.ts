@@ -253,28 +253,16 @@ describe('profile failure transitions (production migrations and real SQLite)', 
     expect(await listCurrentFailedProfiles(db, current)).toEqual([]);
   });
 
-  it('re-admits one permanent pair with a clean history, or fails it again when the catalog lacks it', async () => {
+  const refresh = (catalog: unknown, at: number) =>
+    refreshCurrentProfiles(
+      db,
+      { ...current, entries: [pair], mode: 'refresh' },
+      BenchmarkModelCatalogSchema.parse(catalog),
+      iso(at)
+    );
+
+  it('re-admits one permanent pair with a clean history when the catalog has it', async () => {
     await failedRun('run-1', { failureClass: 'model_not_found', reason: 'gone' }, T0);
-    const refresh = (catalog: unknown, at: number) =>
-      refreshCurrentProfiles(
-        db,
-        { ...current, entries: [pair], mode: 'refresh' },
-        BenchmarkModelCatalogSchema.parse(catalog),
-        iso(at)
-      );
-
-    expect(await refresh({ data: [] }, T0 + HOUR)).toEqual({
-      refreshed: [],
-      unavailable: [pair],
-      skipped: [],
-    });
-    expect(stored()).toMatchObject({
-      status: 'unavailable',
-      failure_class: 'catalog_absent',
-      failure_attempts: 1,
-      first_failed_at: iso(T0 + HOUR),
-    });
-
     expect(await refresh({ data: [{ id: pair.model }] }, T0 + 2 * HOUR)).toEqual({
       refreshed: [pair],
       unavailable: [],
@@ -288,6 +276,42 @@ describe('profile failure transitions (production migrations and real SQLite)', 
       first_failed_at: null,
       retry_after: null,
       failure_reason: null,
+    });
+  });
+
+  it.each<ProfileFailure>([
+    { failureClass: 'model_not_found', reason: 'gone' },
+    { failureClass: 'catalog_absent', reason: 'Not in the catalog.' },
+    providerDown,
+  ])(
+    'keeps the $failureClass failure history when the catalog refuses a re-admit',
+    async failure => {
+      await failedRun('run-1', failure, T0);
+      if ((await requeue(T0 + HOUR)) === 1) await failedRun('run-2', failure, T0 + 2 * HOUR);
+      const before = stored();
+      const [listedBefore] = await listCurrentFailedProfiles(db, current);
+      expect(await refresh({ data: [] }, T0 + 5 * HOUR)).toEqual({
+        refreshed: [],
+        unavailable: [pair],
+        skipped: [],
+      });
+      expect(stored()).toEqual(before);
+      expect(before.first_failed_at).toBe(iso(T0));
+      expect((await listCurrentFailedProfiles(db, current))[0]).toEqual(listedBefore);
+    }
+  );
+
+  it('fails a never-failed pair permanently when the catalog refuses a re-admit', async () => {
+    expect(await refresh({ data: [] }, T0 + HOUR)).toEqual({
+      refreshed: [],
+      unavailable: [pair],
+      skipped: [],
+    });
+    expect(stored()).toMatchObject({
+      status: 'unavailable',
+      failure_class: 'catalog_absent',
+      failure_attempts: 1,
+      first_failed_at: iso(T0 + HOUR),
     });
   });
 

@@ -13,7 +13,11 @@ type RefreshInput = {
   mode: 'refresh' | 'repair_unavailable';
 };
 
-type RefreshedRow = { model: string; variant: string; status: 'pending' | 'unavailable' };
+type RefreshedRow = {
+  model: string;
+  variant: string;
+  status: 'pending' | 'failed' | 'unavailable';
+};
 
 type RecordedLookupResult = {
   run_id: string;
@@ -106,20 +110,28 @@ export async function refreshCurrentProfiles(
     WHERE json_extract(requested.value, '$.model') = benchmark_profiles.model
       AND json_extract(requested.value, '$.variant') = benchmark_profiles.variant`;
   // Re-admitting clears the failure history, so the retry budgets start over. A pair the
-  // catalog cannot run fails permanently here instead, before any paid call.
+  // catalog cannot run is refused: an already failed row keeps its status and failure
+  // history, and any other row fails permanently here, before any paid call.
+  const failedSql = `status IN ('failed', 'unavailable')`;
   const result = await db
     .prepare(`UPDATE benchmark_profiles SET
-      status = CASE WHEN (${availableSql}) THEN 'pending' ELSE 'unavailable' END,
-      failure_reason = CASE WHEN (${availableSql}) THEN NULL
+      status = CASE WHEN (${availableSql}) THEN 'pending'
+        WHEN ${failedSql} THEN status ELSE 'unavailable' END,
+      failure_reason = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN failure_reason
         ELSE 'Model or variant is unavailable to the benchmark CLI.' END,
-      failure_class = CASE WHEN (${availableSql}) THEN NULL ELSE 'catalog_absent' END,
-      failure_attempts = CASE WHEN (${availableSql}) THEN 0 ELSE 1 END,
-      model_failure_attempts = 0,
-      first_failed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?5 END,
-      retry_after = NULL,
-      run_id = NULL, requested_at = ?5, updated_at = ?5,
-      completed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?5 END,
-      invalidated_at = ?5
+      failure_class = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN failure_class
+        ELSE 'catalog_absent' END,
+      failure_attempts = CASE WHEN (${availableSql}) THEN 0 WHEN ${failedSql} THEN failure_attempts
+        ELSE 1 END,
+      model_failure_attempts = CASE WHEN (${availableSql}) THEN 0 ELSE model_failure_attempts END,
+      first_failed_at = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN first_failed_at
+        ELSE ?5 END,
+      retry_after = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN retry_after
+        ELSE NULL END,
+      run_id = CASE WHEN NOT (${availableSql}) AND ${failedSql} THEN run_id ELSE NULL END,
+      completed_at = CASE WHEN (${availableSql}) THEN NULL WHEN ${failedSql} THEN completed_at
+        ELSE ?5 END,
+      requested_at = ?5, updated_at = ?5, invalidated_at = ?5
     WHERE router = ?1 AND engine_identity = ?2 AND repetitions = ?3
       AND EXISTS (${availableSql}) AND status != 'running'
       AND NOT EXISTS (${runningSql})

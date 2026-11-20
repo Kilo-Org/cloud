@@ -3595,6 +3595,7 @@
       "identifierLabel": "आइडेंटिफ़ायर",
       "identifierRequired": "आइडेंटिफ़ायर दर्ज करें।",
       "identifierTaken": "कोई दूसरा मोड पहले से इस आइडेंटिफ़ायर का उपयोग करता है।",
+      "identifierTooLong": "आइडेंटिफ़ायर को {{max}} अक्षरों या उससे कम तक रखें।",
       "nameLabel": "मोड नाम",
       "nameRequired": "मोड नाम दर्ज करें।",
       "notFound": "यह मोड अब मौजूद नहीं है।",

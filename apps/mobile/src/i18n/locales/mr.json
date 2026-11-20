@@ -3591,6 +3591,7 @@
       "identifierLabel": "ओळखकर्ता",
       "identifierRequired": "ओळखकर्ता प्रविष्ट करा.",
       "identifierTaken": "हा ओळखकर्ता दुसरा मोड आधीच वापरत आहे.",
+      "identifierTooLong": "ओळखकर्ता {{max}} वर्णांपर्यंत किंवा त्यापेक्षा कमी ठेवा.",
       "nameLabel": "मोडचे नाव",
       "nameRequired": "मोडचे नाव प्रविष्ट करा.",
       "notFound": "हा मोड आता अस्तित्वात नाही.",

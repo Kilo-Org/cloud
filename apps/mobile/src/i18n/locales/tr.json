@@ -3595,6 +3595,7 @@
       "identifierLabel": "Tanımlayıcı",
       "identifierRequired": "Bir tanımlayıcı girin.",
       "identifierTaken": "Bu tanımlayıcıyı başka bir mod zaten kullanıyor.",
+      "identifierTooLong": "Tanımlayıcıyı {{max}} karakter veya daha az tutun.",
       "nameLabel": "Mod adı",
       "nameRequired": "Bir mod adı girin.",
       "notFound": "Bu mod artık mevcut değil.",

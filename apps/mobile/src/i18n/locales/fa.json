@@ -3591,6 +3591,7 @@
       "identifierLabel": "شناسه",
       "identifierRequired": "شناسه را وارد کنید.",
       "identifierTaken": "حالت دیگری از این شناسه استفاده می‌کند.",
+      "identifierTooLong": "شناسه را حداکثر {{max}} نویسه نگه دارید.",
       "nameLabel": "نام حالت",
       "nameRequired": "نام حالت را وارد کنید.",
       "notFound": "این حالت دیگر وجود ندارد.",

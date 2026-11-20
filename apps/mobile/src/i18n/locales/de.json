@@ -3595,6 +3595,7 @@
       "identifierLabel": "Bezeichner",
       "identifierRequired": "Bezeichner eingeben.",
       "identifierTaken": "Ein anderer Modus verwendet diesen Bezeichner bereits.",
+      "identifierTooLong": "Bezeichner auf {{max}} Zeichen oder weniger beschränken.",
       "nameLabel": "Modusname",
       "nameRequired": "Modusnamen eingeben.",
       "notFound": "Dieser Modus existiert nicht mehr.",

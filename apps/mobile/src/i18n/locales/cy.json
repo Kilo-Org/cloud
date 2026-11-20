@@ -3839,6 +3839,7 @@
       "identifierLabel": "Dynodydd",
       "identifierRequired": "Rhowch ddynodydd.",
       "identifierTaken": "Mae modd arall eisoes yn defnyddio'r dynodydd hwn.",
+      "identifierTooLong": "Cadwch y dynodydd i {{max}} nod neu lai.",
       "nameLabel": "Enw'r modd",
       "nameRequired": "Rhowch enw modd.",
       "notFound": "Nid yw'r modd hwn yn bodoli mwyach.",

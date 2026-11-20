@@ -3591,6 +3591,7 @@
       "identifierLabel": "Njirimara",
       "identifierRequired": "Tinye njirimara.",
       "identifierTaken": "Ụdị ọrụ ọzọ ejirila njirimara a.",
+      "identifierTooLong": "Debe njirimara ahụ na {{max}} mkpụrụedemede ma ọ bụ obere.",
       "nameLabel": "Aha ụdị ọrụ",
       "nameRequired": "Tinye aha ụdị ọrụ.",
       "notFound": "Ụdị ọrụ a adịkwaghị.",

@@ -3591,6 +3591,7 @@
       "identifierLabel": "Eenyummeessaa",
       "identifierRequired": "Eenyummeessaa galchi.",
       "identifierTaken": "Haalni biraa eenyummeessaa kana duraan fayyadama.",
+      "identifierTooLong": "Eenyummeessaa qubee {{max}} ykn sanaa gadiitti eegi.",
       "nameLabel": "Maqaa haalaa",
       "nameRequired": "Maqaa haalaa galchi.",
       "notFound": "Haalni kun amma hin jiru.",

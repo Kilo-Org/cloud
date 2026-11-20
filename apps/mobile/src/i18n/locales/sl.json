@@ -3715,6 +3715,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Vnesi identifikator.",
       "identifierTaken": "Drug način že uporablja ta identifikator.",
+      "identifierTooLong": "Identifikator naj ima {{max}} znakov ali manj.",
       "nameLabel": "Ime načina",
       "nameRequired": "Vnesi ime načina.",
       "notFound": "Ta način ne obstaja več.",

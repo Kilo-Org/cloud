@@ -3591,6 +3591,7 @@
       "identifierLabel": "ਪਛਾਣਕਰਤਾ",
       "identifierRequired": "ਪਛਾਣਕਰਤਾ ਦਰਜ ਕਰੋ।",
       "identifierTaken": "ਕੋਈ ਹੋਰ ਮੋਡ ਪਹਿਲਾਂ ਹੀ ਇਹ ਪਛਾਣਕਰਤਾ ਵਰਤ ਰਿਹਾ ਹੈ।",
+      "identifierTooLong": "ਪਛਾਣਕਰਤਾ ਨੂੰ {{max}} ਅੱਖਰ ਜਾਂ ਇਸ ਤੋਂ ਘੱਟ ਤੱਕ ਰੱਖੋ।",
       "nameLabel": "ਮੋਡ ਦਾ ਨਾਮ",
       "nameRequired": "ਮੋਡ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।",
       "notFound": "ਇਹ ਮੋਡ ਹੁਣ ਮੌਜੂਦ ਨਹੀਂ ਹੈ।",

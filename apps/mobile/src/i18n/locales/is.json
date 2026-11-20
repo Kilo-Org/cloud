@@ -3591,6 +3591,7 @@
       "identifierLabel": "Auðkenni",
       "identifierRequired": "Sláðu inn auðkenni.",
       "identifierTaken": "Þetta auðkenni er þegar notað í öðrum ham.",
+      "identifierTooLong": "Haltu auðkenninu í {{max}} stöfum eða færri.",
       "nameLabel": "Heiti hams",
       "nameRequired": "Sláðu inn heiti hams.",
       "notFound": "Þessi hamur er ekki lengur til.",

@@ -3653,6 +3653,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Unesite identifikator.",
       "identifierTaken": "Drugi način rada već koristi ovaj identifikator.",
+      "identifierTooLong": "Zadrži identifikator na {{max}} znakova ili manje.",
       "nameLabel": "Naziv načina rada",
       "nameRequired": "Unesite naziv načina rada.",
       "notFound": "Ovaj način rada više ne postoji.",

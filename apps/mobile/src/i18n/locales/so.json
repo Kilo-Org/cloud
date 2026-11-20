@@ -3591,6 +3591,7 @@
       "identifierLabel": "Aqoonsiga",
       "identifierRequired": "Geli aqoonsi.",
       "identifierTaken": "Qaab kale ayaa hore u isticmaalaya aqoonsigan.",
+      "identifierTooLong": "Aqoonsiga ku hay {{max}} xaraf ama ka yar.",
       "nameLabel": "Magaca qaabka",
       "nameRequired": "Geli magaca qaabka.",
       "notFound": "Qaabkani mar dambe ma jiro.",

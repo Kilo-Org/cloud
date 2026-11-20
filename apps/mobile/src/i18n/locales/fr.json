@@ -3657,6 +3657,7 @@
       "identifierLabel": "Identifiant",
       "identifierRequired": "Saisissez un identifiant.",
       "identifierTaken": "Un autre mode utilise déjà cet identifiant.",
+      "identifierTooLong": "Limitez l'identifiant à {{max}} caractères ou moins.",
       "nameLabel": "Nom du mode",
       "nameRequired": "Saisissez un nom de mode.",
       "notFound": "Ce mode n'existe plus.",

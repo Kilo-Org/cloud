@@ -3591,6 +3591,7 @@
       "identifierLabel": "អត្តសញ្ញាណ",
       "identifierRequired": "បញ្ចូលអត្តសញ្ញាណ។",
       "identifierTaken": "របៀបមួយផ្សេងទៀតបានប្រើអត្តសញ្ញាណនេះរួចហើយ។",
+      "identifierTooLong": "រក្សាអត្តសញ្ញាណឱ្យនៅក្នុង {{max}} តួអក្សរ ឬតិចជាងនេះ។",
       "nameLabel": "ឈ្មោះរបៀប",
       "nameRequired": "បញ្ចូលឈ្មោះរបៀប។",
       "notFound": "របៀបនេះលែងមានទៀតហើយ។",

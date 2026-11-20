@@ -3591,6 +3591,7 @@
       "identifierLabel": "Tunniste",
       "identifierRequired": "Anna tunniste.",
       "identifierTaken": "Toinen tila käyttää jo tätä tunnistetta.",
+      "identifierTooLong": "Pidä tunniste enintään {{max}} merkin mittaisena.",
       "nameLabel": "Tilan nimi",
       "nameRequired": "Anna tilalle nimi.",
       "notFound": "Tätä tilaa ei enää ole.",

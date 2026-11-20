@@ -3591,6 +3591,7 @@
       "identifierLabel": "Pengecam",
       "identifierRequired": "Masukkan pengecam.",
       "identifierTaken": "Mod lain sudah menggunakan pengecam ini.",
+      "identifierTooLong": "Kekalkan pengecam kepada {{max}} aksara atau kurang.",
       "nameLabel": "Nama mod",
       "nameRequired": "Masukkan nama mod.",
       "notFound": "Mod ini tidak lagi wujud.",

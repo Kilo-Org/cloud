@@ -3591,6 +3591,7 @@
       "identifierLabel": "Kitambulisho",
       "identifierRequired": "Weka kitambulisho.",
       "identifierTaken": "Hali nyingine tayari inatumia kitambulisho hiki.",
+      "identifierTooLong": "Weka kitambulisho kuwa herufi {{max}} au chache.",
       "nameLabel": "Jina la hali",
       "nameRequired": "Weka jina la hali.",
       "notFound": "Hali hii haipo tena.",

@@ -3595,6 +3595,7 @@
       "identifierLabel": "식별자",
       "identifierRequired": "식별자를 입력하세요.",
       "identifierTaken": "다른 모드에서 이미 이 식별자를 사용합니다.",
+      "identifierTooLong": "식별자를 {{max}}자 이하로 유지하세요.",
       "nameLabel": "모드 이름",
       "nameRequired": "모드 이름을 입력하세요.",
       "notFound": "이 모드는 더 이상 존재하지 않습니다.",

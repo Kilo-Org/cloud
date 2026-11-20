@@ -3591,6 +3591,7 @@
       "identifierLabel": "Idantifyan",
       "identifierRequired": "Antre yon idantifyan.",
       "identifierTaken": "Yon lòt mòd deja itilize idantifyan sa a.",
+      "identifierTooLong": "Kenbe idantifyan an nan {{max}} karaktè oswa mwens.",
       "nameLabel": "Non mòd",
       "nameRequired": "Antre yon non mòd.",
       "notFound": "Mòd sa a pa egziste ankò.",

@@ -3591,6 +3591,7 @@
       "identifierLabel": "Танигч",
       "identifierRequired": "Танигч оруулна уу.",
       "identifierTaken": "Өөр горим энэ танигчийг аль хэдийн ашиглаж байна.",
+      "identifierTooLong": "Танигчийг {{max}} тэмдэгт эсвэл түүнээс бага байлгана уу.",
       "nameLabel": "Горимын нэр",
       "nameRequired": "Горимын нэр оруулна уу.",
       "notFound": "Энэ горим байхгүй болсон.",

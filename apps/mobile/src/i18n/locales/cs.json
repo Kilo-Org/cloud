@@ -3715,6 +3715,7 @@
       "identifierLabel": "Identifikátor",
       "identifierRequired": "Zadejte identifikátor.",
       "identifierTaken": "Tento identifikátor už používá jiný režim.",
+      "identifierTooLong": "Ponechte identifikátor na {{max}} znacích nebo méně.",
       "nameLabel": "Název režimu",
       "nameRequired": "Zadejte název režimu.",
       "notFound": "Tento režim už neexistuje.",

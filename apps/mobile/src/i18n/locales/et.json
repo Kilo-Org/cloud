@@ -3591,6 +3591,7 @@
       "identifierLabel": "Identifikaator",
       "identifierRequired": "Sisesta identifikaator.",
       "identifierTaken": "Seda identifikaatorit kasutab juba teine režiim.",
+      "identifierTooLong": "Hoia identifikaator {{max}} tähemärgi piires või lühem.",
       "nameLabel": "Režiimi nimi",
       "nameRequired": "Sisesta režiimi nimi.",
       "notFound": "Seda režiimi enam ei ole.",

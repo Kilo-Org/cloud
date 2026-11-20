@@ -3591,6 +3591,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Skriv inn en identifikator.",
       "identifierTaken": "En annen modus bruker allerede denne identifikatoren.",
+      "identifierTooLong": "Hold identifikatoren på {{max}} tegn eller færre.",
       "nameLabel": "Modusnavn",
       "nameRequired": "Skriv inn et modusnavn.",
       "notFound": "Denne modusen finnes ikke lenger.",

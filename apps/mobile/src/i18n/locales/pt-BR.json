@@ -3719,6 +3719,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Insira um identificador.",
       "identifierTaken": "Outro modo já usa este identificador.",
+      "identifierTooLong": "Mantenha o identificador com {{max}} caracteres ou menos.",
       "nameLabel": "Nome do modo",
       "nameRequired": "Insira um nome para o modo.",
       "notFound": "Este modo não existe mais.",

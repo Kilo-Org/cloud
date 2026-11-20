@@ -3591,6 +3591,7 @@
       "identifierLabel": "መለያ",
       "identifierRequired": "መለያ አስገባ።",
       "identifierTaken": "ሌላ ሁነታ ይህን መለያ አስቀድሞ ይጠቀማል።",
+      "identifierTooLong": "መለያውን በ{{max}} ቁምፊዎች ወይም ከዚያ ባነሰ ይያዙ።",
       "nameLabel": "የሁነታ ስም",
       "nameRequired": "የሁነታ ስም አስገባ።",
       "notFound": "ይህ ሁነታ ከእንግዲህ የለም።",

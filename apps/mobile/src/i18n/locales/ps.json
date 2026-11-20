@@ -3591,6 +3591,7 @@
       "identifierLabel": "پېژندونکی",
       "identifierRequired": "پېژندونکی ولیکئ.",
       "identifierTaken": "بل حالت لا دمخه دا پېژندونکی کاروي.",
+      "identifierTooLong": "پېژندونکی {{max}} توري یا لږ وساتئ.",
       "nameLabel": "د حالت نوم",
       "nameRequired": "د حالت نوم ولیکئ.",
       "notFound": "دا حالت نور نشته.",

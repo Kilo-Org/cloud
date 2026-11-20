@@ -3657,6 +3657,7 @@
       "identifierLabel": "Identificatore",
       "identifierRequired": "Inserisci un identificatore.",
       "identifierTaken": "Un'altra modalità usa già questo identificatore.",
+      "identifierTooLong": "Mantieni l'identificatore entro {{max}} caratteri.",
       "nameLabel": "Nome modalità",
       "nameRequired": "Inserisci un nome per la modalità.",
       "notFound": "Questa modalità non esiste più.",

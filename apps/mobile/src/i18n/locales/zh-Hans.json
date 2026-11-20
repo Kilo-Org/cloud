@@ -3595,6 +3595,7 @@
       "identifierLabel": "标识符",
       "identifierRequired": "请输入标识符。",
       "identifierTaken": "另一个模式已使用此标识符。",
+      "identifierTooLong": "标识符请保持在 {{max}} 个字符以内。",
       "nameLabel": "模式名称",
       "nameRequired": "请输入模式名称。",
       "notFound": "此模式已不存在。",

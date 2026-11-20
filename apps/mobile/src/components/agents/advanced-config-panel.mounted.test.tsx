@@ -1077,6 +1077,54 @@ describe('AdvancedConfigPanel', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
+  it('refuses to adopt a refetched row whose stored description no longer matches', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The retry sends exactly what the lost attempt sent, so only the row's own
+    // stored description can disagree with it.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    // The row carries the name, an id the panel did not know and the submitted
+    // counts, but its description was changed after the lost write.
+    // The list row carries the stored description the panel reads, which the
+    // selector profile it builds does not.
+    const edited: ProfileSelectorProfile & { description: string | null } = {
+      id: 'prod-1',
+      name: 'prod',
+      description: 'changed elsewhere',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, edited] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    // The row no longer holds the description this flow submitted, so it is not
+    // the save's own record and the draft stays with the person.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it('states the duplicate sentence when the name was taken before any attempt', async () => {
     const mocks = mutations();
     const refusal = 'A profile with this name already exists';

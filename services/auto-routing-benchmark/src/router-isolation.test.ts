@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
+import { applyBenchmarkMigrations } from '../test/sqlite-d1';
 import {
   AutoRouterSchema,
   BenchmarkConfigSchema,
@@ -11,6 +12,7 @@ import {
 import {
   getConfigRows,
   getLatestRoutingTable,
+  getQueueRunOccupancy,
   getRunningRun,
   listRuns,
   replaceConfig,
@@ -171,8 +173,9 @@ describe('router contracts and database isolation', () => {
       const { db, queries } = capturingDatabase();
       await listRuns(db, 20, { router });
       await getRunningRun(db, 'decider', 'platform', router);
+      await getQueueRunOccupancy(db, router, 'user');
       await getLatestRoutingTable(db, router);
-      expect(queries).toHaveLength(3);
+      expect(queries).toHaveLength(4);
       for (const query of queries) {
         expect(query.sql).toContain('"router" = ?');
         expect(query.params).toContain(router);
@@ -191,33 +194,7 @@ describe('router contracts and database isolation', () => {
   });
 });
 
-describe('atomic run lifecycle admission', () => {
-  const SCHEMA_SQL = `
-    CREATE TABLE benchmark_runs (
-      id TEXT PRIMARY KEY NOT NULL,
-      router TEXT NOT NULL DEFAULT 'efficient',
-      kind TEXT NOT NULL,
-      status TEXT NOT NULL,
-      started_at TEXT NOT NULL,
-      completed_at TEXT,
-      error TEXT,
-      min_accuracy REAL NOT NULL,
-      accuracy_noise_band REAL NOT NULL DEFAULT 0.05,
-      frontier_min_accuracy_delta REAL NOT NULL DEFAULT 0,
-      switch_cost_factor REAL NOT NULL,
-      best_accuracy_switch_threshold REAL NOT NULL DEFAULT 0.05,
-      max_concurrency INTEGER NOT NULL,
-      benchmark_user_id TEXT,
-      benchmark_org_id TEXT,
-      repetitions INTEGER NOT NULL DEFAULT 1,
-      classifier_max_p95_latency_ms INTEGER,
-      engine_identity TEXT NOT NULL DEFAULT '',
-      purpose TEXT NOT NULL DEFAULT 'platform'
-    );
-    CREATE UNIQUE INDEX one_running_slot ON benchmark_runs(router, kind, purpose)
-      WHERE status = 'running';
-  `;
-
+describe('atomic run lifecycle admission (production migrations)', () => {
   const run = {
     id: 'efficient-platform',
     router: 'efficient' as const,
@@ -236,7 +213,7 @@ describe('atomic run lifecycle admission', () => {
 
   function admissionHarness() {
     const sqlite = new DatabaseSync(':memory:');
-    sqlite.exec(SCHEMA_SQL);
+    applyBenchmarkMigrations(sqlite);
     const { db, queries } = capturingDatabase();
     const apply = (index: number): void => {
       const query = queries[index];
@@ -288,49 +265,43 @@ describe('atomic run lifecycle admission', () => {
     }
   });
 
-  it('atomically keeps one active lifecycle per router and queue, not per container budget', async () => {
-    const { sqlite, db, queries, apply, rejects, lanes } = admissionHarness();
+  it('admits several active decider runs per router and queue', async () => {
+    const { sqlite, db, apply } = admissionHarness();
     try {
-      await insertRun(
-        db,
-        {
-          ...run,
-          id: 'user-active',
-          purpose: 'user',
-          max_concurrency: 0,
-        },
-        [],
-        []
-      );
-      await insertRun(
-        db,
-        {
-          ...run,
-          id: 'duplicate-user',
-          purpose: 'user',
-          max_concurrency: 0,
-        },
-        [],
-        []
-      );
+      for (const id of ['user-active', 'user-second', 'user-third']) {
+        await insertRun(db, { ...run, id, purpose: 'user', max_concurrency: 0 }, [], []);
+      }
       await insertRun(db, { ...run, id: 'efficient-platform', max_concurrency: 0 }, [], []);
-      await insertRun(
-        db,
-        {
-          ...run,
-          id: 'frontier-platform',
-          router: 'frontier',
-          max_concurrency: 0,
-        },
-        [],
-        []
-      );
+      for (const index of [0, 1, 2, 3]) apply(index);
+      expect(
+        sqlite
+          .prepare(
+            "SELECT purpose, COUNT(*) AS n FROM benchmark_runs WHERE status = 'running' GROUP BY purpose ORDER BY purpose"
+          )
+          .all()
+      ).toEqual([
+        { purpose: 'platform', n: 1 },
+        { purpose: 'user', n: 3 },
+      ]);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('atomically keeps one active classifier run per router', async () => {
+    const { sqlite, db, apply, rejects } = admissionHarness();
+    try {
+      const classifier = { ...run, kind: 'classifier' as const, max_concurrency: 0 };
+      await insertRun(db, { ...classifier, id: 'classifier-active' }, [], []);
+      await insertRun(db, { ...classifier, id: 'classifier-duplicate' }, [], []);
+      await insertRun(db, { ...run, id: 'decider-alongside', max_concurrency: 0 }, [], []);
       apply(0);
       rejects(1);
       apply(2);
-      apply(3);
-      expect(lanes()).toEqual({ lanes: 0 });
-      expect(queries).toHaveLength(4);
+      sqlite
+        .prepare("UPDATE benchmark_runs SET status = 'completed' WHERE id = ?")
+        .run('classifier-active');
+      apply(1);
     } finally {
       sqlite.close();
     }

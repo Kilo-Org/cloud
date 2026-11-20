@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
+      "managedOnWebTitle": "تتم الإدارة على الويب",
+      "managedOnWebShort": "تتم إدارة هذا الاتصال عبر الويب من جهاز كمبيوتر.",
+      "managedOnWebRepositories": "اختر المستودعات الخاصة بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
       "description": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
       "descriptionReconnect": "أنشئ رمز وصول جديدًا لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
       "descriptionOverview": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه في الشاشة التالية.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "النشاط",
       "checking": "جارٍ التحقق…",
+      "needsAttention": "يتطلب الانتباه",
       "platforms": "المنصات",
       "statusUnavailable": "الحالة غير متاحة"
     },
@@ -4325,7 +4329,13 @@
     "providerUnavailable": "المزوّد غير متاح الآن. أعد الإرسال بعد قليل."
   },
   "settingsTools": {
-    "confirmTitle": "تأكيد هذا التغيير؟"
+    "confirmTitle": "تأكيد هذا التغيير؟",
+    "guarded": {
+      "spendAlertsOff": "هل تريد إيقاف تنبيهات الإنفاق؟ لن تصلك إشعارات عند تجاوز حدود الإنفاق أو الارتفاعات الساعية.",
+      "balanceAlertsOff": "هل تريد إيقاف تنبيهات الرصيد؟ لن تصلك إشعارات عند انخفاض رصيدك.",
+      "securityFindingsOff": "هل تريد إيقاف النتائج الأمنية؟ لن تصلك إشعارات حول النتائج الأمنية الجديدة.",
+      "hideBalanceOn": "هل تريد إخفاء أرصدتك؟ لن تظهر أرصدة الاعتمادات بعد الآن على شاشات الملف الشخصي ومركز المؤسسة."
+    }
   },
   "appActions": {
     "start": {

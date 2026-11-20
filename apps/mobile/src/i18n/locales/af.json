@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
+      "managedOnWebTitle": "Op die web bestuur",
+      "managedOnWebShort": "Hierdie verbinding word op die web vanaf 'n rekenaar bestuur.",
+      "managedOnWebRepositories": "Kies die repositories vir {{organization}} op die web vanaf 'n rekenaar.",
       "description": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
       "descriptionReconnect": "Skep weer vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
       "descriptionOverview": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit op die volgende skerm.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Besig om na te gaan…",
       "statusUnavailable": "Status onbeskikbaar",
+      "needsAttention": "Aandag nodig",
       "platforms": "Kodeplatforms",
       "activity": "Aktiwiteit"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Die verskaffer is tans onbeskikbaar. Stuur binnekort weer."
   },
   "settingsTools": {
-    "confirmTitle": "Bevestig hierdie verandering?"
+    "confirmTitle": "Bevestig hierdie verandering?",
+    "guarded": {
+      "spendAlertsOff": "Skakel bestedingswaarskuwings af? Jy sal ophou om kennisgewings te ontvang oor die oorskryding van bestedingsdrempels en uurlikse pieke.",
+      "balanceAlertsOff": "Skakel balanswaarskuwings af? Jy sal ophou om kennisgewings te ontvang wanneer jou krediete laag raak.",
+      "securityFindingsOff": "Skakel sekuriteitsbevindings af? Jy sal ophou om kennisgewings te ontvang oor nuwe sekuriteitsbevindings.",
+      "hideBalanceOn": "Versteek jou balanse? Kredietbalanse sal nie meer op die profielskerms en die organisasiehub verskyn nie."
+    }
   },
   "appActions": {
     "start": {

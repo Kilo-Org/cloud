@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",
+      "managedOnWebTitle": "Diurus di web",
+      "managedOnWebShort": "Sambungan ini diurus di web melalui komputer.",
+      "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web melalui komputer.",
       "description": "Cipta token akses ruang kerja untuk {{organization}} dan tampalkannya di bawah.",
       "descriptionReconnect": "Cipta token akses ruang kerja baharu untuk {{organization}} dan tampalkannya di bawah.",
       "descriptionOverview": "Cipta token akses ruang kerja untuk {{organization}} dan tampalkannya pada skrin seterusnya.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Menyemak…",
       "statusUnavailable": "Status tidak tersedia",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "activity": "Aktiviti"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Penyedia tidak tersedia buat masa ini. Hantar semula sebentar lagi."
   },
   "settingsTools": {
-    "confirmTitle": "Sahkan perubahan ini?"
+    "confirmTitle": "Sahkan perubahan ini?",
+    "guarded": {
+      "spendAlertsOff": "Matikan makluman perbelanjaan? Anda tidak lagi akan menerima pemberitahuan tentang melepasi ambang perbelanjaan dan lonjakan setiap jam.",
+      "balanceAlertsOff": "Matikan makluman baki? Anda tidak lagi akan menerima pemberitahuan apabila kredit anda hampir habis.",
+      "securityFindingsOff": "Matikan penemuan keselamatan? Anda tidak lagi akan menerima pemberitahuan tentang penemuan keselamatan baharu.",
+      "hideBalanceOn": "Sembunyikan baki anda? Baki kredit tidak lagi akan dipaparkan pada skrin profil dan hab organisasi."
+    }
   },
   "appActions": {
     "start": {

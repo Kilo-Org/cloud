@@ -1415,6 +1415,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",
+      "managedOnWebTitle": "Gestionată pe web",
+      "managedOnWebShort": "Această conexiune se gestionează pe web, de pe un computer.",
+      "managedOnWebRepositories": "Alege repository-urile pentru {{organization}} pe web, de pe un computer.",
       "description": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "descriptionReconnect": "Creează un nou token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "descriptionOverview": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l pe ecranul următor.",
@@ -1438,6 +1441,7 @@
     "platformList": {
       "checking": "Se verifică…",
       "statusUnavailable": "Stare indisponibilă",
+      "needsAttention": "Necesită atenție",
       "platforms": "Platforme",
       "activity": "Activitate"
     },
@@ -4139,7 +4143,13 @@
     "providerUnavailable": "Furnizorul este indisponibil acum. Trimite din nou în curând."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmi această modificare?"
+    "confirmTitle": "Confirmi această modificare?",
+    "guarded": {
+      "spendAlertsOff": "Dezactivați alertele de cheltuieli? Nu veți mai primi notificări despre depășirea pragurilor de cheltuieli și despre vârfurile orare.",
+      "balanceAlertsOff": "Dezactivați alertele de sold? Nu veți mai primi notificări când creditele sunt aproape epuizate.",
+      "securityFindingsOff": "Dezactivați constatările de securitate? Nu veți mai primi notificări despre constatări de securitate noi.",
+      "hideBalanceOn": "Ascundeți soldurile? Soldurile de credite nu vor mai apărea pe ecranele de profil și în hub-ul organizației."
+    }
   },
   "appActions": {
     "start": {

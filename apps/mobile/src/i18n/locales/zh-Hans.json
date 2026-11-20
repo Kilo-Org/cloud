@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
+      "managedOnWebTitle": "在网页版管理",
+      "managedOnWebShort": "此连接需在电脑上通过网页版进行管理。",
+      "managedOnWebRepositories": "请在电脑上通过网页版为 {{organization}} 选择仓库。",
       "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
       "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
       "descriptionOverview": "为 {{organization}} 创建工作区访问令牌，然后在下一个页面中粘贴。",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "活动",
       "checking": "正在检查…",
+      "needsAttention": "需要处理",
       "platforms": "平台",
       "statusUnavailable": "无法获取状态"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "提供商当前不可用。请稍后重新发送。"
   },
   "settingsTools": {
-    "confirmTitle": "确认此更改？"
+    "confirmTitle": "确认此更改？",
+    "guarded": {
+      "spendAlertsOff": "关闭支出提醒？你将不再收到有关支出阈值超限和每小时峰值的通知。",
+      "balanceAlertsOff": "关闭余额提醒？当你的额度不足时，你将不再收到通知。",
+      "securityFindingsOff": "关闭安全发现提醒？你将不再收到有关新安全发现的通知。",
+      "hideBalanceOn": "隐藏你的余额？额度余额将不再显示在个人资料页面和组织中心。"
+    }
   },
   "appActions": {
     "start": {

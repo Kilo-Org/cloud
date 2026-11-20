@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng {{organization}}.",
+      "managedOnWebTitle": "Pinamamahalaan sa web",
+      "managedOnWebShort": "Ang koneksyong ito ay pinamamahalaan sa web gamit ang computer.",
+      "managedOnWebRepositories": "Pumili ng mga repository para sa {{organization}} sa web gamit ang computer.",
       "description": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "descriptionReconnect": "Gumawa ng bagong token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "descriptionOverview": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa susunod na screen.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Sinusuri…",
       "statusUnavailable": "Hindi makuha ang katayuan",
+      "needsAttention": "Kailangan ng atensyon",
       "platforms": "Mga platform",
       "activity": "Aktibidad"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Hindi available ang provider sa ngayon. Muling ipadala sa ilang sandali."
   },
   "settingsTools": {
-    "confirmTitle": "Kumpirmahin ang pagbabagong ito?"
+    "confirmTitle": "Kumpirmahin ang pagbabagong ito?",
+    "guarded": {
+      "spendAlertsOff": "I-off ang mga alerto sa gastos? Hindi ka na makakatanggap ng mga notification tungkol sa paglampas sa hangganan ng gastos at sa mga hourly spike.",
+      "balanceAlertsOff": "I-off ang mga alerto sa balanse? Hindi ka na makakatanggap ng mga notification kapag paubos na ang iyong mga credit.",
+      "securityFindingsOff": "I-off ang mga security finding? Hindi ka na makakatanggap ng mga notification tungkol sa mga bagong security finding.",
+      "hideBalanceOn": "Itago ang iyong mga balanse? Hindi na lalabas ang mga balanse ng credit sa mga profile screen at sa organization hub."
+    }
   },
   "appActions": {
     "start": {

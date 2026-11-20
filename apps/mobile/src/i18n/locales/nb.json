@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
+      "managedOnWebTitle": "Administreres på nettet",
+      "managedOnWebShort": "Denne tilkoblingen administreres på nettet fra en datamaskin.",
+      "managedOnWebRepositories": "Velg repositorier for {{organization}} på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "descriptionReconnect": "Opprett et nytt tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "descriptionOverview": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn på neste skjerm.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Sjekker…",
       "statusUnavailable": "Status utilgjengelig",
+      "needsAttention": "Oppfølging nødvendig",
       "platforms": "Plattformer",
       "activity": "Aktivitet"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Leverandøren er utilgjengelig akkurat nå. Send på nytt om litt."
   },
   "settingsTools": {
-    "confirmTitle": "Bekrefte denne endringen?"
+    "confirmTitle": "Bekrefte denne endringen?",
+    "guarded": {
+      "spendAlertsOff": "Slå av forbruksvarsler? Du vil ikke lenger få varsler om at forbruksterskler overskrides og om timesvise topper.",
+      "balanceAlertsOff": "Slå av saldovarsler? Du vil ikke lenger få varsler når du begynner å gå tom for kreditt.",
+      "securityFindingsOff": "Slå av sikkerhetsfunn? Du vil ikke lenger få varsler om nye sikkerhetsfunn.",
+      "hideBalanceOn": "Skjul saldoene dine? Kredittsaldoer vil ikke lenger vises på profilskjermene og i organisasjonssenteret."
+    }
   },
   "appActions": {
     "start": {

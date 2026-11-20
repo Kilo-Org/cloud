@@ -130,7 +130,7 @@ export function stripLeadingDocumentTitle(html: string): string {
   let ancestor = heading.parent;
   while (ancestor && ancestor.parent !== null) {
     const holdsContent = ancestor.children.some(
-      (child) => child !== top && !(child.kind === 'text' && child.value.trim() === '')
+      child => child !== top && !(child.kind === 'text' && child.value.trim() === '')
     );
     if (holdsContent) break;
     top = ancestor;

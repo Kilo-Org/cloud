@@ -67,7 +67,7 @@ export interface DownloadHoldGlobals {
 export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | undefined => {
   // Only Chrome raises the event. Firefox has none, and a browser that will not name its own origin cannot prove it
   // Does: neither gets a hold, so the runtime's cancel-after-start guard is the one that arms for its downloads.
-  if (!globals.extensionOrigin()?.startsWith('chrome-extension://')) {
+  if (globals.extensionOrigin()?.startsWith('chrome-extension://') !== true) {
     return undefined;
   }
 

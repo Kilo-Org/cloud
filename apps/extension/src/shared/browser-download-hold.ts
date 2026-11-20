@@ -649,15 +649,20 @@ export const createDownloadHold = ({
     return pageOf(item.referrer) === undefined ? newest?.[0] : undefined;
   };
 
-  /** The agent tab an unclaimed announcement already named: the strongest attribution there is. */
+  /**
+   * The agent tab whose unclaimed announcement already named this item's url. Only a url the announcement carries
+   * counts: an announcement with none would otherwise claim the next item on any tab, and a user's own file would be
+   * cancelled and reported as the agent's.
+   */
   const tabByAnnouncement = (item: DownloadHoldItem): number | undefined => {
     const url = item.url === undefined || item.url === '' ? undefined : item.url;
 
+    if (url === undefined) {
+      return undefined;
+    }
+
     for (const [tabId, list] of announcements) {
-      if (
-        tabs.has(tabId) &&
-        list.some(entry => !entry.claimed && announcementMatches(entry, url))
-      ) {
+      if (tabs.has(tabId) && list.some(entry => !entry.claimed && entry.url === url)) {
         return tabId;
       }
     }
@@ -675,8 +680,8 @@ export const createDownloadHold = ({
       return { kind: 'foreign' };
     }
 
-    // The browser named this file on an agent tab a moment before the item: owned whichever way the referrer points,
-    // Which is what an origin-only or withheld referrer leaves to read.
+    // The browser named this exact file on an agent tab a moment before the item: owned whichever way the referrer
+    // Points, which is what an origin-only or withheld referrer leaves to read.
     const announced = tabByAnnouncement(item);
 
     if (announced !== undefined) {

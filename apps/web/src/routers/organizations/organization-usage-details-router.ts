@@ -38,10 +38,19 @@ import {
   calculateWeeklyTrends,
 } from '@/lib/organizations/ai-adoption-calculations';
 
+// The dashboard's longest period is a year; the margin covers calendar differences.
+const MAX_ADOPTION_RANGE_MS = 400 * 24 * 60 * 60 * 1000;
+
 const UsageTimeseriesInputSchema = OrganizationIdInputSchema.extend({
   startDate: z.iso.datetime(),
   endDate: z.iso.datetime(),
-});
+}).refine(
+  input => {
+    const span = new Date(input.endDate).getTime() - new Date(input.startDate).getTime();
+    return span >= 0 && span <= MAX_ADOPTION_RANGE_MS;
+  },
+  { message: 'The date range must be ascending and at most 400 days', path: ['endDate'] }
+);
 
 const FeatureAdoptionOutputSchema = z.object({
   checks: z.array(
@@ -209,9 +218,11 @@ async function computeAIAdoptionTimeseries(
   );
 
   // Generate daily timeseries
+  // The query range ends at the next hour boundary, which can be tomorrow's midnight.
+  const seriesEnd = new Date(Math.min(new Date(endDate).getTime(), Date.now())).toISOString();
   const { timeseries: data, userMetricsByDate } = generateDailyTimeseries(
     startDate,
-    endDate,
+    seriesEnd,
     members,
     activityData
   );

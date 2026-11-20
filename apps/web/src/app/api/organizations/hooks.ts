@@ -728,6 +728,9 @@ export type OrganizationAIAdoptionProps = Partial<
 // The server caches the result for an hour and the scan behind it is expensive, so a score
 // that is a few minutes old is worth more than a fresh read on every mount.
 const AI_ADOPTION_STALE_TIME_MS = 20 * 60 * 1000;
+// The server does not cache the degraded result, so the client must not hold it either: a short
+// stale time lets the next mount or focus retry the replica.
+const AI_ADOPTION_UNAVAILABLE_STALE_TIME_MS = 60 * 1000;
 
 export function useOrganizationAIAdoptionTimeseries(
   organizationId: string,
@@ -749,7 +752,10 @@ export function useOrganizationAIAdoptionTimeseries(
           endDate: range.endDate,
         },
         {
-          staleTime: AI_ADOPTION_STALE_TIME_MS,
+          staleTime: query =>
+            query.state.data?.unavailable
+              ? AI_ADOPTION_UNAVAILABLE_STALE_TIME_MS
+              : AI_ADOPTION_STALE_TIME_MS,
           trpc: {
             context: {
               skipBatch: true,

@@ -4,8 +4,8 @@ const HOUR_MS = 60 * 60 * 1000;
  * Snaps an AI-adoption date range to UTC hour boundaries: the start down, the end up so the
  * current hour's activity stays inside the range. The dashboard builds its range from `now`, so
  * without this every mount sends a new range, and neither React Query nor the server cache
- * could reuse a result. The router applies the same snap, which also bounds how many distinct
- * cache keys a client can create.
+ * could reuse a result. The router applies the same snap so equal hours share a cache key;
+ * its input schema bounds the span, and the cache TTL bounds how long any key lives.
  */
 export function roundAIAdoptionDateRange(range: { startDate: string; endDate: string }): {
   startDate: string;

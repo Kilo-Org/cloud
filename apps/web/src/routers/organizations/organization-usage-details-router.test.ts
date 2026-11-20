@@ -578,6 +578,34 @@ describe('organizations usage details trpc router', () => {
       );
     });
 
+    it('does not add a day that has not started when the end rounds up to midnight', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-20T23:30:00.000Z'));
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries({
+        organizationId: testOrganization.id,
+        startDate: '2026-11-20T00:00:00.000Z',
+        endDate: '2026-11-20T23:30:00.000Z',
+      });
+
+      expect(result.timeseries.map(point => point.datetime.slice(0, 10))).toEqual(['2026-11-20']);
+    });
+
+    it.each([
+      ['an end before the start', '2026-11-20T00:00:00.000Z', '2026-11-19T00:00:00.000Z'],
+      ['a span over 400 days', '2025-01-01T00:00:00.000Z', '2026-11-20T00:00:00.000Z'],
+    ])('rejects %s', async (_name, startDate, endDate) => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.usageDetails.getAIAdoptionTimeseries({
+          organizationId: testOrganization.id,
+          startDate,
+          endDate,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
     it('still fails on errors that are not replica bounds', async () => {
       jest
         .mocked(getCodeReviewsPerDay)

@@ -3252,6 +3252,9 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
       p50LatencyMs: latencies[Math.floor(latencies.length / 2)] ?? null,
       p95LatencyMs,
       cases: group.length,
+      // `avgCostUsd` above divides by exactly this many rows. The console needs
+      // it to report a route's total without charging its unpriced cases.
+      costedCases: costs.length,
       errors: group.filter(r => r.error !== null).length,
       timeouts: group.filter(r => r.timed_out).length,
       routeAccuracy: routeGraded.length

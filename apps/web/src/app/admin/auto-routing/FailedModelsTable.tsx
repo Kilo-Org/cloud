@@ -23,6 +23,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
+import { AdminTimeLabel } from './AdminTimeLabel';
+import { formatAdminTime } from './admin-time';
 
 const QUEUE_LABELS: Record<BenchmarkRegistryFailedEntry['queues'][number], string> = {
   platform: 'Platform',
@@ -33,23 +35,11 @@ function failedEntryKey(entry: BenchmarkPair): string {
   return JSON.stringify([entry.model, entry.variant]);
 }
 
-function formatFailedAt(iso: string): string {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? iso
-    : date.toLocaleString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-}
-
 function nextRetryText(failure: BenchmarkRegistryFailedEntry['failure'], now: Date): string {
   if (failure.kind === 'permanent') return 'Re-admit only';
   return Date.parse(failure.retryAfter) <= now.getTime()
     ? 'Eligible now'
-    : formatFailedAt(failure.retryAfter);
+    : formatAdminTime(failure.retryAfter, now.getTime()).local;
 }
 
 /**
@@ -108,20 +98,26 @@ export function FailedModelsTable({
                     {failure.failureClass}
                   </div>
                 </TableCell>
-                <TableCell className="min-w-48 text-xs">
-                  <p className="line-clamp-2" title={reason}>
+                <TableCell className="min-w-48 max-w-96 text-xs">
+                  <p className="break-words whitespace-pre-wrap" title={reason}>
                     {reason}
                   </p>
                 </TableCell>
-                <TableCell className="text-xs whitespace-nowrap">
-                  <div>{`First ${formatFailedAt(failure.firstFailedAt)}`}</div>
-                  <div className="text-muted-foreground">
-                    {`Last ${formatFailedAt(failure.lastFailedAt)} · ${failure.attempts} ${failure.attempts === 1 ? 'attempt' : 'attempts'}`}
+                <TableCell className="text-xs">
+                  <div>
+                    <span className="text-muted-foreground">First </span>
+                    <AdminTimeLabel iso={failure.firstFailedAt} now={now.getTime()} />
+                  </div>
+                  <div className="mt-1">
+                    <span className="text-muted-foreground">Last </span>
+                    <AdminTimeLabel iso={failure.lastFailedAt} now={now.getTime()} />
+                    <span className="text-muted-foreground">
+                      {' '}
+                      · {failure.attempts} {failure.attempts === 1 ? 'attempt' : 'attempts'}
+                    </span>
                   </div>
                 </TableCell>
-                <TableCell className="text-xs whitespace-nowrap">
-                  {nextRetryText(failure, now)}
-                </TableCell>
+                <TableCell className="text-xs">{nextRetryText(failure, now)}</TableCell>
                 <TableCell className="text-right">
                   <Button
                     type="button"

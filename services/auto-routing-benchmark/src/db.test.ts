@@ -125,6 +125,7 @@ describe('mapSummaryRow', () => {
       p50_latency_ms: 300.0,
       p95_latency_ms: 300.0,
       cases: 50,
+      costed_cases: 50,
       errors: 2,
       timeouts: 0,
       route_accuracy: null,
@@ -145,6 +146,7 @@ describe('mapSummaryRow', () => {
       p50LatencyMs: 300.0,
       p95LatencyMs: 300.0,
       cases: 50,
+      costedCases: 50,
       errors: 2,
       timeouts: 0,
       routeAccuracy: null,
@@ -167,6 +169,7 @@ describe('mapSummaryRow', () => {
       p50_latency_ms: null,
       p95_latency_ms: null,
       cases: 30,
+      costed_cases: null,
       errors: 0,
       timeouts: 0,
       route_accuracy: null,
@@ -175,6 +178,8 @@ describe('mapSummaryRow', () => {
     const result = mapSummaryRow(row);
     expect(result.variant).toBeNull();
     expect(result.avgCostUsd).toBeNull();
+    // A row written before the count existed keeps it unknown, not zero.
+    expect(result.costedCases).toBeNull();
     expect(result.avgInputTokens).toBeNull();
     expect(result.avgCachedInputTokens).toBeNull();
     expect(result.avgOutputTokens).toBeNull();

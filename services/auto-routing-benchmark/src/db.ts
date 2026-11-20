@@ -96,6 +96,11 @@ const RUN_MODEL_INSERT_BATCH_SIZE = 18;
 // ceiling — the same ceiling that once stranded every pending profile in prod.
 const PROFILE_ENTRY_FILTER_BATCH_SIZE = 30;
 
+// Statements that filter on a page of run ids bind one variable per id plus the
+// fixed clause. `GET /admin/runs` caps a page at 100 ids, so 90 leaves room for
+// that clause inside D1's 100-variable ceiling.
+const RUN_ID_FILTER_BATCH_SIZE = 90;
+
 /**
  * Rows per config INSERT. D1 allows 100 bound variables per statement and the
  * widest of these tables is 4 columns, so 20 rows always fits. The decider
@@ -127,6 +132,7 @@ export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
     p50LatencyMs: row.p50_latency_ms,
     p95LatencyMs: row.p95_latency_ms,
     cases: row.cases,
+    costedCases: row.costed_cases,
     errors: row.errors,
     timeouts: row.timeouts,
     routeAccuracy: row.route_accuracy,
@@ -425,6 +431,7 @@ export async function insertRun(
           p50_latency_ms: s.p50LatencyMs,
           p95_latency_ms: s.p95LatencyMs,
           cases: s.cases,
+          costed_cases: s.costedCases,
           errors: s.errors,
           timeouts: s.timeouts,
           route_accuracy: s.routeAccuracy,
@@ -1101,6 +1108,7 @@ export async function replaceModelSummaries(
           p50_latency_ms: s.p50LatencyMs,
           p95_latency_ms: s.p95LatencyMs,
           cases: s.cases,
+          costed_cases: s.costedCases,
           errors: s.errors,
           timeouts: s.timeouts,
           route_accuracy: s.routeAccuracy,
@@ -1233,6 +1241,146 @@ export async function listRunProgressCounts(
     enqueuedModels: Number(row.enqueuedModels),
     completedCases: Number(row.completedCases),
     failedCases: Number(row.failedCases),
+  }));
+}
+
+export type RunTotalsRow = {
+  runId: string;
+  totalCostUsd: number | null;
+  measuredCases: number;
+  erroredCases: number;
+};
+
+/**
+ * Statement {@link listRunTotals} runs; exported for the query-plan test. One
+ * bounded index seek on case_results per run in the page, grouped by run — a
+ * page of runs never ships their case rows.
+ */
+export function listRunTotalsStatement(orm: ReturnType<typeof drizzle>, runIds: readonly string[]) {
+  return orm
+    .select({
+      runId: caseResults.run_id,
+      totalCostUsd: sql<number | null>`SUM(${caseResults.cost_usd})`,
+      measuredCases: count(),
+      erroredCases: sql<number>`SUM(
+        CASE WHEN ${caseResults.error} IS NOT NULL OR ${caseResults.timed_out} = 1 THEN 1 ELSE 0 END
+      )`,
+    })
+    .from(caseResults)
+    .where(inArray(caseResults.run_id, [...runIds]))
+    .groupBy(caseResults.run_id);
+}
+
+/**
+ * Cost and case tallies for every run among `runIds` in one statement. Runs
+ * without any graded case are absent from the result, and a run whose cases
+ * reported no cost carries a null total.
+ */
+export async function listRunTotals(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<RunTotalsRow[]> {
+  if (runIds.length === 0) return [];
+  const rows = await listRunTotalsStatement(drizzle(db), runIds);
+  return rows.map(row => ({
+    runId: row.runId,
+    totalCostUsd: row.totalCostUsd === null ? null : Number(row.totalCostUsd),
+    measuredCases: Number(row.measuredCases),
+    erroredCases: Number(row.erroredCases),
+  }));
+}
+
+/**
+ * Enqueued model ids per run for the runs among `runIds`, in one statement per
+ * batch of ids. A skipped (not enqueued) model is absent: it was measured by an
+ * earlier run. A model enqueued at two reasoning variants is one id, because the
+ * list answers "which models did this run measure", not "how many pairs".
+ */
+export async function listRunModelIds(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<Map<string, string[]>> {
+  if (runIds.length === 0) return new Map();
+  const orm = drizzle(db);
+  const models = new Map<string, string[]>();
+  for (let i = 0; i < runIds.length; i += RUN_ID_FILTER_BATCH_SIZE) {
+    const rows = await orm
+      .selectDistinct({ runId: runModels.run_id, model: runModels.model })
+      .from(runModels)
+      .where(
+        and(
+          inArray(runModels.run_id, runIds.slice(i, i + RUN_ID_FILTER_BATCH_SIZE)),
+          eq(runModels.enqueued, true)
+        )
+      );
+    for (const row of rows) {
+      const list = models.get(row.runId);
+      if (list) list.push(row.model);
+      else models.set(row.runId, [row.model]);
+    }
+  }
+  // DISTINCT removes the duplicates of one run's variants; a run id belongs to
+  // exactly one batch, so no list is assembled twice.
+  return models;
+}
+
+export type RunModelTotalsRow = {
+  model: string;
+  variant: string;
+  scoreSum: number;
+  cases: number;
+  costedCases: number;
+  costSum: number | null;
+  errors: number;
+  timeouts: number;
+  routeGraded: number;
+  routeHits: number;
+};
+
+/**
+ * Statement {@link listRunModelTotals} runs; exported for the query-plan test.
+ * One index seek on the run's case rows, grouped by the exact pair.
+ */
+export function listRunModelTotalsStatement(orm: ReturnType<typeof drizzle>, runId: string) {
+  return orm
+    .select({
+      model: caseResults.model,
+      variant: caseResults.variant,
+      scoreSum: sql<number>`SUM(${caseResults.score})`,
+      cases: count(),
+      costedCases: sql<number>`COUNT(${caseResults.cost_usd})`,
+      costSum: sql<number | null>`SUM(${caseResults.cost_usd})`,
+      errors: sql<number>`SUM(CASE WHEN ${caseResults.error} IS NOT NULL THEN 1 ELSE 0 END)`,
+      timeouts: sql<number>`SUM(CASE WHEN ${caseResults.timed_out} = 1 THEN 1 ELSE 0 END)`,
+      routeGraded: sql<number>`COUNT(${caseResults.route_hit})`,
+      routeHits: sql<number>`COALESCE(SUM(CASE WHEN ${caseResults.route_hit} THEN 1 ELSE 0 END), 0)`,
+    })
+    .from(caseResults)
+    .where(eq(caseResults.run_id, runId))
+    .groupBy(caseResults.model, caseResults.variant);
+}
+
+/**
+ * Per-(model, variant) case aggregates for one run, summed over every route.
+ * The caller turns the sums into the accuracy and cost means a reader sees.
+ * Variant is storage form.
+ */
+export async function listRunModelTotals(
+  db: D1Database,
+  runId: string
+): Promise<RunModelTotalsRow[]> {
+  const rows = await listRunModelTotalsStatement(drizzle(db), runId);
+  return rows.map(row => ({
+    model: row.model,
+    variant: row.variant,
+    scoreSum: Number(row.scoreSum),
+    cases: Number(row.cases),
+    costedCases: Number(row.costedCases),
+    costSum: row.costSum === null ? null : Number(row.costSum),
+    errors: Number(row.errors),
+    timeouts: Number(row.timeouts),
+    routeGraded: Number(row.routeGraded),
+    routeHits: Number(row.routeHits),
   }));
 }
 
@@ -2266,6 +2414,7 @@ export async function getLatestSummariesByModel(
       p50_latency_ms: modelSummaries.p50_latency_ms,
       p95_latency_ms: modelSummaries.p95_latency_ms,
       cases: modelSummaries.cases,
+      costed_cases: modelSummaries.costed_cases,
       errors: modelSummaries.errors,
       timeouts: modelSummaries.timeouts,
       route_accuracy: modelSummaries.route_accuracy,

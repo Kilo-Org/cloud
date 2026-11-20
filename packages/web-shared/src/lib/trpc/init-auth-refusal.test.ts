@@ -97,3 +97,75 @@ describe('createTRPCContext blocked-account refusal', () => {
     expect(trpcError.cause).toBeInstanceOf(AuthContextError);
   });
 });
+
+describe('createTRPCContext revoked-account admission', () => {
+  /** The auth read answers a live blocked account the way the real one does when
+   *  the block is admitted: the session resolves and the refusal does not fire. */
+  function blockedAccountAuthRead() {
+    return {
+      user: { id: 'user-1' } as never,
+      deviceSessionId: 'device-1',
+      authFailedResponse: null,
+    };
+  }
+
+  const DEVICE = { calls: [{ path: 'user.revokeCurrentDeviceSession' }] } as const;
+
+  test('admits the account for its own device-session revocation', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(blockedAccountAuthRead() as never);
+
+    const context = (await createTRPCContext({
+      req: new Request('http://localhost/api/trpc/user.revokeCurrentDeviceSession'),
+      info: DEVICE as never,
+    })) as { user: { id: string }; deviceSessionId?: string };
+
+    // The auth read is asked to admit the block, which is what lets the revoke
+    // reach the procedure instead of dying at the context gate.
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ DANGEROUS_allowBlockedUsers: true })
+    );
+    expect(context.user).toEqual({ id: 'user-1' });
+    expect(context.deviceSessionId).toBe('device-1');
+  });
+
+  test('refuses a batch that mixes the revocation with another call', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(
+      failedAuthResponse({
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+      })
+    );
+
+    const error = await caught(
+      createTRPCContext({
+        req: new Request('http://localhost/api/trpc/user.revokeCurrentDeviceSession,user.getMe'),
+        info: {
+          calls: [{ path: 'user.revokeCurrentDeviceSession' }, { path: 'user.getMe' }],
+        } as never,
+      })
+    );
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ DANGEROUS_allowBlockedUsers: false })
+    );
+  });
+
+  test('refuses the account when the request carries no call path', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(
+      failedAuthResponse({
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+      })
+    );
+
+    const error = await caught(createTRPCContext({ req: REQUEST }));
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ DANGEROUS_allowBlockedUsers: false })
+    );
+  });
+});

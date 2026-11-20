@@ -65,6 +65,26 @@ import {
 } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
 export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+
+/**
+ * The one procedure a refused account may still call: revoking its own device
+ * session. Signing out has to end the session server-side even while the block
+ * stands, otherwise the app clears its credentials but leaves a usable session
+ * behind. The web logout route already admits a blocked account for the same
+ * cleanup (`apps/web/src/app/api/auth/revoke-web-session/route.ts`).
+ *
+ * The admission is keyed on the whole request, never on the first call: a
+ * batch that mixes this procedure with any other call is refused as before, so
+ * the exemption cannot carry another procedure through the gate.
+ */
+const SELF_SESSION_REVOCATION_PATH = 'user.revokeCurrentDeviceSession';
+
+function admitsRefusedAccount(info: ControlPlaneRequestInfo | null | undefined): boolean {
+  const calls = info?.calls;
+  if (!calls || calls.length === 0) return false;
+  return calls.every(call => call.path.split('?')[0] === SELF_SESSION_REVOCATION_PATH);
+}
+
 // Define the context type
 export type TRPCContext = {
   user: User;
@@ -181,6 +201,10 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
         adminOnly: false,
         requestHeaders: headersList,
         requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
+        // A refused account still owns the session it is signing out of. The
+        // admission covers exactly one procedure (see admitsRefusedAccount), so
+        // every other call keeps the block refusal below.
+        DANGEROUS_allowBlockedUsers: admitsRefusedAccount(opts?.info),
       }),
     startedAt,
     surface: 'context',

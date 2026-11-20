@@ -41,6 +41,11 @@ export const UNBATCHED_PROCEDURES = new Set([
   'user.getMe',
   'activeSessions.list',
   'cliSessionsV2.getSessionMessagesPage',
+  // Sign-out issues the session revoke and a push-token unregister in one
+  // tick. Batching them would put a second procedure on the revoke's HTTP
+  // request, and the context admits a refused account only when that request
+  // carries the revoke alone — the server gate covers exactly one procedure.
+  'user.revokeCurrentDeviceSession',
 ]);
 
 /**

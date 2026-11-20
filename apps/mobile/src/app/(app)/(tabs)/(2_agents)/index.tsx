@@ -85,11 +85,14 @@ export function buildGitHubInstallOutcomeAlert(
           buttons: [{ text: i18n.t('common.back') }],
         };
       }
+      // The callback answers this code for a transient exchange failure as well
+      // as for a request it cannot name, so a retry can succeed and the card
+      // keeps the retry the web card offers for the same code.
       if (result.code === 'pending_request_unidentified') {
         return {
-          title: i18n.t('agents.githubInstall.cannotCompleteTitle'),
+          title: i18n.t('agents.githubInstall.didNotCompleteTitle'),
           message: i18n.t('agents.githubInstall.pendingRequestUnidentifiedMessage'),
-          buttons: [{ text: i18n.t('common.back') }],
+          buttons: [{ text: i18n.t('common.tryAgain'), onPress: onRetry }],
         };
       }
       if (result.code === 'installation_unavailable') {

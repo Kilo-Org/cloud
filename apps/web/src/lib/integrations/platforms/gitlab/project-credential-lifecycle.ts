@@ -10,10 +10,7 @@ import {
   revokeProjectAccessToken,
 } from './adapter';
 import { mutateGitLabMetadataInTransaction } from './metadata-mutation';
-import {
-  GitLabProjectAccessTokenCredentialRowSchema,
-  GitLabProjectAccessTokenMetadataSchema,
-} from '@kilocode/worker-utils/gitlab-credential';
+import { GitLabProjectAccessTokenMetadataSchema } from '@kilocode/worker-utils/gitlab-credential';
 
 export type StoredProjectCredential = {
   credentialId: string;
@@ -194,66 +191,4 @@ export async function retireStoredProjectCredential(input: {
     credential: input.credential,
   });
   return 'retired';
-}
-
-export async function retireProjectCredentialsForReplacedAccount(input: {
-  integrationId: string;
-  userToken: string;
-  instanceUrl: string;
-  currentAccountId: string;
-}): Promise<{ retired: number; retained: number }> {
-  const rows = await db
-    .select()
-    .from(platform_access_token_credentials)
-    .where(
-      and(
-        eq(platform_access_token_credentials.platform_integration_id, input.integrationId),
-        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
-      )
-    );
-
-  let retired = 0;
-  let retained = 0;
-  for (const row of rows) {
-    const parsed = GitLabProjectAccessTokenCredentialRowSchema.safeParse(row);
-    if (!parsed.success) continue;
-    if (parsed.data.provider_metadata.authorizedAccountId === input.currentAccountId) continue;
-    const tokenId = Number(parsed.data.provider_metadata.providerCredentialId);
-    if (!Number.isSafeInteger(tokenId)) continue;
-
-    const outcome = await retireStoredProjectCredential({
-      integrationId: input.integrationId,
-      projectId: parsed.data.provider_resource_id,
-      credential: {
-        credentialId: parsed.data.id,
-        credentialVersion: parsed.data.credential_version,
-        tokenId,
-        expiresAt: parsed.data.provider_metadata.expiresOn,
-        authorizedAccountId: readProjectCredentialAccountId(parsed.data.provider_metadata),
-        unusable: parsed.data.provider_metadata.unusableReason !== undefined,
-      },
-      userToken: input.userToken,
-      instanceUrl: input.instanceUrl,
-    }).catch(error => {
-      logExceptInTest(
-        '[retireProjectCredentialsForReplacedAccount] Row changed during retirement',
-        {
-          integrationId: input.integrationId,
-          projectId: parsed.data.provider_resource_id,
-          error: error instanceof Error ? error.message : String(error),
-        }
-      );
-      return 'retained' as const;
-    });
-    if (outcome === 'retired') retired += 1;
-    else retained += 1;
-  }
-
-  logExceptInTest('[retireProjectCredentialsForReplacedAccount] Retirement finished', {
-    integrationId: input.integrationId,
-    currentAccountId: input.currentAccountId,
-    retired,
-    retained,
-  });
-  return { retired, retained };
 }

@@ -65,12 +65,13 @@ const VarSchema = z.object({
 
 // The service drops whitespace-only rows before it writes and then applies the
 // cap to what is left, so a stored list can always be re-sent unchanged. The
-// schema counts only the rows that would survive that drop, which is the same
-// list the service caps; a legacy profile at the cap that still holds a blank
-// row therefore stays editable instead of failing the request shape.
+// schema counts that same list: the outer bound leaves room for the stored rows
+// an older write could leave behind (at most the cap) plus the one row an edit
+// appends, and the list cap is then checked on what would survive the drop.
 const CommandsSchema = z.object({
   commands: z
     .array(z.string().max(profileCommandsService.MAX_PROFILE_COMMAND_LENGTH))
+    .max(profileCommandsService.MAX_PROFILE_COMMANDS + 1)
     .refine(
       commands =>
         commands.filter(command => command.trim().length > 0).length <=

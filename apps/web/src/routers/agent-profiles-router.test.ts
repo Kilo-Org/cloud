@@ -1592,6 +1592,12 @@ describe('Agent Profiles Router', () => {
           caller.agentProfiles.setCommands({ profileId, commands: overCap })
         ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
+        // A request cannot spend its outer bound on rows that store nothing.
+        const padded = Array.from({ length: MAX_PROFILE_COMMANDS + 2 }, () => '');
+        await expect(
+          caller.agentProfiles.setCommands({ profileId, commands: padded })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
         // Bypassing the schema puts the same payload before the service, which
         // refuses it before the delete so the stored list survives.
         await expect(
@@ -1610,7 +1616,8 @@ describe('Agent Profiles Router', () => {
         const { id: profileId } = await caller.agentProfiles.create({ name: 'Blank At Cap Test' });
 
         // A stored list can hold a row from before the service dropped blanks,
-        // so the widest shape a client can re-send is the cap plus that row.
+        // so the widest shape a client can re-send is the cap plus the row an
+        // edit appends. The blank row is dropped, and the real commands fit.
         const atCap = Array.from({ length: MAX_PROFILE_COMMANDS }, (_, index) => `cmd ${index}`);
         await caller.agentProfiles.setCommands({ profileId, commands: [...atCap, ''] });
 

@@ -172,6 +172,7 @@
     "generating": "Genereer…",
     "working": "Besig",
     "yourOwnRepositories": "Jou eie bewaarplekke",
+    "organizationRepositories": "Organisasie se bewaarplekke",
     "dismissed": "Verwerp",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -1226,7 +1227,7 @@
     },
     "instructions": {
       "title": "Pasgemaakte instruksies",
-      "deprecation": "Pasgemaakte instruksies sal uitgefaseer word. Skuif hierdie riglyne eerder na 'n REVIEW.md-lêer in jou bewaarplek.",
+      "deprecation": "Pasgemaakte instruksies sal verwyder word. Skuif hierdie riglyne eerder na 'n REVIEW.md-lêer in jou bewaarplek.",
       "placeholder": "bv. Pas ons konvensies vir foutafhandeling toe…",
       "clearTitle": "Pasgemaakte instruksies verwyder?",
       "clearMessage": "As jy 'n leë veld stoor, word die pasgemaakte instruksies wat vir hierdie resensent gestoor is, verwyder."
@@ -1392,6 +1393,7 @@
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
       "description": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
       "descriptionReconnect": "Skep weer vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
+      "descriptionOverview": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit op die volgende skerm.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",
       "tokenPlaceholder": "Toegangstoken vir die werkruimte",
       "tokenRefused": "Bitbucket het nie hierdie toegangstoken vir die werkruimte aanvaar nie. Kontroleer dat dit die toestemmings hierbo het en probeer dan weer."
@@ -3186,6 +3188,8 @@
     "retryHint": "Probeer die Kilo Pass-status weer laai.",
     "endedOn": "Geëindig op {{date}}",
     "notAvailableInApp": "Kilo Pass is nie in die app beskikbaar nie.",
+    "notAvailableTitle": "Kilo Pass is nie in die app nie",
+    "noPassDescription": "Hierdie rekening het geen Kilo Pass nie.",
     "statusActive": "Aktief",
     "statusTrialing": "Proeftydperk",
     "statusPastDue": "Betaling agterstallig",
@@ -3468,7 +3472,7 @@
       "retentionLimit": "Die mees onlangse fakture word gewys."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktiveer waarskuwing vir lae saldo",
+      "subtitle": "Stuur 'n e-poswaarskuwing na die adresse wat jy opgee wanneer hierdie organisasie se saldo onder die bedrag daal wat jy stel.",
       "notifyEmailsLabel": "E-posadresse vir kennisgewings",
       "permissionDenied": "Jy het nie toestemming om faktureringswaarskuwings te bestuur nie.",
       "separateEmailsHint": "Skei verskeie e-posadresse met kommas.",
@@ -3615,8 +3619,7 @@
       "renameTitle": "Hernoem organisasie",
       "renamePlaceholder": "Organisasienaam",
       "balance": "Saldo",
-      "organizationSeats": "Gebruikersplekke in die organisasie",
-      "plan": "Organisasieplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Het geëindig",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Gebruik '$t(login.moreSignInOptions)' om jou rekening klaar te skep.",
     "signupStepUpApple": "Gebruik '$t(login.signInWithApple)' om jou rekening klaar te skep.",
     "signupStepUpGoogle": "Gebruik '$t(login.signInWithGoogle)' om jou rekening klaar te skep.",
-    "invalidCode": "Daardie kode is verkeerd. Probeer asseblief weer.",
+    "signupStepUpBack": "Gaan terug en gebruik '$t(login.moreSignInOptions)' om jou rekening klaar te skep.",
+    "invalidCode": "Daardie kode is verkeerd of het verval. Probeer asseblief weer of gebruik '$t(login.resendCode)'.",
     "codeInProgress": "Jou kode word verwerk. Wag 'n oomblik en probeer weer.",
     "tooManyAttempts": "Te veel pogings. Vra asseblief 'n nuwe kode aan.",
     "invalidToken": "Aanmelding het misluk. Probeer asseblief weer.",
@@ -3919,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) stuur 'n kort inferensieversoek na hierdie eindpunt met die gekose protokol en model. Die verskaffer kan daarvoor geld vra.",
       "connectionSucceeded": "Die model het 'n versoek met hierdie protokol voltooi.",
       "connectionFailed": "Die model kon nie 'n versoek voltooi nie. Kontroleer die API-basis-URL, protokol, aanmeldbesonderhede en model-ID.",
+      "requestTimedOut": "Die eindpunt het nie betyds geantwoord nie. Kontroleer die API-basis-URL en jou verbinding en probeer dan weer.",
+      "requestUnauthorized": "Die eindpunt het die aanmeldbesonderhede geweier. Kontroleer die API-sleutel en pasgemaakte kopvelde en probeer dan weer.",
+      "requestNotFound": "Die eindpunt of model is nie gevind nie. Kontroleer die API-basis-URL en die model-ID.",
+      "requestRateLimited": "Die eindpunt beperk versoeke. Wag 'n oomblik en probeer weer.",
+      "requestUnavailable": "Die eindpunt is tans onbeskikbaar. Probeer oor 'n oomblik weer.",
+      "requestUnreachable": "Die eindpunt kon nie bereik word nie. Kontroleer die API-basis-URL en jou verbinding.",
+      "requestInvalidResponse": "Die eindpunt het nie in die verwagte formaat geantwoord nie. Kontroleer dat die API-wortel en protokol by die bediener pas, en probeer dan weer.",
+      "discoveryNoModels": "Die eindpunt het geen modelle gelys nie. Voer modelle handmatig in.",
+      "connectionIncomplete": "Die model het geantwoord maar nie klaargemaak nie. Probeer weer of kontroleer die model-ID en protokol.",
       "invalidInput": "Voer 'n agtergrondstelselnaam, geldige kopvelde en minstens een model met 'n unieke ID en naam in. Die perke vir tekseenhede moet positiewe heelgetalle wees.",
       "invalidUrl": "Voer 'n HTTP- of HTTPS-API-basis-URL sonder aanmeldbesonderhede, 'n navraag of 'n fragment in.",
       "publicHttp": "Openbare HTTP-eindpunte word nie toegelaat nie. Gebruik HTTPS of 'n private plaaslike eindpunt.",
@@ -4057,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"
     },
-    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie."
+    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie.",
+    "providerKeyRefused": "Die verskaffer het die aanmeldbesonderhede geweier. Kontroleer sy API-sleutel en stuur dan weer.",
+    "providerModelMissing": "Hierdie agtergrondstelsel bedien nie meer hierdie model nie. Kies 'n ander.",
+    "providerRateLimited": "Die verskaffer beperk versoeke. Wag 'n oomblik en stuur weer.",
+    "providerUnavailable": "Die verskaffer is tans onbeskikbaar. Stuur binnekort weer."
   },
   "settingsTools": {
     "confirmTitle": "Bevestig hierdie verandering?"
@@ -4432,6 +4449,7 @@
     "pickPackToBuyAgain": "Kies 'n pakket hierbo om 'n nuwe aankoop te begin.",
     "purchasePending": "Die winkel verwerk nog hierdie betaling. Jou krediete kom aan sodra dit die heffing goedkeur.",
     "buyAgain": "Koop weer",
+    "checkPurchase": "Gaan aankoop na",
     "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
     "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
   },
@@ -4525,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Stoor in lys",
-      "saved": "Gestoor in {{list}}"
+      "saved": "Gestoor in {{list}}",
+      "saveFailed": "Kon die taak nie stoor nie. Kontroleer jou verbinding en probeer weer.",
+      "saveRefused": "Kon die taak nie in hierdie lys stoor nie. Kies 'n ander lys."
     }
   },
   "agentBriefing": {
@@ -4805,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "KI-veiligheidsreëls",
-    "permissionDenied": "Slegs organisasie-eienaars en -administrateurs kan KI-veiligheidsreëls bestuur.",
+    "permissionDenied": "Slegs organisasie-eienaars en -administrateurs kan KI-veiligheidsreëls bestuur. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "KI-veiligheidsreëls is nie geaktiveer nie",
     "unavailable": "Kilo aktiveer KI-veiligheidsreëls vir 'n organisasie op versoek. Kontak {{supportEmail}}, en die Kilo-span skakel dit vir jou organisasie aan.",
     "contactSupport": "Kontak ondersteuning",
@@ -4943,7 +4963,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Ondernemingsfunksie",
-    "enterpriseOnly": "Hierdie funksie is slegs vir ondernemings beskikbaar.",
+    "enterpriseOnly": "Verskaffers en modelle is op die Enterprise-plan beskikbaar.",
     "readOnly": "Slegs organisasie-eienaars en -administrateurs kan hierdie instellings verander.",
     "loadError": "Verskaffers en modelle kon nie laai nie",
     "tabModels": "Modelle",

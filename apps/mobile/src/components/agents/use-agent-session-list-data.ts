@@ -1,8 +1,9 @@
 import { useCallback, useMemo } from 'react';
 
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import {
   expandPlatformFilter,
-  formatGitUrlProject,
   normalisePlatformSelection,
   type SessionSection,
 } from '@/components/agents/session-list-helpers';

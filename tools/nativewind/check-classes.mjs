@@ -48,7 +48,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
@@ -214,6 +214,17 @@ const COLOR_UTILITIES = [
 ].join('|');
 
 /**
+ * The first line of an error: compile failures, resolution failures and a
+ * theme read failure are all reported the same way, and a stack trace would
+ * bury the file or fixture name that says what to fix.
+ */
+function firstLine(error) {
+  return (error instanceof Error ? error.message : String(error)).split('\n')[0];
+}
+
+let themeTokenCache;
+
+/**
  * Theme colour tokens come from the same `@theme inline` block in the app's
  * global.css that makes `bg-<token>` a class at all. Parsing it keeps the
  * rule in step with the generated theme map and global.css variables: a new
@@ -224,38 +235,68 @@ const COLOR_UTILITIES = [
  * modifier on top of one is still a color-mix over a variable that NativeWind
  * drops.
  *
- * Read on first use, so importing this module reads no file.
+ * Read on first use, so importing this module reads no file. A moved, renamed
+ * or unreadable global.css, or one without the block, does not abort the
+ * audit: the failure is kept as the reason so only the one rule that needs the
+ * tokens is skipped and every other finding still reaches the report.
  */
-let themeTokenCache;
-function themeTokens() {
-  if (themeTokenCache === undefined) {
+function readThemeTokens() {
+  try {
     const css = readFileSync(join(APP_SRC, 'global.css'), 'utf8');
     const block = css.match(/@theme inline \{([\s\S]*?)\n\}/)?.[1];
     if (!block) {
-      throw new Error('check-classes: no @theme inline block in apps/mobile/src/global.css');
+      throw new Error('no @theme inline block');
     }
     const tokens = [...block.matchAll(/--color-([a-z0-9-]+):\s*var\(--/g)].map(m => m[1]);
+    if (tokens.length === 0) {
+      throw new Error('no --color token in the @theme inline block');
+    }
     // Longest first so the alternation is unambiguous (`muted-soft` before `muted`).
     tokens.sort((a, b) => b.length - a.length || a.localeCompare(b));
-    themeTokenCache = tokens;
+    return { tokens, failure: null };
+  } catch (error) {
+    return {
+      tokens: null,
+      failure: `check-classes: cannot read the @theme inline tokens from apps/mobile/src/global.css (${firstLine(error)}) — the /opacity modifier rule cannot run without them and was skipped`,
+    };
   }
+}
+
+/** The memoised read of the theme tokens and its failure, so one read serves the run. */
+function themeTokens() {
+  themeTokenCache ??= readThemeTokens();
   return themeTokenCache;
 }
 
-/** The ban list, built once from the app's theme tokens. */
-let ruleCache;
-function rules() {
-  ruleCache ??= [
+/**
+ * The `/opacity`-on-theme-token rule, or no rule when the tokens could not be
+ * read: the pattern is built from the tokens themselves, so without them it
+ * would match nothing while claiming the colours were checked.
+ */
+function opacityRules() {
+  const { tokens } = themeTokens();
+  if (tokens === null) {
+    return [];
+  }
+  return [
     {
       // A `/opacity` modifier on a theme colour compiles to
       // `color-mix(in oklab, var(--color-…) n%, transparent)`. NativeWind v5
       // cannot decompose the variable, so the runtime drops the declaration and
       // the element paints nothing, with no build error. The `*-tile-bg` /
       // `*-tile-border` pairs pre-bake the alpha instead.
-      pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-(?:${themeTokens().join('|')})/\\d+\\b`, 'g'),
+      pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-(?:${tokens.join('|')})/\\d+\\b`, 'g'),
       advice:
         'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
     },
+  ];
+}
+
+/** The ban list, built once; the theme rule joins it only when its tokens were read. */
+let ruleCache;
+function rules() {
+  ruleCache ??= [
+    ...opacityRules(),
     {
       // `text-align` only accepts auto/left/right/center/justify, so this
       // logical keyword is dropped and the text keeps its default alignment.
@@ -311,18 +352,34 @@ const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 function stringChunks(root, text) {
   const chunks = [];
   walk(root, node => {
-    if (node.type === 'Literal' && typeof node.value === 'string') {
-      chunks.push({ start: node.start, raw: text.slice(node.start, node.end), value: node.value });
-    } else if (node.type === 'TemplateElement') {
-      // The node spans its delimiters; the chunk itself starts just inside.
-      chunks.push({
-        start: node.start + 1,
-        raw: node.value.raw,
-        value: node.value.cooked ?? node.value.raw,
-      });
+    const chunk = chunkOf(node, text);
+    if (chunk !== null) {
+      chunks.push(chunk);
     }
   });
   return chunks;
+}
+
+/**
+ * The string chunk one node holds, or null when it holds none: a string
+ * `Literal`, or a `TemplateElement`, whose node spans its delimiters so the
+ * chunk itself starts just inside.
+ */
+function chunkOf(node, text) {
+  if (node.type === 'Literal') {
+    const value = stringLiteralValue(node);
+    return value === null
+      ? null
+      : { start: node.start, raw: text.slice(node.start, node.end), value };
+  }
+  if (node.type === 'TemplateElement') {
+    return {
+      start: node.start + 1,
+      raw: node.value.raw,
+      value: node.value.cooked ?? node.value.raw,
+    };
+  }
+  return null;
 }
 
 /** The source of a JSX tag's name, `ScrollView` or `Animated.ScrollView` alike. */
@@ -330,15 +387,40 @@ function tagName(node, text) {
   return text.slice(node.name.start, node.name.end);
 }
 
-export function checkScrollPadding(relative, program, text, lineOf) {
-  const problems = [];
-  walk(program, node => {
-    if (node.type !== 'JSXOpeningElement') {
-      return;
+/**
+ * The chunks whose `start` lies inside `node`, or none when there is no node.
+ * Chunk starts are strictly ascending, because the walk visits children in
+ * source order and a chunk is a leaf, so the run is found with a binary search
+ * instead of a second traversal: the walk of the node alone would select the
+ * same chunks, and a class name reads the same either way.
+ */
+function chunksWithin(chunks, node) {
+  if (node === null || node === undefined) {
+    return [];
+  }
+  let low = 0;
+  let high = chunks.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (chunks[mid].start < node.start) {
+      low = mid + 1;
+    } else {
+      high = mid;
     }
+  }
+  const found = [];
+  for (let index = low; index < chunks.length && chunks[index].start < node.end; index++) {
+    found.push(chunks[index]);
+  }
+  return found;
+}
+
+export function checkScrollPadding(relative, elements, chunks, text, lineOf) {
+  const problems = [];
+  for (const node of elements) {
     const name = tagName(node, text);
     if (!SCROLL_CONTAINER.test(name)) {
-      return;
+      continue;
     }
     const attribute = node.attributes.find(
       candidate =>
@@ -348,7 +430,7 @@ export function checkScrollPadding(relative, program, text, lineOf) {
     );
     const padding = [
       ...new Set(
-        stringChunks(attribute?.value, text)
+        chunksWithin(chunks, attribute?.value)
           .map(chunk => chunk.value)
           .flatMap(classes => classes.split(/\s+/))
           .filter(classes => HORIZONTAL_PADDING.test(classes))
@@ -360,7 +442,7 @@ export function checkScrollPadding(relative, program, text, lineOf) {
         `${relative}:${line}: <${name}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
       );
     }
-  });
+  }
   return problems;
 }
 
@@ -400,17 +482,17 @@ function importedName(node) {
   return node.type === 'Identifier' ? node.name : node.value;
 }
 
-export function checkRawText(relative, program, lineOf) {
+export function checkRawText(relative, imports, lineOf) {
   const problems = [];
   if (RAW_TEXT_EXEMPT.has(relative) || relative.endsWith('components/ui/text.tsx')) {
     return problems;
   }
-  walk(program, node => {
-    if (node.type !== 'ImportDeclaration' || node.importKind === 'type') {
-      return;
+  for (const node of imports) {
+    if (node.importKind === 'type') {
+      continue;
     }
     if (node.source.value !== 'react-native') {
-      return;
+      continue;
     }
     const runtime = node.specifiers.some(
       specifier =>
@@ -424,7 +506,7 @@ export function checkRawText(relative, program, lineOf) {
         `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
       );
     }
-  });
+  }
   return problems;
 }
 
@@ -481,7 +563,7 @@ function formatterProblem(relative, line, quote) {
   return `${relative}:${line}: "${quote}" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once`;
 }
 
-export function checkDirectIntl(relative, absolute, program, lineOf) {
+export function checkDirectIntl(relative, absolute, calls, lineOf) {
   const problems = [];
   if (
     !absolute.startsWith(APP_SRC) ||
@@ -490,7 +572,7 @@ export function checkDirectIntl(relative, absolute, program, lineOf) {
   ) {
     return problems;
   }
-  walk(program, node => {
+  for (const node of calls) {
     if (node.type === 'NewExpression') {
       const member = memberName(node.callee);
       if (member?.object === 'Intl') {
@@ -498,21 +580,18 @@ export function checkDirectIntl(relative, absolute, program, lineOf) {
           formatterProblem(relative, lineOf(node.callee.start), `new Intl.${member.name}`)
         );
       }
-      return;
-    }
-    if (node.type !== 'CallExpression') {
-      return;
+      continue;
     }
     const member = memberName(node.callee);
     if (member === null) {
-      return;
+      continue;
     }
     if (member.object === 'Intl' && INTL_CONSTRUCTORS.has(member.name)) {
       problems.push(formatterProblem(relative, lineOf(node.callee.start), `Intl.${member.name}(`));
     } else if (TO_LOCALE_STRING.test(member.name)) {
       problems.push(formatterProblem(relative, lineOf(member.propertyStart), `.${member.name}(`));
     }
-  });
+  }
   return problems;
 }
 
@@ -1084,10 +1163,11 @@ export function checkLayout(relative, program, text, lineOf) {
 }
 
 /** The ban list over one file: every match of every rule, in source order. */
-export function checkRules(relative, program, text, lineOf) {
+export function checkRules(relative, chunks, lineOf) {
   const problems = [];
-  for (const { start, raw } of stringChunks(program, text)) {
-    for (const rule of rules()) {
+  const bans = rules();
+  for (const { start, raw } of chunks) {
+    for (const rule of bans) {
       for (const match of raw.matchAll(rule.pattern)) {
         problems.push({
           offset: start + match.index,
@@ -1109,10 +1189,6 @@ export function checkRules(relative, program, text, lineOf) {
  */
 export function checkCompilerStillDropsThese() {
   const problems = [];
-  // The first line of an error: compile failures and resolution failures are
-  // reported the same way, and a stack trace would bury the fixture name.
-  const firstLine = error =>
-    (error instanceof Error ? error.message : String(error)).split('\n')[0];
 
   /** One compiler-pin fixture that could not compile: the pin cannot hold. */
   function compilerPinFailure(fixture, error) {
@@ -1280,6 +1356,34 @@ export function checkCompilerStillDropsThese() {
 }
 
 /**
+ * The per-file facts the four syntax rules read, gathered in one traversal.
+ * `walk` rebuilds and sorts a child list at every node, so four rules that
+ * each walked the file paid that cost four times over, plus a fifth walk for
+ * the chunks. One pre-order visit keeps every rule's output order identical: a
+ * rule reports the collected nodes in source order, arm for arm with the walk
+ * it used to run.
+ */
+function fileFacts(program, text) {
+  const chunks = [];
+  const elements = [];
+  const imports = [];
+  const calls = [];
+  walk(program, node => {
+    const chunk = chunkOf(node, text);
+    if (chunk !== null) {
+      chunks.push(chunk);
+    } else if (node.type === 'JSXOpeningElement') {
+      elements.push(node);
+    } else if (node.type === 'ImportDeclaration') {
+      imports.push(node);
+    } else if (node.type === 'NewExpression' || node.type === 'CallExpression') {
+      calls.push(node);
+    }
+  });
+  return { chunks, elements, imports, calls };
+}
+
+/**
  * Every problem one parsed source file has, from every rule this checker owns.
  * The problems are returned, not kept in module state, so one file's findings
  * cannot leak into the next call.
@@ -1291,14 +1395,18 @@ export function checkCompilerStillDropsThese() {
  * those problems were built with, which the rules reuse so the text is scanned
  * for lines once. A file the parser refused is reported here, once: its tree is
  * empty, so leaving it out would report the file as clean.
+ *
+ * The four syntax rules read the facts one traversal gathered; only the layout
+ * rules still walk the tree themselves.
  */
 export function checkParsedFile({ file, path, text, program, lineOf, problems }) {
+  const { chunks, elements, imports, calls } = fileFacts(program, text);
   return [
     ...problems,
-    ...checkScrollPadding(path, program, text, lineOf),
-    ...checkRawText(path, program, lineOf),
-    ...checkDirectIntl(path, file, program, lineOf),
-    ...checkRules(path, program, text, lineOf),
+    ...checkScrollPadding(path, elements, chunks, text, lineOf),
+    ...checkRawText(path, imports, lineOf),
+    ...checkDirectIntl(path, file, calls, lineOf),
+    ...checkRules(path, chunks, lineOf),
     ...checkLayout(path, program, text, lineOf),
   ];
 }
@@ -1414,6 +1522,7 @@ function compareLayoutBaseline(findings, baseline) {
 /** The whole audit: every source file, then the compiler pins, then the report. */
 function run() {
   const problems = [];
+  const { failure: themeFailure } = themeTokens();
   for (const dir of SOURCE_DIRS) {
     for (const entry of parseSourceTree(dir, ROOT, isTestArtifact)) {
       problems.push(...checkParsedFile(entry));
@@ -1422,10 +1531,23 @@ function run() {
   const findings = layoutFindings(problems);
 
   if (process.argv.includes('--write-layout-baseline')) {
+    // A run that could not read the theme must not rewrite the baseline as if
+    // it had audited the tree.
+    if (themeFailure !== null) {
+      console.error(themeFailure);
+      console.error('\ncheck-classes: 1 problem(s)');
+      process.exitCode = 1;
+      return;
+    }
     writeLayoutBaseline(findings);
     return;
   }
 
+  // The theme problem belongs with the instrument problems: the file problems
+  // print first, then what the audit could not check, then the summary.
+  if (themeFailure !== null) {
+    problems.push(themeFailure);
+  }
   problems.push(...checkCompilerStillDropsThese());
 
   const layoutProblems = compareLayoutBaseline(findings, readLayoutBaseline());
@@ -1439,7 +1561,10 @@ function run() {
       console.error(problem);
     }
     console.error(`\ncheck-classes: ${others.length + layoutProblems.length} problem(s)`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   const admitted = [...findings.values()].reduce(

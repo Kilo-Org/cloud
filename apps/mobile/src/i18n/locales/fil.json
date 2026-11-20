@@ -172,6 +172,7 @@
     "generating": "Ginagawa…",
     "working": "Nagtatrabaho",
     "yourOwnRepositories": "Mga sarili mong repositoryo",
+    "organizationRepositories": "Mga repositoryo ng organisasyon",
     "dismissed": "Binalewala",
     "agent": "Ahente",
     "durationMinuteShort": "min",
@@ -1226,7 +1227,7 @@
     },
     "instructions": {
       "title": "Mga sariling tagubilin",
-      "deprecation": "Planong ihinto ang suporta sa mga pasadyang tagubilin. Ilipat na lang ang mga gabay na ito sa isang REVIEW.md file sa iyong repository.",
+      "deprecation": "Aalisin na ang mga pasadyang tagubilin. Ilipat na lang ang mga gabay na ito sa isang REVIEW.md file sa iyong repository.",
       "placeholder": "hal. Ipatupad ang aming mga pamantayan sa paghawak ng error…",
       "clearTitle": "Alisin ang mga sariling tagubilin?",
       "clearMessage": "Sa pag-save ng walang laman na field, mabubura ang mga sariling tagubilin na naka-imbak para sa reviewer na ito."
@@ -1392,6 +1393,7 @@
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng {{organization}}.",
       "description": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "descriptionReconnect": "Gumawa ng bagong token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
+      "descriptionOverview": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa susunod na screen.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
       "tokenPlaceholder": "Token para sa access sa workspace",
       "tokenRefused": "Hindi tinanggap ng Bitbucket ang token para sa access sa workspace na ito. Tiyakin na taglay nito ang mga saklaw ng pahintulot sa itaas, pagkatapos ay subukan muli."
@@ -3186,6 +3188,8 @@
     "retryHint": "Sinusubukang kunin muli ang katayuan ng Kilo Pass.",
     "endedOn": "Natapos {{date}}",
     "notAvailableInApp": "Hindi magagamit ang Kilo Pass sa app.",
+    "notAvailableTitle": "Wala sa app ang Kilo Pass",
+    "noPassDescription": "Walang Kilo Pass ang account na ito.",
     "statusActive": "Aktibo",
     "statusTrialing": "Nasa pagsubok",
     "statusPastDue": "Lampas na ang bayad",
@@ -3468,7 +3472,7 @@
       "retentionLimit": "Ipinapakita ang mga pinakabagong talaan ng singil."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Paganahin ang babala sa mababang balanse",
+      "subtitle": "Magpadala ng babala sa email sa mga address na ilalagay mo kapag naging mas mababa ang balanse ng organisasyong ito sa halagang itinakda mo.",
       "notifyEmailsLabel": "Mga email na padadalhan ng babala",
       "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa pagsingil.",
       "separateEmailsHint": "Paghiwalayin ang mga email gamit ang kuwit.",
@@ -3615,8 +3619,7 @@
       "renameTitle": "Palitan ang pangalan ng organisasyon",
       "renamePlaceholder": "Pangalan ng organisasyon",
       "balance": "Balanse",
-      "organizationSeats": "Mga puwesto sa organisasyon",
-      "plan": "Plano ng organisasyon",
+      "plan": "Plano",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Natapos",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Mali ang code na iyon. Pakisubukan muli.",
+    "signupStepUpBack": "Para matapos ang paggawa ng iyong account, bumalik at gamitin ang '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Mali o expired na ang code na iyon. Pakisubukan muli o gamitin ang '$t(login.resendCode)'.",
     "codeInProgress": "Pinoproseso ang iyong code. Maghintay ng sandali at subukan muli.",
     "tooManyAttempts": "Masyado nang maraming pagsubok. Humiling ng bagong code.",
     "invalidToken": "Hindi makapag-sign in. Pakisubukan muli.",
@@ -3919,6 +3923,15 @@
       "checkHelp": "Ang $t(modelChat.backends.checkConnection) ay nagpapadala ng maikling kahilingan sa paghihinuha sa endpoint na ito gamit ang napiling protokol at modelo. Maaaring maningil ang tagapagbigay para rito.",
       "connectionSucceeded": "Nakumpleto ng modelo ang isang kahilingan gamit ang protokol na ito.",
       "connectionFailed": "Hindi nakumpleto ng modelo ang isang kahilingan. Suriin ang pangunahing URL ng API, protokol, mga kredensyal, at ID ng modelo.",
+      "requestTimedOut": "Hindi sumagot ang endpoint sa takdang oras. Suriin ang pangunahing URL ng API at ang iyong koneksyon, pagkatapos ay subukang muli.",
+      "requestUnauthorized": "Tinanggihan ng endpoint ang mga kredensyal. Suriin ang API key at mga custom na header, pagkatapos ay subukang muli.",
+      "requestNotFound": "Hindi natagpuan ang endpoint o modelo. Suriin ang pangunahing URL ng API at ang ID ng modelo.",
+      "requestRateLimited": "Nililimitahan ng endpoint ang mga kahilingan. Maghintay sandali at subukang muli.",
+      "requestUnavailable": "Hindi available ang endpoint sa ngayon. Subukang muli sa ilang sandali.",
+      "requestUnreachable": "Hindi maabot ang endpoint. Suriin ang pangunahing URL ng API at ang iyong koneksyon.",
+      "requestInvalidResponse": "Sumagot ang endpoint, ngunit hindi sa inaasahang format ang sagot. Tiyakin na tumutugma ang pangunahing URL ng API at protocol sa server, pagkatapos ay subukan muli.",
+      "discoveryNoModels": "Walang nakalista na modelo ang endpoint. Maglagay ng mga modelo nang manu-mano.",
+      "connectionIncomplete": "Sumagot ang modelo ngunit hindi natapos. Subukang muli, o suriin ang ID ng modelo at protocol.",
       "invalidInput": "Maglagay ng pangalan ng sistema, mga wastong header, at kahit isang modelo na may natatanging ID at pangalan. Ang mga limitasyon sa token ay dapat mga positibong buong bilang.",
       "invalidUrl": "Maglagay ng pangunahing URL ng API na gumagamit ng HTTP o HTTPS at walang mga kredensyal, mga parameter ng query, o fragment.",
       "publicHttp": "Hindi pinapayagan ang mga pampublikong HTTP endpoint. Gumamit ng HTTPS o isang pribadong lokal na endpoint.",
@@ -4057,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
     },
-    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito."
+    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito.",
+    "providerKeyRefused": "Tinanggihan ng provider ang mga kredensyal. Suriin ang API key nito, pagkatapos ay muling ipadala.",
+    "providerModelMissing": "Hindi na nag-aalok ang backend na ito ng modelong ito. Pumili ng iba.",
+    "providerRateLimited": "Nililimitahan ng provider ang mga kahilingan. Maghintay sandali at muling ipadala.",
+    "providerUnavailable": "Hindi available ang provider sa ngayon. Muling ipadala sa ilang sandali."
   },
   "settingsTools": {
     "confirmTitle": "Kumpirmahin ang pagbabagong ito?"
@@ -4432,6 +4449,7 @@
     "pickPackToBuyAgain": "Pumili ng pack sa itaas para magsimula ng bagong pagbili.",
     "purchasePending": "Pinoproseso pa ng store ang bayad na ito. Darating ang iyong mga credit kapag naaprubahan na nito ang singil.",
     "buyAgain": "Bumili muli",
+    "checkPurchase": "Suriin ang pagbili",
     "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
     "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."
   },
@@ -4525,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "I-save sa listahan",
-      "saved": "Na-save sa {{list}}"
+      "saved": "Na-save sa {{list}}",
+      "saveFailed": "Hindi ma-save ang gagawin. I-check ang iyong koneksyon at subukang muli.",
+      "saveRefused": "Hindi ma-save ang gagawin sa listahang ito. Pumili ng ibang listahan."
     }
   },
   "agentBriefing": {
@@ -4805,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "Mga AI Guardrail",
-    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail.",
+    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Hindi naka-enable ang Mga AI Guardrail",
     "unavailable": "Ini-enable ng Kilo ang Mga AI Guardrail para sa isang organisasyon kapag hiniling. Makipag-ugnayan sa {{supportEmail}}, at i-on ito ng Kilo team para sa iyong organisasyon.",
     "contactSupport": "Makipag-ugnayan sa suporta",
@@ -4943,7 +4963,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Feature ng Enterprise",
-    "enterpriseOnly": "Para sa enterprise lang ang feature na ito.",
+    "enterpriseOnly": "Makukuha ang mga provider at modelo sa Enterprise plan.",
     "readOnly": "Ang mga owner at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
     "loadError": "Hindi ma-load ang mga provider at modelo",
     "tabModels": "Mga modelo",

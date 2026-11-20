@@ -159,6 +159,18 @@ describe('browser tab groups', () => {
     expect(controller.tabsForSession('s1')).toStrictEqual([12]);
   });
 
+  it('moves a tab another session shares out of the first session, as Chrome moves it between groups', async () => {
+    const controller = createBrowserTabGroupController({ api: {} });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'First' });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 's2', title: 'Second' });
+
+    await controller.shareActiveTab({ sessionHandle: 's1', tabId: 13 });
+    await controller.shareActiveTab({ sessionHandle: 's2', tabId: 13 });
+
+    expect(controller.sessionForTab(13)).toBe('s2');
+    expect(controller.isTabAllowed('s1', 13)).toBe(false);
+  });
+
   it('resolves the active tab in the last focused window when no tab is named', async () => {
     const tabQuery = vi.fn(
       async (_query: {

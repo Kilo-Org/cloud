@@ -1,17 +1,38 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { webhook_events, type User } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  webhook_event_signatures,
+  webhook_events,
+  webhook_events_v2,
+  type User,
+} from '@kilocode/db/schema';
+import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { logWebhookEvent } from './webhook-events';
+import { logWebhookEvent, updateWebhookEvent } from './webhook-events';
+import {
+  provisionWebhookEventPartitions,
+  webhookEventPartitionName,
+} from './webhook-event-partitions';
 
 async function findEventBySignature(signature: string) {
   const [event] = await db
     .select()
-    .from(webhook_events)
-    .where(eq(webhook_events.event_signature, signature));
-  if (!event) throw new Error(`webhook_events row ${signature} not found`);
+    .from(webhook_events_v2)
+    .where(eq(webhook_events_v2.event_signature, signature));
+  if (!event) throw new Error(`webhook_events_v2 row ${signature} not found`);
   return event;
+}
+
+function eventInput(userId: string, eventSignature: string) {
+  return {
+    owner: { type: 'user' as const, id: userId },
+    platform: 'github',
+    event_type: 'pull_request',
+    event_action: 'opened',
+    payload: { action: 'opened' },
+    headers: { 'x-github-event': 'pull_request' },
+    event_signature: eventSignature,
+  };
 }
 
 describe('logWebhookEvent NUL sanitization', () => {
@@ -117,5 +138,150 @@ describe('logWebhookEvent NUL sanitization', () => {
     const stored = await findEventBySignature(eventSignature);
     expect(stored.payload).toEqual(payload);
     expect(stored.headers).toEqual(headers);
+  });
+});
+
+describe('logWebhookEvent deduplication', () => {
+  let user: User;
+
+  beforeEach(async () => {
+    user = await insertTestUser();
+  });
+
+  afterEach(cleanupDbForTest);
+
+  test('stores the event and its signature claim with the returned identity', async () => {
+    const eventSignature = `delivery-${crypto.randomUUID()}`;
+
+    const result = await logWebhookEvent(eventInput(user.id, eventSignature));
+
+    expect(result.isDuplicate).toBe(false);
+    const stored = await findEventBySignature(eventSignature);
+    expect(stored.id).toBe(result.event?.id);
+    expect(new Date(stored.created_at).toISOString()).toBe(result.event?.createdAt);
+    const [claim] = await db
+      .select()
+      .from(webhook_event_signatures)
+      .where(eq(webhook_event_signatures.event_signature, eventSignature));
+    expect(claim?.webhook_event_id).toBe(result.event?.id);
+  });
+
+  test('reports a redelivery as a duplicate without storing it again', async () => {
+    const eventSignature = `delivery-${crypto.randomUUID()}`;
+
+    await logWebhookEvent(eventInput(user.id, eventSignature));
+    const redelivery = await logWebhookEvent(eventInput(user.id, eventSignature));
+
+    expect(redelivery).toEqual({ isDuplicate: true });
+    const stored = await db
+      .select({ id: webhook_events_v2.id })
+      .from(webhook_events_v2)
+      .where(eq(webhook_events_v2.event_signature, eventSignature));
+    expect(stored).toHaveLength(1);
+  });
+
+  test('stores one event when the same delivery arrives concurrently', async () => {
+    const eventSignature = `delivery-${crypto.randomUUID()}`;
+
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () => logWebhookEvent(eventInput(user.id, eventSignature)))
+    );
+
+    expect(results.filter(result => !result.isDuplicate)).toHaveLength(1);
+    const stored = await db
+      .select({ id: webhook_events_v2.id })
+      .from(webhook_events_v2)
+      .where(eq(webhook_events_v2.event_signature, eventSignature));
+    expect(stored).toHaveLength(1);
+  });
+
+  test('treats a delivery already in the pre-partitioning table as a duplicate', async () => {
+    const eventSignature = `delivery-${crypto.randomUUID()}`;
+    await db.insert(webhook_events).values({
+      owned_by_user_id: user.id,
+      platform: 'github',
+      event_type: 'pull_request',
+      payload: {},
+      headers: {},
+      event_signature: eventSignature,
+    });
+
+    const result = await logWebhookEvent(eventInput(user.id, eventSignature));
+
+    expect(result).toEqual({ isDuplicate: true });
+    const stored = await db
+      .select({ id: webhook_events_v2.id })
+      .from(webhook_events_v2)
+      .where(eq(webhook_events_v2.event_signature, eventSignature));
+    expect(stored).toHaveLength(0);
+  });
+
+  test('releases the claim when the event insert fails, so a retry is stored', async () => {
+    const eventSignature = `delivery-${crypto.randomUUID()}`;
+    const invalidEvent = { ...eventInput(user.id, eventSignature), platform: null as never };
+
+    await expect(logWebhookEvent(invalidEvent)).rejects.toThrow();
+    const claims = await db
+      .select()
+      .from(webhook_event_signatures)
+      .where(eq(webhook_event_signatures.event_signature, eventSignature));
+    expect(claims).toHaveLength(0);
+
+    const retry = await logWebhookEvent(eventInput(user.id, eventSignature));
+    expect(retry.isDuplicate).toBe(false);
+  });
+});
+
+describe('logWebhookEvent without a partition for today', () => {
+  let user: User;
+
+  beforeEach(async () => {
+    user = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await cleanupDbForTest();
+    await provisionWebhookEventPartitions(db);
+  });
+
+  test('creates the missing partition and stores the event', async () => {
+    // Where no cron keeps partitions ahead, such as local development.
+    const today = webhookEventPartitionName(new Date());
+    await db.execute(sql.raw(`ALTER TABLE webhook_events_v2 DETACH PARTITION ${today}`));
+    await db.execute(sql.raw(`DROP TABLE ${today}`));
+    const eventSignature = `delivery-${crypto.randomUUID()}`;
+
+    const result = await logWebhookEvent(eventInput(user.id, eventSignature));
+
+    expect(result.isDuplicate).toBe(false);
+    const stored = await findEventBySignature(eventSignature);
+    expect(stored.id).toBe(result.event?.id);
+  });
+});
+
+describe('updateWebhookEvent', () => {
+  let user: User;
+
+  beforeEach(async () => {
+    user = await insertTestUser();
+  });
+
+  afterEach(cleanupDbForTest);
+
+  test('marks the event processed through the identity logWebhookEvent returned', async () => {
+    const eventSignature = `delivery-${crypto.randomUUID()}`;
+    const { event } = await logWebhookEvent(eventInput(user.id, eventSignature));
+    if (!event) throw new Error('expected a stored event');
+
+    await updateWebhookEvent(event, {
+      processed: true,
+      processed_at: '2026-11-19T10:00:00.000Z',
+      handlers_triggered: ['code_review'],
+      errors: null,
+    });
+
+    const stored = await findEventBySignature(eventSignature);
+    expect(stored.processed).toBe(true);
+    expect(stored.handlers_triggered).toEqual(['code_review']);
   });
 });

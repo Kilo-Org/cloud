@@ -247,89 +247,95 @@ export function InviteMemberSheet() {
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
-        <FormField
-          key={formEpoch}
-          label={t('common.email')}
-          required
-          validateWhileTyping
-          placeholder={t('organization.inviteMember.emailPlaceholder')}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          textContentType="emailAddress"
-          autoFocus
-          validate={inviteEmailError}
-          alwaysReserve
-          reserveErrorMessages={inviteEmailErrorMessages()}
-          error={visibleInviteError?.field === 'email' ? visibleInviteError.message : undefined}
-          onChangeText={value => {
-            emailRef.current = value;
-            setCanSubmit(inviteEmailError(value) == null);
-            clearInviteError();
-          }}
-        />
+        {/* Email and Role are fields of one form, so they keep the related-item
+            gap a section's blocks keep, not the body's section gap: with the
+            Email field's reserved error line, the section gap left about 50 dp
+            between the field and the Role label. */}
+        <View className="gap-3">
+          <FormField
+            key={formEpoch}
+            label={t('common.email')}
+            required
+            validateWhileTyping
+            placeholder={t('organization.inviteMember.emailPlaceholder')}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            autoFocus
+            validate={inviteEmailError}
+            alwaysReserve
+            reserveErrorMessages={inviteEmailErrorMessages()}
+            error={visibleInviteError?.field === 'email' ? visibleInviteError.message : undefined}
+            onChangeText={value => {
+              emailRef.current = value;
+              setCanSubmit(inviteEmailError(value) == null);
+              clearInviteError();
+            }}
+          />
 
-        {/* The rejected invite sits under the field it names, above the
-            software keyboard. The mutation has no toast (inline error pattern
-            P2), so the status line is the single announcement owner here: one
-            announcement per platform, visuals preserved (tone error). A plan
-            refusal this reader can end carries the billing step under the
-            copy. */}
-        <RefusalStatus
-          message={visibleInviteError?.field === 'form' ? visibleInviteError.message : null}
-          action={trialRefusalAction}
-          className="text-sm"
-        />
+          {/* The rejected invite sits under the field it names, above the
+              software keyboard. The mutation has no toast (inline error
+              pattern P2), so the status line is the single announcement owner
+              here: one announcement per platform, visuals preserved (tone
+              error). A plan refusal this reader can end carries the billing
+              step under the copy. */}
+          <RefusalStatus
+            message={visibleInviteError?.field === 'form' ? visibleInviteError.message : null}
+            action={trialRefusalAction}
+            className="text-sm"
+          />
 
-        {/* A full organization states why Send is unavailable before the role
-            group, and names the one role that still works when the caller may
-            assign it. */}
-        {seatWarning ? (
-          <View
-            accessible
-            accessibilityRole="alert"
-            className="rounded-lg border border-warn-tile-border bg-warn-tile-bg p-3"
-          >
-            <Text className="text-sm text-warn">{seatWarning}</Text>
-          </View>
-        ) : null}
+          {/* A full organization states why Send is unavailable before the role
+              group, and names the one role that still works when the caller may
+              assign it. */}
+          {seatWarning ? (
+            <View
+              accessible
+              accessibilityRole="alert"
+              className="rounded-lg border border-warn-tile-border bg-warn-tile-bg p-3"
+            >
+              <Text className="text-sm text-warn">{seatWarning}</Text>
+            </View>
+          ) : null}
 
-        {isBillingManager ? (
-          <Text variant="muted">{t('organization.inviteMember.roleMember')}</Text>
-        ) : (
-          <View className="gap-2">
-            {/* The same label the Email field above draws. The two are labels of
-                one form, so the role group does not wear the list-section
-                eyebrow the rest of the app uses for section headings. */}
-            <FormFieldLabel label={t('common.role')} />
-            <RadioGroup label={t('common.role')}>
-              <RowGroup>
-                {roles.map(value => {
-                  const selected = selectedRole === value;
-                  return (
-                    <Pressable
-                      key={value}
-                      className={cn(
-                        ROW_TARGET_CLASS,
-                        'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
-                      )}
-                      onPress={() => {
-                        setRole(value);
-                      }}
-                      {...radioItemA11y({ label: roleLabel(value), checked: selected })}
-                    >
-                      <Text className="flex-1 text-sm font-medium text-foreground">
-                        {roleLabel(value)}
-                      </Text>
-                      {selected && <Check size={16} color={selectionCheckColor(colors)} />}
-                    </Pressable>
-                  );
-                })}
-              </RowGroup>
-            </RadioGroup>
-          </View>
-        )}
+          {isBillingManager ? (
+            <Text variant="muted">{t('organization.inviteMember.roleMember')}</Text>
+          ) : (
+            <View className="gap-2">
+              {/* The same label the Email field above draws. The two are labels
+                  of one form, so the role group does not wear the list-section
+                  eyebrow the rest of the app uses for section headings. */}
+              <FormFieldLabel label={t('common.role')} />
+              <RadioGroup label={t('common.role')}>
+                <RowGroup>
+                  {roles.map(value => {
+                    const selected = selectedRole === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        className={cn(
+                          ROW_TARGET_CLASS,
+                          'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
+                        )}
+                        onPress={() => {
+                          setRole(value);
+                        }}
+                        {...radioItemA11y({ label: roleLabel(value), checked: selected })}
+                      >
+                        <Text className="flex-1 text-sm font-medium text-foreground">
+                          {roleLabel(value)}
+                        </Text>
+                        {selected && <Check size={16} color={selectionCheckColor(colors)} />}
+                      </Pressable>
+                    );
+                  })}
+                </RowGroup>
+              </RadioGroup>
+            </View>
+          )}
+        </View>
       </SheetScrollView>
       {dialog}
     </PresentedContent>

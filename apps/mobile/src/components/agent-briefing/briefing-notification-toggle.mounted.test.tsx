@@ -10,6 +10,7 @@ import {
 
 const mutate = vi.hoisted(() => vi.fn());
 const preferencesRead = vi.hoisted(() => ({ isError: false, refetch: vi.fn() }));
+const push = vi.hoisted(() => vi.fn());
 
 const network = vi.hoisted(() => ({ offline: false }));
 
@@ -59,7 +60,7 @@ afterEach(() => {
 });
 
 vi.mock('react-native', () => ({ View: 'View', ActivityIndicator: 'ActivityIndicator' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -73,12 +74,11 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
-vi.mock('@/components/ui/row-skeleton', () => ({
-  RowSkeleton: 'RowSkeleton',
-  SwitchPlaceholder: 'SwitchPlaceholder',
-}));
-vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+vi.mock('@/components/ui/icons', () => ({ Bell: 'Bell', Newspaper: 'Newspaper' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -122,9 +122,19 @@ function rowSkeletonOf(mounted: TestRenderer.ReactTestRenderer) {
 }
 
 it('shows the device-notifications link from Briefing settings', () => {
+  push.mockClear();
   const mounted = mount(BriefingNotificationToggle, {});
 
-  expect(mounted.root.findAll(node => (node.type as string) === 'Button')).toHaveLength(1);
+  // The permission sentence is the row's subtitle, not a bold centered label:
+  // the row names where it leads and carries the chevron every destination row
+  // has.
+  const link = mounted.root.find(node => (node.type as string) === 'ConfigureRow');
+  expect(link.props.title).toBe('common.notifications');
+  expect(link.props.subtitle).toBe('agentBriefing.notificationPermission');
+  act(() => {
+    (link.props.onPress as () => void)();
+  });
+  expect(push).toHaveBeenCalledWith('/(app)/notifications');
 
   act(() => {
     mounted.unmount();
@@ -205,10 +215,13 @@ it('shows the toggle placeholder instead of the switch while preferences load', 
   beginPreferencesLoad();
 
   const standalone = mount(BriefingNotificationToggle, {});
-  // The placeholder takes the host the switch contributes to the row's layout,
-  // so the row the value lands in is the row already on screen.
-  expect(nodesOfType(standalone, 'SwitchPlaceholder')).toHaveLength(1);
-  expect(nodesOfType(standalone, 'Switch')).toHaveLength(0);
+  // The switch row is the shared skeleton with its switch slot, so the row the
+  // value lands in keeps the height already on screen.
+  const standaloneSkeleton = rowSkeletonOf(standalone);
+  expect(standaloneSkeleton.props.subtitle).toBe(true);
+  expect(standaloneSkeleton.props.trailing).toBe('switch');
+  expect(nodesOfType(standalone, 'PreferenceRow')).toHaveLength(0);
+  expect(nodesOfType(standalone, 'ConfigureRow')).toHaveLength(1);
   act(() => {
     standalone.unmount();
   });

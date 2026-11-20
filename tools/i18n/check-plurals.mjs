@@ -43,7 +43,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogTags,
   declaresPluralFamily,
@@ -175,8 +175,9 @@ export const NO_AGREEMENT = new Map([
  * written the way the source writes it with its whitespace collapsed.
  */
 function countedKey(argument, text) {
-  if (argument.type === 'Literal' && typeof argument.value === 'string') {
-    return { key: argument.value };
+  const key = stringLiteralValue(argument);
+  if (key !== null) {
+    return { key };
   }
   if (argument.type === 'TemplateLiteral' && argument.expressions.length === 0) {
     const [chunk] = argument.quasis;
@@ -405,9 +406,9 @@ function typeKeys(typeNode) {
     if (node.type !== 'TSLiteralType') {
       return;
     }
-    const literal = unwrap(node.literal);
-    if (literal.type === 'Literal' && typeof literal.value === 'string') {
-      keys.push(literal.value);
+    const key = stringLiteralValue(node.literal);
+    if (key !== null) {
+      keys.push(key);
     }
   });
   return keys;
@@ -429,9 +430,9 @@ function objectKeys(initializer) {
     if (property.type !== 'Property') {
       continue;
     }
-    const value = unwrap(property.value);
-    if (value.type === 'Literal' && typeof value.value === 'string') {
-      keys.push(value.value);
+    const key = stringLiteralValue(property.value);
+    if (key !== null) {
+      keys.push(key);
     }
   }
   return keys;
@@ -746,7 +747,10 @@ function run() {
       counts.push(`${report.length} language(s) with missing plural categories`);
     }
     console.error(`\ncheck-plurals: ${counts.join('; ')}`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   console.log(

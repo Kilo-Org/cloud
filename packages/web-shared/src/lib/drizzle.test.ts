@@ -160,7 +160,11 @@ describe('drizzle', () => {
       jest.restoreAllMocks();
     });
 
-    async function readHostAtStartup(vercelRegion: string, disabled: string) {
+    async function readHostAtStartup(
+      vercelRegion: string,
+      disabled: string,
+      overrides: Record<string, string> = {}
+    ) {
       jest.replaceProperty(process, 'env', {
         ...process.env,
         VERCEL_REGION: vercelRegion,
@@ -171,6 +175,7 @@ describe('drizzle', () => {
         POSTGRES_REPLICA_EU_URL: 'postgres://eu-1.example/db',
         POSTGRES_REPLICA_EU_URL_2: 'postgres://eu-2.example/db',
         POSTGRES_REPLICAS_DISABLED: disabled,
+        ...overrides,
       });
       jest.spyOn(Math, 'random').mockReturnValue(0.75);
 
@@ -202,6 +207,18 @@ describe('drizzle', () => {
       expect(warn).toHaveBeenCalledWith(
         'POSTGRES_REPLICAS_DISABLED names unknown replicas: ["us_west"]; valid names: us-west, eu-central-1, eu-central-2'
       );
+    });
+
+    it('skips a replica whose URL does not parse, without logging the URL', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const invalidUrl = 'postgres://user:secret@eu-2.example:notaport/db';
+
+      await expect(
+        readHostAtStartup('fra1', '', { POSTGRES_REPLICA_EU_URL_2: invalidUrl })
+      ).resolves.toBe('eu-1.example');
+
+      expect(warn).toHaveBeenCalledWith('Skipping read replica eu-central-2: its URL is invalid');
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('secret');
     });
   });
 
@@ -249,6 +266,11 @@ describe('drizzle', () => {
       expect(replicaAffinityKey('::ffff:192.0.2.1')).toBe('192.0.2.1');
       expect(replicaAffinityKey('::ffff:c000:201')).toBe('192.0.2.1');
       expect(replicaAffinityKey('::FFFF:C000:0201')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('0:0:0:0:0:ffff:192.0.2.1')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('0:0:0:0:0:FFFF:c000:201')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('2001:db8:1:2::192.0.2.1')).toBe(
+        replicaAffinityKey('2001:db8:1:2::1')
+      );
       expect(replicaAffinityKey('::ffff:c000:202')).not.toBe(replicaAffinityKey('::ffff:c000:201'));
     });
   });

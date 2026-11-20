@@ -4,7 +4,7 @@ import {
   readReplicaInventory,
 } from '@kilocode/web-shared/lib/read-replicas';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
-import { computeDatabaseUrl } from '@kilocode/db';
+import { computeDatabaseUrl, getDatabaseClientConfig } from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { attachDatabasePool } from '@vercel/functions';
 import { parseIPv6 } from '@kilocode/web-shared/lib/cloudflare-ip';
@@ -69,20 +69,29 @@ export function selectReplicaUrls({
 /**
  * The part of a client address that picks its replica: the /64 prefix of an IPv6 address,
  * which privacy extensions keep while rotating the rest, otherwise the address itself. An
- * IPv4-mapped address (`::ffff:a.b.c.d` or `::ffff:xxxx:xxxx`) keys as its IPv4 address; its
- * /64 prefix is 0 for every client.
+ * IPv4-mapped address keys as its IPv4 address in every spelling; its /64 prefix is 0 for every
+ * client.
  */
 export function replicaAffinityKey(ip: string): string {
   if (!ip.includes(':')) return ip;
-  const dottedMapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
-  if (dottedMapped?.[1]) return dottedMapped[1];
-  const parsed = parseIPv6(ip);
+  const parsed = parseIPv6(dottedTailToHex(ip));
   if (parsed === null) return ip;
   if (parsed >> BigInt(32) === BigInt(0xffff)) {
     const v4 = Number(parsed & BigInt(0xffffffff));
     return [v4 >>> 24, (v4 >>> 16) & 255, (v4 >>> 8) & 255, v4 & 255].join('.');
   }
   return (parsed >> BigInt(64)).toString(16);
+}
+
+/** Rewrites an IPv6 address's dotted IPv4 tail as two hex groups, which `parseIPv6` accepts. */
+function dottedTailToHex(ip: string): string {
+  const tail = /:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (!tail) return ip;
+  const octets = tail.slice(1).map(Number);
+  if (octets.some(octet => octet > 255)) return ip;
+  const [a = 0, b = 0, c = 0, d = 0] = octets;
+  const groups = `${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  return `${ip.slice(0, tail.index)}:${groups}`;
 }
 
 /**
@@ -145,16 +154,28 @@ function requestIp(headers: Record<string, string>): string | null {
  * - EU deployments use every enabled EU replica to split read traffic, picking one per request
  *   by client address
  * - Replicas listed in POSTGRES_REPLICAS_DISABLED are skipped (see read-replicas.ts)
+ * - Replicas whose URL does not parse are skipped, so one bad optional URL cannot stop the
+ *   module from loading now that every EU replica gets a pool
  * - Falls back to primary if no enabled replica is configured for the region
  */
 function getReplicaUrls(): string[] {
-  const { enabled, unknownDisabled } = readReplicaInventory();
-  if (unknownDisabled.length > 0) {
+  const inventory = readReplicaInventory();
+  if (inventory.unknownDisabled.length > 0) {
     console.warn(
-      `POSTGRES_REPLICAS_DISABLED names unknown replicas: ${JSON.stringify(unknownDisabled)}; ` +
+      `POSTGRES_REPLICAS_DISABLED names unknown replicas: ${JSON.stringify(inventory.unknownDisabled)}; ` +
         `valid names: ${KNOWN_READ_REPLICA_NAMES.join(', ')}`
     );
   }
+  const enabled = inventory.enabled.filter(replica => {
+    try {
+      getDatabaseClientConfig(replica.url);
+      return true;
+    } catch {
+      // The URL and the parse error can both contain credentials, so only the name is logged.
+      console.warn(`Skipping read replica ${replica.name}: its URL is invalid`);
+      return false;
+    }
+  });
   return selectReplicaUrls({
     primaryUrl: postgresUrl,
     nodeEnv: NODE_ENV,
@@ -187,22 +208,17 @@ const primary = createDrizzleClient({
 export const pool = primary.pool;
 
 // Replica pools - US replica in US regions; in EU regions one pool per configured
-// EU replica, with the primary only as fallback. Every EU instance now connects to
-// both EU replicas instead of one, so each pool gets its share of `max`: an instance
-// holds no more replica connections than before, and neither replica sees a higher ceiling.
+// EU replica, with the primary only as fallback. Each pool keeps the full `max`,
+// because a request reads from one replica only and needs the capacity it had
+// before.
 const replicaUrls = getReplicaUrls();
 export const usesSeparateReplica = replicaUrls[0] !== postgresUrl;
-const replicaPoolMax = Math.ceil(max / replicaUrls.length);
 
 const replicas = usesSeparateReplica
   ? replicaUrls.map(connectionString =>
       createDrizzleClient({
         connectionString,
-        poolConfig: {
-          ...sharedPoolConfig,
-          max: replicaPoolMax,
-          application_name: `${appName}-replica`,
-        },
+        poolConfig: { ...sharedPoolConfig, application_name: `${appName}-replica` },
         logger: !!DEBUG_QUERY_LOGGING,
       })
     )

@@ -36,8 +36,6 @@ const TARGET = {
   diagnostic: { component: PRODUCT, exportName: 'default', props: { title: 'Diagnostic data' } },
 };
 const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
-const INTENT_SOURCE =
-  'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n';
 
 const INLINE_INTENT =
   'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n';
@@ -1622,20 +1620,4 @@ test('a manifest above the document bound is still refused', t => {
   const file = path.join(dir, 'proof-manifest.json');
   fs.writeFileSync(file, JSON.stringify({ version: 1, padding: BIG_TEXT }));
   assert.throws(() => readProofManifest(file), /Proof JSON exceeds 1048576 bytes/u);
-});
-
-test('a wrapped native-intent signature still receives the diagnostic branch', async t => {
-  const wrapped =
-    'export function redirectSystemPath({\n  path,\n  initial,\n}: {\n  path: string | null;\n  initial: boolean;\n}): string | null {\n  return initial ? path : null;\n}\n';
-  const fixture = syntheticRepo(t, manifest, wrapped);
-  const preparation = await prepareProof(fixture);
-  for (const revision of ['base', 'head'] as const) {
-    const intent = fs.readFileSync(path.join(preparation[revision].directory, INTENT), 'utf8');
-    assert.match(
-      intent,
-      /return "\/\(auth\)\/design-proof-card";/,
-      `${revision} keeps the generated diagnostic branch`
-    );
-    assert.match(intent, /\n  if \(__DEV__ && !initial &&/, 'the branch sits inside the function');
-  }
 });

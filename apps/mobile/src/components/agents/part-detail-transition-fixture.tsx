@@ -1,4 +1,4 @@
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { useEffect } from 'react';
 import { View } from 'react-native';
@@ -176,23 +176,30 @@ const ignoreExit = () => Promise.resolve();
 /**
  * Put the tool card image cache behind `MEDIA_PART` into one settled state.
  *
- * `loaded` writes a real PNG and records its URI. `failed` makes the cache
- * directory uncreatable by leaving a regular file at its path, so the write
- * throws and the part id stays latched. `superseded` resets the cache while the
- * base64 write is still in flight, so that attempt publishes nothing (no URI,
- * no pending mark, no latch) into the next generation.
+ * `loaded` writes a real PNG and records its URI. `failed` leaves a regular
+ * file where the cache directory belongs, so the directory create throws and
+ * the part id stays latched. `superseded` resets the cache while the base64
+ * write is still in flight, so that attempt publishes nothing (no URI, no
+ * pending mark, no latch) into the next generation.
  */
 function seedMediaState(media: 'loaded' | 'failed' | 'superseded'): void {
   // A fresh generation: one target can run twice in one app process.
   clearToolCardImageCache();
   let blocker: File | undefined = undefined;
   if (media === 'failed') {
-    // A regular file where the cache directory belongs is a real device fault:
-    // the directory creation throws and the sink latches the part id.
+    // An earlier pass in this process may have left the cache directory here (a
+    // finished write) or a leftover blocker file; both must go before the file
+    // that breaks the directory create can exist.
+    const cacheDirectory = new Directory(Paths.cache, 'tool-card-images');
+    const staleBlocker = new File(Paths.cache, 'tool-card-images');
+    if (cacheDirectory.exists) {
+      cacheDirectory.delete();
+    }
+    if (staleBlocker.exists) {
+      staleBlocker.delete();
+    }
     blocker = new File(Paths.cache, 'tool-card-images');
-    // Overwrite: a leftover blocker from an earlier run in this process must not
-    // fail the seeding itself.
-    blocker.create({ intermediates: true, overwrite: true });
+    blocker.create({ intermediates: true });
   }
   cacheToolAttachment(MEDIA_PART, {
     mime: 'image/png',

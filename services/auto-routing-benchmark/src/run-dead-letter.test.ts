@@ -212,6 +212,9 @@ describe('processDeadLetter — legacy migration', () => {
         repetitions: 2,
         classifier_max_p95_latency_ms: null,
         purpose: 'platform',
+        // A run the dead letter re-materializes is current work: the cutover fence retires
+        // only runs without this marker.
+        admission_marker: 'marker-dead-letter',
       },
       models: [
         { model: 'b/dead', variant: 'high', enqueued: true, reasoning_effort: 'high' },

@@ -43,11 +43,36 @@ const createCaller = createCallerFactory(
   createTRPCRouter({ customRouterBenchmarks: customRouterBenchmarksRouter })
 );
 
+/**
+ * A signed-in browser caller: the context the request boundary builds for a session cookie. The
+ * tests pre-exercise the cookie path, so the credential is the boundary's own classification for
+ * a request with no `Authorization` header.
+ */
 async function createCallerForUser(userId: string) {
   const user = await findUserById(userId);
   if (!user) throw new Error(`Test user not found: ${userId}`);
   return createCaller({
     user,
+    authViaToken: false,
+    credential: 'session',
+    tokenSource: null,
+    headersList: new Headers(),
+  });
+}
+
+/**
+ * An API-token caller for the same already-authenticated user: exactly what the boundary derives
+ * from an `Authorization` header (`human_bearer`). A delegated or internal token classifies the
+ * same way for the purposes of the start guard, so one bearer fixture covers them.
+ */
+async function createBearerCallerForUser(userId: string) {
+  const user = await findUserById(userId);
+  if (!user) throw new Error(`Test user not found: ${userId}`);
+  return createCaller({
+    user,
+    authViaToken: true,
+    credential: 'human_bearer',
+    tokenSource: null,
     headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
   });
 }
@@ -316,6 +341,49 @@ describe('customRouterBenchmarks', () => {
       requiredMicrodollars: 5_000,
       availableMicrodollars: 10,
     });
+  });
+
+  test('refuses a start from an API token for the correct owner, before the Worker', async () => {
+    // A valid bearer token belonging to the pool's own owner, and a live quote in hand: this is
+    // exactly the automated click the rule forbids, so it must be refused at HTTP with no
+    // Worker call at all.
+    await createRouter({ userId: user.id });
+    mockedQuote.mockResolvedValue({
+      ok: true,
+      body: {
+        status: 'ready',
+        id: REQUEST_ID,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        estimateMicrodollars: 1_500,
+        maximumMicrodollars: 2_000,
+        cases: { reused: 0, covered: 0, shared: 0, exclusive: 2 },
+        aliases: [],
+      },
+    });
+
+    const bearerCaller = await createBearerCallerForUser(user.id);
+    // The quote itself is allowed for that credential: only starting is reserved for the browser.
+    await expect(
+      bearerCaller.customRouterBenchmarks.quote({ slug: 'coding' })
+    ).resolves.toMatchObject({ status: 'ready' });
+    await expect(
+      bearerCaller.customRouterBenchmarks.start({ slug: 'coding', quoteId: REQUEST_ID })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Start a benchmark from the Kilo web app, not from an API token.',
+    });
+    expect(mockedStart).not.toHaveBeenCalled();
+  });
+
+  test('refuses a start when the context carries no derived browser credential', async () => {
+    await createRouter({ userId: user.id });
+    // A context assembled without the boundary's classification must fail closed: the guard
+    // cannot prove a human browser session, so it does not spend.
+    const caller = createCaller({ user, headersList: new Headers() });
+    await expect(
+      caller.customRouterBenchmarks.start({ slug: 'coding', quoteId: REQUEST_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockedStart).not.toHaveBeenCalled();
   });
 
   test('serializes a start against a pool edit instead of admitting a stale pool', async () => {

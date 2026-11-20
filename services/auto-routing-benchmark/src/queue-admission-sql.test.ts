@@ -79,6 +79,11 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     vi.spyOn(console, 'log').mockImplementation(() => {});
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
+    // The paid cutover fences every registry row requested before it. These fixtures are
+    // current work, so the marker is placed before every seeded `requested_at`.
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run(new Date(NOW - 86_400_000).toISOString());
     sent = [];
     env = {
       BENCH_DB: sqliteD1(sqlite),
@@ -99,7 +104,17 @@ describe('decider queue admission (production migrations and real SQLite)', () =
           router,
           accuracyNoiseBand: 0.05,
           classifierModels: ['classifier/model'],
-          deciderModels: [{ id: 'platform/model' }],
+          // Every seeded platform pair must be in the saved list: the drain reconciles the
+          // registry first and would otherwise release the flag before reading it.
+          deciderModels: [
+            { id: 'platform/model' },
+            { id: NEW_MODEL },
+            { id: 'vendor/starting' },
+            { id: 'vendor/platform-starting' },
+            { id: 'vendor/frontier-starting' },
+            { id: 'vendor/first' },
+            { id: 'vendor/second' },
+          ],
           minAccuracy: 0.7,
           productionTokenProfile: null,
           switchHorizonTurns: null,
@@ -130,14 +145,15 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     id: string,
     models: readonly string[],
     router: AutoRouter = 'efficient',
-    purpose: 'platform' | 'user' = 'user'
+    purpose: 'platform' | 'user' = 'platform'
   ) {
     sqlite
       .prepare(`
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at, min_accuracy, switch_cost_factor,
-        max_concurrency, repetitions, engine_identity, benchmark_user_id, benchmark_org_id
-      ) VALUES (?, ?, 'decider', ?, 'running', ?, 0.7, 3, 0, ?, ?, ?, ?)
+        max_concurrency, repetitions, engine_identity, benchmark_user_id, benchmark_org_id,
+        admission_marker
+      ) VALUES (?, ?, 'decider', ?, 'running', ?, 0.7, 3, 0, ?, ?, ?, ?, ?)
     `)
       .run(
         id,
@@ -147,13 +163,16 @@ describe('decider queue admission (production migrations and real SQLite)', () =
         repetitionsOf(router),
         computeEngineIdentity('decider', router),
         BENCHMARK_USER,
-        BENCHMARK_ORG
+        BENCHMARK_ORG,
+        // A run these tests dispatch must carry the post-cutover admission marker; the
+        // lane heads are fenced without it.
+        crypto.randomUUID()
       );
     for (const model of models) {
       sqlite
         .prepare("INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)")
         .run(id, model);
-      insertProfile(model, 'running', id, router);
+      insertProfile(model, 'running', id, router, purpose);
     }
   }
 
@@ -161,14 +180,15 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     model: string,
     status: 'pending' | 'running',
     runId: string | null,
-    router: AutoRouter = 'efficient'
+    router: AutoRouter = 'efficient',
+    queue: 'platform' | 'user' = 'user'
   ) {
     sqlite
       .prepare(`
       INSERT INTO benchmark_profiles (
         router, model, variant, engine_identity, repetitions, status, run_id,
         requested_at, updated_at, platform_requested, user_requested
-      ) VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, 0, 1)
+      ) VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)
     `)
       .run(
         router,
@@ -177,8 +197,10 @@ describe('decider queue admission (production migrations and real SQLite)', () =
         repetitionsOf(router),
         status,
         runId,
-        new Date(Date.now()).toISOString(),
-        new Date(Date.now()).toISOString()
+        new Date(NOW).toISOString(),
+        new Date(NOW).toISOString(),
+        queue === 'platform' ? 1 : 0,
+        queue === 'platform' ? 0 : 1
       );
   }
 
@@ -198,10 +220,10 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     ).toBe(true);
   }
 
-  function runningUserRuns(): string[] {
+  function runningQueueRuns(): string[] {
     return sqlite
       .prepare(
-        "SELECT id FROM benchmark_runs WHERE purpose = 'user' AND status = 'running' ORDER BY started_at, id"
+        "SELECT id FROM benchmark_runs WHERE purpose = 'platform' AND status = 'running' ORDER BY started_at, id"
       )
       .all()
       .map(row => String(row.id));
@@ -229,14 +251,14 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     );
     expect(held).toHaveLength(100);
     vi.setSystemTime(NOW + 60_000);
-    insertProfile(NEW_MODEL, 'pending', null);
+    insertProfile(NEW_MODEL, 'pending', null, 'efficient', 'platform');
 
-    const started = await drainQueue(env, 'user');
+    const started = await drainQueue(env, 'platform');
 
     if (!started) throw new Error('Expected the drain to start a run');
     const { runId } = started;
     expect(started.entryCount).toBe(1);
-    expect(runningUserRuns()).toEqual(['user-large', runId]);
+    expect(runningQueueRuns()).toEqual(['user-large', runId]);
     expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: runId });
     expect(
       sqlite.prepare('SELECT measurement_revision FROM benchmark_runs WHERE id = ?').get(runId)
@@ -273,26 +295,29 @@ describe('decider queue admission (production migrations and real SQLite)', () =
   it('waits while a run of the queue is still starting, then starts once it is initialized', async () => {
     insertRun('user-starting', ['vendor/starting']);
     vi.setSystemTime(NOW + 60_000);
-    insertProfile(NEW_MODEL, 'pending', null);
+    insertProfile(NEW_MODEL, 'pending', null, 'efficient', 'platform');
 
-    expect(await drainQueue(env, 'user')).toBeNull();
+    expect(await drainQueue(env, 'platform')).toBeNull();
     expect(profile(NEW_MODEL)).toEqual({ status: 'pending', run_id: null });
-    expect(runningUserRuns()).toEqual(['user-starting']);
+    expect(runningQueueRuns()).toEqual(['user-starting']);
 
     await dispatchScheduler(env);
     expect(initialized('user-starting')).toBe(true);
 
-    const started = await drainQueue(env, 'user');
+    const started = await drainQueue(env, 'platform');
     expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: started?.runId });
   });
 
   it('does not let a starting run of another queue or router hold this queue back', async () => {
-    insertRun('platform-starting', ['vendor/platform-starting'], 'efficient', 'platform');
-    insertRun('frontier-user-starting', ['vendor/frontier-starting'], 'frontier');
-    insertProfile(NEW_MODEL, 'pending', null);
+    // A starting run belongs to its own (router, queue): a frontier platform run must never
+    // hold back the efficient platform queue. (The owner queue is retired, so the surviving
+    // queues are one per router.)
+    insertRun('frontier-platform-starting', ['vendor/frontier-starting'], 'frontier', 'platform');
+    insertProfile(NEW_MODEL, 'pending', null, 'efficient', 'platform');
 
-    const started = await drainQueue(env, 'user');
+    const started = await drainQueue(env, 'platform');
 
+    expect(started).not.toBeNull();
     expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: started?.runId });
   });
 
@@ -305,24 +330,24 @@ describe('decider queue admission (production migrations and real SQLite)', () =
       insertRun(run.id, [run.model]);
       await initialize(run.id, [run.model]);
     }
-    insertProfile(NEW_MODEL, 'pending', null);
+    insertProfile(NEW_MODEL, 'pending', null, 'efficient', 'platform');
 
-    expect(await drainQueue(env, 'user')).toBeNull();
+    expect(await drainQueue(env, 'platform')).toBeNull();
     expect(profile(NEW_MODEL)).toEqual({ status: 'pending', run_id: null });
 
     sqlite
       .prepare("UPDATE benchmark_runs SET status = 'completed' WHERE id = 'user-active-0'")
       .run();
-    const started = await drainQueue(env, 'user');
+    const started = await drainQueue(env, 'platform');
     expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: started?.runId });
   });
 
   it('initializes a starting run of every router and queue in one dispatch pass', async () => {
+    // The owner queue is retired, so the surviving registry queues are the two platform
+    // ones; a dispatch pass initializes each of them.
     const starting = [
       { id: 'efficient-platform-starting', router: 'efficient', purpose: 'platform' },
-      { id: 'efficient-user-starting', router: 'efficient', purpose: 'user' },
       { id: 'frontier-platform-starting', router: 'frontier', purpose: 'platform' },
-      { id: 'frontier-user-starting', router: 'frontier', purpose: 'user' },
     ] as const;
     for (const [index, run] of starting.entries()) {
       vi.setSystemTime(NOW + index * 1000);
@@ -361,7 +386,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
   });
 
   it('lets exactly one of two overlapping drains start a run', async () => {
-    insertProfile('vendor/first', 'pending', null);
+    insertProfile('vendor/first', 'pending', null, 'efficient', 'platform');
     const firstAtInsert = Promise.withResolvers<void>();
     const firstRelease = Promise.withResolvers<void>();
     const secondInserted = Promise.withResolvers<void>();
@@ -376,10 +401,14 @@ describe('decider queue admission (production migrations and real SQLite)', () =
           await firstRelease.promise;
         }),
       },
-      'user'
+      'platform',
+      'efficient',
+      // This test drives admission serialisation, not the registry reconcile: the reconcile
+      // would fetch the catalog before the first insert and stall the hold hook.
+      { skipPlatformSync: true }
     );
     await firstAtInsert.promise;
-    insertProfile('vendor/second', 'pending', null);
+    insertProfile('vendor/second', 'pending', null, 'efficient', 'platform');
     const second = drainQueue(
       {
         ...env,
@@ -389,7 +418,9 @@ describe('decider queue admission (production migrations and real SQLite)', () =
           await secondRelease.promise;
         }),
       },
-      'user'
+      'platform',
+      'efficient',
+      { skipPlatformSync: true }
     );
     await secondInserted.promise;
     firstRelease.resolve();
@@ -399,7 +430,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
 
     expect(firstResult).toBeNull();
     if (!secondResult) throw new Error('Expected the second drain to start a run');
-    expect(runningUserRuns()).toEqual([secondResult.runId]);
+    expect(runningQueueRuns()).toEqual([secondResult.runId]);
     expect(profile('vendor/first')).toEqual({ status: 'pending', run_id: null });
     expect(profile('vendor/second')).toEqual({ status: 'running', run_id: secondResult.runId });
     expect(

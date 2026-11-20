@@ -200,11 +200,26 @@ export const customRouterBenchmarksRouter = createTRPCRouter({
       return result.body;
     }),
 
-  /** The explicit confirmation: spends against the confirmed quote or refuses with a reason. */
+  /**
+   * The explicit confirmation: spends against the confirmed quote or refuses with a reason.
+   *
+   * Only a signed-in human in the browser may spend. The request boundary classifies the
+   * credential (`session` for a browser session, `human_bearer` for an API token, and the
+   * workload classes for delegated callers), and `start` is the one action that must not be
+   * reachable by automation: a bearer token — human or delegated — is refused here, before the
+   * Worker sees anything. The check fails closed, so a context without a derived credential
+   * (an unusual constructor) is also refused. Quotes, reads and pause keep their authority.
+   */
   start: baseProcedure
     .input(StartBenchmarkInput)
     .output(PaidBenchmarkStartResultSchema)
     .mutation(async ({ ctx, input }) => {
+      if (ctx.authViaToken || ctx.credential !== 'session') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Start a benchmark from the Kilo web app, not from an API token.',
+        });
+      }
       const owner = await resolveOwner(ctx, input.organizationId, 'start');
       // The lock serializes the authorized read and the Worker's durable admission against a pool
       // edit or delete, so no edit can authorize or invalidate a paid start after it is admitted.

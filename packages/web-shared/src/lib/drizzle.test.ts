@@ -153,6 +153,56 @@ describe('drizzle', () => {
     });
   });
 
+  describe('readDb startup routing', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    async function readHostAtStartup(vercelRegion: string, disabled: string) {
+      jest.replaceProperty(process, 'env', {
+        ...process.env,
+        VERCEL_REGION: vercelRegion,
+        USE_PRODUCTION_DB: 'false',
+        IS_SCRIPT: 'false',
+        POSTGRES_URL: 'postgres://primary.example/db',
+        POSTGRES_REPLICA_US_URL: 'postgres://us.example/db',
+        POSTGRES_REPLICA_EU_URL: 'postgres://eu-1.example/db',
+        POSTGRES_REPLICA_EU_URL_2: 'postgres://eu-2.example/db',
+        POSTGRES_REPLICAS_DISABLED: disabled,
+      });
+      jest.spyOn(Math, 'random').mockReturnValue(0.75);
+
+      let host: string | undefined;
+      await jest.isolateModulesAsync(async () => {
+        const { readDb, closeAllDrizzleConnections } =
+          await import('@kilocode/web-shared/lib/drizzle');
+        host = readDb.$client.options.host;
+        await closeAllDrizzleConnections();
+      });
+      return host;
+    }
+
+    it.each([
+      ['sfo1', '', 'us.example'],
+      ['sfo1', 'us-west', 'primary.example'],
+      ['fra1', '', 'eu-2.example'],
+      ['fra1', 'eu-central-2', 'eu-1.example'],
+    ])('routes %s with disabled list "%s" to %s', async (region, disabled, host) => {
+      await expect(readHostAtStartup(region, disabled)).resolves.toBe(host);
+    });
+
+    it('warns about unknown names without changing routing', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await expect(readHostAtStartup('sfo1', 'us_west')).resolves.toBe('us.example');
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        'POSTGRES_REPLICAS_DISABLED names unknown replicas: ["us_west"]; valid names: us-west, eu-central-1, eu-central-2'
+      );
+    });
+  });
+
   describe('cleanupDbForTest', () => {
     async function publicRelations() {
       const { rows } = await db.execute<{ name: string }>(sql`

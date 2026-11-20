@@ -1,4 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { ReadReplicaInventory } from '@kilocode/web-shared/lib/read-replicas';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
@@ -60,6 +61,21 @@ function okProbe(name: string): ReplicaHealth {
     last_xact_replay_timestamp: '2026-07-30 09:39:06+00',
     replay_delay_seconds: 0.1,
     error: null,
+  };
+}
+
+function inventoryOf(
+  enabledNames: string[],
+  { disabled = [], unknownDisabled = [] }: Partial<ReadReplicaInventory> = {}
+): ReadReplicaInventory {
+  return {
+    enabled: enabledNames.map(name => ({
+      name,
+      side: name === 'us-west' ? 'us' : 'eu',
+      url: `postgres://${name}`,
+    })),
+    disabled,
+    unknownDisabled,
   };
 }
 
@@ -153,7 +169,7 @@ describe('collectReplicationHealth', () => {
     mockPrimary([walSenderRow()], [slotRow()]);
 
     const report = await collectReplicationHealth({
-      targets: [],
+      inventory: inventoryOf([]),
       probe: async target => okProbe(target.name),
     });
 
@@ -166,7 +182,7 @@ describe('collectReplicationHealth', () => {
     mockPrimary([walSenderRow()], [slotRow()]);
 
     const report = await collectReplicationHealth({
-      targets: [],
+      inventory: inventoryOf([]),
       probe: async target => okProbe(target.name),
     });
 
@@ -179,11 +195,7 @@ describe('collectReplicationHealth', () => {
     mockPrimary([walSenderRow()], [slotRow()]);
 
     const report = await collectReplicationHealth({
-      targets: [
-        { name: 'us-west', url: 'postgres://a' },
-        { name: 'eu-central-1', url: 'postgres://b' },
-        { name: 'eu-central-2', url: 'postgres://c' },
-      ],
+      inventory: inventoryOf(['us-west', 'eu-central-1', 'eu-central-2']),
       probe: async target => okProbe(target.name),
     });
 
@@ -191,11 +203,74 @@ describe('collectReplicationHealth', () => {
     expect(report.healthy).toBe(true);
   });
 
+  it('expects fewer replicas in production when some are explicitly disabled', async () => {
+    process.env.VERCEL_ENV = 'production';
+    mockPrimary([walSenderRow()], [slotRow()]);
+    const probe = jest.fn(async (target: { name: string }) => okProbe(target.name));
+
+    const report = await collectReplicationHealth({
+      inventory: inventoryOf(['us-west', 'eu-central-1'], { disabled: ['eu-central-2'] }),
+      probe,
+    });
+
+    expect(report.errors).toEqual([]);
+    expect(report.healthy).toBe(true);
+    expect(report.disabledReplicas).toEqual(['eu-central-2']);
+    expect(probe.mock.calls.map(([target]) => target.name)).toEqual(['us-west', 'eu-central-1']);
+  });
+
+  it('reports an error when every replica is disabled in production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    mockPrimary([walSenderRow()], [slotRow()]);
+    const disabled = ['us-west', 'eu-central-1', 'eu-central-2'];
+    const probe = jest.fn(async (target: { name: string }) => okProbe(target.name));
+
+    const report = await collectReplicationHealth({
+      inventory: inventoryOf([], { disabled }),
+      probe,
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.errors).toEqual([
+      'POSTGRES_REPLICAS_DISABLED disables all read replicas; enable at least one in production',
+    ]);
+    expect(report.disabledReplicas).toEqual(disabled);
+    expect(probe).not.toHaveBeenCalled();
+  });
+
+  it('still flags a replica whose URL is missing but which is not disabled', async () => {
+    process.env.VERCEL_ENV = 'production';
+    mockPrimary([walSenderRow()], [slotRow()]);
+
+    const report = await collectReplicationHealth({
+      inventory: inventoryOf(['us-west'], { disabled: ['eu-central-2'] }),
+      probe: async target => okProbe(target.name),
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.errors).toEqual([expect.stringContaining('expected 2 read replicas but only 1')]);
+  });
+
+  it('flags a disable request for an unknown replica name', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    mockPrimary([walSenderRow()], [slotRow()]);
+
+    const report = await collectReplicationHealth({
+      inventory: inventoryOf(['us-west'], { unknownDisabled: ['eu-central-3'] }),
+      probe: async target => okProbe(target.name),
+    });
+
+    expect(report.healthy).toBe(false);
+    expect(report.errors).toEqual([
+      'POSTGRES_REPLICAS_DISABLED names unknown replicas: eu-central-3',
+    ]);
+  });
+
   it('is healthy when replicas are caught up and slots are safe', async () => {
     mockPrimary([walSenderRow()], [slotRow()]);
 
     const report = await collectReplicationHealth({
-      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      inventory: inventoryOf(['us-west']),
       probe: async target => okProbe(target.name),
     });
 
@@ -210,7 +285,7 @@ describe('collectReplicationHealth', () => {
     mockPrimary([walSenderRow()], [slotRow()]);
 
     const report = await collectReplicationHealth({
-      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      inventory: inventoryOf(['us-west']),
       probe: async target => ({
         name: target.name,
         status: 'unreachable',
@@ -241,7 +316,7 @@ describe('collectReplicationHealth', () => {
     );
 
     const report = await collectReplicationHealth({
-      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      inventory: inventoryOf(['us-west']),
       probe: async target => okProbe(target.name),
     });
 
@@ -257,7 +332,7 @@ describe('collectReplicationHealth', () => {
     );
 
     const report = await collectReplicationHealth({
-      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      inventory: inventoryOf(['us-west']),
       probe: async target => okProbe(target.name),
     });
 
@@ -271,7 +346,7 @@ describe('collectReplicationHealth', () => {
     mockPrimary([walSenderRow()], [slotRow()]);
 
     const report = await collectReplicationHealth({
-      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      inventory: inventoryOf(['us-west']),
       probe: async () => {
         throw new Error('boom');
       },
@@ -289,7 +364,7 @@ describe('collectReplicationHealth', () => {
     mockPrimary([walSenderRow()], [slotRow()]);
 
     const report = await collectReplicationHealth({
-      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      inventory: inventoryOf(['us-west']),
       probe: async () => {
         // Shape of a drizzle failure: generic wrapper message + real driver cause.
         throw Object.assign(new Error('Failed query: SELECT ...'), {
@@ -310,7 +385,7 @@ describe('collectReplicationHealth', () => {
       .mockResolvedValueOnce(queryResult([slotRow()]));
 
     const report = await collectReplicationHealth({
-      targets: [{ name: 'us-west', url: 'postgres://replica' }],
+      inventory: inventoryOf(['us-west']),
       probe: async target => okProbe(target.name),
     });
 

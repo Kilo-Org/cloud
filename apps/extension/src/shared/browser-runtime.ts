@@ -3852,7 +3852,9 @@ export const createBrowserRuntime = ({
         const resultText =
           alsoText === undefined
             ? successText
-            : [successText, alsoText].filter((part): part is string => part !== undefined).join(' ');
+            : [successText, alsoText]
+                .filter((part): part is string => part !== undefined)
+                .join(' ');
         const finalResult: EvalTabResult =
           resultText === undefined ? settled : { ok: true, value: resultText };
 

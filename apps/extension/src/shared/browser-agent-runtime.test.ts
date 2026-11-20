@@ -6155,6 +6155,52 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
     });
   });
 
+  it('answers a dialog from an inheriting frame (about:blank) with the tab’s own grant', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The blank iframe inherits the tab document's origin, so answering it acts where the tab already is.
+    pageDialog(cdp, { message: 'Saved', type: 'alert', url: 'about:blank' });
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'alert' } },
+    });
+  });
+
+  it('answers a dialog from a blob frame whose url names the tab’s origin', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, {
+      message: 'Saved',
+      type: 'alert',
+      url: `blob:${MAIN_ORIGIN}/1234-5678`,
+    });
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'alert' } },
+    });
+  });
+
+  it('still refuses a dialog from a genuinely opaque frame, which inherits nothing', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert', url: 'data:text/html,<p>hi</p>' });
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: 'opaque:null' }],
+      kind: 'needs_permission',
+      result: { error: NEEDS_PERMISSION_ERROR, ok: false },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+  });
+
   it('answers a dialog a granted frame opened once that frame’s origin is granted', async () => {
     const { cdp, runtime } = await createHarness();
     const payOrigin = 'https://pay.example.com';

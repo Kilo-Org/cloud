@@ -74,6 +74,7 @@ import type { BrowserCaller } from './browser-caller';
 import { clearBrowserToolResize } from './browser-tool-page-actions';
 import {
   BrowserToolDialogOpenError,
+  dialogOriginFor,
   dialogRefusalText,
   isHandleDialogTool,
   modalStateText,
@@ -2814,8 +2815,10 @@ export const createBrowserRuntime = ({
    * The frames a dialog answer is judged by. The page cannot report them (its
    * renderer is blocked), but the dialog names the frame that opened it: that
    * frame's document is the one the answer acts in, so its origin is the act
-   * origin. A dialog with no url is attributed to no frame at all, which fails
-   * closed as `opaque:null`.
+   * origin. A frame that inherits its creator's origin (`about:blank`,
+   * `about:srcdoc`, a `blob:` url) takes the tab's, as the gate does for such
+   * frames. A dialog with no url, or one from a genuinely opaque scheme
+   * (`data:`), is attributed to no frame at all, which fails closed.
    */
   const dialogFrameInventory = async (
     tabId: number,
@@ -2824,7 +2827,10 @@ export const createBrowserRuntime = ({
     const tab = await tabsApi.get?.(tabId);
     const url = dialog.url ?? tab?.url ?? '';
     const origin =
-      dialog.url === undefined ? 'opaque:null' : (toBrowserOrigin(dialog.url) ?? 'opaque:null');
+      dialog.url === undefined
+        ? 'opaque:null'
+        : (dialogOriginFor(dialog.url, toBrowserOrigin(tab?.url), toBrowserOrigin) ??
+          'opaque:null');
 
     return {
       childSessions: new Map(),

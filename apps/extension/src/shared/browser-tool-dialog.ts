@@ -15,6 +15,45 @@ import type { EvalTabResult } from './tab-debugger';
  */
 
 const HANDLE_DIALOG_TOOL = 'browser_handle_dialog';
+/** The two `about:` documents that carry no origin of their own and inherit one. */
+const INHERITED_ABOUT_URLS = ['about:blank', 'about:srcdoc'] as const;
+
+/**
+ * The origin a dialog's frame url stands for, given the tab's own document
+ * origin. A frame at `about:blank`, `about:srcdoc` or a `blob:` url inherits
+ * its creator's origin (a `blob:` url even spells it out), so a dialog from
+ * such a frame acts in the document that created it. Every other url is judged
+ * on its own; anything without an origin — `data:`, a url-less dialog — stays
+ * `undefined`, which the caller turns into a fail-closed `opaque:null`.
+ */
+export const dialogOriginFor = (
+  url: string | undefined,
+  tabOrigin: string | undefined,
+  originOf: (url: string | undefined) => string | undefined
+): string | undefined => {
+  if (url === undefined || url === '') {
+    return undefined;
+  }
+
+  const direct = originOf(url);
+
+  if (direct !== undefined) {
+    return direct;
+  }
+
+  // A `blob:` url embeds the creator's origin: `blob:https://host:port/uuid`.
+  if (url.startsWith('blob:')) {
+    return originOf(url.slice('blob:'.length));
+  }
+
+  if (
+    INHERITED_ABOUT_URLS.some(candidate => url === candidate || url.startsWith(`${candidate}#`))
+  ) {
+    return tabOrigin;
+  }
+
+  return undefined;
+};
 
 const textValueSchema = z.string();
 

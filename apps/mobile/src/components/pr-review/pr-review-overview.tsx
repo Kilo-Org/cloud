@@ -1,21 +1,22 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { CheckCheck, GitPullRequest } from '@/components/ui/icons';
+import { CheckCheck, Download, GitPullRequest, RefreshCw } from '@/components/ui/icons';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type ScrollViewProps, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { Card } from '@/components/ui/card';
+import { Section } from '@/components/ui/section';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { PrReviewOverviewSkeleton } from '@/components/pr-review/pr-review-overview-skeleton';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
 import { PrMergeSectionProvider } from '@/components/pr-review/merge/pr-merge-section-provider';
@@ -29,13 +30,11 @@ import {
 } from '@/components/pr-review/pr-review-overview-parts';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
-import { cn } from '@/lib/utils';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
@@ -120,11 +119,16 @@ export function PrReviewOverview({
   }, [t]);
 
   const state = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
-  // A retryable gateway-class failure (retryable or service-unavailable)
-  // with cached data keeps it on screen: a failed background refetch of a
-  // previously loaded PR must not blank the overview. Every other state, or
-  // a first load with no data, renders the error states below.
-  const keepCachedData = state?.kind === 'retryable' || state?.kind === 'service-unavailable';
+  // A recoverable failure (transient, gateway, or a read that never reached
+  // the server) with cached data keeps it on screen: a failed background
+  // refetch of a previously loaded PR must not blank the overview — and a
+  // reader who went offline has even less reason to lose what they had.
+  // Every other state, or a first load with no data, renders the error states
+  // below.
+  const keepCachedData =
+    state?.kind === 'retryable' ||
+    state?.kind === 'service-unavailable' ||
+    state?.kind === 'offline';
   if (state && (!pr.data || !keepCachedData)) {
     if (state.kind === 'not-found') {
       return (
@@ -143,9 +147,11 @@ export function PrReviewOverview({
           }
           action={
             isGitHub ? (
-              <Button className={cn('mt-3 w-full', STATE_ACTION_CLASS)} onPress={handleInstallApp}>
-                <Text>{t('prReview.installKiloGitHubApp')}</Text>
-              </Button>
+              <StateAction
+                label={t('prReview.installKiloGitHubApp')}
+                icon={Download}
+                onPress={handleInstallApp}
+              />
             ) : (
               // GitLab folds its connection failures (no integration, inactive
               // integration) into the same NOT_FOUND a deleted merge request
@@ -200,16 +206,29 @@ export function PrReviewOverview({
           title={t('prReview.reconnectNotice.title')}
           description={t('prReview.reconnectNotice.message')}
           action={
-            <Button
-              className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
+            <StateAction
+              label={t('prReview.checkConnection')}
+              icon={RefreshCw}
+              loading={connection.isPending}
               onPress={() => {
                 connection.mutate();
               }}
-              loading={connection.isPending}
-            >
-              <Text>{t('prReview.checkConnection')}</Text>
-            </Button>
+            />
           }
+        />
+      );
+    }
+    // The read never reached the server: name the connection, not the backend,
+    // and keep the Retry a restored network makes useful.
+    if (state.kind === 'offline') {
+      return (
+        <QueryError
+          refreshControl={refreshControl}
+          variant="offline"
+          onRetry={() => {
+            void pr.refetch();
+          }}
+          isRetrying={pr.isFetching}
         />
       );
     }
@@ -273,10 +292,7 @@ export function PrReviewOverview({
     >
       <View className="gap-3">
         <PrStateChip descriptor={chip} />
-        <Text
-          className="text-[22px] font-semibold leading-[1.75rem] text-foreground"
-          numberOfLines={3}
-        >
+        <Text className="text-lg font-semibold text-foreground" numberOfLines={3}>
           {data.title}
         </Text>
         <PrAuthorRow author={data.author} />
@@ -291,18 +307,17 @@ export function PrReviewOverview({
 
       <PrOverviewMeta overview={data} />
 
-      <View className="gap-2">
-        <PrReviewSectionLabel label={t('prReview.description')} />
+      <Section label={t('prReview.description')}>
         {data.bodyMarkdown && data.bodyMarkdown.trim().length > 0 ? (
-          <View className="rounded-lg bg-card p-4">
+          <Card>
             <MarkdownText value={data.bodyMarkdown} variant="assistant" />
-          </View>
+          </Card>
         ) : (
           <Text variant="muted" className="text-sm italic">
             {t('prReview.noDescriptionProvided')}
           </Text>
         )}
-      </View>
+      </Section>
 
       <PrReviewChecksSection owner={owner} repo={repo} number={number} checks={checks} />
 

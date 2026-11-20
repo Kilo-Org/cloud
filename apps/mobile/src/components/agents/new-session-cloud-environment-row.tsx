@@ -2,12 +2,14 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type TFunction } from 'i18next';
 
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
   LINE_ACTION_BOX_CLASS,
   LINE_ACTION_HIT_SLOP,
-  ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import {
   buildSummaryLabel,
@@ -32,10 +34,7 @@ type NewSessionCloudEnvironmentRowProps = {
   onOpen: () => void;
 };
 
-const CARD_CLASS = cn(
-  ROW_TARGET_CLASS,
-  'flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5'
-);
+const CARD_CLASS = FIELD_TRIGGER_FRAME_CLASS;
 
 /**
  * The build line under the picked environment: a failed list, a failed build
@@ -103,7 +102,7 @@ export function NewSessionCloudEnvironmentRow({
   }
 
   const body = (
-    <>
+    <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
       <View className="min-w-0 flex-1 gap-1">
         <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
           {label}
@@ -115,16 +114,14 @@ export function NewSessionCloudEnvironmentRow({
         )}
       </View>
       {opensPicker ? <ChevronDown size={18} color={colors.mutedForeground} /> : null}
-    </>
+    </View>
   );
 
   const canOpen = opensPicker && !disabled;
 
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.cloudEnvironment')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('agentChat.newSession.cloudEnvironment')} />
       {/* The card's own chrome lives on the Pressable, exactly as the profile
           row below does, and the Pressable is never flattened: an unstyled
           Pressable around a styled card collapses into that card's native view

@@ -132,57 +132,28 @@ describe('parseRemoteMcpServers', () => {
   });
 
   it('normalizes a stored URL and keeps a valid server', () => {
-    expect(
-      parseRemoteMcpServers(
-        JSON.stringify([
-          {
-            id: 'alpha',
-            name: 'Alpha',
-            url: 'https://alpha.example/mcp/',
-            auth: { type: 'bearer', token: 'secret' },
-            enabled: false,
-          },
-        ])
-      )
-    ).toEqual([
-      {
-        id: 'alpha',
-        name: 'Alpha',
-        url: 'https://alpha.example/mcp',
-        auth: { type: 'bearer', token: 'secret' },
-        enabled: false,
-      },
+    const stored = row('alpha', {
+      name: 'Alpha',
+      url: 'https://alpha.example/mcp/',
+      auth: { type: 'bearer', token: 'secret' },
+      enabled: false,
+    });
+
+    expect(parseRemoteMcpServers(JSON.stringify([stored]))).toEqual([
+      { ...stored, url: 'https://alpha.example/mcp' },
     ]);
   });
 
   it('keeps one server when two persisted rows name one root endpoint', () => {
-    expect(
-      parseRemoteMcpServers(
-        JSON.stringify([
-          {
-            id: 'alpha',
-            name: 'Alpha',
-            url: 'https://alpha.example/',
-            auth: { type: 'bearer', token: 'secret' },
-            enabled: true,
-          },
-          {
-            id: 'beta',
-            name: 'Beta',
-            url: 'https://alpha.example',
-            auth: { type: 'none' },
-            enabled: true,
-          },
-        ])
-      )
-    ).toEqual([
-      {
-        id: 'alpha',
-        name: 'Alpha',
-        url: 'https://alpha.example',
-        auth: { type: 'bearer', token: 'secret' },
-        enabled: true,
-      },
+    const first = row('alpha', {
+      name: 'Alpha',
+      url: 'https://alpha.example/',
+      auth: { type: 'bearer', token: 'secret' },
+    });
+    const second = row('beta', { name: 'Beta', url: 'https://alpha.example' });
+
+    expect(parseRemoteMcpServers(JSON.stringify([first, second]))).toEqual([
+      { ...first, url: 'https://alpha.example' },
     ]);
   });
 
@@ -219,8 +190,33 @@ describe('remote MCP server store', () => {
 
     expect(() =>
       addRemoteMcpServer(draft({ name: 'Second', url: 'https://remote.example/mcp' }))
-    ).toThrow('Remote MCP URL is already saved.');
+    ).toThrow(expect.objectContaining({ problem: 'duplicateUrl' }));
     expect(listRemoteMcpServers()).toHaveLength(1);
+  });
+
+  it('refuses an edit that names a missing server', () => {
+    expect(() => updateRemoteMcpServer('missing', { name: 'Ghost' })).toThrow(
+      expect.objectContaining({ problem: 'notFound' })
+    );
+    expect(() => deleteRemoteMcpServer('missing')).toThrow(
+      expect.objectContaining({ problem: 'notFound' })
+    );
+    expect(() => setRemoteMcpServerEnabled('missing', false)).toThrow(
+      expect.objectContaining({ problem: 'notFound' })
+    );
+  });
+
+  it('refuses an edit that reuses another server URL', () => {
+    addRemoteMcpServer(draft({ name: 'Alpha', url: 'https://a.example/mcp' }));
+    const second = addRemoteMcpServer(draft({ name: 'Beta', url: 'https://b.example/mcp' }));
+
+    expect(() => updateRemoteMcpServer(second.id, { url: 'https://a.example/mcp' })).toThrow(
+      expect.objectContaining({ problem: 'duplicateUrl' })
+    );
+    expect(listRemoteMcpServers().map(server => server.url)).toEqual([
+      'https://a.example/mcp',
+      'https://b.example/mcp',
+    ]);
   });
 
   it('uniquifies ids for two servers with the same name', () => {

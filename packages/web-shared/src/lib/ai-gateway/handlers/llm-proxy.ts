@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { type NextResponse as NextResponseType } from 'next/server';
-import { type NextRequest } from 'next/server';
+import { after, type NextRequest } from 'next/server';
+import { ensureAnthropicUserProfile } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/ensure';
+import {
+  isAnthropicUserProfileRoute,
+  resolveGatewayAnthropicUserProfile,
+} from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/gateway';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
@@ -248,6 +253,21 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Overlaps routing work; a failed lookup only drops the profile header.
+  const anthropicUserProfilePromise = callerPromise
+    .then(caller =>
+      caller.kind === 'signed-in'
+        ? resolveGatewayAnthropicUserProfile({
+            model: effectiveModelIdLowerCased,
+            user: caller.user,
+            organizationId: caller.organizationId,
+          })
+        : null
+    )
+    .catch((error: unknown) => {
+      console.error('Failed to resolve the Anthropic user profile', error);
+      return null;
+    });
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
   // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
@@ -333,6 +353,7 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     countryCode,
+    taskId: headers.taskId,
     boundedSpending: requestCostLimit !== null,
     providerMetadataCapture,
     effectivePrivacy,
@@ -362,7 +383,7 @@ export async function handleLlmProxyRequest(
     provider: route.provider.type,
     requested_model: effectiveModelIdLowerCased,
     is_free: route.isFree,
-    custom_llm_pricing: customLlm?.definition.pricing ?? null,
+    custom_llm_pricing: route.customLlmPricing ?? customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
@@ -426,6 +447,21 @@ export async function handleLlmProxyRequest(
     return guardrailRejection;
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
+  const anthropicUserProfile = await anthropicUserProfilePromise;
+  if (
+    anthropicUserProfile?.create &&
+    !anthropicUserProfile.userProfileId &&
+    isAnthropicUserProfileRoute(route)
+  ) {
+    // This request goes out unattributed; later ones carry the stored profile.
+    const { subject } = anthropicUserProfile;
+    after(() =>
+      ensureAnthropicUserProfile(subject, countryCode).then(
+        () => undefined,
+        (error: unknown) => console.error('Failed to create an Anthropic user profile', error)
+      )
+    );
+  }
 
   const {
     attempt,
@@ -448,6 +484,7 @@ export async function handleLlmProxyRequest(
       signal: request.signal,
       vercelRequestId: headers.vercelRequestId,
       dataRegion,
+      anthropicUserProfileId: anthropicUserProfile?.userProfileId ?? null,
       costLimit:
         requestCostLimit !== null && requestCostBalance
           ? {
@@ -464,6 +501,9 @@ export async function handleLlmProxyRequest(
   }
   if (attempt.type === 'error') return attempt.response;
   usageContext.provider = providerContext.provider.type;
+  // A partner route bills its own pricing; the gateway route it fails over to bills the model's.
+  usageContext.custom_llm_pricing =
+    providerContext.customLlmPricing ?? customLlm?.definition.pricing ?? null;
 
   const { settings: organizationSettings } = await balanceAndSettingsPromise;
   return await respondToUpstream({
@@ -494,6 +534,7 @@ export async function handleLlmProxyRequest(
           )
         : null,
     signal: request.signal,
+    keepAliveUntilFirstByte: caller.kind === 'signed-in' && caller.cloudAgentRuntimeProxied,
     captureEnkryptOutputReport: report =>
       providerMetadataCapture?.captureEnkryptOutputReport(report),
   });

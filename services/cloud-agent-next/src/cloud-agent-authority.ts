@@ -6,41 +6,42 @@ import {
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
-import {
-  renewRuntimeAuthorization,
-  sealRuntimeAuthorization,
-} from '@kilocode/worker-utils/runtime-authorization';
+import { egressModeSchema } from '@kilocode/worker-utils/egress-allowlist';
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import {
   RuntimeAuthorizationSchema,
   type RuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization-contract';
-import {
-  signModernKiloToken,
-  verifyKiloTokenForPolicy,
-} from '@kilocode/worker-utils/kilo-token-policy';
 import { backendUrlForSandbox } from './kilo/kilo-targets.js';
 import {
   isLegacySharedSandboxWorkspace,
   type SessionMetadata,
 } from './persistence/session-metadata.js';
-import { logRuntimeAuthorizationDiagnostic } from './session/runtime-authorization-diagnostics.js';
 
 export const CLOUD_AGENT_PARENT_AUTHORITY_DENIED = 'Cloud Agent parent authority denied';
 
 export const CLOUD_AGENT_MCP_URL = 'https://mcp.kiloapps.io/mcp';
 
+const WORKTREE_ID_PREFIX = 'worktree_';
+const WORKSPACE_SESSION_ID_PREFIX = 'workspace_';
+export const workspaceSessionIdSchema = z.templateLiteral([WORKSPACE_SESSION_ID_PREFIX, z.uuid()]);
+
+/** The workspace a route or chat belongs to, as the Sandbox DO sees it. */
 export type WorkspaceMcpBinding = {
-  worktreeId: string;
+  workspaceSessionId: string;
+  worktreeId: string | null;
   ownerId: string;
   organizationId: string | null;
 };
 
-const WORKTREE_ID_PREFIX = 'worktree_';
-const WORKSPACE_SESSION_ID_PREFIX = 'workspace_';
-const workspaceSessionIdSchema = z.templateLiteral([WORKSPACE_SESSION_ID_PREFIX, z.uuid()]);
-
-// Worktree creation uses the initial root's UUID. Never elect a replacement sibling.
-export function workspaceMcpAnchorSessionId(
+/**
+ * The canonical workspace ID. A worktree is named after the UUID of the chat
+ * that created it, so `worktree_<uuid>` maps to `workspace_<uuid>` for the
+ * whole workspace's life, including after that chat is deleted. A session
+ * without a worktree is its own workspace. The ID names the workspace; it never
+ * selects a chat whose authorization grants anything.
+ */
+export function workspaceSessionIdForScope(
   scopeId: string | null | undefined,
   sessionId: string
 ): string | undefined {
@@ -53,26 +54,195 @@ export function workspaceMcpAnchorSessionId(
   return parsed.success ? parsed.data : undefined;
 }
 
+export function workspaceSessionIdForMetadata(metadata: SessionMetadata): string | undefined {
+  return workspaceSessionIdForScope(metadata.workspace?.worktreeId, metadata.identity.sessionId);
+}
+
+/** Whether this chat created its workspace: the only chat a workspace record is seeded from. */
 export function isWorkspaceAnchorMetadata(metadata: SessionMetadata | null): boolean {
   if (metadata === null) return false;
-  const worktreeId = metadata.workspace?.worktreeId;
-  if (worktreeId === undefined) return true;
+  return workspaceSessionIdForMetadata(metadata) === metadata.identity.sessionId;
+}
+
+export const workspaceEgressSchema = z
+  .object({
+    egressMode: egressModeSchema,
+    egressAllowlist: z.array(z.string()).optional(),
+    egressAudit: z.literal(true).optional(),
+  })
+  .strict();
+
+/**
+ * The workspace's own Cloud Agent authority. It is bound to the canonical
+ * workspace ID, owner and organization, and carries its own runtime
+ * delegation and revocation state, independent of any chat's authorization.
+ */
+export const WorkspaceAuthorityRecordSchema = z
+  .object({
+    version: z.literal(1),
+    workspaceSessionId: workspaceSessionIdSchema,
+    worktreeId: cloudAgentWorktreeIdSchema.nullable(),
+    ownerId: z.string().min(1),
+    organizationId: z.string().min(1).nullable(),
+    createdOnPlatform: z.string().optional(),
+    egress: workspaceEgressSchema.optional(),
+    authorization: RuntimeAuthorizationSchema,
+    establishedAt: z.number().int().nonnegative(),
+  })
+  .strict()
+  .superRefine((record, ctx) => {
+    if (
+      record.authorization.resourceKind !== 'cloud-agent-next' ||
+      record.authorization.resourceId !== record.workspaceSessionId ||
+      record.authorization.userId !== record.ownerId ||
+      (record.authorization.organizationId ?? null) !== record.organizationId ||
+      (record.worktreeId !== null &&
+        workspaceSessionIdForScope(record.worktreeId, record.workspaceSessionId) !==
+          record.workspaceSessionId)
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'Workspace authority binding mismatch' });
+    }
+  });
+
+export type WorkspaceAuthorityRecord = z.infer<typeof WorkspaceAuthorityRecordSchema>;
+
+export type WorkspaceChildEntry = {
+  cloudAgentSessionId: string;
+  initialMessageId?: string;
+  worktreeId?: string;
+};
+
+/** What the creating chat hands its workspace once: authorization and legacy child hints. */
+export type WorkspaceAuthoritySeed = {
+  metadata: SessionMetadata;
+  authorization: unknown;
+  children: WorkspaceChildEntry[];
+};
+export type WorkspaceEgress = z.infer<typeof workspaceEgressSchema>;
+
+/** The network policy a workspace records from the chat that created it. */
+export function workspaceEgressFromMetadata(
+  metadata: SessionMetadata
+): WorkspaceEgress | undefined {
+  const workspace = metadata.workspace;
+  if (workspace?.egressMode !== 'allowlist' && workspace?.egressAudit !== true) return undefined;
+  return {
+    egressMode: workspace.egressMode ?? 'unrestricted',
+    ...(workspace.egressMode === 'allowlist'
+      ? { egressAllowlist: workspace.egressAllowlist ?? [] }
+      : {}),
+    ...(workspace.egressAudit === true ? { egressAudit: true as const } : {}),
+  };
+}
+
+/**
+ * The record a workspace adopts once from the chat that created it. The
+ * authorization is copied as stored, including an expired or revoked state, so
+ * adoption never restores anything the creating chat had lost. Adopting it
+ * keeps grants issued before the workspace owned its authority valid until
+ * their own expiry.
+ */
+export function workspaceAuthorityFromAnchor(
+  seed: { metadata: SessionMetadata; authorization: unknown },
+  now: number
+): WorkspaceAuthorityRecord | undefined {
+  const { metadata } = seed;
+  if (
+    !isWorkspaceAnchorMetadata(metadata) ||
+    metadata.allowSubagentSessions !== true ||
+    isLegacySharedSandboxWorkspace(metadata.workspace)
+  ) {
+    return undefined;
+  }
+  const authorization = RuntimeAuthorizationSchema.safeParse(seed.authorization);
+  if (!authorization.success) return undefined;
+  const record = WorkspaceAuthorityRecordSchema.safeParse({
+    version: 1,
+    workspaceSessionId: metadata.identity.sessionId,
+    worktreeId: metadata.workspace?.worktreeId ?? null,
+    ownerId: metadata.identity.userId,
+    organizationId: metadata.identity.orgId ?? null,
+    ...(metadata.identity.createdOnPlatform === undefined
+      ? {}
+      : { createdOnPlatform: metadata.identity.createdOnPlatform }),
+    ...(workspaceEgressFromMetadata(metadata) === undefined
+      ? {}
+      : { egress: workspaceEgressFromMetadata(metadata) }),
+    authorization: authorization.data,
+    establishedAt: now,
+  });
+  return record.success ? record.data : undefined;
+}
+
+export type WorkspaceAuthorityUnavailableReason =
+  | 'stored_authorization_revoked'
+  | 'delegation_expired';
+
+export function workspaceAuthorityUnavailableReason(
+  record: WorkspaceAuthorityRecord,
+  now: number
+): WorkspaceAuthorityUnavailableReason | undefined {
+  if (record.authorization.state !== 'active') return 'stored_authorization_revoked';
+  // Credentials carry whole seconds, so a delegation in its last second is already spent.
+  if (workspaceAuthorityScope(record).expiresAt * 1000 <= now) return 'delegation_expired';
+  return undefined;
+}
+
+export function workspaceAuthorityScope(record: WorkspaceAuthorityRecord): CloudAgentAuthority {
+  return {
+    version: 1,
+    ownerId: record.ownerId,
+    parentSessionId: record.workspaceSessionId,
+    organizationId: record.organizationId,
+    authorizationId: record.authorization.id,
+    expiresAt: Math.floor(Date.parse(record.authorization.delegationExpiresAt) / 1000),
+  };
+}
+
+function hasWorkspaceAuthorityMismatch(
+  record: WorkspaceAuthorityRecord,
+  scope: CloudAgentAuthority
+): boolean {
   return (
-    worktreeId ===
-    `${WORKTREE_ID_PREFIX}${metadata.identity.sessionId.slice(WORKSPACE_SESSION_ID_PREFIX.length)}`
+    scope.parentSessionId !== record.workspaceSessionId ||
+    scope.ownerId !== record.ownerId ||
+    scope.organizationId !== record.organizationId ||
+    scope.authorizationId !== record.authorization.id ||
+    scope.expiresAt * 1000 > Date.parse(record.authorization.delegationExpiresAt)
   );
 }
 
-function matchesWorkspaceMcpBinding(
-  metadata: SessionMetadata | null,
-  workspace: WorkspaceMcpBinding | undefined
+/**
+ * The stored part of every authority check: the presented authority names this
+ * workspace's current authorization, which is active and unexpired. Live
+ * owner, organization and device-session checks follow in the caller.
+ */
+export function assertWorkspaceAuthority(
+  record: WorkspaceAuthorityRecord | undefined,
+  authority: unknown,
+  now = Date.now()
+): asserts record is WorkspaceAuthorityRecord {
+  const scope = CloudAgentAuthoritySchema.safeParse(authority);
+  if (
+    record === undefined ||
+    !scope.success ||
+    hasWorkspaceAuthorityMismatch(record, scope.data) ||
+    workspaceAuthorityUnavailableReason(record, now) !== undefined ||
+    scope.data.expiresAt * 1000 <= now
+  ) {
+    throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+  }
+}
+
+export function matchesWorkspaceMcpBinding(
+  record: WorkspaceAuthorityRecord,
+  binding: WorkspaceMcpBinding
 ): boolean {
   return (
-    workspace === undefined ||
-    (metadata !== null &&
-      metadata.workspace?.worktreeId === workspace.worktreeId &&
-      metadata.identity.userId === workspace.ownerId &&
-      (metadata.identity.orgId ?? null) === workspace.organizationId)
+    binding.workspaceSessionId === record.workspaceSessionId &&
+    binding.worktreeId === record.worktreeId &&
+    binding.ownerId === record.ownerId &&
+    binding.organizationId === record.organizationId
   );
 }
 
@@ -86,6 +256,58 @@ export function resolveCloudAgentMcpUrl(override?: string): string {
     return CLOUD_AGENT_MCP_URL;
   }
 }
+
+/** Signs the workspace MCP credential. Its lifetime ends with the workspace delegation. */
+export async function signWorkspaceMcpGrant(input: {
+  record: WorkspaceAuthorityRecord;
+  pepper: string | null;
+  secret: string;
+  mcpUrl?: string;
+  now: number;
+}): Promise<{ url: string; token: string; expiresAt: number }> {
+  const scope = workspaceAuthorityScope(input.record);
+  const issuedAt = Math.floor(input.now / 1000);
+  const { token } = await signModernKiloToken({
+    userId: scope.ownerId,
+    pepper: input.pepper,
+    secret: input.secret,
+    expiresInSeconds: scope.expiresAt - issuedAt,
+    audience: 'kilo-api',
+    tokenPurpose: 'delegated-workload',
+    credentialExchange: false,
+    env: input.record.authorization.env,
+    extra: {
+      ...(scope.organizationId === null ? {} : { organizationId: scope.organizationId }),
+      cloudAgentAuthority: scope,
+    },
+    now: new Date(issuedAt * 1000),
+  });
+  return { url: resolveCloudAgentMcpUrl(input.mcpUrl), token, expiresAt: scope.expiresAt };
+}
+
+/**
+ * A runtime authorization for a direct child or a new chat in this workspace.
+ * It inherits the workspace's bindings and never outlives its delegation.
+ */
+export function deriveWorkspaceRuntimeAuthorization(
+  record: WorkspaceAuthorityRecord,
+  resourceId: string,
+  now: number
+): RuntimeAuthorization {
+  if (
+    !resourceId.startsWith(WORKSPACE_SESSION_ID_PREFIX) ||
+    resourceId === record.workspaceSessionId
+  ) {
+    throw new Error('Cloud Agent delegation requires an independent workspace session');
+  }
+  return RuntimeAuthorizationSchema.parse({
+    ...record.authorization,
+    id: crypto.randomUUID(),
+    resourceId,
+    issuedAt: new Date(now).toISOString(),
+  });
+}
+
 const workerPreparationMetadataSchema = z
   .object({
     platform: z.literal('github').optional(),
@@ -126,204 +348,4 @@ export function validateScopedWorkerPreparation(authority: CloudAgentAuthority, 
       ? {}
       : { organizationId: parsed.kilocodeOrganizationId }),
   });
-}
-
-function hasCloudAgentParentAuthorityMismatch(
-  metadata: SessionMetadata | null,
-  authorization: RuntimeAuthorization,
-  scope: CloudAgentAuthority
-): boolean {
-  return (
-    !metadata ||
-    !isWorkspaceAnchorMetadata(metadata) ||
-    metadata.allowSubagentSessions !== true ||
-    isLegacySharedSandboxWorkspace(metadata.workspace) ||
-    !metadata.identity.sessionId.startsWith('workspace_') ||
-    metadata.identity.sessionId !== scope.parentSessionId ||
-    metadata.identity.userId !== scope.ownerId ||
-    (metadata.identity.orgId ?? null) !== scope.organizationId ||
-    authorization.resourceKind !== 'cloud-agent-next' ||
-    authorization.resourceId !== scope.parentSessionId ||
-    authorization.userId !== scope.ownerId ||
-    (authorization.organizationId ?? null) !== scope.organizationId ||
-    authorization.id !== scope.authorizationId ||
-    scope.expiresAt * 1000 > Date.parse(authorization.delegationExpiresAt)
-  );
-}
-
-function parentDelegationUnavailableReason(authorization: RuntimeAuthorization, now: number) {
-  if (authorization.state !== 'active') return 'stored_authorization_revoked';
-  if (Date.parse(authorization.delegationExpiresAt) <= now) return 'delegation_expired';
-  return undefined;
-}
-
-export function assertCloudAgentParentAuthority(
-  metadata: SessionMetadata | null,
-  authorization: RuntimeAuthorization,
-  authority: CloudAgentAuthority,
-  now = Date.now()
-): void {
-  const scope = CloudAgentAuthoritySchema.parse(authority);
-  if (
-    hasCloudAgentParentAuthorityMismatch(metadata, authorization, scope) ||
-    parentDelegationUnavailableReason(authorization, now) !== undefined ||
-    scope.expiresAt * 1000 <= now
-  ) {
-    throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-  }
-}
-
-type ParentAuthorityContext = {
-  metadata: () => Promise<SessionMetadata | null>;
-  authorization: () => Promise<unknown>;
-  secret: string;
-  connectionString: string;
-  mcpUrl?: string;
-};
-
-export async function issueCloudAgentMcpGrant(
-  input: ParentAuthorityContext & { workspace?: WorkspaceMcpBinding }
-): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
-  const metadata = await input.metadata();
-  if (metadata?.allowSubagentSessions !== true) return undefined;
-  if (!isWorkspaceAnchorMetadata(metadata)) return undefined;
-  if (!matchesWorkspaceMcpBinding(metadata, input.workspace)) return undefined;
-  const authorization = RuntimeAuthorizationSchema.parse(await input.authorization());
-  const nowMs = Date.now();
-  const now = Math.floor(nowMs / 1000);
-  const scope: CloudAgentAuthority = {
-    version: 1,
-    ownerId: metadata.identity.userId,
-    parentSessionId: metadata.identity.sessionId,
-    organizationId: metadata.identity.orgId ?? null,
-    authorizationId: authorization.id,
-    expiresAt: Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000),
-  };
-  const unavailableReason = parentDelegationUnavailableReason(authorization, nowMs);
-  if (
-    unavailableReason !== undefined &&
-    !hasCloudAgentParentAuthorityMismatch(
-      metadata,
-      authorization,
-      CloudAgentAuthoritySchema.parse(scope)
-    )
-  ) {
-    logRuntimeAuthorizationDiagnostic(scope.parentSessionId, 'mcp_grant', unavailableReason);
-    return undefined;
-  }
-  assertCloudAgentParentAuthority(metadata, authorization, scope);
-  const renewed = await renewRuntimeAuthorization({
-    authorization,
-    secret: input.secret,
-    connectionString: input.connectionString,
-  });
-  const verified = await verifyKiloTokenForPolicy(renewed.token, input.secret, {
-    audience: 'kilo-api',
-    mode: 'required',
-  });
-  const current = RuntimeAuthorizationSchema.parse(await input.authorization());
-  const currentMetadata = await input.metadata();
-  assertCloudAgentParentAuthority(currentMetadata, current, scope);
-  if (!matchesWorkspaceMcpBinding(currentMetadata, input.workspace)) return undefined;
-  const { token } = await signModernKiloToken({
-    userId: scope.ownerId,
-    pepper: verified.claims.apiTokenPepper ?? null,
-    secret: input.secret,
-    expiresInSeconds: scope.expiresAt - now,
-    audience: 'kilo-api',
-    tokenPurpose: 'delegated-workload',
-    credentialExchange: false,
-    env: authorization.env,
-    extra: {
-      ...(scope.organizationId === null ? {} : { organizationId: scope.organizationId }),
-      cloudAgentAuthority: scope,
-    },
-    now: new Date(now * 1000),
-  });
-  return { url: resolveCloudAgentMcpUrl(input.mcpUrl), token, expiresAt: scope.expiresAt };
-}
-
-export async function authorizeCloudAgentChild(
-  input: ParentAuthorityContext & {
-    authority: CloudAgentAuthority;
-    childSessionId: string;
-  }
-): Promise<{ token: string; seal: string }> {
-  if (
-    !input.childSessionId.startsWith('workspace_') ||
-    input.childSessionId === input.authority.parentSessionId
-  ) {
-    throw new Error('Cloud Agent child requires an independent workspace session');
-  }
-  const parent = RuntimeAuthorizationSchema.parse(await input.authorization());
-  assertCloudAgentParentAuthority(await input.metadata(), parent, input.authority);
-  const child = RuntimeAuthorizationSchema.parse({
-    ...parent,
-    id: crypto.randomUUID(),
-    resourceId: input.childSessionId,
-    issuedAt: new Date().toISOString(),
-  });
-  const issued = await renewRuntimeAuthorization({
-    authorization: child,
-    secret: input.secret,
-    connectionString: input.connectionString,
-  });
-  const current = RuntimeAuthorizationSchema.parse(await input.authorization());
-  assertCloudAgentParentAuthority(await input.metadata(), current, input.authority);
-  return { token: issued.token, seal: await sealRuntimeAuthorization(child, input.secret) };
-}
-
-/**
- * Mint the runtime authorization for a new sibling chat in the parent's
- * workspace. Unlike a child, the sibling shares the parent's worktree and has
- * no spawn lineage, so it is a workspace root with its own authorization.
- */
-export async function authorizeCloudAgentWorkspaceSibling(input: {
-  parentSessionId: string;
-  siblingSessionId: string;
-  secret: string;
-  connectionString: string;
-  metadata: () => Promise<SessionMetadata | null>;
-  authorization: () => Promise<unknown>;
-}): Promise<{ token: string; seal: string }> {
-  if (
-    !input.siblingSessionId.startsWith('workspace_') ||
-    input.siblingSessionId === input.parentSessionId
-  ) {
-    throw new Error('Cloud Agent sibling requires an independent workspace session');
-  }
-  const metadata = await input.metadata();
-  if (metadata?.identity.sessionId !== input.parentSessionId) {
-    throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-  }
-  const authorization = RuntimeAuthorizationSchema.parse(await input.authorization());
-  const now = Math.floor(Date.now() / 1000);
-  const scope: CloudAgentAuthority = {
-    version: 1,
-    ownerId: metadata.identity.userId,
-    parentSessionId: metadata.identity.sessionId,
-    organizationId: metadata.identity.orgId ?? null,
-    authorizationId: authorization.id,
-    expiresAt: Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000),
-  };
-  if (scope.expiresAt <= now) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-  assertCloudAgentParentAuthority(metadata, authorization, scope);
-  const sibling = RuntimeAuthorizationSchema.parse({
-    ...authorization,
-    id: crypto.randomUUID(),
-    resourceId: input.siblingSessionId,
-    issuedAt: new Date().toISOString(),
-  });
-  const issued = await renewRuntimeAuthorization({
-    authorization: sibling,
-    secret: input.secret,
-    connectionString: input.connectionString,
-  });
-  const current = RuntimeAuthorizationSchema.parse(await input.authorization());
-  const currentMetadata = await input.metadata();
-  if (currentMetadata?.identity.sessionId !== input.parentSessionId) {
-    throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-  }
-  assertCloudAgentParentAuthority(currentMetadata, current, scope);
-  return { token: issued.token, seal: await sealRuntimeAuthorization(sibling, input.secret) };
 }

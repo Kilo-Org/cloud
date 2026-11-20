@@ -5,13 +5,13 @@ import {
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
 import {
-  createDeviceSession,
   createDeviceSessionWithAttestedKey,
-  issueSessionCredentials,
+  createDeviceSessionWithCredentials,
 } from '@/lib/auth/device-sessions';
 import {
   requireAdmissionPayload,
   countAdmissionCondition,
+  reportAttestedKeyCollision,
   verifyAdmissionAsync,
   KeyCollisionError,
   type VerifyAdmissionOk,
@@ -94,7 +94,6 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
   if (verification.keyId !== undefined) {
     try {
       const combined = await createDeviceSessionWithAttestedKey({
-        userId: auth.user.id,
         userAgent,
         user: auth.user,
         verification,
@@ -109,8 +108,7 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
       );
     } catch (error) {
       if (error instanceof KeyCollisionError) {
-        captureMessage('native_attested_key_cross_user_collision');
-        countAdmissionCondition('native_admission_refused');
+        reportAttestedKeyCollision();
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
       // Without the key row the client would hold an id the server cannot
@@ -120,15 +118,17 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
     }
   }
 
-  const sessionId = await createDeviceSession({ userId: auth.user.id, userAgent });
-
-  const pair = await issueSessionCredentials(auth.user, sessionId);
+  const credentials = await createDeviceSessionWithCredentials({
+    userId: auth.user.id,
+    userAgent,
+    user: auth.user,
+  });
 
   return NextResponse.json(
     {
-      token: pair.token,
-      refreshToken: pair.refreshToken,
-      expiresIn: pair.expiresIn,
+      token: credentials.token,
+      refreshToken: credentials.refreshToken,
+      expiresIn: credentials.expiresIn,
     },
     { status: 200, headers: { 'Cache-Control': 'no-store' } }
   );

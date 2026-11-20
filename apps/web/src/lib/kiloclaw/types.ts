@@ -1,6 +1,7 @@
 import type { EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
 import type { InstanceTierKey, InstanceType } from '@kilocode/kiloclaw-instance-tiers';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
+import type { KiloClawProvider } from '@kilocode/db/schema-types';
 
 /** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
 export type ImageVersionEntry = {
@@ -156,9 +157,6 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
-// Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
-export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank';
-
 export type ProviderRolloutConfig = {
   northflank: {
     personalTrafficPercent: number;
@@ -181,7 +179,7 @@ export type RestoreVolumeSnapshotResponse = {
 export type PlatformStatusResponse = {
   userId: string | null;
   sandboxId: string | null;
-  provider: KiloClawProviderId | null;
+  provider: KiloClawProvider | null;
   runtimeId: string | null;
   storageId: string | null;
   region: string | null;

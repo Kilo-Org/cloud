@@ -4,11 +4,13 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type NativeRemoteClient,
   useNativeInventory,
 } from '@/lib/native-remote/use-native-inventory';
 import { useNativeSession } from '@/lib/native-remote/use-native-session';
+import { cn } from '@/lib/utils';
 import { NativeRemoteInventory } from './native-remote-inventory';
 import { NativeRemoteTranscript } from './native-remote-transcript';
 
@@ -56,7 +58,7 @@ function NativeRemoteScreen({ client, organizationID }: NativeRemoteDemoProps) {
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         className="flex-1"
-        contentContainerClassName="gap-4 px-4 pt-4 pb-8"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
       >
         <NativeRemoteInventory
           inventory={inventory}

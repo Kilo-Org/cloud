@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { toast } from 'sonner-native';
 
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
@@ -24,7 +25,14 @@ export function useOrgGuardrails(organizationId: string | null, enabled: boolean
   );
 }
 
-export function useSaveOrgGuardrails(organizationId: string | null) {
+/**
+ * Saves the organization's AI guardrail configuration. The write is an
+ * organizationAdmin procedure, so a refusal lands on a reader the screen
+ * already gated by role; this module renders no billing step under the toast,
+ * so the refusal copy itself names the destination to a money role instead of
+ * claiming an owner must act.
+ */
+export function useSaveOrgGuardrails(organizationId: string | null, canManageBilling = false) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
@@ -43,8 +51,8 @@ export function useSaveOrgGuardrails(organizationId: string | null) {
           }),
         });
       },
-      onError: (error: { message: string }) => {
-        toast.error(error.message);
+      onError: error => {
+        toast.error(organizationErrorMessage(error, canManageBilling, 'absent'));
       },
     })
   );
@@ -91,7 +99,7 @@ export type OrgGatewaySettings = RouterOutputs['organizations']['settings']['get
  * takes the provider allow list and the model deny list together so one write
  * cannot drop the organization's default model against the other list.
  */
-export function useSaveOrgModelAccess(organizationId: string | null) {
+export function useSaveOrgModelAccess(organizationId: string | null, canManageBilling = false) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
@@ -115,14 +123,14 @@ export function useSaveOrgModelAccess(organizationId: string | null) {
           ]);
         }
       },
-      onError: (error: { message: string }) => {
-        toast.error(error.message);
+      onError: error => {
+        toast.error(organizationErrorMessage(error, canManageBilling, 'absent'));
       },
     })
   );
 }
 
-export function useSaveOrgGatewaySettings(organizationId: string | null) {
+export function useSaveOrgGatewaySettings(organizationId: string | null, canManageBilling = false) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
@@ -135,8 +143,8 @@ export function useSaveOrgGatewaySettings(organizationId: string | null) {
           });
         }
       },
-      onError: (error: { message: string }) => {
-        toast.error(error.message);
+      onError: error => {
+        toast.error(organizationErrorMessage(error, canManageBilling, 'absent'));
       },
     })
   );

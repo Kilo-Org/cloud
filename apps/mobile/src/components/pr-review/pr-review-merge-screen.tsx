@@ -84,7 +84,11 @@ export function PrReviewMergeScreen() {
     mode === 'enable-auto-merge'
       ? t('prReview.merge.enableAutoMerge')
       : providerPrMergeTitles(t, providerRef ? providerRef.platform : 'github').title;
-  const eyebrow = providerRef ? providerPrRefLabel(providerRef) : `${owner}/${repo}#${rawNumber}`;
+  const paramsValid = Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0;
+  // A route that names no request has no reference to show: an empty
+  // `owner/repo#number` would paint as "/#" under the title.
+  const githubEyebrow = paramsValid ? `${owner}/${repo}#${rawNumber}` : undefined;
+  const eyebrow = providerRef ? providerPrRefLabel(providerRef) : githubEyebrow;
   const dismiss = () => {
     router.back();
   };
@@ -100,7 +104,6 @@ export function PrReviewMergeScreen() {
 
   const trpc = useTRPC();
   const overviewOptions = useMemo(() => buildPrOverviewQueryOptions(trpc, scope), [trpc, scope]);
-  const paramsValid = Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0;
   const pr = useQuery({
     ...overviewOptions,
     enabled: paramsValid && isProviderScopeReady(scope),

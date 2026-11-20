@@ -62,6 +62,19 @@ describe('selectPrInboxView', () => {
     });
   });
 
+  // D5 on a device: offline mode pauses the first read, so no error ever
+  // reaches the classifier and the paused read painted the server's copy
+  // ("Something went wrong on our end"). Confirmed offline names the
+  // connection; a pause with no confirmed connection keeps the read's copy.
+  it('names the connection for a paused first read on a confirmed-offline device', () => {
+    expect(
+      selectPrInboxView({ ...idle, isPending: true, isFetching: false, isOffline: true })
+    ).toEqual({ kind: 'offline', showLoadMoreRetry: false });
+    expect(
+      selectPrInboxView({ ...idle, isPending: true, isFetching: false, isOffline: false })
+    ).toEqual({ kind: 'retryable', showLoadMoreRetry: false });
+  });
+
   it('selects retryable when no rows loaded and a provider failed', () => {
     // A GitLab/Bitbucket outage beside an empty GitHub inbox must not render
     // "No review requests": the failure owns the surface and its retry CTA.

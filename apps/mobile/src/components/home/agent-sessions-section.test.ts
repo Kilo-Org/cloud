@@ -79,12 +79,14 @@ vi.mock('@/components/agents/remote-session-exit-alert', () => ({
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },
 }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 // The zero state's glyph comes from the icon set, whose native renderer the
 // pure project does not load.
 vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot' }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'ArrowLeft',
+  DirectionalChevronRight: 'ChevronRight',
+}));
 // The briefing card reaches the native SQLCipher dismissal journal; these
 // assertions cover the live card and the section header only.
 vi.mock('@/components/agent-briefing/briefing-card', () => ({
@@ -93,7 +95,7 @@ vi.mock('@/components/agent-briefing/briefing-card', () => ({
 }));
 // A host element that still renders the header notice. The factory is hoisted
 // above the static imports, so it loads React itself.
-vi.mock('@/components/home/section-header', async () => {
+vi.mock('@/components/ui/section-header', async () => {
   const { createElement: create } = await import('react');
   return {
     SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),
@@ -106,6 +108,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/empty-state', async () => {
   const { createElement: create } = await import('react');
   return {
+    StateAction: 'StateAction',
     EmptyState: (props: { icon: unknown; title: string; description?: ReactNode }) =>
       create(
         'EmptyState',
@@ -301,11 +304,11 @@ describe('Home live section', () => {
     (node('SectionHeader').props.onActionPress as () => void)();
     // An empty params object is what clears a lingering status filter.
     expect(navigateSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: {},
     });
     expect(dismissToSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: {},
     });
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
@@ -327,11 +330,11 @@ describe('Home live section', () => {
     (row.props.onPress as () => void)();
 
     expect(navigateSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: { status: 'idle' },
     });
     expect(dismissToSpy).toHaveBeenCalledWith({
-      pathname: '/(app)/(tabs)/(2_agents)/',
+      pathname: '/(app)/(tabs)/(2_agents)',
       params: { status: 'idle' },
     });
   });
@@ -344,6 +347,147 @@ describe('Home live section', () => {
     await render({ ...settled, activeSessions: [session('a1')] });
     expect(nodes('Skeleton')).toHaveLength(0);
     expect(text()).toContain('a1');
+  });
+
+  it('draws the offline card instead of a load that cannot start', async () => {
+    // Confirmed offline, first read paused: pending never settles, so the card
+    // must name the connection with its own Retry instead of leaving the
+    // skeleton under a "No internet connection" notice.
+    connectivity.offline = true;
+    connectivity.connected = false;
+    await render({ ...settled, hasAcceptedSuccess: false, isPaused: true }, context);
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(nodes('QueryError')).toHaveLength(1);
+    expect(node('QueryError').props.variant).toBe('offline');
+    expect(typeof node('QueryError').props.onRetry).toBe('function');
+    // The card speaks for the connection; the header notice does not repeat it.
+    expect(text()).not.toContain('No internet connection');
+    expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
+
+    // A read that is still in flight keeps the wait: it can still land.
+    await render(
+      { ...settled, hasAcceptedSuccess: false, isPaused: true, isFetching: true },
+      context
+    );
+    expect(nodes('Skeleton').length).toBeGreaterThan(0);
+    expect(nodes('QueryError')).toHaveLength(0);
+  });
+
+  it('draws the offline card while the context read is still unresolved', async () => {
+    connectivity.offline = true;
+    connectivity.connected = false;
+    await render(
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isReady: false, isResolving: true }
+    );
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(node('QueryError').props.variant).toBe('offline');
+
+    // A boundary read on `networkMode: 'always'` refetches in the background
+    // (an app foreground, a profile focus) and fails: it is not a wait that can
+    // land, so the card stays instead of a skeleton stack coming back.
+    await render(
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isReady: false, isResolving: true }
+    );
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(node('QueryError').props.variant).toBe('offline');
+  });
+
+  it('keeps the offline card when the boundary read fails on an organization scope', async () => {
+    // The boundary read runs on `networkMode: 'always'`, so offline it settles
+    // by failing. That failure is the outage, not a verdict on the organization:
+    // the card's own Retry, an app foreground and a profile focus all re-run it,
+    // and none of them may turn the surface into "Couldn't load your
+    // organizations" for the rest of the outage.
+    connectivity.offline = true;
+    connectivity.connected = false;
+    const failedBoundary = { ...context, isReady: false, isError: true };
+    await render({ ...settled, hasAcceptedSuccess: false, isPaused: true }, failedBoundary);
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(node('QueryError').props.variant).toBe('offline');
+    expect(node('QueryError').props.title).not.toBe(i18n.t('organization.boundary.loadErrorTitle'));
+
+    // Answers the device already has outrank the same failure.
+    await render(
+      {
+        ...settled,
+        activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+      },
+      failedBoundary
+    );
+    expect(nodes('QueryError')).toHaveLength(0);
+    expect(text()).toContain('a1');
+
+    // Online, the same boundary failure is the error it always was.
+    connectivity.offline = false;
+    connectivity.connected = true;
+    await render({ ...settled, hasAcceptedSuccess: false }, failedBoundary);
+    expect(node('QueryError').props.variant).not.toBe('offline');
+    expect(node('QueryError').props.title).toBe(i18n.t('organization.boundary.loadErrorTitle'));
+  });
+
+  it('keeps rows and confirmed-empty content through an outage', async () => {
+    connectivity.offline = true;
+    connectivity.connected = false;
+    await render({
+      ...settled,
+      activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+    });
+    expect(nodes('QueryError')).toHaveLength(0);
+    expect(text()).toContain('a1');
+    expect(text()).toContain('No internet connection');
+
+    await render(settled);
+    expect(nodes('QueryError')).toHaveLength(0);
+    expect(text()).toContain(i18n.t('home.noLiveSessions'));
+    expect(text()).toContain('No internet connection');
+  });
+
+  it('retries the boundary read from the offline card and leaves the paused one to reconnect', async () => {
+    connectivity.offline = true;
+    connectivity.connected = false;
+    const contextRefetch = vi.fn().mockResolvedValue(undefined);
+    const sessionsRefetch = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(LiveSessionFeedback, {
+          context: { ...context, isResolving: true, isReady: false, refetch: contextRefetch },
+          sessions: {
+            ...settled,
+            hasAcceptedSuccess: false,
+            isPaused: true,
+            refetch: sessionsRefetch,
+          },
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+      await Promise.resolve();
+    });
+    const card = nodes('QueryError')[0];
+    if (!card) {
+      throw new Error('Missing offline card');
+    }
+    expect(card.props.variant).toBe('offline');
+    await act(async () => {
+      (card.props.onRetry as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The boundary read settles by failing, so the attempt ends; the live read
+    // pauses offline and is left to React Query's reconnect refetch instead of
+    // holding the lock for the whole outage.
+    expect(contextRefetch).toHaveBeenCalledTimes(1);
+    expect(sessionsRefetch).not.toHaveBeenCalled();
+
+    // The lock is released: a second press asks again instead of being dropped.
+    await act(async () => {
+      (card.props.onRetry as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(contextRefetch).toHaveBeenCalledTimes(2);
   });
 
   it('draws the zero state as its one message, without four zero counts', async () => {
@@ -482,7 +626,9 @@ describe('Home live section status box', () => {
   });
 
   it('draws the column when the failure block owns the surface', () => {
-    mountFeedback(settled, { ...context, isError: true });
+    // A boundary failure is never `isReady`: the live context derives readiness
+    // from the same read.
+    mountFeedback(settled, { ...context, isError: true, isReady: false });
     expect(nodes('View').length).toBeGreaterThan(0);
     expect(nodes('QueryError')).toHaveLength(1);
   });
@@ -503,8 +649,14 @@ describe('Home live section status box', () => {
     act(() => {
       renderer?.update(
         createElement(LiveSessionFeedback, {
-          context: { ...context, isError: true },
-          sessions: settled,
+          // A boundary failure is never ready, so the column that appears beside
+          // a live connection fact is the live read's own failure here.
+          context,
+          sessions: {
+            ...settled,
+            hasAcceptedSuccess: false,
+            terminalError: { kind: 'retryable', error: new Error('temporary') } as const,
+          },
           failureLabel: "Couldn't load active sessions",
           inlineNotices: false,
         })

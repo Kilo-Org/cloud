@@ -307,7 +307,7 @@ function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
 
 function groupMessagesByAssistant(messages: Anthropic.MessageParam[]) {
   const groups = new Array<{
-    assistantMessage?: Anthropic.MessageParam;
+    assistantMessage?: Anthropic.AssistantMessageParam;
     otherMessages: Anthropic.MessageParam[];
   }>();
 
@@ -324,7 +324,7 @@ function groupMessagesByAssistant(messages: Anthropic.MessageParam[]) {
   return groups;
 }
 
-function deduplicateMessagesToolUses(message: Anthropic.MessageParam): void {
+function deduplicateMessagesToolUses(message: Anthropic.AssistantMessageParam): void {
   if (!Array.isArray(message.content)) return;
 
   const toolUseIds = new Set<string>();

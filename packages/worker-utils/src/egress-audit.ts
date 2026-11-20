@@ -1,4 +1,22 @@
 import { z } from 'zod';
+import { NETWORK_SECRET_LIMITS } from './network-secrets';
+
+const credentialAuditSchema = z.object({
+  credentialKey: z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
+    .optional(),
+  credentialDecision: z.enum([
+    'substituted',
+    'denied_host_mismatch',
+    'denied_unknown',
+    'denied_location',
+    'denied_policy',
+    'unavailable',
+  ]),
+});
 
 export const EgressAuditRequestSchema = z.object({
   requestId: z.string().uuid().toLowerCase(),
@@ -17,6 +35,13 @@ export const EgressAuditRequestSchema = z.object({
   protocol: z.enum(['http:', 'https:']),
   port: z.number().int().min(1).max(65535),
   decision: z.enum(['allowed', 'denied']),
+  credentialKey: credentialAuditSchema.shape.credentialKey,
+  credentialDecision: credentialAuditSchema.shape.credentialDecision.optional(),
+  credentialDecisions: z
+    .array(credentialAuditSchema)
+    .min(2)
+    .max(NETWORK_SECRET_LIMITS.MAX_SECRETS)
+    .optional(),
 });
 
 export const EgressAuditRecordSchema = EgressAuditRequestSchema.extend({

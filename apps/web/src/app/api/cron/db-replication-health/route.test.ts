@@ -27,6 +27,7 @@ function report(overrides: Partial<ReplicationHealthReport> = {}): ReplicationHe
     replicas: [],
     walSenders: [],
     slots: [],
+    disabledReplicas: [],
     errors: [],
     ...overrides,
   };
@@ -64,6 +65,26 @@ describe('GET /api/cron/db-replication-health', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({ healthy: true, problems: [] })
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(console.log).not.toHaveBeenCalled();
+  });
+
+  it('logs disabled replicas without alerting', async () => {
+    const disabledReplicas = ['us-west', 'eu-central-2'];
+    const healthReport = report({ disabledReplicas });
+    mockCollect.mockResolvedValue(healthReport);
+
+    const response = await GET(createRequest({ authorization: 'Bearer cron-secret' }));
+
+    await expect(response.json()).resolves.toMatchObject({ healthy: true, disabledReplicas });
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(console.log).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'db_replication_disabled_replicas',
+        disabledReplicas,
+        timestamp: healthReport.timestamp,
+      })
     );
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
@@ -155,6 +176,23 @@ describe('GET /api/cron/db-replication-health', () => {
     const body = await response.json();
     expect(body.problems).toEqual([
       expect.stringContaining('slot other_logical_consumer: wal_status=lost'),
+    ]);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('alerts with each report error as written, without a primary-failure label', async () => {
+    mockCollect.mockResolvedValue(
+      report({
+        healthy: false,
+        errors: ['POSTGRES_REPLICAS_DISABLED names unknown replicas: eu-central-3'],
+      })
+    );
+
+    const response = await GET(createRequest({ authorization: 'Bearer cron-secret' }));
+
+    const body = await response.json();
+    expect(body.problems).toEqual([
+      'POSTGRES_REPLICAS_DISABLED names unknown replicas: eu-central-3',
     ]);
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });

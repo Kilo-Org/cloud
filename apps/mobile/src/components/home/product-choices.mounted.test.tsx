@@ -18,7 +18,7 @@ vi.mock('react-native', () => ({
 vi.mock('@/components/ui/configure-row', () => ({
   ConfigureRow: 'ConfigureRow',
 }));
-vi.mock('@/components/home/section-header', () => ({
+vi.mock('@/components/ui/section-header', () => ({
   SectionHeader: 'SectionHeader',
 }));
 vi.mock('@/components/ui/icons', () => ({

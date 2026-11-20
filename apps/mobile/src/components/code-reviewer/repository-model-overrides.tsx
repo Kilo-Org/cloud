@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { openModelPicker } from '@/components/agents/model-selector';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import {
   LINE_ACTION_BOX_CLASS,
@@ -88,25 +90,15 @@ export function RepositoryModelOverrides({
   };
 
   return (
-    <View className="mt-6">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('codeReviewer.repoModels.title')}
-      </Text>
-      <Text variant="muted" className="mt-1 mb-2 text-xs">
+    <Section label={t('codeReviewer.repoModels.title')} className="mt-6">
+      <Text variant="muted" className="text-xs">
         {t('codeReviewer.repoModels.description')}
       </Text>
-      <View>
-        {repositories.map((repo, index) => {
+      <RowGroup>
+        {repositories.map(repo => {
           const override = overrides.find(entry => entry.repositoryId === repo.id);
-          const last = index === repositories.length - 1;
           return (
-            <View
-              key={String(repo.id)}
-              className={cn(
-                'flex-row items-center gap-3 py-1',
-                !last && 'border-b-[0.5px] border-hair-soft'
-              )}
-            >
+            <View key={String(repo.id)} className="flex-row items-center gap-3 px-4 py-3">
               <Pressable
                 className={cn(
                   ROW_TARGET_CLASS,
@@ -151,7 +143,7 @@ export function RepositoryModelOverrides({
             </View>
           );
         })}
-      </View>
-    </View>
+      </RowGroup>
+    </Section>
   );
 }

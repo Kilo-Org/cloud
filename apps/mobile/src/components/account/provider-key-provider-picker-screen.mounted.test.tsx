@@ -80,6 +80,7 @@ vi.mock('@/lib/a11y/tap-target', () => ({
   FIELD_CLEAR_BOX_CLASS: 'h-[48px] w-[48px] -my-[7px] items-center justify-center',
   ROW_TARGET_CLASS: 'min-h-11',
   STATE_ACTION_CLASS: '',
+  TOUCH_TARGET_OVERHANG_DP: 8,
 }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', X: 'X' }));
 vi.mock('@/components/ui/directional-icons', () => ({
@@ -89,7 +90,10 @@ vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 
@@ -290,6 +294,17 @@ describe('ProviderKeyProviderPickerScreen', () => {
     });
 
     expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
+  });
+
+  it('matches an accented provider name from its unaccented spelling', async () => {
+    state.providers = [{ id: 'acme-llm', name: 'Café LLM' }];
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('cafe');
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['Café LLM']);
   });
 
   it('matches an id whose capital I was typed in a Turkish locale', async () => {

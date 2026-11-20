@@ -21,6 +21,7 @@ const messagePageSchema = z.object({
   data: z.array(kilo2MessageSchema),
   cursor: z.object({ next: z.string().nullish() }),
 });
+const MAX_PARENT_LOOKBACK_PAGES = 8;
 
 export function projectKilo2Question(form: z.infer<typeof kilo2FormSchema>): QuestionRequest {
   return {
@@ -93,7 +94,30 @@ export function createKilo2Reads(api: Kilo2Api, defaultDirectory: string) {
         { signal }
       ),
     ]);
-    return { session: info, messages: messagePageSchema.parse(raw).data.toReversed() };
+    const page = messagePageSchema.parse(raw);
+    return { session: info, messages: page.data.toReversed(), olderCursor: page.cursor.next };
+  }
+  async function findEarlierParent(id: string, cursor: string, signal: AbortSignal) {
+    const seen = new Set<string>();
+    let next: string | null | undefined = cursor;
+    while (next && !seen.has(next) && seen.size < MAX_PARENT_LOOKBACK_PAGES) {
+      seen.add(next);
+      const query = new URLSearchParams({
+        limit: String(KILO_ACTIVITY_MESSAGE_LIMIT),
+        cursor: next,
+      });
+      const page = messagePageSchema.parse(
+        await api.request(`${kilo2SessionPath(id)}/message?${query}`, { signal })
+      );
+      const parent = page.data.find(
+        message => message.type === 'user' || message.type === 'synthetic'
+      );
+      if (parent) return { parentID: parent.id };
+      next = page.cursor.next;
+    }
+    return {
+      reason: !next ? 'history_exhausted' : seen.has(next) ? 'cursor_repeated' : 'page_limit',
+    };
   }
   const reads = {
     async getSessionDetails(id: string, _directory: string, signal?: AbortSignal) {
@@ -157,5 +181,5 @@ export function createKilo2Reads(api: Kilo2Api, defaultDirectory: string) {
       return [];
     },
   };
-  return { reads, session, list, messages };
+  return { reads, session, list, messages, findEarlierParent };
 }

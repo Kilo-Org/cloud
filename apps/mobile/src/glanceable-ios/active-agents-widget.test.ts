@@ -50,6 +50,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   }),
   buttonStyle: mockModifier('buttonStyle'),
   cornerRadius: mockModifier('cornerRadius'),
+  dynamicTypeSize: mockModifier('dynamicTypeSize'),
   containerBackground: (style: unknown) => ({ $type: 'containerBackground', args: style }),
   environment: mockModifier('environment'),
   fixedSize: mockModifier('fixedSize'),
@@ -89,7 +90,7 @@ const translate = (key: string) => ENGLISH[key] ?? key;
 
 type Options = {
   feedback?: GlanceableActionFeedback;
-  status?: 'waiting' | 'empty' | 'signed_out' | 'privacy' | 'stale';
+  status?: 'waiting' | 'signed_out' | 'privacy' | 'stale';
   now?: number;
 };
 
@@ -190,6 +191,16 @@ function textNode(tree: Rendered, value: string): Rendered | undefined {
   return collect(tree).find(node => node.kind === 'Text' && node.props.children === value);
 }
 
+/** The texts under a node that holds Dynamic Type at the default size. */
+function defaultSizeTexts(node: Rendered, capped = false): string[] {
+  const here = capped || modifier(node, 'dynamicTypeSize')?.max === 'large';
+  const own = here && node.kind === 'Text' && typeof node.props.children === 'string';
+  return [
+    ...(own ? [node.props.children as string] : []),
+    ...children(node).flatMap(child => defaultSizeTexts(child, here)),
+  ];
+}
+
 function buttons(tree: Rendered): Record<string, unknown>[] {
   return collect(tree)
     .filter(node => node.kind === 'Button' && typeof node.props.onPress === 'function')
@@ -209,8 +220,24 @@ const SIZE: Record<string, [number, number]> = {
 
 type Baseline = { text: string; baseline: number };
 
+// Apple's default sizes of the Dynamic Type text styles the layout uses.
+const TEXT_STYLE_SIZE: Record<string, number> = {
+  caption2: 11,
+  caption: 12,
+  footnote: 13,
+  subheadline: 15,
+  body: 17,
+  title3: 20,
+  title2: 22,
+};
+
 function fontSize(node: Rendered | undefined): number {
-  return (modifier(node, 'font')?.size as number | undefined) ?? 17;
+  const font = modifier(node, 'font');
+  const style = font?.textStyle;
+  if (typeof style === 'string') {
+    return TEXT_STYLE_SIZE[style] ?? 17;
+  }
+  return (font?.size as number | undefined) ?? 17;
 }
 
 function fixedHeight(node: Rendered): number | undefined {
@@ -342,7 +369,7 @@ describe('Home header', () => {
   const STATES = [
     propsFor([PERMISSION, BUSY]),
     propsFor([BUSY]),
-    propsFor([], { status: 'empty' }),
+    propsFor([]),
     propsFor([], { status: 'waiting' }),
     propsFor([], { status: 'privacy' }),
     propsFor([], { status: 'signed_out' }),
@@ -381,6 +408,25 @@ describe('Home header', () => {
       });
     }
   });
+
+  it.each(HOME_FAMILIES)(
+    'grows every text run but the big count with Dynamic Type, capped at xLarge, in %s',
+    family => {
+      for (const props of [...STATES, propsFor([PERMISSION, QUESTION, BUSY, IDLE])]) {
+        const tree = render(props, family);
+        expect(modifier(tree, 'dynamicTypeSize')).toEqual({ max: 'xLarge' });
+        for (const node of collect(tree).filter(entry => entry.kind === 'Text')) {
+          const font = modifier(node, 'font');
+          if (font?.textStyle === undefined) {
+            // Only the count keeps a fixed size, and it is never smaller than 44pt.
+            expect(font?.size, String(node.props.children)).toBeGreaterThanOrEqual(44);
+          } else {
+            expect(font.size, String(node.props.children)).toBeUndefined();
+          }
+        }
+      }
+    }
+  );
 
   it.each(['accented', 'vibrant'] as const)(
     'draws the glyph template and see-through action fills when %s',
@@ -615,6 +661,28 @@ describe('scheduled', () => {
     }
   });
 
+  it('names the clock time a wake was due once its retry window has closed', () => {
+    // `awaitingUpdate` is a bounded claim: inside the retry window the line
+    // asks for an update, and after it the line states the time the run was
+    // due. Small and large own the line; medium keeps its per-row detail.
+    const due = NOW + MINUTE;
+    const at = due + 16 * MINUTE;
+    const props = propsFor([scheduled('Dependency audit', due)], { now: at });
+    expect(props.home?.awaitingUpdate).toBe(false);
+    for (const family of ['systemSmall', 'systemLarge'] as const) {
+      const tree = render(props, family, { at });
+      const label = textNode(tree, 'Was due');
+      expect(label, family).toBeDefined();
+      expect(modifier(label, 'foregroundStyle')).toBe('#6F6A61');
+      const time = collect(tree).find(
+        node => node.kind === 'Text' && node.props.dateStyle === 'time'
+      );
+      expect(time, family).toBeDefined();
+      expect(modifier(time, 'foregroundStyle')).toBe('#6F6A61');
+      expect(texts(tree)).not.toContain('Next run');
+    }
+  });
+
   it('shows nothing for an unknown time: the title in small, no detail in the rows', () => {
     const rows = [scheduled('Dependency audit', null), scheduled('Usage report', null)];
     expectBaselines(render(propsFor(rows), 'systemSmall'), 'systemSmall', [
@@ -653,7 +721,7 @@ describe('scheduled', () => {
 
 describe('nothing running, updating, last known', () => {
   it('keeps + on the small card and moves create into a pill on medium and large', () => {
-    const props = propsFor([], { status: 'empty' });
+    const props = propsFor([]);
     expectBaselines(render(props, 'systemSmall'), 'systemSmall', [
       ['Nothing running right now', 123],
       ['Checked', 151],
@@ -690,6 +758,11 @@ describe('nothing running, updating, last known', () => {
     const tree = render(propsFor([], { status: 'waiting' }), 'systemMedium');
     const intrinsicHeight = children(tree).reduce((sum, node) => sum + place(node, 0, []), 0);
     expect(intrinsicHeight).toBeLessThanOrEqual(164 - 16 * 2);
+  });
+
+  it('keeps the medium updating line at the default size, so it stays out of the band', () => {
+    const tree = render(propsFor([], { status: 'waiting' }), 'systemMedium');
+    expect(defaultSizeTexts(tree)).toEqual(['Updating agents']);
   });
 
   it.each(HOME_FAMILIES)(
@@ -746,6 +819,25 @@ describe('stress', () => {
         )
       ).toBe(false);
     }
+  });
+
+  it('keeps the large needs-input header and reason lines at the default size', () => {
+    const sessions = [
+      ...Array.from({ length: 128 }, () => PERMISSION),
+      ...Array.from({ length: 1234 }, () => BUSY),
+      ...Array.from({ length: 999 }, () => IDLE),
+    ];
+    const tree = render(propsFor(sessions), 'systemLarge');
+    const capped = defaultSizeTexts(tree);
+    // The other counts, so the longest one is never cut beside the big count.
+    expect(capped).toEqual(
+      expect.arrayContaining(['128', 'Needs input', '1,234 Working', '999 Idle'])
+    );
+    // The reason lines, so three rows still clear the footer.
+    expect(capped.filter(value => value === 'Permission required')).toHaveLength(3);
+    // The titles and the footer still grow.
+    expect(capped).not.toContain(PERMISSION.title);
+    expect(capped).not.toContain('Checked');
   });
 
   it.each(HOME_FAMILIES)('names an untitled agent in %s', family => {
@@ -855,18 +947,18 @@ describe('Lock Screen accessories', () => {
   });
 
   it('draws the Kilo glyph over a state glyph, never a placeholder dash, when nothing counts', () => {
-    const expected = {
-      waiting: 'arrow.triangle.2.circlepath',
-      empty: 'checkmark.circle.fill',
-      privacy: 'lock.fill',
-      signed_out: 'person.fill',
-    } as const;
-    for (const status of Object.keys(expected) as (keyof typeof expected)[]) {
-      const tree = render(propsFor([], { status }), 'accessoryCircular');
+    const expected: [GlanceableViewProps, string][] = [
+      [propsFor([], { status: 'waiting' }), 'arrow.triangle.2.circlepath'],
+      [propsFor([]), 'checkmark.circle.fill'],
+      [propsFor([], { status: 'privacy' }), 'lock.fill'],
+      [propsFor([], { status: 'signed_out' }), 'person.fill'],
+    ];
+    for (const [props, stateGlyph] of expected) {
+      const tree = render(props, 'accessoryCircular');
       const images = collect(tree).filter(node => node.kind === 'Image');
       expect(images.map(node => node.props.uiImage ?? node.props.systemName)).toEqual([
         '__KILO_WIDGET_GLYPH_URI__',
-        expected[status],
+        stateGlyph,
       ]);
       expect(texts(tree)).not.toContain('—');
     }

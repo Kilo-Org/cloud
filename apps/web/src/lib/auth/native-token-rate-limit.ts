@@ -15,8 +15,15 @@ import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
  * spend the provider calls that admission and identity verification make: the
  * exchange proceeds only on an answer that permits it. The account rule runs
  * once the account is known, before any device session or refresh token is
- * written; it reports a rule that is not configured and lets the exchange
- * finish, because the provider calls it covers have already happened by then.
+ * written, and takes no refusal decision of its own: it returns the limiter's
+ * answer unchanged and only adds the report, because the provider calls it
+ * covers have already happened by then. Whether the exchange finishes is
+ * therefore whatever `rateLimited` says. An id that is not configured answers
+ * `rateLimited: false`, so the exchange finishes. An answer the firewall blocks
+ * arrives as either shape — `rateLimited: true` on its own, which refuses, or
+ * `rateLimited: false` with the `blocked` discriminator, which proceeds — and
+ * both are reported through the shared throttle, as is the not-configured
+ * answer.
  */
 const ADDRESS_RATE_LIMIT_ID = 'native-token-address';
 const USER_RATE_LIMIT_ID = 'native-token-user';
@@ -66,6 +73,23 @@ export async function isNativeTokenAddressRateLimited(request: Request): Promise
   return rateLimited;
 }
 
+/**
+ * Reports the account rule's answer. As with the address rule both an unmet
+ * configuration and an answer the firewall blocked are reported through the
+ * shared once-per-rule-per-minute throttle.
+ */
+function reportUserRuleIssue(error: 'not-found' | 'blocked'): void {
+  if (error === 'not-found') {
+    reportMissingRule(USER_RATE_LIMIT_ID);
+    return;
+  }
+  reportFirewallRateLimitIssue(
+    USER_RATE_LIMIT_ID,
+    'native_token_rate_limit',
+    `Firewall rate limit '${USER_RATE_LIMIT_ID}' could not be evaluated`
+  );
+}
+
 /** True when one account is exchanging device credentials too fast. */
 export async function isNativeTokenUserRateLimited(
   request: Request,
@@ -75,8 +99,8 @@ export async function isNativeTokenUserRateLimited(
     request,
     rateLimitKey: accountRateLimitKey(kiloUserId),
   });
-  if (error === 'not-found') {
-    reportMissingRule(USER_RATE_LIMIT_ID);
+  if (error) {
+    reportUserRuleIssue(error);
   }
   return rateLimited;
 }

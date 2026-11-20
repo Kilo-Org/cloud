@@ -19,7 +19,9 @@
     "presenceStatus": "హోస్ట్‌లు: {{connection}}",
     "commandStatus": "కమాండ్ డెలివరీ: {{status}}",
     "delivered": "చేరింది",
-    "expired": "గడువు ముగిసింది"
+    "expired": "గడువు ముగిసింది",
+    "recoveryGaps_one": "ఈ ట్రాన్స్క్రిప్ట్‌లోని {{displayCount}} భాగం కనిపించడం లేదు.",
+    "recoveryGaps_other": "ఈ ట్రాన్స్క్రిప్ట్‌లోని {{displayCount}} భాగాలు కనిపించడం లేదు."
   },
   "common": {
     "manageOnWeb": "వెబ్‌లో నిర్వహించండి",
@@ -57,6 +59,7 @@
     "link": "లింక్",
     "takingLonger": "ఇది ఊహించిన దానికంటే ఎక్కువ సమయం తీసుకుంటోంది. మీరు దీన్ని మూసివేసి మళ్లీ తనిఖీ చేయవచ్చు.",
     "model": "మోడల్",
+    "notSelected": "ఎంచుకోలేదు",
     "accessDenied": "అనుమతి లేదు.",
     "allRepositories": "అన్ని రిపోజిటరీలు",
     "personal": "వ్యక్తిగతం",
@@ -137,16 +140,19 @@
     "keepRunning": "అమలు కొనసాగించండి",
     "newSession": "కొత్త సెషన్",
     "noModelsAvailable": "మోడళ్లు అందుబాటులో లేవు",
+    "modelRetires": "{{date}}న రిటైర్ అవుతుంది",
     "notFound": "దొరకలేదు.",
     "online": "ఆన్‌లైన్",
     "open": "{{name}}ను తెరవండి",
     "openPullRequest": "పుల్ రిక్వెస్ట్ తెరవండి",
+    "viewOnGitHub": "GitHubలో PRని చూడండి",
     "completed": "పూర్తయింది",
     "pending": "వేచి ఉంది",
     "running": "నడుస్తోంది",
     "performance": "పనితీరు",
     "preferences": "ప్రాధాన్యతలు",
     "privacyPolicy": "గోప్యతా విధానం",
+    "termsOfService": "సేవా నిబంధనలు",
     "profile": "ప్రొఫైల్",
     "reactions": "స్పందనలు",
     "recent": "ఇటీవలి",
@@ -170,6 +176,7 @@
     "generating": "సృష్టిస్తోంది…",
     "working": "పని జరుగుతోంది",
     "yourOwnRepositories": "మీ స్వంత రిపోజిటరీలు",
+    "organizationRepositories": "సంస్థ రిపోజిటరీలు",
     "dismissed": "విస్మరించారు",
     "agent": "ఏజెంట్",
     "durationMinuteShort": "నిమి",
@@ -178,7 +185,8 @@
     "organizationTrialEnded": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. సంస్థ యజమాని kilo.ai లో బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు.",
     "privateRepositoryA11y": "{{name}}, ప్రైవేట్ రిపోజిటరీ",
     "legalDocumentEnglishOnly": "ఈ పత్రం ఆంగ్లంలో మాత్రమే అందుబాటులో ఉంది.",
-    "organizationTrialEndedBilling": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. మీరు బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు."
+    "organizationTrialEndedBilling": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. మీరు బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు.",
+    "organizationTrialEndedBillingAtKiloAi": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు. మీరు kilo.ai లో బిల్లింగ్‌ను అప్‌డేట్ చేసి, ఆపై మళ్లీ ప్రయత్నించవచ్చు."
   },
   "language": {
     "restarting": "ఎంచుకున్న భాషను వర్తింపజేయడానికి పునఃప్రారంభిస్తోంది",
@@ -201,7 +209,7 @@
     "openSignInPageInBrowser": "బ్రౌజర్‌లో సైన్ ఇన్ పేజీని తెరవండి",
     "copySignInLink": "సైన్ ఇన్ లింక్‌ను కాపీ చేయండి",
     "cancelSignIn": "సైన్ ఇన్‌ను రద్దు చేయండి",
-    "startingSignIn": "సైన్ ఇన్ ప్రారంభిస్తోంది...",
+    "startingSignIn": "సైన్ ఇన్ ప్రారంభిస్తోంది…",
     "organizationUsesSso": "మీ సంస్థ సింగిల్ సైన్-ఆన్ ఉపయోగిస్తుంది.",
     "continueWithSso": "SSOతో కొనసాగించండి",
     "useDifferentEmail": "వేరే ఇమెయిల్ చిరునామాను ఉపయోగించండి",
@@ -209,15 +217,15 @@
     "signInWithGoogle": "Googleతో సైన్ ఇన్ చేయండి",
     "signInWithPasskey": "పాస్‌కీతో సైన్ ఇన్ చేయండి",
     "emailAddress": "ఇమెయిల్ చిరునామా",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "మీరు@example.com",
     "continueWithEmail": "ఇమెయిల్‌తో కొనసాగించండి",
     "enterCodeSentTo": "{{email}}కు పంపిన కోడ్‌ను నమోదు చేయండి.",
     "codeArrivalHint": "ఈ చిరునామాకు అర్హత ఉంటే, ఒక నిమిషంలో కోడ్ వస్తుంది.",
     "verifyCode": "కోడ్‌ను ధృవీకరించండి",
     "resendCode": "కోడ్‌ను మళ్లీ పంపండి",
     "termsPrefix": "కొనసాగిస్తే, మీరు అంగీకరించేవి: మా ",
+    "termsInSentence": "సేవా నిబంధనలు",
     "terms": "నిబంధనలు",
-    "termsInSentence": "నిబంధనలు",
     "termsConnector": " మరియు ",
     "termsSuffix": ".",
     "moreSignInOptions": "మరిన్ని సైన్ ఇన్ ఎంపికలు",
@@ -272,6 +280,9 @@
     "credits": "క్రెడిట్లు",
     "failedToLoadBalance": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి నొక్కండి.",
     "balanceLoadFailed": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము",
+    "balanceUnreachable": "సర్వర్‌ను చేరుకోలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
+    "balanceAccessDenied": "ఈ బ్యాలెన్స్ చూడటానికి మీకు అనుమతి లేదు.",
+    "balanceUnavailable": "బ్యాలెన్స్ లోడ్ కాలేదు.",
     "hideBalance": "బ్యాలెన్స్ దాచు",
     "showBalance": "బ్యాలెన్స్ చూపించు",
     "balanceHidden": "బ్యాలెన్స్ దాచబడింది",
@@ -311,9 +322,9 @@
     "passkeyVerifyDescription": "మీ భద్రత కోసం, మీ పాస్‌కీలను మార్చే ముందు మీరేనని నిర్ధారించండి.",
     "passkeyVerifyWithPasskey": "పాస్‌కీతో ధృవీకరించండి",
     "passkeyVerifySendCode": "నాకు ఈమెయిల్ ద్వారా కోడ్ పంపండి",
-    "passkeyVerifySendingCode": "కోడ్ పంపుతున్నాం...",
+    "passkeyVerifySendingCode": "కోడ్ పంపుతున్నాం…",
     "passkeyVerifyPasskeyPrompt": "కొనసాగించడానికి మీ పాస్‌కీతో నిర్ధారించండి.",
-    "passkeyVerifyChecking": "మీ కోడ్‌ను తనిఖీ చేస్తున్నాం...",
+    "passkeyVerifyChecking": "మీ కోడ్‌ను తనిఖీ చేస్తున్నాం…",
     "passkeyVerifyCodeSent": "{{email}}కు పంపిన కోడ్‌ను నమోదు చేయండి.",
     "passkeyVerifyCodeRejected": "ఆ కోడ్ సరిపోలలేదు. మళ్లీ ప్రయత్నించండి.",
     "passkeyVerifyPasskeyFailed": "ఆ పాస్‌కీతో నిర్ధారించలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
@@ -321,8 +332,8 @@
     "passkeyVerifyInProgress": "ఆ కోడ్‌ను ఇప్పటికే తనిఖీ చేస్తున్నాం. కాసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
     "passkeyVerifyTooManyAttempts": "చాలాసార్లు ప్రయత్నించారు. కొత్త కోడ్ పంపండి.",
     "passkeyVerifySsoRequired": "మీ సంస్థలో సింగిల్ సైన్ ఆన్ తప్పనిసరి. బ్రౌజర్‌లో ఈ మార్పును ఆమోదించి, ఇక్కడికి తిరిగి రండి.",
-    "passkeyVerifySsoStarting": "ఆమోద ప్రక్రియను ప్రారంభిస్తున్నాం...",
-    "passkeyVerifySsoWaiting": "ఆమోదం కోసం వేచి ఉన్నాం...",
+    "passkeyVerifySsoStarting": "ఆమోద ప్రక్రియను ప్రారంభిస్తున్నాం…",
+    "passkeyVerifySsoWaiting": "ఆమోదం కోసం వేచి ఉన్నాం…",
     "passkeyVerifySsoOpen": "ఆమోద పేజీని తెరవండి",
     "passkeyVerifySsoExpired": "ఆ ఆమోదం గడువు ముగిసింది లేదా రద్దయింది. మళ్లీ ప్రయత్నించండి.",
     "passkeyVerifySsoUnavailable": "సింగిల్ సైన్ ఆన్ ఆమోదం ప్రస్తుతం అందుబాటులో లేదు. మళ్లీ ప్రయత్నించండి.",
@@ -502,7 +513,7 @@
     "changelogFixesPolish": "యాప్ అంతటా పరిష్కారాలు మరియు మెరుగుదలలు.",
     "changelogAreas": {
       "signIn": "సైన్ ఇన్",
-      "profileOrganizations": "ప్రొఫైల్ మరియు సంస్థలు"
+      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు"
     }
   },
   "preferences": {
@@ -747,6 +758,9 @@
       "couldNotLoadMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయలేకపోయాము.",
       "retryLoadingMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "loadMoreComments": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయండి",
+      "conversationTruncated": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
+      "conversationTruncated_one": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
+      "conversationTruncated_other": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
       "addReaction": "స్పందనను జోడించండి",
       "reactionPill": "{{emoji}} స్పందన, {{displayCount}} {{countLabel}}",
       "reaction_one": "స్పందన",
@@ -762,7 +776,6 @@
       "replyPlaceholder": "ప్రత్యుత్తరం…",
       "replyBody": "ప్రత్యుత్తర వచనం",
       "submitReply": "ప్రత్యుత్తరాన్ని పంపండి",
-      "termsTitle": "సేవా నిబంధనలు",
       "termsCopy": "పోస్ట్ చేయడానికి మీ వయస్సు కనీసం 13 సంవత్సరాలు ఉండాలి.",
       "termsAcceptRetry": "నిబంధనల అంగీకారాన్ని నమోదు చేయలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "viewTerms": "నిబంధనలను చూడండి",
@@ -820,7 +833,19 @@
         "fileComment": "ఫైల్‌పై వ్యాఖ్య",
         "outdatedOnPathLines": "{{path}} {{lines}}పై పాత వ్యాఖ్య",
         "outdatedOnLines": "{{lines}}పై పాత వ్యాఖ్య",
-        "outdatedOnPath": "{{path}}పై పాత వ్యాఖ్య"
+        "outdatedOnPath": "{{path}}పై పాత వ్యాఖ్య",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "ఎడమ వైపు",
+        "sideRight": "కుడి వైపు",
+        "outdatedOnLinesSide": "{{lines}}పై పాతది ({{side}})",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}}పై పాతది ({{side}})",
+        "outdatedSide": "పాతది ({{side}})",
+        "outdatedOnPathSide": "{{path}}పై పాతది ({{side}})"
       },
       "deletedUser": "తొలగించబడిన వినియోగదారు",
       "replyForbiddenTerm": "ఈ {{term}}‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు.",
@@ -865,7 +890,6 @@
       "noAccess": "ఈ రిపోజిటరీ తనిఖీలను చూడటానికి మీకు అనుమతి లేదు.",
       "couldNotLoad": "తనిఖీలను లోడ్ చేయలేకపోయాము.",
       "retryChecks": "తనిఖీల కోసం మళ్లీ ప్రయత్నించండి",
-      "viewOnGitHub": "GitHubలో PRని చూడండి",
       "noChecksReported": "తనిఖీల సమాచారం లేదు",
       "passed": "{{displayCount}} విజయవంతమయ్యాయి",
       "passed_one": "{{displayCount}} విజయవంతమయ్యాయి",
@@ -920,9 +944,9 @@
       "checkFailedTitleGitLab": "GitLab కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "checkFailedTitleBitbucket": "Bitbucket కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "providerCheckFailedMessage": "ప్రొవైడర్‌ను చేరుకోలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
-      "reconnectTitle": "GitHubకు మళ్లీ కనెక్షన్",
-      "reconnectTitleGitLab": "GitLabకు మళ్లీ కనెక్షన్",
-      "reconnectTitleBitbucket": "Bitbucketకు మళ్లీ కనెక్షన్",
+      "reconnectTitle": "GitHubను మళ్లీ కనెక్ట్ చేయండి",
+      "reconnectTitleGitLab": "GitLabను మళ్లీ కనెక్ట్ చేయండి",
+      "reconnectTitleBitbucket": "Bitbucketను మళ్లీ కనెక్ట్ చేయండి",
       "reconnectDescription": "మీ GitHub కనెక్షన్ అనుమతిని రద్దు చేశారు.",
       "gitlabDescription": "మొబైల్‌లో మెర్జ్ రిక్వెస్ట్‌లను సమీక్షించండి",
       "gitlabInstanceMismatchTitle": "GitLab కనెక్షన్ మరో ఇన్స్టాన్స్ కోసం ఉంది",
@@ -932,7 +956,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "ఈ ఖాతాలో ఇంకా ఏ సంస్థా లేదు. మీరు ఒక సంస్థను సృష్టించిన లేదా అందులో చేరిన తర్వాతే Bitbucket పుల్ రిక్వెస్ట్‌లను సమీక్షించవచ్చు.",
       "gitlabReconnectAdminOnlyDescription": "దానిని మళ్లీ కనెక్ట్ చేయమని సంస్థ యజమాని, నిర్వాహకుడు లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
       "bitbucketNotConnectedTitle": "Bitbucket కనెక్ట్ కాలేదు",
-      "bitbucketAdminOnlyDescription": "దానిని సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే కనెక్ట్ చేయగలరు.",
+      "adminOnlyConnectDescription": "దానిని సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే కనెక్ట్ చేయగలరు.",
       "contextLine": "{{organization}} కోసం",
       "contextLinePersonal": "మీ వ్యక్తిగత ఖాతా కోసం"
     },
@@ -949,6 +973,8 @@
       "pendingComment": "ఇంకా పంపని వ్యాఖ్యలు",
       "pendingComment_other": "ఇంకా పంపని వ్యాఖ్యలు",
       "submitCountOfTotal": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
+      "submitCountOfTotal_one": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
+      "submitCountOfTotal_other": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
       "submitReview": "సమీక్షను సమర్పించండి",
       "partialPostedFresh": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
@@ -1013,7 +1039,10 @@
     "tabs": {
       "overview": "అవలోకనం",
       "files": "ఫైళ్లు",
-      "discussion": "చర్చ"
+      "discussion": "చర్చ",
+      "discussionAccessibility_one": "{{title}}: 1 వ్యాఖ్య",
+      "discussionAccessibility": "{{title}}: {{displayCount}} వ్యాఖ్యలు",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} వ్యాఖ్యలు"
     },
     "fileStatus": {
       "modified": "సవరించబడింది",
@@ -1210,7 +1239,7 @@
     },
     "instructions": {
       "title": "ప్రత్యేక సూచనలు",
-      "deprecation": "అనుకూల సూచనల ఫీచర్‌ను నిలిపివేయాలని నిర్ణయించాము. బదులుగా ఈ మార్గదర్శకాలను మీ రిపోజిటరీలోని REVIEW.md ఫైల్‌కు తరలించండి.",
+      "deprecation": "అనుకూల సూచనల ఫీచర్ తీసివేయబడుతుంది. బదులుగా ఈ మార్గదర్శకాలను మీ రిపోజిటరీలోని REVIEW.md ఫైల్‌కు తరలించండి.",
       "placeholder": "ఉదా. లోపాలను నిర్వహించడానికి మా పద్ధతులను అనుసరించండి…",
       "clearTitle": "ప్రత్యేక సూచనలను తీసివేయాలా?",
       "clearMessage": "ఖాళీ ఫీల్డ్‌ను సేవ్ చేయడం వల్ల ఈ రివ్యూయర్ కోసం నిల్వ చేయబడిన ప్రత్యేక సూచనలు తొలగించబడతాయి."
@@ -1272,7 +1301,7 @@
       "transcriptRetry": "సమీక్ష సంభాషణ రికార్డును లోడ్ చేయలేకపోయాము.",
       "transcriptLive": "లైవ్",
       "agentIdle": "ఏజెంట్ వేచి ఉంది",
-      "agentWorking": "ఏజెంట్ పని చేస్తోంది...",
+      "agentWorking": "ఏజెంట్ పని చేస్తోంది…",
       "anErrorOccurred": "లోపం సంభవించింది",
       "errorWithMessage": "లోపం ఏర్పడింది: {{message}}",
       "executionStarted": "అమలు ప్రారంభించబడింది",
@@ -1370,11 +1399,16 @@
     "followReviewMd": "REVIEW.mdను అనుసరించండి",
     "followReviewMdSubtitle": "ప్రతి రిపోజిటరీలోని REVIEW.md ఫైల్ సూచనలను పాటించండి",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket కనెక్ట్ కాలేదు. దానిని సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే కనెక్ట్ చేయగలరు."
+      "notConnectedReadOnlyPlan": "సంస్థ యొక్క ట్రయల్ ముగిసింది, కాబట్టి యజమాని kilo.ai లో బిల్లింగ్‌ను అప్‌డేట్ చేయాలి."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "ఈ సంస్థ యొక్క Bitbucket కనెక్షన్ కంప్యూటర్ నుండి వెబ్‌లో నిర్వహించబడుతుంది.",
-      "description": "అవసరమైన అనుమతులతో వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, కింద అతికించండి.",
+      "managedOnWeb": "{{organization}} యొక్క Bitbucket కనెక్షన్ కంప్యూటర్ నుండి వెబ్‌లో నిర్వహించబడుతుంది.",
+      "managedOnWebTitle": "వెబ్‌లో నిర్వహించబడుతుంది",
+      "managedOnWebShort": "ఈ కనెక్షన్ కంప్యూటర్ నుండి వెబ్‌లో నిర్వహించబడుతుంది.",
+      "managedOnWebRepositories": "కంప్యూటర్ నుండి వెబ్‌లో {{organization}} కోసం రిపాజిటరీలను ఎంచుకోండి.",
+      "description": "{{organization}} కోసం వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, కింద అతికించండి.",
+      "descriptionReconnect": "{{organization}} కోసం కొత్త వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, కింద అతికించండి.",
+      "descriptionOverview": "వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, తదుపరి స్క్రీన్‌లో అతికించండి.",
       "scopes": "ఖాతా: చదవడం · రిపోజిటరీలు: చదవడం/రాయడం · పుల్ రిక్వెస్ట్‌లు: చదవడం · వెబ్‌హుక్‌లు: చదవడం/రాయడం",
       "tokenPlaceholder": "వర్క్‌స్పేస్ యాక్సెస్ టోకెన్",
       "tokenRefused": "Bitbucket ఈ వర్క్స్‌స్పేస్ యాక్సెస్ టోకెన్‌ను అంగీకరించలేదు. దానికి పైన ఉన్న అనుమతులు ఉన్నాయో లేదో తనిఖీ చేసి, మళ్లీ ప్రయత్నించండి."
@@ -1395,6 +1429,7 @@
     "platformList": {
       "checking": "తనిఖీ చేస్తోంది…",
       "statusUnavailable": "స్థితి అందుబాటులో లేదు",
+      "needsAttention": "శ్రద్ధ అవసరం",
       "platforms": "ప్లాట్‌ఫారమ్‌లు",
       "activity": "కార్యాచరణ"
     },
@@ -1816,7 +1851,7 @@
       "couldNotLoadMore": "మరిన్ని సమస్యలను లోడ్ చేయలేకపోయాము.",
       "noMatchesTitle": "ఫిల్టర్‌లకు సరిపోలే సమస్యలు లేవు",
       "noMatchesDescription": "ఎంచుకున్న ఫిల్టర్‌లను మార్చి లేదా తీసివేసి చూడండి.",
-      "emptyTitle": "పెండింగ్ సమస్యలు లేవు",
+      "emptyTitle": "ఓపెన్ సమస్యలు లేవు",
       "emptyDescription": "ప్రస్తుతం శ్రద్ధ పెట్టాల్సిన పెండింగ్ సమస్యలు లేవు."
     },
     "findingRow": {
@@ -2007,7 +2042,7 @@
     "remediationUnavailable": {
       "findingNotFound": "భద్రతా సమస్య ఇక లేదు.",
       "approvalRequired": "స్వయంచాలక పరిష్కారానికి ఆమోదం అవసరం. ఆమోదించడానికి పరిష్కారాన్ని మీరే ప్రారంభించండి.",
-      "findingNotOpen": "ఈ సమస్య ఇక పెండింగ్‌లో లేదు.",
+      "findingNotOpen": "ఈ సమస్య ఇక ఓపెన్‌లో లేదు.",
       "repoNotInScope": "భద్రతా ఏజెంట్ కోసం ఈ రిపోజిటరీని ఎంచుకోలేదు.",
       "analysisRequired": "పరిష్కారాన్ని ప్రారంభించే ముందు కోడ్‌బేస్ విశ్లేషణను అమలు చేయండి.",
       "staleAnalysis": "విశ్లేషణ తర్వాత సమస్య మారింది. పరిష్కారాన్ని ప్రారంభించే ముందు మళ్లీ విశ్లేషించండి.",
@@ -2148,6 +2183,8 @@
       "renameAccessibility": "{{title}} సెషన్ పేరు మార్చండి",
       "cloningSession": "సెషన్‌ను క్లోన్ చేస్తోంది",
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయాము.",
+      "historyTooLarge": "ఈ సెషన్ లిప్యంతరీకరణ లోడ్ చేయడానికి చాలా పెద్దది.",
+      "historyUnavailable": "ఈ సెషన్ లిప్యంతరీకరణను చదవలేకపోయింది.",
       "cloneFailedRetry": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
       "notEnoughCredits": "ఈ అభ్యర్థనకు తగినంత క్రెడిట్లు లేవు. క్రెడిట్లను జోడించి మళ్లీ ప్రయత్నించండి.",
       "previousTaskFinishing": "మునుపటి పని ఇంకా పూర్తి కాలేదు. కాసేపు వేచి ఉండండి.",
@@ -2224,6 +2261,7 @@
       "branchDefault": "డిఫాల్ట్",
       "branchAccessibility": "బ్రాంచ్: {{label}}",
       "branchLoading": "బ్రాంచ్‌లు లోడ్ అవుతున్నాయి",
+      "branchInactive": "దాని బ్రాంచ్‌లను లోడ్ చేయడానికి రిపోజిటరీని ఎంచుకోండి.",
       "branchLoadError": "బ్రాంచ్‌లను లోడ్ చేయలేకపోయాము",
       "branchUnavailable": "ఈ రిపొజిటరీ కోసం బ్రాంచ్‌లు అందుబాటులో లేవు. ప్రొవైడర్ వద్ద మీ యాక్సెస్‌ను తనిఖీ చేసి, వేరే రిపొజిటరీని ఎంచుకోండి.",
       "branchEmpty": "బ్రాంచ్‌లు అందుబాటులో లేవు",
@@ -2456,7 +2494,8 @@
       "customModes": "అనుకూల మోడ్‌లు"
     },
     "modeSelector": {
-      "accessibility": "మోడ్: {{label}}"
+      "accessibility": "మోడ్: {{label}}",
+      "customMode": "అనుకూల మోడ్"
     },
     "modeOptions": {
       "code": "కోడ్",
@@ -2477,7 +2516,7 @@
       "noMatches": "సరిపోలికలు లేవు",
       "noRepositories": "రిపోజిటరీలు అందుబాటులో లేవు",
       "noRepositoriesDescription": "మీ ఖాతాకు ఏ రిపోజిటరీలూ కనెక్ట్ కాలేదు.",
-      "loading": "లోడ్ అవుతోంది...",
+      "loading": "లోడ్ అవుతోంది…",
       "accessibility": "రిపోజిటరీ: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2761,6 +2800,8 @@
     "modelPicker": {
       "title": "మోడల్‌ను ఎంచుకోండి",
       "noModelsDescription": "ఎంచుకోవడానికి మోడళ్లు అందుబాటులో లేవు.",
+      "allUnavailableTitle": "ఏ మోడల్‌ను ఉపయోగించలేము",
+      "allUnavailableDescription": "ప్రొవైడర్ కీని జోడించి మళ్లీ ప్రయత్నించండి.",
       "favorites": "ఇష్టమైనవి"
     },
     "modelSelector": {
@@ -2772,7 +2813,7 @@
       "thinkingEffortAccessibility": "ఆలోచనా స్థాయి: {{label}}",
       "thinkingEffortSelected": "ఆలోచనా స్థాయి: {{label}}, ఎంచుకున్నది",
       "thinkingEffortWithModel": "{{model}}, ఆలోచనా స్థాయి: {{variant}}",
-      "lockedByAgent": ", \"{{agent}}\" ఏజెంట్ దీన్ని మార్చకుండా లాక్ చేసింది",
+      "lockedByAgent": "\"{{agent}}\" ఏజెంట్ దీన్ని మార్చకుండా లాక్ చేసింది",
       "addToFavorites": "{{name}}ను ఇష్టమైనవాటికి జోడించండి",
       "removeFromFavorites": "{{name}}ను ఇష్టమైనవాటి నుండి తీసివేయండి",
       "sessionModel": "సెషన్ మోడల్"
@@ -2808,8 +2849,8 @@
       "pasteFromClipboard": "క్లిప్‌బోర్డ్ నుండి అతికించండి",
       "stopGenerating": "ప్రతిస్పందనను రూపొందించడం ఆపండి",
       "selectModelBeforeSending": "పంపడానికి ముందు మోడల్‌ను ఎంచుకోండి.",
-      "preparingPlaceholder": "పని వాతావరణాన్ని సిద్ధం చేస్తోంది...",
-      "finalizingPlaceholder": "ముగిస్తోంది...",
+      "preparingPlaceholder": "పని వాతావరణాన్ని సిద్ధం చేస్తోంది…",
+      "finalizingPlaceholder": "ముగిస్తోంది…",
       "sessionLoadFailed": "సెషన్ను లోడ్ చేయలేకపోయాం. ముందుగా మళ్లీ ప్రయత్నించండి.",
       "cannotReceiveFiles": "ఈ సెషన్ ఫైళ్లను స్వీకరించలేదు. మీ సందేశాన్ని పంపడానికి జోడింపులను తీసివేయండి.",
       "couldNotAttachFiles": "ఫైళ్లను జోడించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపే బటన్‌ను నొక్కండి.",
@@ -3008,6 +3049,7 @@
     "noSessions": "సైన్ ఇన్ అయి ఉన్న సెషన్‌లు లేవు",
     "noSessionsDescription": "మరో పరికరంలో Kilo యాప్ ద్వారా సైన్ ఇన్ చేయండి. ఆ పరికరం ఇక్కడ కనిపిస్తుంది.",
     "signedIn": "సైన్ ఇన్ చేసిన సమయం: {{signedIn}} · చివరిగా కనిపించిన సమయం: {{lastSeen}}",
+    "signedInThisDevice": "సైన్ ఇన్ చేసిన సమయం: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Kilo యాప్, Kilo CLI మరియు వెబ్ బ్రౌజర్ ద్వారా చేసిన సైన్ ఇన్‌లు ఇక్కడ కనిపిస్తాయి. ఎడిటర్ ద్వారా చేసిన సైన్ ఇన్‌లు ఇక్కడ చూపబడవు.",
     "thisDevice": "ఈ పరికరం",
     "viewProfile": "ప్రొఫైల్‌ను చూడండి",
@@ -3030,7 +3072,6 @@
   },
   "home": {
     "couldNotLoadSessions": "సెషన్‌లను లోడ్ చేయలేకపోయాము.",
-    "couldNotLoadActiveSessions": "ప్రస్తుతం నడుస్తున్న సెషన్‌లను లోడ్ చేయలేకపోయాము.",
     "agentSessions": "ప్రస్తుతం నడుస్తున్నవి",
     "newCodingTask": "కొత్త కోడింగ్ పని",
     "newTaskFromPicture": "చిత్రం నుండి కొత్త పని",
@@ -3057,6 +3098,7 @@
   "queryError": {
     "neutralDescription": "దయచేసి మళ్లీ ప్రయత్నించండి.",
     "offlineTitle": "లోడ్ చేయడం విఫలమైంది.",
+    "offlineDescription": "సర్వర్‌ను చేరుకోలేకపోయాము.",
     "permissionDescription": "దీన్ని చూడడానికి మీకు అనుమతి లేదు.",
     "notFoundDescription": "ఈ అంశాన్ని తీసివేసి ఉండవచ్చు లేదా ఇది ఇక అందుబాటులో లేదు.",
     "serverTitle": "లోడ్ చేయలేకపోయాము.",
@@ -3077,7 +3119,7 @@
     "scheduled": "షెడ్యూల్ చేయబడింది"
   },
   "voiceInput": {
-    "listening": "వింటోంది...",
+    "listening": "వింటోంది…",
     "onlineTitle": "మాటలను ఆన్‌లైన్‌లో వచనంగా మారుస్తారు",
     "onlineMessage": "ఈ పరికరం ఆఫ్‌లైన్‌లో మాటలను వచనంగా మార్చలేదు. మీ రికార్డింగ్‌ను వచనంగా మార్చడానికి {{provider}}కు పంపుతాము. Kilo ఆడియోను నిల్వ చేయదు.",
     "allow": "అనుమతించండి",
@@ -3099,7 +3141,7 @@
     "useOnlineTranscription": "ఆన్‌లైన్ ట్రాన్స్‌క్రిప్షన్‌ను అనుమతించండి",
     "offlineModelDownloadScheduled": "ఆఫ్‌లైన్ స్పీచ్ ఫైల్‌లు నేపథ్యంలో డౌన్‌లోడ్ అవుతాయి. తర్వాత వాయిస్ ఇన్‌పుట్‌ను మళ్లీ ప్రయత్నించండి.",
     "listeningStopped": "వినడం ఆగిపోయింది.",
-    "transcribing": "వచనంగా మారుస్తోంది...",
+    "transcribing": "వచనంగా మారుస్తోంది…",
     "gatewayUnreachable": "Kilo Gatewayను చేరుకోలేకపోయాం. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "gatewayTimeout": "వచనంగా మార్చడానికి చాలా సమయం పట్టింది. మళ్లీ ప్రయత్నించండి.",
     "gatewayModelUnavailable": "ఈ వచన మార్పిడి మోడల్ అందుబాటులో లేదు. ప్రాధాన్యతలలో మరొకదాన్ని ఎంచుకోండి.",
@@ -3139,6 +3181,11 @@
       "billingHistory": "బిల్లింగ్ చరిత్ర",
       "billingHistoryEmpty": "ఇంకా బిల్లింగ్ చరిత్ర ఏదీ లేదు.",
       "billingHistoryError": "బిల్లింగ్ చరిత్రను లోడ్ చేయడం సాధ్యపడలేదు",
+      "billingRowInitial": "మొదటి ఛార్జ్ · {{tier}}",
+      "billingRowRenewal": "పునరుద్ధరణ · {{tier}}",
+      "billingRowSubscription": "సబ్‌స్క్రిప్షన్ · {{tier}}",
+      "billingRowTrial": "ఉచిత ట్రయల్ · {{tier}}",
+      "billingRowUpgrade": "ప్లాన్ మార్పు · {{tier}}",
       "cancel": "సబ్‌స్క్రిప్షన్‌ను రద్దు చేయండి",
       "cancelDescription": "మీ Kilo Pass బిల్లింగ్ వ్యవధి ముగిసే వరకు యాక్టివ్‌గా ఉంటుంది, ఆ తర్వాత పునరుద్ధరించబడదు.",
       "cancelScheduled": "{{date}}న రద్దవుతుంది",
@@ -3164,6 +3211,8 @@
     "retryHint": "Kilo Pass స్థితిని మళ్లీ పొందడానికి ప్రయత్నిస్తుంది.",
     "endedOn": "{{date}}న ముగిసింది",
     "notAvailableInApp": "Kilo Pass యాప్‌లో అందుబాటులో లేదు.",
+    "notAvailableTitle": "Kilo Pass యాప్‌లో లేదు",
+    "noPassDescription": "ఈ ఖాతాకు Kilo Pass లేదు.",
     "statusActive": "క్రియాశీలం",
     "statusTrialing": "ట్రయల్‌లో",
     "statusPastDue": "చెల్లింపు గడువు దాటింది",
@@ -3234,6 +3283,7 @@
     "revokeConsent": "సమ్మతిని ఉపసంహరించండి",
     "revokeConsentTitle": "డేటా భాగస్వామ్య సమ్మతిని ఉపసంహరించాలా?",
     "acceptAndContinue": "అంగీకరించి కొనసాగించండి",
+    "loadingConsentSettings": "మీ సమ్మతి సెట్టింగ్‌లు లోడ్ అవుతున్నాయి…",
     "decline": "తిరస్కరించండి",
     "declineAndSignOut": "తిరస్కరించి సైన్ అవుట్ చేయండి",
     "declineTitle": "డేటా భాగస్వామ్యాన్ని తిరస్కరించాలా?",
@@ -3408,7 +3458,8 @@
         "accounting_adjustment": "లెక్కల సర్దుబాటు",
         "credits_expired": "క్రెడిట్ల గడువు ముగిసింది"
       },
-      "truncated": "పాత క్రెడిట్ లావాదేవీలు అందుబాటులో ఉన్నాయి."
+      "truncated": "పాత క్రెడిట్ లావాదేవీలు అందుబాటులో ఉన్నాయి.",
+      "retentionLimit": "ఇటీవలి క్రెడిట్ లావాదేవీలు చూపబడుతున్నాయి."
     },
     "inviteMember": {
       "emailError": "చెల్లుబాటు అయ్యే ఇమెయిల్ చిరునామాను నమోదు చేయండి.",
@@ -3418,6 +3469,7 @@
       "sendInvite": "ఆహ్వానం పంపండి",
       "title": "సభ్యుడిని ఆహ్వానించండి",
       "alreadyInvited": "వారికి ఇప్పటికే ఆహ్వానం వెళ్లింది లేదా వారు ఇప్పటికే సభ్యులే.",
+      "organizationUnavailable": "ఈ సంస్థ ఇప్పుడు అందుబాటులో లేదు.",
       "sendError": "ఆహ్వానాన్ని పంపలేకపోయాము.",
       "pendingInvitation": "ఈ ఇమెయిల్‌కు ఇప్పటికే పెండింగ్‌లో ఉన్న ఆహ్వానం ఉంది.",
       "alreadyMember": "ఈ వ్యక్తి ఇప్పటికే ఈ సంస్థలో సభ్యుడు.",
@@ -3439,10 +3491,11 @@
         "void": "రద్దు",
         "uncollectible": "వసూలు చేయలేనిది"
       },
-      "truncated": "పాత ఇన్వాయిస్‌లు అందుబాటులో ఉన్నాయి."
+      "truncated": "పాత ఇన్వాయిస్‌లు అందుబాటులో ఉన్నాయి.",
+      "retentionLimit": "ఇటీవలి ఇన్వాయిస్‌లు చూపబడుతున్నాయి."
     },
     "lowBalanceAlert": {
-      "enableA11y": "బ్యాలెన్స్ తగ్గితే హెచ్చరిక వచ్చేలా చేయండి",
+      "subtitle": "ఈ సంస్థ బ్యాలెన్స్ మీరు సెట్ చేసిన మొత్తం కంటే తగ్గినప్పుడు, మీరు జాబితా చేసిన చిరునామాలకు ఇమెయిల్ ద్వారా హెచ్చరిక పంపండి.",
       "notifyEmailsLabel": "హెచ్చరికలు పంపే ఇమెయిల్ చిరునామాలు",
       "permissionDenied": "బిల్లింగ్ హెచ్చరికలను నిర్వహించడానికి మీకు అనుమతి లేదు.",
       "separateEmailsHint": "ఒకటి కంటే ఎక్కువ ఇమెయిల్ చిరునామాలు ఉంటే, వాటిని కామాలతో వేరు చేయండి.",
@@ -3518,6 +3571,7 @@
       "truncated": "ఈ గంటలో జాబితాలో చూపిన వాటి కంటే ఎక్కువ రిక్వెస్ట్‌లు ఉన్నాయి.",
       "emptyTitle": "ఈ గంటలో రిక్వెస్ట్‌లు లేవు",
       "emptyDescription": "మునుపటి రిక్వెస్ట్‌లను చూడటానికి మునుపటి గంటను ఉపయోగించండి.",
+      "emptyBoundDescription": "రిక్వెస్ట్‌ల చరిత్ర ఇంతవరకు మాత్రమే అందుబాటులో ఉంది.",
       "loadError": "రిక్వెస్ట్ లాగ్‌లను లోడ్ చేయడం సాధ్యపడలేదు.",
       "permissionDenied": "సంస్థ యజమాని, అడ్మిన్ లేదా బిల్లింగ్ మేనేజర్ మాత్రమే దాని రిక్వెస్ట్ లాగ్‌లను చూడగలరు.",
       "tokens": "{{input}} ఇన్‌పుట్ · {{output}} అవుట్‌పుట్",
@@ -3586,10 +3640,9 @@
     },
     "hub": {
       "renameTitle": "సంస్థ పేరు మార్చండి",
-      "renamePlaceholder": "సంస్థ పేరు",
+      "renamePlaceholder": "సంస్థ పేరును నమోదు చేయండి",
       "balance": "బ్యాలెన్స్",
-      "organizationSeats": "సంస్థ సీట్లు",
-      "plan": "సంస్థ ప్లాన్",
+      "plan": "ప్లాన్",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · ముగిసింది",
@@ -3623,7 +3676,8 @@
     "signupStepUp": "మీ ఖాతా సృష్టిని పూర్తి చేయడానికి '$t(login.moreSignInOptions)' ఉపయోగించండి.",
     "signupStepUpApple": "మీ ఖాతా సృష్టిని పూర్తి చేయడానికి '$t(login.signInWithApple)' ఉపయోగించండి.",
     "signupStepUpGoogle": "మీ ఖాతా సృష్టిని పూర్తి చేయడానికి '$t(login.signInWithGoogle)' ఉపయోగించండి.",
-    "invalidCode": "ఆ కోడ్ సరైనది కాదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
+    "signupStepUpBack": "మీ ఖాతా సృష్టిని పూర్తి చేయడానికి వెనక్కి వెళ్లి '$t(login.moreSignInOptions)' ఉపయోగించండి.",
+    "invalidCode": "ఆ కోడ్ సరైనది కాదు లేదా దాని గడువు ముగిసింది. మళ్లీ ప్రయత్నించండి లేదా '$t(login.resendCode)' ఉపయోగించండి.",
     "codeInProgress": "మీ కోడ్ ప్రాసెస్ చేయబడుతోంది. కొంచెం ఆగి మళ్లీ ప్రయత్నించండి.",
     "tooManyAttempts": "చాలా సార్లు ప్రయత్నించారు. కొత్త కోడ్‌ను అభ్యర్థించండి.",
     "invalidToken": "సైన్ ఇన్ చేయలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
@@ -3673,8 +3727,7 @@
     "imagesSectionEmpty": "విశ్వసించిన చిత్ర హోస్ట్‌లు లేవు",
     "revoke": "{{host}}పై నమ్మకాన్ని ఉపసంహరించండి",
     "revokeMessage": "ఈ హోస్ట్‌కు ఉన్న లింక్‌లు మళ్లీ నిర్ధారణ అడుగుతాయి.",
-    "revokeImageMessage": "ఈ హోస్ట్ నుండి వచ్చే చిత్రాలు మళ్లీ నిర్ధారణ అడుగుతాయి.",
-    "backToPreferences": "ప్రాధాన్యతలకు తిరిగి వెళ్లండి"
+    "revokeImageMessage": "ఈ హోస్ట్ నుండి వచ్చే చిత్రాలు మళ్లీ నిర్ధారణ అడుగుతాయి."
   },
   "glanceable": {
     "waiting": "ఏజెంట్లను నవీకరిస్తోంది",
@@ -3688,7 +3741,7 @@
     "newestSession": "సరికొత్త: {{title}}",
     "noneWaiting": "వేచి ఉన్న ఏజెంట్ లేదు",
     "newAgent": "కొత్త ఏజెంట్",
-    "approving": "ఆమోదిస్తోంది...",
+    "approving": "ఆమోదిస్తోంది…",
     "couldNotApprove": "ఆమోదించలేకపోయింది",
     "channelName": "పనిచేస్తున్న ఏజెంట్లు",
     "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి.",
@@ -3700,6 +3753,7 @@
     "lastKnown": "చివరిగా తెలిసిన స్థితి",
     "awaitingUpdate": "అప్‌డేట్ కోసం వేచి ఉంది",
     "nextRun": "తదుపరి అమలు",
+    "wasDue": "ఆశించబడింది",
     "waitingForYou": "మీ కోసం వేచి ఉంది",
     "nextScheduled": "తదుపరి షెడ్యూల్",
     "answerNeeded": "మీ సమాధానం అవసరం",
@@ -3752,6 +3806,7 @@
   },
   "modelChat": {
     "offlineFailure": "ఈ మోడల్‌కు ఇంటర్నెట్ కనెక్షన్ అవసరం. కనెక్ట్ చేసి మళ్లీ ప్రయత్నించండి, లేదా ఈ పరికరంలోని మోడల్‌కు మారండి.",
+    "connectionLost": "మోడల్‌తో కనెక్షన్ తెగిపోయింది. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "empty": {
       "title": "చాట్ ప్రారంభించండి",
       "description": "మోడల్తో మాట్లాడటానికి సందేశం పంపండి."
@@ -3809,6 +3864,8 @@
       "fieldName": "ప్రదర్శించే పేరు",
       "fieldUrl": "సర్వర్ URL",
       "fieldUrlInvalid": "చెల్లుబాటు అయ్యే సర్వర్ URL నమోదు చేయండి.",
+      "duplicateUrl": "ఆ URL ఇప్పటికే సేవ్ చేయబడింది.",
+      "serverNotFound": "ఈ సర్వర్ ఇకపై సేవ్ చేయబడలేదు.",
       "enableServer": "ఈ సర్వర్‌ను ప్రారంభించండి: {{name}}",
       "editServer": "సర్వర్‌ను సవరించండి",
       "deleteServer": "సర్వర్‌ను తొలగించండి",
@@ -3889,6 +3946,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) ఎంచుకున్న ప్రోటోకాల్ మరియు మోడల్‌ను ఉపయోగించి ఈ ఎండ్‌పాయింట్‌కు ఒక చిన్న అనుమితి అభ్యర్థనను పంపుతుంది. సేవా ప్రదాత దీనికి రుసుము వసూలు చేయవచ్చు.",
       "connectionSucceeded": "ఈ ప్రోటోకాల్‌ను ఉపయోగించి మోడల్ ఒక అభ్యర్థనను పూర్తి చేసింది.",
       "connectionFailed": "మోడల్ అభ్యర్థనను పూర్తి చేయలేకపోయింది. API మూల చిరునామా, ప్రోటోకాల్, ప్రామాణీకరణ వివరాలు మరియు మోడల్ IDని తనిఖీ చేయండి.",
+      "requestTimedOut": "ఎండ్‍పాయింట్ సమయానికి సమాధానం ఇవ్వలేదు. API మూల చిరునామా మరియు మీ కనెక్షన్‍ను తనిఖీ చేసి, మళ్లీ ప్రయత్నించండి.",
+      "requestUnauthorized": "ఎండ్‍పాయింట్ ప్రామాణీకరణ వివరాలను తిరస్కరించింది. API కీ మరియు కస్టమ్ హెడర్‍లను తనిఖీ చేసి, మళ్లీ ప్రయత్నించండి.",
+      "requestNotFound": "ఎండ్‍పాయింట్ లేదా మోడల్ కనుగొనబడలేదు. API మూల చిరునామా మరియు మోడల్ IDని తనిఖీ చేయండి.",
+      "requestRateLimited": "ఎండ్‍పాయింట్ అభ్యర్థనలను పరిమితం చేస్తోంది. కొంత సేపు ఆగి మళ్లీ ప్రయత్నించండి.",
+      "requestUnavailable": "ఎండ్‍పాయింట్ ప్రస్తుతం అందుబాటులో లేదు. కొంత సేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
+      "requestUnreachable": "ఎండ్‍పాయింట్‍ను చేరుకోలేకపోయాము. API మూల చిరునామా మరియు మీ కనెక్షన్‍ను తనిఖీ చేయండి.",
+      "requestInvalidResponse": "ఎండ్‍పాయింట్ ఆశించిన ఆకృతిలో సమాధానం ఇవ్వలేదు. API మూల చిరునామా మరియు ప్రోటోకాల్ సర్వర్‍కు సరిపోతున్నాయో లేదో తనిఖీ చేయండి, ఆపై మళ్లీ ప్రయత్నించండి.",
+      "discoveryNoModels": "ఎండ్‍పాయింట్ ఏ మోడళ్లను జాబితా చేయలేదు. మోడళ్లను మాన్యువల్‍గా నమోదు చేయండి.",
+      "connectionIncomplete": "మోడల్ సమాధానం ఇచ్చింది కానీ పూర్తి చేయలేదు. మళ్లీ ప్రయత్నించండి, లేదా మోడల్ ID మరియు ప్రోటోకాల్‍ను తనిఖీ చేయండి.",
       "invalidInput": "బ్యాకెండ్ పేరు, చెల్లుబాటు అయ్యే హెడర్‌లు, ప్రత్యేక ID మరియు పేరు ఉన్న కనీసం ఒక మోడల్‌ను నమోదు చేయండి. టోకెన్ పరిమితులు సున్నా కంటే ఎక్కువ పూర్ణ సంఖ్యలుగా ఉండాలి.",
       "invalidUrl": "ప్రామాణీకరణ వివరాలు, క్వెరీ లేదా ఫ్రాగ్మెంట్ లేని HTTP లేదా HTTPS API మూల చిరునామాను నమోదు చేయండి.",
       "publicHttp": "పబ్లిక్ HTTP ఎండ్‌పాయింట్‌లు అనుమతించబడవు. HTTPS లేదా ప్రైవేట్ స్థానిక ఎండ్‌పాయింట్‌ను ఉపయోగించండి.",
@@ -3918,6 +3984,8 @@
       "downloading": "డౌన్‌లోడ్ అవుతోంది: {{total}}లో {{written}}",
       "downloadingUnknown": "డౌన్‌లోడ్ అవుతోంది: {{written}}",
       "paused": "పాజ్ చేయబడింది: {{total}}లో {{written}}",
+      "retrying": "మళ్లీ ప్రయత్నిస్తోంది: {{total}}లో {{written}}",
+      "retryingUnknown": "మళ్లీ ప్రయత్నిస్తోంది: {{written}}",
       "verifying": "డౌన్‌లోడ్ చేసిన ఫైల్‌ను తనిఖీ చేస్తోంది…",
       "downloaded": "డౌన్‌లోడ్ అయింది · {{size}}",
       "url": "నేరుగా డౌన్‌లోడ్ లింక్",
@@ -4008,7 +4076,9 @@
         "androidModelUnavailable": "ఈ పరికరం Gemini Nanoను సపోర్ట్ చేయదు, లేదా AICore సిస్టమ్ యాప్ ఇంకా సెటప్ అవుతోంది. తర్వాత మళ్లీ ప్రయత్నించండి.",
         "aicoreUpdateRequired": "ఈ మోడల్‌ను ఉపయోగించడానికి AICore యాప్‌ను, మీ సిస్టమ్ సాఫ్ట్‌వేర్‌ను అప్‌డేట్ చేయండి.",
         "downloadable": "ఈ మోడల్‌ను ఉపయోగించే ముందు ఒకసారి డౌన్‌లోడ్ చేయాలి.",
-        "downloading": "మోడల్ డౌన్‌లోడ్ అవుతోంది. డౌన్‌లోడ్ పూర్తయ్యాక ఇది సిద్ధంగా ఉంటుంది."
+        "downloading": "మోడల్ డౌన్‌లోడ్ అవుతోంది. డౌన్‌లోడ్ పూర్తయ్యాక ఇది సిద్ధంగా ఉంటుంది.",
+        "batteryQuota": "పరికరంలోని మోడల్ ఇప్పుడు దాని బ్యాటరీ కేటాయింపును ఉపయోగించింది. తర్వాత మళ్లీ ప్రయత్నించండి.",
+        "checkFailed": "ఈ మోడల్‌ను తనిఖీ చేయడం యాప్‌కు సాధ్యం కాలేదు. మళ్లీ ప్రయత్నించండి."
       },
       "unavailable": "పరికరంలోని మోడల్ ప్రస్తుతం అందుబాటులో లేదు. దాని స్థితిని $t(modelChat.backends.title)లో తనిఖీ చేయండి.",
       "busy": "పరికరంలోని మోడల్ మరొక ప్రత్యుత్తరంతో బిజీగా ఉంది. అది పూర్తయ్యాక మళ్లీ ప్రయత్నించండి.",
@@ -4023,10 +4093,20 @@
     "reasoningEffort": {
       "modelFlag": "ఈ మోడల్ ఆలోచనా స్థాయికి మద్దతు ఇస్తుంది"
     },
-    "creditsRequired": "ఈ సందేశాన్ని పంపడానికి తగినంత క్రెడిట్లు లేవు."
+    "creditsRequired": "ఈ సందేశాన్ని పంపడానికి తగినంత క్రెడిట్లు లేవు.",
+    "providerKeyRefused": "సేవా ప్రదాత ప్రామాణీకరణ వివరాలను తిరస్కరించారు. దాని API కీని తనిఖీ చేసి, మళ్లీ పంపండి.",
+    "providerModelMissing": "ఈ బ్యాకెండ్ ఇకపై ఈ మోడల్‍ను అందించదు. మరొకటి ఎంచుకోండి.",
+    "providerRateLimited": "సేవా ప్రదాత అభ్యర్థనలను పరిమితం చేస్తున్నారు. కొంత సేపు ఆగి మళ్లీ పంపండి.",
+    "providerUnavailable": "సేవా ప్రదాత ప్రస్తుతం అందుబాటులో లేరు. కొద్దిసేపట్లో మళ్లీ పంపండి."
   },
   "settingsTools": {
-    "confirmTitle": "ఈ మార్పును నిర్ధారించాలా?"
+    "confirmTitle": "ఈ మార్పును నిర్ధారించాలా?",
+    "guarded": {
+      "spendAlertsOff": "ఖర్చు హెచ్చరికలను ఆఫ్ చేయాలా? ఖర్చు పరిమితి దాటినప్పుడు మరియు గంటవారీ పెరుగుదలల గురించి మీకు నోటిఫికేషన్లు రావడం ఆగిపోతుంది.",
+      "balanceAlertsOff": "బ్యాలెన్స్ హెచ్చరికలను ఆఫ్ చేయాలా? మీ క్రెడిట్లు తగ్గిపోతున్నప్పుడు మీకు నోటిఫికేషన్లు రావడం ఆగిపోతుంది.",
+      "securityFindingsOff": "భద్రతా ఫైండింగ్స్‌ను ఆఫ్ చేయాలా? కొత్త భద్రతా ఫైండింగ్స్ గురించి మీకు నోటిఫికేషన్లు రావడం ఆగిపోతుంది.",
+      "hideBalanceOn": "మీ బ్యాలెన్స్‌లను దాచాలా? క్రెడిట్ బ్యాలెన్స్‌లు ఇకపై ప్రొఫైల్ స్క్రీన్‌లు మరియు సంస్థ హబ్‌లో కనిపించవు."
+    }
   },
   "appActions": {
     "start": {
@@ -4171,6 +4251,7 @@
     "instructionsHint": "ఈ ప్రొఫైల్ వాడే ప్రతి సెషన్‌కు వర్తించే రూల్స్ మార్క్‌డౌన్.",
     "instructionsEmpty": "ఇంకా సూచన ఫైల్‌లు లేవు",
     "instructionsEmptyDescription": "ఈ ప్రొఫైల్ వాడే ప్రతి సెషన్‌కు వర్తించే రూల్ ఫైల్‌లను జోడించండి.",
+    "instructionsEmptyDescriptionReadOnly": "ఇక్కడ జోడించిన రూల్స్ ఫైల్స్ ఈ ప్రొఫైల్‌ను ఉపయోగించే ప్రతి సెషన్‌కు వర్తిస్తాయి.",
     "instructionNameRequired": "ఫైల్ పేరు నమోదు చేయండి",
     "instructionNameTooLong": "ఫైల్ పేరు {{max}} అక్షరాలకు మించకూడదు",
     "instructionNameInvalid": "అక్షరం లేదా అంకెతో మొదలుపెట్టండి; చిన్న అక్షరాలు, అంకెలు, డాష్‌లు మాత్రమే వాడండి",
@@ -4246,7 +4327,7 @@
       "topPPlaceholder": "ఉదా. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "నా ఏజెంట్",
-      "promptPlaceholder": "మీరు ఒక ...",
+      "promptPlaceholder": "మీరు ఒక …",
       "tools": "ఉపకరణాలు",
       "wholeToolRule": "ఈ ఏజెంట్ ఒకేసారి ప్రతి ఉపకరణానికి ఒక నియమాన్ని వర్తిస్తుంది: {{rule}}. ఈ స్విచ్‌లు చదవడానికి మాత్రమే.",
       "visibility": "దృశ్యమానత",
@@ -4302,10 +4383,10 @@
       "add": "డిఫాల్ట్‌ని జోడించండి",
       "empty": "డిఫాల్ట్‌లు ఏవీ కాన్ఫిగర్ చేయబడలేదు",
       "emptyDescription": "రెపో కోసం సెషన్‌లను ప్రారంభించేటప్పుడు ప్రొఫైల్‌ను స్వయంచాలకంగా వర్తింపజేయడానికి డిఫాల్ట్‌ను జోడించండి.",
-      "repo": "రిపోజిటరీని ఎంచుకోండి...",
+      "repo": "రిపోజిటరీని ఎంచుకోండి…",
       "profile": "ప్రొఫైల్‌ని ఎంచుకోండి",
       "removeForRepo": "{{repo}}ను అన్‌బైండ్ చేయి",
-      "search": "రిపోజిటరీలను శోధించండి...",
+      "search": "రిపోజిటరీలను శోధించండి…",
       "addedToast": "\"{{repo}}\" కోసం డిఫాల్ట్ ప్రొఫైల్ సెట్ చేయబడింది",
       "addFailed": "డిఫాల్ట్ ప్రొఫైల్‌ను సెట్ చేయడం సాధ్యపడలేదు",
       "removedToast": "\"{{repo}}\" కోసం డిఫాల్ట్ ప్రొఫైల్ తీసివేయబడింది",
@@ -4369,7 +4450,8 @@
       "purchaseFallback": "క్రెడిట్ కొనుగోలు",
       "receipt": "రసీదు",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} కోసం రసీదును తెరవండి",
-      "receiptUnavailable": "ఈ కొనుగోలుకు రసీదు అందుబాటులో లేదు."
+      "receiptUnavailable": "ఈ కొనుగోలుకు రసీదు అందుబాటులో లేదు.",
+      "retentionLimit": "ఇటీవలి క్రెడిట్ చరిత్ర చూపబడుతోంది."
     },
     "title": "క్రెడిట్‌లు కొనండి",
     "description": "క్రెడిట్‌లు అనేవి Kilo యాప్‌లో AI కోడింగ్ సెషన్‌లను నడపడానికి మీ Kilo బ్యాలెన్స్‌కు జోడించే ఒక-సారి కొనుగోలు. స్టోర్ మీ ఖాతా నుండి ఛార్జ్ చేస్తుంది మరియు స్టోర్ చెల్లింపును నిర్ధారించిన తర్వాత క్రెడిట్‌లు జోడించబడతాయి.",
@@ -4396,6 +4478,7 @@
     "pickPackToBuyAgain": "కొత్త కొనుగోలును ప్రారంభించడానికి పైన ఉన్న ఒక ప్యాక్‌ను ఎంచుకోండి.",
     "purchasePending": "స్టోర్ ఇంకా ఈ చెల్లింపును ప్రాసెస్ చేస్తోంది. ఛార్జ్ ఆమోదించిన వెంటనే మీ క్రెడిట్‌లు వస్తాయి.",
     "buyAgain": "మళ్లీ కొనండి",
+    "checkPurchase": "కొనుగోలును తనిఖీ చేయండి",
     "purchaseOwnedByAnotherAccount": "ఈ Apple Accountలోని క్రెడిట్‌లు వేరే Kilo ఖాతాకు చెందుతాయి. వాటిని ఉపయోగించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి.",
     "purchaseOwnedByAnotherAccountPlay": "ఈ Google Play ఖాతాలోని క్రెడిట్‌లు వేరే Kilo ఖాతాకు చెందుతాయి. వాటిని ఉపయోగించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి."
   },
@@ -4489,7 +4572,9 @@
     },
     "saveSheet": {
       "title": "జాబితాలో సేవ్ చేయండి",
-      "saved": "{{list}}లో సేవ్ చేయబడింది"
+      "saved": "{{list}}లో సేవ్ చేయబడింది",
+      "saveFailed": "పనిని సేవ్ చేయడం సాధ్యపడలేదు. మీ కనెక్షన్‌ను తనిఖీ చేసి, మళ్లీ ప్రయత్నించండి.",
+      "saveRefused": "పనిని ఈ జాబితాలో సేవ్ చేయడం సాధ్యపడలేదు. మరొక జాబితాను ఎంచుకోండి."
     }
   },
   "agentBriefing": {
@@ -4501,17 +4586,24 @@
     "empty": "ఈ బ్రీఫింగ్ కాలవ్యవధిలో కార్యాచరణ ఏదీ లేదు",
     "emptyHint": "షెడ్యూల్ చేసిన బ్రీఫింగ్‌లో కార్యాచరణ ఉన్నప్పుడు మీ క్లౌడ్ మరియు CLI కోడింగ్ సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
     "loadError": "బ్రీఫింగ్‌లను లోడ్ చేయడం సాధ్యపడలేదు",
+    "estimateLoadError": "అంచనాను లోడ్ చేయడం సాధ్యపడలేదు.",
     "view": "బ్రీఫింగ్ చదవండి",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "సందర్భం ప్రకారం ఫిల్టర్ చేయండి",
+    "contextAll": "అన్ని సందర్భాలు",
     "dismiss": "బ్రీఫింగ్ విస్మరించండి",
+    "dismissFailed": "ఈ బ్రీఫింగ్‌ను విస్మరించడం ఇంకా సాధ్యం కాలేదు. ఇది నేపథ్యంలో మళ్లీ ప్రయత్నిస్తుంది.",
     "offline": "ఆఫ్‌లైన్ · సేవ్ చేసిన బ్రీఫింగ్",
-    "cached": "సేవ్ చేసిన రిపోర్ట్ · రిఫ్రెష్ అందుబాటులో లేదు",
+    "cached": "సేవ్ చేసిన బ్రీఫింగ్ · రిఫ్రెష్ అందుబాటులో లేదు",
     "summary": "AI సారాంశం",
     "summaryPending": "AI సారాంశం తయారవుతోంది. సిద్ధమైనప్పుడు ఇక్కడ జోడించబడుతుంది.",
-    "summaryUnavailable": "AI సారాంశం అందుబాటులో లేదు. మీ నిర్మాణాత్మక రిపోర్ట్ ఇంకా అందుబాటులో ఉంది.",
+    "summaryUnavailable": "AI సారాంశం అందుబాటులో లేదు. మీ నిర్మాణాత్మక బ్రీఫింగ్ ఇంకా అందుబాటులో ఉంది.",
+    "summaryNotAdmitted": "AI సారాంశం ఈ బ్రీఫ్ కోసం రూపొందించబడలేదు. మీ నిర్మాణాత్మక బ్రీఫింగ్ ఇంకా అందుబాటులో ఉంది.",
     "summaryCharge": "AI ఛార్జీ {{cost}}",
     "summaryChargePending": "AI ఛార్జీ సరిపోల్చడం పెండింగ్‌లో ఉంది",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "ఆధారాలు మరియు ఆర్టిఫ్యాక్ట్‌లు",
     "timezone": "బ్రీఫింగ్ టైమ్ జోన్",
     "deviceTimezone": "పరికర టైమ్ జోన్ ఉపయోగించండి",
@@ -4523,22 +4615,22 @@
     "timeHint": "బ్రీఫింగ్ కాలవ్యవధి ముగిసినప్పుడు, ఆఫ్‌లైన్‌లో ఉన్నా, హోమ్ కార్డ్ ప్రత్యక్ష స్థితిని పునరుద్ధరిస్తుంది.",
     "invalidSchedule": "చెల్లుబాటు అయ్యే టైమ్ జోన్ మరియు సున్నా కంటే ఎక్కువ నిడివి ఉన్న బ్రీఫింగ్ కాలవ్యవధిని ఎంచుకోండి.",
     "notificationsHint": "షెడ్యూల్ చేసిన ప్రతి బ్రీఫింగ్‌కు ఒక సాధారణ నోటిఫికేషన్. చెల్లింపు AI సారాంశాలతో సంబంధం లేదు.",
-    "notificationPermission": "మీ బ్రీఫింగ్ పొందడానికి $t(common.notifications)లో పరికర నోటిఫికేషన్‌లను ప్రారంభించండి.",
+    "notificationPermission": "మీ బ్రీఫింగ్ పొందడానికి పుష్ నోటిఫికేషన్‌లను ప్రారంభించండి.",
     "defaultModel": "Kilo డిఫాల్ట్ మోడల్ ఉపయోగించండి",
     "duration": "సమయ పరిమితి (నిమిషాలు)",
     "spendLimit": "ఖర్చు పరిమితి (USD)",
     "invalidSafeguards": "ధనాత్మక, పరిమిత సమయ మరియు ఖర్చు పరిమితులను నమోదు చేయండి.",
     "estimate": "అంచనా {{estimate}} · గరిష్టం {{maximum}}",
-    "estimateUnavailable": "ఈ సెట్టింగ్‌ల కోసం చెల్లింపు సారాంశం అందుబాటులో లేదు.",
+    "estimateUnavailable": "ఈ సెట్టింగ్‌ల కోసం చెల్లింపు సారాంశం అందుబాటులో లేదు. మోడల్ లేదా పరిమితులను మార్చండి, లేదా తర్వాత మళ్లీ ప్రయత్నించండి.",
     "confirmPaid": "{{context}} కోసం చెల్లింపు సారాంశాలను ప్రారంభించాలా?",
     "paidDisclosure": "అంచనా {{estimate}}, గరిష్ఠం {{maximum}}, {{minutes}} నిమి. పరిమితితో. రూపొందింపు విఫలమైనా ఛార్జీలు వర్తిస్తాయి.",
     "enable": "చెల్లింపు సారాంశాలను ప్రారంభించండి",
     "allContexts": "వ్యక్తిగత మరియు సంస్థ బ్రీఫింగ్‌లు వేర్వేరుగా ఉంటాయి.",
     "emptyHistory": "సేవ్ చేసిన బ్రీఫింగ్‌లు లేవు",
-    "estimatePermissionUnavailable": "ఈ సందర్భంలోని నిల్వ మొత్తాన్ని ఉపయోగించడానికి మీకు అనుమతి లేదు.",
-    "estimatePricingUnavailable": "ఈ మోడల్ ధర అందుబాటులో లేదు.",
-    "estimateBalanceUnavailable": "చెల్లింపు సారాంశం కోసం తగినంత బ్యాలెన్స్ లేదు.",
-    "estimateModelNotAllowed": "ఈ మోడల్ ఇక్కడ అనుమతించబడలేదు.",
+    "estimatePermissionUnavailable": "ఈ సందర్భంలోని బ్యాలెన్స్‌ను ఉపయోగించడానికి మీకు అనుమతి లేదు. దీన్ని ప్రారంభించమని సంస్థ యజమానిని అడగండి.",
+    "estimatePricingUnavailable": "ఈ మోడల్ ధర అందుబాటులో లేదు. వేరే మోడల్‌ను ఎంచుకోండి.",
+    "estimateBalanceUnavailable": "చెల్లింపు సారాంశం కోసం తగినంత బ్యాలెన్స్ లేదు. ఈ సందర్భంలోని బ్యాలెన్స్‌కి క్రెడిట్ జోడించండి.",
+    "estimateModelNotAllowed": "ఈ మోడల్ ఈ సందర్భంలో అనుమతించబడలేదు. వేరే మోడల్‌ను ఎంచుకోండి.",
     "estimateSpendLimitTooLow": "ఈ సారాంశాన్ని అనుమతించడానికి ఖర్చు పరిమితిని పెంచండి.",
     "saved": "బ్రీఫింగ్ సెట్టింగ్‌లు సేవ్ చేయబడ్డాయి",
     "selectedSessions": "ఎంచుకున్న సెషన్‌లు",
@@ -4547,16 +4639,35 @@
     "capturedAt": "{{time}}కి సంగ్రహించబడింది",
     "snapshotHint": "షెడ్యూల్ చేసిన ఉదయం సమయంలో అందుబాటులో ఉన్న తాజా సెషన్ స్థితిని సాధ్యమైన మేరకు సంగ్రహించిన స్నాప్‌షాట్. లెక్కలు ఎంచుకున్న సెషన్‌లకు సంబంధించినవి మాత్రమే, రాత్రంతా జరిగిన పూర్తి కార్యాచరణకు కాదు.",
     "snapshotTruncated": "ఈ స్నాప్‌షాట్ పరిమాణాన్ని పరిమితంగా ఉంచడానికి కొన్ని సెషన్‌లు లేదా ఆధారాలను వదిలివేశాం.",
-    "snapshotSummaryFailed": "AI సారాంశం విఫలమైంది. మీ నిర్మాణాత్మక స్నాప్‌షాట్ ఇంకా అందుబాటులో ఉంది.",
+    "snapshotSummaryFailed": "AI సారాంశం విఫలమైంది. మీ నిర్మాణాత్మక బ్రీఫింగ్ ఇంకా అందుబాటులో ఉంది.",
     "scheduledContextEnabled": "షెడ్యూల్ చేసిన బ్రీఫింగ్‌లు",
     "scheduledContextSettings": "షెడ్యూల్ చేసిన బ్రీఫింగ్‌లు · {{context}}",
     "scheduledContextHint": "ఈ సందర్భానికి మాత్రమే షెడ్యూల్ చేసిన సంగ్రహణ మరియు చెల్లింపు AI సారాంశాలను ప్రారంభించండి. ఎంచుకున్న భాగాల్లో సున్నితమైన సమాచారాన్ని తొలగించి లేదా దాచిపెట్టి, వాటిని మరియు నిర్మాణాత్మక వాస్తవాలను మీ మోడల్‌కు పంపుతారు. సారాంశాలు మీరు బ్రీఫింగ్ సెట్టింగ్‌లను మార్చినప్పుడు సేవ్ చేసిన యాప్ భాషను ఉపయోగిస్తాయి. ఛార్జీలు ఈ సందర్భపు బ్యాలెన్స్ నుండి తీసుకోబడతాయి. కార్యాచరణ లేని స్నాప్‌షాట్‌లు AIని ఉపయోగించవు.",
     "snapshotSafeguards": "ప్రతి సారాంశానికి సమయ మరియు ఖర్చు పరిమితులు షెడ్యూల్ చేసిన ప్రతి స్నాప్‌షాట్‌కు వర్తిస్తాయి, రోజువారీ బడ్జెట్‌గా కాదు.",
-    "snapshotEstimateInputTooLarge": "ఈ స్నాప్‌షాట్‌లో ఎంచుకున్న మోడల్ నిర్వహించగలిగిన దానికంటే ఎక్కువ ఆధారాలు ఉన్నాయి.",
+    "snapshotEstimateInputTooLarge": "ఈ స్నాప్‌షాట్‌లో ఎంచుకున్న మోడల్ నిర్వహించగలిగిన దానికంటే ఎక్కువ ఆధారాలు ఉన్నాయి. పెద్ద ఇన్‌పుట్ విండో కలిగిన మోడల్‌ను ఎంచుకోండి.",
     "quietSnapshot": "ఈ స్నాప్‌షాట్ కోసం సెషన్ కార్యాచరణ ఏదీ ఎంచుకోబడలేదు. AI సారాంశం అభ్యర్థించబడలేదు, ఛార్జీ విధించబడలేదు.",
     "noEnabledContexts": "షెడ్యూల్ చేసిన బ్రీఫింగ్‌ల కోసం ఏ సందర్భాలూ ప్రారంభించబడలేదు",
     "sourceBlocker": "సెషన్‌పై శ్రద్ధ అవసరం",
-    "sourceMetadata": "సంగ్రహించిన సెషన్ మెటాడేటా"
+    "sourceMetadata": "సంగ్రహించిన సెషన్ మెటాడేటా",
+    "metadataPlan_one": "ప్లాన్: {{displayTotal}} దశల్లో {{displayDone}} దశ పూర్తయింది",
+    "metadataPlan_other": "ప్లాన్: {{displayTotal}} దశల్లో {{displayDone}} దశలు పూర్తయ్యాయి",
+    "metadataPlan": "ప్లాన్: {{displayTotal}} దశల్లో {{displayDone}} దశలు పూర్తయ్యాయి",
+    "metadataFiles_one": "{{displayCount}} ఫైల్ మార్చబడింది",
+    "metadataFiles_other": "{{displayCount}} ఫైల్లు మార్చబడ్డాయి",
+    "metadataFiles": "{{displayCount}} ఫైల్లు మార్చబడ్డాయి",
+    "metadataLinesAdded_one": "{{displayCount}} లైన్ జోడించబడింది",
+    "metadataLinesAdded_other": "{{displayCount}} లైన్లు జోడించబడ్డాయి",
+    "metadataLinesAdded": "{{displayCount}} లైన్లు జోడించబడ్డాయి",
+    "metadataLinesRemoved_one": "{{displayCount}} లైన్ తీసివేయబడింది",
+    "metadataLinesRemoved_other": "{{displayCount}} లైన్లు తీసివేయబడ్డాయి",
+    "metadataLinesRemoved": "{{displayCount}} లైన్లు తీసివేయబడ్డాయి",
+    "metadataPlanCurrent": "ప్రస్తుత దశ: {{current}}",
+    "metadataFailure": "చివరి టర్న్ విఫలమైంది: {{kind}}",
+    "sourceActivity": "శీర్షిక లేని యాక్టివిటీ",
+    "metadataFailureProvider": "ప్రొవైడర్ లోపం",
+    "metadataFailureTool": "టూల్ లోపం",
+    "metadataFailureCancelled": "రద్దయింది",
+    "metadataFailureOther": "పేర్కొనని లోపం"
   },
   "systemSearch": {
     "couldNotOpenResult": "ఈ శోధన ఫలితాన్ని తెరవలేకపోయాము"
@@ -4574,7 +4685,7 @@
     "topFeatures": "అగ్ర ఫీచర్‌లు",
     "emptyTitle": "ఈ వ్యవధిలో వినియోగం లేదు",
     "unavailableTitle": "వినియోగం అందుబాటులో లేదు",
-    "unavailableDescription": "ఈ వర్క్‌స్పేస్ వినియోగాన్ని నివేదించడం లేదు. మళ్లీ ప్రయత్నించినా ఉపయోగం ఉండదు.",
+    "unavailableDescription": "ఈ వర్క్‌స్పేస్‌కు వినియోగం ఏర్పాటు చేయబడలేదు. ఇక్కడ వినియోగం కనిపించాలని మీరు ఆశిస్తే, సహాయ బృందాన్ని సంప్రదించండి.",
     "orgSelfNotice": "మీరు ఈ సంస్థలో మీ స్వంత వినియోగాన్ని చూస్తున్నారు.",
     "viewDetails": "వినియోగ వివరాలను చూడండి"
   },
@@ -4582,7 +4693,7 @@
     "title": "ఇంటిగ్రేషన్‌లు",
     "sectionTitle": "కనెక్ట్ చేసిన సేవలు",
     "entrySubtitle": "GitHub, Slack, Linear మరియు మరిన్ని",
-    "subtitle": "మీ డెవలప్‌మెంట్ టూల్స్‌ను, వర్క్‌ఫ్లోలను Kiloకి కనెక్ట్ చేయండి",
+    "subtitle": "మీ డెవలప్‌మెంట్ టూల్స్‌ను, వర్క్‌ఫ్లోలను Kiloకి కనెక్ట్ చేయండి.",
     "disconnect": "డిస్‌కనెక్ట్ చేయండి",
     "disconnectTitle": "{{provider}}ని డిస్‌కనెక్ట్ చేయాలా?",
     "disconnectMessage": "{{provider}}లో Kilo ఇకపై స్పందించదు. మీరు ఎప్పుడైనా మళ్లీ కనెక్ట్ చేయవచ్చు.",
@@ -4592,10 +4703,14 @@
     "couldNotLoad": "ఇంటిగ్రేషన్‌లను లోడ్ చేయడం సాధ్యపడలేదు",
     "permissionDenied": "ఈ ఇంటిగ్రేషన్‌లను నిర్వహించడానికి మీకు అనుమతి లేదు.",
     "managedByOwner": "మీరు మార్చలేని కనెక్షన్‌ను మార్చడానికి సంస్థ యజమానిని అడగండి.",
+    "managedByOwnerOrAdmin": "మీరు మార్చలేని కనెక్షన్‌ను మార్చడానికి సంస్థ యజమాని లేదా నిర్వాహకుడిని అడగండి.",
+    "managedByOwnerOrBilling": "మీరు మార్చలేని కనెక్షన్‌ను మార్చడానికి సంస్థ యజమాని లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
+    "managedByOwnerAdminOrBilling": "మీరు మార్చలేని కనెక్షన్‌ను మార్చడానికి సంస్థ యజమాని, నిర్వాహకుడు లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
     "connectFailed": "కనెక్షన్ పేజీని తెరవడం సాధ్యపడలేదు"
   },
   "invoices": {
-    "personalEmptyDescription": "మీకు బిల్ చేయబడిన తర్వాత, మీ స్వంత కొనుగోళ్ల ఇన్‌వాయిస్‌లు ఇక్కడ కనిపిస్తాయి."
+    "personalEmptyDescription": "మీకు బిల్ చేయబడిన తర్వాత, మీ స్వంత కొనుగోళ్ల ఇన్‌వాయిస్‌లు ఇక్కడ కనిపిస్తాయి. App Store మరియు Google Play నుండి రసీదులు క్రెడిట్ చరిత్రలో ఉన్నాయి.",
+    "personalPeriod": "గత 12 నెలలు"
   },
   "cloudAgent": {
     "compute": {
@@ -4627,7 +4742,7 @@
       "new": "కొత్త ట్రిగ్గర్",
       "create": "ట్రిగ్గర్ సృష్టించండి",
       "emptyTitle": "ఇంకా ట్రిగ్గర్లు లేవు",
-      "emptyDescription": "వెబ్హుక్ కాల్ నుండి లేదా షెడ్యూల్లో Cloud Agent రన్ను ప్రారంభించడానికి ట్రిగ్గర్ను సృష్టించండి.",
+      "emptyDescription": "మీ మొదటి ట్రిగ్గర్ను సృష్టించండి.",
       "loadFailedTitle": "ట్రిగ్గర్లను లోడ్ చేయలేకపోయాం",
       "loadFailedDescription": "కనెక్షన్ ఉన్నప్పుడు మళ్లీ ప్రయత్నించండి.",
       "detailLoadFailedTitle": "ఈ ట్రిగ్గర్ను లోడ్ చేయలేకపోయాం",
@@ -4650,7 +4765,6 @@
       "nameLocked": "ట్రిగ్గర్ సృష్టించిన తర్వాత పేరును మార్చలేరు.",
       "repositoryLocked": "ట్రిగ్గర్ సృష్టించిన తర్వాత రిపాజిటరీని మార్చలేరు.",
       "environmentAutomatic": "రిపాజిటరీ ప్రకారం స్వయంచాలకం",
-      "notSelected": "ఎంచుకోలేదు",
       "profileDefaults": "డిఫాల్ట్లను ఉపయోగించండి",
       "profileHelp": "ట్రిగ్గర్ నడిచినప్పుడు ప్రొఫైల్ సెట్టింగ్లు వర్తిస్తాయి. అప్పుడే దాని సీక్రెట్లు రిజాల్వ్ అవుతాయి.",
       "customAgent": "కస్టమ్ ఏజెంట్",
@@ -4740,7 +4854,7 @@
   },
   "organizationGuardrails": {
     "title": "ఏఐ గార్డ్రేల్స్",
-    "permissionDenied": "సంస్థ యజమానులు మరియు నిర్వాహకులు మాత్రమే ఏఐ గార్డ్రేల్స్ను నిర్వహించగలరు.",
+    "permissionDenied": "సంస్థ యజమానులు మరియు నిర్వాహకులు మాత్రమే ఏఐ గార్డ్రేల్స్ను నిర్వహించగలరు. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ఏఐ గార్డ్రేల్స్ ప్రారంభించబడలేదు",
     "unavailable": "Kilo అభ్యర్థన మేరకు ఒక సంస్థ కోసం ఏఐ గార్డ్రేల్స్‌ను ప్రారంభిస్తుంది. {{supportEmail}}ని సంప్రదించండి, Kilo బృందం మీ సంస్థ కోసం వాటిని ప్రారంభిస్తుంది.",
     "contactSupport": "సహాయ బృందాన్ని సంప్రదించండి",
@@ -4752,12 +4866,15 @@
     "inputDescription": "ప్రతి ఇన్పుట్ను Enkrypt AI తో స్కాన్ చేస్తుంది, టూల్ ఫలితాలతో సహా. Enkrypt అందుబాటులో లేనప్పుడు అభ్యర్థనలు తిరస్కరించడానికి బదులుగా స్కాన్ చేయకుండానే పంపబడతాయి.",
     "outputTitle": "అవుట్పుట్ గార్డ్రేల్స్",
     "outputDescription": "సభ్యులు స్వీకరించే ముందు Enkrypt AI తో ప్రతిస్పందనలను స్కాన్ చేస్తుంది. మీరు ఆన్ చేయనంత వరకు ఆఫ్లో ఉంటుంది.",
+    "outputUnavailable": "Kilo ఈ సంస్థ కోసం అవుట్‌పుట్ స్కానింగ్‌ను ప్రారంభించలేదు, కాబట్టి ప్రతిస్పందనలు తనిఖీ చేయబడవు మరియు ఇక్కడ సెట్ చేయడానికి ఏమీ లేదు. దీన్ని అభ్యర్థించడానికి {{supportEmail}}ని సంప్రదించండి.",
     "detectorsHint": "బ్లాక్ ఫ్లాగ్ చేయబడిన అభ్యర్థనను తిరస్కరిస్తుంది. లాగ్ మాత్రమే అభ్యర్థనను ఆలస్యం చేయకుండా దాన్ని నమోదు చేస్తుంది.",
     "detectorsHintOutput": "బ్లాక్ ఫ్లాగ్ చేయబడిన ప్రతిస్పందనను విఫలం చేస్తుంది. లాగ్ మాత్రమే ప్రతిస్పందనను ఆలస్యం చేయకుండా దాన్ని నమోదు చేస్తుంది.",
     "choiceLog": "లాగ్ మాత్రమే",
     "applyTo": "వర్తించు",
     "applyToAllMembers": "సభ్యులందరూ",
     "applyKiloDefault": "Kilo డిఫాల్ట్ను వర్తించు",
+    "applyKiloDefaultEnglishNote": "Kilo యొక్క డిఫాల్ట్ పాలసీ వచనం ఆంగ్లంలో ఉంది, ఎందుకంటే Kilo Gateway దాన్ని రాసిన విధంగానే సరిగ్గా వర్తిస్తుంది.",
+    "applyKiloDefaultReplaceMessage": "Kilo డిఫాల్ట్ పాలసీ ఆంగ్లంలో రాయబడింది మరియు పాలసీ ఉల్లంఘనలో మీరు సెట్ చేసినదాన్ని భర్తీ చేస్తుంది. పాలసీ వచనం ఫీల్డ్‌లో మీరు నమోదు చేసిన వచనాన్ని తిరిగి పొందలేము.",
     "invalidSavedTitle": "సేవ్ చేయబడిన ఇన్పుట్ డిటెక్టర్ సెట్టింగ్లు చదవబడలేవు",
     "invalidSavedBody": "ఇన్పుట్ డిటెక్టర్లు మళ్లీ సేవ్ అయ్యే వరకు అభ్యర్థనలు బ్లాక్ చేయబడతాయి. కింది డిటెక్టర్లు Kilo డిఫాల్ట్ నుండి ప్రారంభమవుతాయి.",
     "invalidSavedOutputTitle": "సేవ్ చేయబడిన అవుట్పుట్ డిటెక్టర్ సెట్టింగ్లు చదవబడలేవు",
@@ -4878,7 +4995,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ఎంటర్ప్రైజ్ ఫీచర్",
-    "enterpriseOnly": "ఇది ఎంటర్ప్రైజ్కు మాత్రమే ఉండే ఫీచర్.",
+    "enterpriseOnly": "ప్రొవైడర్లు మరియు మోడల్లు ఎంటర్‌ప్రైజ్ ప్లాన్‌లో అందుబాటులో ఉంటాయి.",
     "readOnly": "సంస్థ యజమానులు మరియు నిర్వాహకులు మాత్రమే ఈ సెట్టింగ్లను మార్చగలరు.",
     "loadError": "ప్రొవైడర్లు మరియు మోడల్లు లోడ్ కాలేదు",
     "tabModels": "మోడల్లు",
@@ -4892,6 +5009,8 @@
     "providersDescription": "ఈ సంస్థ కోసం Kilo దానికి రూటింగ్ చేయడాన్ని ఆపడానికి ప్రొవైడర్ను ఆఫ్ చేయండి.",
     "providersNeedCatalog": "పూర్తి మోడల్ కేటలాగ్ లోడ్ అయ్యే వరకు ప్రొవైడర్ స్విచ్‌లు చదవడానికి మాత్రమే ఉంటాయి. వాటిని మార్చడానికి పైన ఉన్న మళ్లీ ప్రయత్నించండి నొక్కండి.",
     "providersEmpty": "ఈ శోధనకు ఏ ప్రొవైడర్లు సరిపోలలేదు.",
+    "providersNone": "ఈ సంస్థ కోసం ఏ ప్రొవైడర్లు అందుబాటులో లేవు.",
+    "providersUnavailable": "ప్రొవైడర్ జాబితా లోడ్ కాలేదు.",
     "allowAllShown": "చూపిన అన్నింటినీ అనుమతించు",
     "denyAllShown": "చూపిన అన్నింటినీ నిరాకరించు",
     "gatewaysDescription": "Kilo మోడల్ అభ్యర్థనలను Vercel AI Gateway లేదా OpenRouter ద్వారా రూట్ చేస్తుంది. నిలిపివేయబడిన గేట్వే ఆ అభ్యర్థనలను విఫలం చేస్తుంది.",

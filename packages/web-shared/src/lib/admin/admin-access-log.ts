@@ -125,17 +125,21 @@ export type AdminAccessAttribution = {
   /** Capability issuance id (`jti`) when the event records a capability mint. */
   issuanceId: string | null;
   /**
-   * Best-effort route identifier. For tRPC this is the exact procedure path;
-   * for REST and server components it is the concrete pathname (`x-pathname`)
-   * when available, falling back to Vercel's matched route pattern
-   * (`x-matched-path`), which may be templated (e.g. `/admin/api/users/[id]/...`).
+   * Route identifier. For tRPC this is the exact procedure path; for REST and
+   * server components it is the route the caller supplied explicitly (see
+   * {@link AdminAuditContext.auditRoute}) when present, otherwise the concrete
+   * pathname (`x-pathname`) when available, falling back to Vercel's matched
+   * route pattern (`x-matched-path`), which may be templated (e.g.
+   * `/admin/api/users/[id]/...`).
    */
   route: string | null;
   /**
    * The tRPC operation type (`query`, `mutation`) on `surface:"trpc"`; the HTTP
-   * method on `surface:"rest"`, forwarded by `proxy.ts` as `x-http-method`.
-   * Null when no reliable value exists (for example a unit test that invokes a
-   * shared helper without the proxy).
+   * method on `surface:"rest"`, taken from the value the caller supplies
+   * explicitly (see {@link AdminAuditContext.auditMethod}) when present,
+   * otherwise from `proxy.ts`'s `x-http-method`. Null when no reliable value
+   * exists (for example a unit test that invokes a shared helper without the
+   * proxy).
    */
   method: string | null;
   ip: string | null;
@@ -152,9 +156,15 @@ export type AdminAccessAttribution = {
 };
 
 /**
- * Privileged-access attribution. Identity is nullable because a bearer request
- * can be refused before any user is resolved; the credential, route, and
- * outcome are still worth alerting on.
+ * Privileged-access attribution. `kiloUserId` and `email` are nullable because a
+ * bearer request can be refused before any user is resolved; the credential,
+ * route, and outcome are still worth alerting on.
+ *
+ * `adminTier` is also null when the credential resolved to a caller who is not
+ * an admin: the denial itself is the finding, and {@link adminTierFor} labels
+ * every non-super user `platform_admin`, which would put a self-contradictory
+ * role in the audit stream. A resolved non-admin still records its user id and
+ * email, so the refusal is attributable to one account.
  */
 export type PrivilegedAccessAttribution = Omit<
   AdminAccessAttribution,
@@ -360,16 +370,18 @@ function attributionFor(user: AdminAccessUser) {
   };
 }
 
+/**
+ * Attribution for a credential that may have been refused before a user was
+ * resolved. Only the unresolved case nulls every identity field; a resolved
+ * caller always records its id and email, and gets a tier only when it carries
+ * one (see {@link PrivilegedAccessAttribution}).
+ */
 function nullableAttributionFor(user: AdminAccessUser | undefined) {
-  const adminTier = user?.is_super_admin
-    ? ('super_admin' as const)
-    : user?.is_admin
-      ? ('platform_admin' as const)
-      : null;
+  if (!user) return { kiloUserId: null, email: null, adminTier: null };
   return {
-    kiloUserId: user?.id ?? null,
-    email: user?.is_admin ? user.google_user_email : null,
-    adminTier,
+    kiloUserId: user.id,
+    email: user.google_user_email,
+    adminTier: user.is_admin ? adminTierFor(user) : null,
   };
 }
 
@@ -410,9 +422,16 @@ export type AdminAuditContext = {
   trpcType?: string;
   /** REST/server-component surface when the caller already knows it. */
   auditSurface?: AdminAccessSurface;
-  /** Route a REST or server-component caller already knows, e.g. from its request headers. */
+  /**
+   * Route a REST or server-component caller already knows, e.g. from its
+   * request headers. Takes precedence over the `x-pathname`/`x-matched-path`
+   * derivation.
+   */
   auditRoute?: string;
-  /** Actual request method for a REST caller. */
+  /**
+   * Actual request method for a REST caller. Takes precedence over the
+   * `x-http-method` derivation.
+   */
   auditMethod?: string;
   delegatedWorkload?: boolean;
 };
@@ -481,6 +500,7 @@ function attributionFromHeaders(params: {
   headersList: Headers;
   surface?: AdminAccessSurface;
   method?: string;
+  route?: string;
   tokenSource?: string | null;
   internalApiUse?: boolean;
   delegatedWorkload?: boolean;
@@ -497,7 +517,7 @@ function attributionFromHeaders(params: {
       internalApiUse: params.internalApiUse,
       delegatedWorkload: params.delegatedWorkload,
     }),
-    route: routeFromHeaders(params.headersList),
+    route: params.route ?? routeFromHeaders(params.headersList),
     method: params.method ?? methodFromHeaders(params.headersList),
     ip: clientIpFromHeaders(params.headersList),
     userAgentProduct: userAgentProductFromHeaders(params.headersList),
@@ -585,6 +605,11 @@ export async function recordKiloAdminElevation(
       target: params.target,
       surface: ctx.auditSurface,
       method: ctx.auditMethod,
+      route: ctx.auditRoute,
+      // Keep every header-derived field on one source when the caller carries
+      // its own request headers: mixing the caller's route with attribution
+      // read from the ambient store would attribute one event to two requests.
+      headersList: ctx.headersList,
       delegatedWorkload: ctx.delegatedWorkload,
       membershipRole: params.membershipRole,
       wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
@@ -641,6 +666,8 @@ export type KiloAdminElevationRequestParams = {
   surface?: AdminAccessSurface;
   /** The actual Request method when the caller has one. */
   method?: string;
+  /** Route the caller already knows, e.g. from its request context. */
+  route?: string;
   /** Use the caller's request headers instead of the ambient header store. */
   headersList?: Headers;
   internalApiUse?: boolean;

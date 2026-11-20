@@ -1,9 +1,6 @@
 import * as z from 'zod';
-import type {
-  DirectByokModel,
-  DirectByokProvider,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import type { DirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { directByokProviderList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
@@ -127,8 +124,7 @@ export function parseModelsDevProviderModels(
 }
 
 function getModelsDevId(providerId: DirectUserByokInferenceProviderId): string | undefined {
-  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
-  return providers.find(provider => provider.id === providerId)?.models_dev_id;
+  return directByokProviderList.find(provider => provider.id === providerId)?.models_dev_id;
 }
 
 function isPreferredCatalogModelId(candidate: string, current: string, canonicalId: string) {
@@ -247,10 +243,6 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   openAICompatibleFetcher({
     providerId: 'inceptron-byok',
     url: 'https://api.inceptron.io/v1/models',
-  }),
-  openAICompatibleFetcher({
-    providerId: 'martian',
-    url: 'https://api.withmartian.com/v1/models',
   }),
   openAICompatibleFetcher({
     providerId: 'synthetic',

@@ -2,6 +2,7 @@ import { Info } from '@/components/ui/icons';
 import { Platform, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -40,7 +41,8 @@ export function RoleRefusalNotice({ message, className }: Readonly<RoleRefusalNo
       accessibilityRole="alert"
       accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
       className={cn(
-        'min-h-[44px] w-full flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3',
+        TOUCH_TARGET_CLASS,
+        'w-full flex-row items-start gap-2.5 rounded-lg border border-info-tile-border bg-info-tile-bg px-4 py-3',
         className
       )}
     >

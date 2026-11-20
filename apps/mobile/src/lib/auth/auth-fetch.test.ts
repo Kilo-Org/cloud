@@ -11,10 +11,12 @@ vi.mock('@/lib/config', () => ({
 }));
 
 // The admission module imports expo-secure-store, expo-crypto, and
-// @expo/app-integrity, which need a device runtime. Stub the single export
-// postAuth uses.
+// @expo/app-integrity, which need a device runtime. Stub the two exports
+// postAuth uses: the refusal clear, and the proof rebuilt for the one
+// unknown-key retry.
 vi.mock('@/lib/auth/admission', () => ({
   clearAttestKeyOnRefusal: vi.fn(),
+  getAdmission: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({

@@ -19,7 +19,9 @@
     "presenceStatus": "Хостови: {{connection}}",
     "commandStatus": "Испорака на командата: {{status}}",
     "delivered": "Испорачано",
-    "expired": "Истечено"
+    "expired": "Истечено",
+    "recoveryGaps_one": "Недостасува {{displayCount}} дел од овој транскрипт.",
+    "recoveryGaps_other": "Недостасуваат {{displayCount}} делови од овој транскрипт."
   },
   "common": {
     "manageOnWeb": "Управувај на веб",
@@ -57,6 +59,7 @@
     "link": "линк",
     "takingLonger": "Ова трае подолго од очекуваното. Можеш да го затвориш овој екран и да провериш повторно.",
     "model": "Модел",
+    "notSelected": "Не е избрано",
     "accessDenied": "Пристапот е одбиен.",
     "allRepositories": "Сите репозиториуми",
     "personal": "Личен простор",
@@ -137,6 +140,7 @@
     "keepRunning": "Остави да работи",
     "newSession": "Нова сесија",
     "noModelsAvailable": "Нема достапни модели",
+    "modelRetires": "Се повлекува на {{date}}",
     "notFound": "Не е пронајдено.",
     "online": "Онлајн",
     "open": "Отвори {{name}}",
@@ -147,6 +151,7 @@
     "performance": "Перформанси",
     "preferences": "Лични поставки",
     "privacyPolicy": "Политика за приватност",
+    "termsOfService": "Услови за користење",
     "profile": "Профил",
     "reactions": "Реакции",
     "recent": "Неодамнешни",
@@ -170,6 +175,7 @@
     "generating": "Се генерира…",
     "working": "Во тек",
     "yourOwnRepositories": "Твоите репозиториуми",
+    "organizationRepositories": "Репозиториуми на организацијата",
     "dismissed": "Отфрлено",
     "agent": "Агент",
     "durationMinuteShort": "min",
@@ -178,7 +184,9 @@
     "organizationTrialEnded": "Пробниот период на организацијата заврши и таа нема активен план. Сопственик на организација може да го ажурира наплатувањето на kilo.ai, а потоа да се обиде повторно.",
     "privateRepositoryA11y": "{{name}}, приватен репозиториум",
     "legalDocumentEnglishOnly": "Овој документ е достапен само на англиски јазик.",
-    "organizationTrialEndedBilling": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето, а потоа да се обидеш повторно."
+    "organizationTrialEndedBilling": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето, а потоа да се обидеш повторно.",
+    "organizationTrialEndedBillingAtKiloAi": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето на kilo.ai, а потоа да се обидеш повторно.",
+    "viewOnGitHub": "Прикажи PR на GitHub"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -201,7 +209,7 @@
     "openSignInPageInBrowser": "Отвори ја страницата за најавување во прелистувачот",
     "copySignInLink": "Копирај ја врската за најавување",
     "cancelSignIn": "Откажи го најавувањето",
-    "startingSignIn": "Започнува најавувањето...",
+    "startingSignIn": "Започнува најавувањето…",
     "organizationUsesSso": "Твојата организација користи единствено најавување.",
     "continueWithSso": "Продолжи со SSO",
     "useDifferentEmail": "Користи друга адреса на е-пошта",
@@ -216,8 +224,8 @@
     "verifyCode": "Потврди го кодот",
     "resendCode": "Испрати го кодот повторно",
     "termsPrefix": "Со продолжувањето се согласуваш со нашите ",
+    "termsInSentence": "Услови на услугата",
     "terms": "Услови",
-    "termsInSentence": "Услови",
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Повеќе опции за најавување",
@@ -272,6 +280,9 @@
     "credits": "Кредити",
     "failedToLoadBalance": "Не успеа вчитувањето на состојбата. Допри за да се обидеш повторно.",
     "balanceLoadFailed": "Не се вчита состојбата",
+    "balanceUnreachable": "Не можеше да се стигне до серверот. Обидете се повторно.",
+    "balanceAccessDenied": "Немате дозвола да го гледате ова салдо.",
+    "balanceUnavailable": "Салдото не можеше да се вчита.",
     "hideBalance": "Скриј ја состојбата",
     "showBalance": "Прикажи ја состојбата",
     "balanceHidden": "Состојбата е скриена",
@@ -311,9 +322,9 @@
     "passkeyVerifyDescription": "За твоја безбедност, потврди дека си ти пред да ги промениш клучевите за пристап.",
     "passkeyVerifyWithPasskey": "Потврди со клуч за пристап",
     "passkeyVerifySendCode": "Испрати ми код по е-пошта",
-    "passkeyVerifySendingCode": "Испраќам код...",
+    "passkeyVerifySendingCode": "Испраќам код…",
     "passkeyVerifyPasskeyPrompt": "Потврди со клучот за пристап за да продолжиш.",
-    "passkeyVerifyChecking": "Го проверувам кодот...",
+    "passkeyVerifyChecking": "Го проверувам кодот…",
     "passkeyVerifyCodeSent": "Внеси го кодот што го испративме на {{email}}.",
     "passkeyVerifyCodeRejected": "Кодот не се совпаѓа. Обиди се повторно.",
     "passkeyVerifyPasskeyFailed": "Потврдата со клучот за пристап не успеа. Обиди се повторно.",
@@ -321,8 +332,8 @@
     "passkeyVerifyInProgress": "Кодот веќе се проверува. Обиди се повторно за миг.",
     "passkeyVerifyTooManyAttempts": "Премногу обиди. Испрати нов код.",
     "passkeyVerifySsoRequired": "Твојата организација бара единствена најава. Одобри ја оваа промена во прелистувач, па врати се овде.",
-    "passkeyVerifySsoStarting": "Започнувам одобрување...",
-    "passkeyVerifySsoWaiting": "Чекам одобрување...",
+    "passkeyVerifySsoStarting": "Започнувам одобрување…",
+    "passkeyVerifySsoWaiting": "Чекам одобрување…",
     "passkeyVerifySsoOpen": "Отвори ја страницата за одобрување",
     "passkeyVerifySsoExpired": "Одобрувањето истече или беше откажано. Обиди се повторно.",
     "passkeyVerifySsoUnavailable": "Одобрувањето со единствена најава во моментов не е достапно. Обиди се повторно.",
@@ -502,7 +513,7 @@
     "changelogFixesPolish": "Поправки и подобрувања низ целата апликација.",
     "changelogAreas": {
       "signIn": "Најава",
-      "profileOrganizations": "Профил и организации"
+      "profileOrganizations": "Профил & организации"
     }
   },
   "preferences": {
@@ -747,6 +758,9 @@
       "couldNotLoadMore": "Не успеа вчитувањето на дополнителни коментари.",
       "retryLoadingMore": "Повтори го вчитувањето на дополнителни коментари",
       "loadMoreComments": "Вчитај повеќе коментари",
+      "conversationTruncated": "Се прикажуваат само првите {{displayCount}} коментари.",
+      "conversationTruncated_one": "Се прикажуваат само првите {{displayCount}} коментари.",
+      "conversationTruncated_other": "Се прикажуваат само првите {{displayCount}} коментари.",
       "addReaction": "Додај реакција",
       "reactionPill": "реакција {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакција",
@@ -762,7 +776,6 @@
       "replyPlaceholder": "Одговор…",
       "replyBody": "Содржина на одговорот",
       "submitReply": "Испрати одговор",
-      "termsTitle": "Услови за користење",
       "termsCopy": "Мора да имаш најмалку 13 години за да објавуваш.",
       "termsAcceptRetry": "Не успеа прифаќањето на условите. Провери ја врската и обиди се повторно.",
       "viewTerms": "Прикажи ги условите",
@@ -820,7 +833,19 @@
         "fileComment": "Коментар за датотеката",
         "outdatedOnPathLines": "Застарено на {{path}} {{lines}}",
         "outdatedOnLines": "Застарено на {{lines}}",
-        "outdatedOnPath": "Застарено на {{path}}"
+        "outdatedOnPath": "Застарено на {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Лева страна",
+        "sideRight": "Десна страна",
+        "outdatedOnLinesSide": "Застарено на {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Застарено на {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Застарено ({{side}})",
+        "outdatedOnPathSide": "Застарено на {{path}} ({{side}})"
       },
       "deletedUser": "избришан корисник",
       "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}.",
@@ -865,7 +890,6 @@
       "noAccess": "Немаш пристап до проверките за ова складиште.",
       "couldNotLoad": "Не успеа вчитувањето на проверките.",
       "retryChecks": "Обиди се повторно со проверките",
-      "viewOnGitHub": "Прикажи PR на GitHub",
       "noChecksReported": "Нема пријавени проверки",
       "passed": "{{displayCount}} успешни",
       "passed_one": "{{displayCount}} успешни",
@@ -920,9 +944,9 @@
       "checkFailedTitleGitLab": "Не можеше да се провери врската со GitLab",
       "checkFailedTitleBitbucket": "Не можеше да се провери врската со Bitbucket",
       "providerCheckFailedMessage": "Не можеше да се поврзе со провајдерот. Провери ја врската и обиди се повторно.",
-      "reconnectTitle": "Повторно поврзување со GitHub",
-      "reconnectTitleGitLab": "Повторно поврзување со GitLab",
-      "reconnectTitleBitbucket": "Повторно поврзување со Bitbucket",
+      "reconnectTitle": "Поврзи го GitHub повторно",
+      "reconnectTitleGitLab": "Поврзи го GitLab повторно",
+      "reconnectTitleBitbucket": "Поврзи го Bitbucket повторно",
       "reconnectDescription": "Пристапот до твојата сметка на GitHub е отповикан.",
       "gitlabDescription": "Прегледувај merge барања на мобилен уред",
       "gitlabInstanceMismatchTitle": "Поврзувањето со GitLab е за друга инстанца",
@@ -932,7 +956,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Оваа сметка сè уште нема организации. Барањата за спојување на Bitbucket може да се прегледуваат откако ќе креирате организација или ќе се приклучите кон неа.",
       "gitlabReconnectAdminOnlyDescription": "Побарајте од Сопственик, Администратор или Одговорен за наплата на организацијата да ја поврзат повторно.",
       "bitbucketNotConnectedTitle": "Bitbucket не е поврзан",
-      "bitbucketAdminOnlyDescription": "Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
+      "adminOnlyConnectDescription": "Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
       "contextLine": "За {{organization}}",
       "contextLinePersonal": "За вашиот личен простор"
     },
@@ -949,6 +973,8 @@
       "pendingComment": "неиспратени коментари",
       "pendingComment_other": "неиспратени коментари",
       "submitCountOfTotal": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
+      "submitCountOfTotal_one": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
+      "submitCountOfTotal_other": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
       "submitReview": "Испрати преглед",
       "partialPostedFresh": "Објавени коментари: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Објавени коментари: {{displayFreshCount}}. ",
@@ -1013,7 +1039,10 @@
     "tabs": {
       "overview": "Општо",
       "files": "Датотеки",
-      "discussion": "Дискусија"
+      "discussion": "Дискусија",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} коментар",
+      "discussionAccessibility": "{{title}}: {{displayCount}} коментари",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} коментари"
     },
     "fileStatus": {
       "modified": "Изменета",
@@ -1119,16 +1148,16 @@
     },
     "category": {
       "agentAttentionTitle": "На агентот му требаш ти",
-      "agentAttentionSubtitle": "прашања и барања за дозвола или одговор",
+      "agentAttentionSubtitle": "Прашања и барања за дозвола или одговор",
       "agentUpdatesTitle": "Новости од агентот",
-      "agentUpdatesSubtitle": "пораки од агентот додека ја извршува задачата",
+      "agentUpdatesSubtitle": "Пораки од агентот додека ја извршува задачата",
       "sessionStatusTitle": "Статус на сесија",
-      "sessionStatusSubtitle": "завршено / неуспешно / подготвено за контрола",
-      "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
+      "sessionStatusSubtitle": "Завршено / неуспешно / подготвено за контрола",
+      "balanceAlertsSubtitle": "Предупредувања за ниска состојба на организацијата",
       "balanceAlertsUnavailable": "Придружете се на организација за да добивате предупредувања за состојба.",
-      "securityFindingsSubtitle": "нови наоди и потсетници за SLA",
+      "securityFindingsSubtitle": "Нови наоди и потсетници за SLA",
       "securityFindingsUnavailable": "Овозможете го Безбедносниот агент Kilo на опсег за да добивате безбедносни наоди.",
-      "spendAlertsSubtitle": "преминувања на прагови и часовни скокови",
+      "spendAlertsSubtitle": "Преминувања на прагови и часовни скокови",
       "spendAlertsToggle": "Категорија предупредувања за трошење"
     },
     "history": {
@@ -1210,7 +1239,7 @@
     },
     "instructions": {
       "title": "Прилагодени упатства",
-      "deprecation": "Се планира укинување на прилагодените упатства. Наместо тоа, премести ги овие насоки во датотеката REVIEW.md во твоето складиште.",
+      "deprecation": "Прилагодените упатства ќе бидат отстранети. Наместо тоа, премести ги овие насоки во датотеката REVIEW.md во твоето складиште.",
       "placeholder": "на пр. примена на нашите правила за обработка на грешки…",
       "clearTitle": "Да ги отстраниш прилагодените упатства?",
       "clearMessage": "Зачувувањето на празно поле ги брише прилагодените упатства зачувани за овој рецензент."
@@ -1272,7 +1301,7 @@
       "transcriptRetry": "Не успеа вчитувањето на записот од прегледот.",
       "transcriptLive": "Во живо",
       "agentIdle": "Агентот чека",
-      "agentWorking": "Агентот работи...",
+      "agentWorking": "Агентот работи…",
       "anErrorOccurred": "Се појави грешка",
       "errorWithMessage": "Се појави грешка: {{message}}.",
       "executionStarted": "Извршувањето започна",
@@ -1370,11 +1399,16 @@
     "followReviewMd": "Следи REVIEW.md",
     "followReviewMdSubtitle": "Почитувај ги упатствата во датотеката REVIEW.md во секое складиште",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат."
+      "notConnectedReadOnlyPlan": "Пробниот период на организацијата заврши, затоа сопственикот мора да го ажурира наплатувањето на kilo.ai."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Врската со Bitbucket на оваа организација се управува преку веб од компјутер.",
-      "description": "Создај токен за пристап до работниот простор со потребните дозволи и залепи го подолу.",
+      "managedOnWeb": "Врската со Bitbucket на {{organization}} се управува преку веб од компјутер.",
+      "managedOnWebTitle": "Се управува преку веб",
+      "managedOnWebShort": "Оваа врска се управува преку веб од компјутер.",
+      "managedOnWebRepositories": "Избери ги репозиториумите за {{organization}} преку веб од компјутер.",
+      "description": "Создај токен за пристап до работниот простор за {{organization}} и залепи го подолу.",
+      "descriptionReconnect": "Создај нов токен за пристап до работниот простор за {{organization}} и залепи го подолу.",
+      "descriptionOverview": "Создај токен за пристап до работниот простор и залепи го на следниот екран.",
       "scopes": "Сметка: читање · Складишта: читање/запишување · Барања за спојување: читање · Веб-куки: читање/запишување",
       "tokenPlaceholder": "Токен за пристап до работниот простор",
       "tokenRefused": "Bitbucket не го прифати овој токен за пристап до работниот простор. Провери дали ги има дозволите наведени погоре, па обиди се повторно."
@@ -1395,13 +1429,14 @@
     "platformList": {
       "checking": "Се проверува…",
       "statusUnavailable": "Статусот е недостапен",
+      "needsAttention": "Бара внимание",
       "platforms": "Платформи",
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "Апликација на GitHub",
+      "githubApp": "апликација на GitHub",
       "githubError": "Не можеше да се отвори поставувањето на GitHub. Обиди се повторно.",
-      "gitlabAccount": "Сметка на GitLab",
+      "gitlabAccount": "сметка на GitLab",
       "gitlabError": "Не можеше да се отвори поставувањето на GitLab. Обиди се повторно.",
       "description": "Поврзи ја {{label}} со Kilo за автоматски преглед на барањата за спојување."
     },
@@ -1697,7 +1732,7 @@
       "dueThisWeekDetail_one": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "dueThisWeekDetail_other": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
-      "reviewSlaAssignment": "Провери ги доделените рокови според SLA",
+      "reviewSlaAssignment": "Провери доделувањето на рокови според SLA",
       "allOpenFindingsTracked": "Се следат сите отворени наоди"
     },
     "dismiss": {
@@ -2148,6 +2183,8 @@
       "renameAccessibility": "Преименувај ја сесијата: {{title}}",
       "cloningSession": "Клонирање на сесијата",
       "couldNotLoadThisSession": "Не успеа вчитувањето на оваа сесија.",
+      "historyTooLarge": "Записот на оваа сесија е премногу голем за вчитување.",
+      "historyUnavailable": "Записот на оваа сесија не може да се прочита.",
       "cloneFailedRetry": "Не успеа клонирањето на оваа сесија. Обиди се повторно.",
       "notEnoughCredits": "Немаш доволно кредити за ова барање. Додај кредити и обиди се повторно.",
       "previousTaskFinishing": "Претходната задача сè уште се завршува. Почекај малку.",
@@ -2224,6 +2261,7 @@
       "branchDefault": "Основна",
       "branchAccessibility": "Гранка: {{label}}",
       "branchLoading": "Се вчитуваат гранки",
+      "branchInactive": "Изберете репозиториум за да се вчитаат неговите гранки.",
       "branchLoadError": "Не можеше да се вчитаат гранките",
       "branchUnavailable": "Гранките се недостапни за овој репозиториум. Проверете го пристапот кај операторот, па изберете друг репозиториум.",
       "branchEmpty": "Нема достапни гранки",
@@ -2456,7 +2494,8 @@
       "customModes": "Прилагодени режими"
     },
     "modeSelector": {
-      "accessibility": "Режим: {{label}}"
+      "accessibility": "Режим: {{label}}",
+      "customMode": "Прилагоден режим"
     },
     "modeOptions": {
       "code": "Кодирање",
@@ -2477,7 +2516,7 @@
       "noMatches": "Нема совпаѓања",
       "noRepositories": "Нема достапни репозиториуми",
       "noRepositoriesDescription": "Ниту еден репозиториум не е поврзан со твојата сметка.",
-      "loading": "Вчитување...",
+      "loading": "Вчитување…",
       "accessibility": "Репозиториум: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2761,6 +2800,8 @@
     "modelPicker": {
       "title": "Избор на модел",
       "noModelsDescription": "Нема достапни модели за избор.",
+      "allUnavailableTitle": "Ниту еден модел не може да се користи",
+      "allUnavailableDescription": "Додај клуч за давател и обиди се повторно.",
       "favorites": "Омилени"
     },
     "modelSelector": {
@@ -2772,7 +2813,7 @@
       "thinkingEffortAccessibility": "Ниво на размислување: {{label}}",
       "thinkingEffortSelected": "Ниво на размислување: {{label}}, избрано",
       "thinkingEffortWithModel": "{{model}}, ниво на размислување: {{variant}}",
-      "lockedByAgent": ", Заклучено од агентот „{{agent}}“",
+      "lockedByAgent": "Заклучено од агентот „{{agent}}“",
       "addToFavorites": "Додај {{name}} во омилени",
       "removeFromFavorites": "Отстрани {{name}} од омилени",
       "sessionModel": "Модел на сесијата"
@@ -2808,8 +2849,8 @@
       "pasteFromClipboard": "Залепи од таблата со исечоци",
       "stopGenerating": "Запри го создавањето на одговорот",
       "selectModelBeforeSending": "Избери модел пред да испратиш порака.",
-      "preparingPlaceholder": "Подготовка на околината...",
-      "finalizingPlaceholder": "Завршување...",
+      "preparingPlaceholder": "Подготовка на околината…",
+      "finalizingPlaceholder": "Завршување…",
       "sessionLoadFailed": "Сесијата не можеше да се вчита. Прво обидете се повторно.",
       "cannotReceiveFiles": "Оваа сесија не може да прима датотеки. Отстрани ги прилозите за да ја испратиш пораката.",
       "couldNotAttachFiles": "Не успеа прикачувањето на датотеките. Допри го копчето за испраќање за да се обидеш повторно.",
@@ -3008,6 +3049,7 @@
     "noSessions": "Нема активни сесии",
     "noSessionsDescription": "Најави се во апликацијата Kilo на друг уред и тој ќе се прикаже тука.",
     "signedIn": "Најава: {{signedIn}} · Последна активност: {{lastSeen}}",
+    "signedInThisDevice": "Најава: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Тука се прикажуваат најавувањата во апликацијата Kilo, во Kilo CLI и во веб прелистувач. Најавувањата преку уредувачот не се наведени.",
     "thisDevice": "Овој уред",
     "viewProfile": "Прикажи профил",
@@ -3030,7 +3072,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Не успеа вчитувањето на сесиите.",
-    "couldNotLoadActiveSessions": "Не успеа вчитувањето на активните сесии.",
     "agentSessions": "Активни сега",
     "newCodingTask": "Нова задача за кодирање",
     "newTaskFromPicture": "Нова задача од слика",
@@ -3057,6 +3098,7 @@
   "queryError": {
     "neutralDescription": "Обиди се повторно.",
     "offlineTitle": "Вчитувањето не успеа.",
+    "offlineDescription": "Не можевме да стигнеме до серверот.",
     "permissionDescription": "Немаш дозвола да го видиш ова.",
     "notFoundDescription": "Оваа ставка можеби е отстранета или повеќе не е достапна.",
     "serverTitle": "Вчитувањето не е можно.",
@@ -3077,7 +3119,7 @@
     "scheduled": "ЗАКАЖАНО"
   },
   "voiceInput": {
-    "listening": "Се слуша...",
+    "listening": "Се слуша…",
     "onlineTitle": "Говорот се обработува онлајн",
     "onlineMessage": "Овој уред не може да го претвори говорот во текст без интернет. Твојата снимка се испраќа до {{provider}} за да се претвори во текст. Kilo не ја чува аудиоснимката.",
     "allow": "Дозволи",
@@ -3099,7 +3141,7 @@
     "useOnlineTranscription": "Дозволи онлајн транскрипција",
     "offlineModelDownloadScheduled": "Офлајн датотеките со говор ќе се преземат во позадина. Обиди се повторно со гласовниот внес подоцна.",
     "listeningStopped": "Слушањето е запрено.",
-    "transcribing": "Се транскрибира...",
+    "transcribing": "Се транскрибира…",
     "gatewayUnreachable": "Не може да се достигне Kilo Gateway. Провери ја врската и обиди се повторно.",
     "gatewayTimeout": "Транскрипцијата трае предолго. Обиди се повторно.",
     "gatewayModelUnavailable": "Овој модел за транскрипција не е достапен. Одбери друг во Лични поставки.",
@@ -3139,6 +3181,11 @@
       "billingHistory": "Историја на плаќања",
       "billingHistoryEmpty": "Сè уште нема историја на плаќања.",
       "billingHistoryError": "Не успеа да се вчита историја на плаќања",
+      "billingRowInitial": "Прво наплатување · {{tier}}",
+      "billingRowRenewal": "Обновување · {{tier}}",
+      "billingRowSubscription": "Претплата · {{tier}}",
+      "billingRowTrial": "Бесплатен пробен период · {{tier}}",
+      "billingRowUpgrade": "Промена на план · {{tier}}",
       "cancel": "Откажи претплата",
       "cancelDescription": "Вашиот Kilo Pass останува активен до крајот на периодот на наплата и нема да се обнови.",
       "cancelScheduled": "Се откажува на {{date}}",
@@ -3164,6 +3211,8 @@
     "retryHint": "Повторно ја проверува состојбата на Kilo Pass.",
     "endedOn": "Завршено на {{date}}",
     "notAvailableInApp": "Kilo Pass не е достапен во апликацијата.",
+    "notAvailableTitle": "Kilo Pass не се нуди во апликацијата",
+    "noPassDescription": "Оваа сметка нема Kilo Pass.",
     "statusActive": "Активен",
     "statusTrialing": "Пробен период",
     "statusPastDue": "Задоцнето плаќање",
@@ -3234,6 +3283,7 @@
     "revokeConsent": "Повлечи ја согласноста",
     "revokeConsentTitle": "Да се повлече согласноста за споделување податоци?",
     "acceptAndContinue": "Прифати и продолжи",
+    "loadingConsentSettings": "Се вчитуваат твоите поставки за согласност…",
     "decline": "Одбиј",
     "declineAndSignOut": "Одбиј и одјави се",
     "declineTitle": "Да се одбие споделувањето податоци?",
@@ -3408,7 +3458,8 @@
         "accounting_adjustment": "Сметководствена корекција",
         "credits_expired": "Истечени кредити"
       },
-      "truncated": "Достапни се и постари активности со кредити."
+      "truncated": "Достапни се и постари активности со кредити.",
+      "retentionLimit": "Се прикажуваат најновите активности со кредити."
     },
     "inviteMember": {
       "emailError": "Внеси важечка адреса за е-пошта.",
@@ -3418,6 +3469,7 @@
       "sendInvite": "Испрати покана",
       "title": "Покани член",
       "alreadyInvited": "Оваа адреса веќе е поканета или веќе припаѓа на член.",
+      "organizationUnavailable": "Оваа организација повеќе не е достапна.",
       "sendError": "Не успеа испраќањето на поканата.",
       "pendingInvitation": "Оваа е-пошта веќе има покана на чекање.",
       "alreadyMember": "Ова лице веќе е член на оваа организација.",
@@ -3439,10 +3491,11 @@
         "void": "Поништено",
         "uncollectible": "Ненаплатливо"
       },
-      "truncated": "Достапни се и постари фактури."
+      "truncated": "Достапни се и постари фактури.",
+      "retentionLimit": "Се прикажуваат најновите фактури."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Овозможи предупредување за ниска состојба",
+      "subtitle": "Испрати предупредување по е-пошта до адресите што ќе ги наведеш кога состојбата на оваа организација ќе падне под износот што ќе го поставиш.",
       "notifyEmailsLabel": "Адреси за известување",
       "permissionDenied": "Немаш дозвола да управуваш со предупредувањата за наплата.",
       "separateEmailsHint": "Оддели ги адресите за е-пошта со запирки.",
@@ -3518,6 +3571,7 @@
       "truncated": "Во овој час има повеќе барања отколку што се прикажани.",
       "emptyTitle": "Нема барања во овој час",
       "emptyDescription": "Користете „Претходен час“ за да ги видите претходните барања.",
+      "emptyBoundDescription": "Дневниците на барања не одат подалеку наназад од ова.",
       "loadError": "Не може да се вчитаат дневниците на барања.",
       "permissionDenied": "Само сопственик, администратор или менаџер за наплата на организацијата може да ги чита нејзините дневници на барања.",
       "tokens": "{{input}} влез · {{output}} излез",
@@ -3586,10 +3640,9 @@
     },
     "hub": {
       "renameTitle": "Преименувај организација",
-      "renamePlaceholder": "Име на организацијата",
+      "renamePlaceholder": "Внесете име на организацијата",
       "balance": "Состојба",
-      "organizationSeats": "Места во организацијата",
-      "plan": "План на организацијата",
+      "plan": "План",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Истечен",
@@ -3623,7 +3676,8 @@
     "signupStepUp": "За да го завршиш создавањето на сметката, избери „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да го завршиш создавањето на сметката, избери „$t(login.signInWithGoogle)“.",
-    "invalidCode": "Кодот е неточен. Обиди се повторно.",
+    "signupStepUpBack": "За да го завршиш создавањето на сметката, врати се назад и избери „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Кодот е неточен или истечен. Обиди се повторно или избери „$t(login.resendCode)“.",
     "codeInProgress": "Твојот код се обработува. Почекај малку и обиди се повторно.",
     "tooManyAttempts": "Премногу обиди. Побарај нов код.",
     "invalidToken": "Најавата не успеа. Обиди се повторно.",
@@ -3673,8 +3727,7 @@
     "imagesSectionEmpty": "Нема доверливи хостови за слики",
     "revoke": "Отстрани го {{host}} од доверливите хостови",
     "revokeMessage": "Линковите до овој хост повторно ќе бараат потврда.",
-    "revokeImageMessage": "Сликите од овој хост повторно ќе бараат потврда.",
-    "backToPreferences": "Назад на поставките"
+    "revokeImageMessage": "Сликите од овој хост повторно ќе бараат потврда."
   },
   "glanceable": {
     "waiting": "Се ажурираат агентите",
@@ -3688,7 +3741,7 @@
     "newestSession": "Најнова: {{title}}",
     "noneWaiting": "Нема агенти што чекаат",
     "newAgent": "Нов агент",
-    "approving": "Се одобрува...",
+    "approving": "Се одобрува…",
     "couldNotApprove": "Одобрувањето не успеа",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
@@ -3700,6 +3753,7 @@
     "lastKnown": "Последно познато",
     "awaitingUpdate": "Чека ажурирање",
     "nextRun": "Следно извршување",
+    "wasDue": "Се очекуваше",
     "waitingForYou": "Чека на вас",
     "nextScheduled": "Следни закажани",
     "answerNeeded": "Потребен е одговор",
@@ -3752,6 +3806,7 @@
   },
   "modelChat": {
     "offlineFailure": "На овој модел му е потребна интернет-врска. Поврзете се и обидете се повторно или префрлете се на модел на овој уред.",
+    "connectionLost": "Врската со моделот е прекината. Провери ја врската и обиди се повторно.",
     "empty": {
       "title": "Започнете разговор",
       "description": "Испратете порака за да разговарате со модел."
@@ -3809,6 +3864,8 @@
       "fieldName": "Прикажано име",
       "fieldUrl": "URL на серверот",
       "fieldUrlInvalid": "Внеси важечки URL на серверот.",
+      "duplicateUrl": "Овој URL е веќе зачуван.",
+      "serverNotFound": "Овој сервер повеќе не е зачуван.",
       "enableServer": "Овозможи го овој сервер: {{name}}",
       "editServer": "Уреди сервер",
       "deleteServer": "Избриши сервер",
@@ -3889,6 +3946,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) испраќа кратко барање за извршување на моделот до оваа крајна точка со избраниот протокол и модел. Давателот може да го наплати тоа.",
       "connectionSucceeded": "Моделот успешно обработи барање со овој протокол.",
       "connectionFailed": "Моделот не можеше да го обработи барањето. Провери ги основниот URL на API, протоколот, податоците за автентикација и ID на моделот.",
+      "requestTimedOut": "Крајната точка не одговори навреме. Проверете го основниот URL на API и врската, па обидете се повторно.",
+      "requestUnauthorized": "Крајната точка ги одби податоците за автентикација. Проверете го API клучот и прилагодените заглавија, па обидете се повторно.",
+      "requestNotFound": "Крајната точка или моделот не се најдени. Проверете го основниот URL на API и ID на моделот.",
+      "requestRateLimited": "Крајната точка ограничува барања. Почекајте момент и обидете се повторно.",
+      "requestUnavailable": "Крајната точка е недостапна во моментов. Обидете се повторно наскоро.",
+      "requestUnreachable": "Крајната точка не можеше да се достигне. Проверете го основниот URL на API и врската.",
+      "requestInvalidResponse": "Крајната точка не одговори во очекуваниот формат. Проверете дали основниот URL на API и протоколот одговараат на серверот, потоа обидете се повторно.",
+      "discoveryNoModels": "Крајната точка не наведе ниту еден модел. Внесете модели рачно.",
+      "connectionIncomplete": "Моделот одговори, но не заврши. Обидете се повторно или проверете го ID на моделот и протоколот.",
       "invalidInput": "Внеси име на серверот, важечки заглавија и барем еден модел со единствени ID и име. Ограничувањата за токени мора да бидат позитивни цели броеви.",
       "invalidUrl": "Внеси основен HTTP или HTTPS URL на API без податоци за автентикација, низа за пребарување или фрагмент.",
       "publicHttp": "Јавни HTTP крајни точки не се дозволени. Користи HTTPS или приватна локална крајна точка.",
@@ -3918,6 +3984,8 @@
       "downloading": "Се презема: {{written}} од {{total}}",
       "downloadingUnknown": "Се презема: {{written}}",
       "paused": "Паузирано: {{written}} од {{total}}",
+      "retrying": "Повторен обид: {{written}} од {{total}}",
+      "retryingUnknown": "Повторен обид: {{written}}",
       "verifying": "Се проверува преземената датотека…",
       "downloaded": "Преземено · {{size}}",
       "url": "Директна врска за преземање",
@@ -4008,7 +4076,9 @@
         "androidModelUnavailable": "Овој уред не го поддржува Gemini Nano или системската апликација AICore сè уште се поставува. Обидете се повторно подоцна.",
         "aicoreUpdateRequired": "Ажурирајте ја апликацијата AICore и системскиот софтвер за да го користите овој модел.",
         "downloadable": "Овој модел треба еднаш да се преземе пред да можете да го користите.",
-        "downloading": "Моделот се презема. Ќе биде подготвен кога ќе заврши преземањето."
+        "downloading": "Моделот се презема. Ќе биде подготвен кога ќе заврши преземањето.",
+        "batteryQuota": "Моделот на уредот засега ја потроши дозволената батерија. Обидете се повторно подоцна.",
+        "checkFailed": "Апликацијата не можеше да го провери овој модел. Обидете се повторно."
       },
       "unavailable": "Моделот на уредот моментално не е достапен. Проверете го неговиот статус во $t(modelChat.backends.title).",
       "busy": "Моделот на уредот е зафатен со друг одговор. Обидете се повторно кога ќе заврши.",
@@ -4023,10 +4093,20 @@
     "reasoningEffort": {
       "modelFlag": "Овој модел поддржува ниво на размислување"
     },
-    "creditsRequired": "Немате доволно кредити за да ја испратите оваа порака."
+    "creditsRequired": "Немате доволно кредити за да ја испратите оваа порака.",
+    "providerKeyRefused": "Давателот ги одби податоците за автентикација. Проверете го неговиот API клуч, па испратете повторно.",
+    "providerModelMissing": "Овој бекенд повеќе не го нуди овој модел. Изберете друг.",
+    "providerRateLimited": "Давателот ограничува барања. Почекајте момент и испратете повторно.",
+    "providerUnavailable": "Давателот е недостапен во моментов. Испратете повторно наскоро."
   },
   "settingsTools": {
-    "confirmTitle": "Да се потврди оваа промена?"
+    "confirmTitle": "Да се потврди оваа промена?",
+    "guarded": {
+      "spendAlertsOff": "Да се исклучат предупредувањата за трошење? Ќе престанете да добивате известувања за преминување на праговите на трошење и часовни пикови.",
+      "balanceAlertsOff": "Да се исклучат предупредувањата за салдо? Ќе престанете да добивате известувања кога ќе ви останат малку кредити.",
+      "securityFindingsOff": "Да се исклучат безбедносните наоди? Ќе престанете да добивате известувања за нови безбедносни наоди.",
+      "hideBalanceOn": "Да го скриете салдото? Салдата на кредити повеќе нема да се прикажуваат на екраните на профилот и во организацискиот центар."
+    }
   },
   "appActions": {
     "start": {
@@ -4171,6 +4251,7 @@
     "instructionsHint": "Правила во Markdown што се применуваат на секоја сесија што го користи овој профил.",
     "instructionsEmpty": "Сè уште нема датотеки со инструкции",
     "instructionsEmptyDescription": "Додајте датотеки со правила што ги применува секоја сесија со овој профил.",
+    "instructionsEmptyDescriptionReadOnly": "Датотеките со правила додадени овде се применуваат на секоја сесија што го користи овој профил.",
     "instructionNameRequired": "Внесете име на датотека",
     "instructionNameTooLong": "Името на датотеката мора да има {{max}} знаци или помалку",
     "instructionNameInvalid": "Започнете со буква или број и користете само мали букви, бројки и цртички",
@@ -4246,7 +4327,7 @@
       "topPPlaceholder": "пр. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Мојот агент",
-      "promptPlaceholder": "Вие сте еден ...",
+      "promptPlaceholder": "Вие сте еден …",
       "tools": "Алатки",
       "wholeToolRule": "Овој агент применува едно правило на сите алатки одеднаш: {{rule}}. Овие прекинувачи се само за читање.",
       "visibility": "Видливост",
@@ -4369,7 +4450,8 @@
       "purchaseFallback": "Купување кредити",
       "receipt": "Сметка",
       "receiptA11y": "Отвори ја сметката за {{description}}, {{amount}}, од {{date}}",
-      "receiptUnavailable": "Не е достапна сметка за ова купување."
+      "receiptUnavailable": "Не е достапна сметка за ова купување.",
+      "retentionLimit": "Се прикажува најновата историја на кредити."
     },
     "title": "Купи кредити",
     "description": "Кредитите се еднократна набавка што се додава на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App. Продавницата ви го наплатува сметката и кредитите се додаваат откако продавницата ќе го потврди плаќањето.",
@@ -4396,6 +4478,7 @@
     "pickPackToBuyAgain": "Изберете пакет погоре за да започнете ново купување.",
     "purchasePending": "Продавницата сè уште го обработува ова плаќање. Кредитите ќе пристигнат штом таа ја одобри наплатата.",
     "buyAgain": "Купи повторно",
+    "checkPurchase": "Провери го купувањето",
     "purchaseOwnedByAnotherAccount": "Кредитите на оваа Apple Account припаѓаат на друга сметка на Kilo. Најави се на таа сметка на Kilo за да ги користиш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на оваа Google Play сметка припаѓаат на друга Kilo сметка. Најавете се на таа Kilo сметка за да ги користите."
   },
@@ -4489,7 +4572,9 @@
     },
     "saveSheet": {
       "title": "Зачувај во список",
-      "saved": "Зачувано во {{list}}"
+      "saved": "Зачувано во {{list}}",
+      "saveFailed": "Не можеше да се зачува задачата. Проверете ја врската и обидете се повторно.",
+      "saveRefused": "Не можеше да се зачува задачата во овој список. Изберете друг список."
     }
   },
   "agentBriefing": {
@@ -4501,17 +4586,24 @@
     "empty": "Нема активност во овој период на извештајот",
     "emptyHint": "Вашите сесии за кодирање во облак и CLI ќе се појават тука кога закажан извештај има активност.",
     "loadError": "Извештаите не можеа да се вчитаат",
+    "estimateLoadError": "Проценката не можеше да се вчита.",
     "view": "Прочитај извештај",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Филтрирајте по контекст",
+    "contextAll": "Сите контексти",
     "dismiss": "Отфрли го извештајот",
+    "dismissFailed": "Сè уште не успеа да се отфрли овој извештај. Обидот се повторува во позадина.",
     "offline": "Офлајн · зачуван извештај",
     "cached": "Зачуван извештај · освежувањето е недостапно",
     "summary": "AI резиме",
     "summaryPending": "AI резимето се подготвува. Ќе се прикачи тука кога ќе биде готово.",
-    "summaryUnavailable": "AI резимето е недостапно. Структурираниот извештај е сè уште достапен.",
+    "summaryUnavailable": "AI резимето е недостапно. Вашиот структуриран извештај е сè уште достапен.",
+    "summaryNotAdmitted": "AI резимето не е генерирано за овој извештај. Вашиот структуриран извештај е сè уште достапен.",
     "summaryCharge": "AI наплати {{cost}}",
     "summaryChargePending": "AI наплатата чека усогласување",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Докази и артефакти",
     "timezone": "Временска зона на извештајот",
     "deviceTimezone": "Користи ја временската зона на уредот",
@@ -4523,22 +4615,22 @@
     "timeHint": "Картичката на почетниот екран го враќа статусот во живо кога ќе заврши периодот на извештајот, дури и офлајн.",
     "invalidSchedule": "Изберете валидна временска зона и непразен временски период за извештајот.",
     "notificationsHint": "Едно општо известување за секој закажан извештај. Независно од платените AI резимеа.",
-    "notificationPermission": "Овозможете известувања на уредот во $t(common.notifications) за да го добивате извештајот.",
+    "notificationPermission": "Вклучете push известувања за да го добивате извештајот.",
     "defaultModel": "Користи го стандардниот модел на Kilo",
     "duration": "Временско ограничување (минути)",
     "spendLimit": "Ограничување на трошоци (USD)",
     "invalidSafeguards": "Внесете позитивни, конечни ограничувања за време и трошоци.",
     "estimate": "Проценка {{estimate}} · максимум {{maximum}}",
-    "estimateUnavailable": "Платено резиме не е достапно за овие поставки.",
+    "estimateUnavailable": "Платено резиме не е достапно за овие поставки. Променете го моделот или границите, или обидете се повторно подоцна.",
     "confirmPaid": "Да се овозможат платени резимеа за {{context}}?",
     "paidDisclosure": "Проценето {{estimate}}, до {{maximum}}, со ограничување од {{minutes}} мин. Наплатата важи дури и ако генерирањето не успее.",
     "enable": "Овозможи платени резимеа",
     "allContexts": "Личните и организациските извештаи остануваат одвоени.",
     "emptyHistory": "Нема зачувани извештаи",
-    "estimatePermissionUnavailable": "Немате дозвола да ги користите средствата на овој контекст.",
-    "estimatePricingUnavailable": "Цените за овој модел не се достапни.",
-    "estimateBalanceUnavailable": "Нема доволно средства за платено резиме.",
-    "estimateModelNotAllowed": "Овој модел не е дозволен тука.",
+    "estimatePermissionUnavailable": "Немате дозвола да ги користите средствата на овој контекст. Побарајте од сопственикот на организацијата да го овозможи тоа.",
+    "estimatePricingUnavailable": "Цените за овој модел не се достапни. Изберете друг модел.",
+    "estimateBalanceUnavailable": "Нема доволно средства за платено резиме. Додадете кредит во салдото на овој контекст.",
+    "estimateModelNotAllowed": "Овој модел не е дозволен во овој контекст. Изберете друг модел.",
     "estimateSpendLimitTooLow": "Подигнете го лимитот за трошоци за да го овозможите ова резиме.",
     "saved": "Поставките за извештај се зачувани",
     "selectedSessions": "Избрани сесии",
@@ -4547,16 +4639,35 @@
     "capturedAt": "Зачувано {{time}}",
     "snapshotHint": "Снимка на најновата достапна состојба на сесиите, со можни пропусти, зачувана во закажаното утринско време. Бројките се однесуваат на избраните сесии, а не на целосната активност во текот на ноќта.",
     "snapshotTruncated": "Некои сесии или докази се изоставени за да се ограничи обемот на оваа снимка.",
-    "snapshotSummaryFailed": "AI резимето не успеа. Вашата структурирана снимка е сè уште достапна.",
+    "snapshotSummaryFailed": "AI резимето не успеа. Вашиот структуриран извештај е сè уште достапен.",
     "scheduledContextEnabled": "Закажани извештаи",
     "scheduledContextSettings": "Закажани извештаи · {{context}}",
     "scheduledContextHint": "Овозможете закажано зачувување снимки и платени AI резимеа само за овој контекст. Избрани извадоци со скриени чувствителни податоци и структурирани факти се испраќаат до вашиот модел. Резимеата го користат јазикот на апликацијата зачуван кога ги менувате поставките за извештај. Наплатите се од салдото на овој контекст. Снимките без активност не користат AI.",
     "snapshotSafeguards": "Ограничувањата за време и трошоци по резиме важат за секоја закажана снимка и не се дневен буџет.",
-    "snapshotEstimateInputTooLarge": "Оваа снимка содржи премногу докази за избраниот модел.",
+    "snapshotEstimateInputTooLarge": "Оваа снимка содржи премногу докази за избраниот модел. Изберете модел со поголем влезен прозорец.",
     "quietSnapshot": "За оваа снимка не е избрана активност од сесиите. Не е побарано или наплатено AI резиме.",
     "noEnabledContexts": "Нема овозможени контексти за закажани извештаи",
     "sourceBlocker": "Сесијата бара внимание",
-    "sourceMetadata": "Зачувани метаподатоци за сесијата"
+    "sourceMetadata": "Зачувани метаподатоци за сесијата",
+    "metadataPlan_one": "План: {{displayDone}} од {{displayTotal}} чекор завршен",
+    "metadataPlan_other": "План: {{displayDone}} од {{displayTotal}} чекори завршени",
+    "metadataPlan": "План: {{displayDone}} од {{displayTotal}} чекори завршени",
+    "metadataFiles_one": "{{displayCount}} променета датотека",
+    "metadataFiles_other": "{{displayCount}} променети датотеки",
+    "metadataFiles": "{{displayCount}} променети датотеки",
+    "metadataLinesAdded_one": "{{displayCount}} додадена линија",
+    "metadataLinesAdded_other": "{{displayCount}} додадени линии",
+    "metadataLinesAdded": "{{displayCount}} додадени линии",
+    "metadataLinesRemoved_one": "{{displayCount}} отстранета линија",
+    "metadataLinesRemoved_other": "{{displayCount}} отстранети линии",
+    "metadataLinesRemoved": "{{displayCount}} отстранети линии",
+    "metadataPlanCurrent": "Тековен чекор: {{current}}",
+    "metadataFailure": "Последниот обид не успеа: {{kind}}",
+    "sourceActivity": "Активност без наслов",
+    "metadataFailureProvider": "грешка на провајдерот",
+    "metadataFailureTool": "грешка на алатката",
+    "metadataFailureCancelled": "Откажано",
+    "metadataFailureOther": "неодредена грешка"
   },
   "systemSearch": {
     "couldNotOpenResult": "Не успеа отворањето на овој резултат од пребарувањето"
@@ -4574,7 +4685,7 @@
     "topFeatures": "Најкористени функции",
     "emptyTitle": "Нема користење во овој период",
     "unavailableTitle": "Користењето не е достапно",
-    "unavailableDescription": "Овој работен простор не пријавува користење. Повторното обидување нема да помогне.",
+    "unavailableDescription": "Користењето не е поставено за овој работен простор. Контактирајте ја поддршката ако очекувате тука да се прикажува користење.",
     "orgSelfNotice": "Го гледате вашето користење во оваа организација.",
     "viewDetails": "Прикажи детали за користењето"
   },
@@ -4582,7 +4693,7 @@
     "title": "Интеграции",
     "sectionTitle": "Поврзани услуги",
     "entrySubtitle": "GitHub, Slack, Linear и друго",
-    "subtitle": "Поврзете ги вашите развојни алатки и работни процеси со Kilo",
+    "subtitle": "Поврзете ги вашите развојни алатки и работни процеси со Kilo.",
     "disconnect": "Прекини врска",
     "disconnectTitle": "Да се прекине врската со {{provider}}?",
     "disconnectMessage": "Kilo ќе престане да одговара во {{provider}}. Можете повторно да се поврзете во секое време.",
@@ -4592,10 +4703,14 @@
     "couldNotLoad": "Не може да се вчитаат интеграциите",
     "permissionDenied": "Немате дозвола за управување со овие интеграции.",
     "managedByOwner": "Побарајте од сопственик на организацијата да ја промени врската што не можете да ја промените.",
+    "managedByOwnerOrAdmin": "Побарајте од сопственик или администратор на организацијата да ја промени врската што не можете да ја промените.",
+    "managedByOwnerOrBilling": "Побарајте од сопственик или одговорен за наплата на организацијата да ја промени врската што не можете да ја промените.",
+    "managedByOwnerAdminOrBilling": "Побарајте од сопственик, администратор или одговорен за наплата на организацијата да ја промени врската што не можете да ја промените.",
     "connectFailed": "Не може да се отвори страницата за поврзување"
   },
   "invoices": {
-    "personalEmptyDescription": "Фактурите за вашите лични купувања ќе се појават тука откако ќе ви биде наплатено."
+    "personalEmptyDescription": "Фактурите за вашите лични купувања се појавуваат тука откако ќе ви биде наплатено. Сметките од App Store и Google Play се наоѓаат во Историја на кредити.",
+    "personalPeriod": "Последните 12 месеци"
   },
   "cloudAgent": {
     "compute": {
@@ -4627,7 +4742,7 @@
       "new": "Нов активатор",
       "create": "Создај активатор",
       "emptyTitle": "Сè уште нема активатори",
-      "emptyDescription": "Создадете активатор за да започнете извршување на Cloud Agent од повик на вебхук или по распоред.",
+      "emptyDescription": "Создадете го вашиот прв активатор.",
       "loadFailedTitle": "Не успеа вчитувањето на активаторите",
       "loadFailedDescription": "Обидете се повторно кога имате врска.",
       "detailLoadFailedTitle": "Не успеа вчитувањето на овој активатор",
@@ -4650,7 +4765,6 @@
       "nameLocked": "Името не може да се менува откако ќе се создаде активаторот.",
       "repositoryLocked": "Репозиториумот не може да се менува откако ќе се создаде активаторот.",
       "environmentAutomatic": "Автоматски според репозиториумот",
-      "notSelected": "Не е избрано",
       "profileDefaults": "Користи стандардни вредности",
       "profileHelp": "Поставките на профилот важат кога активаторот се извршува. Тогаш се разрешуваат и неговите тајни.",
       "customAgent": "Прилагоден агент",
@@ -4740,7 +4854,7 @@
   },
   "organizationGuardrails": {
     "title": "Заштитни механизми за ВИ",
-    "permissionDenied": "Само сопствениците и администраторите на организацијата можат да управуваат со заштитните механизми за ВИ.",
+    "permissionDenied": "Само сопствениците и администраторите на организацијата можат да управуваат со заштитните механизми за ВИ. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Заштитните механизми за ВИ не се активирани",
     "unavailable": "Kilo ги активира заштитните механизми за ВИ за организација на барање. Обратете се на {{supportEmail}}, а тимот на Kilo ги вклучува за вашата организација.",
     "contactSupport": "Контактирај ја поддршката",
@@ -4752,12 +4866,15 @@
     "inputDescription": "Го скенира секој влез со Enkrypt AI, вклучително и резултатите од алатките. Кога Enkrypt AI не е достапен, барањата се испраќаат без скенирање наместо да се отфрлат.",
     "outputTitle": "Излезни заштитни механизми",
     "outputDescription": "Ги скенира одговорите со Enkrypt AI пред членовите да ги добијат. Исклучено е освен ако не го вклучите.",
+    "outputUnavailable": "Kilo не вклучи скенирање на излезот за оваа организација, затоа одговорите не се проверуваат и тука нема што да се постави. Обратете се на {{supportEmail}} за да го побарате тоа.",
     "detectorsHint": "Опцијата Блокирај отфрла означено барање. Опцијата Само евидентирај го запишува без одложување на барањето.",
     "detectorsHintOutput": "Опцијата Блокирај го отфрла означениот одговор. Опцијата Само евидентирај го запишува без одложување на одговорот.",
     "choiceLog": "Само евидентирај",
     "applyTo": "Примени на",
     "applyToAllMembers": "Сите членови",
     "applyKiloDefault": "Примени го стандардното за Kilo",
+    "applyKiloDefaultEnglishNote": "Текстот на стандардната политика на Kilo е на англиски, бидејќи Kilo Gateway го применува точно како што е напишан.",
+    "applyKiloDefaultReplaceMessage": "Стандардната политика на Kilo е напишана на англиски и го заменува тоа што го поставивте во Прекршување на политика. Текстот што го внесовте во полето за текст на политика не може да се врати.",
     "invalidSavedTitle": "Зачуваните поставки за влезните детектори не можат да се прочитаат",
     "invalidSavedBody": "Барањата се блокирани додека влезните детектори повторно не се зачуваат. Детекторите подолу започнуваат од стандардното за Kilo.",
     "invalidSavedOutputTitle": "Зачуваните поставки за излезните детектори не можат да се прочитаат",
@@ -4878,7 +4995,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Функција за претпријатија",
-    "enterpriseOnly": "Ова е функција само за претпријатија.",
+    "enterpriseOnly": "Добавувачите и моделите се достапни во планот Enterprise.",
     "readOnly": "Само сопствениците и администраторите на организацијата можат да ги менуваат овие поставки.",
     "loadError": "Добавувачите и моделите не можеа да се вчитаат",
     "tabModels": "Модели",
@@ -4892,6 +5009,8 @@
     "providersDescription": "Исклучете добавувач за да спречите Kilo да насочува кон него за оваа организација.",
     "providersNeedCatalog": "Прекинувачите за добавувачи остануваат само за читање додека не се вчита целиот каталог на модели. Допрете Обиди се повторно погоре за да ги уредите.",
     "providersEmpty": "Нема добавувачи што одговараат на ова пребарување.",
+    "providersNone": "Нема достапни добавувачи за оваа организација.",
+    "providersUnavailable": "Списокот на добавувачи не можеше да се вчита.",
     "allowAllShown": "Дозволи ги сите прикажани",
     "denyAllShown": "Забрани ги сите прикажани",
     "gatewaysDescription": "Kilo ги насочува барањата за моделите преку Vercel AI Gateway или OpenRouter. Исклучен портал ги отфрла тие барања.",

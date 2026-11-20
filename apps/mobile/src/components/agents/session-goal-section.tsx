@@ -63,10 +63,10 @@ export function SessionGoalSection({
   const { t } = useTranslation();
 
   // Two stacked pills are taller than the collapsed row's content box, so the
-  // column reaches 4px into the row's bottom padding (`-mb-[4px]`) instead of
-  // growing the row. One pill or none leaves the row height as it was.
+  // column reaches into the row's bottom padding instead of growing the row.
+  // One pill or none leaves the row height as it was.
   const trailingSlot = trailing ? (
-    <View className="-mb-[4px] ml-auto shrink-0 items-end gap-[1px] self-start">{trailing}</View>
+    <View className="-mb-1 ml-auto shrink-0 items-end gap-0.5 self-start">{trailing}</View>
   ) : null;
 
   const isActive = goal.status === 'active';

@@ -2,25 +2,69 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import {
   chmodSync,
+  cpSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as sleep } from 'node:timers/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { load } from 'js-yaml';
-import { claimScheduledChunks, scheduleRunChunks, schedulerConfig } from '../src/scheduler.ts';
+import {
+  claimScheduledChunks,
+  scheduleRunChunks,
+  schedulerConfig,
+  SCHEDULER_DISPATCH_LEASE_MS,
+  SCHEDULER_LIVE_SQL,
+} from '../src/scheduler.ts';
 import { sqliteD1 } from '../test/sqlite-d1.ts';
 
 const deployScript = fileURLToPath(new URL('./deploy.mjs', import.meta.url));
 const fixtureUrl = new URL('../test/fixtures/deploy-wrangler.mjs', import.meta.url).href;
+
+function packageCopy(t) {
+  const root = mkdtempSync(join(tmpdir(), 'benchmark-package-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'scripts'));
+  cpSync(deployScript, join(root, 'scripts', 'deploy.mjs'));
+  cpSync(
+    fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)),
+    join(root, 'wrangler.jsonc')
+  );
+  cpSync(fileURLToPath(new URL('../container/', import.meta.url)), join(root, 'container'), {
+    recursive: true,
+  });
+  cpSync(fileURLToPath(new URL('../migrations/', import.meta.url)), join(root, 'migrations'), {
+    recursive: true,
+  });
+  symlinkSync(
+    fileURLToPath(new URL('../node_modules/', import.meta.url)),
+    join(root, 'node_modules')
+  );
+  return {
+    script: join(root, 'scripts', 'deploy.mjs'),
+    edit(file, change) {
+      const path = join(root, file);
+      const before = readFileSync(path, 'utf8');
+      const after = change(before);
+      assert.notEqual(after, before);
+      writeFileSync(path, after);
+    },
+    move(from, to) {
+      mkdirSync(dirname(join(root, to)), { recursive: true });
+      renameSync(join(root, from), join(root, to));
+    },
+  };
+}
 
 function fixture(t, overrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'benchmark-deploy-'));
@@ -33,12 +77,19 @@ function fixture(t, overrides = {}) {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000');
   const migrations = new URL('../migrations/', import.meta.url);
-  for (const name of readdirSync(migrations)
+  const migrationNames = readdirSync(migrations)
     .filter(name => name.endsWith('.sql'))
-    .sort()) {
+    .sort();
+  for (const name of migrationNames) {
     db.exec(readFileSync(new URL(name, migrations), 'utf8'));
   }
+  db.exec('CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL)');
+  const recordMigration = db.prepare('INSERT INTO d1_migrations (name) VALUES (?)');
+  for (const name of migrationNames) recordMigration.run(name);
   db.exec(`CREATE TABLE fixture_events (kind TEXT NOT NULL, at INTEGER NOT NULL);
+    CREATE TABLE fixture_deployments (version_id TEXT PRIMARY KEY, message TEXT, created_on INTEGER NOT NULL);
+    CREATE TABLE fixture_app (updated_at INTEGER NOT NULL);
+    INSERT INTO fixture_app VALUES (1);
     INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at,
       min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity)
     VALUES ('fixture-run', 'efficient', 'decider', 'platform', 'running', '2026-01-01T00:00:00.000Z',
@@ -47,20 +98,21 @@ function fixture(t, overrides = {}) {
     ...process.env,
     PATH: `${bin}:${process.env.PATH ?? ''}`,
     BENCHMARK_DEPLOY_FIXTURE_DB: path,
-    BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '500',
-    BENCHMARK_DEPLOY_DRAIN_TIMEOUT_MS: '2000',
+    BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '30000',
+    BENCHMARK_DEPLOY_DRAIN_TIMEOUT_MS: '30000',
     BENCHMARK_DEPLOY_LEASE_MS: '2400',
     BENCHMARK_DEPLOY_POLL_INTERVAL_MS: '50',
     BENCHMARK_DEPLOY_COMMAND_TIMEOUT_MS: '900',
     BENCHMARK_DEPLOY_DEPLOY_TIMEOUT_MS: '6000',
+    BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '60000',
     ...overrides,
   };
   let child;
   let result;
-  const start = (args = []) => {
-    assert.equal(child, undefined);
-    child = spawn(process.execPath, [deployScript, ...args], {
-      env,
+  const start = (args = [], runEnv = {}, script = deployScript) => {
+    assert.ok(child === undefined || child.exitCode !== null || child.signalCode !== null);
+    child = spawn(process.execPath, [script, ...args], {
+      env: { ...env, ...runEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -85,11 +137,19 @@ function fixture(t, overrides = {}) {
     db.close();
     rmSync(directory, { recursive: true, force: true });
   });
+  const addChunk = (id, status, slot, leaseUntil) => {
+    db.prepare(`INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
+      case_ids, status, token, slot, lease_until) VALUES (?, 'fixture-run', 'fixture-model', 'default',
+      '[]', 0, 0, '[]', ?, 'existing-claim', ?, ?)`).run(id, status, slot, leaseUntil);
+  };
   return {
     db,
     start,
     kill(signal) {
       child.kill(signal);
+    },
+    mark(kind) {
+      db.prepare('INSERT INTO fixture_events (kind, at) VALUES (?, ?)').run(kind, Date.now());
     },
     count(kind) {
       return Number(
@@ -107,23 +167,28 @@ function fixture(t, overrides = {}) {
         .prepare('SELECT token, lease_until FROM scheduler_dispatch_lock WHERE id = 1')
         .get();
     },
+    deployedMessages() {
+      return db
+        .prepare('SELECT message FROM fixture_deployments ORDER BY rowid')
+        .all()
+        .map(row => row.message);
+    },
+    rollOut(message) {
+      const createdOn =
+        Math.max(
+          Date.now(),
+          db.prepare('SELECT COALESCE(MAX(created_on), 0) AS latest FROM fixture_deployments').get()
+            .latest
+        ) + 10;
+      db.prepare(
+        'INSERT INTO fixture_deployments (version_id, message, created_on) VALUES (?, ?, ?)'
+      ).run(`seeded-${createdOn}`, message, createdOn);
+      db.prepare('UPDATE fixture_app SET updated_at = ?').run(createdOn + 1);
+    },
+    addChunk,
     addLive() {
-      db.prepare(`INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
-        case_ids, status, token, slot, lease_until) VALUES (?, 'fixture-run', 'fixture-model', 'default',
-        '[]', 0, 0, '[]', ?, 'existing-claim', ?, ?)`).run(
-        'queued-chunk',
-        'queued',
-        0,
-        Date.now() + 60_000
-      );
-      db.prepare(`INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk,
-        case_ids, status, token, slot, lease_until) VALUES (?, 'fixture-run', 'fixture-model', 'default',
-        '[]', 0, 0, '[]', ?, 'existing-claim', ?, ?)`).run(
-        'active-chunk',
-        'active',
-        1,
-        Date.now() + 60_000
-      );
+      addChunk('queued-chunk', 'queued', 0, Date.now() + 60_000);
+      addChunk('active-chunk', 'active', 1, Date.now() + 60_000);
     },
   };
 }
@@ -136,11 +201,20 @@ async function until(predicate) {
   }
 }
 
-function diagnostics(result) {
-  assert.doesNotMatch(
-    result.stdout + result.stderr,
-    /untrusted-(?:stdout|stderr|response)-canary|existing-claim|replacement-owner|operator-pause-/
-  );
+function diagnostics(result, { commandOutput = false } = {}) {
+  if (commandOutput) {
+    assert.match(result.stderr, /--- wrangler stderr \(last \d+ lines\) ---/);
+    assert.match(result.stderr, /\u2718 \[ERROR\] A request to the Cloudflare API/);
+    assert.doesNotMatch(
+      result.stdout + result.stderr,
+      /fixture-secret-value-9f3c|fixture-api-token-value|BEARERTOKEN|existing-claim|replacement-owner|operator-pause-/
+    );
+  } else {
+    assert.doesNotMatch(
+      result.stdout + result.stderr,
+      /untrusted-(?:stdout|stderr|response)-canary|existing-claim|replacement-owner|operator-pause-/
+    );
+  }
   const rows = result.stdout
     .trim()
     .split('\n')
@@ -158,9 +232,9 @@ function released(state) {
   assert.deepEqual({ ...state.lock() }, { token: null, lease_until: 0 });
 }
 
-function failed(result, reason) {
+function failed(result, reason, options) {
   assert.equal(result.code, 1);
-  assert.equal(diagnostics(result).at(-1).reason, reason);
+  assert.equal(diagnostics(result, options).at(-1).reason, reason);
 }
 
 test(
@@ -193,7 +267,7 @@ test(
   'does not steal a contended lease and does not deploy after lock timeout',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t);
+    const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '500' });
     state.db
       .prepare(
         "UPDATE scheduler_dispatch_lock SET token = 'replacement-owner', lease_until = ? WHERE id = 1"
@@ -213,12 +287,12 @@ test(
   'a real scheduler dispatch pass claims nothing while the deploy holds the lease',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '1500' });
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'test_released:1' });
     const db = sqliteD1(state.db);
     const config = schedulerConfig('{"slots":8}');
     await scheduleRunChunks(db, {
       runId: 'fixture-run',
-      entries: [{ model: 'claimable/model', variant: '', providers: ['deepinfra'] }],
+      entries: [{ model: 'claimable/model', variant: '' }],
       repetitions: 1,
       caseIds: ['case'],
       chunkSize: 1,
@@ -236,6 +310,7 @@ test(
         .get().n,
       0
     );
+    state.mark('test_released');
     assert.equal((await result).code, 0);
     released(state);
     const claims = await claimScheduledChunks(db, config, Date.now(), 'after-deploy');
@@ -260,6 +335,95 @@ test(
   }
 );
 
+function intentRow(state) {
+  return {
+    ...state.db
+      .prepare('SELECT token, lease_until FROM scheduler_dispatch_lock WHERE id = 3')
+      .get(),
+  };
+}
+
+/** A D1 whose dispatch passes hold the lease while their occupancy read takes `holdMs`. */
+function slowPasses(d1, holdMs, onHold) {
+  return new Proxy(d1, {
+    get(target, property) {
+      if (property !== 'prepare') {
+        const value = target[property];
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      return sql => {
+        const statement = target.prepare(sql);
+        if (sql !== SCHEDULER_LIVE_SQL) return statement;
+        return {
+          ...statement,
+          async all() {
+            onHold();
+            await sleep(holdMs);
+            return statement.all();
+          },
+        };
+      };
+    },
+  });
+}
+
+test(
+  'takes the lease from back-to-back dispatch passes within one dispatch lease',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '8000' });
+    let holds = 0;
+    let stopped = false;
+    const dispatcher = slowPasses(sqliteD1(state.db), 300, () => {
+      holds += 1;
+    });
+    const config = schedulerConfig('{"slots":8}');
+    const passes = (async () => {
+      for (let pass = 0; !stopped; pass++) {
+        const before = holds;
+        await claimScheduledChunks(dispatcher, config, Date.now(), `dispatch-pass-${pass}`);
+        if (holds === before) await sleep(5);
+      }
+    })();
+    await until(() => holds >= 2);
+    const result = await state.start();
+    stopped = true;
+    await passes;
+    assert.equal(result.code, 0, result.stdout);
+    const at = (kind, order) =>
+      state.db
+        .prepare(`SELECT at FROM fixture_events WHERE kind = ? ORDER BY rowid ${order} LIMIT 1`)
+        .get(kind).at;
+    assert.ok(at('acquire', 'DESC') - at('intent', 'ASC') <= SCHEDULER_DISPATCH_LEASE_MS);
+    assert.equal(state.count('intent_cleared'), 1);
+    assert.deepEqual(intentRow(state), { token: null, lease_until: 0 });
+    assert.equal(state.count('unguarded_deploy'), 0);
+    released(state);
+  }
+);
+
+test(
+  'bounds the deploy intent by the lock wait so a dead deploy cannot hold dispatch',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '2000' });
+    state.db
+      .prepare(
+        "UPDATE scheduler_dispatch_lock SET token = 'replacement-owner', lease_until = ? WHERE id = 1"
+      )
+      .run(Date.now() + 60_000);
+    const startedAt = Date.now();
+    const result = state.start();
+    await until(() => state.count('intent') === 1);
+    state.kill('SIGKILL');
+    assert.equal((await result).signal, 'SIGKILL');
+    const intent = intentRow(state);
+    assert.match(intent.token, /^deploy-intent-/);
+    assert.ok(intent.lease_until <= Date.now() + 2000);
+    assert.ok(intent.lease_until >= startedAt);
+  }
+);
+
 const PAUSE_TOKEN = 'operator-pause-fixture-secret';
 
 function pause(state, token = PAUSE_TOKEN, leaseUntil = Date.now() + 3_000_000_000) {
@@ -279,12 +443,12 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER: '3',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '1500',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'verify_pause:1,test_released:1',
     });
     const db = sqliteD1(state.db);
     await scheduleRunChunks(db, {
       runId: 'fixture-run',
-      entries: [{ model: 'claimable/model', variant: '', providers: ['deepinfra'] }],
+      entries: [{ model: 'claimable/model', variant: '' }],
       repetitions: 1,
       caseIds: ['case'],
       chunkSize: 1,
@@ -297,6 +461,7 @@ test(
       await claimScheduledChunks(db, schedulerConfig('{"slots":8}'), Date.now(), 'contender'),
       []
     );
+    state.mark('test_released');
     const finished = await result;
     assert.equal(finished.code, 0, finished.stdout);
     assert.deepEqual({ ...state.lock() }, held);
@@ -333,7 +498,7 @@ for (const [checkpoint, change, reason] of [
         BENCHMARK_DEPLOY_FIXTURE_PAUSE_CHANGE_AT: checkpoint,
         BENCHMARK_DEPLOY_FIXTURE_PAUSE_CHANGE: change,
         BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER: '3',
-        BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: checkpoint === 'deploy' ? '5000' : '0',
+        ...(checkpoint === 'deploy' ? { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'never' } : {}),
       });
       state.addLive();
       pause(state);
@@ -367,7 +532,7 @@ for (const token of [
     `treats unexpired owner ${token} as contention, not an operator pause`,
     { timeout: 15_000 },
     async t => {
-      const state = fixture(t);
+      const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '500' });
       const held = pause(state, token, Date.now() + 60_000);
       const result = await state.start();
       failed(result, 'lock_timeout');
@@ -409,12 +574,487 @@ test(
 );
 
 test(
-  'renews the lease while draining and throughout a long deployment',
+  'a queued claim whose queue lease expired does not hold the drain',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    state.addChunk('undelivered-claim', 'queued', 0, Date.now() - 1_000);
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('drain'), 1);
+    assert.equal(state.count('deploy_completed'), 1);
+    assert.equal(state.count('unguarded_deploy'), 0);
+    assert.equal(
+      state.db.prepare("SELECT status FROM scheduler_chunks WHERE id = 'undelivered-claim'").get()
+        .status,
+      'queued'
+    );
+    assert.ok(
+      diagnostics(result).some(
+        row =>
+          row.event === 'benchmark_deploy_drain_progress' &&
+          row.queued === 0 &&
+          row.active === 0 &&
+          row.expired === 1
+      )
+    );
+    released(state);
+  }
+);
+
+test(
+  'a queued claim with a live queue lease holds the drain until it times out',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_DRAIN_TIMEOUT_MS: '400' });
+    state.addChunk('delivering-claim', 'queued', 0, Date.now() + 60_000);
+    const result = await state.start();
+    failed(result, 'drain_timeout');
+    assert.equal(state.count('migrations'), 0);
+    assert.equal(state.count('deploy_started'), 0);
+    released(state);
+  }
+);
+
+const CONTAINER_MARKER = /^container-inputs:[0-9a-f]{64}$/;
+
+test(
+  'rolls containers on an unmarked deployment, then skips the rollout when container inputs are unchanged',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '2' });
+    const first = await state.start();
+    assert.equal(first.code, 0, first.stdout);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.count('deploy_containers_none'), 0);
+    const [marker] = state.deployedMessages();
+    assert.match(marker, CONTAINER_MARKER);
+    assert.ok(
+      diagnostics(first).some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'unknown'
+      )
+    );
+
+    const second = await state.start();
+    assert.equal(second.code, 0, second.stdout);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.deepEqual(state.deployedMessages(), [marker, marker]);
+    assert.ok(
+      diagnostics(second).some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'unchanged'
+      )
+    );
+    assert.equal(state.count('unguarded_deploy'), 0);
+    released(state);
+  }
+);
+
+test(
+  'rolls containers when the rolled-out version carries different container inputs',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.count('deploy_containers_none'), 0);
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'changed'
+      )
+    );
+  }
+);
+
+test(
+  're-runs the container rollout once when the Worker is live but the rollout did not apply',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'once' });
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows.filter(row => row.event === 'benchmark_deploy_half_applied').map(row => row.rollout),
+      ['rerun', 'rerun-ok']
+    );
+    assert.equal(state.count('deploy_half_applied'), 1);
+    assert.equal(state.count('deploy_completed'), 1);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+    released(state);
+
+    const next = await state.start();
+    assert.equal(next.code, 0, next.stdout);
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+  }
+);
+
+test(
+  'reports a failed rollout re-run and does not let the next deploy trust the marker',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'always' });
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows.filter(row => row.event === 'benchmark_deploy_half_applied').map(row => row.rollout),
+      ['rerun', 'rerun-failed']
+    );
+    assert.equal(state.count('deploy_completed'), 0);
+    released(state);
+
+    const next = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: '' });
+    assert.equal(next.code, 0, next.stdout);
+    const nextRows = diagnostics(next);
+    assert.ok(
+      nextRows.some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed !== 'unchanged'
+      )
+    );
+    assert.equal(state.count('deploy_containers_none'), 0);
+  }
+);
+
+test(
+  'does not re-run the rollout when the applied container state is unknown',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'once',
+      BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'missing',
+    });
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows
+        .filter(row => row.event === 'benchmark_deploy_deploy_failure_state')
+        .map(row => ({ live: row.live, applied: row.applied })),
+      [{ live: 'ours', applied: 'unknown' }]
+    );
+    assert.equal(rows.filter(row => row.event === 'benchmark_deploy_half_applied').length, 0);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.deployedMessages().length, 1);
+    released(state);
+  }
+);
+
+test(
+  'does not trust the marker of a deploy whose image never reached the containers',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
+    const failedRun = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_IMAGE_PUSH_FAIL: '1' });
+    assert.equal(failedRun.code, 1);
+    assert.match(state.deployedMessages().at(-1), CONTAINER_MARKER);
+    diagnostics(failedRun, { commandOutput: true });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('deploy_containers_configured'), 3);
+    assert.equal(state.count('deploy_containers_none'), 0);
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'changed'
+      )
+    );
+    released(state);
+  }
+);
+
+test(
+  'container inputs change with the image build context and the containers configuration only',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t);
+    const copy = packageCopy(t);
+    const deploy = async () => {
+      const result = await state.start([], {}, copy.script);
+      assert.equal(result.code, 0, result.stdout);
+      return state.deployedMessages().at(-1);
+    };
+    const original = await deploy();
+    assert.match(original, CONTAINER_MARKER);
+
+    copy.edit('wrangler.jsonc', text =>
+      text.replace('"compatibility_date"', '"keep_vars": true,\n  "compatibility_date"')
+    );
+    assert.equal(await deploy(), original);
+    assert.equal(state.count('deploy_containers_none'), 1);
+
+    copy.edit('container/server.mjs', text => `${text}\n// changed\n`);
+    const serverChanged = await deploy();
+    assert.notEqual(serverChanged, original);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+
+    copy.edit('wrangler.jsonc', text =>
+      text.replace('"max_instances": 250', '"max_instances": 249')
+    );
+    const configChanged = await deploy();
+    assert.notEqual(configChanged, serverChanged);
+    assert.equal(state.count('deploy_containers_configured'), 3);
+    assert.equal(state.count('deploy_containers_none'), 1);
+  }
+);
+
+test(
+  'container inputs follow a Dockerfile that sits outside its build context',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t);
+    const copy = packageCopy(t);
+    copy.move('container/Dockerfile', 'docker/Dockerfile');
+    copy.edit('wrangler.jsonc', text =>
+      text.replace(
+        '"image": "./container/Dockerfile",',
+        '"image": "./docker/Dockerfile",\n      "image_build_context": "./container",'
+      )
+    );
+    const deploy = async () => {
+      const result = await state.start([], {}, copy.script);
+      assert.equal(result.code, 0, result.stdout);
+      return state.deployedMessages().at(-1);
+    };
+    const original = await deploy();
+    assert.equal(await deploy(), original);
+    assert.equal(state.count('deploy_containers_none'), 1);
+
+    copy.edit('docker/Dockerfile', text => `${text}\n# changed\n`);
+    assert.notEqual(await deploy(), original);
+    assert.equal(state.count('deploy_containers_configured'), 2);
+    assert.equal(state.count('deploy_containers_none'), 1);
+  }
+);
+
+for (const [name, rolledOutMessage, runEnv] of [
+  ['the deployment list fails', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'fail' }],
+  ['the deployment list is malformed', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'malformed' }],
+  ['traffic was split across versions', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'split' }],
+  [
+    'the container listing fails',
+    true,
+    { BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'fail', BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '300' },
+  ],
+  [
+    'the container application is missing',
+    true,
+    { BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'missing' },
+  ],
+  ['the rolled-out version has no message', null, {}],
+  ['the rolled-out version has an unrelated message', 'Automatic deployment on upload.', {}],
+]) {
+  test(
+    `rolls containers when the deployed container inputs are unknown because ${name}`,
+    { timeout: 15_000 },
+    async t => {
+      const state = fixture(t);
+      const first = await state.start();
+      assert.equal(first.code, 0, first.stdout);
+      const [marker] = state.deployedMessages();
+      state.rollOut(rolledOutMessage === true ? marker : rolledOutMessage);
+      const result = await state.start([], runEnv);
+      assert.equal(result.code, 0, result.stdout);
+      assert.equal(state.count('deploy_containers_configured'), 2);
+      assert.equal(state.count('deploy_containers_none'), 0);
+      assert.equal(state.count('acquire'), 2);
+      assert.equal(state.count('migrations'), 2);
+      assert.ok(
+        diagnostics(result).some(
+          row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'unknown'
+        )
+      );
+    }
+  );
+}
+
+test(
+  'deploys without draining or taking the dispatch lease when container inputs and migrations are unchanged',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    assert.equal((await state.start()).code, 0);
+    const acquired = state.count('acquire');
+    const drained = state.count('drain');
+    const polled = state.count('rollout_poll');
+    state.addLive();
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('acquire'), acquired);
+    assert.equal(state.count('drain'), drained);
+    assert.equal(state.count('migrations'), 1);
+    assert.equal(state.count('drainless_deploy'), 1);
+    assert.equal(state.count('unguarded_deploy'), 0);
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.equal(state.count('rollout_poll'), polled);
+    assert.deepEqual(
+      state.db
+        .prepare(
+          "SELECT status FROM scheduler_chunks WHERE id IN ('queued-chunk', 'active-chunk') ORDER BY id"
+        )
+        .all()
+        .map(row => row.status),
+      ['active', 'queued']
+    );
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_started' && row.drain === 'skipped'
+      )
+    );
+    released(state);
+  }
+);
+
+test(
+  'drains under the lease when a migration is pending even though container inputs are unchanged',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER: '3' });
+    assert.equal((await state.start()).code, 0);
+    state.db.exec('DELETE FROM d1_migrations WHERE id = (SELECT MAX(id) FROM d1_migrations)');
+    state.addLive();
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('acquire'), 2);
+    assert.equal(state.count('migrations'), 2);
+    assert.ok(state.events().lastIndexOf('migrations') > state.events().lastIndexOf('drain'));
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.equal(state.count('drainless_deploy'), 0);
+    assert.equal(state.count('unguarded_deploy'), 0);
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_migrations_pending' && row.pending === 1
+      )
+    );
+    released(state);
+  }
+);
+
+for (const [name, runEnv] of [
+  ['cannot be read', { BENCHMARK_DEPLOY_FIXTURE_APPLIED_MIGRATIONS: 'fail' }],
+  ['are malformed', { BENCHMARK_DEPLOY_FIXTURE_BAD_JSON: 'applied_migrations' }],
+]) {
+  test(`drains under the lease when applied migrations ${name}`, { timeout: 15_000 }, async t => {
+    const state = fixture(t);
+    assert.equal((await state.start()).code, 0);
+    const result = await state.start([], runEnv);
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('acquire'), 2);
+    assert.equal(state.count('migrations'), 2);
+    assert.equal(state.count('drainless_deploy'), 0);
+    assert.equal(state.count('unguarded_deploy'), 0);
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_migrations_pending' && row.pending === 'unknown'
+      )
+    );
+    released(state);
+  });
+}
+
+test(
+  'falls back to a rolling deploy when the deploy without a container rollout fails',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    assert.equal((await state.start()).code, 0);
+    const result = await state.start([], { BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_NONE_FAIL: '1' });
+    assert.equal(result.code, 0, result.stdout);
+    const events = state.events();
+    assert.ok(
+      events.lastIndexOf('deploy_containers_configured') > events.indexOf('deploy_containers_none')
+    );
+    assert.equal(state.count('deploy_completed'), 2);
+    assert.ok(
+      diagnostics(result).some(row => row.event === 'benchmark_deploy_rollout_skip_failed')
+    );
+    released(state);
+  }
+);
+
+test(
+  'holds the dispatch lease until the container rollout finishes',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '3' });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    const events = state.events();
+    assert.equal(state.count('rollout_poll'), 4);
+    assert.ok(events.indexOf('rollout_poll') > events.indexOf('deploy_completed'));
+    assert.ok(events.indexOf('release') > events.lastIndexOf('rollout_poll'));
+    assert.equal(state.count('rollout_without_lease'), 0);
+    const progress = diagnostics(result)
+      .filter(row => row.event === 'benchmark_deploy_rollout_progress')
+      .map(row => row.rolling);
+    assert.deepEqual(progress, [1, 1, 1, 0]);
+    released(state);
+  }
+);
+
+test(
+  'stops waiting for a rollout at its deadline and still releases the lease',
   { timeout: 15_000 },
   async t => {
     const state = fixture(t, {
-      BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER: '12',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '2000',
+      BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '1000000',
+      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '300',
+    });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.ok(
+      diagnostics(result).some(row => row.event === 'benchmark_deploy_rollout_wait_timeout')
+    );
+    released(state);
+  }
+);
+
+test(
+  'keeps polling through unreadable rollout state until the rollout is observed finished',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_CONTAINER_INFO: 'fail:2' });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('rollout_poll'), 3);
+    const rows = diagnostics(result);
+    assert.deepEqual(
+      rows.filter(row => row.event === 'benchmark_deploy_rollout_progress').map(row => row.rolling),
+      [null, null, 0]
+    );
+    assert.ok(!rows.some(row => row.event === 'benchmark_deploy_rollout_wait_timeout'));
+    released(state);
+  }
+);
+
+test(
+  'does not wait when the container application is absent from the listing',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'missing' });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('rollout_poll'), 0);
+    assert.ok(
+      diagnostics(result).some(row => row.event === 'benchmark_deploy_rollout_unobservable')
+    );
+    released(state);
+  }
+);
+
+test(
+  'renews the lease while draining and throughout a long deployment',
+  { timeout: 60_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_DEPLOY_TIMEOUT_MS: '30000',
+      BENCHMARK_DEPLOY_FIXTURE_DRAIN_UNTIL: 'renew:1',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'renew:2',
     });
     state.addLive();
     const result = await state.start();
@@ -438,7 +1078,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_RENEW_FAILURES_DURING_DEPLOY: '2',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '2500',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'renew:3',
     });
     const result = await state.start();
     assert.equal(result.code, 0, result.stdout);
@@ -493,24 +1133,51 @@ test(
 );
 
 test(
-  'releases the dispatch lease when deployment fails without exposing command output',
+  'prints the last wrangler output with secrets redacted when the deploy command fails',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_FAIL: '1' });
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_FAIL: '1',
+      BENCHMARK_DEPLOY_FIXTURE_SECRET: 'fixture-secret-value-9f3c',
+    });
     const result = await state.start();
-    failed(result, 'command_failed');
+    failed(result, 'command_failed', { commandOutput: true });
+    assert.match(result.stderr, /token='\[redacted\]'/);
+    assert.match(result.stderr, /CLOUDFLARE_API_TOKEN=\[redacted\]/);
+    assert.match(result.stderr, /authorization=\[redacted\]/);
+    assert.match(result.stderr, /--- end wrangler output ---/);
     assert.equal(state.count('deploy_failed'), 1);
     released(state);
   }
 );
 
-test('does not deploy when migrations fail', { timeout: 15_000 }, async t => {
-  const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_MIGRATION_FAIL: '1' });
-  const result = await state.start();
-  failed(result, 'command_failed');
-  assert.equal(state.count('deploy_started'), 0);
-  released(state);
-});
+test(
+  'does not deploy and prints redacted output when migrations fail',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_MIGRATION_FAIL: '1',
+      BENCHMARK_DEPLOY_FIXTURE_SECRET: 'fixture-secret-value-9f3c',
+    });
+    const result = await state.start();
+    failed(result, 'command_failed', { commandOutput: true });
+    assert.equal(state.count('deploy_started'), 0);
+    released(state);
+  }
+);
+
+test(
+  'keeps a successful deploy quiet and does not print command output',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.doesNotMatch(result.stderr, /--- wrangler/);
+    diagnostics(result);
+    released(state);
+  }
+);
 
 test('lease loss before migrations prevents any deployment work', { timeout: 15_000 }, async t => {
   const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_LOSE_ON_RENEW: '1' });
@@ -540,7 +1207,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_LOSE_DURING_DEPLOY: '1',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '5000',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'never',
     });
     const result = await state.start();
     failed(result, 'lease_lost');
@@ -557,7 +1224,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_RENEW_DELAY_MS: '5000',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '5000',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'never',
     });
     const result = await state.start();
     failed(result, 'lease_lost');
@@ -579,7 +1246,7 @@ test(
   'handles interruption by aborting deployment and releasing its lease',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '5000' });
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'never' });
     const result = state.start();
     await until(() => state.count('deploy_started') === 1);
     state.kill('SIGTERM');

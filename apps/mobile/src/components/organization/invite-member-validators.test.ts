@@ -99,6 +99,19 @@ describe('inviteErrorCopy', () => {
     });
   });
 
+  it('names the unavailable organization on the form', () => {
+    // `organizations.members.invite` answers NOT_FOUND when the organization
+    // row is deleted or was never there, so the sheet must not keep offering
+    // Send as though the address were the problem.
+    const error = Object.assign(new Error('This organization is no longer available'), {
+      data: { code: 'NOT_FOUND' },
+    });
+    expect(inviteErrorCopy(error)).toEqual({
+      field: 'form',
+      message: i18n.t('organization.inviteMember.organizationUnavailable'),
+    });
+  });
+
   it('falls back to the generic line for every other failure', () => {
     const generic = { field: 'form', message: i18n.t('organization.inviteMember.sendError') };
     expect(inviteErrorCopy(new Error('Failed to fetch'))).toEqual(generic);

@@ -7,6 +7,40 @@ import {
   OrganizationGroupPoliciesSchema,
   type OrganizationGroupPolicies,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import type { organization_group_policy_settings } from '@kilocode/db/schema';
+
+export type OrganizationGroupPolicySettingsRow =
+  typeof organization_group_policy_settings.$inferSelect;
+
+export type CanonicalOrganizationGroupPolicySettings = {
+  defaultPolicies: OrganizationGroupPolicies;
+  policyRevision: number;
+};
+
+/**
+ * The canonical view of an organization's group-policy settings: the stored
+ * row, or the defaults at revision 0 when the organization has none yet. The
+ * read path and the mutation wrapper share it so they cannot disagree about
+ * the defaults or the parse options.
+ */
+export function canonicalSettingsFrom(
+  settings: OrganizationGroupPolicySettingsRow | undefined,
+  organizationId: string
+): CanonicalOrganizationGroupPolicySettings {
+  if (!settings) {
+    return {
+      defaultPolicies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
+      policyRevision: 0,
+    };
+  }
+  return {
+    defaultPolicies: parseOrganizationGroupPolicies(settings.default_policies, {
+      organizationId,
+      source: 'default',
+    }),
+    policyRevision: settings.policy_revision,
+  };
+}
 
 /**
  * Policies an organization without a settings row is evaluated against, and the
@@ -20,7 +54,19 @@ export function parseOrganizationGroupPolicies(
   value: unknown,
   context: { organizationId: string; groupId?: string; source: 'group' | 'default' }
 ): OrganizationGroupPolicies {
-  const parsed = OrganizationGroupPoliciesSchema.safeParse(value);
+  const parsed = OrganizationGroupPoliciesSchema.safeParse(
+    Array.isArray(value)
+      ? value.filter(
+          (policy: unknown) =>
+            !(
+              typeof policy === 'object' &&
+              policy !== null &&
+              'type' in policy &&
+              policy.type === 'client_access'
+            )
+        )
+      : value
+  );
   if (!parsed.success) {
     captureException(parsed.error, {
       tags: { domain: 'organization-groups', source: context.source },

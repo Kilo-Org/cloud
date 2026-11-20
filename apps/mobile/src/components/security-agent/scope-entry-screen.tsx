@@ -19,7 +19,10 @@ import {
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -39,19 +42,21 @@ import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access
  * resolved config already points at a setup state; an unanswered config paints
  * the dashboard frame instead (`DashboardLoadingView`).
  *
- * Sizes are the loaded state's, in px: the `ShieldCheck` mark, the `text-base`
- * title line, two `text-sm` description lines, the `mt-3` the button carries,
- * and the button's `min-h-[44px]` default at the shared `rounded-md`.
+ * Frames come from the spacing scale, not hand-picked pixels: the `ShieldCheck`
+ * bubble, the title line, two description lines, and the state action's own
+ * box — `STATE_ACTION_CLASS`, the frame the loaded `StateAction` paints — at
+ * the shared control radius. A shorter bar sat 12dp above the action the swap
+ * then draws.
  */
 function ScopeEntryBodySkeleton() {
   return (
-    <View className="flex-1 items-center justify-center px-6">
-      <View className="w-full items-center gap-3">
-        <Skeleton className="size-[28px] rounded-full" />
-        <Skeleton className="h-[20px] w-40 rounded" />
-        <Skeleton className="h-[14px] w-full rounded" />
-        <Skeleton className="h-[14px] w-2/3 rounded" />
-        <Skeleton className="mt-3 h-[44px] w-full rounded-md" />
+    <View className={cn('flex-1 items-center justify-center', SCREEN_GUTTER_CLASS)}>
+      <View className="w-full items-center gap-4">
+        <Skeleton className="size-14 rounded-full" />
+        <Skeleton className="h-6 w-40 rounded" />
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-4 w-2/3 rounded" />
+        <Skeleton className={cn(STATE_ACTION_CLASS, 'mt-3 w-36 rounded-md')} />
       </View>
     </View>
   );
@@ -62,7 +67,7 @@ function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
   const scopeTitle = useSecurityScopeTitle(scope);
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={scopeTitle} eyebrow={t('common.securityAgent')} />
+      <ScreenHeader title={t('common.securityAgent')} subtitle={scopeTitle} />
       <ScopeEntryBodySkeleton />
     </View>
   );
@@ -214,8 +219,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (view === 'denied') {
     return (
       <ScopeAccessDeniedScreen
-        title={scopeTitle}
-        eyebrow={t('common.securityAgent')}
+        title={t('common.securityAgent')}
+        subtitle={scopeTitle}
         kind={access === 'not-found' ? 'not-found' : 'denied'}
         onRetry={() => void recovery.retry()}
         isRetrying={recovery.isRetrying}
@@ -275,8 +280,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     });
     return (
       <PlatformErrorScreen
-        title={scopeTitle}
-        eyebrow={t('common.securityAgent')}
+        title={t('common.securityAgent')}
+        subtitle={scopeTitle}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
         variant={failure.variant}
         message={failure.descriptionKey ? t(failure.descriptionKey) : undefined}
@@ -300,13 +305,18 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // A failed or pending mount-time mint keeps this setup screen up; the
       // button resolves (re-mints) the URL on press. An error-only page here
       // made the landing permanently unusable on a transient backend failure.
+      //
+      // The audit action resolves after the capability read, so the band is
+      // reserved at its height from the first frame: the icon cannot grow the
+      // header when it lands.
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            className="px-6"
-            title={scopeTitle}
-            eyebrow={t('common.securityAgent')}
+            title={t('common.securityAgent')}
+            subtitle={scopeTitle}
             headerRight={auditAction}
+            headerRightWidth={48}
+            reserveHeaderRightSpace
           />
           {!connectUrl && isMinting ? (
             <ScopeEntryBodySkeleton />
@@ -344,10 +354,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            className="px-6"
-            title={scopeTitle}
-            eyebrow={t('common.securityAgent')}
+            title={t('common.securityAgent')}
+            subtitle={scopeTitle}
             headerRight={auditAction}
+            headerRightWidth={48}
+            reserveHeaderRightSpace
           />
           {!reauthUrl && !connectUrl && isMinting ? (
             <ScopeEntryBodySkeleton />

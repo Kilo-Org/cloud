@@ -3282,6 +3282,8 @@ describe('SandboxContainers runtime release start', () => {
 const BUILDER_RUNNER = { url: 'https://worker.example/b', credential: 'builder-credential' };
 
 function launchBuilder(instance: SandboxContainers, ref: string, extra = {}) {
+  const ctx = (instance as unknown as { ctx: { exports?: { ContainersOutbound?: unknown } } }).ctx;
+  if (!ctx.exports?.ContainersOutbound) attachOutbound(instance);
   return instance.launchBuilder({
     command: { argv: [RUNTIME_BUN_PATH, ENVIRONMENT_BUILDER_PATH] },
     allocationRef: ref,
@@ -3293,6 +3295,39 @@ function launchBuilder(instance: SandboxContainers, ref: string, extra = {}) {
 }
 
 describe('SandboxContainers environment builder', () => {
+  it('does not change interception before confirming ownership', async () => {
+    const { instance } = setup({ running: true });
+    const outbound = attachOutbound(instance);
+    await expect(
+      launchBuilder(instance, REF_A, { networkSecretHosts: ['api.example.com'] })
+    ).rejects.toThrow('unowned running container');
+    expect(outbound).not.toHaveBeenCalled();
+  });
+  it('trusts interception after a refused secret build is replaced by a build without secrets', async () => {
+    const { instance, container } = setup();
+    container.startBehavior = 'reject';
+    await expect(
+      launchBuilder(instance, REF_A, { networkSecretHosts: ['api.example.com'] })
+    ).rejects.toThrow('container start failed');
+    container.startBehavior = 'ok';
+    await launchBuilder(instance, REF_B);
+    expect(container.startCalls.at(-1)?.env).toMatchObject({
+      SANDBOX_INTERCEPT_HTTPS: '1',
+      NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+    });
+  });
+  it('installs the shared outbound proxy and CA environment before a network-secret build starts', async () => {
+    const { instance, container } = setup();
+    const outbound = attachOutbound(instance);
+    await launchBuilder(instance, REF_A, { networkSecretHosts: ['api.example.com'] });
+    expect(container.calls.slice(0, 3)).toEqual(['https-intercept', 'http-intercept', 'start']);
+    expect(outbound).toHaveBeenCalledWith({ props: { containerId: 'do-id' } });
+    expect(container.startCalls[0].env).toMatchObject({
+      SANDBOX_INTERCEPT_HTTPS: '1',
+      NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+    });
+    expect(JSON.stringify(container.startCalls[0])).not.toContain('api.example.com');
+  });
   it('starts the builder from runtime-free with internet egress', async () => {
     const { instance, container, readRecord } = setup();
     const outbound = attachOutbound(instance);
@@ -3307,7 +3342,11 @@ describe('SandboxContainers environment builder', () => {
       enableInternet: true,
       entrypoint: [RUNTIME_BUN_PATH, ENVIRONMENT_BUILDER_PATH],
       // A snapshot keeps the start env, so the runner never travels in it.
-      env: { ...NATIVE_GATE_ENV },
+      env: {
+        ...NATIVE_GATE_ENV,
+        SANDBOX_INTERCEPT_HTTPS: '1',
+        NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+      },
     });
     const delivery = container.execCalls.at(-1);
     expect(delivery?.cmd.slice(0, 2)).toEqual(['/bin/sh', '-c']);
@@ -3317,7 +3356,7 @@ describe('SandboxContainers environment builder', () => {
     expect(delivery?.options?.env).toEqual({
       KILO_BUILDER_RUNNER: JSON.stringify(BUILDER_RUNNER),
     });
-    expect(outbound).not.toHaveBeenCalled();
+    expect(outbound).toHaveBeenCalledOnce();
     expect(readRecord()).toMatchObject({
       state: 'running',
       allocationRef: REF_A,

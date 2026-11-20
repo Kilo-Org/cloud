@@ -10,7 +10,7 @@ import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/co
 import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';
-import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
+import { type TrialRefusalBillingStep, trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** The server's denial message for an organization the caller cannot use. */
@@ -29,6 +29,9 @@ export const ORGANIZATION_TRIAL_EXPIRED_MESSAGE = 'Organization trial has expire
 /** `organizations.members.invite`: the address already belongs to a member. */
 export const ORGANIZATION_MEMBER_EXISTS_MESSAGE =
   'This user is already a member of this organization';
+
+/** `organizations.members.invite`: the organization row is deleted or never existed. */
+const ORGANIZATION_MISSING_MESSAGE = 'This organization is no longer available';
 
 /** `organizations.members.invite`: an invitation for the address is outstanding. */
 export const ORGANIZATION_PENDING_INVITATION_MESSAGE =
@@ -66,11 +69,17 @@ const CLONE_STAGING_FAILED_MESSAGE = 'clone_setup_failed';
  * has none. A `switch` keeps the mapping exhaustive and typo-free without an
  * open string dictionary.
  *
- * `canManageBilling` reaches the one sentence whose explanation depends on the
- * reader: the trial refusal offers the plan step to a role that can take it and
- * names the owner who can to everyone else.
+ * `canManageBilling` and `billingStep` reach the one sentence whose explanation
+ * depends on the reader: the trial refusal offers the plan step to a role that
+ * can take it when the surface pairs one with the copy, names the destination
+ * when the surface cannot render the step, and names the owner who can to
+ * everyone else.
  */
-function copyKeyFor(message: string, canManageBilling: boolean): string | undefined {
+function copyKeyFor(
+  message: string,
+  canManageBilling: boolean,
+  billingStep: TrialRefusalBillingStep
+): string | undefined {
   switch (message) {
     case ORGANIZATION_ACCESS_MESSAGE: {
       return 'agentChat.newSession.checkOrganizationAccess';
@@ -79,7 +88,7 @@ function copyKeyFor(message: string, canManageBilling: boolean): string | undefi
       return 'agentChat.session.modelUnavailable';
     }
     case ORGANIZATION_TRIAL_EXPIRED_MESSAGE: {
-      return trialRefusalCopyKey(canManageBilling);
+      return trialRefusalCopyKey(canManageBilling, billingStep);
     }
     case ORGANIZATION_MEMBER_EXISTS_MESSAGE: {
       return 'organization.inviteMember.alreadyMember';
@@ -89,6 +98,9 @@ function copyKeyFor(message: string, canManageBilling: boolean): string | undefi
     }
     case ORGANIZATION_PENDING_INVITATION_MESSAGE: {
       return 'organization.inviteMember.pendingInvitation';
+    }
+    case ORGANIZATION_MISSING_MESSAGE: {
+      return 'organization.inviteMember.organizationUnavailable';
     }
     case ORGANIZATION_SELF_ROLE_MESSAGE: {
       return 'organization.members.ownRoleChange';
@@ -152,12 +164,16 @@ function copyKeyFor(message: string, canManageBilling: boolean): string | undefi
  * change) keep the key; everything that renders once reads
  * `knownServerErrorMessage`.
  *
- * `canManageBilling` selects the reader's copy for the trial refusal; every
- * other sentence has one explanation and ignores it.
+ * `canManageBilling` and `billingStep` select the reader's copy for the trial
+ * refusal; every other sentence has one explanation and ignores them.
  */
-export function knownServerErrorCopyKey(error: unknown, canManageBilling = false): string | null {
+export function knownServerErrorCopyKey(
+  error: unknown,
+  canManageBilling = false,
+  billingStep: TrialRefusalBillingStep = 'offered'
+): string | null {
   const message = readTrpcErrorField(error, 'message');
-  return message == null ? null : (copyKeyFor(message, canManageBilling) ?? null);
+  return message == null ? null : (copyKeyFor(message, canManageBilling, billingStep) ?? null);
 }
 
 /**
@@ -173,8 +189,12 @@ export function isTrialExpiredRefusal(error: unknown): boolean {
  * The localized copy for a server rejection the app knows how to explain, or
  * `null` when it carries no explanation of its own.
  */
-export function knownServerErrorMessage(error: unknown, canManageBilling = false): string | null {
-  const key = knownServerErrorCopyKey(error, canManageBilling);
+export function knownServerErrorMessage(
+  error: unknown,
+  canManageBilling = false,
+  billingStep: TrialRefusalBillingStep = 'offered'
+): string | null {
+  const key = knownServerErrorCopyKey(error, canManageBilling, billingStep);
   return key == null ? null : i18n.t(key);
 }
 
@@ -183,6 +203,13 @@ export function knownServerErrorMessage(error: unknown, canManageBilling = false
  * server sentence gets its own explanation, everything else the generic line.
  * Organization surfaces call this instead of reading `error.message`.
  */
-export function organizationErrorMessage(error: unknown, canManageBilling = false): string {
-  return knownServerErrorMessage(error, canManageBilling) ?? i18n.t('common.somethingWentWrong');
+export function organizationErrorMessage(
+  error: unknown,
+  canManageBilling = false,
+  billingStep: TrialRefusalBillingStep = 'offered'
+): string {
+  return (
+    knownServerErrorMessage(error, canManageBilling, billingStep) ??
+    i18n.t('common.somethingWentWrong')
+  );
 }

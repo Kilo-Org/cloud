@@ -29,6 +29,7 @@ vi.mock('react-native', async () => {
     Platform: { OS: 'ios' },
     Pressable: 'Pressable',
     View: 'View',
+    useColorScheme: () => 'light',
     ScrollView: forwardRef(function ScrollViewStub(
       props: { children?: ReactNode },
       ref: Ref<{ scrollTo: typeof h.scrollTo }>

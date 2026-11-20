@@ -199,12 +199,12 @@ describe('SessionPrBadge mounted', () => {
     mocks.openExternalUrl.mockClear();
   });
 
-  it('reserves a 52pt skeleton while loading', async () => {
+  it('reserves a compact skeleton while loading', async () => {
     const renderer = await renderBadge({ pr: null, loading: true });
 
     const skeletons = findHost(renderer.root, 'Skeleton');
     expect(skeletons).toHaveLength(1);
-    expect(skeletons[0]?.props.className).toContain('w-[52px]');
+    expect(skeletons[0]?.props.className).toContain('w-14');
   });
 
   it('renders nothing after the fetch when there is no PR', async () => {

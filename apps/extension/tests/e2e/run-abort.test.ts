@@ -90,7 +90,11 @@ test('closing the selected tab aborts a running request', async () => {
     await expect(sidePanel.getByLabel('Target tab')).toContainText('No tab selected');
     await expect.poll(() => wasChatCompletionAborted(sidePanel)).toBe(true);
     releaseCompletion();
-    await expect(sidePanel.getByText('Stopped.')).toBeVisible();
+    // The user stopped nothing: the turn must say the target went away and what to do next.
+    await expect(
+      sidePanel.getByText('The tab you picked closed or is no longer available', { exact: false })
+    ).toBeVisible();
+    await expect(sidePanel.getByText('Stopped.', { exact: true })).toHaveCount(0);
   } finally {
     releaseCompletion();
     await context.close();

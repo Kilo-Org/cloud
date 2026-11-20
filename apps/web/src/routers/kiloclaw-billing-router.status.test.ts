@@ -26,6 +26,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { KiloPassTier, KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
@@ -1078,6 +1079,52 @@ describe('subscription center procedures', () => {
     );
   });
 
+  it('Stripe guard cancels a final Commit row whose provider subscription already ended', async () => {
+    const { subscription } = await insertFinalCommitFixture({
+      stripeSubscriptionId: 'sub_ended_commit_guard',
+      cancelAtPeriodEnd: false,
+    });
+    const endedSubscription = makeStripeSubscription({
+      id: 'sub_ended_commit_guard',
+      metadata: { type: 'kiloclaw', plan: 'commit', kiloUserId: user.id },
+      status: 'canceled',
+      priceId: 'price_commit',
+    });
+    stripeMock.subscriptions.retrieve.mockResolvedValueOnce(endedSubscription);
+    const { enforceKiloClawCommitRetirementGuard } =
+      await import('@/lib/kiloclaw/commit-retirement');
+
+    await expect(
+      enforceKiloClawCommitRetirementGuard({
+        subscriptionId: subscription.id,
+        expectedFinalBoundary: FINAL_COMMIT_END,
+      })
+    ).resolves.toEqual({ guarded: true });
+
+    expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    expect(row).toEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        stripe_subscription_id: 'sub_ended_commit_guard',
+        cancel_at_period_end: false,
+      })
+    );
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+    expect(logs).toEqual([
+      expect.objectContaining({
+        action: 'canceled',
+        reason: 'commit_retirement_provider_subscription_ended',
+      }),
+    ]);
+  });
+
   it.each(['legacy', 'per-instance'] as const)(
     '%s reactivation schedules Standard for a final Commit term without reopening renewal',
     async mutationPath => {
@@ -1753,7 +1800,7 @@ describe('subscription center procedures', () => {
   });
 
   it.each(['legacy', 'per-instance'] as const)(
-    '%s undo clears continuation consent and conversion while preserving final-term evidence',
+    '%s undo still clears continuation consent and preserves period-end cancellation after end of life',
     async mutationPath => {
       setTestSystemTime('2026-06-07T00:00:00.000Z');
       const { instance } = await insertFinalCommitFixture();
@@ -1768,14 +1815,16 @@ describe('subscription center procedures', () => {
         .where(eq(kiloclaw_subscriptions.instance_id, instance.id));
 
       const caller = await createCallerForUser(user.id);
-      const result =
-        mutationPath === 'legacy'
-          ? await caller.kiloclaw.cancelPlanSwitch()
-          : await caller.kiloclaw.cancelPlanSwitchAtInstance({
-              instanceId: instance.id,
-            });
-
-      expect(result).toEqual({ success: true });
+      await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(
+        () => false,
+        async () => {
+          const result =
+            mutationPath === 'legacy'
+              ? await caller.kiloclaw.cancelPlanSwitch()
+              : await caller.kiloclaw.cancelPlanSwitchAtInstance({ instanceId: instance.id });
+          expect(result).toEqual({ success: true });
+        }
+      );
       const [row] = await db
         .select()
         .from(kiloclaw_subscriptions)
@@ -1790,7 +1839,42 @@ describe('subscription center procedures', () => {
     }
   );
 
-  it('canceling pending Standard-to-Commit clears only pending retirement evidence', async () => {
+  it('cannot undo a Stripe plan switch that could restore renewal after end of life', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_eol_cancel_switch',
+      plan: 'standard',
+      status: 'active',
+      stripe_schedule_id: 'sched_eol_cancel_switch',
+      scheduled_plan: 'commit',
+      scheduled_by: 'user',
+      cancel_at_period_end: true,
+    });
+    const { kiloclaw } = await createCallerForUser(user.id);
+    await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(
+      () => false,
+      async () => {
+        await expect(kiloclaw.cancelPlanSwitch()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        await expect(
+          kiloclaw.cancelPlanSwitchAtInstance({ instanceId: instance.id })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      }
+    );
+    expect(stripeMock.subscriptionSchedules.release).not.toHaveBeenCalled();
+    expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, instance.id));
+    expect(row).toMatchObject({
+      cancel_at_period_end: true,
+      stripe_schedule_id: 'sched_eol_cancel_switch',
+    });
+  });
+
+  it('allows withdrawing a local Standard-to-Commit switch after end of life', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -1800,15 +1884,23 @@ describe('subscription center procedures', () => {
       status: 'active',
       scheduled_plan: 'commit',
       scheduled_by: 'user',
+      cancel_at_period_end: true,
       current_period_start: '2026-05-01T00:00:00.000Z',
       current_period_end: '2026-06-01T00:00:00.000Z',
       credit_renewal_at: '2026-06-01T00:00:00.000Z',
     });
 
     const caller = await createCallerForUser(user.id);
-    await caller.kiloclaw.cancelPlanSwitchAtInstance({
-      instanceId: instance.id,
-    });
+    await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(
+      () => false,
+      async () => {
+        await expect(
+          caller.kiloclaw.cancelPlanSwitchAtInstance({ instanceId: instance.id })
+        ).resolves.toEqual({ success: true });
+      }
+    );
+    expect(stripeMock.subscriptionSchedules.release).not.toHaveBeenCalled();
+    expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
 
     const [row] = await db
       .select()
@@ -1818,8 +1910,11 @@ describe('subscription center procedures', () => {
       expect.objectContaining({
         plan: 'standard',
         scheduled_plan: null,
+        scheduled_by: null,
+        cancel_at_period_end: true,
       })
     );
+    expect(Date.parse(row?.current_period_end ?? '')).toBe(Date.parse('2026-06-01T00:00:00Z'));
   });
 
   it('writes changelog when canceling targeted instance plan switch', async () => {

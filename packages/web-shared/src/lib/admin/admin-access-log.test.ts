@@ -362,6 +362,46 @@ describe('kilo admin elevation telemetry', () => {
       target: 'organization:org-1',
     });
   });
+
+  test('an explicit route on a REST context wins over the route from headers', async () => {
+    await recordKiloAdminElevation(
+      {
+        user: defineTestUser({ is_admin: true }),
+        auditSurface: 'rest',
+        auditMethod: 'GET',
+        auditRoute: '/admin/api/known-path',
+        headersList: new Headers({ 'x-pathname': '/admin/api/best-effort-path' }),
+      },
+      { reason: 'organization_access_rest', target: organizationTarget('org-1') }
+    );
+
+    expect(events[0]).toMatchObject({
+      surface: 'rest',
+      kind: 'kilo_admin_elevation',
+      route: '/admin/api/known-path',
+      method: 'GET',
+      reason: 'organization_access_rest',
+      target: 'organization:org-1',
+    });
+  });
+
+  test('a request without an explicit route still falls back to headers', async () => {
+    await recordKiloAdminElevationForRequest({
+      user: defineTestUser({ is_admin: true }),
+      surface: 'rest',
+      headersList: new Headers({ 'x-pathname': '/admin/api/best-effort-path' }),
+      reason: 'organization_access_rest',
+      target: organizationTarget('org-1'),
+    });
+
+    expect(events[0]).toMatchObject({
+      surface: 'rest',
+      kind: 'kilo_admin_elevation',
+      route: '/admin/api/best-effort-path',
+      reason: 'organization_access_rest',
+      target: 'organization:org-1',
+    });
+  });
 });
 
 describe('privileged access telemetry', () => {
@@ -423,6 +463,30 @@ describe('privileged access telemetry', () => {
       kind: 'privileged_access',
       kiloUserId: null,
       email: null,
+      adminTier: null,
+      outcome: 'denied',
+    });
+  });
+
+  test('records a resolved non-admin caller by id and email but without a tier', () => {
+    const user = defineTestUser({ is_admin: false });
+
+    emitPrivilegedAccessEvent({
+      surface: 'rest',
+      user,
+      credential: 'human_bearer',
+      outcome: 'denied',
+      actionClass: 'support_read',
+      tokenSource: null,
+      route: '/admin/api/users',
+      method: null,
+      ip: null,
+    });
+
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      kiloUserId: user.id,
+      email: user.google_user_email,
       adminTier: null,
       outcome: 'denied',
     });

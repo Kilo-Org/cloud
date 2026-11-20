@@ -45,10 +45,14 @@ type SystemModelModule = InstanceType<
   // Only a module that runs the tool loop has it: Apple has it, Android does not.
   Pick<NativeModelBridge, 'resume'>;
 
-/** A provider that cannot answer its availability check is unavailable, not missing. */
+/**
+ * A provider that cannot answer its availability check is unavailable, not
+ * missing. The reason says the check failed, so its copy never claims the
+ * device cannot run the model.
+ */
 const UNANSWERED: NativeAvailability = {
   status: 'unavailable',
-  reason: 'model_unavailable',
+  reason: 'check_failed',
   modelId: '',
   contextWindow: 0,
   maxOutputTokens: 0,

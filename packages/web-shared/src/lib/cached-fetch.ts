@@ -118,7 +118,9 @@ export function createCachedFetch<T>(
         warnExceptInTest(
           `[cached-fetch] ${name} refresh failed: ${reason}; serving the ${served} value, retrying in ${failureBackoffMs}ms`
         );
-        const value = cached?.value ?? defaultValue;
+        // A cached nullish value is still the last-known-good value. Choose by cache presence, so
+        // a non-null default never replaces a successful `null` result.
+        const value = cached === null ? defaultValue : cached.value;
         cached = {
           value,
           at: Number.NEGATIVE_INFINITY,

@@ -1,10 +1,12 @@
 /* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new, promise/prefer-await-to-callbacks */
 import { chromium, expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
-import { access, mkdtemp } from 'node:fs/promises';
+import { rmSync } from 'node:fs';
+import { access, cp, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
+import { z } from 'zod';
 import {
   applyPosthogE2eBrowserWorkarounds,
   EXTENSION_E2E_LAUNCH_ARGS,
@@ -23,12 +25,14 @@ export interface FixtureServer {
 
 export const startFixtureServer = async ({
   bodyHtml,
+  host = '127.0.0.1',
   pathHtml,
   pathJson,
   pathText,
   title = 'Kilo extension fixture',
 }: {
   bodyHtml?: string;
+  host?: string;
   pathHtml?: Record<string, string>;
   pathJson?: Record<string, string>;
   pathText?: Record<string, string>;
@@ -71,7 +75,7 @@ export const startFixtureServer = async ({
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.listen(0, host, () => {
       server.off('error', reject);
       resolve();
     });
@@ -101,11 +105,123 @@ export const startFixtureServer = async ({
           resolve();
         });
       }),
-    url: `http://127.0.0.1:${address.port}`,
+    url: `http://${host}:${address.port}`,
   };
 };
 
-export const launchExtensionContext = async (): Promise<{
+const manifestSchema = z.looseObject({
+  optional_permissions: z.array(z.string()).optional(),
+  permissions: z.array(z.string()).optional(),
+});
+
+/**
+ * A copy of the built extension with these optional permissions promoted to
+ * required ones. Chrome grants a required permission at load time; an optional
+ * one needs a prompt only a human can answer, so a headless spec that needs the
+ * permission in its granted state loads this copy. The shipped manifest is not
+ * touched, and the extension code under test is byte-identical.
+ */
+const buildGrantedExtensionCopy = async (granted: readonly string[]): Promise<string> => {
+  const target = await mkdtemp(join(tmpdir(), 'kilo-extension-granted-'));
+  await cp(extensionPath, target, { recursive: true });
+  const manifestPath = join(target, 'manifest.json');
+  // Kept as written: the build's manifest carries every field Chrome needs to load it.
+  const { optional_permissions: optionalPermissions, permissions } = manifestSchema.parse(
+    JSON.parse(await readFile(manifestPath, 'utf8'))
+  );
+  const optional = (optionalPermissions ?? []).filter(name => !granted.includes(name));
+
+  await writeFile(
+    manifestPath,
+    JSON.stringify(
+      {
+        ...manifestSchema.parse(JSON.parse(await readFile(manifestPath, 'utf8'))),
+        optional_permissions: optional,
+        permissions: [...new Set([...(permissions ?? []), ...granted])],
+      },
+      null,
+      2
+    )
+  );
+
+  return target;
+};
+
+/**
+ * One copy per permission set for the whole worker: a launch reuses it instead
+ * of copying the build again, and the copies are removed when the worker exits,
+ * so a run leaves none of them behind.
+ */
+const grantedExtensionCopies = new Map<string, Promise<string>>();
+const extensionCopiesOnDisk = new Set<string>();
+
+process.once('exit', () => {
+  for (const copy of extensionCopiesOnDisk) {
+    try {
+      rmSync(copy, { force: true, recursive: true });
+    } catch {
+      // A temporary directory the system already reclaimed needs no cleanup.
+    }
+  }
+});
+
+export const copyExtensionWithGrantedPermissions = async (
+  granted: readonly string[]
+): Promise<string> => {
+  const key = [...granted].toSorted().join(',');
+  const existing = grantedExtensionCopies.get(key);
+
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const copy = (async (): Promise<string> => {
+    try {
+      return await buildGrantedExtensionCopy(granted);
+    } catch (error) {
+      // A copy that failed is not cached: the next launch retries instead of replaying this error for the worker's life.
+      grantedExtensionCopies.delete(key);
+
+      throw error;
+    }
+  })();
+
+  grantedExtensionCopies.set(key, copy);
+  extensionCopiesOnDisk.add(await copy);
+
+  return copy;
+};
+
+export const launchExtensionContext = async (
+  /**
+   * A spec that asserts on files the browser accepted passes its own directory,
+   * so "no file landed" is a real directory read rather than a Playwright event.
+   */
+  options: {
+    readonly downloadsPath?: string;
+    /**
+     * Browser switches a spec needs for the state it measures, appended to the
+     * fixture's own — the device pixel ratio a high-DPI run renders at, above all.
+     */
+    readonly extraLaunchArgs?: readonly string[];
+    /** Optional permissions Chrome cannot be asked for by automation, granted at load time in a copy of the build; `[]` loads the shipped manifest. */
+    readonly grantPermissions?: readonly string[];
+    /**
+     * Playwright's own default arguments to drop as well as `--enable-automation`.
+     * Playwright disables three throttling switches so test runs stay fast; a
+     * spec that measures what a real user's Chrome does drops them here, and a
+     * background tab is throttled the way it is in the wild.
+     */
+    readonly ignoreDefaultArgs?: readonly string[];
+    /**
+     * Playwright emulates a 1280x720 viewport at device scale factor 1 on every
+     * page it opens, which overrides the scale a browser switch asks for. `true`
+     * launches with no viewport override, so the window's own size and scale
+     * apply — the state a real user's Chrome has.
+     */
+    readonly realViewport?: boolean;
+  } = {}
+): Promise<{
   context: BrowserContext;
   extensionId: string;
   /** `/flags` and `/decide/` URLs that hit the stub (must stay empty with flags disabled). */
@@ -115,7 +231,11 @@ export const launchExtensionContext = async (): Promise<{
   userDataDir: string;
 }> => {
   const userDataDir = await mkdtemp(join(tmpdir(), 'kilo-extension-e2e-'));
-  await access(join(extensionPath, 'manifest.json'));
+  // The normal state is the optional permissions granted: the switch asks for them, and an agent page load without the guard is refused.
+  const loadedExtensionPath = await copyExtensionWithGrantedPermissions(
+    options.grantPermissions ?? ['downloads']
+  );
+  await access(join(loadedExtensionPath, 'manifest.json'));
   const isHeaded = process.env['EXTENSION_E2E_HEADED'] === '1';
 
   const executablePath = process.env['EXTENSION_E2E_EXECUTABLE_PATH'];
@@ -123,13 +243,16 @@ export const launchExtensionContext = async (): Promise<{
 
   const context = await chromium.launchPersistentContext(userDataDir, {
     args: [
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
+      `--disable-extensions-except=${loadedExtensionPath}`,
+      `--load-extension=${loadedExtensionPath}`,
       ...EXTENSION_E2E_LAUNCH_ARGS,
+      ...(options.extraLaunchArgs ?? []),
     ],
+    ...(options.downloadsPath === undefined ? {} : { downloadsPath: options.downloadsPath }),
     ...(executablePath === undefined ? { channel } : { executablePath }),
     headless: !isHeaded,
-    ignoreDefaultArgs: ['--enable-automation'],
+    ignoreDefaultArgs: ['--enable-automation', ...(options.ignoreDefaultArgs ?? [])],
+    ...(options.realViewport === true ? { viewport: null } : {}),
     userAgent: EXTENSION_E2E_USER_AGENT,
   });
 

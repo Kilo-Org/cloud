@@ -33,6 +33,7 @@ const pageQuery = vi.hoisted(() => ({
 const pageHook = vi.hoisted(() => ({
   entries: [] as unknown[],
   hasMore: false,
+  isRetentionLimited: false,
 }));
 
 const queryErrors = vi.hoisted(() => ({
@@ -54,14 +55,14 @@ const boundaryState = vi.hoisted(() => ({
 // Props each header boundary was rendered with: the boundary's own header and
 // the shared list header, which the resolved screen paints.
 const boundaryProps = vi.hoisted(() => ({
-  rendered: [] as { title?: string; reserveEyebrow?: boolean }[],
+  rendered: [] as { title?: string; reserveSubtitle?: boolean }[],
 }));
 
 const screenHeaders = vi.hoisted(() => ({
   rendered: [] as {
     title?: string;
+    subtitle?: string;
     eyebrow?: string;
-    reserveEyebrow?: boolean;
   }[],
 }));
 
@@ -97,6 +98,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     query: pageQuery,
     entries: pageHook.entries,
     hasMore: pageHook.hasMore,
+    isRetentionLimited: pageHook.isRetentionLimited,
   }),
 }));
 
@@ -134,6 +136,7 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; placement?: string }) =>
     createElement('EmptyState', props, `EMPTY_STATE:${props.title}`),
 }));
@@ -146,14 +149,14 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
-  OrganizationBoundary: (props: { title?: string; reserveEyebrow?: boolean }) => {
+  OrganizationBoundary: (props: { title?: string; reserveSubtitle?: boolean }) => {
     boundaryProps.rendered.push(props);
     return null;
   },
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
+  ScreenHeader: (props: { title?: string; subtitle?: string; eyebrow?: string }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -258,6 +261,7 @@ beforeEach(() => {
   pageQuery.fetchNextPage.mockClear();
   pageHook.entries = [];
   pageHook.hasMore = false;
+  pageHook.isRetentionLimited = false;
   queryErrors.errors = [];
   buttons.rendered = [];
   boundaryState.isResolving = false;
@@ -489,37 +493,36 @@ describe('OrganizationInvoicesScreen pagination', () => {
 });
 
 describe('OrganizationInvoicesScreen header', () => {
-  it('titles the loaded header with the organization name and keeps the screen name as its eyebrow', async () => {
+  it('titles the loaded header with the screen name and names the organization under it', async () => {
     pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
     pageHook.entries = [INVOICE];
 
     await renderScreen();
 
+    // The one two-line header the personal list uses too: the title is the
+    // screen's name and the subtitle names the scope.
     expect(screenHeaders.rendered).toHaveLength(1);
-    expect(screenHeaders.rendered[0]?.title).toBe('Acme Corp');
-    expect(screenHeaders.rendered[0]?.eyebrow).toBe(i18n.t('organization.invoices.title'));
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
+    expect(screenHeaders.rendered[0]?.subtitle).toBe('Acme Corp');
+    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
   });
 
-  it('reserves the eyebrow line on the boundary so the header keeps its height before the name arrives', async () => {
+  it('reserves the subtitle line on the boundary so the header keeps its height before the name arrives', async () => {
     boundaryState.isResolving = true;
 
     await renderScreen();
 
     // The list header is not painted yet: the boundary owns the header while the
-    // membership read resolves, and it reserves the eyebrow line for the label
+    // membership read resolves, and it reserves the subtitle line for the name
     // the resolved screen fills in.
     expect(screenHeaders.rendered).toHaveLength(0);
     expect(boundaryProps.rendered).toHaveLength(1);
     expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
-    expect(boundaryProps.rendered[0]?.reserveEyebrow).toBe(true);
-    // The reserve needs no label of its own: the eyebrow variant holds one line
-    // box for every script (`EYEBROW_LINE_HEIGHT_DP`), so the boundary hands the
-    // header its reserve alone and the swap cannot grow it.
-    expect(boundaryProps.rendered[0]).not.toHaveProperty('eyebrow');
+    expect(boundaryProps.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(boundaryProps.rendered[0]).not.toHaveProperty('subtitle');
   });
 
-  it('does not reserve the eyebrow line on a settled boundary state that never fills it', async () => {
+  it('does not reserve the subtitle line on a settled boundary state that never fills it', async () => {
     boundaryState.isResolving = false;
     boundaryState.organizationId = null;
     boundaryState.hasOrg = false;
@@ -527,11 +530,52 @@ describe('OrganizationInvoicesScreen header', () => {
     await renderScreen();
 
     // The boundary owns the header here too, but no resolved header will ever
-    // paint an eyebrow into the reserved line, so the state keeps its own
+    // paint a subtitle into the reserved line, so the state keeps its own
     // height instead of being permanently one line taller.
     expect(screenHeaders.rendered).toHaveLength(0);
     expect(boundaryProps.rendered).toHaveLength(1);
     expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
-    expect(boundaryProps.rendered[0]?.reserveEyebrow).not.toBe(true);
+    expect(boundaryProps.rendered[0]?.reserveSubtitle).not.toBe(true);
+  });
+});
+
+describe('OrganizationInvoicesScreen retention-limit footer', () => {
+  it('names the retention bound with no Load more at the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('INV-0001');
+    expect(texts).toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).not.toContain('Older invoices are available.');
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(false);
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('Older invoices are available.');
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return the bound flag next to `hasMore: true`, so
+    // force the pairing from the mock side and hold the footer to one note.
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).toContain('Older invoices are available.');
   });
 });

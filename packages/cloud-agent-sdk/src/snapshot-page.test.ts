@@ -1,5 +1,10 @@
 import type { ChatEvent } from './normalizer';
-import { replaySnapshotPage, replayStoredMessages } from './snapshot-page';
+import {
+  replaySnapshotPage,
+  replayStoredMessages,
+  SESSION_HISTORY_UNAVAILABLE_MESSAGE,
+  sessionSnapshotFailureMessage,
+} from './snapshot-page';
 import type { MessageInfo, Part, SessionSnapshot, SessionSnapshotPage, ToolPart } from './types';
 
 function storedMessage(id: string): SessionSnapshot['messages'][number] {
@@ -125,5 +130,22 @@ describe('replaySnapshotPage', () => {
     );
 
     expect(order).toEqual(['session.created', 'message.updated']);
+  });
+});
+
+describe('sessionSnapshotFailureMessage', () => {
+  it('returns kind and message for every typed page failure', () => {
+    expect(sessionSnapshotFailureMessage('retryable_failure')).toEqual({
+      kind: 'retryable_failure',
+      message: SESSION_HISTORY_UNAVAILABLE_MESSAGE,
+    });
+    expect(sessionSnapshotFailureMessage('too_large')).toEqual({
+      kind: 'too_large',
+      message: 'Session history too large to load',
+    });
+    expect(sessionSnapshotFailureMessage('invalid_data')).toEqual({
+      kind: 'invalid_data',
+      message: 'Session history is unavailable',
+    });
   });
 });

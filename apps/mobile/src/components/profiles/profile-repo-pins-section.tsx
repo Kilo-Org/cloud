@@ -13,7 +13,13 @@ import {
   repoPlatformLabelKey,
 } from '@/components/profiles/repo-bindings-model';
 import { QueryError } from '@/components/query-error';
-import { GitBranch, Link2, Plus, Trash2 } from '@/components/ui/icons';
+import { Eyebrow } from '@/components/ui/eyebrow';
+import { Link2, Trash2 } from '@/components/ui/icons';
+import { ROW_FRAME_CLASS } from '@/components/ui/row-frame';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -25,10 +31,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
-  SECTION_ACTION_BOX_CLASS,
-  SECTION_ACTION_HIT_SLOP,
-  SECTION_ACTION_ROW_CANCEL_CLASS,
-  SECTION_HEADER_ROW_PADDING_CLASS,
+  ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
@@ -37,29 +40,27 @@ function hasUsableMessage(error: unknown): boolean {
   return error instanceof Error && error.message.trim().length > 0;
 }
 
-/** A card-shaped skeleton in the same slot as the loaded pins card. */
+/** The section's label, description and first row while the bindings load. */
 function RepoPinsSkeleton() {
   return (
-    <View className="gap-3 rounded-lg border border-border p-3">
-      <View className="flex-row items-center justify-between gap-2">
-        <Skeleton className="h-4 w-40 rounded bg-muted-soft" />
-        {/* The placeholder reserves the compact box the loaded action renders, not
-            a rem-scaled height: NativeWind's 14 pt rem draws `h-7` at 24.5 dp,
-            which would let the card grow when the bindings land. */}
-        <Skeleton className={cn(SECTION_ACTION_BOX_CLASS, 'w-24 rounded-md bg-muted-soft')} />
-      </View>
-      <Skeleton className="h-4 w-full rounded bg-muted-soft" />
-      <Skeleton className="h-9 w-full rounded-md bg-muted-soft" />
+    <View className="gap-3">
+      {/* The shared header twin holds the header's own row and the action's
+          band, so the section cannot grow when the bindings land. */}
+      <SectionHeaderSkeleton action />
+      <Skeleton className="h-3 w-56 rounded bg-muted-soft" />
+      <RowGroup>
+        <RowSkeleton subtitle trailingControl />
+      </RowGroup>
     </View>
   );
 }
 
 /**
- * The `Pinned to repositories` block on the profile Overview: the repos this
- * profile is bound to, with a `Pin a repo` picker and a per-row unbind. Ports
+ * The `Pinned to repositories` section on the profile Overview: the repos this
+ * profile is bound to, with a `Pin a repo` action and a per-row unbind. Ports
  * the web `RepoPinsSection` (`ProfilesListDialog.tsx:895-1144`) to the phone:
- * tap-to-pick, no drag. The loading skeleton reserves the card's space so the
- * Overview does not jump when the bindings land.
+ * tap-to-pick, no drag. The loading skeleton reserves the section's space so
+ * the Overview does not jump when the bindings land.
  */
 export function ProfileRepoPinsSection({
   profileId,
@@ -108,127 +109,90 @@ export function ProfileRepoPinsSection({
     return <RepoPinsSkeleton />;
   }
 
-  return (
-    <View className="gap-3 rounded-lg border border-border p-3">
-      {/* The row reserves the action's hit slop as padding and cancels the same
-          amount from its own height, so the action's whole reach sits inside the
-          row that delivers its touches while the card keeps one text line. */}
-      <View
-        className={cn(
-          'flex-row items-center justify-between gap-2',
-          SECTION_HEADER_ROW_PADDING_CLASS,
-          SECTION_ACTION_ROW_CANCEL_CLASS
-        )}
-      >
-        <View className="flex-row items-center gap-2">
-          <GitBranch size={16} color={colors.mutedForeground} />
-          <Text className="text-sm font-medium text-foreground">
-            {t('profiles.repoBindings.pinnedTitle')}
-          </Text>
+  let body = null;
+  if (bindingsQuery.isError) {
+    body = (
+      <QueryError
+        variant="server"
+        placement="top"
+        title={t('profiles.loadFailed')}
+        onRetry={() => void bindingsQuery.refetch()}
+        isRetrying={bindingsQuery.isRefetching}
+      />
+    );
+  } else if (pinned.length === 0) {
+    // An empty section still draws its card: the message sits in the row the
+    // first pin would take, so the surface reads as a group with nothing in it
+    // rather than two loose lines between the cards around it.
+    body = (
+      <RowGroup>
+        <View className={ROW_FRAME_CLASS}>
+          <Text variant="caption">{t('profiles.repoBindings.pinnedEmpty')}</Text>
         </View>
-        {canManage ? (
-          <Pressable
-            className={cn(
-              SECTION_ACTION_BOX_CLASS,
-              // The outlined secondary chrome the action carried before, at the
-              // compact frame: the box holds the height, so no vertical padding,
-              // and the label is the body font the card's own rows read in.
-              'shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-border px-2.5 active:opacity-80 dark:border-neutral-700 dark:bg-secondary',
-              'bg-card shadow-sm shadow-[#0000000D]',
-              bind.isPending && 'opacity-50'
-            )}
-            hitSlop={SECTION_ACTION_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityLabel={t('profiles.repoBindings.pinRepo')}
-            accessibilityState={{ disabled: bind.isPending }}
-            disabled={bind.isPending}
-            onPress={() => {
-              setPickerOpen(true);
-            }}
+      </RowGroup>
+    );
+  } else {
+    body = (
+      <RowGroup>
+        {pinned.map(binding => (
+          <View
+            key={`${binding.repoFullName}-${binding.platform}`}
+            className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}
           >
-            <Plus size={14} color={colors.foreground} />
-            <Text className="shrink text-sm font-semibold text-foreground">
-              {t('profiles.repoBindings.pinRepo')}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <Text className="text-xs text-muted-foreground">
-        {t('profiles.repoBindings.pinnedDescription')}
-      </Text>
-
-      {bindingsQuery.isError ? (
-        <QueryError
-          variant="server"
-          placement="top"
-          title={t('profiles.loadFailed')}
-          onRetry={() => void bindingsQuery.refetch()}
-          isRetrying={bindingsQuery.isRefetching}
-        />
-      ) : null}
-
-      {!bindingsQuery.isError && pinned.length === 0 ? (
-        <Text className="text-xs italic text-muted-foreground">
-          {t('profiles.repoBindings.pinnedEmpty')}
-        </Text>
-      ) : null}
-
-      {!bindingsQuery.isError && pinned.length > 0 ? (
-        <View className="gap-1.5">
-          {pinned.map(binding => (
-            <View
-              key={`${binding.repoFullName}-${binding.platform}`}
-              className="min-h-11 flex-row items-center gap-2 rounded-md border border-border bg-background px-[16px] py-2"
+            <Link2 size={14} color={colors.mutedForeground} />
+            {/* One identity element, first, as the profile's bindings rows read:
+                the repository and its provider, then the control that unbinds it. */}
+            <ProfileRowIdentity
+              label={profileRowLabel(
+                binding.repoFullName,
+                t(repoPlatformLabelKey(binding.platform))
+              )}
             >
-              <Link2 size={14} color={colors.mutedForeground} />
-              {/* One identity element, first, as the profile's bindings rows read:
-                  the repository and its provider, then the control that unbinds it. */}
-              <ProfileRowIdentity
-                label={profileRowLabel(
-                  binding.repoFullName,
-                  t(repoPlatformLabelKey(binding.platform))
-                )}
-              >
-                <Text variant="mono" className="text-xs" numberOfLines={1}>
-                  {binding.repoFullName}
-                </Text>
-              </ProfileRowIdentity>
-              <Text
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                className="text-[10px] uppercase tracking-wider text-muted-foreground"
-              >
-                {repoPlatformBadge(binding.platform)}
+              <Text variant="mono" className="text-xs" numberOfLines={1}>
+                {binding.repoFullName}
               </Text>
-              {canManage ? (
-                <Pressable
-                  className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-[7px] active:opacity-70')}
-                  // Same compact-box geometry as the repository defaults rows:
-                  // the glyph ends 17 dp from the row's edge against the
-                  // leading icon's 16 dp inset, and the slop keeps the 48 dp
-                  // touch reach inside the row.
-                  hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('profiles.repoBindings.removeForRepo', {
-                    repo: binding.repoFullName,
-                  })}
-                  disabled={unbind.isPending}
-                  onPress={() => {
-                    void handleUnbind(
-                      binding.repoFullName,
-                      binding.platform as RepoBindingPlatform
-                    );
-                  }}
-                >
-                  <Trash2 size={16} color={colors.mutedForeground} />
-                </Pressable>
-              ) : null}
-            </View>
-          ))}
-        </View>
-      ) : null}
+            </ProfileRowIdentity>
+            <Eyebrow>{repoPlatformBadge(binding.platform)}</Eyebrow>
+            {canManage ? (
+              <Pressable
+                className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-2 active:opacity-70')}
+                // The compact box pulls its own end margin, so the glyph ends
+                // level with the leading icon's inset while the row keeps one
+                // text line; the slop carries the touch reach to 48 dp inside
+                // the row.
+                hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+                accessibilityRole="button"
+                accessibilityLabel={t('profiles.repoBindings.removeForRepo', {
+                  repo: binding.repoFullName,
+                })}
+                disabled={unbind.isPending}
+                onPress={() => {
+                  void handleUnbind(binding.repoFullName, binding.platform as RepoBindingPlatform);
+                }}
+              >
+                <Trash2 size={16} color={colors.mutedForeground} />
+              </Pressable>
+            ) : null}
+          </View>
+        ))}
+      </RowGroup>
+    );
+  }
 
+  return (
+    <Section
+      label={t('profiles.repoBindings.pinnedTitle')}
+      actionLabel={t('profiles.repoBindings.pinRepo')}
+      actionHidden={!canManage}
+      actionDisabled={bind.isPending}
+      onActionPress={() => {
+        if (!bind.isPending) {
+          setPickerOpen(true);
+        }
+      }}
+    >
+      <Text variant="caption">{t('profiles.repoBindings.pinnedDescription')}</Text>
+      {body}
       {pickerOpen ? (
         <RepoPickerSheet
           repositories={repoOptions.repositories}
@@ -246,6 +210,6 @@ export function ProfileRepoPinsSection({
           }}
         />
       ) : null}
-    </View>
+    </Section>
   );
 }

@@ -18,6 +18,16 @@ catalog:
   # the Workers runtime forbids. Pinned exactly.
   '@cfworker/json-schema': 4.1.6
   '@octokit/auth-app': 8.2.0
+  # The logs API and the logs SDK move together: the SDK declares the API at its
+  # own 0.x release, so a pair one minor apart installs a second copy of the
+  # interface the SDK implements. One catalog line per side keeps them on one
+  # release line.
+  # The pair is capped by the '@opentelemetry/core' override below at 2.8.0:
+  # sdk-logs declares core at its own release line, so a newer pair would run the
+  # SDK against a core below what it asks for. 0.219.0 is the newest release whose
+  # core is exactly 2.8.0. Move this pair together with any future core bump.
+  '@opentelemetry/api-logs': 0.219.0
+  '@opentelemetry/sdk-logs': 0.219.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
   # @sentry/cli through its Node API, which v3 broke. See the note in `overrides`.
@@ -31,6 +41,8 @@ catalog:
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260707.2
+  # vitest 4, for the workspaces that cannot run vitest 5; the `catalogs.vitest5`
+  # note below says which workspaces stay here and why.
   '@vitest/coverage-v8': 4.1.12
   '@vitest/ui': 4.1.12
   '@workos-inc/node': 12.2.0
@@ -38,9 +50,18 @@ catalog:
   dotenv: 18.0.10
   drizzle-kit: 0.31.11
   drizzle-orm: 0.45.4
+  # Named in both the web manifests and the `overrides` block below, and the
+  # overrides note there requires one reviewed version per literal: the catalog
+  # pin is that one place, so both readers take it from here.
+  form-data: 4.0.6
+  google-auth-library: 10.6.2
   hono: 4.13.16
   jose: 6.2.17
   jsonwebtoken: 9.0.3
+  # One Next release for the three apps and web-shared. web-shared must resolve
+  # the same `next` instance as apps/web for request-scoped APIs, and the
+  # `overrides` entry below forces this version tree-wide, so both read it here.
+  next: 16.4.5
   p-limit: 7.3.0
   # apps/web builds its CSS with this and the workspace override below forces one
   # copy across the tree, so both read the pin from here.
@@ -54,31 +75,58 @@ catalog:
   # its own instead of a second pin here.
   typescript: 7.0.2
   ulid: 3.0.2
+  # vitest 4; the `catalogs.vitest5` note below says which workspaces take
+  # `catalog:vitest5` instead.
   vitest: 4.1.12
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
   zod: 4.6.7
 
 catalogs:
-  # Active test stack: vitest 5 plus its companions at the same version.
-  # Workspaces still on the default `catalog:` entries above at vitest 4 are the
-  # ones that test through `@cloudflare/vitest-pool-workers` (it peers only
-  # `^4.1.0`, so vitest 5 breaks its pool) and the excluded features.
+  # Active test stack: vitest 5 plus its companions at the same version. Take it
+  # with `catalog:vitest5`.
+  # Two kinds of workspace still read the default `catalog:` pins at vitest 4:
+  # the suites whose config loads `cloudflareTest` from
+  # @cloudflare/vitest-pool-workers, which peers only `^4.1.0` and so cannot run
+  # vitest 5; and the excluded-feature and node-environment workspaces that have
+  # not moved, where nothing in the config needs vitest 4.
   vitest5:
     '@vitest/coverage-v8': 5.1.0
     '@vitest/ui': 5.1.0
     vitest: 5.1.0
 
+# Minutes. A new release must be published for this window, about 4.75 days
+# (114 hours), before the workspace installs it, so a compromised or withdrawn
+# release is caught before it is adopted.
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
+  # A dlx resolution outside this workspace, such as the Vercel CLI resolving
+  # tsx through its own backend, fails the age gate with ERR_PNPM_MISSING_TIME:
+  # pnpm needs the release dates before it can match an exact version, and that
+  # path does not carry them. Exempted by name, so the script runner and those
+  # resolutions both install.
   - tsx
+  # expo-dev-client must match the version the installed Expo SDK expects in its
+  # `bundledNativeModules` map, or `expo-doctor`, which
+  # `apps/mobile/AGENTS.md` requires after a dependency change, reports the
+  # mismatch, so it moves with the SDK before the window.
   - expo-dev-client
+  # Expo publishes these together with each SDK as transitive dependencies of
+  # expo-dev-client and its launcher, so they move with it in the same install.
   - expo-dev-launcher
   - expo-dev-menu
   - expo-dev-menu-interface
   - expo-manifests
   - expo-updates-interface
+  # Reached through expo-dev-launcher, @expo/cli, expo-router and
+  # expo-build-properties, not directly through expo-dev-client, and released
+  # with the same SDK, so it moves in that same install.
   - '@expo/schema-utils'
+  # The workspace typechecks with this native compiler preview's `tsgo` binary.
+  # Each dev build publishes its seven platform packages as optionalDependencies
+  # at that same exact version, so the set can only move together. Exempt by name
+  # rather than per version, so each bump does not have to add eight entries
+  # naming the new build.
   - '@typescript/native-preview'
   - '@typescript/native-preview-darwin-arm64'
   - '@typescript/native-preview-darwin-x64'
@@ -139,7 +187,9 @@ overrides:
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.6.2
-  next: 16.4.5
+  # Read the catalog pin: web-shared must resolve the same `next` instance as
+  # apps/web, and one literal for three apps and the shared package is the point.
+  next: 'catalog:'
   preact: 10.28.4
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20
@@ -152,18 +202,19 @@ overrides:
   # esbuild also states its upper bound; its own note says why that bound is a
   # whole minor version rather than a deeper pin.
   glob: 13.0.6
-  google-auth-library: 10.6.2
+  google-auth-library: 'catalog:'
   # The vite/vitest/storybook graph picks up this copy, so the bound names the
-  # whole current minor line. The allowBuilds entry below permits the install
-  # script, and a 0.29 release resolves only through a reviewed change here, in
-  # the lockfile, and in that entry.
+  # whole current minor line. A 0.29 release resolves only through a reviewed
+  # change here and in the lockfile. The allowBuilds entry below is a separate,
+  # version-independent decision: it permits the install script for every
+  # resolved version at once, so re-check it when this minor line moves.
   esbuild: '>=0.28.1 <0.29'
   lodash: 4.18.1
   diff: 8.0.3
   fflate@^0.4.8: 0.4.9
   fflate@^0.8.2: 0.8.3
   vite: '>=8.1.6 <8.2.0'
-  form-data: 4.0.6
+  form-data: 'catalog:'
   follow-redirects: 1.16.2
   ws@^7: 7.5.11
   ws@^8: 8.21.0
@@ -208,6 +259,10 @@ overrides:
   # future dependent, bounded to the reviewed major.
   serialize-javascript: '>=7.0.3 <8'
   hono: 'catalog:'
+  # openclaw depends on @modelcontextprotocol/sdk 1.29.0 exactly, and
+  # @google/genai then peers onto that copy; lift both onto the 1.32.2 that
+  # apps/extension and packages/harness-sdk pin so the tree keeps one MCP
+  # server. Drop the entry when openclaw's own range admits 1.32.2.
   '@modelcontextprotocol/sdk@1.29.0': 1.32.2
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
@@ -224,14 +279,25 @@ overrides:
   # no release for the advisories fixed in 6.24.0-6.28.1, so it moves to the
   # same 6.x copy as above, which also drops its @fastify/busboy dependency.
   undici@^5: 6.29.1
-  # Further vercel CLI transitives with exact vulnerable pins: @vercel/fun,
-  # @vercel/python-analysis and @vercel/backends respectively (ajv also via
-  # @vercel/static-config).
+  # Exact pins for vulnerable transitive ranges. Each range key covers every
+  # dependent that asks that range, so the list under it names the ones present
+  # today; a parent bump shows which pin to re-check. The @vercel/* parents are
+  # the CLI transitives this group was opened for.
+  #   @tootallnate/once@^2 — @vercel/fun
+  #   nanoid@^3 — eas-cli, expo-router, postcss
+  #   minimatch@^5 — eas-cli, filelist, readdir-glob
+  #   ajv@^8 — @modelcontextprotocol/sdk, @segment/ajv-human-errors,
+  #     @vercel/static-config, addons-linter, ajv-formats, ajv-keywords,
+  #     eas-cli, schema-utils
+  #   minimatch@^10 — @expo/fingerprint, @oclif/core,
+  #     @typescript-eslint/typescript-estree, @vercel/python-analysis,
+  #     @vercel/queue, glob, openclaw, test-exclude
   '@tootallnate/once@^2': 2.0.1
   minimatch@^5: 5.1.9
   nanoid@^3: 3.3.20
   ajv@^8: 8.20.0
   minimatch@^10: 10.2.6
+  # Parent-scoped because only @vercel/backends needs this fix.
   '@vercel/backends>srvx': 0.11.22
   # zod 4 below 4.6.6 grows issue lists without bound on oversized arrays.
   # Exact pins in @kilocode/plugin and the vercel CLI follow the catalog instead.
@@ -317,10 +383,15 @@ patchedDependencies:
   # A sheet whose content clears the status bar itself can say so, and then
   # Material3 stops reserving that inset: a dialog window reports it only after
   # the sheet was measured, which used to move the sheet's whole content.
+  # The version in the key must equal the `'@expo/ui'` override above.
   '@expo/ui@58.0.28': patches/@expo+ui@58.0.28.patch
   expo-dev-launcher@58.0.20: patches/expo-dev-launcher@58.0.20.patch
   # A zero badge count must not cancel every app notification: upstream called
   # cancelAll(), which removed the ongoing Active Agents card on Android.
+  # iOS holds the completion handler of a response that arrives in the
+  # background until JS calls `finishHandlingNotificationResponse` (or 25 s
+  # pass): upstream called it at once, so iOS suspended the app before an
+  # Approve or Reply action ran.
   expo-notifications@58.1.9: patches/expo-notifications@58.1.9.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — rank static-suffix siblings before catch-all index routes, and
@@ -330,6 +401,13 @@ patchedDependencies:
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@58.0.31: patches/expo-router@58.0.31.patch
   expo-widgets@58.0.28: patches/expo-widgets@58.0.28.patch
+  # Android: a shared content URI whose provider answers with no resolver, an
+  # empty cursor (a deleted media row, a revoked grant), no permission or no
+  # mime type threw on the main thread inside onNewIntent and crashed the app —
+  # or published a file entry with no path. The module now reports such a share
+  # through its onError event, which the app shows as the "Couldn't read the
+  # shared content" toast.
+  expo-share-intent@9.0.0: patches/expo-share-intent@9.0.0.patch
   # Typed-routes generation must skip colocated tests, exactly like the Metro
   # blockList in apps/mobile/metro.config.js already does for the runtime
   # bundle. A `*.test.tsx` next to a route registers as a route, and a
@@ -360,10 +438,10 @@ patchedDependencies:
   # (expo/expo#51789, expo/expo#47316).
   expo-task-manager@58.0.14: patches/expo-task-manager@58.0.14.patch
   # PurchaseConnector.create returns the native promise, so a create failure
-  # is observable. Android: compile against the project's Kotlin stdlib, not
-  # the 2.4.10 default that RN 0.86's Kotlin 2.1 compiler cannot read. The
-  # package ships TypeScript source, so its `typeof jest` guard (TS2708 here)
-  # gets a ts-ignore.
+  # is observable. Android: the package defaults kotlin-stdlib to 2.4.10, whose
+  # Kotlin 2.4 metadata RN 0.88.1's Kotlin 2.2.0 compiler rejects; take the
+  # resolved kotlinVersion instead. The package ships TypeScript source, so its
+  # `typeof jest` guard (TS2708 here) gets a ts-ignore.
   react-native-appsflyer@7.0.2-v2: patches/react-native-appsflyer@7.0.2-v2.patch
   # Android accessibility: the virtual per-paragraph nodes that EnrichedMarkdownText
   # publishes to TalkBack took their bounds from `getPrimaryHorizontal(start)` and
@@ -393,10 +471,9 @@ patchedDependencies:
   react-native-screens@4.30.1: patches/react-native-screens@4.30.1.patch
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
+  # The version in the key must equal the `stripe` catalog pin above.
   stripe@23.0.0: patches/stripe@23.0.0.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
-  # Keep lease renewal errors categorical; neither runtime may log receipt handles.
-  '@vercel/queue@0.8.0': patches/@vercel+queue@0.8.0.patch
   # Give the Apple @ExpoModule class scan 60 s instead of the hard-coded 5 s.
   # Slow macOS CI runners exceed 5 s; the configure phase then leaves modules
   # out of the modules provider and the iOS build fails. Keep src/ and build/
@@ -416,7 +493,17 @@ patchedDependencies:
   # already drew, so the parent's layout effect and the collection's commit no
   # longer re-enter each other until React's nested update limit. Remove once an
   # upstream release carries every guard.
+  # The version in the key must equal the `minimumReleaseAgeExclude` entry above.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
+  # NativeWind's `react-native` proxy names only the exports its wrapper components
+  # need; every other export, such as the `AssetRegistry` that expo-asset reads, was
+  # `undefined`, which breaks the whole module that imports it. Forward the rest from
+  # the real module. Remove once upstream forwards them itself.
+  react-native-css@3.1.0-rc.1: patches/react-native-css@3.1.0-rc.1.patch
+  # A toast's action and cancel buttons render a bare `Pressable`, so TalkBack
+  # read "Try again" as a clickable group with no role. Give the button its
+  # role. Remove once upstream sets it.
+  sonner-native@0.27.0: patches/sonner-native@0.27.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'
@@ -445,6 +532,11 @@ allowBuilds:
   # Downloads the vendored tree-sitter grammar sources and the iOS math xcframework
   # from their upstream releases; a missing manifest is a no-op.
   react-native-enriched-markdown: true
+  # Each `false` below is an explicit decision, not a default: the package's
+  # install script does not run. An entry moves to `true` only with its own
+  # note stating why running the script is safe or necessary, as the permitted
+  # entries above and below carry, and a denial is removed when nothing in the
+  # tree depends on that package.
   '@sentry/cli': false
   bufferutil: false
   core-js: false

@@ -18,7 +18,7 @@ export const maxDuration = 800;
 /**
  * Maximum duration for the Gateway listener (in ms).
  * On Vercel, this should be less than the function's maxDuration.
- * The cron job should run more frequently than this duration to ensure overlap.
+ * The schedule should run more frequently than this duration to ensure overlap.
  */
 const GATEWAY_DURATION_MS = 770 * 1000; // ~12.8 minutes (30s buffer before 800s maxDuration)
 
@@ -34,7 +34,7 @@ const FORWARD_TIMEOUT_MS = 10_000;
  * Discord Gateway listener with Postgres-based coordination.
  *
  * Architecture:
- * - This route is triggered by a cron job (every 9 minutes)
+ * - This route is triggered by a Vercel schedule (every 9 minutes)
  * - It connects to Discord's Gateway via WebSocket using discord.js
  * - Eligible bot mentions are sent to /discord/webhook for processing
  * - The listener runs for GATEWAY_DURATION_MS, then cleanly disconnects

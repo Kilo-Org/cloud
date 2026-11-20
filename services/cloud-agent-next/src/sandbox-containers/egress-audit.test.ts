@@ -83,6 +83,23 @@ function seedChunks(
 afterEach(() => vi.restoreAllMocks());
 
 describe('durable egress audit storage', () => {
+  it('stores and reloads multiple credential decisions as one request record', async () => {
+    const { store, storage, put } = storageFixture();
+    const input = request({
+      credentialDecisions: [
+        { credentialKey: 'FIRST', credentialDecision: 'substituted' },
+        { credentialKey: 'SECOND', credentialDecision: 'substituted' },
+      ],
+    });
+    await store.recordEgressRequest(input);
+    const restored = new EgressAuditStore(storage);
+    expect(await restored.getEgressAudit()).toEqual({
+      records: [{ ...input, id: 1 }],
+      nextCursor: null,
+    });
+    expect(await restored.recordEgressRequest(input)).toEqual({ ...input, id: 1 });
+    expect(put).toHaveBeenCalledOnce();
+  });
   it('persists sanitized records once with one row write per warm append and one bounded cold read', async () => {
     const { store, map, put, list, transaction } = storageFixture();
     const input = request();

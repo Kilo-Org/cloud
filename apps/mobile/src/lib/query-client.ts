@@ -141,7 +141,17 @@ function observeActiveSessionsQueryOutcomes(queryCache: QueryCache): void {
       return;
     }
     const previous = getActiveSessionsQueryMetadata(query);
-    if (event.type === 'removed') {
+    // A query reset to its initial state (`resetQueries`) holds no answer at
+    // all, so it keeps no provenance either: a surface must load again rather
+    // than present the reset cache as an accepted empty result.
+    const resetToInitial =
+      event.type === 'updated' &&
+      event.action.type === 'setState' &&
+      activeSessionsMetadata.has(query) &&
+      query.state.status === 'pending' &&
+      query.state.dataUpdatedAt === 0 &&
+      query.state.errorUpdatedAt === 0;
+    if (event.type === 'removed' || resetToInitial) {
       activeSessionsMetadata.delete(query);
     } else if (
       event.type === 'updated' &&

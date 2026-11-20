@@ -85,6 +85,19 @@ vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666666' }),
 }));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+// The real persist modules open the encrypted SQLite store, which this Node
+// project cannot import; the screen reads only the key helper and the loaded
+// state, and this suite is about the field's own rule, not the draft.
+vi.mock('@/lib/persist/drafts', () => ({
+  spendAlertsFormDraftKey: (organizationId: string | undefined) =>
+    `spend-alerts-form:${organizationId ?? 'personal'}`,
+}));
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () => ({ kind: 'ready', value: null, save: vi.fn(), clear: vi.fn() }),
+}));
 vi.mock('@/lib/format', () => {
   const normalizeLocalizedNumber = (value: string) => {
     const normalized = value.trim().replaceAll(',', '');

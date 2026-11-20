@@ -38,7 +38,7 @@ type ParsedIPv6Range = {
   mask: bigint;
 };
 
-function parseIPv6(ip: string): bigint | null {
+export function parseIPv6(ip: string): bigint | null {
   const halves = ip.split('::');
   if (halves.length > 2) return null;
 

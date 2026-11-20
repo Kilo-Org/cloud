@@ -65,6 +65,7 @@ const PAUSED: GgufDownload = {
   pending: false,
   written: 250,
   total: 1_000,
+  retrying: false,
 };
 
 let view: RenderWithProvidersResult | undefined = undefined;

@@ -1,3 +1,17 @@
+/**
+ * What the measured turn did with tools. Only events of the run itself count: a continuation
+ * case's imported steps are not replayed on stdout.
+ */
+export type ToolEvidence = {
+  /** Tool calls that finished, completed or failed. */
+  calls: number;
+  /** Distinct tool names in first-use order. */
+  names: string[];
+  steps: number;
+  /** `reason` of the last step_finish: `stop` ends the turn, `tool-calls` expects another step. */
+  finalFinishReason: string | null;
+};
+
 export type ParsedKiloRun = {
   text: string;
   costUsd: number | null;
@@ -9,6 +23,7 @@ export type ParsedKiloRun = {
   // and the trailing event types (never the payloads, which may be sensitive).
   eventCount: number;
   lastEventTypes: string[];
+  tools: ToolEvidence;
 };
 
 type LooseEvent = {
@@ -19,6 +34,8 @@ type LooseEvent = {
   part?: {
     text?: unknown;
     cost?: unknown;
+    tool?: unknown;
+    reason?: unknown;
     tokens?: {
       input?: unknown;
       cache?: { read?: unknown };
@@ -60,6 +77,7 @@ export function parseKiloRunEvents(lines: string[]): ParsedKiloRun {
   let outputTokens: number | null = null;
   let reasoningTokens: number | null = null;
   const eventTypes: string[] = [];
+  const tools: ToolEvidence = { calls: 0, names: [], steps: 0, finalFinishReason: null };
 
   for (const line of lines) {
     let evt: LooseEvent;
@@ -76,6 +94,14 @@ export function parseKiloRunEvents(lines: string[]): ParsedKiloRun {
       if (text !== null) textParts.push(text);
     }
 
+    if (evt.type === 'tool_use') {
+      tools.calls += 1;
+      const name = evt.part?.tool;
+      if (typeof name === 'string' && !tools.names.includes(name)) tools.names.push(name);
+    }
+
+    if (evt.type === 'step_start' || evt.type === 'step-start') tools.steps += 1;
+
     // The CLI emits `step_finish` at the top level (part.type is the
     // hyphenated `step-finish`); accept both spellings across versions.
     if (evt.type === 'step_finish' || evt.type === 'step-finish') {
@@ -90,6 +116,8 @@ export function parseKiloRunEvents(lines: string[]): ParsedKiloRun {
       if (cachedInput !== null) cachedInputTokens = (cachedInputTokens ?? 0) + cachedInput;
       if (output !== null) outputTokens = (outputTokens ?? 0) + output;
       if (reasoning !== null) reasoningTokens = (reasoningTokens ?? 0) + reasoning;
+      const reason = evt.part?.reason;
+      tools.finalFinishReason = typeof reason === 'string' ? reason : null;
     }
   }
 
@@ -102,5 +130,6 @@ export function parseKiloRunEvents(lines: string[]): ParsedKiloRun {
     reasoningTokens,
     eventCount: eventTypes.length,
     lastEventTypes: eventTypes.slice(-3),
+    tools,
   };
 }

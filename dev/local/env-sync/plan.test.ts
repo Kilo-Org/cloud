@@ -412,6 +412,40 @@ test('prepares native session sync secrets without reusing the authentication si
   }
 });
 
+test('generates a blank cron secret and writes it to the web development env', () => {
+  const repo = createRepo({
+    '.env.local': 'CRON_SECRET=\n',
+    'apps/web/.env.development.local.example': fs.readFileSync(
+      new URL('../../../apps/web/.env.development.local.example', import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+    assert.deepEqual(
+      plan.envLocalAutoCreates.find(create => create.key === 'CRON_SECRET'),
+      { key: 'CRON_SECRET', command: 'openssl', args: ['rand', '-base64', '32'] }
+    );
+    assert.equal(
+      plan.envDevLocalChanges.find(change => change.key === 'CRON_SECRET'),
+      undefined
+    );
+
+    writeFile(repo.root, '.env.local', 'CRON_SECRET=synthetic-cron-secret\n');
+    const ready = computePlan(repo.root, new Set(['nextjs']));
+    assert.equal(
+      ready.envLocalAutoCreates.find(create => create.key === 'CRON_SECRET'),
+      undefined
+    );
+    assert.deepEqual(
+      ready.envDevLocalChanges.find(change => change.key === 'CRON_SECRET'),
+      { key: 'CRON_SECRET', oldValue: undefined, newValue: 'synthetic-cron-secret' }
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('syncs generated shared callback secrets into blank worker dev vars', () => {
   const repo = createRepo({
     '.env.local': 'CALLBACK_TOKEN_SECRET=generated-callback-secret\n',
@@ -560,6 +594,37 @@ test('generates an annotated secret instead of copying a plaintext env source', 
       assert.ok(create);
       assert.equal(create.sourceKey, '@dev-generate base64 32');
       assert.notEqual(create.value, 'plaintext-source');
+      assert.equal(Buffer.from(create.value, 'base64').length, 32);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('generates the session share signing secret for the local session ingest Worker', () => {
+  const sessionIngestDir = 'services/session-ingest';
+  const repo = createRepo({
+    '.env.local':
+      'NEXTAUTH_SECRET=synthetic-auth-key\nINTERNAL_API_SECRET=synthetic-internal-key\n',
+    [`${sessionIngestDir}/package.json`]: fs.readFileSync(
+      new URL(`../../../${sessionIngestDir}/package.json`, import.meta.url),
+      'utf-8'
+    ),
+    [`${sessionIngestDir}/wrangler.jsonc`]: fs.readFileSync(
+      new URL(`../../../${sessionIngestDir}/wrangler.jsonc`, import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['cloudflare-session-ingest']));
+      assert.deepEqual(plan.secretStoreWarnings, []);
+      const create = plan.secretStoreAutoCreates.find(
+        item => item.binding.secret_name === 'SESSION_SHARE_JWT_SECRET_PROD'
+      );
+      assert.ok(create);
+      assert.equal(create.workerDir, sessionIngestDir);
+      assert.equal(create.sourceKey, '@dev-generate base64 32');
       assert.equal(Buffer.from(create.value, 'base64').length, 32);
     });
   } finally {

@@ -177,6 +177,57 @@ const encodeScreenshotPng = async (image: PixelImage): Promise<string> => {
 };
 
 /**
+ * Paints the boxes on a canvas instead of over a copied pixel buffer: the
+ * decode still builds an `ImageBitmap`, but the mask is a handful of
+ * `fillRect` calls in the 2d context rather than `getImageData` →
+ * byte-loop → `createImageData` → `putImageData` on a full-viewport image.
+ * Each rect is snapped outwards to whole pixels, so a pixel a box touches is
+ * painted, never skipped.
+ */
+const maskScreenshotPngWithCanvas = async (input: ScreenshotMaskInput): Promise<string> => {
+  const response = await fetch(input.dataUrl);
+  const bitmap = await createImageBitmap(await response.blob());
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const context = canvas.getContext('2d');
+
+  if (context === null) {
+    bitmap.close();
+    throw new Error('OffscreenCanvas has no 2d context.');
+  }
+
+  try {
+    context.drawImage(bitmap, 0, 0);
+  } finally {
+    bitmap.close();
+  }
+
+  context.fillStyle = '#000';
+
+  for (const box of input.boxes) {
+    const right = (box.left + box.width) * input.scale;
+    const bottom = (box.top + box.height) * input.scale;
+    const left = box.left * input.scale;
+    const top = box.top * input.scale;
+    const finite =
+      Number.isFinite(left) &&
+      Number.isFinite(top) &&
+      Number.isFinite(right) &&
+      Number.isFinite(bottom);
+
+    if (finite) {
+      const startX = Math.floor(left);
+      const startY = Math.floor(top);
+
+      context.fillRect(startX, startY, Math.ceil(right) - startX, Math.ceil(bottom) - startY);
+    }
+  }
+
+  const masked = await canvas.convertToBlob({ type: 'image/png' });
+  const bytes = new Uint8Array(await masked.arrayBuffer());
+
+  return `data:image/png;base64,${encodeBase64(bytes)}`;
+};
+/**
  * Returns the screenshot with every box blacked out, always as a PNG data URL,
  * or the failure message when the image cannot be decoded or re-encoded. With
  * no boxes the input data URL is returned as is and nothing is decoded, so a
@@ -188,6 +239,15 @@ export const maskScreenshotDataUrl = async (
 ): Promise<ScreenshotMaskResult> => {
   if (input.boxes.length === 0) {
     return { dataUrl: input.dataUrl, ok: true };
+  }
+
+  // The browser path masks on a canvas; an injected decode/encode pair keeps the byte-precise path the unit tests pin.
+  if (deps.decode === undefined && deps.encodePng === undefined) {
+    try {
+      return { dataUrl: await maskScreenshotPngWithCanvas(input), ok: true };
+    } catch {
+      return { error: MASK_FAILED_ERROR, ok: false };
+    }
   }
 
   const decode = deps.decode ?? decodeScreenshotDataUrl;

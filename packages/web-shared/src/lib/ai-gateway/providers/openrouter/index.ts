@@ -7,11 +7,11 @@ import {
   LOCAL_FAKE_LLM_API_KEY,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   OpenRouterModelsResponseSchema,
   type OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
@@ -56,7 +56,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
-import { addMonths } from 'date-fns';
+import {
+  isNewModel,
+  retirementDate,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import {
   getProviderDisplayPricing,
   getVercelModelForPricing,
@@ -78,6 +81,17 @@ import {
 
 const OPENROUTER_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
 const OPENROUTER_MODELS_FETCH_TIMEOUT_MS = 15_000;
+
+type OpenRouterCatalogueSubject = 'models' | 'transcription models';
+
+/**
+ * The fewest entries each catalogue can hold and still be the whole OpenRouter catalogue.
+ * A shorter response is a truncated or substituted payload, not a smaller catalogue.
+ */
+export const OPENROUTER_CATALOGUE_MINIMUM_COUNTS: Record<OpenRouterCatalogueSubject, number> = {
+  models: 100,
+  'transcription models': 1,
+};
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -130,29 +144,18 @@ function buildAutoModels(): OpenRouterModel[] {
   return AUTO_MODELS.map(buildAutoModelCatalogEntry);
 }
 
+/**
+ * The name every consumer renders, without any locale-specific copy: the retirement note travels
+ * as `retires_on` so each client words it in its own language. The English note the web and the
+ * extension show is `modelNameWithRetirement` in `./retirement`.
+ */
 export function formatName(model: OpenRouterModel, preferredIndex: number) {
   const name =
     model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
       ? 'OpenRouter ' + model.name
       : model.name;
-  const promptPrice = Number.parseFloat(model.pricing.prompt);
-  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
-  if (isExpensive) return name + ' ($$$$)';
   if (name.endsWith(')')) return name;
-  const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
-  const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
-  if (isNew) return name + ' (new)';
-  if (model.expiration_date) {
-    const expirationDate = new Date(model.expiration_date);
-    if (expirationDate <= addMonths(new Date(), 1)) {
-      const suffix = expirationDate.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        timeZone: 'UTC',
-      });
-      return name + ' (retires ' + suffix + ')';
-    }
-  }
+  if (isNewModel(model, preferredIndex)) return name + ' (new)';
   return name;
 }
 
@@ -355,6 +358,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         ...model,
         inference_provider_ids: inferenceProviderIds,
         name: formatName(model, preferredIndex),
+        retires_on: retirementDate(model, preferredIndex),
         description,
         preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
         isFree: model.isFree ?? isFree,
@@ -382,7 +386,6 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     if (a.preferredIndex !== undefined && b.preferredIndex === undefined) return -1;
     if (a.preferredIndex === undefined && b.preferredIndex !== undefined) return 1;
 
-    // If both have preferredIndex, sort by the index value
     if (a.preferredIndex !== undefined && b.preferredIndex !== undefined) {
       return a.preferredIndex - b.preferredIndex;
     }
@@ -421,7 +424,7 @@ function removeUpstreamEnkrypt(response: unknown): unknown {
 async function fetchOpenRouterModels(
   url: string,
   init: Parameters<typeof fetch>[1],
-  { subject, endpoint }: { subject: 'models' | 'transcription models'; endpoint: string }
+  { subject, endpoint }: { subject: OpenRouterCatalogueSubject; endpoint: string }
 ): Promise<OpenRouterModelsResponse> {
   const response = await fetch(url, init);
 
@@ -439,23 +442,17 @@ async function fetchOpenRouterModels(
 
   const data = removeUpstreamEnkrypt(await response.json());
 
-  const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
-
-  if (!parseResult.success) {
-    errorExceptInTest(`OpenRouter ${subject} response not in expected format:`, parseResult.error);
+  try {
+    return parseOpenRouterModels(data, url, OPENROUTER_CATALOGUE_MINIMUM_COUNTS[subject]);
+  } catch (error) {
+    errorExceptInTest(`OpenRouter ${subject} response not in expected format:`, error);
 
     captureMessage(`openrouter ${subject} not in expected format!`, {
       level: 'error',
-      extra: {
-        data,
-        zodError: parseResult.error.issues,
-      },
+      extra: { data, error },
     });
-    // Return data as-is if parsing fails, maintaining existing behavior
-    return data as OpenRouterModelsResponse;
+    throw error;
   }
-
-  return parseResult.data;
 }
 
 function openRouterModelsHeaders() {
@@ -465,24 +462,35 @@ function openRouterModelsHeaders() {
   };
 }
 
-function openRouterModelsSource(
+function parseOpenRouterModels(
+  sanitized: unknown,
   url: string,
   minimumCount: number
+): OpenRouterModelsResponse {
+  const parsed = OpenRouterModelsResponseSchema.parse(sanitized);
+  assertMinimumCount(url, parsed.data.length, minimumCount);
+  return parsed;
+}
+
+function openRouterModelsSource(
+  url: string,
+  subject: OpenRouterCatalogueSubject
 ): MetadataSource<OpenRouterModelsResponse> {
   return {
     url,
     headers: openRouterModelsHeaders,
-    parse: raw => {
-      const parsed = OpenRouterModelsResponseSchema.parse(removeUpstreamEnkrypt(raw));
-      assertMinimumCount(url, parsed.data.length, minimumCount);
-      return parsed;
-    },
+    parse: raw =>
+      parseOpenRouterModels(
+        removeUpstreamEnkrypt(raw),
+        url,
+        OPENROUTER_CATALOGUE_MINIMUM_COUNTS[subject]
+      ),
   };
 }
 
 function createOpenRouterModelsReader(
   source: MetadataSource<OpenRouterModelsResponse>,
-  { subject, endpoint }: { subject: 'models' | 'transcription models'; endpoint: string }
+  { subject, endpoint }: { subject: OpenRouterCatalogueSubject; endpoint: string }
 ) {
   return createCachedMetadataReader(source, {
     fromDb: readDb,
@@ -503,12 +511,12 @@ function createOpenRouterModelsReader(
 
 export const openRouterModelsMetadataSource = openRouterModelsSource(
   `${OPENROUTER.apiUrl}/models`,
-  100
+  'models'
 );
 
 export const openRouterTranscriptionModelsMetadataSource = openRouterModelsSource(
   `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
-  1
+  'transcription models'
 );
 
 const openRouterModelsReader = createOpenRouterModelsReader(openRouterModelsMetadataSource, {
@@ -552,11 +560,6 @@ export async function getEnhancedOpenRouterModels({
   fromDb?: ModelStatsLoadClient;
 }): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels();
-
-  // If data is not in expected format (e.g., validation failed), return as-is
-  if (!rawResponse.data || !Array.isArray(rawResponse.data)) {
-    return rawResponse;
-  }
 
   const models = await enhancedModelList(rawResponse.data, countryCode);
   const snapshot = await getEnkryptBenchmarks({ fromDb });

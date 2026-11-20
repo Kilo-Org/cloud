@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { z } from 'zod';
 import type { ArtifactObjectStore } from '../src/sandbox-control/runtime-artifact-keys.js';
 import { RUNTIME_BASE_ABI } from '../src/sandbox-control/runtime-release.js';
+import { baseBinaryCheckScript } from '../src/shared/runtime-toolchain.js';
 import { sha256 } from './runtime-publication.js';
 
 export const RUNTIME_BASE_PLATFORM = 'linux/amd64';
@@ -57,6 +58,19 @@ export function runRuntimeTool(command: string, args: string[], cwd: string): st
   return result.stdout.trim();
 }
 
+/**
+ * Runs in the image before publication: the base tools the bootstrap needs and
+ * every required base command are present, and no runtime release is baked in.
+ */
+export function runtimeBaseCheckScript(): string {
+  return [
+    'test -x /usr/bin/flock; test -x /usr/local/bin/node; test -x /usr/local/bin/bun',
+    'test ! -e /usr/local/bin/kilo; test ! -e /usr/local/bin/kilocode-control-plane',
+    'test ! -e /opt/kilo-cloud/kilo-git-credential',
+    baseBinaryCheckScript(),
+  ].join('\n');
+}
+
 export function verifyRuntimeBase(base: RuntimeBase, packageRoot: string): void {
   runRuntimeTool('docker', ['pull', '--platform', base.platform, base.image], packageRoot);
   const inspect = z
@@ -87,9 +101,7 @@ export function verifyRuntimeBase(base: RuntimeBase, packageRoot: string): void 
       '/bin/sh',
       base.image,
       '-ec',
-      'test -x /usr/bin/flock; test -x /usr/local/bin/node; test -x /usr/local/bin/bun; ' +
-        'test ! -e /usr/local/bin/kilo; test ! -e /usr/local/bin/kilocode-control-plane; ' +
-        'test ! -e /opt/kilo-cloud/kilo-git-credential',
+      runtimeBaseCheckScript(),
     ],
     packageRoot
   );

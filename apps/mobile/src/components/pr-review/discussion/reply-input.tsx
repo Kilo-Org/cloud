@@ -81,7 +81,7 @@ async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome>
     }
     function showRetry() {
       Alert.alert(
-        i18n.t('prReview.discussion.termsTitle'),
+        i18n.t('common.termsOfService'),
         i18n.t('prReview.discussion.termsAcceptRetry'),
         [
           {
@@ -103,7 +103,7 @@ async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome>
     }
     const show = () => {
       Alert.alert(
-        i18n.t('prReview.discussion.termsTitle'),
+        i18n.t('common.termsOfService'),
         i18n.t('prReview.discussion.termsCopy'),
         [
           {

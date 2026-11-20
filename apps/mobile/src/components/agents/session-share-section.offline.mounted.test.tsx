@@ -64,6 +64,7 @@ vi.mock('react-native', () => ({
       return Promise.resolve({ action: 'sharedAction' });
     },
   },
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -76,7 +77,11 @@ vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+  // The shared `cn` helper reaches `@/i18n`, which installs this plugin.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
 
 type Renderer = ReactTestRenderer;
 type Node = ReactTestInstance;

@@ -7,7 +7,7 @@
     "directory": "پوشهٔ کاری",
     "createSession": "ایجاد نشست نیتیو",
     "queueIfOffline": "قرار دادن پرامپت در صف اگر میزبان آفلاین است",
-    "prompt": "پرامپت یا /command",
+    "prompt": "پرامپت یا \u2066/command\u2069",
     "localClear": "پاک کردن نمای محلی",
     "abort": "لغو نوبت",
     "failed": "عملیات دسترسی از راه دور نیتیو ناموفق بود",
@@ -19,7 +19,9 @@
     "presenceStatus": "میزبان‌ها: {{connection}}",
     "commandStatus": "تحویل فرمان: {{status}}",
     "delivered": "تحویل داده شد",
-    "expired": "منقضی شد"
+    "expired": "منقضی شد",
+    "recoveryGaps_one": "{{displayCount}} بخش از این رونوشت موجود نیست.",
+    "recoveryGaps_other": "{{displayCount}} بخش از این رونوشت موجود نیست."
   },
   "common": {
     "manageOnWeb": "مدیریت در وب",
@@ -57,6 +59,7 @@
     "link": "پیوند",
     "takingLonger": "این کار بیش از حد انتظار طول می‌کشد. می‌توانید این صفحه را ببندید و بعداً دوباره بررسی کنید.",
     "model": "مدل",
+    "notSelected": "انتخاب نشده",
     "accessDenied": "اجازه دسترسی ندارید.",
     "allRepositories": "همه مخازن",
     "personal": "شخصی",
@@ -137,6 +140,7 @@
     "keepRunning": "ادامه اجرا",
     "newSession": "نشست جدید",
     "noModelsAvailable": "مدلی در دسترس نیست",
+    "modelRetires": "بازنشستگی در {{date}}",
     "notFound": "پیدا نشد.",
     "online": "آنلاین",
     "open": "باز کردن {{name}}",
@@ -147,6 +151,7 @@
     "performance": "عملکرد",
     "preferences": "تنظیمات دلخواه",
     "privacyPolicy": "خط‌مشی حریم خصوصی",
+    "termsOfService": "شرایط استفاده",
     "profile": "پروفایل",
     "reactions": "واکنش",
     "recent": "موارد اخیر",
@@ -170,6 +175,7 @@
     "generating": "در حال تولید…",
     "working": "در حال کار",
     "yourOwnRepositories": "مخازن خودتان",
+    "organizationRepositories": "مخازن سازمان",
     "dismissed": "نادیده‌گرفته‌شده",
     "agent": "عامل",
     "durationMinuteShort": "min",
@@ -178,7 +184,9 @@
     "organizationTrialEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در kilo.ai به‌روزرسانی کند و سپس دوباره تلاش کند.",
     "privateRepositoryA11y": "{{name}}، مخزن خصوصی",
     "legalDocumentEnglishOnly": "این سند تنها به زبان انگلیسی در دسترس است.",
-    "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید."
+    "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
+    "organizationTrialEndedBillingAtKiloAi": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را در kilo.ai به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
+    "viewOnGitHub": "مشاهدهٔ PR در GitHub"
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -201,7 +209,7 @@
     "openSignInPageInBrowser": "باز کردن صفحهٔ ورود در مرورگر",
     "copySignInLink": "کپی پیوند ورود",
     "cancelSignIn": "لغو ورود",
-    "startingSignIn": "در حال شروع ورود...",
+    "startingSignIn": "در حال شروع ورود…",
     "organizationUsesSso": "سازمان شما از ورود یکپارچه استفاده می‌کند.",
     "continueWithSso": "ادامه با SSO",
     "useDifferentEmail": "استفاده از ایمیل دیگر",
@@ -209,15 +217,15 @@
     "signInWithGoogle": "ورود با Google",
     "signInWithPasskey": "ورود با کلید عبور",
     "emailAddress": "نشانی ایمیل",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "shoma@example.com",
     "continueWithEmail": "ادامه با ایمیل",
     "enterCodeSentTo": "کد ارسال‌شده به {{email}} را وارد کنید.",
     "codeArrivalHint": "اگر این نشانی واجد شرایط باشد، کد ظرف یک دقیقه می‌رسد.",
     "verifyCode": "تأیید کد",
     "resendCode": "ارسال مجدد کد",
     "termsPrefix": "با ادامه، موافقت خود را با این موارد اعلام می‌کنید: ",
+    "termsInSentence": "شرایط خدمات",
     "terms": "شرایط",
-    "termsInSentence": "شرایط",
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "گزینه‌های بیشتر برای ورود",
@@ -272,6 +280,9 @@
     "credits": "اعتبار",
     "failedToLoadBalance": "بارگذاری موجودی ممکن نشد. برای تلاش مجدد ضربه بزنید.",
     "balanceLoadFailed": "بارگذاری موجودی ممکن نشد",
+    "balanceUnreachable": "اتصال به سرور برقرار نشد. دوباره تلاش کنید.",
+    "balanceAccessDenied": "اجازه دیدن این موجودی را ندارید.",
+    "balanceUnavailable": "موجودی بارگذاری نشد.",
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
@@ -311,9 +322,9 @@
     "passkeyVerifyDescription": "برای امنیت شما، پیش از تغییر کلیدهای عبور، هویت خود را تأیید کنید.",
     "passkeyVerifyWithPasskey": "با کلید عبور تأیید کنید",
     "passkeyVerifySendCode": "کد را برایم ایمیل کنید",
-    "passkeyVerifySendingCode": "در حال ارسال کد...",
+    "passkeyVerifySendingCode": "در حال ارسال کد…",
     "passkeyVerifyPasskeyPrompt": "برای ادامه، با کلید عبور خود تأیید کنید.",
-    "passkeyVerifyChecking": "در حال بررسی کد شما...",
+    "passkeyVerifyChecking": "در حال بررسی کد شما…",
     "passkeyVerifyCodeSent": "کد ارسال‌شده به {{email}} را وارد کنید.",
     "passkeyVerifyCodeRejected": "آن کد مطابقت نداشت. دوباره تلاش کنید.",
     "passkeyVerifyPasskeyFailed": "آن کلید عبور تأیید نشد. دوباره تلاش کنید.",
@@ -321,8 +332,8 @@
     "passkeyVerifyInProgress": "این کد از قبل در حال بررسی است. لحظه‌ای بعد دوباره تلاش کنید.",
     "passkeyVerifyTooManyAttempts": "تعداد تلاش‌ها بیش از حد مجاز است. کد جدیدی ارسال کنید.",
     "passkeyVerifySsoRequired": "سازمان شما ورود یکپارچه را الزامی کرده است. این تغییر را در مرورگر تأیید کنید، سپس به اینجا برگردید.",
-    "passkeyVerifySsoStarting": "در حال شروع تأیید...",
-    "passkeyVerifySsoWaiting": "در انتظار تأیید...",
+    "passkeyVerifySsoStarting": "در حال شروع تأیید…",
+    "passkeyVerifySsoWaiting": "در انتظار تأیید…",
     "passkeyVerifySsoOpen": "صفحه تأیید را باز کنید",
     "passkeyVerifySsoExpired": "آن تأیید منقضی یا لغو شد. دوباره تلاش کنید.",
     "passkeyVerifySsoUnavailable": "تأیید ورود یکپارچه همین حالا در دسترس نیست. دوباره تلاش کنید.",
@@ -502,7 +513,7 @@
     "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
       "signIn": "ورود",
-      "profileOrganizations": "نمایه و سازمان‌ها"
+      "profileOrganizations": "نمایه & سازمان‌ها"
     }
   },
   "preferences": {
@@ -747,6 +758,9 @@
       "couldNotLoadMore": "بارگذاری نظرات بیشتر ممکن نشد.",
       "retryLoadingMore": "تلاش مجدد برای بارگذاری نظرات بیشتر",
       "loadMoreComments": "بارگذاری نظرات بیشتر",
+      "conversationTruncated": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
+      "conversationTruncated_one": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
+      "conversationTruncated_other": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
       "addReaction": "افزودن واکنش",
       "reactionPill": "واکنش {{emoji}}، {{displayCount}} {{countLabel}}",
       "reaction_one": "واکنش",
@@ -762,7 +776,6 @@
       "replyPlaceholder": "پاسخ…",
       "replyBody": "متن پاسخ",
       "submitReply": "ارسال پاسخ",
-      "termsTitle": "شرایط استفاده",
       "termsCopy": "برای ارسال مطلب باید دست‌کم ۱۳ سال داشته باشید.",
       "termsAcceptRetry": "ثبت پذیرش شرایط استفاده ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
       "viewTerms": "مشاهدهٔ شرایط استفاده",
@@ -820,7 +833,19 @@
         "fileComment": "نظر دربارهٔ فایل",
         "outdatedOnPathLines": "مربوط به نسخهٔ قبلی: {{path}} {{lines}}",
         "outdatedOnLines": "مربوط به نسخهٔ قبلی: {{lines}}",
-        "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}"
+        "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "سمت چپ",
+        "sideRight": "سمت راست",
+        "outdatedOnLinesSide": "مربوط به نسخهٔ قبلی: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "مربوط به نسخهٔ قبلی: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "مربوط به نسخهٔ قبلی ({{side}})",
+        "outdatedOnPathSide": "مربوط به نسخهٔ قبلی: {{path}} ({{side}})"
       },
       "deletedUser": "کاربر حذف‌شده",
       "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
@@ -865,7 +890,6 @@
       "noAccess": "شما به بررسی‌های این مخزن دسترسی ندارید.",
       "couldNotLoad": "بارگذاری بررسی‌ها ممکن نشد.",
       "retryChecks": "تلاش مجدد برای بارگذاری بررسی‌ها",
-      "viewOnGitHub": "مشاهدهٔ PR در GitHub",
       "noChecksReported": "هیچ بررسی‌ای گزارش نشده است",
       "passed": "{{displayCount}} موفق",
       "passed_one": "{{displayCount}} موفق",
@@ -920,9 +944,9 @@
       "checkFailedTitleGitLab": "بررسی اتصال به GitLab ممکن نشد.",
       "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
       "providerCheckFailedMessage": "اتصال به ارائه‌دهنده برقرار نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
-      "reconnectTitle": "اتصال مجدد به GitHub",
-      "reconnectTitleGitLab": "اتصال مجدد به GitLab",
-      "reconnectTitleBitbucket": "اتصال مجدد به Bitbucket",
+      "reconnectTitle": "GitHub را دوباره متصل کنید",
+      "reconnectTitleGitLab": "GitLab را دوباره متصل کنید",
+      "reconnectTitleBitbucket": "Bitbucket را دوباره متصل کنید",
       "reconnectDescription": "مجوز اتصال شما به GitHub لغو شده است.",
       "gitlabDescription": "بازبینی درخواست‌های ادغام در موبایل",
       "gitlabInstanceMismatchTitle": "اتصال GitLab برای نمونه دیگری است",
@@ -932,7 +956,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
       "gitlabReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
       "bitbucketNotConnectedTitle": "Bitbucket متصل نیست",
-      "bitbucketAdminOnlyDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "adminOnlyConnectDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
     },
@@ -949,6 +973,8 @@
       "pendingComment": "نظر در انتظار ارسال",
       "pendingComment_other": "نظر در انتظار ارسال",
       "submitCountOfTotal": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
+      "submitCountOfTotal_one": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
+      "submitCountOfTotal_other": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
       "submitReview": "ارسال بازبینی",
       "partialPostedFresh": "{{displayFreshCount}} نظر ارسال شد. ",
       "partialPostedFresh_one": "{{displayFreshCount}} نظر ارسال شد. ",
@@ -1013,7 +1039,10 @@
     "tabs": {
       "overview": "مرور کلی",
       "files": "فایل‌ها",
-      "discussion": "گفت‌وگو"
+      "discussion": "گفت‌وگو",
+      "discussionAccessibility_one": "{{title}}: ۱ نظر",
+      "discussionAccessibility": "{{title}}: {{displayCount}} نظر",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} نظر"
     },
     "fileStatus": {
       "modified": "تغییریافته",
@@ -1210,7 +1239,7 @@
     },
     "instructions": {
       "title": "دستورالعمل‌های سفارشی",
-      "deprecation": "قابلیت دستورالعمل‌های سفارشی قرار است کنار گذاشته شود. این دستورالعمل‌ها را به فایل REVIEW.md در مخزن خود منتقل کنید.",
+      "deprecation": "قابلیت دستورالعمل‌های سفارشی حذف خواهد شد. این دستورالعمل‌ها را به فایل REVIEW.md در مخزن خود منتقل کنید.",
       "placeholder": "مثلاً قراردادهای مدیریت خطای ما را رعایت کنید…",
       "clearTitle": "حذف دستورالعمل‌های سفارشی؟",
       "clearMessage": "ذخیره کردن فیلد خالی، دستورالعمل‌های سفارشی ذخیره‌شده برای این بازبین را حذف می‌کند."
@@ -1272,7 +1301,7 @@
       "transcriptRetry": "بارگذاری متن گفت‌وگوی بررسی ممکن نشد.",
       "transcriptLive": "زنده",
       "agentIdle": "عامل در انتظار",
-      "agentWorking": "عامل در حال کار...",
+      "agentWorking": "عامل در حال کار…",
       "anErrorOccurred": "خطایی رخ داد",
       "errorWithMessage": "خطایی رخ داد: {{message}}.",
       "executionStarted": "اجرا شروع شد",
@@ -1370,11 +1399,16 @@
     "followReviewMd": "پیروی از REVIEW.md",
     "followReviewMdSubtitle": "رعایت دستورالعمل‌های فایل REVIEW.md در هر مخزن",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket متصل نیست. فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند."
+      "notConnectedReadOnlyPlan": "دوره آزمایشی سازمان به پایان رسیده است، بنابراین مالک باید صورتحساب را در ⁨kilo.ai⁩ به‌روزرسانی کند."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "اتصال Bitbucket این سازمان از طریق وب و با رایانه مدیریت می‌شود.",
-      "description": "یک توکن دسترسی فضای کاری با مجوزهای لازم ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
+      "managedOnWeb": "اتصال Bitbucket به {{organization}} از طریق وب و با رایانه مدیریت می‌شود.",
+      "managedOnWebTitle": "از طریق وب مدیریت می‌شود",
+      "managedOnWebShort": "این اتصال از طریق وب و با رایانه مدیریت می‌شود.",
+      "managedOnWebRepositories": "مخزن‌های {{organization}} را از طریق وب و با رایانه انتخاب کنید.",
+      "description": "یک توکن دسترسی فضای کاری برای {{organization}} ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
+      "descriptionReconnect": "یک توکن دسترسی فضای کاری جدید برای {{organization}} ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
+      "descriptionOverview": "یک توکن دسترسی فضای کاری ایجاد کنید و آن را در صفحهٔ بعد جای‌گذاری کنید.",
       "scopes": "حساب: خواندن · مخازن: خواندن/نوشتن · درخواست‌های ادغام: خواندن · وب‌هوک‌ها: خواندن/نوشتن",
       "tokenPlaceholder": "توکن دسترسی فضای کاری",
       "tokenRefused": "Bitbucket این توکن فضای کاری را نپذیرفت. بررسی کنید که مجوزهای بالا را داشته باشد، سپس دوباره تلاش کنید."
@@ -1395,6 +1429,7 @@
     "platformList": {
       "checking": "در حال بررسی…",
       "statusUnavailable": "وضعیت در دسترس نیست",
+      "needsAttention": "نیازمند رسیدگی",
       "platforms": "پلتفرم‌ها",
       "activity": "فعالیت"
     },
@@ -1697,7 +1732,7 @@
       "dueThisWeekDetail_one": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "dueThisWeekDetail_other": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "noDeadline": "بدون مهلت",
-      "reviewSlaAssignment": "بررسی مهلت‌های تعیین‌شده در SLA",
+      "reviewSlaAssignment": "بررسی تخصیص SLA",
       "allOpenFindingsTracked": "همه یافته‌های باز ردیابی می‌شوند"
     },
     "dismiss": {
@@ -2148,6 +2183,8 @@
       "renameAccessibility": "تغییر نام نشست: {{title}}",
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
+      "historyTooLarge": "متن گفت‌وگوی این نشست برای بارگذاری بیش از حد بزرگ است.",
+      "historyUnavailable": "متن گفت‌وگوی این نشست خوانده نمی‌شود.",
       "cloneFailedRetry": "کپی کردن این نشست ممکن نشد. دوباره تلاش کنید.",
       "notEnoughCredits": "اعتبار کافی برای این درخواست وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
       "previousTaskFinishing": "کار قبلی هنوز تمام نشده است. لطفاً کمی صبر کنید.",
@@ -2224,6 +2261,7 @@
       "branchDefault": "پیش‌فرض",
       "branchAccessibility": "شاخه: {{label}}",
       "branchLoading": "در حال بارگذاری شاخه‌ها",
+      "branchInactive": "یک مخزن انتخاب کنید تا شاخه‌های آن بارگذاری شوند.",
       "branchLoadError": "شاخه‌ها بارگذاری نشدند",
       "branchUnavailable": "شاخه‌ها برای این مخزن در دسترس نیستند. دسترسی خود را با ارائه‌دهنده بررسی کنید، سپس مخزن دیگری را انتخاب کنید.",
       "branchEmpty": "هیچ شاخه‌ای در دسترس نیست",
@@ -2456,7 +2494,8 @@
       "customModes": "حالت‌های سفارشی"
     },
     "modeSelector": {
-      "accessibility": "حالت: {{label}}"
+      "accessibility": "حالت: {{label}}",
+      "customMode": "حالت سفارشی"
     },
     "modeOptions": {
       "code": "کدنویسی",
@@ -2504,8 +2543,8 @@
       "reportAiResponseFailedTerminal": "گزارش این پاسخ ممکن نیست."
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "زیر {{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} در هر {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "جزئیات در دسترس نیست.",
@@ -2761,6 +2800,8 @@
     "modelPicker": {
       "title": "انتخاب مدل",
       "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست.",
+      "allUnavailableTitle": "هیچ مدلی قابل استفاده نیست",
+      "allUnavailableDescription": "یک کلید ارائه‌دهنده اضافه کنید، سپس دوباره تلاش کنید.",
       "favorites": "موارد دلخواه"
     },
     "modelSelector": {
@@ -2772,7 +2813,7 @@
       "thinkingEffortAccessibility": "میزان تفکر {{label}}",
       "thinkingEffortSelected": "میزان تفکر {{label}}، انتخاب‌شده",
       "thinkingEffortWithModel": "{{model}}، میزان تفکر {{variant}}",
-      "lockedByAgent": "، قفل‌شده توسط عامل «{{agent}}»",
+      "lockedByAgent": "قفل‌شده توسط عامل «{{agent}}»",
       "addToFavorites": "افزودن {{name}} به موارد دلخواه",
       "removeFromFavorites": "حذف {{name}} از موارد دلخواه",
       "sessionModel": "مدل نشست"
@@ -3008,6 +3049,7 @@
     "noSessions": "هیچ نشست فعالی وجود ندارد",
     "noSessionsDescription": "با برنامه Kilo در دستگاه دیگری وارد شوید تا در اینجا نمایش داده شود.",
     "signedIn": "ورود در {{signedIn}} · آخرین بازدید {{lastSeen}}",
+    "signedInThisDevice": "ورود در {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "ورودهای برنامه Kilo، Kilo CLI و مرورگر وب در اینجا ظاهر می‌شوند. ورودهای ویرایشگر فهرست نمی‌شوند.",
     "thisDevice": "این دستگاه",
     "viewProfile": "مشاهدهٔ پروفایل",
@@ -3030,7 +3072,6 @@
   },
   "home": {
     "couldNotLoadSessions": "بارگذاری نشست‌ها ممکن نشد.",
-    "couldNotLoadActiveSessions": "بارگذاری نشست‌های فعال ممکن نشد.",
     "agentSessions": "در حال اجرا",
     "newCodingTask": "کار کدنویسی جدید",
     "newTaskFromPicture": "کار جدید از یک تصویر",
@@ -3057,6 +3098,7 @@
   "queryError": {
     "neutralDescription": "لطفاً دوباره تلاش کنید.",
     "offlineTitle": "بارگذاری ناموفق بود.",
+    "offlineDescription": "به سرور دسترسی پیدا نشد.",
     "permissionDescription": "اجازه مشاهده این مورد را ندارید.",
     "notFoundDescription": "این مورد ممکن است حذف شده باشد یا دیگر در دسترس نباشد.",
     "serverTitle": "بارگذاری ممکن نشد.",
@@ -3077,7 +3119,7 @@
     "scheduled": "زمانبندیشده"
   },
   "voiceInput": {
-    "listening": "در حال گوش دادن...",
+    "listening": "در حال گوش دادن…",
     "onlineTitle": "گفتار به‌صورت آنلاین پردازش می‌شود",
     "onlineMessage": "این دستگاه نمی‌تواند گفتار را به‌صورت آفلاین به متن تبدیل کند. صدای ضبط‌شده شما برای تبدیل به متن به {{provider}} ارسال می‌شود. Kilo صدا را ذخیره نمی‌کند.",
     "allow": "اجازه دادن",
@@ -3099,7 +3141,7 @@
     "useOnlineTranscription": "اجازه دادن تبدیل آنلاین",
     "offlineModelDownloadScheduled": "فایل‌های گفتار آفلاین در پس‌زمینه دانلود می‌شوند. بعداً دوباره ورودی صوتی را امتحان کنید.",
     "listeningStopped": "گوش دادن متوقف شد.",
-    "transcribing": "در حال تبدیل به متن...",
+    "transcribing": "در حال تبدیل به متن…",
     "gatewayUnreachable": "اتصال به Kilo Gateway ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
     "gatewayTimeout": "تبدیل گفتار به متن بیش از حد طول کشید. دوباره تلاش کنید.",
     "gatewayModelUnavailable": "این مدل تبدیل گفتار به متن در دسترس نیست. در تنظیمات دلخواه مدل دیگری انتخاب کنید.",
@@ -3139,6 +3181,11 @@
       "billingHistory": "تاریخچهٔ صورتحساب",
       "billingHistoryEmpty": "هنوز تاریخچهٔ صورتحسابی وجود ندارد.",
       "billingHistoryError": "بارگذاری تاریخچهٔ صورتحسابی ممکن نشد",
+      "billingRowInitial": "اولین شارژ · {{tier}}",
+      "billingRowRenewal": "تمدید · {{tier}}",
+      "billingRowSubscription": "اشتراک · {{tier}}",
+      "billingRowTrial": "دوره آزمایشی رایگان · {{tier}}",
+      "billingRowUpgrade": "تغییر طرح · {{tier}}",
       "cancel": "لغو اشتراک",
       "cancelDescription": "Kilo Pass شما تا پایان دورهٔ صورتحساب فعال می‌ماند و تمدید نخواهد شد.",
       "cancelScheduled": "در {{date}} لغو می‌شود",
@@ -3164,6 +3211,8 @@
     "retryHint": "وضعیت Kilo Pass را دوباره بررسی می‌کند.",
     "endedOn": "پایان‌یافته {{date}}",
     "notAvailableInApp": "Kilo Pass در برنامه در دسترس نیست.",
+    "notAvailableTitle": "Kilo Pass در برنامه ارائه نمی‌شود",
+    "noPassDescription": "این حساب Kilo Pass ندارد.",
     "statusActive": "فعال",
     "statusTrialing": "دوره آزمایشی",
     "statusPastDue": "پرداخت معوق",
@@ -3234,6 +3283,7 @@
     "revokeConsent": "حذف رضایت",
     "revokeConsentTitle": "رضایت به اشتراک‌گذاری داده‌ها لغو شود؟",
     "acceptAndContinue": "پذیرش و ادامه",
+    "loadingConsentSettings": "در حال بارگذاری تنظیمات رضایت شما…",
     "decline": "رد",
     "declineAndSignOut": "رد و خروج از حساب",
     "declineTitle": "اشتراک‌گذاری داده‌ها را رد می‌کنید؟",
@@ -3408,7 +3458,8 @@
         "accounting_adjustment": "تعدیل حسابداری",
         "credits_expired": "اعتبار منقضی‌شده"
       },
-      "truncated": "سوابق قبلی گردش اعتبار در دسترس است."
+      "truncated": "سوابق قبلی گردش اعتبار در دسترس است.",
+      "retentionLimit": "جدیدترین گردش‌های اعتبار نمایش داده می‌شوند."
     },
     "inviteMember": {
       "emailError": "یک آدرس ایمیل معتبر وارد کنید.",
@@ -3418,6 +3469,7 @@
       "sendInvite": "ارسال دعوت‌نامه",
       "title": "دعوت از عضو",
       "alreadyInvited": "این آدرس ایمیل قبلاً دعوت شده است یا از قبل عضو است.",
+      "organizationUnavailable": "این سازمان دیگر در دسترس نیست.",
       "sendError": "ارسال دعوت‌نامه ممکن نشد.",
       "pendingInvitation": "این ایمیل از قبل یک دعوت‌نامه در انتظار دارد.",
       "alreadyMember": "این شخص از قبل عضو این سازمان است.",
@@ -3439,10 +3491,11 @@
         "void": "باطل",
         "uncollectible": "وصول‌نشدنی"
       },
-      "truncated": "فاکتورهای قدیمی‌تر در دسترس هستند."
+      "truncated": "فاکتورهای قدیمی‌تر در دسترس هستند.",
+      "retentionLimit": "جدیدترین فاکتورها نمایش داده می‌شوند."
     },
     "lowBalanceAlert": {
-      "enableA11y": "فعال‌سازی هشدار موجودی کم",
+      "subtitle": "وقتی موجودی این سازمان از مبلغ تعیین‌شده کمتر می‌شود، هشداری را با ایمیل به نشانی‌های واردشده بفرست.",
       "notifyEmailsLabel": "ایمیل‌های دریافت‌کنندهٔ هشدار",
       "permissionDenied": "شما اجازه مدیریت هشدارهای صورتحساب را ندارید.",
       "separateEmailsHint": "آدرس‌های ایمیل را با ویرگول جدا کنید.",
@@ -3518,6 +3571,7 @@
       "truncated": "درخواست‌های این ساعت بیشتر از تعدادی است که در فهرست نمایش داده می‌شود.",
       "emptyTitle": "درخواستی در این ساعت وجود ندارد",
       "emptyDescription": "برای دیدن درخواست‌های پیشین از «ساعت قبل» استفاده کنید.",
+      "emptyBoundDescription": "گزارش‌های درخواست بیش از این به عقب نمی‌روند.",
       "loadError": "بارگذاری گزارش‌های درخواست ناموفق بود.",
       "permissionDenied": "فقط مالک، ادمین یا مدیر صورتحساب سازمان می‌تواند گزارش‌های درخواست آن را ببیند.",
       "tokens": "{{input}} ورودی · {{output}} خروجی",
@@ -3586,10 +3640,9 @@
     },
     "hub": {
       "renameTitle": "تغییر نام سازمان",
-      "renamePlaceholder": "نام سازمان",
+      "renamePlaceholder": "نام سازمان را وارد کنید",
       "balance": "موجودی",
-      "organizationSeats": "مجوزهای کاربری سازمان",
-      "plan": "طرح سازمان",
+      "plan": "طرح",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · به پایان رسیده",
@@ -3623,7 +3676,8 @@
     "signupStepUp": "برای تکمیل ساخت حساب خود، از «$t(login.moreSignInOptions)» استفاده کنید.",
     "signupStepUpApple": "برای تکمیل ساخت حساب خود، از «$t(login.signInWithApple)» استفاده کنید.",
     "signupStepUpGoogle": "برای تکمیل ساخت حساب خود، از «$t(login.signInWithGoogle)» استفاده کنید.",
-    "invalidCode": "کد واردشده نادرست است. لطفاً دوباره تلاش کنید.",
+    "signupStepUpBack": "برای تکمیل ساخت حساب خود، به صفحهٔ قبل برگردید و از «$t(login.moreSignInOptions)» استفاده کنید.",
+    "invalidCode": "کد واردشده نادرست است یا منقضی شده است. لطفاً دوباره تلاش کنید یا از «$t(login.resendCode)» استفاده کنید.",
     "codeInProgress": "کد شما در حال پردازش است. کمی صبر کنید و دوباره تلاش کنید.",
     "tooManyAttempts": "تعداد تلاش‌ها بیش از حد مجاز است. لطفاً کد جدیدی درخواست کنید.",
     "invalidToken": "ورود ناموفق بود. لطفاً دوباره تلاش کنید.",
@@ -3673,8 +3727,7 @@
     "imagesSectionEmpty": "هیچ میزبان تصویر مورد اعتمادی نیست",
     "revoke": "لغو اعتماد به {{host}}",
     "revokeMessage": "پیوندهای این میزبان دوباره درخواست تأیید خواهند کرد.",
-    "revokeImageMessage": "تصاویر این میزبان دوباره درخواست تأیید خواهند کرد.",
-    "backToPreferences": "بازگشت به تنظیمات"
+    "revokeImageMessage": "تصاویر این میزبان دوباره درخواست تأیید خواهند کرد."
   },
   "glanceable": {
     "waiting": "در حال به‌روزرسانی عامل‌ها",
@@ -3688,7 +3741,7 @@
     "newestSession": "جدیدترین: {{title}}",
     "noneWaiting": "هیچ عاملی در انتظار نیست",
     "newAgent": "عامل جدید",
-    "approving": "در حال تأیید...",
+    "approving": "در حال تأیید…",
     "couldNotApprove": "تأیید نشد",
     "channelName": "عامل‌های فعال",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
@@ -3700,6 +3753,7 @@
     "lastKnown": "آخرین وضعیت شناخته‌شده",
     "awaitingUpdate": "در انتظار به‌روزرسانی",
     "nextRun": "اجرای بعدی",
+    "wasDue": "قرار بود",
     "waitingForYou": "در انتظار شما",
     "nextScheduled": "زمانبندی‌های بعدی",
     "answerNeeded": "نیازمند پاسخ",
@@ -3752,6 +3806,7 @@
   },
   "modelChat": {
     "offlineFailure": "این مدل به اتصال اینترنت نیاز دارد. متصل شوید و دوباره امتحان کنید، یا به مدلی روی این دستگاه تغییر دهید.",
+    "connectionLost": "اتصال به مدل قطع شد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
     "empty": {
       "title": "شروع گفتگو",
       "description": "برای گفتگو با یک مدل، یک پیام ارسال کنید."
@@ -3809,6 +3864,8 @@
       "fieldName": "نام نمایشی",
       "fieldUrl": "نشانی URL سرور",
       "fieldUrlInvalid": "یک نشانی URL معتبر سرور وارد کنید.",
+      "duplicateUrl": "این نشانی URL قبلاً ذخیره شده است.",
+      "serverNotFound": "این سرور دیگر ذخیره نشده است.",
       "enableServer": "فعال‌کردن این سرور: {{name}}",
       "editServer": "ویرایش سرور",
       "deleteServer": "حذف سرور",
@@ -3889,6 +3946,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) یک درخواست کوتاه استنتاج با پروتکل و مدل انتخاب‌شده به این نقطهٔ پایانی می‌فرستد. ارائه‌دهنده ممکن است بابت آن هزینه دریافت کند.",
       "connectionSucceeded": "مدل با استفاده از این پروتکل یک درخواست را تکمیل کرد.",
       "connectionFailed": "مدل نتوانست درخواست را تکمیل کند. نشانی ریشهٔ API، پروتکل، اطلاعات احراز هویت و شناسهٔ مدل را بررسی کنید.",
+      "requestTimedOut": "نقطهٔ پایانی به‌موقع پاسخ نداد. نشانی ریشهٔ API و اتصال خود را بررسی کنید، سپس دوباره امتحان کنید.",
+      "requestUnauthorized": "نقطهٔ پایانی اطلاعات احراز هویت را رد کرد. کلید API و سرآیندهای سفارشی را بررسی کنید، سپس دوباره امتحان کنید.",
+      "requestNotFound": "نقطهٔ پایانی یا مدل پیدا نشد. نشانی ریشهٔ API و شناسهٔ مدل را بررسی کنید.",
+      "requestRateLimited": "نقطهٔ پایانی در حال محدودکردن درخواست‌هاست. کمی صبر کنید و دوباره امتحان کنید.",
+      "requestUnavailable": "نقطهٔ پایانی همین حالا در دسترس نیست. لحظه‌ای دیگر دوباره امتحان کنید.",
+      "requestUnreachable": "دسترسی به نقطهٔ پایانی ممکن نشد. نشانی ریشهٔ API و اتصال خود را بررسی کنید.",
+      "requestInvalidResponse": "نقطهٔ پایانی با قالبی غیر از قالب مورد انتظار پاسخ داد. بررسی کنید که نشانی ریشهٔ API و پروتکل با سرور مطابقت داشته باشد، سپس دوباره تلاش کنید.",
+      "discoveryNoModels": "نقطهٔ پایانی هیچ مدلی را فهرست نکرد. مدل‌ها را به‌صورت دستی وارد کنید.",
+      "connectionIncomplete": "مدل پاسخ داد اما کار را به پایان نرساند. دوباره امتحان کنید، یا شناسهٔ مدل و پروتکل را بررسی کنید.",
       "invalidInput": "نام سامانهٔ پشتیبان، سرآیندهای معتبر و دست‌کم یک مدل با شناسه و نام یکتا وارد کنید. محدودیت‌های توکن باید اعداد صحیح مثبت باشند.",
       "invalidUrl": "نشانی ریشهٔ API با HTTP یا HTTPS وارد کنید که فاقد اطلاعات احراز هویت، پارامترهای پرس‌وجو و بخش پس از علامت # باشد.",
       "publicHttp": "نقاط پایانی عمومی HTTP مجاز نیستند. از HTTPS یا یک نقطهٔ پایانی محلی خصوصی استفاده کنید.",
@@ -3918,6 +3984,8 @@
       "downloading": "در حال دانلود: {{written}} از {{total}}",
       "downloadingUnknown": "در حال دانلود: {{written}}",
       "paused": "متوقف‌شده: {{written}} از {{total}}",
+      "retrying": "تلاش مجدد: {{written}} از {{total}}",
+      "retryingUnknown": "تلاش مجدد: {{written}}",
       "verifying": "بررسی فایل دانلودشده…",
       "downloaded": "دانلود شد · {{size}}",
       "url": "پیوند دانلود مستقیم",
@@ -4008,7 +4076,9 @@
         "androidModelUnavailable": "این دستگاه از Gemini Nano پشتیبانی نمی‌کند، یا برنامه سیستمی AICore هنوز در حال راه‌اندازی است. بعداً دوباره امتحان کنید.",
         "aicoreUpdateRequired": "برای استفاده از این مدل، برنامه AICore و نرم‌افزار سیستم را به‌روزرسانی کنید.",
         "downloadable": "پیش از استفاده از این مدل، باید یک بار آن را بارگیری کنید.",
-        "downloading": "مدل در حال بارگیری است. پس از پایان بارگیری آماده استفاده می‌شود."
+        "downloading": "مدل در حال بارگیری است. پس از پایان بارگیری آماده استفاده می‌شود.",
+        "batteryQuota": "مدل روی دستگاه سهمیه باتری خود را فعلاً مصرف کرده است. بعداً دوباره تلاش کنید.",
+        "checkFailed": "برنامه نتوانست این مدل را بررسی کند. دوباره تلاش کنید."
       },
       "unavailable": "مدل روی دستگاه اکنون در دسترس نیست. وضعیت آن را در $t(modelChat.backends.title) بررسی کنید.",
       "busy": "مدل روی دستگاه مشغول پاسخ دیگری است. پس از پایان آن دوباره امتحان کنید.",
@@ -4023,10 +4093,20 @@
     "reasoningEffort": {
       "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
     },
-    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد."
+    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد.",
+    "providerKeyRefused": "ارائه‌دهنده اطلاعات احراز هویت را رد کرد. کلید API آن را بررسی کنید، سپس دوباره ارسال کنید.",
+    "providerModelMissing": "این سامانهٔ پشتیبان دیگر این مدل را ارائه نمی‌دهد. یکی دیگر انتخاب کنید.",
+    "providerRateLimited": "ارائه‌دهنده در حال محدودکردن درخواست‌هاست. کمی صبر کنید و دوباره ارسال کنید.",
+    "providerUnavailable": "ارائه‌دهنده همین حالا در دسترس نیست. به‌زودی دوباره ارسال کنید."
   },
   "settingsTools": {
-    "confirmTitle": "این تغییر تأیید شود؟"
+    "confirmTitle": "این تغییر تأیید شود؟",
+    "guarded": {
+      "spendAlertsOff": "هشدارهای هزینه خاموش شوند؟ دیگر اعلان‌هایی درباره عبور از آستانه هزینه و جهش‌های ساعتی دریافت نخواهید کرد.",
+      "balanceAlertsOff": "هشدارهای موجودی خاموش شوند؟ دیگر هنگام کم شدن اعتبارتان اعلانی دریافت نخواهید کرد.",
+      "securityFindingsOff": "یافته‌های امنیتی خاموش شوند؟ دیگر اعلان‌هایی درباره یافته‌های امنیتی جدید دریافت نخواهید کرد.",
+      "hideBalanceOn": "موجودی‌هایتان پنهان شوند؟ موجودی اعتبار دیگر در صفحه‌های نمایه و مرکز سازمان نمایش داده نخواهد شد."
+    }
   },
   "appActions": {
     "start": {
@@ -4171,6 +4251,7 @@
     "instructionsHint": "قواعد مارک‌داون که روی هر نشستی که از این پروفایل استفاده می‌کند اعمال می‌شود.",
     "instructionsEmpty": "هنوز فایل دستورالعملی نیست",
     "instructionsEmptyDescription": "فایل‌های قاعده‌ای اضافه کنید که هر نشست با این پروفایل اعمال کند.",
+    "instructionsEmptyDescriptionReadOnly": "فایل‌های قواعدی که اینجا اضافه می‌شوند برای هر نشستی که از این پروفایل استفاده می‌کند اعمال می‌شوند.",
     "instructionNameRequired": "یک نام فایل وارد کنید",
     "instructionNameTooLong": "نام فایل باید {{max}} نویسه یا کمتر باشد",
     "instructionNameInvalid": "با حرف یا رقم شروع کنید و فقط از حروف کوچک، ارقام و خط تیره استفاده کنید",
@@ -4246,7 +4327,7 @@
       "topPPlaceholder": "مثلاً 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "نماینده من",
-      "promptPlaceholder": "شما یک ...",
+      "promptPlaceholder": "شما یک …",
       "tools": "ابزار",
       "wholeToolRule": "این عامل یک قاعده را به‌طور همزمان به همهٔ ابزارها اعمال می‌کند: {{rule}}. این کلیدها فقط‌خواندنی هستند.",
       "visibility": "دید",
@@ -4369,7 +4450,8 @@
       "purchaseFallback": "خرید اعتبار",
       "receipt": "رسید",
       "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
-      "receiptUnavailable": "رسیدی برای این خرید موجود نیست."
+      "receiptUnavailable": "رسیدی برای این خرید موجود نیست.",
+      "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود."
     },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
@@ -4396,6 +4478,7 @@
     "pickPackToBuyAgain": "برای شروع خرید جدید، یکی از بسته‌های بالا را انتخاب کنید.",
     "purchasePending": "فروشگاه هنوز در حال پردازش این پرداخت است. اعتبارهای شما به‌محض تأیید این پرداخت توسط فروشگاه واریز می‌شود.",
     "buyAgain": "خرید دوباره",
+    "checkPurchase": "بررسی خرید",
     "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
     "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
   },
@@ -4489,7 +4572,9 @@
     },
     "saveSheet": {
       "title": "ذخیره در فهرست",
-      "saved": "ذخیره در {{list}}"
+      "saved": "ذخیره در {{list}}",
+      "saveFailed": "ذخیره کار ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "saveRefused": "ذخیره کار در این فهرست ممکن نشد. فهرست دیگری را انتخاب کنید."
     }
   },
   "agentBriefing": {
@@ -4501,17 +4586,24 @@
     "empty": "هیچ فعالیتی در این بازه گزارش وجود ندارد",
     "emptyHint": "جلسه‌های کدنویسی ابری و CLI شما وقتی یک گزارش زمان‌بندی‌شده فعالیتی داشته باشد، اینجا نمایش داده می‌شوند.",
     "loadError": "بارگیری گزارش‌ها ممکن نشد",
+    "estimateLoadError": "بارگیری تخمین ممکن نشد.",
     "view": "خواندن گزارش",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
+    "filterByContext": "فیلتر بر اساس زمینه",
+    "contextAll": "همه زمینه‌ها",
     "dismiss": "نادیده گرفتن گزارش",
+    "dismissFailed": "فعلاً نادیده گرفتن این گزارش ممکن نشد. در پس‌زمینه دوباره تلاش می‌شود.",
     "offline": "آفلاین · گزارش ذخیره‌شده",
     "cached": "گزارش ذخیره‌شده · به‌روزرسانی در دسترس نیست",
     "summary": "خلاصه AI",
     "summaryPending": "خلاصه AI در حال تهیه است و پس از آماده شدن اینجا افزوده می‌شود.",
     "summaryUnavailable": "خلاصه AI در دسترس نیست. گزارش ساختاریافته همچنان موجود است.",
+    "summaryNotAdmitted": "خلاصه AI برای این گزارش تولید نشد. گزارش ساختاریافته همچنان موجود است.",
     "summaryCharge": "هزینه دریافت‌شده برای AI: {{cost}}",
     "summaryChargePending": "هزینه AI در انتظار تطبیق",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "شواهد و مصنوعات",
     "timezone": "منطقه زمانی گزارش",
     "deviceTimezone": "استفاده از منطقه زمانی دستگاه",
@@ -4523,23 +4615,23 @@
     "timeHint": "کارت خانه در پایان بازه گزارش، حتی به‌صورت آفلاین، وضعیت زنده را بازمی‌گرداند.",
     "invalidSchedule": "یک منطقه زمانی معتبر و یک بازه گزارش غیرخالی انتخاب کنید.",
     "notificationsHint": "برای هر گزارش زمان‌بندی‌شده یک اعلان کلی ارسال می‌شود. مستقل از خلاصه‌های پولی AI.",
-    "notificationPermission": "برای دریافت گزارش، اعلان‌های دستگاه را در $t(common.notifications) فعال کنید.",
+    "notificationPermission": "برای دریافت گزارش، اعلان‌های فوری را روشن کنید.",
     "defaultModel": "استفاده از مدل پیش‌فرض Kilo",
     "duration": "محدودیت زمانی (دقیقه)",
     "spendLimit": "محدودیت هزینه (USD)",
     "invalidSafeguards": "محدودیت زمان و هزینه را به‌صورت عددی مثبت و متناهی وارد کنید.",
     "estimate": "تخمین {{estimate}} · حداکثر {{maximum}}",
-    "estimateUnavailable": "خلاصه پولی برای این تنظیمات در دسترس نیست.",
-    "estimatePricingUnavailable": "قیمت‌گذاری این مدل در دسترس نیست.",
-    "estimateBalanceUnavailable": "موجودی کافی برای خلاصه پرداختی وجود ندارد.",
-    "estimateModelNotAllowed": "این مدل در اینجا مجاز نیست.",
+    "estimateUnavailable": "خلاصه پولی برای این تنظیمات در دسترس نیست. مدل یا محدودیت‌ها را تغییر دهید یا بعداً دوباره امتحان کنید.",
+    "estimatePricingUnavailable": "قیمت‌گذاری این مدل در دسترس نیست. مدل دیگری انتخاب کنید.",
+    "estimateBalanceUnavailable": "موجودی کافی برای خلاصه پرداختی وجود ندارد. به موجودی این زمینه اعتبار اضافه کنید.",
+    "estimateModelNotAllowed": "این مدل در این زمینه مجاز نیست. مدل دیگری انتخاب کنید.",
     "estimateSpendLimitTooLow": "حد خرج کردن را برای فعال شدن این خلاصه افزایش دهید.",
     "confirmPaid": "خلاصه‌های پولی برای {{context}} فعال شود؟",
     "paidDisclosure": "تخمین {{estimate}}، حداکثر {{maximum}}، با محدودیت {{minutes}} دقیقه. حتی در صورت ناموفق بودن، هزینه دریافت می‌شود.",
     "enable": "فعال‌سازی خلاصه‌های پولی",
     "allContexts": "گزارش‌های شخصی و سازمانی جدا از هم نگهداری می‌شوند.",
     "emptyHistory": "هیچ گزارش ذخیره‌شده‌ای وجود ندارد",
-    "estimatePermissionUnavailable": "شما اجازه استفاده از موجودی این زمینه را ندارید.",
+    "estimatePermissionUnavailable": "شما اجازه استفاده از موجودی این زمینه را ندارید. از مالک سازمان بخواهید آن را فعال کند.",
     "saved": "تنظیمات گزارش ذخیره شد",
     "selectedSessions": "جلسه‌های انتخاب‌شده",
     "snapshotPullRequests": "PRs در جلسه‌های انتخاب‌شده",
@@ -4547,16 +4639,35 @@
     "capturedAt": "ثبت‌شده در {{time}}",
     "snapshotHint": "تصویری لحظه‌ای از آخرین وضعیت در دسترس جلسه‌ها که در زمان تعیین‌شدهٔ صبح، تا حد امکان ثبت شده است. تعدادها مربوط به جلسه‌های انتخاب‌شده‌اند، نه کل فعالیت‌های شبانه.",
     "snapshotTruncated": "برای محدود نگه داشتن حجم این تصویر لحظه‌ای، برخی جلسه‌ها یا شواهد کنار گذاشته شدند.",
-    "snapshotSummaryFailed": "تهیه خلاصه AI ناموفق بود. تصویر لحظه‌ای ساختاریافته شما همچنان در دسترس است.",
+    "snapshotSummaryFailed": "تهیه خلاصه AI ناموفق بود. گزارش ساختاریافته شما همچنان در دسترس است.",
     "scheduledContextEnabled": "گزارش‌های زمان‌بندی‌شده",
     "scheduledContextSettings": "گزارش‌های زمان‌بندی‌شده · {{context}}",
     "scheduledContextHint": "ثبت زمان‌بندی‌شده و خلاصه‌های پولی AI را فقط برای این بخش فعال کنید. گزیده‌های انتخاب‌شده پس از حذف اطلاعات حساس و داده‌های ساختاریافته به مدل شما ارسال می‌شوند. خلاصه‌ها از زبان برنامه‌ای استفاده می‌کنند که هنگام به‌روزرسانی تنظیمات گزارش ذخیره شده است. هزینه‌ها از موجودی این بخش کسر می‌شود. تصویرهای لحظه‌ای بدون فعالیت از AI استفاده نمی‌کنند.",
     "snapshotSafeguards": "محدودیت زمان و هزینهٔ هر خلاصه برای هر تصویر لحظه‌ای زمان‌بندی‌شده اعمال می‌شود، نه به‌عنوان بودجهٔ روزانه.",
-    "snapshotEstimateInputTooLarge": "حجم شواهد این تصویر لحظه‌ای برای مدل انتخاب‌شده بیش از حد زیاد است.",
+    "snapshotEstimateInputTooLarge": "حجم شواهد این تصویر لحظه‌ای برای مدل انتخاب‌شده بیش از حد زیاد است. مدلی با پنجره ورودی بزرگ‌تر انتخاب کنید.",
     "quietSnapshot": "برای این تصویر لحظه‌ای هیچ فعالیتی انتخاب نشد. هیچ خلاصه AI درخواست نشد و هزینه‌ای دریافت نشد.",
     "noEnabledContexts": "هیچ بخشی برای گزارش‌های زمان‌بندی‌شده فعال نیست",
     "sourceBlocker": "جلسه به توجه نیاز دارد",
-    "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه"
+    "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه",
+    "metadataPlan_one": "برنامه: {{displayDone}} از {{displayTotal}} مرحله انجام شد",
+    "metadataPlan_other": "برنامه: {{displayDone}} از {{displayTotal}} مرحله انجام شد",
+    "metadataPlan": "برنامه: {{displayDone}} از {{displayTotal}} مرحله انجام شد",
+    "metadataFiles_one": "{{displayCount}} فایل تغییر کرد",
+    "metadataFiles_other": "{{displayCount}} فایل تغییر کرد",
+    "metadataFiles": "{{displayCount}} فایل تغییر کرد",
+    "metadataLinesAdded_one": "{{displayCount}} خط اضافه شد",
+    "metadataLinesAdded_other": "{{displayCount}} خط اضافه شد",
+    "metadataLinesAdded": "{{displayCount}} خط اضافه شد",
+    "metadataLinesRemoved_one": "{{displayCount}} خط حذف شد",
+    "metadataLinesRemoved_other": "{{displayCount}} خط حذف شد",
+    "metadataLinesRemoved": "{{displayCount}} خط حذف شد",
+    "metadataPlanCurrent": "مرحله فعلی: {{current}}",
+    "metadataFailure": "آخرین نوبت ناموفق بود: {{kind}}",
+    "sourceActivity": "فعالیت بدون عنوان",
+    "metadataFailureProvider": "خطای ارائهدهنده",
+    "metadataFailureTool": "خطای ابزار",
+    "metadataFailureCancelled": "لغوشده",
+    "metadataFailureOther": "خطای نامشخص"
   },
   "systemSearch": {
     "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
@@ -4574,7 +4685,7 @@
     "topFeatures": "قابلیت‌های پرکاربرد",
     "emptyTitle": "مصرفی در این بازه ثبت نشده است",
     "unavailableTitle": "مصرف در دسترس نیست",
-    "unavailableDescription": "این فضای کار مصرفی گزارش نمی‌کند. تلاش دوباره کمکی نمی‌کند.",
+    "unavailableDescription": "مصرف برای این فضای کار تنظیم نشده است. اگر انتظار دارید مصرف را اینجا ببینید، با پشتیبانی تماس بگیرید.",
     "orgSelfNotice": "شما مصرف خودتان در این سازمان را می‌بینید.",
     "viewDetails": "مشاهده جزئیات مصرف"
   },
@@ -4582,7 +4693,7 @@
     "title": "یکپارچه‌سازی‌ها",
     "sectionTitle": "سرویس‌های متصل",
     "entrySubtitle": "GitHub، Slack، Linear و موارد دیگر",
-    "subtitle": "ابزارها و گردش‌کارهای توسعهٔ خود را به Kilo متصل کنید",
+    "subtitle": "ابزارها و گردش‌کارهای توسعهٔ خود را به Kilo متصل کنید.",
     "disconnect": "قطع اتصال",
     "disconnectTitle": "اتصال {{provider}} قطع شود؟",
     "disconnectMessage": "Kilo دیگر در {{provider}} پاسخ نمی‌دهد. هر زمان بخواهید می‌توانید دوباره متصل شوید.",
@@ -4592,10 +4703,14 @@
     "couldNotLoad": "بارگیری یکپارچه‌سازی‌ها ممکن نشد",
     "permissionDenied": "شما اجازهٔ مدیریت این یکپارچه‌سازی‌ها را ندارید.",
     "managedByOwner": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک سازمان درخواست کنید.",
+    "managedByOwnerOrAdmin": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک یا مدیر سازمان درخواست کنید.",
+    "managedByOwnerOrBilling": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک یا مدیر صورتحساب سازمان درخواست کنید.",
+    "managedByOwnerAdminOrBilling": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک، مدیر یا مدیر صورتحساب سازمان درخواست کنید.",
     "connectFailed": "باز کردن صفحهٔ اتصال ممکن نشد"
   },
   "invoices": {
-    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند."
+    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند. رسید از App Store و رسید از Google Play در تاریخچهٔ اعتبار هستند.",
+    "personalPeriod": "12 ماه اخیر"
   },
   "cloudAgent": {
     "compute": {
@@ -4627,7 +4742,7 @@
       "new": "تریگر جدید",
       "create": "ساخت تریگر",
       "emptyTitle": "هنوز تریگری وجود ندارد",
-      "emptyDescription": "یک تریگر بسازید تا یک اجرای Cloud Agent را با فراخوانی وب‌هوک یا طبق زمان‌بندی شروع کنید.",
+      "emptyDescription": "اولین تریگر خود را بسازید.",
       "loadFailedTitle": "بارگذاری تریگرها ناموفق بود",
       "loadFailedDescription": "وقتی اتصال دارید دوباره تلاش کنید.",
       "detailLoadFailedTitle": "بارگذاری این تریگر ناموفق بود",
@@ -4650,7 +4765,6 @@
       "nameLocked": "نام پس از ساخت تریگر قابل تغییر نیست.",
       "repositoryLocked": "مخزن پس از ساخت تریگر قابل تغییر نیست.",
       "environmentAutomatic": "خودکار بر اساس مخزن",
-      "notSelected": "انتخاب نشده",
       "profileDefaults": "استفاده از پیش‌فرض‌ها",
       "profileHelp": "تنظیمات پروفایل هنگام اجرای تریگر اعمال می‌شود. رازهای آن در همان زمان تعیین می‌شوند.",
       "customAgent": "عامل سفارشی",
@@ -4740,7 +4854,7 @@
   },
   "organizationGuardrails": {
     "title": "محدودیت‌های ایمنی هوش مصنوعی",
-    "permissionDenied": "فقط مالکان و مدیران سازمان می‌توانند محدودیت‌های ایمنی هوش مصنوعی را مدیریت کنند.",
+    "permissionDenied": "فقط مالکان و مدیران سازمان می‌توانند محدودیت‌های ایمنی هوش مصنوعی را مدیریت کنند. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "محدودیت‌های ایمنی هوش مصنوعی فعال نیست",
     "unavailable": "Kilo محدودیت‌های ایمنی هوش مصنوعی را بنا به درخواست برای یک سازمان فعال می‌کند. با {{supportEmail}} تماس بگیرید تا تیم Kilo آن را برای سازمان شما فعال کند.",
     "contactSupport": "تماس با پشتیبانی",
@@ -4752,12 +4866,15 @@
     "inputDescription": "همه ورودی‌ها، از جمله نتایج ابزارها، را با Enkrypt AI بررسی می‌کند. وقتی Enkrypt در دسترس نباشد، درخواست‌ها به‌جای رد شدن، بدون بررسی ارسال می‌شوند.",
     "outputTitle": "محدودیت‌های ایمنی خروجی",
     "outputDescription": "پاسخ‌ها را پیش از رسیدن به اعضا با Enkrypt AI بررسی می‌کند. تا وقتی آن را روشن نکنید، خاموش است.",
+    "outputUnavailable": "Kilo بررسی خروجی را برای این سازمان فعال نکرده است، بنابراین پاسخ‌ها بررسی نمی‌شوند و چیزی برای تنظیم در اینجا وجود ندارد. برای درخواست آن با {{supportEmail}} تماس بگیرید.",
     "detectorsHint": "«مسدودسازی» درخواست علامت‌گذاری‌شده را رد می‌کند. «فقط ثبت» آن را بدون ایجاد تأخیر در درخواست ثبت می‌کند.",
     "detectorsHintOutput": "«مسدودسازی» پاسخ علامت‌گذاری‌شده را ناموفق می‌کند. «فقط ثبت» آن را بدون ایجاد تأخیر در پاسخ ثبت می‌کند.",
     "choiceLog": "فقط ثبت",
     "applyTo": "اعمال بر",
     "applyToAllMembers": "همه اعضا",
     "applyKiloDefault": "اعمال پیش‌فرض Kilo",
+    "applyKiloDefaultEnglishNote": "متن خط‌مشی پیش‌فرض Kilo به زبان انگلیسی است، زیرا Kilo Gateway آن را دقیقاً همان‌گونه که نوشته شده اعمال می‌کند.",
+    "applyKiloDefaultReplaceMessage": "خط‌مشی پیش‌فرض Kilo به زبان انگلیسی نوشته شده است و آنچه را در نقض خط‌مشی تعیین کرده‌اید جایگزین می‌کند. متنی که در فیلد متن خط‌مشی وارد کرده‌اید قابل بازیابی نیست.",
     "invalidSavedTitle": "تنظیمات ذخیره‌شده تشخیص‌دهنده‌های ورودی قابل خواندن نیست",
     "invalidSavedBody": "تا وقتی تشخیص‌دهنده‌های ورودی دوباره ذخیره نشوند، درخواست‌ها مسدود می‌شوند. تشخیص‌دهنده‌های زیر با پیش‌فرض Kilo شروع می‌شوند.",
     "invalidSavedOutputTitle": "تنظیمات ذخیره‌شده تشخیص‌دهنده‌های خروجی قابل خواندن نیست",
@@ -4878,7 +4995,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ویژگی Enterprise",
-    "enterpriseOnly": "این ویژگی فقط برای Enterprise در دسترس است.",
+    "enterpriseOnly": "ارائه‌دهندگان و مدل‌ها در طرح Enterprise در دسترس هستند.",
     "readOnly": "فقط مالکان و مدیران سازمان می‌توانند این تنظیمات را تغییر دهند.",
     "loadError": "ارائه‌دهندگان و مدل‌ها بارگیری نشدند",
     "tabModels": "مدل‌ها",
@@ -4892,6 +5009,8 @@
     "providersDescription": "با خاموش کردن یک ارائه‌دهنده، Kilo دیگر درخواست‌های این سازمان را به آن هدایت نمی‌کند.",
     "providersNeedCatalog": "کلیدهای ارائه‌دهنده تا زمانی که فهرست کامل مدل‌ها بارگیری نشود فقط‌خواندنی می‌مانند. برای ویرایش آن‌ها، روی تلاش مجدد در بالا ضربه بزنید.",
     "providersEmpty": "هیچ ارائه‌دهنده‌ای با این جست‌وجو مطابقت ندارد.",
+    "providersNone": "هیچ ارائه‌دهنده‌ای برای این سازمان در دسترس نیست.",
+    "providersUnavailable": "فهرست ارائه‌دهندگان بارگیری نشد.",
     "allowAllShown": "مجاز کردن همه موارد نمایش‌داده‌شده",
     "denyAllShown": "ممنوع کردن همه موارد نمایش‌داده‌شده",
     "gatewaysDescription": "Kilo درخواست‌های مدل را از طریق Vercel AI Gateway یا OpenRouter هدایت می‌کند. اگر درگاهی غیرفعال باشد، این درخواست‌ها ناموفق می‌شوند.",

@@ -3,7 +3,7 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Kikao chako cha wakala kimepokea sasisho",
-      "lowBalance": "Usawa wako unahitaji umakini",
+      "lowBalance": "Salio lako linahitaji umakini",
       "spendAlert": "Matumizi yako yanahitaji umakini",
       "securityFinding": "Tokeo la usalama linahitaji umakini",
       "securityUpdate": "Ukaguzi wa usalama umepokea sasisho",
@@ -18,7 +18,7 @@
   "internal": {
     "lowBalance": {
       "title": "Arifa ya salio la chini",
-      "body": "Usawa wa {{organizationName}} ulishuka chini ya ${{minimumBalanceUsd}}"
+      "body": "Salio la {{organizationName}} lilishuka chini ya ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Arifa ya matumizi",

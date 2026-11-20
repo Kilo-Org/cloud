@@ -15,6 +15,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   cleanInstructionName,
   INSTRUCTION_CONTENT_MAX_LENGTH,
@@ -154,7 +155,7 @@ export function InstructionFormSheet({
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -198,6 +199,7 @@ export function InstructionFormSheet({
           defaultValue={contentRef.current}
           error={contentError}
           disabled={isSaving}
+          required
           multiline
           textAlignVertical="top"
           className="min-h-40 max-h-56 leading-[1.25rem]"
@@ -211,6 +213,7 @@ export function InstructionFormSheet({
             }
           }}
         />
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

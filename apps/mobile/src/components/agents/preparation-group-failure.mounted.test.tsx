@@ -15,6 +15,7 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
   Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -83,13 +84,13 @@ async function mount(candidate: PreparationAttempt) {
 describe('PreparationGroup failure copy', () => {
   it('titles two stage-less failures apart and keeps the remedy in the body', async () => {
     const container = await mount(failedAttempt({ safeError: 'container_limit_reached' }));
-    expect(container.group().props.accessibilityLabel).toBe('Container limit reached.');
+    expect(container.group().props.accessibilityLabel).toBe('Container limit reached');
     expect(container.texts()).toContain('Stop an existing container before starting another.');
     container.unmount();
 
     const credentials = await mount(failedAttempt({ safeError: 'credential_upgrade_required' }));
     expect(credentials.group().props.accessibilityLabel).toBe(
-      'This session is missing a required credential upgrade.'
+      'This session is missing a required credential upgrade'
     );
     expect(credentials.texts()).toContain('Start a new session to continue.');
     credentials.unmount();

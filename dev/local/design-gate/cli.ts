@@ -5,7 +5,7 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
-import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
+import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import {
   compareProof,
   prepareProof,
@@ -17,6 +17,7 @@ import {
   writeCaptureReceipt,
   type Revision,
 } from './baseline';
+import { batchesMain } from './batch-runner';
 import {
   captureFiles,
   DEFAULT_OBSERVE_MS,
@@ -42,7 +43,15 @@ import {
 import { createProbeClient } from './cdp';
 import { createAndroidDevice, parseAdbDevices, resolveSerial } from './devices/android';
 import { createIosDevice, resolveSimulator } from './devices/ios';
-import { MATRIX_NAMES, matrixCells, type MatrixName, type Platform } from './matrix';
+import {
+  assertCellsSupported,
+  CELL_IDS,
+  MATRIX_NAMES,
+  matrixCells,
+  type CellId,
+  type MatrixName,
+  type Platform,
+} from './matrix';
 import { runMotion } from './motion';
 import { readRgba } from './pixels';
 import { APP_ID, PROBE_REQUIREMENT, recordRestoreError, summarize, writeArtifacts } from './report';
@@ -79,6 +88,7 @@ export type CliArgs =
       links: string[];
       targets?: string;
       matrix: MatrixName;
+      cells: CellId[];
       observeMs: number;
       preparation?: string;
       revision?: Revision;
@@ -98,10 +108,14 @@ export type CliArgs =
       baseRun: string;
       headRun: string;
       out: string;
+      pixelDiff: boolean;
+      pixelDiffExplainShift: boolean;
     });
 
 export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
-  run    --link <deeplink> [--link ...] [--targets <file>] [--matrix base|standard|full] [--observe-ms ${DEFAULT_OBSERVE_MS}]
+  run    --link <deeplink> [--link ...] [--targets <file>] [--matrix base|standard|full] [--cell <id> ...] [--observe-ms ${DEFAULT_OBSERVE_MS}]
+         --cell adds a cell to the preset (${CELL_IDS.join(', ')}); font-max sets the largest text size and restores it after the run
+         On iOS, landscape rotates the simulator and fails when the display did not flip; compact needs an iPhone SE or mini (--device).
   scan   [--source probe|uiautomator|agent-device] [--session <agent-device session>]   waits for a settled layout on the accessibility sources
   motion --link <deeplink> [--tap <text|testID|label>] [--seconds 3] [--observe-ms ${DEFAULT_OBSERVE_MS}]   exit 1 on an interaction layout shift
   prepare --base <exact-40hex> --head <exact-40hex> --targets <proof-manifest.json> --out <new-dir>
@@ -110,7 +124,10 @@ export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
           run from that prepared worktree with its fresh Metro bundle connected
   compare --preparation <preparation.json> --base-run <dir> --head-run <dir> --out <new-dir>
           exit 2 when either target is unreachable or unready; atomic comparison.json contains introduced findings; never reuses output
+          --pixel-diff writes an advisory pixel-diff.json beside it (receipt-bound captures only); --pixel-diff-explain-shift also reports vertically moved content
+          the pixel diff never changes the status, findings or exit code; an unavailable cell is reported inconclusive with its reason
   help   print this text
+  batches run|seed|expect|coverage   the committed end-to-end pass; \`batches help\` prints its flags
 Common: [--platform android|ios] [--device <serial|udid>] [--metro ${DEFAULT_METRO}] [--out <dir>]
 Proof manifest: {"version":1,"targets":[{"id":"card","link":"kiloapp:///card","route":"/card","screen":"card"}]}
 Optional readiness marker: "readyTestID":"card-ready"   without it, a target is ready when its route and screen match and a node is visible
@@ -125,11 +142,11 @@ export function isHelpRequest(argv: readonly string[]): boolean {
 }
 
 const COMMAND_FLAGS: Record<CliArgs['command'], readonly string[]> = {
-  run: ['link', 'targets', 'matrix', 'observe-ms', 'preparation', 'revision'],
+  run: ['link', 'targets', 'matrix', 'cell', 'observe-ms', 'preparation', 'revision'],
   scan: ['source', 'session'],
   motion: ['link', 'tap', 'seconds', 'observe-ms'],
   prepare: ['base', 'head', 'targets'],
-  compare: ['preparation', 'base-run', 'head-run'],
+  compare: ['preparation', 'base-run', 'head-run', 'pixel-diff', 'pixel-diff-explain-shift'],
 };
 const COMMON_FLAGS = ['platform', 'device', 'metro', 'out'];
 
@@ -158,6 +175,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         link: { type: 'string', multiple: true },
         targets: { type: 'string' },
         matrix: { type: 'string' },
+        cell: { type: 'string', multiple: true },
         'observe-ms': { type: 'string' },
         source: { type: 'string' },
         session: { type: 'string' },
@@ -173,6 +191,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         revision: { type: 'string' },
         'base-run': { type: 'string' },
         'head-run': { type: 'string' },
+        'pixel-diff': { type: 'boolean' },
+        'pixel-diff-explain-shift': { type: 'boolean' },
       },
     });
   } catch (error) {
@@ -239,6 +259,11 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ) {
         throw new UsageError('compare needs --preparation, --base-run, --head-run and --out');
       }
+      const pixelDiff = values['pixel-diff'] === true;
+      const explainShift = values['pixel-diff-explain-shift'] === true;
+      if (explainShift && !pixelDiff) {
+        throw new UsageError('--pixel-diff-explain-shift needs --pixel-diff');
+      }
       return {
         ...common,
         command,
@@ -246,6 +271,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         baseRun: values['base-run'],
         headRun: values['head-run'],
         out: values.out,
+        pixelDiff,
+        pixelDiffExplainShift: explainShift,
       };
     }
     case 'run': {
@@ -261,12 +288,22 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ) {
         throw new UsageError('prepared run needs --targets only, no --link overrides');
       }
+      const cells = (values.cell ?? []).map(id => oneOf('cell', id, CELL_IDS) ?? 'base');
+      // A detected platform is checked by matrixCells, before any cell changes the device.
+      if (common.platform !== undefined) {
+        try {
+          assertCellsSupported(common.platform, cells);
+        } catch (error) {
+          throw new UsageError(error instanceof Error ? error.message : String(error));
+        }
+      }
       return {
         ...common,
         command,
         links,
         targets: values.targets,
         matrix: oneOf('matrix', values.matrix, MATRIX_NAMES) ?? 'standard',
+        cells,
         observeMs,
         ...(values.preparation === undefined
           ? {}
@@ -316,7 +353,9 @@ export function resolveTargets(
   links: readonly string[],
   targetsJson: string | undefined
 ): Target[] {
-  const entries: { id?: string; link: string }[] = links.map(link => ({ link }));
+  const entries: { id?: string; link: string; after?: string; hold?: boolean }[] = links.map(
+    link => ({ link })
+  );
   if (targetsJson !== undefined) {
     const parsed: unknown = JSON.parse(targetsJson);
     const list =
@@ -330,13 +369,24 @@ export function resolveTargets(
         entries.push({ link: entry });
         continue;
       }
-      const { id, name, link } = (
+      const { id, name, link, after, hold } = (
         typeof entry === 'object' && entry !== null ? entry : {}
       ) as Record<string, unknown>;
       if (typeof link !== 'string')
         throw new UsageError('Every --targets entry needs a string link');
+      if (after !== undefined && typeof after !== 'string')
+        throw new UsageError('A --targets entry after must be a string link');
+      if (hold !== undefined && typeof hold !== 'boolean')
+        throw new UsageError('A --targets entry hold must be true or false');
+      if (hold === true && after === undefined)
+        throw new UsageError('A held target needs an after link to release it');
       const explicit = typeof id === 'string' ? id : typeof name === 'string' ? name : undefined;
-      entries.push({ id: explicit, link });
+      entries.push({
+        id: explicit,
+        link,
+        ...(after === undefined ? {} : { after }),
+        ...(hold === true ? { hold: true } : {}),
+      });
     }
   }
   const seen = new Map<string, number>();
@@ -344,7 +394,12 @@ export function resolveTargets(
     const base = targetIdFromLink(entry.id ?? entry.link);
     const count = (seen.get(base) ?? 0) + 1;
     seen.set(base, count);
-    return { id: count === 1 ? base : `${base}-${count}`, link: entry.link };
+    return {
+      id: count === 1 ? base : `${base}-${count}`,
+      link: entry.link,
+      ...(entry.after === undefined ? {} : { after: entry.after }),
+      ...(entry.hold === true ? { hold: true } : {}),
+    };
   });
 }
 
@@ -602,6 +657,11 @@ async function scanOutcome(
   screenshot.completedMs = deps.clock.now() - started;
   const after = await readTree();
   const image = readRgba(files.absolute(files.screenshot), deps.exec);
+  const scaled = withScreenshotScale(dump, image.width);
+  if (scaled !== dump) {
+    dump = scaled;
+    writeJson(files.absolute(files.dump), dump);
+  }
   const alignment = captureAlignment(
     before,
     screenshot,
@@ -621,6 +681,7 @@ async function scanOutcome(
           rtl: dump.env.isRTL,
           compact: false,
           landscape: false,
+          fontMax: false,
         },
         env: dump.env,
         screens: [
@@ -650,6 +711,7 @@ async function scanOutcome(
 
 export async function main(argv: readonly string[], deps: CliDeps = defaultDeps): Promise<number> {
   let args: CliArgs;
+  if (argv[0] === 'batches') return batchesMain(argv.slice(1), deps);
   if (isHelpRequest(argv)) {
     deps.log(USAGE);
     return 0;
@@ -696,9 +758,20 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
           args.baseRun,
           args.headRun,
           args.out,
-          controller.signal
+          controller.signal,
+          args.pixelDiff ? { explainShift: args.pixelDiffExplainShift } : undefined
         );
         deps.log(`design-gate: ${path.resolve(args.out, 'comparison.json')}; ${result.status}`);
+        if (result.pixelDiff !== undefined) {
+          const counts = { changed: 0, unchanged: 0, inconclusive: 0 };
+          for (const cell of result.pixelDiff.cells) counts[cell.status] += 1;
+          deps.log(
+            `design-gate: advisory pixel diff ${result.pixelDiff.status}: ${counts.changed} changed, ${counts.unchanged} unchanged, ${counts.inconclusive} inconclusive; ${path.resolve(args.out, 'pixel-diff.json')}`
+          );
+          for (const reason of result.pixelDiff.reasons) {
+            deps.warn(`design-gate: advisory pixel diff: ${reason}`);
+          }
+        }
         if (result.status === 'inconclusive') return 2;
         return result.introduced.length > 0 ? 1 : 0;
       } catch (error) {
@@ -797,9 +870,9 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
           log: deps.log,
           registerCleanup: abort?.register,
         },
-        matrixCells(device.platform, args.matrix),
+        matrixCells(device.platform, args.matrix, args.cells),
         targets,
-        captured => write(captured, args.matrix)
+        captured => write(captured, [args.matrix, ...args.cells].join('+'))
       );
       if (result.restoreError !== undefined) {
         deps.warn(`design-gate: warning: device state restore failed: ${result.restoreError}`);

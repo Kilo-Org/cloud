@@ -55,6 +55,15 @@ function findEnvironmentDetailsCacheTargetIndex(
   return environmentDetailsIndex > 0 ? environmentDetailsIndex - 1 : undefined;
 }
 
+function findCacheTargetBlock<T extends { type: string; text?: string }>(
+  content: ReadonlyArray<T>,
+  role: string
+) {
+  const cacheTargetIndex =
+    role === 'user' ? findEnvironmentDetailsCacheTargetIndex(content) : undefined;
+  return cacheTargetIndex === undefined ? content.at(-1) : content[cacheTargetIndex];
+}
+
 function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionMessageParam) {
   if (typeof message.content === 'string') {
     message.content = [
@@ -66,10 +75,10 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
       },
     ];
   } else if (Array.isArray(message.content)) {
-    const cacheTargetIndex =
-      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
-    const cacheTarget =
-      cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
+    const content: Array<
+      OpenAI.ChatCompletionContentPart | OpenAI.ChatCompletionContentPartRefusal
+    > = message.content;
+    const cacheTarget = findCacheTargetBlock(content, message.role);
     if (cacheTarget) {
       // @ts-expect-error non-standard extension
       cacheTarget.cache_control = { type: 'ephemeral' };
@@ -102,12 +111,7 @@ function setPromptCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Re
         },
       ];
     } else if (Array.isArray(message.content)) {
-      const cacheTargetIndex =
-        message.role === 'user'
-          ? findEnvironmentDetailsCacheTargetIndex(message.content)
-          : undefined;
-      const cacheTarget =
-        cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
+      const cacheTarget = findCacheTargetBlock(message.content, message.role);
       if (cacheTarget) {
         cacheTarget.prompt_cache_breakpoint = RESPONSES_PROMPT_CACHE_BREAKPOINT;
       }
@@ -143,17 +147,18 @@ function setCacheControlOnMessagesMessage(
       },
     ];
   } else {
+    const content: Anthropic.ContentBlockParam[] = message.content;
     const environmentDetailsCacheTargetIndex =
-      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
+      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(content) : undefined;
     const environmentDetailsCacheTarget =
       environmentDetailsCacheTargetIndex === undefined
         ? undefined
-        : message.content[environmentDetailsCacheTargetIndex];
+        : content[environmentDetailsCacheTargetIndex];
     const cacheTarget =
       environmentDetailsCacheTarget &&
       isCacheableMessagesContentBlock(environmentDetailsCacheTarget)
         ? environmentDetailsCacheTarget
-        : message.content.findLast(isCacheableMessagesContentBlock);
+        : content.findLast(isCacheableMessagesContentBlock);
     if (cacheTarget) {
       cacheTarget.cache_control = cacheControl;
     }
@@ -194,7 +199,8 @@ function hasCacheableMessagesContent(message: Anthropic.MessageParam) {
     : message.content.some(isCacheableMessagesContentBlock);
 }
 
-const CACHE_CONTROL_NODE_BUDGET = 100_000;
+/** Bounds the cache-control traversal of a client-supplied request payload. */
+export const CACHE_CONTROL_NODE_BUDGET = 100_000;
 
 function containsCacheControl(value: unknown): boolean {
   const pending: unknown[] = [value];
@@ -408,6 +414,9 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   if (request.body.reasoning?.enabled === true) {
     return false;
   }
+  if (request.body.reasoning?.enabled === false) {
+    return true;
+  }
   return (
     (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none' ||
     request.body.enable_thinking === false || // Alibaba
@@ -447,6 +456,9 @@ export function replaceReasoningObjectWithReasoningEffort(
  * upstreams as the standard `reasoning_effort` instead.
  */
 export function applyThinkingToggleAndReasoningEffort(request: GatewayRequest) {
+  if (request.kind !== 'chat_completions') {
+    return;
+  }
   request.body.thinking = {
     type: isReasoningExplicitlyDisabled(request) ? 'disabled' : 'enabled',
   };

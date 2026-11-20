@@ -83,7 +83,7 @@ const hello = (runnerConnected = true) => ({
 async function flush() {
   for (let index = 0; index < 25; index++) await Promise.resolve();
 }
-function fixture() {
+function fixture(respond?: (path: string) => Promise<Response> | undefined) {
   const calls: {
     path: string;
     body: Record<string, unknown>;
@@ -104,6 +104,8 @@ function fixture() {
         ticket: 'private-ticket',
         expiresAt: new Date(Date.now() + 90_000).toISOString(),
       });
+    const overridden = await respond?.(path);
+    if (overridden) return overridden;
     return Response.json({ commandID: body.commandID ?? 'known', status: 'queued' });
   });
   const client = new NativeSyncClient({
@@ -287,6 +289,66 @@ test('rejects offline live-only commands and queues opt-in prompts with TTL and 
     type: 'send_message',
   });
   expect(await connection.getCommandStatus(commandID)).toBe('queued');
+  connection.close();
+});
+
+test('keeps the newest command status when a frame advances it before the POST answer settles', async () => {
+  let answer: (response: Response) => void = () => {
+    throw new Error('command POST answer was not requested');
+  };
+  const pending = new Promise<Response>(resolve => {
+    answer = resolve;
+  });
+  const { client, calls } = fixture(path => (path.endsWith('/commands') ? pending : undefined));
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  const sent = connection.sendMessage('queue me', { queueIfOffline: true });
+  await flush();
+  const posted = calls.find(call => call.path.endsWith('/commands'))?.body.commandID;
+  expect(typeof posted).toBe('string');
+  const commandID = posted as string;
+  socket.frame('command_status', { commandID, status: 'delivered' });
+  await flush();
+  expect(state?.commands[commandID]).toBe('delivered');
+  answer(Response.json({ commandID, status: 'queued' }));
+  await sent;
+  await flush();
+  expect(state?.commands[commandID]).toBe('delivered');
+  connection.close();
+});
+
+test('a late status poll answer does not regress a frame-reported expiry', async () => {
+  let answer: (response: Response) => void = () => {
+    throw new Error('status poll answer was not requested');
+  };
+  const pending = new Promise<Response>(resolve => {
+    answer = resolve;
+  });
+  const { client } = fixture(path =>
+    path.endsWith('/commands/cmd_expired') ? pending : undefined
+  );
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame('command_status', { commandID: 'cmd_expired', status: 'expired' });
+  await flush();
+  expect(state?.commands['cmd_expired']).toBe('expired');
+  const status = connection.getCommandStatus('cmd_expired');
+  await flush();
+  answer(Response.json({ commandID: 'cmd_expired', status: 'queued' }));
+  await expect(status).resolves.toBe('expired');
+  expect(state?.commands['cmd_expired']).toBe('expired');
   connection.close();
 });
 
@@ -543,6 +605,42 @@ test('unreadable pending inventory clears controls without blocking later ordere
   connection.close();
 });
 
+test('a mixed pending inventory publishes readable cards and an unreadable notice together', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame(
+    'remote.state',
+    {
+      incarnation: 'runner',
+      runID: 'run',
+      pending: {
+        permissions: [
+          { requestID: 'readable', tool: 'edit', summary: 'file' },
+          { requestID: 'unreadable', tool: 'edit', summary: 7 },
+        ],
+        questions: [
+          { requestID: 'question', fields: [{ type: 'string', key: 'q', title: 'Which?' }] },
+        ],
+      },
+    },
+    1,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.permissions.map(item => item.id)).toEqual(['readable']);
+  expect(state?.pending.unreadablePermissions).toEqual([{ requestId: 'unreadable' }]);
+  expect(state?.pending.questions.map(item => item.id)).toEqual(['question']);
+  expect(state?.connection).toBe('connected');
+  connection.close();
+});
+
 test('an unreadable live permission is published by identity until the runner replies', async () => {
   const { client } = fixture();
   let state: NativeSessionState | undefined;
@@ -733,6 +831,461 @@ test('a missing session snapshot stays retryable', async () => {
   connection.close();
 });
 
+test('three failed snapshot cycles settle the transport until an explicit refresh', async () => {
+  snapshot.mockRejectedValue(new Error('Native state read failed'));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const cycle = async (index: number) => {
+    connectedSocket(index).frame('hello', hello());
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  };
+  await cycle(0);
+  await cycle(1);
+  await cycle(2);
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure?.error).toContain('Native state read failed');
+  expect(snapshot).toHaveBeenCalledTimes(3);
+  expect(FakeSocket.sockets).toHaveLength(3);
+  for (const socket of FakeSocket.sockets.slice(3)) socket.frame('hello', hello());
+  await jest.advanceTimersByTimeAsync(120_000);
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(3);
+  expect(snapshot).toHaveBeenCalledTimes(3);
+  connection.close();
+});
+
+test('a successful snapshot cycle resets the failure streak', async () => {
+  const failure = () => new Error('Native state read failed');
+  snapshot
+    .mockRejectedValueOnce(failure())
+    .mockRejectedValueOnce(failure())
+    .mockResolvedValueOnce({
+      position: 0,
+      revision: 1,
+      session: sessionMetadata,
+      entities: [],
+      messages: [],
+    })
+    .mockRejectedValue(failure());
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  for (const index of [0, 1]) {
+    connectedSocket(index).frame('hello', hello());
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  }
+  connectedSocket(2).frame('hello', hello(), 20);
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  connectedSocket(2).frame('reset_required', { seq: 21 }, 21);
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  await jest.advanceTimersByTimeAsync(2001);
+  await flush();
+  connectedSocket(3).frame('reset_required', { seq: 22 }, 22);
+  await flush();
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure).toBeUndefined();
+  await jest.advanceTimersByTimeAsync(2001);
+  await flush();
+  connectedSocket(4).frame('reset_required', { seq: 23 }, 23);
+  await flush();
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure?.error).toContain('Native state read failed');
+  expect(snapshot).toHaveBeenCalledTimes(6);
+  connection.close();
+});
+
+test('refresh after a latch clears the marker and reads a fresh snapshot', async () => {
+  snapshot.mockRejectedValue(new Error('Native state read failed'));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const cycle = async (index: number) => {
+    connectedSocket(index).frame('hello', hello());
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  };
+  await cycle(0);
+  await cycle(1);
+  await cycle(2);
+  expect(state?.snapshotFailure?.error).toContain('Native state read failed');
+  expect(FakeSocket.sockets).toHaveLength(3);
+  snapshot.mockResolvedValueOnce({
+    position: 4,
+    revision: 2,
+    session: sessionMetadata,
+    entities: [],
+    messages: [],
+  });
+  connection.refresh();
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  expect(FakeSocket.sockets).toHaveLength(4);
+  connectedSocket(3).frame('hello', hello(), 7);
+  await flush();
+  expect(connectedSocket(3).sent).toContainEqual({ type: 'subscribe', afterSeq: 7 });
+  expect(state?.snapshot?.position).toBe(4);
+  expect(state?.connection).toBe('connected');
+  expect(snapshot).toHaveBeenCalledTimes(4);
+  connection.close();
+});
+
+test('refresh after a reset-cycle latch re-reads the transcript at its new position', async () => {
+  snapshot.mockResolvedValueOnce(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket(0).frame('hello', hello(), 3);
+  await flush();
+  expect(state?.snapshot?.position).toBe(5);
+  snapshot.mockRejectedValue(new Error('Native state read failed'));
+  for (const index of [0, 1, 2]) {
+    connectedSocket(index).frame('reset_required', { seq: 20 + index }, 20 + index);
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  }
+  expect(state?.snapshotFailure?.error).toContain('Native state read failed');
+  expect(FakeSocket.sockets).toHaveLength(3);
+  // The reset transcript restarts behind the position read before it.
+  snapshot.mockResolvedValueOnce({ ...complete(4), revision: 3 });
+  connection.refresh();
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  expect(state?.error).toBeUndefined();
+  connectedSocket(3).frame('hello', hello(), 6);
+  await flush();
+  expect(state?.snapshot?.position).toBe(4);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'done' }]);
+  expect(state?.error).toBeUndefined();
+  expect(connectedSocket(3).sent).toContainEqual({ type: 'subscribe', afterSeq: 6 });
+  expect(snapshot).toHaveBeenCalledTimes(5);
+  connection.close();
+});
+
+test('refresh keeps a warning for a frame no later snapshot has covered yet', async () => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 9, data: { data: { id: 'invalid' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.error).toContain('skipped an event it could not read');
+  // Three exhausted recoveries latch while the unprojectable frame stays uncovered.
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  socket.frame('reset_required', { seq: 5 }, 5);
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  socket.frame('reset_required', { seq: 6 }, 6);
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.snapshotFailure?.error).toContain('recovery is incomplete');
+  // The refreshed read still does not cover the quarantined frame.
+  snapshot.mockResolvedValue(complete(5));
+  connection.refresh();
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  connectedSocket(1).frame('hello', hello(), 7);
+  await flush();
+  expect(state?.error).toContain('skipped an event it could not read');
+  connection.close();
+});
+
+test('refresh clears a replay-loss notice only with an authoritative read', async () => {
+  snapshot.mockResolvedValueOnce(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket(0).frame('hello', hello(), 3);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  // Replay was unavailable, so the transcript cannot be certified from the live stream.
+  snapshot.mockRejectedValue(new Error('Native state read failed'));
+  connectedSocket(0).frame('reset_required', { seq: 9 }, 9);
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  // A clean subscribe alone does not certify it.
+  connectedSocket(0).frame('subscribed', { seq: 9 }, 9);
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  // The authoritative read does, and the notice goes with it.
+  snapshot.mockResolvedValueOnce({ ...complete(9), revision: 2 });
+  connection.refresh();
+  await flush();
+  connectedSocket(1).frame('hello', hello(), 12);
+  await flush();
+  connectedSocket(1).frame('subscribed', { seq: 12 }, 12);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  expect(state?.snapshot?.position).toBe(9);
+  connection.close();
+});
+
+test('a retry that cannot read the transcript reports the terminal failure', async () => {
+  snapshot.mockResolvedValueOnce(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket(0).frame('hello', hello(), 3);
+  await flush();
+  snapshot.mockRejectedValue(new Error('Native state read failed'));
+  connectedSocket(0).frame('reset_required', { seq: 9 }, 9);
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  connection.refresh();
+  await flush();
+  for (const index of [1, 2, 3]) {
+    connectedSocket(index).frame('hello', hello());
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  }
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure?.error).toContain('Native state read failed');
+  expect(state?.error).toBe(state?.snapshotFailure?.error);
+  connection.close();
+});
+
+test('a read canceled by a closing socket never counts toward the bound', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  for (const index of [0, 1, 2, 3]) {
+    snapshot.mockImplementationOnce(
+      (_request, _sessionID, signal?: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new NativeSyncError('request_canceled')));
+        })
+    );
+    const socket = connectedSocket(index);
+    socket.frame('hello', hello());
+    await flush();
+    socket.close();
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+    expect(state?.snapshotFailure).toBeUndefined();
+  }
+  expect(FakeSocket.sockets.length).toBeGreaterThan(3);
+  connection.close();
+});
+
+test('a retry keeps a more specific transcript notice', async () => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 9, data: { data: { id: 'invalid' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.error).toContain('skipped an event it could not read');
+  // Replay is unavailable as well, and its notice names the loss the client cannot repair.
+  snapshot.mockRejectedValueOnce(new Error('Native state read failed'));
+  socket.frame('reset_required', { seq: 9 }, 9);
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  connection.refresh();
+  await flush();
+  expect(state?.error).toContain('may be incomplete');
+  expect(state?.error).not.toContain('skipped an event it could not read');
+  connection.close();
+});
+
+test('a retry during a recovery still settles the transcript', async () => {
+  snapshot.mockResolvedValueOnce(incomplete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket(0).frame('hello', hello(), 3);
+  await flush();
+  // A live frame is retained for replay while recovery waits out its backoff.
+  await jest.advanceTimersByTimeAsync(250);
+  connectedSocket(0).frame(
+    'session.text.delta',
+    { syncPosition: 6, data: { data: { assistantMessageID: 'msg_m', ordinal: 0, delta: 'live' } } },
+    4,
+    'events'
+  );
+  await flush();
+  snapshot.mockResolvedValueOnce(complete(6));
+  connection.refresh();
+  await flush();
+  connectedSocket(1).frame('hello', hello(), 8);
+  await flush();
+  connectedSocket(1).frame('subscribed', { seq: 8 }, 8);
+  await flush();
+  expect(state?.error).toBeUndefined();
+  expect(state?.messages[0]?.message.incomplete).toBeUndefined();
+  expect(state?.connection).toBe('connected');
+  connection.close();
+});
+
+test('an unreadable native asset latches on the first snapshot read', async () => {
+  snapshot.mockRejectedValueOnce(
+    Object.assign(new Error('asset file is not readable'), { code: 'native_asset_not_found' })
+  );
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello());
+  await flush();
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure?.error).toBe(
+    'Native transcript is unavailable: asset file is not readable. Open the session again to retry.'
+  );
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  await jest.advanceTimersByTimeAsync(120_000);
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(1);
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  connection.close();
+});
+
+test('a missing session stays retryable past the snapshot failure limit', async () => {
+  snapshot.mockRejectedValue(new NativeSyncError('session_not_found', 404));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  for (let index = 0; index < 5; index++) {
+    connectedSocket(index).frame('hello', hello());
+    await flush();
+    expect(state?.snapshotFailure).toBeUndefined();
+    expect(FakeSocket.sockets).toHaveLength(index + 1);
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  }
+  expect(FakeSocket.sockets).toHaveLength(6);
+  expect(snapshot).toHaveBeenCalledTimes(5);
+  connection.close();
+});
+
+test('exhausted recovery reads count one failed cycle each', async () => {
+  snapshot
+    .mockResolvedValueOnce(incomplete(5))
+    .mockRejectedValue(new Error('Native state read failed'));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.error).toContain('Native transcript recovery is incomplete');
+  expect(state?.snapshotFailure).toBeUndefined();
+  socket.frame('session.execution.succeeded', { syncPosition: 6, data: { data: {} } }, 4, 'events');
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  socket.frame('session.execution.succeeded', { syncPosition: 7, data: { data: {} } }, 5, 'events');
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure?.error).toContain('Native state read failed');
+  expect(snapshot).toHaveBeenCalledTimes(13);
+  expect(FakeSocket.sockets).toHaveLength(1);
+  connection.close();
+});
+
+test('an unconverged recovery snapshot counts one failed cycle each', async () => {
+  snapshot.mockResolvedValue(incomplete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.error).toContain('Native transcript recovery is incomplete.');
+  expect(state?.snapshotFailure).toBeUndefined();
+  socket.frame('session.execution.succeeded', { syncPosition: 6, data: { data: {} } }, 4, 'events');
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  socket.frame('session.execution.succeeded', { syncPosition: 7, data: { data: {} } }, 5, 'events');
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure?.error).toBe(
+    'Native transcript is unavailable: Native transcript recovery is incomplete. Open the session again to retry.'
+  );
+  expect(snapshot).toHaveBeenCalledTimes(13);
+  expect(FakeSocket.sockets).toHaveLength(1);
+  connection.close();
+});
+
 test('frames queued behind a closing socket cannot renew or resubscribe it', async () => {
   let release: (value: NativeSnapshot) => void = () => {};
   snapshot.mockReturnValueOnce(
@@ -758,6 +1311,89 @@ test('frames queued behind a closing socket cannot renew or resubscribe it', asy
   expect(FakeSocket.sockets).toHaveLength(2);
   expect(calls.filter(call => call.path.endsWith('live-ticket'))).toHaveLength(2);
   connection.close();
+});
+
+function flakyTicketFixture(failingTickets: number) {
+  const calls: { path: string }[] = [];
+  let tickets = 0;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    calls.push({ path });
+    if (path.endsWith('/exchange'))
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (path.endsWith('ticket')) {
+      tickets++;
+      if (tickets <= failingTickets)
+        return Response.json({ error: { code: 'service_overloaded' } }, { status: 503 });
+      return Response.json({
+        ticket: 'private-ticket',
+        expiresAt: new Date(Date.now() + 90_000).toISOString(),
+      });
+    }
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  return { client, calls };
+}
+
+test('connect attempts that never reach hello escalate to the ceiling', async () => {
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const { client, calls } = flakyTicketFixture(Number.POSITIVE_INFINITY);
+  const connection = client.connectSession('ses_a', () => {});
+  const attempts = () => calls.filter(call => call.path.endsWith('live-ticket')).length;
+  try {
+    await flush();
+    expect(attempts()).toBe(1);
+    const steps = [1000, 2000, 4000, 8000, 16_000, 32_000, 60_000, 60_000];
+    for (const [index, step] of steps.entries()) {
+      await jest.advanceTimersByTimeAsync(step);
+      await flush();
+      expect(attempts()).toBe(index + 2);
+    }
+    expect(FakeSocket.sockets).toHaveLength(0);
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
+test('hello resets the connect backoff', async () => {
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const { client, calls } = flakyTicketFixture(2);
+  const connection = client.connectSession('ses_a', () => {});
+  const attempts = () => calls.filter(call => call.path.endsWith('live-ticket')).length;
+  try {
+    await flush();
+    expect(attempts()).toBe(1);
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(attempts()).toBe(2);
+    await jest.advanceTimersByTimeAsync(2000);
+    await flush();
+    expect(attempts()).toBe(3);
+    expect(FakeSocket.sockets).toHaveLength(1);
+    const socket = connectedSocket();
+    socket.frame('hello', hello());
+    await flush();
+    socket.close();
+    await flush();
+    // The escalated step stood at 4000 ms; only a hello reset yields a retry after 1000 ms.
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(attempts()).toBe(4);
+    expect(FakeSocket.sockets).toHaveLength(2);
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
 });
 
 test('binds the browser default fetch receiver', async () => {
@@ -1495,6 +2131,74 @@ test('a replaced native asset re-reports stale references through already covere
   connection.close();
 });
 
+test('an unresolved private asset keeps the notice and starts recovery', async () => {
+  const key = kilo2AssetKey('msg_file_000000_file_0', 'file:///owned/stale.png', 'image/png');
+  const fileMessage = {
+    message: {
+      id: 'msg_file',
+      type: 'assistant',
+      time: { created: 1, completed: 5 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call',
+          name: 'read',
+          time: { created: 1, ran: 1, completed: 1 },
+          state: {
+            status: 'completed' as const,
+            input: { path: 'stale.png' },
+            content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }],
+          },
+        },
+      ],
+    },
+    seq: 1,
+  };
+  snapshot.mockResolvedValueOnce({
+    position: 5,
+    revision: 2,
+    session: sessionMetadata,
+    entities: [],
+    messages: [fileMessage],
+  });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(), 3);
+  await flush();
+  if (!state) throw new Error('Missing native state');
+  expect(state.error).toBeUndefined();
+  // No pending identity names this message, yet the unresolved asset is a gap, so recovery
+  // reads the canonical snapshot that can authorize its bytes.
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(snapshot.mock.calls.length).toBeGreaterThan(1);
+  // A published failure stays visible through `subscribed` while the transcript is still gapped.
+  connectedSocket().frame('error', { code: 'Session command failed' });
+  await flush();
+  expect(state.error).toBe('Session command failed');
+  connectedSocket().frame('subscribed', { seq: 6 }, 6);
+  await flush();
+  expect(state.error).toBe('Session command failed');
+  snapshot.mockResolvedValueOnce({
+    position: 6,
+    revision: 3,
+    session: sessionMetadata,
+    entities: [],
+    assetURLs: { [key]: 'data:image/png;base64,c3RhbGU=' },
+    messages: [fileMessage],
+  });
+  await jest.advanceTimersByTimeAsync(500);
+  await flush();
+  expect(state.pendingSnapshotMessageIDs).toBeUndefined();
+  expect(state.error).toBeUndefined();
+  expect(readNativeConversation(state).error).toBeUndefined();
+  connection.close();
+});
+
 test('a reset keeps its integrity error through snapshots, reconnect and subscribed', async () => {
   snapshot.mockResolvedValue(complete(5));
   const { client } = fixture();
@@ -1585,7 +2289,7 @@ test('session moves wait for a revision-pinned authoritative canonical message i
   expect(state?.messages).toEqual([]);
   expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
   if (!state) throw new Error('Missing native state');
-  expect(readNativeConversation(state).error).toContain('incomplete');
+  expect(readNativeConversation(state)).toMatchObject({ recoveryGaps: 1, error: undefined });
   await jest.advanceTimersByTimeAsync(250);
   await flush();
   expect(state.pendingSnapshotMessageIDs).toEqual(['msg_2']);
@@ -1803,6 +2507,76 @@ test('missing metadata recovery stops at its bound with a visible error, not a c
   if (!state) throw new Error('Missing native state');
   expect(readNativeConversation(state).error).toContain('incomplete');
   expect(readNativeConversation(state).loading).toBe(false);
+  connection.close();
+});
+
+test('requestRecovery retries missing parts over the live socket and resolves once they arrive', async () => {
+  const initial: NativeSnapshot = {
+    position: 1,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    messages: [],
+  };
+  snapshot.mockResolvedValue(initial);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  socket.frame(
+    'session.moved',
+    {
+      syncPosition: 1,
+      data: { data: { sessionID: 'ses_a', location: { directory: '/after' } } },
+    },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
+  // Let the automatic run reach its bound, so the retry below is the only recovery left.
+  await jest.advanceTimersByTimeAsync(3750);
+  await flush();
+  expect(state?.error).toContain('incomplete');
+  const sockets = FakeSocket.sockets.length;
+  const reads = snapshot.mock.calls.length;
+  snapshot.mockResolvedValue({
+    ...initial,
+    position: 2,
+    revision: 2,
+    messages: [
+      {
+        seq: 2,
+        message: {
+          id: 'msg_2',
+          type: 'location-switched',
+          time: { created: 2 },
+          location: { directory: '/after' },
+          previous: { location: { directory: '/before' } },
+        },
+      },
+    ],
+  });
+  const recovered = connection.requestRecovery();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  await recovered;
+  // The same socket carried the retry: no reconnect, no teardown.
+  expect(FakeSocket.sockets.length).toBe(sockets);
+  expect(snapshot.mock.calls.length).toBe(reads + 1);
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  expect(state?.error).toBeUndefined();
+  if (!state) throw new Error('Missing recovered state');
+  expect(readNativeConversation(state).recoveryGaps).toBe(0);
+  // Nothing is missing any more, so a later retry resolves without reading a snapshot.
+  const clean = snapshot.mock.calls.length;
+  await connection.requestRecovery();
+  expect(snapshot.mock.calls.length).toBe(clean);
   connection.close();
 });
 

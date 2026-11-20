@@ -73,6 +73,7 @@ vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   Cpu: 'Cpu',
   FolderGit2: 'FolderGit2',
+  ShieldCheck: 'ShieldCheck',
   Zap: 'Zap',
 }));
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
@@ -374,7 +375,7 @@ describe.each([
       );
       // The empty list makes "choose which repositories to monitor" untrue, so
       // the row names the step that actually unblocks it.
-      expect(cta?.props.subtitle).toBe('Grant the Kilo GitHub App access to repositories');
+      expect(cta?.props.subtitle).toBe('Grant the Kilo GitHub App access to repositories.');
     }
   );
 

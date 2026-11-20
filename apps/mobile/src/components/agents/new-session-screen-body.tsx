@@ -63,6 +63,7 @@ import { useSessionEnvironment } from '@/lib/cloud-environments/use-session-envi
 import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
@@ -93,7 +94,9 @@ import {
 } from '@/lib/hooks/remote-instance-spawn-classifier';
 import {
   resolveContinueStartDisabled,
+  resolveGatewayModelsReadFailed,
   resolveNewSessionConnectProvider,
+  resolveNewSessionProfileGate,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
   resolveRemoteStartMissingContent,
@@ -289,10 +292,8 @@ export function NewSessionScreenBody() {
   // the personal account or one of the reader's organizations, and its sheet is
   // titled "Select account" (`profile.selectAccount`).
   const accountSection = (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('preferences.account')}
-      </Text>
+    <View className="mt-5 gap-2">
+      <FormFieldLabel label={t('preferences.account')} />
       {isCloneEntry ? (
         <ContextControl
           scope={{ organizationId: organizationId ?? null, isResolved: true }}
@@ -349,6 +350,8 @@ export function NewSessionScreenBody() {
     models,
     isLoading: isLoadingModels,
     isError: isModelsError,
+    isFetching: isFetchingModels,
+    isFetched: isFetchedModels,
     refetch: refetchModels,
   } = useAvailableModels(organizationId);
   const instanceCatalog = useInstanceModelCatalog(runOnInstance?.connectionId ?? null);
@@ -606,11 +609,21 @@ export function NewSessionScreenBody() {
   const {
     profile,
     profileId,
+    resolvedOverrideProfileId,
     isLoading: isProfileLoading,
     isError: isProfileError,
     overrideNeedsAttention: profileOverrideNeedsAttention,
     refetch: refetchProfile,
   } = useEffectiveAgentProfile(organizationId, overrideProfileId);
+
+  // One state for the profile read's share of the Start gate. Built once here:
+  // the Start gate and the blocked-reason helper read the same value, so an
+  // offer to retry is only made when Start actually waits on the read.
+  const profileGate = resolveNewSessionProfileGate({
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    hasOverride: overrideProfileId !== null,
+  });
 
   // The picker opens as the app's standard native formSheet. The bridge carries
   // the current pick; the sheet reports the new one back through `onSelect`.
@@ -1220,7 +1233,7 @@ export function NewSessionScreenBody() {
       model: displayModel,
       selectedRepo,
       selectedRepositoryResolved: selectedRepository !== null,
-      isProfileLoading,
+      profileGate,
     });
   }
 
@@ -1277,10 +1290,18 @@ export function NewSessionScreenBody() {
             isRemoteTargetSelected,
             isSubmitting,
             model: displayModel,
-            isProfileLoading,
+            profileGate,
           },
         }
   );
+
+  const gatewayModelsReadFailed = resolveGatewayModelsReadFailed({
+    isRemoteTargetSelected,
+    isError: isModelsError,
+    isLoading: isLoadingModels,
+    isFetched: isFetchedModels,
+    modelCount: models.length,
+  });
 
   let startBlockedReason: string | null = null;
   let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
@@ -1296,6 +1317,17 @@ export function NewSessionScreenBody() {
     startBlockedReason = stripInlineCodeMarkers(
       t('agentChat.instancePicker.noCliInstancesDescription')
     );
+  } else if (gatewayModelsReadFailed) {
+    // The composer keeps its toolbar and does not state the failure, so the
+    // footer names it and carries its Retry whatever else is still missing:
+    // with a remembered model the picker would otherwise open empty with no
+    // explanation, and with none it would ask for a pick it cannot offer.
+    startBlockedReason = t('agentChat.newSession.couldNotLoadModels');
+    startBlockedAction = {
+      label: t('common.retry'),
+      onPress: () => void refetchModels(),
+      isBusy: isFetchingModels,
+    };
   } else if (startBlockedReasonKey === 'refresh-repositories') {
     startBlockedReason = t('common.noRepositoriesFound');
     startBlockedAction = {
@@ -1322,6 +1354,12 @@ export function NewSessionScreenBody() {
     // The Environment row already shows its busy state; the footer says why
     // Start waits on it, so a disabled control is never unexplained.
     startBlockedReason = t('agentChat.newSession.profileLoadingToStart');
+  } else if (startBlockedReasonKey === 'profile-error') {
+    // The Environment row's error state offers the same retry. The footer names
+    // the failure and carries the action because Start waits on the read the
+    // retry re-runs: the picked profile cannot be submitted until it resolves.
+    startBlockedReason = t('agentChat.newSession.couldNotLoadEnvironment');
+    startBlockedAction = { label: t('common.retry'), onPress: () => void refetchProfile() };
   } else if (startBlockedReasonKey === 'model-missing') {
     startBlockedReason = t('agentChat.newSession.modelMissingToStart');
   } else if (startBlockedReasonKey === 'stale-selection') {
@@ -1500,7 +1538,7 @@ export function NewSessionScreenBody() {
         profileOverrideNeedsAttention={profileOverrideNeedsAttention}
         onRetryProfile={() => void refetchProfile()}
         onOpenProfilePicker={handleOpenProfilePicker}
-        selectedProfileId={overrideProfileId}
+        selectedProfileId={resolvedOverrideProfileId}
         onSelectProfile={setOverrideProfileId}
         manualVars={manualVars}
         manualCommands={manualCommands}

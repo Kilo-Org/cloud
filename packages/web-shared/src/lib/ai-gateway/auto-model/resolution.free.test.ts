@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoFreeCandidates } from './resolution';
-import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterChatModelIdsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
@@ -25,7 +25,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   ...jest.requireActual<typeof GatewayModelsCache>(
     '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
-  getOpenRouterModelsFromDatabase: jest.fn(),
+  getOpenRouterChatModelIdsFromDatabase: jest.fn(),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
@@ -50,7 +50,9 @@ describe('getAutoFreeCandidates', () => {
     jest
       .mocked(getRuntimeGatewayRoutingConfig)
       .mockResolvedValue({ vercelOptOutModels: new Set() });
-    jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
+    jest
+      .mocked(getOpenRouterChatModelIdsFromDatabase)
+      .mockResolvedValue(new Set(['test/present:free']));
     configure([AUTO_SMALL_TARGET_MODELS.free, 'test/present:free', 'test/absent:free']);
   });
 
@@ -76,7 +78,7 @@ describe('getAutoFreeCandidates', () => {
 
   it('includes the kilo-auto/small free model when the OpenRouter catalog lists it', async () => {
     jest
-      .mocked(getOpenRouterModelsFromDatabase)
+      .mocked(getOpenRouterChatModelIdsFromDatabase)
       .mockResolvedValue(new Set([AUTO_SMALL_TARGET_MODELS.free, 'test/present:free']));
 
     expect(await getAutoFreeCandidates('chat_completions')).toEqual(
@@ -86,7 +88,7 @@ describe('getAutoFreeCandidates', () => {
 
   it('skips configured models that are not free or need a non-default AI SDK provider', async () => {
     jest
-      .mocked(getOpenRouterModelsFromDatabase)
+      .mocked(getOpenRouterChatModelIdsFromDatabase)
       .mockResolvedValue(
         new Set(['test/present:free', 'test/paid', 'anthropic/claude-free:free', 'kilo-auto/free'])
       );

@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
-import { OwnerTypeSchema, type OwnerType } from './owner';
+import { OwnerIdentityShape, OwnerTypeSchema, type OwnerType } from './owner';
 import { ClassifierSubtaskTypeSchema, ClassifierTaskTypeSchema } from './taxonomy';
 import { VariantSchema } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
@@ -147,7 +147,11 @@ export const CustomRouterEntryRefSchema = z.discriminatedUnion('kind', [
 ]);
 export type CustomRouterEntryRef = z.infer<typeof CustomRouterEntryRefSchema>;
 
-export function customRouterEntryRef(entry: CustomRouterEntryRef): CustomRouterEntryRef {
+// The ref keeps only what names the entry: it drops the fields that only the
+// full entry carries (`measuredAs`, `variants`, `capabilities`, `pricing`).
+export function toCustomRouterEntryRef(
+  entry: CustomRouterEntry | CustomRouterEntryRef
+): CustomRouterEntryRef {
   return entry.kind === 'gateway'
     ? { kind: 'gateway', model: entry.model }
     : { kind: 'client', provider: entry.provider, model: entry.model };
@@ -156,7 +160,7 @@ export function customRouterEntryRef(entry: CustomRouterEntryRef): CustomRouterE
 export function customRouterEntryKey(entry: CustomRouterEntryRef): string {
   return entry.kind === 'gateway'
     ? `gateway:${entry.model}`
-    : `client:${entry.provider}/${entry.model}`;
+    : `${CLIENT_CANDIDATE_PREFIX}${entry.provider}/${entry.model}`;
 }
 
 // Custom routing tables and decisions name a client entry `client:<provider>/<model>`, so policy
@@ -232,17 +236,9 @@ function validateEntryBudget(
       `Too big: expected measuredAs to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
     );
   }
-  if (entry.kind === 'gateway') {
-    if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
-      addIssue(
-        ctx,
-        path('model'),
-        `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
-      );
-    }
-    return;
-  }
-  if (entry.provider.length > MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH) {
+  // A client entry reports its provider bound before the model bound, so that check stays
+  // ahead of the shared model guard. The model guard itself is written once for both kinds.
+  if (entry.kind === 'client' && entry.provider.length > MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH) {
     addIssue(
       ctx,
       path('provider'),
@@ -255,6 +251,9 @@ function validateEntryBudget(
       path('model'),
       `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
     );
+  }
+  if (entry.kind === 'gateway') {
+    return;
   }
   if (entry.variants.length > MAX_CLIENT_VARIANTS) {
     addIssue(ctx, path('variants'), `Too big: expected at most ${MAX_CLIENT_VARIANTS} variants`);
@@ -339,8 +338,7 @@ const WriteEntryKeySchema = EntryKeySchema.max(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGT
 export const CustomRouterDefinitionSchema = z
   .object({
     id: z.uuid(),
-    ownerType: OwnerTypeSchema,
-    ownerId: z.string().trim().min(1),
+    ...OwnerIdentityShape,
     slug: CustomRouterSlugSchema,
     name: CustomRouterNameSchema,
     baseRouter: AutoRouterSchema,
@@ -786,8 +784,7 @@ export const CUSTOM_ROUTER_STATUS_PATH = '/admin/custom-router-status';
 export const PLATFORM_MEASUREMENTS_PATH = '/admin/platform-measurements';
 
 const customRouterBenchmarkContextShape = {
-  ownerType: OwnerTypeSchema,
-  ownerId: z.string().trim().min(1),
+  ...OwnerIdentityShape,
   baseRouter: AutoRouterSchema,
   entries: CustomRouterEntriesSchema,
   // Keys of the entries the owner's CLI measures: every client entry, and each gateway entry the
@@ -801,7 +798,6 @@ function addClientEvalEntryKeyIssues(
   ctx: z.RefinementCtx
 ): void {
   const entryKeys = new Set(context.entries.map(customRouterEntryKey));
-  const listed = new Set<string>();
   context.clientEvalEntryKeys.forEach((key, index) => {
     if (!entryKeys.has(key)) {
       ctx.addIssue({
@@ -809,15 +805,13 @@ function addClientEvalEntryKeyIssues(
         path: ['clientEvalEntryKeys', index],
         message: 'clientEvalEntryKeys must name a pool entry',
       });
-    } else if (listed.has(key)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['clientEvalEntryKeys', index],
-        message: `Duplicate client eval entry ${key}`,
-      });
     }
-    listed.add(key);
   });
+  addDuplicateKeyIssues(context.clientEvalEntryKeys, ctx, key => key, {
+    pathPrefix: ['clientEvalEntryKeys'],
+    message: key => `Duplicate client eval entry ${key}`,
+  });
+  const listed = new Set(context.clientEvalEntryKeys);
   context.entries.forEach((entry, index) => {
     if (entry.kind === 'client' && !listed.has(customRouterEntryKey(entry))) {
       ctx.addIssue({

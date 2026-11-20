@@ -124,9 +124,7 @@ vi.mock('@/components/pr-review/pr-review-overview-parts', () => ({
 vi.mock('@/components/pr-review/pr-review-meta-parts', () => ({
   PrOverviewMeta: 'PrOverviewMeta',
 }));
-vi.mock('@/components/pr-review/pr-review-section-label', () => ({
-  PrReviewSectionLabel: 'PrReviewSectionLabel',
-}));
+vi.mock('@/components/ui/section', () => ({ Section: 'Section' }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
@@ -135,7 +133,10 @@ vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
 }));
 vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownText' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'ScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: record('button') }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

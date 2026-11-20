@@ -10,7 +10,7 @@ import type * as TextModule from '@/components/ui/text';
 import { AgentSessionListScreen } from './session-list-screen';
 import { OwnedKeyboardLift } from './owned-keyboard-lift';
 import { RowsRefreshControl } from './rows-refresh-control';
-import { FAB_MARGIN, FAB_SIZE } from './session-list-content';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { LiveSessionListEmptyState } from './live-session-list-empty-state';
@@ -87,9 +87,18 @@ const searchInput = vi.hoisted(() => ({
 }));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 // Mutable so a case can put the tree in an RTL interface: the header action's
-// letterspaced capitals are LTR-only and must drop under RTL, keeping the
-// Arabic label's joins.
+// letterspaced capitals drop for right-to-left script copy inside an RTL
+// interface, which keeps the Arabic label's joins.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The screen's graph reaches `expo` through the session helpers and its rows
+// reach the haptics module; both read the `__DEV__` global the test renderer
+// does not provide, so the native edges stop here.
+vi.mock('expo', () => ({ requireOptionalNativeModule: () => null }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
 }));
@@ -173,6 +182,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({
     fontScale: state.fontScale,
     width: state.windowWidth,
@@ -290,13 +301,17 @@ vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   X: 'X',
   SlidersHorizontal: 'SlidersHorizontal',
+  RotateCcw: 'RotateCcw',
+  ArrowLeft: 'ArrowLeft',
 }));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/session-list-content', () => ({
   AgentSessionListContent: 'AgentSessionListContent',
-  FAB_MARGIN: 16,
-  FAB_SIZE: 48,
 }));
+vi.mock('@/components/ui/fab', async () => {
+  const actual = (await vi.importActual('@/components/ui/fab')) as Record<string, unknown>;
+  return { ...actual, FAB_MARGIN: 16, FAB_SIZE: 48 };
+});
 vi.mock('@/components/agents/session-status-filter-bar', () => ({
   SessionStatusFilterBar: 'SessionStatusFilterBar',
 }));
@@ -333,7 +348,7 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
     state.sessionId = id;
   },
 }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/text', async importOriginal => {
@@ -360,6 +375,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({
     primaryForeground: '#ffffff',
     foreground: '#000000',
@@ -480,12 +496,19 @@ function pressControl(testID: string) {
 }
 /** Fire the body wrapper's layout with the height the list can use. */
 function layoutBody(height: number) {
-  const keyboardFrame = liftNode().findByType('View');
-  const wrapper = nodes('View').find(
-    node => node.props.onLayout !== undefined && node !== keyboardFrame
+  // The lift's own frame reports the keyboard container (see
+  // `layoutKeyboardFrame`); the body wrapper `useAgentsListChrome` measures is
+  // the one other `onLayout` view inside the lifted region. Scoping to the lift
+  // is what makes this the body: the header above it draws its own `onLayout`
+  // views (the row reports its width, an in-row slot its measured extent), and
+  // those must never receive a body height.
+  const frame = liftNode().findByType('View');
+  const wrappers = descendantsOf(liftNode(), 'View').filter(
+    node => node !== frame && node.props.onLayout !== undefined
   );
-  if (!wrapper) {
-    throw new Error('Missing body wrapper');
+  const [wrapper] = wrappers;
+  if (wrappers.length !== 1 || !wrapper) {
+    throw new Error(`Expected one measured body wrapper, found ${wrappers.length}`);
   }
   const onLayout = wrapper.props.onLayout as (event: {
     nativeEvent: { layout: { height: number } };
@@ -734,42 +757,27 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(action('New session')).toBeDefined();
   });
 
-  it('names the accepted-empty body history link and the header control after the same destination', async () => {
+  it('keeps the accepted-empty body to creation, with history in the header alone', async () => {
     await renderScreen();
     const historyLabel = i18n.t('agents.sessionList.pastSessions');
-    const bodyLink = nodes('Pressable').find(
-      node => node.props.testID === 'agents-view-history-empty'
-    );
-    if (!bodyLink) {
-      throw new Error('Missing body history link');
-    }
-    expect(bodyLink.props.accessibilityLabel).toBe(historyLabel);
-    expect(bodyLink.findByType(Text).children).toEqual([historyLabel]);
-    // One destination carries one name, so the header control and the body link
-    // both read it; only their test ids tell the two controls apart.
+    // The header control is the one route into stored history: an accepted
+    // empty body that carried a second link repeated the control above it and
+    // offered nothing the reader could not already press.
+    expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
-    // The body link is the second route into stored history: pressing it must
-    // reach the same destination the header control does.
-    pressControl('agents-view-history-empty');
-    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
-    // The non-empty live list keeps the history route in the header alone: the
-    // body link is gone, and the header keeps the same name.
-    state.live.activeSessions = [row];
-    await renderScreen();
     expect(nodes('Pressable').some(node => node.props.testID === 'agents-view-history-empty')).toBe(
       false
     );
-    expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
+    expect(action('New session')).toBeDefined();
   });
 
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
-    // The full controls row exists only over a non-empty live list (the
-    // accepted-empty state withholds the row and carries the history route in
-    // the body), so a populated render covers it before this case switches to
-    // the empty body it tests. The list controls share the title's row through
-    // `inlineActions`; the heading keeps `flex-1 min-w-0`, so the title keeps
-    // its tail ellipsis and nothing stacks the controls onto a second row.
+    // The full controls row exists only over a non-empty live list, so a
+    // populated render covers it before this case switches to the empty body it
+    // tests. The list controls share the title's row through `inlineActions`;
+    // the heading keeps `flex-1 min-w-0`, so the title keeps its tail ellipsis
+    // and nothing stacks the controls onto a second row.
     state.live.activeSessions = [row];
     await renderScreen();
     expect(header().props.inlineActions).toBeDefined();
@@ -796,9 +804,10 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(84);
     const createAction = action('New session');
     const label = createAction.findByType(Text);
-    expect(createAction.props.className).toContain('max-w-full');
+    // The state's one action is a `StateAction`: a label-sized control on the
+    // shared 48pt state-action floor, whose label the control itself sizes.
     expect(createAction.props.className).toContain('min-h-[48px]');
-    expect(label.props.className).toBe('shrink text-center');
+    expect(label.props.className).toBeUndefined();
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
@@ -846,6 +855,70 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('Skeleton')).toHaveLength(0);
     expect(text()).toContain('Nothing running right now');
     expect(state.announcements).toEqual(['Loading…']);
+  });
+
+  it('names the offline state instead of a load that cannot start', async () => {
+    // A confirmed-offline device pauses the first read: pending never settles,
+    // so the screen owes the person the offline state with its own Retry, not a
+    // "Loading…" line and eight skeletons that would never land.
+    state.internet = 'offline';
+    state.connection.isConnected = false;
+    state.live.hasAcceptedSuccess = false;
+    state.live.isPaused = true;
+    await renderScreen();
+    expect(listSkeletons()).toHaveLength(0);
+    expect(text()).not.toContain('Loading…');
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    // One statement: the card already names the connection, so the inline line
+    // does not repeat it.
+    expect(text()).not.toContain('No internet connection');
+    expect(text()).not.toContain('Nothing running right now');
+
+    // The offline card takes no pull: a refresh there could not settle, and a
+    // failed one would paint "Couldn't refresh" over the list after reconnect.
+    expect(requireNode('CenteredState').props.refreshControl).toBeUndefined();
+
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    // The card's Retry asks the boundary read, which settles by failing; the
+    // paused live read is left to React Query's reconnect refetch, so the press
+    // cannot hold the lock for the whole outage.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
+    expect(state.refetch).not.toHaveBeenCalled();
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    // The lock released: the second press is not dropped.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(2);
+
+    // On an organization scope the same press leaves the boundary read failed,
+    // and that failure is the outage rather than a verdict on the organization:
+    // the card stays instead of "Couldn't load your organizations".
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    await renderScreen();
+    // The surface keeps the offline card; the header's context control may name
+    // the failed organizations read on its own, but the list never falls to the
+    // organization-unavailable state.
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    expect(text()).not.toContain(i18n.t('organization.boundary.unavailableSessionsDescription'));
+
+    // The connection returns: the paused read resumes by itself and the card
+    // gives way to the confirmed list. The boundary read answers again too.
+    state.organization.organizationId = null;
+    state.boundary.isError = false;
+    state.internet = 'online';
+    state.connection.isConnected = true;
+    state.live.isPaused = false;
+    state.live.hasAcceptedSuccess = true;
+    await renderScreen();
+    expect(text()).not.toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain('Nothing running right now');
   });
 
   it('keeps list identity, row identity, navigation, run state, and scroll policy through reconnect and refresh failure', async () => {
@@ -1254,7 +1327,7 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
-      right: 20,
+      right: 14,
       width: 48,
       height: 48,
     });
@@ -1265,7 +1338,7 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
-      right: 79,
+      right: 73,
       width: 48,
       height: 48,
     });

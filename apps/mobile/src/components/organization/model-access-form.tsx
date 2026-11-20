@@ -160,18 +160,14 @@ export function ModelAccessForm({
     available: models,
     savedAllowList: providerAllowList,
   });
-  // The rows come from the catalog plus the saved list, so an empty row set
-  // means the gateway's provider data has not arrived; an organization policy
-  // cannot produce it, because a saved list always adds its slugs.
+  // Rows come from the catalog plus the saved list: an empty set is missing data.
   const providersEmpty = providers.length === 0;
   const serverDraft = initialDraft(
     { provider_allow_list: providerAllowList, model_deny_list: modelDenyList },
     providers
   );
   const serverKey = `${serverDraft.providerAllowList.join(',')}|${serverDraft.modelDenyList.join(',')}`;
-  // The row set is incomplete while the catalog is unavailable or names no
-  // provider: the draft's provider list then reflects missing gateway data, so
-  // the form must rebase it when the rows arrive instead of keeping it.
+  // Missing rows make the draft's provider list provisional: it rebases on arrival.
   const providerRowsIncomplete = catalogUnavailable || providersEmpty;
   const [form, setForm] = useState<FormState>(() => ({
     syncedKey: serverKey,
@@ -179,12 +175,7 @@ export function ModelAccessForm({
     draft: serverDraft,
     providerRowsProvisional: providerRowsIncomplete,
   }));
-  const synced = syncedFormState({
-    state: form,
-    serverKey,
-    serverDraft,
-    providerRowsIncomplete,
-  });
+  const synced = syncedFormState({ state: form, serverKey, serverDraft, providerRowsIncomplete });
   if (synced !== form) {
     setForm(synced);
   }
@@ -196,9 +187,7 @@ export function ModelAccessForm({
     savedAllowList: providerAllowList,
     baseline,
     draft,
-    // An empty row set is the gateway's provider data missing, not a policy of
-    // no providers: a save made then must not write a list derived from it, the
-    // same way a save made before the catalog loads leaves the list alone.
+    // Missing provider data is not a policy of no providers.
     providerCatalogLoaded: !catalogUnavailable && !providersEmpty,
     models: [...catalog, ...models],
   });

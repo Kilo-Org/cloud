@@ -41,8 +41,9 @@ export async function isNativeTokenAddressRateLimited(request: Request): Promise
 }
 
 /**
- * True when one account is exchanging device credentials too fast. Reports
- * every answer and refuses only when the rule limited.
+ * True when one account is exchanging device credentials too fast. The shared
+ * check reports a rule that is not configured or an answer the firewall
+ * blocked, and only a limited answer refuses the exchange.
  */
 export async function isNativeTokenUserRateLimited(
   request: Request,

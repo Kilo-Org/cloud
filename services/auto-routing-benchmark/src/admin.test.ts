@@ -216,7 +216,12 @@ const env = {
   BENCH_DB: undefined,
   BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
-  AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn(), delete: vi.fn() },
+  AUTO_ROUTING_CONFIG: {
+    put: vi.fn(),
+    get: vi.fn(),
+    getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+    delete: vi.fn(),
+  },
   KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
 

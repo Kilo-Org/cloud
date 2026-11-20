@@ -232,7 +232,7 @@ const env = {
   BENCH_DB: schedulerDatabase(),
   BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
-  AUTO_ROUTING_CONFIG: { delete: kvDelete },
+  AUTO_ROUTING_CONFIG: { delete: kvDelete, put: vi.fn() },
   INTERNAL_API_SECRET_PROD: { get: async () => 'secret' },
   KILO_WEB_API_BASE_URL: 'https://app.test',
   KILO_CLI_API_URL: 'https://api.test',
@@ -1767,9 +1767,9 @@ describe('frontier router runs', () => {
     );
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
     expect(kvDelete).toHaveBeenCalledWith('routing_table_frontier_v1');
-    expect(kvDelete).toHaveBeenCalledWith('benchmark_routing_table_response_v1:frontier');
+    expect(kvDelete).toHaveBeenCalledWith('benchmark_routing_table_version_v1:frontier');
     expect(kvDelete).not.toHaveBeenCalledWith('routing_table_v1');
-    expect(kvDelete).not.toHaveBeenCalledWith('benchmark_routing_table_response_v1:efficient');
+    expect(kvDelete).not.toHaveBeenCalledWith('benchmark_routing_table_version_v1:efficient');
   });
 
   it('publishes an admin override in place of the stored threshold', async () => {

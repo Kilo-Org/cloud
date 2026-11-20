@@ -989,7 +989,7 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
 | `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
-| `GET /admin/routing-table` | Latest published **platform** routing table. Served from `AUTO_ROUTING_CONFIG` key `benchmark_routing_table_response_v1:<router>` (5-minute expiry); D1 is read on a miss, and publishing deletes the key |
+| `GET /admin/routing-table` | Latest published **platform** routing table. Served from `AUTO_ROUTING_CONFIG` key `benchmark_routing_table_response_v1:<router>` only while its version matches the pointer `benchmark_routing_table_version_v1:<router>`, which every publish writes after its D1 write; otherwise D1 is read, and the body is cached only when it is the pointed-to version. A location's KV edge cache can keep serving the previous pointer for up to about 60 seconds after a publish |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
 | `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of a custom router's gateway models (quota 20 models per base router per 24h) |

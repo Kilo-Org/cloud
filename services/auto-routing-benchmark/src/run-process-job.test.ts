@@ -217,7 +217,7 @@ const env = {
   BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,
   BENCH_QUEUE: { send: queueSend, sendBatch: queueSendBatch },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
-  AUTO_ROUTING_CONFIG: { delete: kvDelete },
+  AUTO_ROUTING_CONFIG: { delete: kvDelete, put: vi.fn() },
 } as unknown as Env;
 
 function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {

@@ -1,11 +1,18 @@
 import { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import type { RoutingTable } from '@kilocode/auto-routing-contracts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  BenchmarkRoutingTableResponseSchema,
+  type RoutingTable,
+} from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { getLatestRoutingTable, saveRoutingTable } from './db';
 import { app } from './index';
-import { routingTableResponseKvKey } from './routing-table-response';
+import {
+  routingTableResponseKvKey,
+  routingTableVersionKvKey,
+  syncRoutingTableVersionPointer,
+} from './routing-table-response';
 
 function table(version: string): RoutingTable {
   return {
@@ -23,16 +30,16 @@ function table(version: string): RoutingTable {
   };
 }
 
+type StoredValue = { value: string; metadata: unknown };
+
 describe('GET /admin/routing-table (KV in front of D1)', () => {
   let sqlite: DatabaseSync;
   let db: D1Database;
   let d1Reads: number;
-  let store: Map<string, string>;
-  let kv: {
-    get: Mock<(key: string) => Promise<string | null>>;
-    put: Mock<(key: string, value: string, options?: KVNamespacePutOptions) => Promise<void>>;
-    delete: Mock<(key: string) => Promise<void>>;
-  };
+  let store: Map<string, StoredValue>;
+  let onBodyRead: () => Promise<void>;
+  let onPut: (key: string) => Promise<void>;
+  let kvFailure: Error | null;
   let env: Env;
 
   beforeEach(() => {
@@ -41,20 +48,34 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
     db = sqliteD1(sqlite);
     d1Reads = 0;
     store = new Map();
-    kv = {
-      get: vi.fn(async (key: string) => store.get(key) ?? null),
-      put: vi.fn(async (key: string, value: string) => {
-        store.set(key, value);
-      }),
-      delete: vi.fn(async (key: string) => {
-        store.delete(key);
-      }),
-    };
+    onBodyRead = async () => {};
+    onPut = async () => {};
+    kvFailure = null;
     env = {
       BENCH_DB: sqliteD1(sqlite, () => {
         d1Reads++;
       }),
-      AUTO_ROUTING_CONFIG: kv,
+      AUTO_ROUTING_CONFIG: {
+        async get(key: string) {
+          if (kvFailure) throw kvFailure;
+          return store.get(key)?.value ?? null;
+        },
+        async getWithMetadata(key: string) {
+          if (kvFailure) throw kvFailure;
+          const stored = store.get(key);
+          await onBodyRead();
+          return { value: stored?.value ?? null, metadata: stored?.metadata ?? null };
+        },
+        async put(key: string, value: string, options?: KVNamespacePutOptions) {
+          if (kvFailure) throw kvFailure;
+          await onPut(key);
+          store.set(key, { value, metadata: options?.metadata ?? null });
+        },
+        async delete(key: string) {
+          if (kvFailure) throw kvFailure;
+          store.delete(key);
+        },
+      },
       INTERNAL_API_SECRET_PROD: { get: async () => 'bench-token' },
     } as unknown as Env;
   });
@@ -64,32 +85,41 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
     vi.restoreAllMocks();
   });
 
-  function get(path = '/admin/routing-table') {
+  function get() {
     return app.request(
-      `https://bench.example.com${path}`,
+      'https://bench.example.com/admin/routing-table',
       { headers: { authorization: 'Bearer bench-token' } },
       env
     );
   }
 
+  async function publish(version: string, publishedAt: string) {
+    await saveRoutingTable(db, table(version), publishedAt);
+    await syncRoutingTableVersionPointer(env, 'efficient');
+  }
+
   /** The response the route produced before the cache, from the same D1 rows. */
-  async function previousResponse(router: 'efficient' | 'frontier') {
+  async function previousResponse() {
     const reference = new Hono();
     reference.get('/', async c => {
-      const latest = await getLatestRoutingTable(db, router);
+      const latest = await getLatestRoutingTable(db, 'efficient');
       return c.json({ table: latest?.table ?? null, publishedAt: latest?.publishedAt ?? null });
     });
     const response = await reference.request('/');
     return { body: await response.text(), contentType: response.headers.get('content-type') };
   }
 
-  it('serves the previous bytes from D1 on a miss and from KV afterwards', async () => {
-    await saveRoutingTable(db, table('v1'), '2026-11-19T23:30:42.600Z', 'frontier');
-    const expected = await previousResponse('frontier');
+  const servedVersion = async () =>
+    BenchmarkRoutingTableResponseSchema.parse(JSON.parse(await (await get()).text())).table
+      ?.version;
 
-    const miss = await get('/admin/routing-table?router=frontier');
+  it('serves the previous bytes from D1 on a miss and from KV afterwards', async () => {
+    await publish('v1', '2026-11-19T23:00:00.000Z');
+    const expected = await previousResponse();
+
+    const miss = await get();
     const readsAfterMiss = d1Reads;
-    const hit = await get('/admin/routing-table?router=frontier');
+    const hit = await get();
 
     for (const response of [miss, hit]) {
       expect(response.status).toBe(200);
@@ -99,51 +129,89 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
     expect(await hit.text()).toBe(expected.body);
     expect(readsAfterMiss).toBeGreaterThan(0);
     expect(d1Reads).toBe(readsAfterMiss);
-    expect(kv.put).toHaveBeenCalledExactlyOnceWith(
-      routingTableResponseKvKey('frontier'),
-      expected.body,
-      { expirationTtl: 300 }
-    );
+    expect(store.get(routingTableResponseKvKey('efficient'))).toEqual({
+      value: expected.body,
+      metadata: { token: 'v1 2026-11-19T23:00:00.000Z' },
+    });
   });
 
-  it('caches the empty response per router', async () => {
-    const expected = await previousResponse('efficient');
+  it('reads D1 without caching until a publish has named a version', async () => {
+    await saveRoutingTable(db, table('v1'), '2026-11-19T23:00:00.000Z');
+    const expected = await previousResponse();
 
     expect(await (await get()).text()).toBe(expected.body);
-    expect(await (await get()).text()).toBe('{"table":null,"publishedAt":null}');
-    expect(kv.put).toHaveBeenCalledOnce();
-    expect([...store.keys()]).toEqual([routingTableResponseKvKey('efficient')]);
-  });
-
-  it('reads the newly published table once publishing deletes the cached response', async () => {
-    await saveRoutingTable(db, table('v1'), '2026-11-19T23:00:00.000Z');
-    await get();
-    await saveRoutingTable(db, table('v2'), '2026-11-19T23:30:00.000Z');
-    expect(JSON.parse(await (await get()).text()).table.version).toBe('v1');
-
-    await kv.delete(routingTableResponseKvKey('efficient'));
-
-    expect(await (await get()).text()).toBe((await previousResponse('efficient')).body);
-    expect(JSON.parse(store.get(routingTableResponseKvKey('efficient')) ?? '').table.version).toBe(
-      'v2'
-    );
-  });
-
-  it('replaces an unreadable cached value with the D1 response', async () => {
-    await saveRoutingTable(db, table('v1'), '2026-11-19T23:00:00.000Z');
-    store.set(routingTableResponseKvKey('efficient'), '{"table":');
-    const expected = await previousResponse('efficient');
-
     expect(await (await get()).text()).toBe(expected.body);
-    expect(store.get(routingTableResponseKvKey('efficient'))).toBe(expected.body);
+    expect(store.size).toBe(0);
+  });
+
+  it('serves a newly published table on the next read', async () => {
+    await publish('v1', '2026-11-19T23:00:00.000Z');
+    expect(await servedVersion()).toBe('v1');
+
+    await publish('v2', '2026-11-19T23:30:00.000Z');
+
+    expect(await servedVersion()).toBe('v2');
+    const readsAfterMiss = d1Reads;
+    expect(await servedVersion()).toBe('v2');
+    expect(d1Reads).toBe(readsAfterMiss);
+  });
+
+  it('never serves a body that a read stored after a publish replaced it', async () => {
+    await publish('v1', '2026-11-19T23:00:00.000Z');
+    onPut = async key => {
+      if (key !== routingTableResponseKvKey('efficient')) return;
+      onPut = async () => {};
+      await publish('v2', '2026-11-19T23:30:00.000Z');
+    };
+
+    expect(await servedVersion()).toBe('v1');
+    expect(store.get(routingTableResponseKvKey('efficient'))?.metadata).toEqual({
+      token: 'v1 2026-11-19T23:00:00.000Z',
+    });
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v2 2026-11-19T23:30:00.000Z'
+    );
+
+    expect(await servedVersion()).toBe('v2');
+    expect(await servedVersion()).toBe('v2');
+  });
+
+  it('does not cache a table published between the pointer read and the D1 read', async () => {
+    await publish('v1', '2026-11-19T23:00:00.000Z');
+    onBodyRead = async () => {
+      onBodyRead = async () => {};
+      await publish('v2', '2026-11-19T23:30:00.000Z');
+    };
+
+    expect(await servedVersion()).toBe('v2');
+    expect(store.has(routingTableResponseKvKey('efficient'))).toBe(false);
+    expect(await servedVersion()).toBe('v2');
+    expect(store.get(routingTableResponseKvKey('efficient'))?.metadata).toEqual({
+      token: 'v2 2026-11-19T23:30:00.000Z',
+    });
+  });
+
+  it('moves a pointer that a concurrent publish overtook to the latest table', async () => {
+    await saveRoutingTable(db, table('v1'), '2026-11-19T23:00:00.000Z');
+    onPut = async key => {
+      if (key !== routingTableVersionKvKey('efficient')) return;
+      onPut = async () => {};
+      await saveRoutingTable(db, table('v2'), '2026-11-19T23:30:00.000Z');
+    };
+
+    await syncRoutingTableVersionPointer(env, 'efficient');
+
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v2 2026-11-19T23:30:00.000Z'
+    );
+    expect(await servedVersion()).toBe('v2');
   });
 
   it('serves from D1 when KV is unavailable', async () => {
-    await saveRoutingTable(db, table('v1'), '2026-11-19T23:00:00.000Z');
-    kv.get.mockRejectedValue(new Error('KV unavailable'));
-    kv.put.mockRejectedValue(new Error('KV unavailable'));
+    await publish('v1', '2026-11-19T23:00:00.000Z');
+    kvFailure = new Error('KV unavailable');
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const expected = await previousResponse('efficient');
+    const expected = await previousResponse();
 
     const response = await get();
 

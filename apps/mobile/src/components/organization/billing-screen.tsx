@@ -43,10 +43,6 @@ import {
 } from '@/lib/hooks/use-org-billing-queries';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
-    </RowGroup>
-  );
-}
-
 /** A block whose read failed, with the retry that asks it again. */
 function BillingCardError({
   onRetry,

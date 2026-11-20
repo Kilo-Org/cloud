@@ -99,8 +99,12 @@ export function PolicyRulesEditor({
               <Text className="text-sm font-medium text-foreground">
                 {t('organizationGuardrails.ruleNumber', { number: index + 1 })}
               </Text>
+              {/* The icon alone measures 16dp, so the action takes a width floor
+                  of its own: 35.8dp measured plus the line-action slop each
+                  way (5 + 5) reaches the 44pt target, and the box keeps the
+                  audit floor on its own node. */}
               <Pressable
-                className={`${LINE_ACTION_BOX_CLASS} min-w-[28px] items-center justify-center active:opacity-70`}
+                className={`${LINE_ACTION_BOX_CLASS} min-w-[36px] items-center justify-center active:opacity-70`}
                 hitSlop={LINE_ACTION_HIT_SLOP}
                 disabled={disabled}
                 accessibilityRole="button"

@@ -1474,9 +1474,9 @@
       "activity": "Dejavnost"
     },
     "providerConnect": {
-      "githubApp": "Aplikacija GitHub",
+      "githubApp": "aplikacija GitHub",
       "githubError": "Nastavitve povezave s platformo GitHub ni bilo mogoče odpreti. Poskusi znova.",
-      "gitlabAccount": "Račun GitLab",
+      "gitlabAccount": "račun GitLab",
       "gitlabError": "Nastavitve povezave s platformo GitLab ni bilo mogoče odpreti. Poskusi znova.",
       "description": "Za samodejne preglede zahtev za združitev vzpostavi povezavo s Kilo prek možnosti {{label}}."
     },

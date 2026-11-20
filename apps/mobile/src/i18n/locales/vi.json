@@ -748,9 +748,9 @@
     },
     "providerConnect": {
       "description": "Kết nối {{label}} của Kilo để tự động rà soát các yêu cầu hợp nhất.",
-      "githubApp": "Ứng dụng GitHub",
+      "githubApp": "ứng dụng GitHub",
       "githubError": "Không thể mở trang thiết lập GitHub. Vui lòng thử lại.",
-      "gitlabAccount": "Tài khoản GitLab",
+      "gitlabAccount": "tài khoản GitLab",
       "gitlabError": "Không thể mở trang thiết lập GitLab. Vui lòng thử lại."
     },
     "reviewDetail": {

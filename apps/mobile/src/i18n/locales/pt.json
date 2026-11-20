@@ -1474,9 +1474,9 @@
       "activity": "Atividade"
     },
     "providerConnect": {
-      "githubApp": "Aplicação do GitHub",
+      "githubApp": "aplicação do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tenta novamente.",
-      "gitlabAccount": "Conta do GitLab",
+      "gitlabAccount": "conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tenta novamente.",
       "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente."
     },

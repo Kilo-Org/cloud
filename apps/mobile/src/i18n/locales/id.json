@@ -748,9 +748,9 @@
     },
     "providerConnect": {
       "description": "Hubungkan {{label}} Kilo untuk meninjau PR secara otomatis.",
-      "githubApp": "Aplikasi GitHub",
+      "githubApp": "aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Coba lagi.",
-      "gitlabAccount": "Akun GitLab",
+      "gitlabAccount": "akun GitLab",
       "gitlabError": "Tidak dapat membuka penyiapan GitLab. Coba lagi."
     },
     "reviewDetail": {

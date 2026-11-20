@@ -1424,9 +1424,9 @@
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "Апликација на GitHub",
+      "githubApp": "апликација на GitHub",
       "githubError": "Не можеше да се отвори поставувањето на GitHub. Обиди се повторно.",
-      "gitlabAccount": "Сметка на GitLab",
+      "gitlabAccount": "сметка на GitLab",
       "gitlabError": "Не можеше да се отвори поставувањето на GitLab. Обиди се повторно.",
       "description": "Поврзи ја {{label}} со Kilo за автоматски преглед на барањата за спојување."
     },

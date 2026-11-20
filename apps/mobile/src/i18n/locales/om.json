@@ -1424,9 +1424,9 @@
       "activity": "Sochii"
     },
     "providerConnect": {
-      "githubApp": "Aplikeeshinii GitHub",
+      "githubApp": "aplikeeshinii GitHub",
       "githubError": "Qophii GitHub banuun hin danda'amne. Irra deebi'ii yaali.",
-      "gitlabAccount": "Herrega GitLab",
+      "gitlabAccount": "herrega GitLab",
       "gitlabError": "Qophii GitLab banuun hin danda'amne. Irra deebi'ii yaali.",
       "description": "Gaaffii makuu ofumaan sakatta'uuf {{label}} kan Kilo walqabsiisi."
     },

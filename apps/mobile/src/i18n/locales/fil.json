@@ -1426,7 +1426,7 @@
     "providerConnect": {
       "githubApp": "GitHub App",
       "githubError": "Hindi mabuksan ang setup ng GitHub. Pakisubukang muli.",
-      "gitlabAccount": "Account sa GitLab",
+      "gitlabAccount": "account sa GitLab",
       "gitlabError": "Hindi mabuksan ang setup ng GitLab. Pakisubukang muli.",
       "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request."
     },

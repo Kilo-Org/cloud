@@ -1449,9 +1449,9 @@
       "activity": "Activitate"
     },
     "providerConnect": {
-      "githubApp": "Aplicația GitHub",
+      "githubApp": "aplicația GitHub",
       "githubError": "Nu s-a putut deschide configurarea GitHub. Încearcă din nou.",
-      "gitlabAccount": "Contul GitLab",
+      "gitlabAccount": "contul GitLab",
       "gitlabError": "Nu s-a putut deschide configurarea GitLab. Încearcă din nou.",
       "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile."
     },

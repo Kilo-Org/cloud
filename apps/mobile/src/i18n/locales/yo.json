@@ -1424,9 +1424,9 @@
       "activity": "Ìgbòkègbodò"
     },
     "providerConnect": {
-      "githubApp": "Ohun èlò GitHub",
+      "githubApp": "ohun èlò GitHub",
       "githubError": "A kò lè ṣí ìṣètò GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "gitlabAccount": "Àkọọ́lẹ̀ GitLab",
+      "gitlabAccount": "àkọọ́lẹ̀ GitLab",
       "gitlabError": "A kò lè ṣí ìṣètò GitLab. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "description": "So {{label}} ti Kilo pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ láìfọwọ́ṣe."
     },

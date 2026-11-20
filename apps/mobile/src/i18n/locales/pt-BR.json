@@ -717,9 +717,9 @@
     },
     "providerConnect": {
       "description": "Conecte {{label}} ao Kilo para revisar PRs automaticamente.",
-      "githubApp": "o App do GitHub",
+      "githubApp": "o app do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tente novamente.",
-      "gitlabAccount": "a Conta do GitLab",
+      "gitlabAccount": "a conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tente novamente."
     },
     "reviewDetail": {

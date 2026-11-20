@@ -1424,9 +1424,9 @@
       "activity": "Hawlaha"
     },
     "providerConnect": {
-      "githubApp": "Abka GitHub",
+      "githubApp": "abka GitHub",
       "githubError": "Dejinta GitHub lama furi karin. Fadlan mar kale isku day.",
-      "gitlabAccount": "Akoonka GitLab",
+      "gitlabAccount": "akoonka GitLab",
       "gitlabError": "Dejinta GitLab lama furi karin. Fadlan mar kale isku day.",
       "description": "Ku xidh Kilo {{label}} si codsiyada isku darka dib loogu eego si otomaatig ah."
     },

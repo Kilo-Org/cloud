@@ -4,7 +4,7 @@
 // the choice control. So a bodiless card renders exactly one View, and an off
 // detector renders none of its options even when a caller passes them.
 
-import { createElement, type ReactElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
@@ -22,7 +22,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
-function mount(choice: 'off' | 'log' | 'block', children?: ReactElement): ReactTestInstance {
+function mount(choice: 'off' | 'log' | 'block', children?: ReactNode): ReactTestInstance {
   act(() => {
     renderer = TestRenderer.create(
       createElement(
@@ -72,5 +72,11 @@ describe('DetectorCard options body', () => {
 
   it('renders nothing but the header View while the detector is off', () => {
     expect(views(mount('off', createElement('Child', { key: 'child' })))).toHaveLength(1);
+  });
+
+  // The output section passes one conditional child per detector, so a card
+  // with no options of its own receives an array of `null`s rather than nothing.
+  it('renders only the header View for a list of conditional children that all skip', () => {
+    expect(views(mount('log', [null, false, null]))).toHaveLength(1);
   });
 });

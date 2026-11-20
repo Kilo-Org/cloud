@@ -30,3 +30,24 @@ export function useBackToAgentsSessions(): () => void {
     router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
   }, [navigation, replace, router]);
 }
+
+/**
+ * The session screens' header Back press: the route's own history when there is
+ * any, and the sessions list when there is none.
+ *
+ * `ScreenHeader` answers a fallback press by dismissing to it, which is the
+ * shape this rule exists to avoid with nothing beneath. Declaring the handler
+ * keeps every press on the route the same one rule.
+ */
+export function useSessionHeaderBack(): () => void {
+  const router = useRouter();
+  const backToSessions = useBackToAgentsSessions();
+
+  return useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    backToSessions();
+  }, [backToSessions, router]);
+}

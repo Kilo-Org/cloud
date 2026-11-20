@@ -22,9 +22,6 @@ const routerState = vi.hoisted(() => ({
   // POP_TO semantics: find the destination at or below the current index and
   // truncate everything above it; with no match, replace the current route.
   dismissTo: vi.fn<(href: string) => void>(),
-  // The stack-safe replacement pushes its destination and retires the source
-  // after the transition; the header only needs the push it dispatches.
-  push: vi.fn<(href: string) => void>(),
   canGoBack: vi.fn(() => true),
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
@@ -58,11 +55,6 @@ vi.mock('expo-router', () => ({
   useRouter: () => routerState,
   // The header re-reads `canGoBack` on this container's `state` events.
   useNavigationContainerRef: () => navigationContainer,
-}));
-// The fallback's push-then-retire mechanics are their own suite's; the header
-// only dispatches the push.
-vi.mock('@/lib/navigation/stack-safe-replace', () => ({
-  useStackSafeReplace: () => ({ replace: routerState.push }),
 }));
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
@@ -332,15 +324,6 @@ describe('ScreenHeader mounted', () => {
     routerState.dismissTo.mockReset().mockImplementation(href => {
       const index = routerState.routes.lastIndexOf(href.split('?')[0] ?? href);
       routerState.routes = index === -1 ? [href] : routerState.routes.slice(0, index + 1);
-    });
-    // The stack-safe replacement pushes its destination and then retires the
-    // route it came from: the end state is the one `replace` produces.
-    routerState.push.mockReset().mockImplementation(href => {
-      const source = routerState.routes.length - 1;
-      routerState.routes.push(href);
-      if (source >= 0) {
-        routerState.routes.splice(source, 1);
-      }
     });
     routerState.canGoBack.mockReset().mockImplementation(() => routerState.routes.length > 1);
     i18nManager.isRTL = false;
@@ -769,9 +752,7 @@ describe('ScreenHeader mounted', () => {
     act(() => {
       (findBackPressable(renderer.root).props.onPress as () => void)();
     });
-    // With no history the fallback takes this screen's place through the
-    // stack-safe replacement, whose push the header dispatches.
-    expect(routerState.push).toHaveBeenLastCalledWith(AGENTS_SESSIONS_HREF);
+    expect(routerState.dismissTo).toHaveBeenLastCalledWith(AGENTS_SESSIONS_HREF);
     expect(routerState.back).not.toHaveBeenCalled();
     renderer.unmount();
   });

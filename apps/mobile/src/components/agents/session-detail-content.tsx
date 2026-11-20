@@ -245,7 +245,10 @@ import {
   openComposerWithOutcome,
 } from '@/components/agents/new-session-navigation-outcome';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
-import { useBackToAgentsSessions } from '@/lib/navigation/back-to-agents-sessions';
+import {
+  useBackToAgentsSessions,
+  useSessionHeaderBack,
+} from '@/lib/navigation/back-to-agents-sessions';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -353,6 +356,8 @@ export function SessionDetailContent({
   // The terminal card's way back: it truncates the stack to the sessions list,
   // and takes this route's place when it is the stack's only route.
   const handleBackToSessions = useBackToAgentsSessions();
+  // The header's Back answers the same way: history first, then the list.
+  const sessionHeaderBack = useSessionHeaderBack();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
@@ -2979,6 +2984,7 @@ export function SessionDetailContent({
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback={AGENTS_SESSIONS_HREF}
+            onBack={sessionHeaderBack}
             headerRight={headerRight}
             headerRightShrinks
             {...(rename.isTitleInteractive

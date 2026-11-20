@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
   mapKiloPassStatusToClass,
@@ -116,29 +116,14 @@ describe('resolvePurchasePresentation', () => {
     expect(result.program).toBeNull();
   });
 
-  it('types an unavailable CTA so it cannot carry a web path', () => {
-    const iosCredits = resolvePurchasePresentation({
-      platform: 'ios',
-      storefront: 'app_store',
-      product: 'credits',
-      hasStripeManagedPass: false,
-    });
-    const missingPlatform = resolvePurchasePresentation({
-      platform: null,
-      storefront: null,
-      product: 'credits',
-      hasStripeManagedPass: false,
-    });
-
-    expect(iosCredits.cta).toEqual({ action: 'none', webPath: null });
-    expect(missingPlatform.cta).toEqual({ action: 'none', webPath: null });
-
-    // Compile-time guard only, and the result is a plain value (never frozen):
-    // the union rejects a `none` CTA with a web target, so this is a type error
-    // against a mutable `{ action; webPath: string | null }` CTA type.
-    // @ts-expect-error a `none` CTA always reports a null web path
-    const forged: PurchasePresentationCta = { action: 'none', webPath: '/credits' };
-    expect(forged.webPath).toBe('/credits');
+  it('types a CTA as the readonly pairings the resolver produces', () => {
+    expectTypeOf<PurchasePresentationCta>().toEqualTypeOf<
+      | { readonly action: 'none'; readonly webPath: null }
+      | { readonly action: 'open_web'; readonly webPath: string }
+    >();
+    // The two pairings the doc rules out must stay unassignable.
+    expectTypeOf<{ action: 'none'; webPath: '/credits' }>().not.toExtend<PurchasePresentationCta>();
+    expectTypeOf<{ action: 'open_web'; webPath: null }>().not.toExtend<PurchasePresentationCta>();
   });
 });
 

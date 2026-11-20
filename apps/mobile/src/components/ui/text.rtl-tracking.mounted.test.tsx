@@ -36,7 +36,8 @@ afterEach(() => {
 // reset below zeroes their spacing wherever the script asks for it — a joined
 // script in either direction, and any RTL script inside an RTL interface. The
 // eyebrow variant and the section-header action own their Latin display
-// treatment and drop it in RTL instead (see `Text`'s eyebrow variant).
+// treatment and drop it for RTL-script copy instead (see `Text`'s eyebrow
+// variant).
 const TRACKED_CLASSES = ['tracking-[1.5px]', 'tracking-[0.2px]'] as const;
 
 // The Hebrew eyebrow copy from `he.json` (`home.agentSessions`). Hebrew is a
@@ -132,38 +133,40 @@ describe('Text tracked labels', () => {
     expect(hostText(root).props.style).toBeUndefined();
   });
 
-  it('applies the same reset to the shared Eyebrow label, whose own display class is dropped in RTL', () => {
-    // The eyebrow's tracking class is LTR-only (text.tsx EYEBROW_LATIN_DISPLAY):
-    // an RTL eyebrow drops it and relies on the RTL letter-spacing reset.
+  it('applies the same reset to the shared Eyebrow label, whose own display class is dropped for right-to-left script copy', () => {
+    // The eyebrow's tracking class is script-bound (text.tsx
+    // EYEBROW_LATIN_DISPLAY through `keepsLatinDisplay`): right-to-left script
+    // copy in an RTL interface drops it and relies on the RTL letter-spacing
+    // reset.
     i18nManager.isRTL = true;
     const root = mountTextTree(createElement(Eyebrow, null, 'استكشف'));
 
     // Arabic-script copy drops the tracked class and the mono family in an RTL
     // interface (`withoutMonoFamily`): a zero letter spacing alone does not
     // keep a cursive script's joins (text.rtl-labels, text.mounted).
-    // The eyebrow's Latin display treatment (uppercase + tracking) is LTR-only
-    // (see `Text`'s eyebrow variant and `SectionHeader`): the variant owns its
-    // display classes, so an RTL eyebrow drops them — it carries no tracked
-    // class of its own (the rule `text.mounted.test.tsx` pins) — and drops the
-    // capitals and tracked class instead of carrying a class the interface
-    // language never asked for (`section-header.mounted.test.tsx`). No
-    // uppercase or tracked class is left for the shared RTL reset to
-    // neutralize on this label — the reset style is its whole treatment — and
-    // the zero letter-spacing reset still lands.
+    // The eyebrow's Latin display treatment (uppercase + tracking) follows the
+    // copy's script (see `Text`'s eyebrow variant and `SectionHeader`): the
+    // variant owns its display classes, so this Arabic label drops them — it
+    // carries no tracked class of its own (the rule `text.mounted.test.tsx`
+    // pins) — rather than carrying a class the script cannot wear
+    // (`section-header.mounted.test.tsx`). No uppercase or tracked class is
+    // left for the shared RTL reset to neutralize on this label — the reset
+    // style is its whole treatment — and the zero letter-spacing reset still
+    // lands.
     const className = hostText(root).props.className as string;
     const classes = className.split(' ');
     expect(classes).not.toContain('uppercase');
     expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
     // The mono family goes with them: JetBrains Mono ships no Arabic glyphs, so
     // the RTL eyebrow drops `font-mono-medium` as well (`withoutMonoFamily`),
-    // matching the LTR-only display treatment it just lost.
+    // matching the display treatment it just lost.
     expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
     expect(hostStyle(root)).toContainEqual(NATURAL_LETTER_SPACING);
   });
 
   it('neutralizes a caller-supplied tracked class on the shared Eyebrow label', () => {
     i18nManager.isRTL = true;
-    // The eyebrow variant owns its Latin display classes, so an RTL eyebrow
+    // The eyebrow variant owns its Latin display classes, so this Arabic copy
     // drops them (the rule `text.mounted.test.tsx` pins) rather than keeping
     // them like a caller-supplied tracked class; a caller-supplied tracked
     // class stays on the element and the zero letter-spacing reset neutralizes

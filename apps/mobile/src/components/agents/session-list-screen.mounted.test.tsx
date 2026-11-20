@@ -87,8 +87,8 @@ const searchInput = vi.hoisted(() => ({
 }));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 // Mutable so a case can put the tree in an RTL interface: the header action's
-// letterspaced capitals are LTR-only and must drop under RTL, keeping the
-// Arabic label's joins.
+// letterspaced capitals drop for right-to-left script copy inside an RTL
+// interface, which keeps the Arabic label's joins.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 // The screen's graph reaches `expo` through the session helpers and its rows
 // reach the haptics module; both read the `__DEV__` global the test renderer

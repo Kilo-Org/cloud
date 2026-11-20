@@ -18,6 +18,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { AddCreditsRow } from '@/components/add-credits-row';
 import { type OrgKiloPassRowState, type OrgKiloPassSummary } from './org-kilo-pass-row-state';
 import { OrganizationHubScreen } from './hub-screen';
@@ -38,6 +39,9 @@ const boundary = vi.hoisted(() => ({
   balance: 5_000_000,
   plan: 'teams' as 'teams' | 'enterprise',
   isTrialExpiredForEnforcement: false,
+  /** The trial readout `organizations.list` carries; null for a subscribed org. */
+  trialStatus: null as string | null,
+  trialEndsAt: null as string | null,
 }));
 const routerPush = vi.hoisted(() => vi.fn());
 const openExternalUrlMock = vi.hoisted(() => vi.fn());
@@ -77,6 +81,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       seatCount: boundary.seatCount,
       plan: boundary.plan,
       isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
+      trialStatus: boundary.trialStatus,
+      trialEndsAt: boundary.trialEndsAt,
     },
     isResolving: false,
   }),
@@ -140,10 +146,16 @@ vi.mock('@/lib/app-shell-handoff', () => ({ openAppShellHandoff: openAppShellHan
 vi.mock('@/lib/format', () => ({
   formatPrefixedMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
+  // The billing model's trial pill states the trial end; the date's own
+  // formatting is the real module's job and is pinned in its unit test.
+  formatDate: (date: Date) => date.toISOString().slice(0, 10),
 }));
 
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
+  // The billing model parses the trial end with the shared helper, which exists
+  // to read timestamps Hermes' own `new Date` cannot.
+  parseTimestamp: (value: string) => new Date(value),
 }));
 
 // A suite that sets `current` pins the row state it needs; every other suite
@@ -324,6 +336,8 @@ beforeEach(() => {
   boundary.balance = 5_000_000;
   boundary.plan = 'teams';
   boundary.isTrialExpiredForEnforcement = false;
+  boundary.trialStatus = null;
+  boundary.trialEndsAt = null;
   storefrontRule.linkAllowed = true;
   hideBalancePref.hideBalance = false;
   hideBalancePref.hasLoaded = true;
@@ -447,8 +461,9 @@ describe('Organization hub plan', () => {
     // value in the card.
     expect(entitledRow?.props.valueTone).toBeUndefined();
     // An entitled organization is not warned about a state it is not in, and it
-    // carries no status segment.
+    // carries no status segment and no trial caption.
     expect(entitledRow?.props.valueStatus).toBeUndefined();
+    expect(entitledRow?.props.caption).toBeUndefined();
     expect(refusals(entitled.renderer)).toHaveLength(0);
     entitled.unmount();
 
@@ -467,7 +482,44 @@ describe('Organization hub plan', () => {
       label: i18n.t('organization.hub.planStatusLapsed'),
       tone: 'danger',
     });
+    // No trial runs beside the lapse, so there is nothing for the caption line.
+    expect(lapsedRow?.props.caption).toBeUndefined();
     lapsed.unmount();
+  });
+
+  it('states the running trial under the plan row, never inside its value', async () => {
+    boundary.trialStatus = 'trial_active';
+    boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
+
+    const { renderer, unmount } = await renderHub();
+
+    const expectedDate = formatDate(new Date('2026-11-24T00:00:00.000Z'), i18n.language, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    const row = planRow(renderer);
+    // The tier alone on the value line, in the row's ordinary ink: the trial is
+    // a caption line of its own below the row, so a compact window keeps the
+    // value one line tall and a right-to-left interface cannot order the tier
+    // after the date.
+    expect(row?.props.value).toBe(i18n.t('organization.hub.planTeams'));
+    expect(String(row?.props.value)).not.toContain(expectedDate);
+    expect(row?.props.valueTone).toBeUndefined();
+    // The caption replaces the old wrapped value: no line count is raised on
+    // the value, and nothing states the trial as a value status.
+    expect(row?.props.valueLines).toBeUndefined();
+    expect(row?.props.valueStatus).toBeUndefined();
+    expect(row?.props.caption).toBe(
+      i18n.t('organization.billing.stateTrialEndsOn', { date: expectedDate })
+    );
+    // Its own line needs no leading separator, and it states the trial end
+    // rather than losing it to the value's ellipsis.
+    expect(String(row?.props.caption)).not.toMatch(/^ · /);
+    // A running trial is not the lapsed state, so nothing above the card
+    // explains an ending that has not happened.
+    expect(refusals(renderer)).toHaveLength(0);
+    unmount();
   });
 
   it('explains a lapsed plan with the state alone, leaving the step to the action', async () => {
@@ -511,8 +563,10 @@ describe('Organization hub plan', () => {
 
     const [refusal] = refusals(renderer);
     expect(refusal?.props.action).toBeUndefined();
-    // With no action, the sentence has to carry the step.
-    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
+    // With no action, the sentence has to carry the step and the destination
+    // the reader can act on instead of naming someone else.
+    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEndedBillingAtKiloAi'));
+    expect(refusal?.props.message).not.toBe(i18n.t('common.organizationTrialEnded'));
     expect(refusal?.props.message).not.toBe(i18n.t('organization.hub.planEnded'));
     expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();

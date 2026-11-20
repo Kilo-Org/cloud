@@ -7,6 +7,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import {
   billingHrefFor,
   ORGANIZATION_BILLING_HREF,
+  TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY,
   TRIAL_ENDED_BILLING_COPY_KEY,
   TRIAL_ENDED_COPY_KEY,
   type TrialRefusalAction,
@@ -58,8 +59,21 @@ describe('trialRefusalCopyKey', () => {
     expect(trialRefusalCopyKey(false)).toBe(TRIAL_ENDED_COPY_KEY);
   });
 
-  it('keeps the two readers on two keys', () => {
+  it('names the destination when the surface renders no billing step', () => {
+    expect(trialRefusalCopyKey(true, 'absent')).toBe(TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY);
+  });
+
+  // A reader who cannot change the plan gets the owner-naming copy however the
+  // surface is built: the destination sentence would hand a member an
+  // instruction the server would refuse anyway.
+  it('keeps the owner-naming copy for a member whatever the step is', () => {
+    expect(trialRefusalCopyKey(false, 'absent')).toBe(TRIAL_ENDED_COPY_KEY);
+  });
+
+  it('keeps the three readers on three keys', () => {
     expect(TRIAL_ENDED_COPY_KEY).not.toBe(TRIAL_ENDED_BILLING_COPY_KEY);
+    expect(TRIAL_ENDED_BILLING_COPY_KEY).not.toBe(TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY);
+    expect(TRIAL_ENDED_COPY_KEY).not.toBe(TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY);
   });
 });
 
@@ -67,18 +81,26 @@ describe('trialRefusalMessage', () => {
   it('translates the key each reader gets', () => {
     expect(trialRefusalMessage(true)).toBe(i18n.t(TRIAL_ENDED_BILLING_COPY_KEY));
     expect(trialRefusalMessage(false)).toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
+    expect(trialRefusalMessage(true, 'absent')).toBe(
+      i18n.t(TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY)
+    );
   });
 
-  it('holds different copy for the two readers', () => {
+  it('holds different copy for every reader', () => {
     expect(trialRefusalMessage(true)).not.toBe(trialRefusalMessage(false));
+    expect(trialRefusalMessage(true, 'absent')).not.toBe(trialRefusalMessage(true));
+    expect(trialRefusalMessage(true, 'absent')).not.toBe(trialRefusalMessage(false));
   });
 
-  // Both sentences must state the state; only the role that can end it is
-  // offered the step, so the member copy keeps naming who can.
+  // All three sentences must state the state; only the role that can end it is
+  // offered a step, and only its destination-less surface offers the step in
+  // prose, so each sentence differs in who is asked to act and where.
   it('states the ended trial and differs in who is asked to act', () => {
     expect(trialRefusalMessage(true)).toContain("The organization's trial has ended");
     expect(trialRefusalMessage(false)).toContain("The organization's trial has ended");
+    expect(trialRefusalMessage(true, 'absent')).toContain("The organization's trial has ended");
     expect(trialRefusalMessage(true)).toContain('You can update billing');
+    expect(trialRefusalMessage(true, 'absent')).toContain('at kilo.ai');
     expect(trialRefusalMessage(false)).toContain('An organization owner can update billing');
     expect(trialRefusalMessage(false)).not.toContain('You can update billing');
   });

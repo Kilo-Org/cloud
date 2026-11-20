@@ -305,6 +305,27 @@ describe('dangerous turn runner workflow wiring', () => {
     });
   });
 
+  it('does not mark a danger-mode browser call as safe mode', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(executeKiloBrowserToolCall).mockClear();
+    vi.mocked(runLlmTurn).mockImplementation(async options => {
+      await options.executeToolCall({
+        arguments: {},
+        id: 'tc-snap',
+        name: 'kilo_browser_snapshot' as const,
+        tabId: 7,
+        type: 'tool-call' as const,
+      });
+    });
+
+    await runDangerousLlmTurn(buildOptions());
+
+    // Danger mode has the handler, so its modal state names it.
+    expect(vi.mocked(executeKiloBrowserToolCall).mock.calls[0]![1]).not.toMatchObject({
+      safeMode: true,
+    });
+  });
+
   it('routes a kilo_browser_* event to executeKiloBrowserToolCall', async () => {
     vi.mocked(runLlmTurn).mockClear();
     vi.mocked(executeKiloBrowserToolCall).mockClear();

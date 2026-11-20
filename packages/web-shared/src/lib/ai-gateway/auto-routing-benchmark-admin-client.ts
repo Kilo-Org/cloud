@@ -13,9 +13,11 @@ import {
   CustomRouterStatusResponseSchema,
   PLATFORM_MEASUREMENTS_PATH,
   PlatformMeasurementsResponseSchema,
+  RefreshBenchmarkProfilesResponseSchema,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
   type BenchmarkConfig,
+  type BenchmarkPair,
   type BenchmarkProfileQuotaError,
   type BenchmarkSchedulerOverrides,
   type BenchmarkKind,
@@ -145,6 +147,25 @@ export function requeueBenchmarkRegistry(
       body: JSON.stringify({ scope, router }),
     },
     RequeueBenchmarkRegistryResponseSchema
+  );
+}
+
+/**
+ * Re-admit one failed registry pair, retryable or permanent: its failure history is
+ * cleared and it measures again on the next drain, unless the catalog cannot run it.
+ */
+export function readmitBenchmarkProfile(
+  entry: BenchmarkPair,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
+) {
+  return fetchBenchmarkAdmin(
+    `/admin/registry/refresh?router=${router}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ router, mode: 'refresh', entries: [entry] }),
+    },
+    RefreshBenchmarkProfilesResponseSchema
   );
 }
 

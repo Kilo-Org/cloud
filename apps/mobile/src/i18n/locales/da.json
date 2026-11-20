@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
     "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen på kilo.ai og derefter prøve igen.",
     "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
@@ -279,6 +280,9 @@
     "credits": "Kreditter",
     "failedToLoadBalance": "Kunne ikke indlæse saldoen. Tryk for at prøve igen.",
     "balanceLoadFailed": "Kunne ikke indlæse saldoen",
+    "balanceUnreachable": "Serveren kunne ikke nås. Prøv igen.",
+    "balanceAccessDenied": "Du har ikke tilladelse til at se denne saldo.",
+    "balanceUnavailable": "Saldoen kunne ikke indlæses.",
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
@@ -1395,7 +1399,6 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
       "notConnectedReadOnlyPlan": "Organisationens prøveperiode er udløbet, så en ejer skal opdatere betalingen på kilo.ai."
     },
     "bitbucketConnect": {
@@ -1405,7 +1408,7 @@
       "managedOnWebRepositories": "Vælg repositorier for {{organization}} på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
-      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det på næste skærm.",
+      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet, og indsæt det på næste skærm.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
       "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
       "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
@@ -4859,12 +4862,15 @@
     "inputDescription": "Scanner alt input med Enkrypt AI, inklusive værktøjsresultater. Når Enkrypt ikke er tilgængelig, sendes anmodninger uden scanning i stedet for at blive afvist.",
     "outputTitle": "Sikkerhedsgrænser for output",
     "outputDescription": "Scanner svar med Enkrypt AI, før medlemmerne modtager dem. Er slået fra, medmindre du slår det til.",
+    "outputUnavailable": "Kilo har ikke slået scanning af output til for denne organisation, så svar kontrolleres ikke, og der er intet at indstille her. Kontakt {{supportEmail}} for at anmode om det.",
     "detectorsHint": "Bloker afviser en markeret anmodning. Kun log registrerer den uden at forsinke anmodningen.",
     "detectorsHintOutput": "Bloker får et markeret svar til at mislykkes. Kun log registrerer det uden at forsinke svaret.",
     "choiceLog": "Kun log",
     "applyTo": "Anvend på",
     "applyToAllMembers": "Alle medlemmer",
     "applyKiloDefault": "Anvend Kilo-standard",
+    "applyKiloDefaultEnglishNote": "Teksten i Kilos standardpolitik er på engelsk, fordi Kilo Gateway anvender den præcis som skrevet.",
+    "applyKiloDefaultReplaceMessage": "Kilos standardpolitik er skrevet på engelsk og erstatter det, du har angivet under Politikovertrædelse. Den tekst, du har indtastet i feltet til politiktekst, kan ikke gendannes.",
     "invalidSavedTitle": "Gemte indstillinger for inputdetektorer kan ikke læses",
     "invalidSavedBody": "Anmodninger blokeres, indtil inputdetektorerne gemmes igen. Detektorerne nedenfor starter fra Kilo-standard.",
     "invalidSavedOutputTitle": "Gemte indstillinger for outputdetektorer kan ikke læses",
@@ -5000,6 +5006,7 @@
     "providersNeedCatalog": "Udbyderkontakterne er skrivebeskyttede, indtil hele modelkataloget er indlæst. Tryk på Prøv igen ovenfor for at redigere dem.",
     "providersEmpty": "Ingen udbydere matcher denne søgning.",
     "providersNone": "Der er ingen udbydere tilgængelige for denne organisation.",
+    "providersUnavailable": "Udbyderlisten kunne ikke indlæses.",
     "allowAllShown": "Tillad alle viste",
     "denyAllShown": "Afvis alle viste",
     "gatewaysDescription": "Kilo dirigerer modelanmodninger gennem Vercel AI Gateway eller OpenRouter. En deaktiveret gateway får disse anmodninger til at mislykkes.",

@@ -184,6 +184,8 @@ export const ENVIRONMENT_SNAPSHOT_MESSAGES = {
   rebuild: 'Environment snapshot is unavailable. Rebuild the environment.',
   startFailed: `${workspaceFailureUserMessage('environment_snapshot_required')}. Send the message again to retry. Rebuild the environment only if this failure repeats.`,
   retry: 'Environment snapshot is temporarily unavailable. Try again.',
+  networkSecretConfiguration:
+    'Network secret configuration is invalid. Check the allowed domains before rebuilding.',
   unsupported: 'Environment snapshots are not supported for this session.',
   newSession: 'This session cannot use the environment snapshot. Start a new session.',
   providerMismatch:
@@ -272,6 +274,13 @@ function blockedEnvironment(
       };
     case 'skipped':
       switch (resolution.admission.reason) {
+        case 'network_secret_configuration_invalid':
+          return {
+            reason: 'environment_build_failed',
+            detail: ENVIRONMENT_SNAPSHOT_MESSAGES.networkSecretConfiguration,
+            environmentId,
+            buildId,
+          };
         case 'backoff':
           if (buildIsActive(resolution)) {
             return {

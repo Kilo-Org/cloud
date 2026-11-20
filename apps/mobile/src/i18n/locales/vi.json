@@ -185,7 +185,8 @@
     "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
     "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư",
     "legalDocumentEnglishOnly": "Tài liệu này chỉ có sẵn bằng tiếng Anh.",
-    "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại."
+    "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại.",
+    "organizationTrialEndedBillingAtKiloAi": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại."
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -279,6 +280,9 @@
     "credits": "Số dư",
     "failedToLoadBalance": "Không thể tải số dư. Chạm để thử lại.",
     "balanceLoadFailed": "Không thể tải số dư",
+    "balanceUnreachable": "Không kết nối được với máy chủ. Hãy thử lại.",
+    "balanceAccessDenied": "Bạn không có quyền xem số dư này.",
+    "balanceUnavailable": "Không tải được số dư.",
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
@@ -699,7 +703,6 @@
     },
     "autoReviews": "Rà soát tự động",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket chưa được kết nối. Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
       "notConnectedReadOnlyPlan": "Bản dùng thử của tổ chức đã kết thúc, vì vậy chủ sở hữu phải cập nhật thanh toán tại kilo.ai."
     },
     "bitbucketConnect": {
@@ -709,7 +712,7 @@
       "managedOnWebRepositories": "Chọn kho lưu trữ cho {{organization}} trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào bên dưới.",
       "descriptionReconnect": "Tạo mã truy cập không gian làm việc mới cho {{organization}} rồi dán vào bên dưới.",
-      "descriptionOverview": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào màn hình tiếp theo.",
+      "descriptionOverview": "Tạo mã truy cập không gian làm việc rồi dán vào màn hình tiếp theo.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
       "tokenPlaceholder": "Mã truy cập không gian làm việc",
       "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
@@ -4859,12 +4862,15 @@
     "inputDescription": "Quét mọi đầu vào bằng Enkrypt AI, bao gồm cả kết quả công cụ. Khi Enkrypt không khả dụng, yêu cầu được gửi đi mà không quét thay vì bị từ chối.",
     "outputTitle": "Rào chắn đầu ra",
     "outputDescription": "Quét phản hồi bằng Enkrypt AI trước khi thành viên nhận được. Tắt trừ khi bạn bật.",
+    "outputUnavailable": "Kilo chưa bật quét đầu ra cho tổ chức này, nên phản hồi không được kiểm tra và không có gì để thiết lập ở đây. Liên hệ {{supportEmail}} để yêu cầu.",
     "detectorsHint": "Chặn sẽ từ chối yêu cầu bị gắn cờ. Chỉ ghi nhật ký sẽ ghi lại mà không làm chậm yêu cầu.",
     "detectorsHintOutput": "Chặn sẽ làm phản hồi bị gắn cờ thất bại. Chỉ ghi nhật ký sẽ ghi lại mà không làm chậm phản hồi.",
     "choiceLog": "Chỉ ghi nhật ký",
     "applyTo": "Áp dụng cho",
     "applyToAllMembers": "Tất cả thành viên",
     "applyKiloDefault": "Áp dụng Mặc định của Kilo",
+    "applyKiloDefaultEnglishNote": "Văn bản chính sách mặc định của Kilo là tiếng Anh, vì Kilo Gateway áp dụng nó đúng như đã viết.",
+    "applyKiloDefaultReplaceMessage": "Chính sách mặc định của Kilo được viết bằng tiếng Anh và thay thế nội dung bạn đã đặt trong Vi phạm chính sách. Văn bản bạn đã nhập trong trường văn bản chính sách không thể khôi phục.",
     "invalidSavedTitle": "Không thể đọc cài đặt bộ phát hiện đầu vào đã lưu",
     "invalidSavedBody": "Yêu cầu bị chặn cho đến khi các bộ phát hiện đầu vào được lưu lại. Các bộ phát hiện bên dưới bắt đầu từ Mặc định của Kilo.",
     "invalidSavedOutputTitle": "Không thể đọc cài đặt bộ phát hiện đầu ra đã lưu",
@@ -5000,6 +5006,7 @@
     "providersNeedCatalog": "Các công tắc nhà cung cấp sẽ ở chế độ chỉ đọc cho đến khi danh mục mô hình đầy đủ được tải. Nhấn Thử lại ở trên để chỉnh sửa.",
     "providersEmpty": "Không có nhà cung cấp nào khớp với tìm kiếm này.",
     "providersNone": "Không có nhà cung cấp nào khả dụng cho tổ chức này.",
+    "providersUnavailable": "Không thể tải danh sách nhà cung cấp.",
     "allowAllShown": "Cho phép tất cả mục đang hiển thị",
     "denyAllShown": "Từ chối tất cả mục đang hiển thị",
     "gatewaysDescription": "Kilo định tuyến yêu cầu mô hình qua Vercel AI Gateway hoặc OpenRouter. Cổng kết nối bị tắt sẽ làm các yêu cầu đó thất bại.",

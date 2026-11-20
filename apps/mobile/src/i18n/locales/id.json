@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, repositori pribadi",
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
     "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
+    "organizationTrialEndedBillingAtKiloAi": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
     "viewOnGitHub": "Lihat PR di GitHub"
   },
   "language": {
@@ -279,6 +280,9 @@
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuat saldo. Ketuk untuk mencoba lagi.",
     "balanceLoadFailed": "Gagal memuat saldo",
+    "balanceUnreachable": "Tidak dapat menghubungi server. Coba lagi.",
+    "balanceAccessDenied": "Anda tidak memiliki izin untuk melihat saldo ini.",
+    "balanceUnavailable": "Saldo tidak dapat dimuat.",
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
@@ -699,7 +703,6 @@
     },
     "autoReviews": "Tinjauan otomatis",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
       "notConnectedReadOnlyPlan": "Masa percobaan organisasi telah berakhir, jadi pemilik harus memperbarui penagihan di kilo.ai."
     },
     "bitbucketConnect": {
@@ -709,7 +712,7 @@
       "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web dari komputer.",
       "description": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionReconnect": "Buat token akses ruang kerja baru untuk {{organization}}, lalu tempelkan di bawah.",
-      "descriptionOverview": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di layar berikutnya.",
+      "descriptionOverview": "Buat token akses ruang kerja, lalu tempelkan di layar berikutnya.",
       "scopes": "Akun: baca · Repositori: baca/tulis · PR: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja",
       "tokenRefused": "Bitbucket tidak menerima token akses ruang kerja ini. Periksa bahwa token tersebut memiliki cakupan izin di atas, lalu coba lagi."
@@ -4859,12 +4862,15 @@
     "inputDescription": "Memindai setiap masukan dengan Enkrypt AI, termasuk hasil alat. Saat Enkrypt tidak tersedia, permintaan dikirim tanpa dipindai alih-alih ditolak.",
     "outputTitle": "Pagar pengaman keluaran",
     "outputDescription": "Memindai respons dengan Enkrypt AI sebelum anggota menerimanya. Nonaktif kecuali Anda mengaktifkannya.",
+    "outputUnavailable": "Kilo belum mengaktifkan pemindaian keluaran untuk organisasi ini, jadi respons tidak diperiksa dan tidak ada yang perlu diatur di sini. Hubungi {{supportEmail}} untuk memintanya.",
     "detectorsHint": "Blokir menolak permintaan yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda permintaan.",
     "detectorsHintOutput": "Blokir menggagalkan respons yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda respons.",
     "choiceLog": "Catat saja",
     "applyTo": "Terapkan ke",
     "applyToAllMembers": "Semua anggota",
     "applyKiloDefault": "Terapkan Bawaan Kilo",
+    "applyKiloDefaultEnglishNote": "Teks kebijakan bawaan Kilo dalam bahasa Inggris, karena Kilo Gateway menerapkannya persis seperti yang tertulis.",
+    "applyKiloDefaultReplaceMessage": "Kebijakan bawaan Kilo ditulis dalam bahasa Inggris dan menggantikan yang Anda atur di Pelanggaran kebijakan. Teks yang Anda masukkan di kolom teks kebijakan tidak dapat dipulihkan.",
     "invalidSavedTitle": "Pengaturan detektor masukan tersimpan tidak dapat dibaca",
     "invalidSavedBody": "Permintaan diblokir hingga detektor masukan disimpan kembali. Detektor di bawah dimulai dari Bawaan Kilo.",
     "invalidSavedOutputTitle": "Pengaturan detektor keluaran tersimpan tidak dapat dibaca",
@@ -5000,6 +5006,7 @@
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
     "providersNone": "Tidak ada penyedia yang tersedia untuk organisasi ini.",
+    "providersUnavailable": "Daftar penyedia tidak dapat dimuat.",
     "allowAllShown": "Izinkan semua yang ditampilkan",
     "denyAllShown": "Tolak semua yang ditampilkan",
     "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",

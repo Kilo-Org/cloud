@@ -57,6 +57,8 @@ export type ContainerAllocationAlertPayload = {
 
 export type QueueBacklogAlertPayload = {
   alertType: 'queue_backlog';
+  queueName?: string;
+  runbookUrl?: string;
   severity: AlertSeverity;
   provider: string;
   model: string;
@@ -252,6 +254,7 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
     {
       type: 'section',
       fields: [
+        ...(alert.queueName ? [plainTextField('Queue', alert.queueName)] : []),
         plainTextField('Queue ID', alert.model),
         {
           type: 'mrkdwn',
@@ -268,7 +271,7 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `Oldest message: ${oldestMessageTimestamp}`,
+        text: `Oldest message: ${oldestMessageTimestamp}${alert.runbookUrl ? `\nRunbook: ${alert.runbookUrl}` : ''}`,
       },
     },
   ];

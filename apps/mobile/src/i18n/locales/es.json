@@ -186,6 +186,7 @@
     "privateRepositoryA11y": "{{name}}, repositorio privado",
     "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés.",
     "organizationTrialEndedBilling": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación y, después, volver a intentarlo.",
+    "organizationTrialEndedBillingAtKiloAi": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
     "viewOnGitHub": "Ver PR en GitHub"
   },
   "language": {
@@ -280,6 +281,9 @@
     "credits": "Créditos",
     "failedToLoadBalance": "No se pudo cargar el saldo. Toca para reintentar.",
     "balanceLoadFailed": "No se pudo cargar el saldo",
+    "balanceUnreachable": "No se pudo conectar con el servidor. Inténtalo de nuevo.",
+    "balanceAccessDenied": "No tienes permiso para ver este saldo.",
+    "balanceUnavailable": "No se pudo cargar el saldo.",
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
@@ -700,7 +704,6 @@
     },
     "autoReviews": "Revisiones automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
       "notConnectedReadOnlyPlan": "La prueba de la organización ha finalizado, así que un propietario debe actualizar la facturación en kilo.ai."
     },
     "bitbucketConnect": {
@@ -710,7 +713,7 @@
       "managedOnWebRepositories": "Elige los repositorios para {{organization}} en la web desde un ordenador.",
       "description": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
       "descriptionReconnect": "Crea un nuevo token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
-      "descriptionOverview": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo en la siguiente pantalla.",
+      "descriptionOverview": "Crea un token de acceso del espacio de trabajo y pégalo en la siguiente pantalla.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso del espacio de trabajo",
       "tokenRefused": "Bitbucket no ha aceptado este token de acceso del espacio de trabajo. Comprueba que tiene los permisos indicados arriba y vuelve a intentarlo."
@@ -4938,12 +4941,15 @@
     "inputDescription": "Analiza cada entrada con Enkrypt AI, incluidos los resultados de herramientas. Cuando Enkrypt no está disponible, las solicitudes se envían sin analizar en lugar de rechazarse.",
     "outputTitle": "Barreras de seguridad de salida",
     "outputDescription": "Analiza las respuestas con Enkrypt AI antes de que las reciban los miembros. Desactivado salvo que lo actives.",
+    "outputUnavailable": "Kilo no ha activado el análisis de salida para esta organización, así que las respuestas no se comprueban y aquí no hay nada que configurar. Contacta con {{supportEmail}} para solicitarlo.",
     "detectorsHint": "Bloqueo rechaza una solicitud marcada. Solo registrar la registra sin retrasar la solicitud.",
     "detectorsHintOutput": "Bloqueo hace fallar una respuesta marcada. Solo registrar la registra sin retrasar la respuesta.",
     "choiceLog": "Solo registrar",
     "applyTo": "Aplicar a",
     "applyToAllMembers": "Todos los miembros",
     "applyKiloDefault": "Aplicar predeterminado de Kilo",
+    "applyKiloDefaultEnglishNote": "El texto de la política predeterminada de Kilo está en inglés, porque Kilo Gateway la aplica exactamente tal como está escrita.",
+    "applyKiloDefaultReplaceMessage": "La política predeterminada de Kilo está escrita en inglés y sustituye lo que hayas definido en Infracción de la política. El texto que introdujiste en el campo de texto de la política no se puede recuperar.",
     "invalidSavedTitle": "No se puede leer la configuración guardada de los detectores de entrada",
     "invalidSavedBody": "Las solicitudes se bloquean hasta que se vuelvan a guardar los detectores de entrada. Los detectores siguientes parten del predeterminado de Kilo.",
     "invalidSavedOutputTitle": "No se puede leer la configuración guardada de los detectores de salida",
@@ -5079,6 +5085,7 @@
     "providersNeedCatalog": "Los interruptores de proveedores son de solo lectura hasta que se cargue el catálogo completo de modelos. Toca Reintentar arriba para editarlos.",
     "providersEmpty": "Ningún proveedor coincide con esta búsqueda.",
     "providersNone": "No hay proveedores disponibles para esta organización.",
+    "providersUnavailable": "No se pudo cargar la lista de proveedores.",
     "allowAllShown": "Permitir todos los mostrados",
     "denyAllShown": "Denegar todos los mostrados",
     "gatewaysDescription": "Kilo enruta las solicitudes de modelos a través de Vercel AI Gateway u OpenRouter. Si una pasarela está desactivada, esas solicitudes fallan.",

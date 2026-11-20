@@ -1659,7 +1659,7 @@ function wording(value, language = 'en') {
     .trim()
     .toLocaleUpperCase(language)
     .toLocaleLowerCase(language)
-    .replace(/[.!:。！：]+$/u, '');
+    .replace(/[.!:。！：।॥]+$/u, '');
 }
 
 function pluralBaseKey(key) {
@@ -2916,7 +2916,10 @@ function run() {
       console.error(`... and ${found.length - shown.length} more`);
     }
     console.error(`\ncheck-catalogs: ${found.length} problem(s)`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   console.log(`check-catalogs: ${languages} languages, every catalog matches en.json`);

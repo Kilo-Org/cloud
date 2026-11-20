@@ -60,6 +60,13 @@ import {
 import { EnvironmentSandboxField } from './EnvironmentSandboxField';
 import { EnvironmentScriptsEditor } from './EnvironmentScriptsEditor';
 import { EnvironmentVariablesEditor } from './EnvironmentVariablesEditor';
+import { NetworkSecretsEditor } from './NetworkSecretsEditor';
+import {
+  buildNetworkSecretChanges,
+  emptyNetworkSecretForm,
+  hasPendingNetworkSecret,
+  type NetworkSecretDraft,
+} from './network-secrets-form';
 import { splitRepositoryName, toSelectableAllocation } from './settings/settings-options';
 
 type EnvironmentDialogProps = {
@@ -201,10 +208,21 @@ type EnvironmentFormProps = Omit<
   onCancel?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 };
-export type EnvironmentEditorPage = 'overview' | 'scripts' | 'start' | 'variables';
+export type EnvironmentEditorPage =
+  | 'overview'
+  | 'scripts'
+  | 'start'
+  | 'variables'
+  | 'network-secrets';
 
 function isEditorPage(value: string): value is EnvironmentEditorPage {
-  return value === 'overview' || value === 'scripts' || value === 'start' || value === 'variables';
+  return (
+    value === 'overview' ||
+    value === 'scripts' ||
+    value === 'start' ||
+    value === 'variables' ||
+    value === 'network-secrets'
+  );
 }
 
 function EnvironmentForm({
@@ -277,6 +295,11 @@ function EnvironmentForm({
     formatEnvironmentVariables(savedVariables.plainVars, savedVariables.secretKeys)
   );
   const [variablesText, setVariablesText] = useState(initialVariablesText);
+  const [initialNetworkSecrets] = useState<NetworkSecretDraft[]>(existing?.networkSecrets ?? []);
+  const [networkSecrets, setNetworkSecrets] = useState(initialNetworkSecrets);
+  const [networkSecretForm, setNetworkSecretForm] = useState(emptyNetworkSecretForm);
+  const pendingNetworkSecret = hasPendingNetworkSecret(networkSecretForm);
+  const networkSecretChanges = buildNetworkSecretChanges(initialNetworkSecrets, networkSecrets);
   const hasUnsavedChanges =
     hasEnvironmentFormChanges(
       {
@@ -288,7 +311,10 @@ function EnvironmentForm({
         networkAccess: initialNetworkAccess,
       },
       { name: savedName, script, startScript, variablesText, sandboxAllocation, networkAccess }
-    ) || repositoriesChanged;
+    ) ||
+    repositoriesChanged ||
+    networkSecretChanges.length > 0 ||
+    pendingNetworkSecret;
   const [error, setError] = useState<string | null>(null);
   let variables: ReturnType<typeof buildEnvironmentVariableChanges> | undefined;
   let variablesError: string | null = null;
@@ -301,7 +327,10 @@ function EnvironmentForm({
   } catch (caught) {
     variablesError = caught instanceof Error ? caught.message : 'Check the environment variables.';
   }
-  const impact = describeEnvironmentProfileImpact(profileQuery.profiles, variables?.keys ?? []);
+  const impact = describeEnvironmentProfileImpact(profileQuery.profiles, [
+    ...(variables?.keys ?? []),
+    ...networkSecrets.map(row => row.key),
+  ]);
   const hasScript = script.trim().length > 0;
   const hasStartScript = startScript.trim().length > 0;
   const isSaving = createEnvironment.isPending || updateEnvironment.isPending;
@@ -342,6 +371,11 @@ function EnvironmentForm({
       validateEnvironmentName(savedName);
       validateEnvironmentCommands(commands);
       validateEnvironmentCommands(startCommands, 'Start');
+      const collision = networkSecrets.find(row => variables.keys.includes(row.key));
+      if (collision)
+        throw new Error(
+          `"${collision.key}" cannot be both an environment variable and a network secret.`
+        );
       if (existing) {
         await updateEnvironment.mutateAsync({
           organizationId,
@@ -350,6 +384,7 @@ function EnvironmentForm({
           repositories: repositoriesChanged ? repositories : undefined,
           plainVars: variables.plainVars,
           secrets: variables.secrets,
+          networkSecrets: networkSecretChanges,
           commands,
           startCommands,
           sandboxAllocation,
@@ -373,6 +408,9 @@ function EnvironmentForm({
           repositories,
           plainVars: variables.plainVars,
           secrets,
+          networkSecrets: networkSecrets.flatMap(row =>
+            row.value === undefined ? [] : [{ ...row, value: row.value }]
+          ),
           commands,
           startCommands,
           sandboxAllocation,
@@ -485,8 +523,21 @@ function EnvironmentForm({
       {error}
     </p>
   );
+  const pendingNetworkNotice = pendingNetworkSecret && (
+    <p role="status" className="text-muted-foreground text-xs">
+      <button type="button" className="underline" onClick={() => changePage('network-secrets')}>
+        Add or cancel the unfinished network secret
+      </button>{' '}
+      before saving.
+    </p>
+  );
 
-  const saveDisabled = isSaving || deletePending || profileQuery.isLoading || profileQuery.isError;
+  const saveDisabled =
+    isSaving ||
+    deletePending ||
+    profileQuery.isLoading ||
+    profileQuery.isError ||
+    pendingNetworkSecret;
 
   const handleTabChange = (value: string) => {
     if (isEditorPage(value)) changePage(value);
@@ -521,11 +572,24 @@ function EnvironmentForm({
             <TabsTrigger value="variables" className="gap-1 text-xs pointer-coarse:min-h-11">
               Variables
             </TabsTrigger>
+            <TabsTrigger value="network-secrets" className="gap-1 text-xs pointer-coarse:min-h-11">
+              Network secrets
+            </TabsTrigger>
           </TabsList>
         </div>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
           {page === 'scripts' && buildPanel}
           <fieldset disabled={isSaving || deletePending} className="min-w-0 space-y-5">
+            <TabsContent value="network-secrets" className="mt-0">
+              <NetworkSecretsEditor
+                source="environment"
+                value={networkSecrets}
+                onChange={setNetworkSecrets}
+                form={networkSecretForm}
+                onFormChange={setNetworkSecretForm}
+                readOnly={!canManage}
+              />
+            </TabsContent>
             <TabsContent value="overview" className="mt-0 space-y-5">
               {overviewBaseFields}
             </TabsContent>
@@ -555,6 +619,7 @@ function EnvironmentForm({
             </TabsContent>
           </fieldset>
           {profileFeedback}
+          {pendingNetworkNotice}
           {errorMessage}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
@@ -612,11 +677,13 @@ function EnvironmentForm({
               ? 'Snapshot build script'
               : page === 'start'
                 ? 'Workspace start script'
-                : page === 'variables'
-                  ? 'Environment variables'
-                  : existing
-                    ? 'Environment'
-                    : 'Set up environment'}
+                : page === 'network-secrets'
+                  ? 'Network secrets'
+                  : page === 'variables'
+                    ? 'Environment variables'
+                    : existing
+                      ? 'Environment'
+                      : 'Set up environment'}
           </DialogTitle>
         </div>
         <DialogDescription className="sr-only">
@@ -663,9 +730,19 @@ function EnvironmentForm({
                       ? 'Check variable format'
                       : variables?.keys.length
                         ? `${variables.keys.length} ${variables.keys.length === 1 ? 'variable' : 'variables'}`
-                        : 'Add configuration and credentials'
+                        : 'Configuration that commands can read'
                   }
                   onClick={() => changePage('variables')}
+                />
+                <EditorRow
+                  icon={<KeyRound className="size-4" />}
+                  label="Network secrets"
+                  detail={
+                    networkSecrets.length
+                      ? `${networkSecrets.length} secrets`
+                      : 'Keys the agent can use but cannot read'
+                  }
+                  onClick={() => changePage('network-secrets')}
                 />
               </div>
             </>
@@ -690,9 +767,20 @@ function EnvironmentForm({
               error={variablesError}
             />
           )}
+          {page === 'network-secrets' && (
+            <NetworkSecretsEditor
+              source="environment"
+              value={networkSecrets}
+              onChange={setNetworkSecrets}
+              form={networkSecretForm}
+              onFormChange={setNetworkSecretForm}
+              readOnly={!canManage}
+            />
+          )}
         </fieldset>
         {(page === 'overview' || page === 'scripts') && buildPanel}
         {profileFeedback}
+        {pendingNetworkNotice}
         {errorMessage}
       </div>
       <DialogFooter className="shrink-0 gap-3 border-t px-6 py-4 sm:items-center sm:justify-between">

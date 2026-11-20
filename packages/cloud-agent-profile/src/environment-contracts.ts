@@ -3,6 +3,12 @@ import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import type {
+  NetworkSecretInput,
+  NetworkSecretChange,
+  NetworkSecretPolicy,
+  NetworkSecrets,
+} from '@kilocode/worker-utils/network-secrets';
 import { MASKED_SECRET_VALUE, type ProfileOwner } from './types';
 
 export const ENVIRONMENT_SECRET_PLACEHOLDER = '<unchanged>';
@@ -133,6 +139,7 @@ type EnvironmentCreateInputBase = {
   name: string;
   plainVars?: Record<string, string>;
   secrets?: Record<string, string>;
+  networkSecrets?: NetworkSecretInput[];
   commands?: string[];
   /** Commands run in every session after setup. Not a build input. */
   startCommands?: string[];
@@ -176,6 +183,7 @@ export type EnvironmentUpdateInput = {
   repositories?: EnvironmentRepositoryEntry[];
   plainVars?: Record<string, string>;
   secrets?: EnvironmentSecretChange[];
+  networkSecrets?: NetworkSecretChange[];
   commands?: string[];
   /** Replaces the start commands when supplied. Never advances the revision. */
   startCommands?: string[];
@@ -190,6 +198,7 @@ export type EnvironmentUpdateInput = {
 export type EnvironmentSessionLayer = {
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
+  networkSecrets?: NetworkSecrets;
   setupCommands?: string[];
   /**
    * Commands every session runs after setup, including a session whose
@@ -234,6 +243,7 @@ type EnvironmentBuildInputBase = {
   commands: string[];
   plainVars: Record<string, string>;
   encryptedSecrets: Record<string, EncryptedEnvelope>;
+  networkSecrets?: NetworkSecrets;
   /**
    * The environment's saved allocation key, unvalidated. Build admission
    * resolves it with the repository and context settings to pin one target.
@@ -305,6 +315,7 @@ export type EnvironmentResponse = {
   egressAllowlist: string[] | null;
   /** Secret key names only. Values and envelopes are never returned. */
   secretKeys: string[];
+  networkSecrets?: Array<NetworkSecretPolicy & { key: string }>;
 } & EnvironmentIdentityResponse;
 
 /** A V1 summary carries the identity scalars; a V2 summary carries `repositories`. */

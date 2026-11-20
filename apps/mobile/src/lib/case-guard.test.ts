@@ -64,6 +64,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/agents/attachment-picker.ts': 'file-extension/mime normalization',
   'components/agents/code-block-model.ts': 'language-identifier normalization',
   'components/agents/markdown-html.tsx': 'HTML tag-name comparison',
+  'components/agents/markdown-html-sanitization.ts': 'HTML tag-name comparison',
   'components/agents/markdown-html-tree.ts': 'HTML tag-name comparison',
   'components/agents/markdown-image.tsx': 'hostname comparison',
   'components/agents/markdown-link-confirm.ts': 'hostname comparison',

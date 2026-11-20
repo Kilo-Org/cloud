@@ -159,15 +159,17 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   });
 
   if (config.isError && !config.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <PlatformErrorScreen
         title={t('securityAgent.sla.title')}
+        errorTitle={t('securityAgent.sla.couldNotLoad')}
         variant={classifyReadFailureVariant({
           errors: [config.error],
           isPaused: config.fetchStatus === 'paused',
           connectivity,
         })}
-        message={t('securityAgent.sla.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );

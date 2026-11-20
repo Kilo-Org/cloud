@@ -185,7 +185,8 @@
     "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
     "privateRepositoryA11y": "{{name}}，私有儲存庫",
     "legalDocumentEnglishOnly": "本文件僅提供英文版本。",
-    "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。"
+    "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。",
+    "organizationTrialEndedBillingAtKiloAi": "組織的試用期已結束，且沒有使用中的方案。您可以在 kilo.ai 更新帳單資訊，然後再試一次。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -279,6 +280,9 @@
     "credits": "點數",
     "failedToLoadBalance": "無法載入餘額。點一下即可再試一次。",
     "balanceLoadFailed": "無法載入餘額",
+    "balanceUnreachable": "無法連線到伺服器。請再試一次。",
+    "balanceAccessDenied": "你沒有檢視此餘額的權限。",
+    "balanceUnavailable": "無法載入餘額。",
     "hideBalance": "隱藏餘額",
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
@@ -699,7 +703,6 @@
     },
     "autoReviews": "自動審查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "notConnectedReadOnlyPlan": "組織的試用期已結束，因此擁有者必須前往 kilo.ai 更新帳單資訊。"
     },
     "bitbucketConnect": {
@@ -709,7 +712,7 @@
       "managedOnWebRepositories": "請在電腦上透過網頁版為 {{organization}} 選擇儲存庫。",
       "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
       "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
-      "descriptionOverview": "為 {{organization}} 建立工作區存取權杖，然後在下一個畫面貼上。",
+      "descriptionOverview": "建立工作區存取權杖，然後在下一個畫面貼上。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖",
       "tokenRefused": "Bitbucket 未接受此工作區存取權杖。請確認其具有上方列出的權限範圍，然後再試一次。"
@@ -4859,12 +4862,15 @@
     "inputDescription": "使用 Enkrypt AI 掃描每個輸入，包括工具結果。當 Enkrypt 無法使用時，請求不會被拒絕，而是在未經掃描的情況下傳送。",
     "outputTitle": "輸出護欄",
     "outputDescription": "在成員收到回應前，使用 Enkrypt AI 掃描回應。除非您開啟，否則為關閉狀態。",
+    "outputUnavailable": "Kilo 尚未為這個組織啟用輸出掃描，因此回應不會被檢查，這裡也沒有可設定的項目。如需申請啟用，請聯絡 {{supportEmail}}。",
     "detectorsHint": "封鎖會拒絕被標記的請求。僅記錄只會記錄該請求，不會延遲請求。",
     "detectorsHintOutput": "封鎖會讓被標記的回應失敗。僅記錄只會記錄該回應，不會延遲回應。",
     "choiceLog": "僅記錄",
     "applyTo": "套用至",
     "applyToAllMembers": "所有成員",
     "applyKiloDefault": "套用 Kilo 預設值",
+    "applyKiloDefaultEnglishNote": "Kilo 的預設政策文字是英文，因為 Kilo Gateway 會完全依原文套用。",
+    "applyKiloDefaultReplaceMessage": "Kilo 的預設政策以英文編寫，並取代你在政策違規中設定的內容。你在政策文字欄位中輸入的文字無法復原。",
     "invalidSavedTitle": "無法讀取已儲存的輸入偵測器設定",
     "invalidSavedBody": "在重新儲存輸入偵測器之前，請求會遭到封鎖。下方偵測器會從 Kilo 預設值開始。",
     "invalidSavedOutputTitle": "無法讀取已儲存的輸出偵測器設定",
@@ -5000,6 +5006,7 @@
     "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
     "providersEmpty": "沒有符合此搜尋的供應商。",
     "providersNone": "此組織沒有可用的供應商。",
+    "providersUnavailable": "無法載入供應商清單。",
     "allowAllShown": "允許所有顯示項目",
     "denyAllShown": "拒絕所有顯示項目",
     "gatewaysDescription": "Kilo 會透過 Vercel AI Gateway 或 OpenRouter 路由模型請求。停用的閘道會使這些請求失敗。",

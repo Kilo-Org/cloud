@@ -75,6 +75,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.data = null;
     config.isLoading = false;
     config.isError = false;
+    config.error = null;
     config.isPending = false;
     config.fetchStatus = 'idle';
     capability.canManage = true;
@@ -159,7 +160,8 @@ describe('AutomationSettingsScreen approval gate', () => {
       throw new Error('paused first read did not render the failure screen');
     }
     expect(error.variant).toBe('offline');
-    expect(error.message).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(error.message).toBeUndefined();
     expect(error.title).toBe(i18n.t('securityAgent.automation.title'));
     // The retry routes through the deliberate paused-read hook, not the plain
     // query refetch, and the branch forwards the hook's busy state.
@@ -303,5 +305,21 @@ describe('AutomationSettingsScreen approval gate', () => {
       // Label in name: the switch is named by the text the row shows.
       expect(row.accessibilityLabel).toBeUndefined();
     }
+  });
+  it('titles a failed first read with the screen and leaves the description to the variant', () => {
+    config.data = null;
+    config.isError = true;
+    config.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    renderScreen();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('failed first read did not render the failure screen');
+    }
+    // The failed read is named once, in the error's own title. A message here
+    // would repeat the same words above the variant's cause.
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(error.message).toBeUndefined();
+    expect(error.variant).toBe('server');
   });
 });

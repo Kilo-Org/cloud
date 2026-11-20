@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one module's suite: the draft round trip, the detectors, the save input, the issue list and the stored-draft shape share one fixture */
 import { describe, expect, it } from 'vitest';
 
 import { configKey, draftsEqual } from '@/lib/organization/guardrails-config-key';
@@ -7,6 +8,7 @@ import {
   detectorChoice,
   fromDraft,
   GUARDRAILS_LIMITS,
+  isGuardrailsFormDraft,
   type OrgGuardrailsConfig,
   type OrgPolicyRule,
   parseLineList,
@@ -293,5 +295,51 @@ describe('createPolicyRule', () => {
   it('picks an unused numeric id', () => {
     expect(createPolicyRule([rule({ id: 'rule-1' })]).id).toBe('rule-2');
     expect(createPolicyRule([rule({ id: 'rule-1' }), rule({ id: 'rule-2' })]).id).toBe('rule-3');
+  });
+});
+
+describe('isGuardrailsFormDraft', () => {
+  it('accepts the draft the form produces', () => {
+    const saved = config();
+    saved.output.detectors.keyword_detector = {
+      enabled: true,
+      action: 'block',
+      banned_keywords: ['alpha'],
+    };
+    saved.output.detectors.topic_detector = { enabled: true, action: 'log', topic: ['weapons'] };
+    saved.detectors.policy_violation = {
+      ...saved.detectors.policy_violation,
+      enabled: true,
+      format: 'rules',
+      rules: [rule({ id: 'rule-1', text: 'No PII' })],
+    };
+    expect(isGuardrailsFormDraft(toDraft(saved))).toBe(true);
+  });
+
+  it('accepts a draft that breaks a policy limit, which Save reports instead', () => {
+    const saved = config();
+    saved.detectors.pii = { enabled: true, action: 'block', entities: [] };
+    expect(guardrailsIssues(toDraft(saved), true)).toContain('piiEntityRequired');
+    expect(isGuardrailsFormDraft(toDraft(saved))).toBe(true);
+  });
+
+  it('rejects a foreign shape, a missing detector, and a line list left as an array', () => {
+    const draft = toDraft(config());
+    expect(isGuardrailsFormDraft('draft')).toBe(false);
+    expect(isGuardrailsFormDraft(null)).toBe(false);
+    expect(isGuardrailsFormDraft({ ...draft, inputEnabled: 'yes' })).toBe(false);
+    expect(isGuardrailsFormDraft({ ...draft, groupId: 7 })).toBe(false);
+    expect(
+      isGuardrailsFormDraft({ ...draft, detectors: { injection_attack: { enabled: true } } })
+    ).toBe(false);
+    expect(
+      isGuardrailsFormDraft({
+        ...draft,
+        outputDetectors: {
+          ...draft.outputDetectors,
+          keyword_detector: { enabled: true, action: 'block', banned_keywords: ['alpha'] },
+        },
+      })
+    ).toBe(false);
   });
 });

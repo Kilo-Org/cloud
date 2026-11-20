@@ -328,6 +328,39 @@ test('targets resolve to unique slug ids', () => {
   assert.throws(() => resolveTargets([], '[{"id":"x"}]'), /string link/);
 });
 
+test('a held target keeps its release link and its hold', () => {
+  assert.deepEqual(
+    resolveTargets(
+      [],
+      JSON.stringify([
+        {
+          id: 'agents',
+          link: 'kiloapp:///dev/force-state/loading?next=kiloapp%3A%2F%2F%2F(app)',
+          after: 'kiloapp:///dev/force-state/clear?next=kiloapp%3A%2F%2F%2F(app)',
+          hold: true,
+        },
+      ])
+    ),
+    [
+      {
+        id: 'agents',
+        link: 'kiloapp:///dev/force-state/loading?next=kiloapp%3A%2F%2F%2F(app)',
+        after: 'kiloapp:///dev/force-state/clear?next=kiloapp%3A%2F%2F%2F(app)',
+        hold: true,
+      },
+    ]
+  );
+  // A hold without a release would leave the screen held for every later target.
+  assert.throws(
+    () => resolveTargets([], JSON.stringify([{ link: 'kiloapp://a', hold: true }])),
+    /after link to release/
+  );
+  assert.throws(
+    () => resolveTargets([], JSON.stringify([{ link: 'kiloapp://a', after: 'x', hold: 'yes' }])),
+    /hold must be true or false/
+  );
+});
+
 test('detectPlatform prefers a connected adb device', () => {
   const adb = (output: string) => () => Buffer.from(output);
   assert.equal(
@@ -510,6 +543,38 @@ test('prepared proof commands require exact identities and paired source flags',
     'result',
   ]);
   assert.equal(comparison.command, 'compare');
+});
+
+test('compare pixel-diff flags are opt-in and validated together', () => {
+  const base = [
+    'compare',
+    '--preparation',
+    'receipt.json',
+    '--base-run',
+    'base-run',
+    '--head-run',
+    'head-run',
+    '--out',
+    'result',
+  ];
+  const off = parseCliArgs(base);
+  assert.equal(off.command === 'compare' && off.pixelDiff, false);
+  assert.equal(off.command === 'compare' && off.pixelDiffExplainShift, false);
+  const on = parseCliArgs([...base, '--pixel-diff']);
+  assert.equal(on.command === 'compare' && on.pixelDiff, true);
+  assert.equal(on.command === 'compare' && on.pixelDiffExplainShift, false);
+  const explained = parseCliArgs([...base, '--pixel-diff', '--pixel-diff-explain-shift']);
+  assert.equal(explained.command === 'compare' && explained.pixelDiffExplainShift, true);
+  // A shift explanation is only meaningful inside an enabled pixel diff.
+  assert.throws(
+    () => parseCliArgs([...base, '--pixel-diff-explain-shift']),
+    /--pixel-diff-explain-shift needs --pixel-diff/
+  );
+  // The flags belong to compare, never to a run.
+  assert.throws(
+    () => parseCliArgs(['run', '--link', 'kiloapp:///card', '--pixel-diff']),
+    /--pixel-diff is not valid for run/
+  );
 });
 
 test('scan retains bracket mismatch and possible blank observations even when unsettled', () => {

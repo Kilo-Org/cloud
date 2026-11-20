@@ -187,6 +187,7 @@
     "privateRepositoryA11y": "{{name}}, soukromý repozitář",
     "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
     "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu.",
+    "organizationTrialEndedBillingAtKiloAi": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat na kilo.ai a poté to zkuste znovu.",
     "viewOnGitHub": "Zobrazit PR na GitHubu"
   },
   "language": {
@@ -281,6 +282,9 @@
     "credits": "Kredity",
     "failedToLoadBalance": "Zůstatek se nepodařilo načíst. Klepnutím to zkuste znovu.",
     "balanceLoadFailed": "Zůstatek se nepodařilo načíst",
+    "balanceUnreachable": "Server je nedostupný. Zkuste to znovu.",
+    "balanceAccessDenied": "Nemáte oprávnění zobrazit tento zůstatek.",
+    "balanceUnavailable": "Zůstatek se nepodařilo načíst.",
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
@@ -1449,7 +1453,6 @@
     "followReviewMd": "Řídit se pokyny v REVIEW.md",
     "followReviewMdSubtitle": "Dodržovat pokyny ze souboru REVIEW.md v každém repozitáři",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "notConnectedReadOnlyPlan": "Zkušební období organizace skončilo, takže vlastník musí aktualizovat fakturaci na kilo.ai."
     },
     "bitbucketConnect": {
@@ -1459,7 +1462,7 @@
       "managedOnWebRepositories": "Vyberte repozitáře pro {{organization}} na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
-      "descriptionOverview": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej na další obrazovce.",
+      "descriptionOverview": "Vytvořte přístupový token pracovního prostoru a vložte jej na další obrazovce.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
       "tokenPlaceholder": "Přístupový token pracovního prostoru",
       "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
@@ -5017,12 +5020,15 @@
     "inputDescription": "Kontroluje každý vstup pomocí Enkrypt AI, včetně výsledků nástrojů. Když je Enkrypt nedostupný, požadavky se odesílají bez kontroly, místo aby byly odmítnuty.",
     "outputTitle": "Ochranná pravidla pro výstup",
     "outputDescription": "Kontroluje odpovědi pomocí Enkrypt AI dříve, než je členové obdrží. Je vypnuto, dokud ho nezapnete.",
+    "outputUnavailable": "Kilo pro tuto organizaci nezapnul skenování výstupu, takže odpovědi se nekontrolují a zde není co nastavit. Chcete-li o to požádat, kontaktujte {{supportEmail}}.",
     "detectorsHint": "Možnost Blokovat označený požadavek odmítne. Možnost Jen zaznamenat ho pouze zaznamená, aniž by požadavek zdržela.",
     "detectorsHintOutput": "Možnost Blokovat způsobí selhání označené odpovědi. Možnost Jen zaznamenat ji pouze zaznamená, aniž by odpověď zdržela.",
     "choiceLog": "Jen zaznamenat",
     "applyTo": "Použít pro",
     "applyToAllMembers": "Všichni členové",
     "applyKiloDefault": "Použít výchozí nastavení Kilo",
+    "applyKiloDefaultEnglishNote": "Text výchozích zásad Kilo je v angličtině, protože Kilo Gateway je uplatňuje přesně tak, jak jsou napsané.",
+    "applyKiloDefaultReplaceMessage": "Výchozí zásady Kilo jsou napsané v angličtině a nahradí to, co jste nastavili v části Porušení zásad. Text, který jste zadali do pole textu zásad, nelze obnovit.",
     "invalidSavedTitle": "Uložené nastavení vstupních detektorů nelze načíst",
     "invalidSavedBody": "Požadavky jsou blokovány, dokud vstupní detektory znovu neuložíte. Detektory níže vycházejí z výchozího nastavení Kilo.",
     "invalidSavedOutputTitle": "Uložené nastavení výstupních detektorů nelze načíst",
@@ -5158,6 +5164,7 @@
     "providersNeedCatalog": "Přepínače poskytovatelů zůstanou jen pro čtení, dokud se nenačte celý katalog modelů. Pokud je chcete upravit, klepněte výše na Zkusit znovu.",
     "providersEmpty": "Hledání neodpovídají žádní poskytovatelé.",
     "providersNone": "Pro tuto organizaci nejsou k dispozici žádní poskytovatelé.",
+    "providersUnavailable": "Seznam poskytovatelů se nepodařilo načíst.",
     "allowAllShown": "Povolit vše zobrazené",
     "denyAllShown": "Zakázat vše zobrazené",
     "gatewaysDescription": "Kilo směruje požadavky na modely přes Vercel AI Gateway nebo OpenRouter. Pokud je brána vypnutá, tyto požadavky selžou.",

@@ -76,7 +76,7 @@ export const BATCHES_USAGE = `Usage: pnpm dev:mobile:design-gate batches <comman
       Writes <out>/<batch>/ (gate artifacts, targets.json, expectations.json, gate.log),
       <out>/summary.tsv and <out>/resolved-links.tsv (each batch's links as its device resolved them).
       --matrix overrides every batch's own matrix; --cell adds a cell the platform supports
-      (${CELL_IDS.join(', ')}; iOS has no compact, landscape or rtl-compact).
+      (${CELL_IDS.join(', ')}; iOS has no rtl-compact, and its compact cell needs an SE or mini device).
   seed --email <fake@example.com> --out <seed-map.json> [--manifest <file>] [--only <batch>,...] [--step <name> ...]
       Runs the seed steps (${SEED_STEPS.map(step => step.step).join(', ')}) that the manifest rows
       reference, narrowed to the --only batches, or exactly the --step names, for a signed-in fake
@@ -184,12 +184,27 @@ const spawnQuiet: Spawn = (command, args) => {
 };
 const clock: Clock = { now: () => Date.now(), sleep: ms => delay(ms) };
 
-type ResolvedTarget = Readonly<{ id: string; link: string; after?: string; row: ManifestRow }>;
+type ResolvedTarget = Readonly<{
+  id: string;
+  link: string;
+  after?: string;
+  hold?: boolean;
+  row: ManifestRow;
+}>;
 
-/** The batch's gate targets: links with seed ids filled in and force-state wrapping. */
+/**
+ * The batch's gate targets: links with seed ids filled in and force-state wrapping.
+ *
+ * A row forced into `loading` is measured in that state, so its target carries
+ * `hold`: the runner tells the gate to sample the held frame and then release it
+ * on the same screen, which is what makes the jump to the landed content
+ * measurable. Every other forced row is released onto Home.
+ */
 export function batchTargets(batch: Batch, seeds: SeedMap | undefined): ResolvedTarget[] {
   return batch.rows.map((row, index) => {
-    const link = targetLink(row, resolveTemplates(row.link, seeds));
+    const resolved = resolveTemplates(row.link, seeds);
+    const link = targetLink(row, resolved);
+    const held = row.force === 'loading';
     return {
       id: `${String(index + 1).padStart(2, '0')}-${row.force === undefined ? '' : `force-${row.force}-`}${
         link
@@ -200,7 +215,16 @@ export function batchTargets(batch: Batch, seeds: SeedMap | undefined): Resolved
           .slice(0, 80) || 'root'
       }`,
       link,
-      ...(row.force === undefined ? {} : { after: FORCE_CLEAR_LINK }),
+      ...(row.force === undefined
+        ? {}
+        : {
+            // A held target releases onto its own screen: that landing is what its
+            // jump is measured against. Every other mode goes back to Home.
+            after: held
+              ? `${FORCE_CLEAR_LINK}?next=${encodeURIComponent(resolved)}`
+              : FORCE_CLEAR_LINK,
+            ...(held ? { hold: true } : {}),
+          }),
       row,
     };
   });
@@ -388,7 +412,12 @@ async function runBatch(
     targetsFile,
     `${JSON.stringify(
       {
-        targets: targets.map(({ id, link, after }) => ({ id, link, ...(after ? { after } : {}) })),
+        targets: targets.map(({ id, link, after, hold }) => ({
+          id,
+          link,
+          ...(after ? { after } : {}),
+          ...(hold ? { hold } : {}),
+        })),
       },
       null,
       2

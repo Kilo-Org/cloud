@@ -185,7 +185,8 @@
     "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale.",
     "privateRepositoryA11y": "{{name}}, kaydka gaar ah",
     "legalDocumentEnglishOnly": "Dukumeentigan waxaa laga heli karaa af Ingiriisi oo keliya.",
-    "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale."
+    "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale.",
+    "organizationTrialEndedBillingAtKiloAi": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha kilo.ai, ka dibna isku day mar kale."
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -279,6 +280,9 @@
     "credits": "Lacagta isticmaalka",
     "failedToLoadBalance": "Hadhaaga lama soo shubi karin. Taabo si aad mar kale isku daydo.",
     "balanceLoadFailed": "Hadhaaga lama soo shubi karin",
+    "balanceUnreachable": "Lama gaari karin serverka. Isku day mar kale.",
+    "balanceAccessDenied": "Ma haysatid fasax aad ku aragto hadhaagan.",
+    "balanceUnavailable": "Hadhaagii lama soo dejinin karin.",
     "hideBalance": "Qari hadhaaga",
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
@@ -1395,7 +1399,6 @@
     "followReviewMd": "Raac REVIEW.md",
     "followReviewMdSubtitle": "Raac tilmaamaha ku jira faylka REVIEW.md ee kayd kasta",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
       "notConnectedReadOnlyPlan": "Tijaabadii ururku way dhamaatay, sidaas darteed milkiilaha waa inuu cusboonaysiiyaa biilasha kilo.ai."
     },
     "bitbucketConnect": {
@@ -1405,7 +1408,7 @@
       "managedOnWebRepositories": "Dooro keydadka {{organization}} ee shabakadda adigoo kombiyuutar isticmaalaya.",
       "description": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "descriptionReconnect": "Abuur summad gelitaan cusub oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
-      "descriptionOverview": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna ku dheji shaashadda xigta.",
+      "descriptionOverview": "Abuur summad gelitaan oo goobta shaqada ah, ka dibna ku dheji shaashadda xigta.",
       "scopes": "Akoonka: akhrin · Kaydadka: akhrin/qorid · Codsiyada isku darka: akhrin · Ogeysiisyada shabakadda: akhrin/qorid",
       "tokenPlaceholder": "Summadda gelitaanka goobta shaqada",
       "tokenRefused": "Bitbucket ma aqbalin summaddan gelitaanka goobta shaqada. Hubi inay leedahay oggolaanshaha sare, ka dibna isku day mar kale."
@@ -4859,12 +4862,15 @@
     "inputDescription": "Waxay baartaa gelin kasta Enkrypt AI, oo ay ku jiraan natiijooyinka qalabka. Marka Enkrypt aan la heli karin, codsiyada waa la diraa iyadoo aan la baarin, halkii la diidi lahaa.",
     "outputTitle": "Ilaalada soo saarista",
     "outputDescription": "Waxay baartaa jawaabaha Enkrypt AI ka hor intaanay xubnuhu helin. Waa damman tahay ilaa aad daarto.",
+    "outputUnavailable": "Kilo ma uusan daarin ilaalada soo saarista ururkan, sidaas darteed jawaabaha lama baadho mana jirto wax halkan lagu dejiyo. La xiriir {{supportEmail}} si aad u codsato.",
     "detectorsHint": "Xannib wuxuu diidaa codsi calaamad loo geystay. Diiwaan kaliya wuxuu diiwaangeliyaa codsiga isagoon dib u dhigin.",
     "detectorsHintOutput": "Xannib wuxuu sababaa fashilka jawaab calaamad loo geystay. Diiwaan kaliya wuxuu diiwaangeliyaa jawaabta iyada oo aan dib u dhigin.",
     "choiceLog": "Diiwaan kaliya",
     "applyTo": "Ku dabaq",
     "applyToAllMembers": "Dhammaan xubnaha",
     "applyKiloDefault": "Ku dabaq caadiga Kilo",
+    "applyKiloDefaultEnglishNote": "Qoraalka siyaasadda caadiga Kilo waa af Ingiriisi, sababtoo ah Kilo Gateway wuxuu u dabaqaa si sax ah sida loo qoray.",
+    "applyKiloDefaultReplaceMessage": "Siyaasadda caadiga Kilo waxaa lagu qoray af Ingiriisi waxayna beddelaysaa waxa aad ku dejisay Jebinta siyaasadda. Qoraalka aad ku qortay goobta qoraalka siyaasadda lama soo celin karo.",
     "invalidSavedTitle": "Dejinta baareyaasha gelinta ee la kaydiyay lama akhriyi karo",
     "invalidSavedBody": "Codsiyada waa la xannibayaa ilaa baareyaasha gelinta dib loo kaydiyo. Baareyaasha hoose waxay ka bilaabmaan caadiga Kilo.",
     "invalidSavedOutputTitle": "Dejinta baareyaasha soo saarista ee la kaydiyay lama akhriyi karo",
@@ -5000,6 +5006,7 @@
     "providersNeedCatalog": "Furayaasha bixiyeyaasha waa akhris-kaliya ilaa liiska moodellada oo dhan uu soo dego. Si aad u beddesho, taabo Mar kale isku day ee korka ku yaal.",
     "providersEmpty": "Ma jiraan bixiyeyaal u dhigma raadintan.",
     "providersNone": "Ma jiraan bixiyeyaal diyaar u ah ururkan.",
+    "providersUnavailable": "Liiska bixiyeyaasha lama soo dejisan karin.",
     "allowAllShown": "Oggolow dhammaan kuwa la muujiyay",
     "denyAllShown": "Diid dhammaan kuwa la muujiyay",
     "gatewaysDescription": "Kilo wuxuu codsiyada moodeelka mariyaa Vercel AI Gateway ama OpenRouter. Irrid la damiyay waxay fashilmaa codsiyadaas.",

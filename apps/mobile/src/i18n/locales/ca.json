@@ -186,6 +186,7 @@
     "privateRepositoryA11y": "{{name}}, repositori privat",
     "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès.",
     "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar.",
+    "organizationTrialEndedBillingAtKiloAi": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació a kilo.ai i tornar-ho a provar.",
     "viewOnGitHub": "Mostra la PR a GitHub"
   },
   "language": {
@@ -280,6 +281,9 @@
     "credits": "Crèdits",
     "failedToLoadBalance": "No s'ha pogut carregar el saldo. Toca per tornar-ho a provar.",
     "balanceLoadFailed": "No s'ha pogut carregar el saldo",
+    "balanceUnreachable": "No s'ha pogut contactar amb el servidor. Torna-ho a provar.",
+    "balanceAccessDenied": "No tens permís per veure aquest saldo.",
+    "balanceUnavailable": "No s'ha pogut carregar el saldo.",
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
@@ -1422,7 +1426,6 @@
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "notConnectedReadOnlyPlan": "El període de prova de l'organització ha finalitzat, així que un propietari ha d'actualitzar la facturació a kilo.ai."
     },
     "bitbucketConnect": {
@@ -1432,7 +1435,7 @@
       "managedOnWebRepositories": "Tria els repositoris de {{organization}} al web des d'un ordinador.",
       "description": "Crea un testimoni d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
       "descriptionReconnect": "Crea un testimoni nou d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
-      "descriptionOverview": "Crea un testimoni d'accés a l'espai de treball per a {{organization}} i enganxa'l a la pantalla següent.",
+      "descriptionOverview": "Crea un testimoni d'accés a l'espai de treball i enganxa'l a la pantalla següent.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
       "tokenPlaceholder": "Testimoni d'accés a l'espai de treball",
       "tokenRefused": "Bitbucket no ha acceptat aquest testimoni d'accés a l'espai de treball. Comprova que tingui els permisos indicats a dalt i torna-ho a provar."
@@ -4938,12 +4941,15 @@
     "inputDescription": "Analitza cada entrada amb Enkrypt AI, inclosos els resultats de les eines. Quan Enkrypt no està disponible, les sol·licituds s'envien sense analitzar en lloc de ser rebutjades.",
     "outputTitle": "Salvaguardes de sortida",
     "outputDescription": "Analitza les respostes amb Enkrypt AI abans que les rebin els membres. Està desactivat tret que l'activis.",
+    "outputUnavailable": "Kilo no ha activat l'anàlisi de sortida per a aquesta organització, així que les respostes no es comproven i aquí no hi ha res a configurar. Contacta amb {{supportEmail}} per sol·licitar-ho.",
     "detectorsHint": "«Bloqueig» rebutja una sol·licitud marcada. «Només registre» la registra sense endarrerir la sol·licitud.",
     "detectorsHintOutput": "«Bloqueig» fa fallar una resposta marcada. «Només registre» la registra sense endarrerir la resposta.",
     "choiceLog": "Només registre",
     "applyTo": "Aplica a",
     "applyToAllMembers": "Tots els membres",
     "applyKiloDefault": "Aplica el valor per defecte de Kilo",
+    "applyKiloDefaultEnglishNote": "El text de la política predeterminada de Kilo és en anglès, perquè Kilo Gateway l'aplica exactament tal com està escrit.",
+    "applyKiloDefaultReplaceMessage": "La política predeterminada de Kilo està escrita en anglès i substitueix el que has definit a Infracció de la política. El text que has introduït al camp de text de la política no es pot recuperar.",
     "invalidSavedTitle": "No es pot llegir la configuració desada dels detectors d'entrada",
     "invalidSavedBody": "Les sol·licituds es bloquegen fins que es tornin a desar els detectors d'entrada. Els detectors següents parteixen del valor per defecte de Kilo.",
     "invalidSavedOutputTitle": "No es pot llegir la configuració desada dels detectors de sortida",
@@ -5079,6 +5085,7 @@
     "providersNeedCatalog": "Els interruptors dels proveïdors són de només lectura fins que es carregui el catàleg complet de models. Toca Torna-ho a provar a dalt per editar-los.",
     "providersEmpty": "Cap proveïdor coincideix amb aquesta cerca.",
     "providersNone": "No hi ha cap proveïdor disponible per a aquesta organització.",
+    "providersUnavailable": "No s'ha pogut carregar la llista de proveïdors.",
     "allowAllShown": "Permet tots els mostrats",
     "denyAllShown": "Denega tots els mostrats",
     "gatewaysDescription": "Kilo encamina les sol·licituds de models a través de Vercel AI Gateway o OpenRouter. Si una passarel·la està desactivada, aquestes sol·licituds fallen.",

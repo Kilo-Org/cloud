@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
     "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
     "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
@@ -279,6 +280,9 @@
     "credits": "Kreditter",
     "failedToLoadBalance": "Kunne ikke laste inn saldoen. Trykk for å prøve igjen.",
     "balanceLoadFailed": "Kunne ikke laste inn saldoen",
+    "balanceUnreachable": "Kunne ikke nå serveren. Prøv igjen.",
+    "balanceAccessDenied": "Du har ikke tillatelse til å se denne saldoen.",
+    "balanceUnavailable": "Saldoen kunne ikke lastes.",
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
@@ -1395,7 +1399,6 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruksjonene i REVIEW.md i hvert kodelager",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
       "notConnectedReadOnlyPlan": "Organisasjonens prøveperiode er over, så en eier må oppdatere faktureringen på kilo.ai."
     },
     "bitbucketConnect": {
@@ -1405,7 +1408,7 @@
       "managedOnWebRepositories": "Velg repositorier for {{organization}} på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "descriptionReconnect": "Opprett et nytt tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
-      "descriptionOverview": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn på neste skjerm.",
+      "descriptionOverview": "Opprett et tilgangstoken for arbeidsområdet, og lim det inn på neste skjerm.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
       "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
       "tokenRefused": "Bitbucket godtok ikke dette tilgangstokenet for arbeidsområdet. Kontroller at det har tillatelsene ovenfor, og prøv deretter på nytt."
@@ -4859,12 +4862,15 @@
     "inputDescription": "Skanner alle inndata med Enkrypt AI, inkludert verktøyresultater. Når Enkrypt ikke er tilgjengelig, sendes forespørsler uten skanning i stedet for å bli avvist.",
     "outputTitle": "Vernetiltak for utdata",
     "outputDescription": "Skanner svar med Enkrypt AI før medlemmer mottar dem. Av med mindre du slår det på.",
+    "outputUnavailable": "Kilo har ikke slått på skanning av utdata for denne organisasjonen, så svar kontrolleres ikke, og det er ingenting å stille inn her. Kontakt {{supportEmail}} for å be om det.",
     "detectorsHint": "Blokker avviser en forespørsel som er flagget. Bare logg registrerer den uten å forsinke forespørselen.",
     "detectorsHintOutput": "Blokker får et flagget svar til å feile. Bare logg registrerer det uten å forsinke svaret.",
     "choiceLog": "Bare logg",
     "applyTo": "Bruk på",
     "applyToAllMembers": "Alle medlemmer",
     "applyKiloDefault": "Bruk Kilo-standard",
+    "applyKiloDefaultEnglishNote": "Teksten i Kilos standardretningslinje er på engelsk, fordi Kilo Gateway bruker den nøyaktig slik den er skrevet.",
+    "applyKiloDefaultReplaceMessage": "Kilos standardretningslinje er skrevet på engelsk og erstatter det du har angitt under Brudd på retningslinjer. Teksten du skrev inn i feltet for retningslinjetekst, kan ikke gjenopprettes.",
     "invalidSavedTitle": "Lagrede innstillinger for inndatadetektorer kan ikke leses",
     "invalidSavedBody": "Forespørsler blokkeres til inndatadetektorene er lagret på nytt. Detektorene nedenfor starter fra Kilo-standard.",
     "invalidSavedOutputTitle": "Lagrede innstillinger for utdatadetektorer kan ikke leses",
@@ -5000,6 +5006,7 @@
     "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
     "providersEmpty": "Ingen leverandører samsvarer med dette søket.",
     "providersNone": "Ingen leverandører er tilgjengelige for denne organisasjonen.",
+    "providersUnavailable": "Leverandørlisten kunne ikke lastes inn.",
     "allowAllShown": "Tillat alle viste",
     "denyAllShown": "Nekt alle viste",
     "gatewaysDescription": "Kilo ruter modellforespørsler gjennom Vercel AI Gateway eller OpenRouter. En deaktivert inngangsportal får disse forespørslene til å feile.",

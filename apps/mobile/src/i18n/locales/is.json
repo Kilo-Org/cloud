@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, einkakóðasafn",
     "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku.",
     "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur.",
+    "organizationTrialEndedBillingAtKiloAi": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
     "viewOnGitHub": "Skoða PR á GitHub"
   },
   "language": {
@@ -279,6 +280,9 @@
     "credits": "Inneign",
     "failedToLoadBalance": "Ekki tókst að hlaða inneigninni. Ýttu til að reyna aftur.",
     "balanceLoadFailed": "Ekki tókst að hlaða inneigninni",
+    "balanceUnreachable": "Náðist ekki í þjóninn. Reyndu aftur.",
+    "balanceAccessDenied": "Þú hefur ekki leyfi til að sjá þessa stöðu.",
+    "balanceUnavailable": "Ekki tókst að hlaða stöðunni.",
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
@@ -1395,7 +1399,6 @@
     "followReviewMd": "Fylgja REVIEW.md",
     "followReviewMdSubtitle": "Fylgja leiðbeiningum í REVIEW.md-skrá hverrar geymslu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
       "notConnectedReadOnlyPlan": "Próftímabili fyrirtækisins er lokið, svo eigandi þarf að uppfæra greiðsluupplýsingar á kilo.ai."
     },
     "bitbucketConnect": {
@@ -1405,7 +1408,7 @@
       "managedOnWebRepositories": "Veldu geymslur fyrir {{organization}} á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
-      "descriptionOverview": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann á næsta skjá.",
+      "descriptionOverview": "Búðu til aðgangstóka vinnusvæðis og límdu hann á næsta skjá.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
       "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
       "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
@@ -4859,12 +4862,15 @@
     "inputDescription": "Skannar hvert inntak með Enkrypt AI, þar á meðal niðurstöður verkfæra. Þegar Enkrypt er ekki tiltækt eru beiðnir sendar óskannaðar í stað þess að þeim sé hafnað.",
     "outputTitle": "Úttaksvarnir",
     "outputDescription": "Skannar svör með Enkrypt AI áður en meðlimir fá þau. Slökkt nema þú kveikir á því.",
+    "outputUnavailable": "Kilo hefur ekki virkjað skönnun úttaks fyrir þessi samtök, svo svör eru ekki skoðuð og það er ekkert til að stilla hér. Hafðu samband við {{supportEmail}} til að biðja um það.",
     "detectorsHint": "Blokkun hafnar merktri beiðni. Einungis skráning skráir hana án þess að tefja beiðnina.",
     "detectorsHintOutput": "Blokkun lætur merkt svar mistakast. Einungis skráning skráir það án þess að tefja svarið.",
     "choiceLog": "Einungis skráning",
     "applyTo": "Beita á",
     "applyToAllMembers": "Alla meðlimi",
     "applyKiloDefault": "Beita Kilo-sjálfgefnu",
+    "applyKiloDefaultEnglishNote": "Texti sjálfgefnu stefnu Kilo er á ensku, því Kilo Gateway beitir henni nákvæmlega eins og hún er skrifuð.",
+    "applyKiloDefaultReplaceMessage": "Sjálfgefna stefna Kilo er skrifuð á ensku og kemur í stað þess sem þú stilltir í Brot á stefnu. Ekki er hægt að endurheimta textann sem þú settir inn í stefnutextareitinn.",
     "invalidSavedTitle": "Ekki er hægt að lesa vistaðar stillingar inntaksskynjara",
     "invalidSavedBody": "Beiðnum er lokað þar til inntaksskynjarar eru vistaðir aftur. Skynjararnir hér fyrir neðan byrja frá Kilo-sjálfgefnu.",
     "invalidSavedOutputTitle": "Ekki er hægt að lesa vistaðar stillingar úttaksskynjara",
@@ -5000,6 +5006,7 @@
     "providersNeedCatalog": "Rofar veitenda verða skrifvarðir þar til öll líkanaskráin hefur hlaðist inn. Ýttu á Reyna aftur hér að ofan til að breyta þeim.",
     "providersEmpty": "Engir veitendur passa við þessa leit.",
     "providersNone": "Engir veitendur eru í boði fyrir þessi samtök.",
+    "providersUnavailable": "Ekki tókst að hlaða listanum yfir veitendur.",
     "allowAllShown": "Leyfa allt sem sýnt er",
     "denyAllShown": "Hafna öllu sem sýnt er",
     "gatewaysDescription": "Kilo beinir beiðnum um líkön í gegnum Vercel AI Gateway eða OpenRouter. Óvirk gátt lætur þessar beiðnir mistakast.",

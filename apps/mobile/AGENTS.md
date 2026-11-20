@@ -25,7 +25,7 @@ pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused && pnpm assert:c
 git diff --check
 ```
 
-- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `pnpm test` runs it too.
+- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `--config <path>` reads an already-evaluated config instead, resolved from `apps/mobile`. `--profile <name>` selects the contract set, and falls back to `EAS_BUILD_PROFILE`, which the release supplies as `production`. The success line names the resolved profile. Exit 1 is contract drift. Exit 2 is a config it could not evaluate or read. `--profile` selects the contract set only, so a local release-set run needs the production environment. `pnpm test` runs the live guard and the fixture cases for both profiles.
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
@@ -257,7 +257,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 
 ### Layout contract
 
-One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
+One contract, enforced by `pnpm --filter kilo-app run check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
 
 | Concern | Contract | Use |
 |---|---|---|
@@ -284,22 +284,14 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | Primary action | One per screen. A pinned footer is the shared bar, outside the scroll body; an inline action ends its section. | `ScreenFooter` from `@/components/ui/screen-footer` (`clearance` for the bottom band, `keyboard` for who lifts it) |
 | Create control | One per list screen: the header `+` creates, and the empty state carries the title and description only. | `ScreenHeader` `headerRight` with `IconButton` |
 | FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
-| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans L1–L13 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans `LAYOUT_RULES` names, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm --filter kilo-app run check:classes` enforces it |
 
-`pnpm check:classes` reads every class string (and every `style`/`*Style` object) against `LAYOUT_RULES` in
-`tools/nativewind/check-classes.mjs`, which is the only description of the rules: **L1** an arbitrary spacing,
-type-size, line-height, tracking or radius value; **L2** a page inset written on a scroll body or a `CenteredState`
-content container, or any padding on a `ScreenHeader`/`SheetHeader`; **L3** `uppercase` or `tracking-*` outside a
-section label; **L4** a card surface built by hand (a card fill plus a card radius, even when the two sit in
-different branches of one className); **L5** `text-xl` or larger; **L6** a layout number in a `style` or `*Style`
-object (an inset or a measurement passes); **L7** a chevron imported straight from the icon modules instead of
-`RowChevron`; **L8** an arbitrary height, width or size that pins one box; **L9** a row divider drawn as
-`border-b`/`border-t` in `border-border` instead of `border-hair-soft`; **L10** `ScreenHeader` `titleContent`
-outside the three screens that own a title line; **L11** a `Sheet` without a `SheetHeader`; **L12** a horizontal
-padding or margin wider than the 14pt gutter (`px-`/`ps-`/`pe-`/`pl-`/`pr-`/`mx-`/`ms-`/`me-` at 5 and up); **L13** a
-`Button` inside an `EmptyState`/`QueryError` `action` slot instead of `StateAction`. A
-violation the migration has not reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call
-site and lower its line, never regenerate the baseline over a new violation.
+`pnpm --filter kilo-app run check:classes` reads every class string (and every `style`/`*Style` object)
+against `LAYOUT_RULES` in `tools/nativewind/check-classes.mjs`, which is the only description of the rules:
+read the L1–L13 ids and their bans there instead of restating them here. A violation the migration has not
+reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call site and
+lower its line, never regenerate the baseline over a new violation, and the rewrite refuses while the theme
+or any walked file could not be read or parsed.
 
 After you change anything in `components/ui`, run the design gate on
 `kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.

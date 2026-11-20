@@ -8,6 +8,8 @@ import {
   MAX_USAGE_BYTES,
   type Env,
 } from './publish-usage';
+import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
+import { exaMessage, exaRecord } from './exa-usage.test-fixture';
 import { usage } from './usage.test-fixture';
 
 beforeEach(() => {
@@ -531,4 +533,54 @@ describe('hedge failures never change the main result', () => {
     main.settle.resolve(undefined);
     await Promise.all(pending);
   });
+});
+
+describe('tagged ingress with the LLM hedge on', () => {
+  it.each([
+    ['/enkrypt-usage', enkryptRecord, enkryptMessage],
+    ['/exa-usage', exaRecord, exaMessage],
+  ] as const)(
+    '%s sends once to the selected queue and never hedges a slow or failed send',
+    async (path, record, message) => {
+      structuredLogs();
+      for (const [enabled, outcome] of [
+        ['true', 'accept'],
+        ['true', 'reject'],
+        [undefined, 'accept'],
+        [undefined, 'reject'],
+      ] as const) {
+        const selected = heldSend();
+        const other = vi.fn<SendFn>().mockResolvedValue(undefined);
+        const tagged = enabled === 'true' ? selected : { send: other };
+        const shared = enabled === 'true' ? other : selected.send;
+        const hedge = vi.fn<SendFn>().mockResolvedValue(undefined);
+        const env = {
+          ...hedgeEnv(shared, hedge, { mode: 'on', delay: '250', percent: '100' }),
+          USAGE_INGEST_ENKRYPT_QUEUE: { send: tagged.send },
+          ...(enabled === undefined
+            ? {}
+            : { USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED: enabled }),
+        } as unknown as Env;
+        const { ctx } = executionContext();
+        const work = handleFetch(
+          new Request(`https://test.invalid${path}`, {
+            method: 'POST',
+            headers: { authorization: 'Bearer secret' },
+            body: JSON.stringify(record),
+          }),
+          env,
+          ctx
+        );
+        await untilHedgeDue(10_000);
+        expect(await state(work)).toBe('pending');
+        if (outcome === 'accept') selected.settle.resolve(undefined);
+        else selected.settle.reject(new Error('send failed'));
+        expect((await work).status).toBe(outcome === 'accept' ? 202 : 503);
+        expect(selected.send).toHaveBeenCalledExactlyOnceWith(message, { contentType: 'json' });
+        expect(hedge).not.toHaveBeenCalled();
+        expect(other).not.toHaveBeenCalled();
+        expect(ctx.waitUntil).not.toHaveBeenCalled();
+      }
+    }
+  );
 });

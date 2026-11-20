@@ -85,8 +85,8 @@ const policy: EffectiveOrganizationModelPolicy = {
   memberGrant: {
     mode: 'selected',
     includeOrganizationBaseline: false,
-    modelAllowList: ['open/model'],
-    providerAllowList: ['alpha', 'freeonly'],
+    modelAllowList: new Set(['open/model']),
+    providerAllowList: new Set(['alpha', 'freeonly']),
   },
   policyRevision: 1,
   customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
@@ -152,7 +152,7 @@ describe('handleModelsByProviderRequest', () => {
     });
     mockResolvePolicy.mockImplementation(async () => ({
       ...policy,
-      memberGrant: { ...policy.memberGrant, providerAllowList: ['synthetic'] },
+      memberGrant: { ...policy.memberGrant, providerAllowList: new Set(['synthetic']) },
     }));
     mockGetUserFromAuth.mockResolvedValue({ user: { id: 'user-1' }, organizationId: 'org-1' });
     const { handleModelsByProviderRequest } = await loadHandler();

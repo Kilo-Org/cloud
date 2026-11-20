@@ -108,11 +108,14 @@ export type CliArgs =
       baseRun: string;
       headRun: string;
       out: string;
+      pixelDiff: boolean;
+      pixelDiffExplainShift: boolean;
     });
 
 export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
   run    --link <deeplink> [--link ...] [--targets <file>] [--matrix base|standard|full] [--cell <id> ...] [--observe-ms ${DEFAULT_OBSERVE_MS}]
          --cell adds a cell to the preset (${CELL_IDS.join(', ')}); font-max sets the largest text size and restores it after the run
+         On iOS, landscape rotates the simulator and fails when the display did not flip; compact needs an iPhone SE or mini (--device).
   scan   [--source probe|uiautomator|agent-device] [--session <agent-device session>]   waits for a settled layout on the accessibility sources
   motion --link <deeplink> [--tap <text|testID|label>] [--seconds 3] [--observe-ms ${DEFAULT_OBSERVE_MS}]   exit 1 on an interaction layout shift
   prepare --base <exact-40hex> --head <exact-40hex> --targets <proof-manifest.json> --out <new-dir>
@@ -121,6 +124,8 @@ export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
           run from that prepared worktree with its fresh Metro bundle connected
   compare --preparation <preparation.json> --base-run <dir> --head-run <dir> --out <new-dir>
           exit 2 when either target is unreachable or unready; atomic comparison.json contains introduced findings; never reuses output
+          --pixel-diff writes an advisory pixel-diff.json beside it (receipt-bound captures only); --pixel-diff-explain-shift also reports vertically moved content
+          the pixel diff never changes the status, findings or exit code; an unavailable cell is reported inconclusive with its reason
   help   print this text
   batches run|seed|expect|coverage   the committed end-to-end pass; \`batches help\` prints its flags
 Common: [--platform android|ios] [--device <serial|udid>] [--metro ${DEFAULT_METRO}] [--out <dir>]
@@ -141,7 +146,7 @@ const COMMAND_FLAGS: Record<CliArgs['command'], readonly string[]> = {
   scan: ['source', 'session'],
   motion: ['link', 'tap', 'seconds', 'observe-ms'],
   prepare: ['base', 'head', 'targets'],
-  compare: ['preparation', 'base-run', 'head-run'],
+  compare: ['preparation', 'base-run', 'head-run', 'pixel-diff', 'pixel-diff-explain-shift'],
 };
 const COMMON_FLAGS = ['platform', 'device', 'metro', 'out'];
 
@@ -186,6 +191,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         revision: { type: 'string' },
         'base-run': { type: 'string' },
         'head-run': { type: 'string' },
+        'pixel-diff': { type: 'boolean' },
+        'pixel-diff-explain-shift': { type: 'boolean' },
       },
     });
   } catch (error) {
@@ -252,6 +259,11 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ) {
         throw new UsageError('compare needs --preparation, --base-run, --head-run and --out');
       }
+      const pixelDiff = values['pixel-diff'] === true;
+      const explainShift = values['pixel-diff-explain-shift'] === true;
+      if (explainShift && !pixelDiff) {
+        throw new UsageError('--pixel-diff-explain-shift needs --pixel-diff');
+      }
       return {
         ...common,
         command,
@@ -259,6 +271,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         baseRun: values['base-run'],
         headRun: values['head-run'],
         out: values.out,
+        pixelDiff,
+        pixelDiffExplainShift: explainShift,
       };
     }
     case 'run': {
@@ -339,7 +353,9 @@ export function resolveTargets(
   links: readonly string[],
   targetsJson: string | undefined
 ): Target[] {
-  const entries: { id?: string; link: string; after?: string }[] = links.map(link => ({ link }));
+  const entries: { id?: string; link: string; after?: string; hold?: boolean }[] = links.map(
+    link => ({ link })
+  );
   if (targetsJson !== undefined) {
     const parsed: unknown = JSON.parse(targetsJson);
     const list =
@@ -353,15 +369,24 @@ export function resolveTargets(
         entries.push({ link: entry });
         continue;
       }
-      const { id, name, link, after } = (
+      const { id, name, link, after, hold } = (
         typeof entry === 'object' && entry !== null ? entry : {}
       ) as Record<string, unknown>;
       if (typeof link !== 'string')
         throw new UsageError('Every --targets entry needs a string link');
       if (after !== undefined && typeof after !== 'string')
         throw new UsageError('A --targets entry after must be a string link');
+      if (hold !== undefined && typeof hold !== 'boolean')
+        throw new UsageError('A --targets entry hold must be true or false');
+      if (hold === true && after === undefined)
+        throw new UsageError('A held target needs an after link to release it');
       const explicit = typeof id === 'string' ? id : typeof name === 'string' ? name : undefined;
-      entries.push({ id: explicit, link, ...(after === undefined ? {} : { after }) });
+      entries.push({
+        id: explicit,
+        link,
+        ...(after === undefined ? {} : { after }),
+        ...(hold === true ? { hold: true } : {}),
+      });
     }
   }
   const seen = new Map<string, number>();
@@ -373,6 +398,7 @@ export function resolveTargets(
       id: count === 1 ? base : `${base}-${count}`,
       link: entry.link,
       ...(entry.after === undefined ? {} : { after: entry.after }),
+      ...(entry.hold === true ? { hold: true } : {}),
     };
   });
 }
@@ -732,9 +758,20 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
           args.baseRun,
           args.headRun,
           args.out,
-          controller.signal
+          controller.signal,
+          args.pixelDiff ? { explainShift: args.pixelDiffExplainShift } : undefined
         );
         deps.log(`design-gate: ${path.resolve(args.out, 'comparison.json')}; ${result.status}`);
+        if (result.pixelDiff !== undefined) {
+          const counts = { changed: 0, unchanged: 0, inconclusive: 0 };
+          for (const cell of result.pixelDiff.cells) counts[cell.status] += 1;
+          deps.log(
+            `design-gate: advisory pixel diff ${result.pixelDiff.status}: ${counts.changed} changed, ${counts.unchanged} unchanged, ${counts.inconclusive} inconclusive; ${path.resolve(args.out, 'pixel-diff.json')}`
+          );
+          for (const reason of result.pixelDiff.reasons) {
+            deps.warn(`design-gate: advisory pixel diff: ${reason}`);
+          }
+        }
         if (result.status === 'inconclusive') return 2;
         return result.introduced.length > 0 ? 1 : 0;
       } catch (error) {

@@ -209,6 +209,15 @@ function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
+  if (
+    Object.keys(input.profile?.resolved?.networkSecrets ?? {}).length > 0 &&
+    allocation.sandboxProvider !== 'cloudflare-containers'
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Network secrets require a Cloudflare sandbox',
+    });
+  }
   const request = input.runtime ?? {};
   const provider = allocation.sandboxProvider;
   if (egressRequestSupported(provider, request)) return;

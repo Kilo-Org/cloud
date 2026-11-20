@@ -186,6 +186,7 @@
     "privateRepositoryA11y": "{{name}}, privatni repozitorij",
     "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno.",
+    "organizationTrialEndedBillingAtKiloAi": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
     "viewOnGitHub": "Pogledaj PR na GitHubu"
   },
   "language": {
@@ -280,6 +281,9 @@
     "credits": "Krediti",
     "failedToLoadBalance": "Nije moguće učitati saldo. Dodirni za ponovni pokušaj.",
     "balanceLoadFailed": "Nije moguće učitati saldo",
+    "balanceUnreachable": "Poslužitelj nije dostupan. Pokušajte ponovo.",
+    "balanceAccessDenied": "Nemate dopuštenje za prikaz ovog salda.",
+    "balanceUnavailable": "Saldo nije moguće učitati.",
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je skriven",
@@ -1422,7 +1426,6 @@
     "followReviewMd": "Slijedi REVIEW.md",
     "followReviewMdSubtitle": "Slijedi upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
       "notConnectedReadOnlyPlan": "Probno razdoblje organizacije je završilo, pa vlasnik mora ažurirati naplatu na kilo.ai."
     },
     "bitbucketConnect": {
@@ -1432,7 +1435,7 @@
       "managedOnWebRepositories": "Odaberite repozitorije za {{organization}} na webu s računala.",
       "description": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "descriptionReconnect": "Stvori novi token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
-      "descriptionOverview": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem zaslonu.",
+      "descriptionOverview": "Stvori token za pristup radnom prostoru i zalijepi ga na sljedećem zaslonu.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri ima li gore navedena dopuštenja, pa pokušaj ponovno."
@@ -4938,12 +4941,15 @@
     "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Kada Enkrypt nije dostupan, zahtjevi se šalju bez skeniranja umjesto da budu odbijeni.",
     "outputTitle": "Izlazne zaštitne mjere",
     "outputDescription": "Skenira odgovore pomoću Enkrypt AI prije nego ih članovi prime. Isključene su osim ako ih uključite.",
+    "outputUnavailable": "Kilo nije omogućio skeniranje izlaza za ovu organizaciju, pa se odgovori ne provjeravaju i ovdje nema što postaviti. Kontaktirajte {{supportEmail}} da to zatražite.",
     "detectorsHint": "Blokiranje odbija označeni zahtjev. Samo evidentiranje ga bilježi bez odgađanja zahtjeva.",
     "detectorsHintOutput": "Blokiranje odbija označeni odgovor. Samo evidentiranje ga bilježi bez odgađanja odgovora.",
     "choiceLog": "Samo evidentiranje",
     "applyTo": "Primijeni na",
     "applyToAllMembers": "Sve članove",
     "applyKiloDefault": "Primijeni Kilo zadane postavke",
+    "applyKiloDefaultEnglishNote": "Tekst Kilo zadane politike je na engleskom, jer ga Kilo Gateway primjenjuje točno onako kako je napisan.",
+    "applyKiloDefaultReplaceMessage": "Kilo zadana politika napisana je na engleskom i zamjenjuje ono što ste postavili u Kršenje politike. Tekst koji ste unijeli u polje teksta politike ne može se vratiti.",
     "invalidSavedTitle": "Nije moguće pročitati spremljene postavke ulaznih detektora",
     "invalidSavedBody": "Zahtjevi su blokirani dok se ulazni detektori ponovno ne spreme. Detektori u nastavku počinju od zadanih Kilo postavki.",
     "invalidSavedOutputTitle": "Nije moguće pročitati spremljene postavke izlaznih detektora",
@@ -5079,6 +5085,7 @@
     "providersNeedCatalog": "Prekidači pružatelja ostaju samo za čitanje dok se ne učita cijeli katalog modela. Dodirnite Pokušaj ponovno iznad kako biste ih mogli uređivati.",
     "providersEmpty": "Nijedan pružatelj ne odgovara ovom pretraživanju.",
     "providersNone": "Nema dostupnih pružatelja za ovu organizaciju.",
+    "providersUnavailable": "Nije moguće učitati popis pružatelja.",
     "allowAllShown": "Dopusti sve prikazano",
     "denyAllShown": "Zabrani sve prikazano",
     "gatewaysDescription": "Kilo usmjerava zahtjeve modela kroz Vercel AI Gateway ili OpenRouter. Onemogućen pristupnik odbija te zahtjeve.",

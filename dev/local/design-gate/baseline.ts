@@ -9,6 +9,11 @@ import type { RunOutcome } from './capture';
 import { normalize, parseDump } from './tree';
 import { RULE_IDS, type Finding } from './findings';
 import { collapseFindings, type CollapsedFinding } from './report';
+import {
+  runPixelDiffAdvisory,
+  type PixelComparator,
+  type PixelDiffSummary,
+} from './pixel-diff-advice';
 import { baselineGit, containedProofSource } from './baseline-preflight';
 
 const Sha = z.string().regex(/^[0-9a-f]{40}$/);
@@ -915,22 +920,35 @@ const FindingsSchema = z.object({
   ),
   findings: z.array(ComparisonFindingSchema),
 });
+export type PixelDiffOptions = {
+  /** Report vertically moved content as an explanation; counts stay fixed-coordinate. */
+  explainShift: boolean;
+  /** Defaults to the pinned comparator; tests inject their own. */
+  compare?: PixelComparator;
+};
+export type ComparisonResult = {
+  status: 'comparable' | 'inconclusive';
+  introduced: CollapsedFinding[];
+  reasons: string[];
+  /** The advisory pixel diff, present only when the comparison asked for it. */
+  pixelDiff?: PixelDiffSummary;
+};
 export async function compareProof(
   preparation: Preparation,
   baseRun: string,
   headRun: string,
   out: string,
-  signal?: AbortSignal
-): Promise<{
-  status: 'comparable' | 'inconclusive';
-  introduced: CollapsedFinding[];
-  reasons: string[];
-}> {
+  signal?: AbortSignal,
+  pixelDiff?: PixelDiffOptions
+): Promise<ComparisonResult> {
   if (fs.existsSync(out))
     throw new Error(
       'Comparison output must be a new directory; prior evidence is never overwritten'
     );
   const reasons: string[] = [];
+  // Reasons about the pair as a whole, not about one cell: the pixel diff may not
+  // compare a pair the gate itself refused to compare.
+  const pairReasons: string[] = [];
   const runs = (['base', 'head'] as const).map(revision => {
     const dir = revision === 'base' ? baseRun : headRun;
     const receipt = CaptureReceiptSchema.parse(readJson(path.join(dir, 'proof-source.json')));
@@ -953,7 +971,10 @@ export async function compareProof(
     );
     if (required.some(file => !receipt.artifacts.some(artifact => artifact.path === file)))
       throw new Error('Unbound capture artifacts');
-    if (run.run?.restoreError !== undefined) reasons.push(`${revision}: device restoration failed`);
+    if (run.run?.restoreError !== undefined) {
+      reasons.push(`${revision}: device restoration failed`);
+      pairReasons.push(`${revision}: device restoration failed`);
+    }
     // Re-read the actual captured dumps; never trust a claimed readiness boolean.
     // The skips live under `run` in the artifact, which is where the writer put
     // them, so they are handed to the same readiness check the writer ran.
@@ -973,6 +994,9 @@ export async function compareProof(
     // present a dev overlay as a product regression. A base toast with a clean
     // head is a fix, so the pair still compares; the base run's own report and
     // its exit status already carry that error.
+    const overlayBlocked = run.findings
+      .filter(entry => entry.rule === 'dev-overlay')
+      .map(entry => `${entry.cell}/${entry.target}: a LogBox overlay painted this screen`);
     if (revision === 'head')
       reasons.push(
         ...run.findings
@@ -982,14 +1006,28 @@ export async function compareProof(
               `${revision}: a LogBox error painted over ${entry.cell}/${entry.target}: ${entry.element.text?.trim() || entry.message}`
           )
       );
-    return run;
+    // The advisory pixel diff never compares a screenshot that shows an overlay:
+    // a toast diffed against a screen is not a product change. These exact cells
+    // are handed over as blocked, so a sibling screen still gets its comparison.
+    // Every `dev-overlay` finding blocks it, not just an error one: a warning
+    // toast still paints over the screen, and the advisory pass reports pixels,
+    // not gate severity. This blocks the advisory cell for either revision only;
+    // the shared result above still treats a base toast as a pass and a head
+    // toast as blocking only at `error`, exactly as it did before.
+    return {
+      run,
+      artifacts: receipt.artifacts,
+      readiness: [...readiness, ...receipt.readiness, ...overlayBlocked],
+    };
   });
-  const [base, head] = runs;
+  const [base, head] = runs.map(entry => entry.run);
   if (
     JSON.stringify(base.cells.map(cell => [cell.id, cell.config])) !==
     JSON.stringify(head.cells.map(cell => [cell.id, cell.config]))
-  )
+  ) {
     reasons.push('Matrix cells/configuration differ');
+    pairReasons.push('Matrix cells/configuration differ');
+  }
   const environments = (run: typeof base, dir: string): unknown[] =>
     run.cells.flatMap(cell =>
       cell.screens.map(screen => {
@@ -1009,8 +1047,10 @@ export async function compareProof(
         ];
       })
     );
-  if (JSON.stringify(environments(base, baseRun)) !== JSON.stringify(environments(head, headRun)))
+  if (JSON.stringify(environments(base, baseRun)) !== JSON.stringify(environments(head, headRun))) {
     reasons.push('Captured device environments differ');
+    pairReasons.push('Captured device environments differ');
+  }
   const introduced: CollapsedFinding[] = [];
   if (reasons.length === 0) {
     const allFindings = [...base.findings, ...head.findings];
@@ -1071,7 +1111,6 @@ export async function compareProof(
       path.join(out, 'comparison.json')
     );
     signal?.throwIfAborted();
-    return result;
   } catch (error) {
     const current = fs.lstatSync(out);
     if (
@@ -1085,4 +1124,31 @@ export async function compareProof(
     await fs.promises.rm(out, { recursive: true });
     throw error;
   }
+  // The advisory pixel diff runs only after the gate's own result is on disk and
+  // outside its publication error path: every provenance, dump, environment and
+  // readiness check above has already passed, and neither its success nor its
+  // failure can alter the published comparison. It reads only the captures
+  // those checks verified, hashing the bytes it actually compares.
+  if (pixelDiff === undefined) return result;
+  const summary = await runPixelDiffAdvisory({
+    out,
+    base: {
+      dir: baseRun,
+      artifacts: runs[0].artifacts,
+      cells: base.cells,
+      readiness: runs[0].readiness,
+    },
+    head: {
+      dir: headRun,
+      artifacts: runs[1].artifacts,
+      cells: head.cells,
+      readiness: runs[1].readiness,
+    },
+    explainShift: pixelDiff.explainShift,
+    // The gate's own pair-wide reasons travel with the call: a per-cell pixel
+    // comparison over two runs the gate refused to compare would read as clean.
+    pairReasons: [...new Set(pairReasons)],
+    ...(pixelDiff.compare === undefined ? {} : { compare: pixelDiff.compare }),
+  });
+  return { ...result, pixelDiff: summary };
 }

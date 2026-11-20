@@ -22,6 +22,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AddCreditsRow } from '@/components/add-credits-row';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
+import { getOrgTrialHubCaption, seatCountReadout } from '@/components/organization/billing-model';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   getOrgKiloPassRowState,
@@ -53,7 +54,6 @@ import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
-import { seatCountReadout } from '@/components/organization/billing-model';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
@@ -229,6 +229,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // exactly as it does for the new-session composer. Only the server's boolean
   // is read; nothing re-derives the plan state from seats or balance.
   const planEnded = org.isTrialExpiredForEnforcement;
+  // The caption speaks the trial's own words on its own line below the plan
+  // row — the hub readout, from the boundary row the server already classified
+  // — and is absent whenever the trial is not what governs the organization.
+  const trialCaption = getOrgTrialHubCaption(org);
   const planName =
     org.plan === 'enterprise'
       ? t('organization.hub.planEnterprise')
@@ -236,13 +240,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
   // A money role whose platform may open the billing page gets the state
   // alone, because the banner's action is the next step. A money role the
-  // storefront rule keeps from linking gets the sentence the rest of the app
-  // shows, which names where billing is changed, exactly as a role that cannot
-  // change the plan does: with no action, the sentence has to carry the step.
-  const planMessage =
-    showMoney && canLinkBilling
+  // storefront rule keeps from linking has no action under the sentence, so the
+  // sentence carries the step and names where billing is changed. A role that
+  // cannot change the plan is told who can.
+  let planMessage = t('common.organizationTrialEnded');
+  if (showMoney) {
+    planMessage = canLinkBilling
       ? t('organization.hub.planEnded')
-      : t('common.organizationTrialEnded');
+      : t('common.organizationTrialEndedBillingAtKiloAi');
+  }
 
   // The rename control's two states. `organizations.update` runs on the
   // organization billing mutation procedure, which refuses every mutation once
@@ -384,6 +390,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             <KvRow
               label={t('organization.hub.plan')}
               value={planName}
+              // The trial sentence is a caption line of its own rather than a
+              // second value segment: the tier keeps one line, and a
+              // right-to-left interface cannot order the tier after the date.
+              // Nothing is ellipsized away.
+              caption={trialCaption ?? undefined}
               valueStatus={
                 planEnded
                   ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }

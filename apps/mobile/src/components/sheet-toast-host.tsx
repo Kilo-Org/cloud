@@ -8,10 +8,10 @@ import {
   useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { Platform, type ViewInstance } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { claimToastHost } from '@/lib/toast-host';
 
@@ -98,40 +98,52 @@ export function useSheetToastHeader(ref: RefObject<ViewInstance | null>): (() =>
   return slot?.laidOut;
 }
 
+/** The transform-aware rect read `useSettledSheetHeaderTopClearance` also uses. */
+type RectReadableView = {
+  getBoundingClientRect: () => { top: number; bottom: number };
+};
+
+/** The view's rect in window coordinates, or `null` where it cannot be read yet. */
+function readRect(node: ViewInstance | null): { top: number; bottom: number } | null {
+  const view = node as RectReadableView | null;
+  const read = view?.getBoundingClientRect;
+  if (read === undefined) {
+    return null;
+  }
+  try {
+    const { top, bottom } = read.call(view);
+    return Number.isFinite(top) && Number.isFinite(bottom) ? { top, bottom } : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Where the sheet's header ends, measured from the top of `anchor` (a view
- * that fills the sheet's content frame), or `null` while the sheet has no
- * header or it has not been measured. Re-measures when the header lays out
- * and when the returned handler runs from the anchor's own layout.
+ * How far below the top of `anchor` (a view that fills the sheet's content
+ * frame) the sheet's toast must start: below the sheet's `SheetHeader`, and
+ * never inside the status bar, which a full-window sheet reaches. Re-measures
+ * when the header lays out and when the returned handler runs from the
+ * anchor's own layout.
+ *
+ * Both rects come from the same window read, so the presentation offset the
+ * platform gives the sheet cancels out. `measureLayout` cannot do this: it only
+ * measures against an ancestor, and the anchor is the header's sibling, so on
+ * device it failed every time and the toast fell back to the sheet's top edge.
  */
-export function useSheetHeaderBottom(anchor: RefObject<ViewInstance | null>) {
+export function useSheetToastClearance(anchor: RefObject<ViewInstance | null>) {
   const header = use(HeaderAnchorContext);
-  const [headerBottom, setHeaderBottom] = useState<number | null>(null);
-  const request = useRef(0);
+  const statusBar = useSafeAreaInsets().top;
+  const [clearance, setClearance] = useState(0);
   const measure = useCallback(() => {
-    request.current += 1;
-    const attempt = request.current;
-    const anchorNode = anchor.current;
-    const headerNode = header?.ref.current;
-    if (!anchorNode || !headerNode) {
-      setHeaderBottom(null);
+    const anchorRect = readRect(anchor.current);
+    if (!anchorRect) {
       return;
     }
-    headerNode.measureLayout(
-      anchorNode,
-      (...frame) => {
-        const [, top, , height] = frame;
-        if (attempt === request.current) {
-          setHeaderBottom(top + height);
-        }
-      },
-      () => {
-        if (attempt === request.current) {
-          setHeaderBottom(null);
-        }
-      }
-    );
-  }, [anchor, header]);
+    const headerRect = readRect(header?.ref.current ?? null);
+    const belowHeader = headerRect ? headerRect.bottom - anchorRect.top : 0;
+    const belowStatusBar = statusBar - anchorRect.top;
+    setClearance(Math.max(0, belowHeader, belowStatusBar));
+  }, [anchor, header, statusBar]);
   useEffect(measure, [measure]);
-  return { headerBottom, onAnchorLayout: measure };
+  return { clearance, onAnchorLayout: measure };
 }

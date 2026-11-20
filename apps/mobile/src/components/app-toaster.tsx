@@ -6,7 +6,7 @@ import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 
-import { useSheetHeaderBottom } from '@/components/sheet-toast-host';
+import { useSheetToastClearance } from '@/components/sheet-toast-host';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { shouldHideTabBar } from '@/lib/tab-bar-layout';
@@ -47,12 +47,14 @@ function ThemedToaster({
   offset,
   positionerStyle,
   paddingVertical,
+  maxFontSizeMultiplier,
   fullWindowOverlay,
 }: Readonly<{
   position: 'bottom-center' | 'top-center';
   offset: number;
   positionerStyle: ViewStyle;
   paddingVertical?: number;
+  maxFontSizeMultiplier?: number;
   fullWindowOverlay: boolean;
 }>) {
   const colors = useThemeColors();
@@ -62,6 +64,7 @@ function ThemedToaster({
       offset={offset}
       fullWindowOverlay={fullWindowOverlay}
       positionerStyle={positionerStyle}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       icons={{
         success: <CheckCircle2 size={20} color={colors.good} />,
         error: <XCircle size={20} color={colors.destructive} />,
@@ -185,16 +188,18 @@ const SHEET_TOAST_GAP = 4;
 const SHEET_TOAST_POSITIONER_STYLE = { bottom: 0 } as const;
 
 /**
- * The in-sheet toast's vertical padding, down from sonner-native's 16. A short
- * sheet puts its actions right under its header: the "Discard changes?"
- * confirm's Discard button starts 49dp below the header divider (the body's
- * 10.5dp top pad, one 17.5dp line of message, the 21dp section gap). The
- * compact toast is 38dp tall (a 20dp line, 8dp above and below, the 1dp
- * border), so with the gap it ends 7dp above that button. Both lines grow
- * with the font scale (the message's by 17.5dp per unit of scale, the toast's
- * by 20dp), so at Android's largest scale, 200%, it still ends 4.5dp above.
+ * The in-sheet toast's vertical padding, down from sonner-native's 16, and the
+ * largest font scale its text grows to. A short sheet puts its actions right
+ * under its header: the "Discard changes?" confirm's Discard button starts
+ * 49dp below the header at the default scale and 61dp below it at Android's
+ * largest, 200%. Measured on the emulator, the compact toast is 38dp tall at
+ * the default scale and 52dp at 200% (its text stops growing at the cap), so
+ * with the 4dp gap it ends 7dp and 5dp above that button. Uncapped, the 200%
+ * line wrapped and the toast grew to 86dp, over the button. Same cap as the
+ * consent disclosure.
  */
 const SHEET_TOAST_PADDING_VERTICAL = 8;
+const SHEET_TOAST_MAX_FONT_SCALE = 1.4;
 
 /**
  * The Toaster inside a sheet's toast host (Android only, `SheetToastScope`).
@@ -202,13 +207,13 @@ const SHEET_TOAST_PADDING_VERTICAL = 8;
  * bottom toast covered the bottom actions of a short sheet (the Discard button
  * of the "Discard changes?" confirm stopped taking taps on its centre), and the
  * header's own actions stay clear above it. A sheet with no `SheetHeader` gets
- * the toast at its top edge.
+ * the toast at its top edge, below the status bar.
  *
  * The anchor fills the sheet's content frame and takes no touches itself.
  */
 function SheetToaster() {
   const anchor = useRef<ViewInstance | null>(null);
-  const { headerBottom, onAnchorLayout } = useSheetHeaderBottom(anchor);
+  const { clearance, onAnchorLayout } = useSheetToastClearance(anchor);
   return (
     <View
       ref={anchor}
@@ -219,9 +224,10 @@ function SheetToaster() {
     >
       <ThemedToaster
         position="top-center"
-        offset={(headerBottom ?? 0) + SHEET_TOAST_GAP}
+        offset={clearance + SHEET_TOAST_GAP}
         positionerStyle={SHEET_TOAST_POSITIONER_STYLE}
         paddingVertical={SHEET_TOAST_PADDING_VERTICAL}
+        maxFontSizeMultiplier={SHEET_TOAST_MAX_FONT_SCALE}
         // The window-level overlay is iOS-only and draws in the app's main
         // window; the toast renders inline in the sheet's own views.
         fullWindowOverlay={false}

@@ -104,8 +104,9 @@ On iOS the root Toaster's `FullWindowOverlay` already draws above every presente
 app's one Toaster (`AppToaster`) renders into the top open sheet's toast host instead of the main tree the
 sheet covers: `Sheet` and every focused presented route (a `formSheet` or `modal` scene, through the shared
 scene layout) wrap their content in `SheetToastScope` (`@/components/sheet-toast-host`). Inside a sheet the
-toast is compact and sits right below the sheet's `SheetHeader`, so the header's actions stay above it and the
-bottom actions of a short sheet stay clear below it; call sites keep calling `toast.error`.
+toast is compact (its text capped at 1.4x the font scale) and starts below the sheet's `SheetHeader` and the
+status bar, read from both views' window rects, so the header's actions stay above it and the bottom actions
+of a short sheet stay clear below it; call sites keep calling `toast.error`.
 
 Markdown images reach `react-native-enriched-markdown` only from HTTPS hosts the reader trusted or confirmed;
 `markdown-image-gate` rewrites every other image into a "Load" link before the native view can fetch it.

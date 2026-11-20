@@ -19,8 +19,11 @@ import {
   createProfileWithContent,
   MASKED_SECRET_VALUE,
   MAX_OWNER_PROFILES,
+  MAX_PROFILE_COMMANDS,
+  MAX_PROFILE_COMMAND_LENGTH,
   MAX_PROFILE_KILO_COMMANDS,
   MAX_PROFILE_VARS,
+  setCommands,
 } from '@kilocode/cloud-agent-profile';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { User, Organization } from '@kilocode/db/schema';
@@ -512,6 +515,59 @@ describe('Agent Profiles Router', () => {
           const listed = await caller.agentProfiles.list({});
           expect(listed.some(profile => profile.name === 'Over Cap Profile')).toBe(false);
           expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
+        });
+
+        test('refuses an over-cap command list without storing a profile', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const overCapCommands = Array.from({ length: MAX_PROFILE_COMMANDS + 1 }, () => 'npm ci');
+
+          // The routing schema bounds the payload, so a list this long never
+          // reaches the service through the procedure.
+          await expect(
+            caller.agentProfiles.create({ name: 'Over Cap Commands', commands: overCapCommands })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+          // The service holds the same cap for callers that bypass the schema.
+          await expect(
+            createProfileWithContent(
+              db,
+              AGENT_ENV_VARS_PUBLIC_KEY,
+              { type: 'user', id: ownerUser.id },
+              ownerUser.id,
+              { name: 'Over Cap Commands', commands: overCapCommands }
+            )
+          ).rejects.toMatchObject({
+            code: 'PRECONDITION_FAILED',
+            message: `Profiles are limited to ${String(MAX_PROFILE_COMMANDS)} setup commands`,
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Over Cap Commands')).toBe(false);
+        });
+
+        test('refuses a command past the length cap without storing a profile', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const tooLong = ['x'.repeat(MAX_PROFILE_COMMAND_LENGTH + 1)];
+
+          await expect(
+            caller.agentProfiles.create({ name: 'Long Command', commands: tooLong })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+          await expect(
+            createProfileWithContent(
+              db,
+              AGENT_ENV_VARS_PUBLIC_KEY,
+              { type: 'user', id: ownerUser.id },
+              ownerUser.id,
+              { name: 'Long Command', commands: tooLong }
+            )
+          ).rejects.toMatchObject({
+            code: 'PRECONDITION_FAILED',
+            message: `Setup commands are limited to ${String(MAX_PROFILE_COMMAND_LENGTH)} characters`,
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Long Command')).toBe(false);
         });
 
         test('refuses a duplicate name with CONFLICT and leaves the first profile intact', async () => {
@@ -1523,6 +1579,30 @@ describe('Agent Profiles Router', () => {
         const result = await caller.agentProfiles.get({ profileId });
 
         expect(result.commands).toHaveLength(0);
+      });
+
+      test('refuses an over-cap list at the schema and keeps the stored commands', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Cap Commands Test' });
+
+        await caller.agentProfiles.setCommands({ profileId, commands: ['keep me'] });
+
+        const overCap = Array.from({ length: MAX_PROFILE_COMMANDS + 1 }, () => 'npm ci');
+        await expect(
+          caller.agentProfiles.setCommands({ profileId, commands: overCap })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+        // Bypassing the schema puts the same payload before the service, which
+        // refuses it before the delete so the stored list survives.
+        await expect(
+          setCommands(db, profileId, overCap, { type: 'user', id: ownerUser.id })
+        ).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+          message: `Profiles are limited to ${String(MAX_PROFILE_COMMANDS)} setup commands`,
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.commands.map(row => row.command)).toEqual(['keep me']);
       });
     });
 

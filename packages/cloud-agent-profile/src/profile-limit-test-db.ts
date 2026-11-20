@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profile_agents,
+  agent_environment_profile_commands,
   agent_environment_profile_instructions,
   agent_environment_profile_kilo_commands,
   agent_environment_profile_mcp_servers,
@@ -111,6 +112,25 @@ function equalitiesOf(condition: unknown): ReadonlyArray<{ column: string; value
 }
 
 /**
+ * The command text of one inserted command row. The fake only ever receives
+ * the row the service builds, so an absent string is a bug worth throwing on.
+ */
+function commandOf(row: unknown): string {
+  if (typeof row === 'object' && row !== null && 'command' in row && typeof row.command === 'string') {
+    return row.command;
+  }
+  throw new Error('profile limit test db: command row without command text');
+}
+
+/** The key of one inserted variable row, when it carries one. */
+function keyOf(row: unknown): string | undefined {
+  if (typeof row === 'object' && row !== null && 'key' in row && typeof row.key === 'string') {
+    return row.key;
+  }
+  return undefined;
+}
+
+/**
  * In-memory stand-in for the pool-backed `WorkerDb` used by the profile
  * create services.
  *
@@ -124,19 +144,26 @@ function equalitiesOf(condition: unknown): ReadonlyArray<{ column: string; value
  * is what makes an owner-scoped `where` observable: a condition without the
  * owner column matches another owner's row.
  *
- * `state.lockCalls` counts the profile row locks, `state.rowCount` tracks the
- * stored rows, `state.upserts` counts variable writes, `initialVarKeys` are the
- * variable keys the profile already holds, `state.profileRows` is the current
- * profile rows and `state.defaultWrites` the `update`s this fake executed.
+ * `state.lockCalls` counts the profile row locks, `state.advisoryLocks` the
+ * `execute`d advisory locks, `state.rowCount` tracks the stored rows,
+ * `state.upserts` counts variable writes, `initialVarKeys` are the variable
+ * keys the profile already holds, `state.profileRows` is the current profile
+ * rows, `state.defaultWrites` the `update`s this fake executed,
+ * `state.profileInserts` the profile rows it inserted, and `initialCommands` /
+ * `state.commands` the setup commands the profile holds, with
+ * `state.commandDeletes` counting the whole-list deletes.
  */
 export function createLimitTestDb(
   initialRowCount: number,
   initialVarKeys: readonly string[] = [],
-  initialProfiles: readonly LimitTestProfileRow[] = []
+  initialProfiles: readonly LimitTestProfileRow[] = [],
+  initialCommands: readonly string[] = []
 ) {
   let rowCount = initialRowCount;
   let nextId = 0;
   let upserts = 0;
+  let profileInserts = 0;
+  let storedCommands: string[] = [...initialCommands];
   const varKeys = new Set(initialVarKeys);
   const profileRows: LimitTestProfileRow[] = initialProfiles.map(row => ({ ...row }));
   const defaultWrites: LimitTestDefaultWrite[] = [];
@@ -150,8 +177,17 @@ export function createLimitTestDb(
     get profileRows(): readonly LimitTestProfileRow[] {
       return profileRows.map(row => ({ ...row }));
     },
+    /** Profile rows this fake inserted. */
+    get profileInserts() {
+      return profileInserts;
+    },
+    /** The stored setup commands of the profile, in list order. */
+    get commands(): readonly string[] {
+      return [...storedCommands];
+    },
     defaultWrites,
     lockCalls: 0,
+    commandDeletes: 0,
   };
 
   let tail: Promise<unknown> = Promise.resolve();
@@ -180,23 +216,60 @@ export function createLimitTestDb(
     }),
   });
 
-  const insert = () => ({
-    values: (row: { key?: string } = {}) => ({
-      returning: () => {
-        rowCount += 1;
-        nextId += 1;
-        return Promise.resolve([{ id: `row-${nextId}` }]);
-      },
-      onConflictDoUpdate: () => {
-        upserts += 1;
-        if (row.key !== undefined && !varKeys.has(row.key)) {
-          varKeys.add(row.key);
-          rowCount += 1;
+  const insert = (table: unknown) => ({
+    values: (row: unknown = {}) => {
+      const commit = (): Promise<unknown> => {
+        if (table === agent_environment_profile_commands) {
+          const rows = Array.isArray(row) ? row : [row];
+          storedCommands = rows.map(commandOf);
+          return Promise.resolve();
         }
-        return Promise.resolve();
-      },
-    }),
+        if (table === agent_environment_profile_vars) {
+          upserts += 1;
+          const key = keyOf(row);
+          if (key !== undefined && !varKeys.has(key)) {
+            varKeys.add(key);
+            rowCount += 1;
+          }
+          return Promise.resolve();
+        }
+        if (table === agent_environment_profiles) {
+          profileInserts += 1;
+          nextId += 1;
+          rowCount += 1;
+          return Promise.resolve([{ id: `row-${nextId}` }]);
+        }
+        // Any other profile collection row (an agent, a command, a skill):
+        // one stored row under the profile cap.
+        nextId += 1;
+        rowCount += 1;
+        return Promise.resolve([{ id: `row-${nextId}` }]);
+      };
+      return {
+        returning: commit,
+        onConflictDoUpdate: commit,
+        then: (
+          onFulfilled?: (value: unknown) => unknown,
+          onRejected?: (error: unknown) => unknown
+        ) => commit().then(onFulfilled, onRejected),
+      };
+    },
   });
+
+  const remove = (table: unknown) => ({
+    where: (): Promise<void> => {
+      if (table === agent_environment_profile_commands) {
+        state.commandDeletes += 1;
+        storedCommands = [];
+        return Promise.resolve();
+      }
+      throw new Error('profile limit test db: unexpected delete');
+    },
+  });
+
+  // The owner creation lock is an advisory `execute`; the fake serializes
+  // transactions itself, so the statement only needs to succeed.
+  const execute = (): Promise<void> => Promise.resolve();
 
   const update = () => ({
     set: (values: { is_default?: boolean }) => ({
@@ -220,11 +293,13 @@ export function createLimitTestDb(
     }),
   });
 
-  const channel = { select, insert, update };
+  const channel = { select, insert, update, delete: remove, execute };
   const db = {
     select,
     insert,
     update,
+    delete: remove,
+    execute,
     transaction: <T>(work: (tx: typeof channel) => Promise<T>): Promise<T> => {
       const run = tail.then(() => work(channel));
       tail = run.then(

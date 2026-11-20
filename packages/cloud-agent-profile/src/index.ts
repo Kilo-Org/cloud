@@ -89,7 +89,14 @@ export {
 } from './profile-vars-service';
 
 // Command CRUD
-export { setCommands, listCommands, getCommandsForSession } from './profile-commands-service';
+export {
+  MAX_PROFILE_COMMANDS,
+  MAX_PROFILE_COMMAND_LENGTH,
+  assertWritableCommands,
+  setCommands,
+  listCommands,
+  getCommandsForSession,
+} from './profile-commands-service';
 
 // MCP server CRUD + session helpers
 export {

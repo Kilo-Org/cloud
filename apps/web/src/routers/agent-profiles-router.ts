@@ -64,7 +64,9 @@ const VarSchema = z.object({
 });
 
 const CommandsSchema = z.object({
-  commands: z.array(z.string().max(500)).max(20),
+  commands: z
+    .array(z.string().max(profileCommandsService.MAX_PROFILE_COMMAND_LENGTH))
+    .max(profileCommandsService.MAX_PROFILE_COMMANDS),
 });
 
 // Owner type schema

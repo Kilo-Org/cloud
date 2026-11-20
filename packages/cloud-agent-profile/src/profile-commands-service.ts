@@ -1,8 +1,44 @@
 import type { WorkerDb } from '@kilocode/db';
 import { agent_environment_profile_commands } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import type { ProfileOwner, ProfileCommandResponse } from './types';
 import { verifyProfileOwnership } from './profile-utils';
+
+/** A profile holds at most this many setup commands. */
+export const MAX_PROFILE_COMMANDS = 20;
+
+/** Each setup command is at most this many characters. */
+export const MAX_PROFILE_COMMAND_LENGTH = 500;
+
+/**
+ * The command rules every profile write satisfies before it writes anything:
+ * the create and the replace path share one bound, so neither can store a list
+ * the other refuses.
+ */
+export function assertWritableCommands(commands: readonly string[]): void {
+  if (commands.length > MAX_PROFILE_COMMANDS) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: `Profiles are limited to ${MAX_PROFILE_COMMANDS} setup commands`,
+    });
+  }
+
+  for (const command of commands) {
+    if (command.length === 0) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Setup commands cannot be empty',
+      });
+    }
+    if (command.length > MAX_PROFILE_COMMAND_LENGTH) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Setup commands are limited to ${MAX_PROFILE_COMMAND_LENGTH} characters`,
+      });
+    }
+  }
+}
 
 /**
  * Set commands for a profile.
@@ -14,6 +50,10 @@ export async function setCommands(
   commands: string[],
   owner: ProfileOwner
 ): Promise<void> {
+  // Before the delete: an over-cap list must never clear the stored commands
+  // and then fail, leaving the profile with none.
+  assertWritableCommands(commands);
+
   await verifyProfileOwnership(db, profileId, owner);
 
   await db.transaction(async tx => {

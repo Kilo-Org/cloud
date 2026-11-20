@@ -12,6 +12,7 @@ import {
   type ProfileNetworkSecretPolicy,
 } from './profile-vars-service';
 import { assertNetworkSecretKeySpace } from './network-secret-storage';
+import { assertWritableCommands } from './profile-commands-service';
 import { applyDefaultProfile, insertProfileRow } from './profile-service';
 
 /** One variable offered at creation, before any at-rest transformation. */
@@ -82,6 +83,7 @@ export async function createProfileWithContent(
   const vars = input.vars ?? [];
   const commands = input.commands ?? [];
   assertCreatableVars(vars);
+  assertWritableCommands(commands);
 
   return await db.transaction(async tx => {
     const profileId = await insertProfileRow(

@@ -19,7 +19,9 @@
     "presenceStatus": "होस्ट: {{connection}}",
     "commandStatus": "आदेश डिलीवरी: {{status}}",
     "delivered": "पहुँचाया गया",
-    "expired": "समय समाप्त"
+    "expired": "समय समाप्त",
+    "recoveryGaps_one": "इस ट्रांसक्रिप्ट का {{displayCount}} हिस्सा गायब है।",
+    "recoveryGaps_other": "इस ट्रांसक्रिप्ट के {{displayCount}} हिस्से गायब हैं।"
   },
   "common": {
     "manageOnWeb": "वेब पर प्रबंधित करें",
@@ -174,7 +176,7 @@
     "yourOwnRepositories": "आपकी अपनी रिपॉज़िटरी",
     "organizationRepositories": "संगठन की रिपॉज़िटरी",
     "dismissed": "खारिज",
-    "agent": "प्रतिनिधि",
+    "agent": "एजेंट",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "बदलाव",
@@ -699,6 +701,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
+      "managedOnWebTitle": "वेब पर प्रबंधित",
+      "managedOnWebShort": "यह कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है।",
+      "managedOnWebRepositories": "{{organization}} के लिए कंप्यूटर से वेब पर रिपॉज़िटरी चुनें।",
       "description": "{{organization}} के लिए एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "descriptionReconnect": "{{organization}} के लिए एक नया वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "descriptionOverview": "{{organization}} के लिए एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे अगली स्क्रीन पर पेस्ट करें।",
@@ -737,6 +742,7 @@
     "platformList": {
       "activity": "गतिविधि",
       "checking": "जाँच हो रही है…",
+      "needsAttention": "ध्यान आवश्यक",
       "platforms": "प्लेटफ़ॉर्म",
       "statusUnavailable": "स्थिति अनुपलब्ध"
     },
@@ -830,7 +836,7 @@
       "prOpened": "REVIEW.md के लिए पुल रिक्वेस्ट खोली गई",
       "alreadyPresent": "दिशानिर्देश REVIEW.md में पहले से मौजूद हैं",
       "status": {
-        "open": "खुला है",
+        "open": "खुला",
         "edited": "संपादित",
         "opening_change_request": "PR खोली जा रही है",
         "change_request_failed": "PR खोलना विफल रहा",
@@ -842,7 +848,7 @@
       "changeRequestNoGitHubAccess": "किसी भी GitHub कनेक्शन के पास इस रिपॉज़िटरी तक पहुंच नहीं है। इस रिपॉज़िटरी तक पहुंच वाले GitHub कनेक्शन को फिर से कनेक्ट करें, फिर प्रयास करें।",
       "changeRequestMissingPermissions": "Kilo का GitHub ऐप इस रिपॉज़िटरी में पुल रिक्वेस्ट नहीं खोल सकता है। रिपॉज़िटरी के मालिक को ऐप को सामग्री और पुल रिक्वेस्ट तक लिखने की पहुंच देनी होगी, फिर प्रयास करें।",
       "changeRequestFailed": "Kilo पुल रिक्वेस्ट नहीं खोल सका। थोड़ी देर में फिर प्रयास करें।",
-      "proposalConflict": "इस रिपॉज़िटरी के लिए एक और समीक्षा मेमोरी प्रस्ताव अभी भी सक्रिय है, इसलिए इसे अभी सहेजा नहीं जा सकता।",
+      "proposalConflict": "इस रिपॉज़िटरी के लिए एक और प्रस्ताव अभी भी सक्रिय है।",
       "offAction": "समीक्षा मेमोरी बंद है। इसे चालू करें, फिर प्रयास करें।",
       "analyze": {
         "title": "फ़ीडबैक का विश्लेषण करें",
@@ -1662,7 +1668,7 @@
       "keepSessionRunning": "सत्र चालू रखें",
       "restartExitFailed": "नया सत्र शुरू हुआ। पिछला सत्र अभी भी खुला है।",
       "exitNotSupported": "इस सत्र में रिमोट से बाहर निकलने की सुविधा नहीं है।",
-      "exitUnavailable": "अभी इस सत्र से रिमोट के ज़रिए बाहर नहीं निकल सकते।",
+      "exitUnavailable": "इस सत्र के लिए रिमोट सत्र से बाहर निकलना उपलब्ध नहीं है।",
       "exitNeedsNewerCli": "रिमोट स्लैश आदेश के लिए Kilo CLI का नया संस्करण चाहिए। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "newSession": {
@@ -1899,7 +1905,7 @@
     "repoPicker": {
       "title": "रिपॉज़िटरी चुनें",
       "searchLabel": "रिपॉज़िटरी की खोज",
-      "searchPlaceholder": "रिपॉज़िटरी की खोज",
+      "searchPlaceholder": "रिपॉज़िटरी खोजें…",
       "noMatches": "कोई मिलान नहीं",
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
       "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है।",
@@ -2093,15 +2099,15 @@
       "unreadableBody": "एजेंट एक अनुमति अनुरोध की प्रतीक्षा कर रहा है, जिसे यह ऐप दिखा नहीं सकता, इसलिए उसके लिए कोई कार्ड नहीं दिखाई देता। ऐप या CLI अपडेट करें, या जारी रखने के लिए CLI में अनुरोध का उत्तर दें।"
     },
     "questionCard": {
-      "title": "एजेंट को आपका उत्तर चाहिए",
+      "title": "एजेंट को इनपुट चाहिए",
       "skipQuestionsTitle": "प्रश्न छोड़ें?",
       "skipQuestionsMessage": "एजेंट यह चरण छोड़ देगा।",
-      "answerProgress": "{{total}} में से {{answered}} के उत्तर दिए गए",
+      "answerProgress": "उत्तर दिए गए: {{answered}}/{{total}}",
       "selectAllThatApply": "लागू होने वाले सभी विकल्प चुनें।",
-      "option": "विकल्प: {{label}}",
+      "option": "{{label}}",
       "optionSelected": "{{label}}, चयनित",
       "typeYourOwnAnswer": "अपना उत्तर टाइप करें",
-      "typeYourOwnAnswerPlaceholder": "आपका उत्तर…",
+      "typeYourOwnAnswerPlaceholder": "अपना उत्तर लिखें…",
       "skip": "छोड़ें",
       "retrySkip": "प्रश्न छोड़ने की फिर से कोशिश करें",
       "submitting": "भेजा जा रहा है…",
@@ -2176,6 +2182,8 @@
     "modelPicker": {
       "title": "मॉडल चुनें",
       "noModelsDescription": "चुनने के लिए कोई मॉडल उपलब्ध नहीं है।",
+      "allUnavailableTitle": "कोई भी मॉडल उपयोग नहीं किया जा सकता",
+      "allUnavailableDescription": "प्रदाता कुंजी जोड़ें और फिर से कोशिश करें।",
       "favorites": "पसंदीदा"
     },
     "modelSelector": {
@@ -2272,7 +2280,7 @@
       "exitSession": "सत्र से बाहर निकलें",
       "clearSession": "यह सत्र समाप्त करें और नया शुरू करें",
       "compactDescription": "वर्तमान सत्र का संदर्भ संकुचित करें",
-      "goalDescription": "सत्र लक्ष्य की ओर काम जारी रखें। /goal <objective> या pause, resume, clear",
+      "goalDescription": "सत्र लक्ष्य की ओर काम जारी रखें। /goal <objective> या pause, resume, clear। लक्ष्य किसी निर्धारित वेकअप, क्रॉन कार्य या बैकग्राउंड प्रक्रिया की प्रतीक्षा कर सकता है: प्रतीक्षा लक्ष्य को तब तक निलंबित रखती है जब तक वह पूरा न हो, और फिर लक्ष्य स्वयं फिर से शुरू हो जाता है; /goal pause और /goal clear उसके सेट किए गए टाइमर रद्द कर देते हैं। यदि उद्देश्य किसी डिप्लॉय, बिल्ड या CI जॉब की प्रतीक्षा करना है, तो वह प्रतीक्षा तुरंत शेड्यूल करें; पहले रिपॉज़िटरी न देखें।",
       "initDescription": "निर्देशित AGENTS.md सेटअप",
       "resumeClaudeDescription": "Claude Code सत्र का ट्रांसक्रिप्ट आयात करें",
       "resumeCodexDescription": "OpenAI Codex सत्र का ट्रांसक्रिप्ट आयात करें",
@@ -2366,19 +2374,19 @@
       "toolWrite": "लिखें",
       "toolBash": "bash",
       "toolGlob": "फ़ाइल खोजें",
-      "toolWebFetch": "वेब पेज डाउनलोड करें",
+      "toolWebFetch": "वेब पेज प्राप्त करना",
       "toolWebSearch": "वेब खोजें",
       "toolCodeSearch": "कोड खोजें",
-      "toolTodo": "प्लान प्रबंधित करें",
-      "toolSkill": "कौशल लोड करें",
-      "toolLsp": "भाषा सर्वर",
-      "toolBrowser": "एकीकृत ब्राउज़र",
-      "toolNotebook": "नोटबुक फ़ाइल",
-      "toolBoard": "साझा बोर्ड",
-      "toolQuestion": "प्रश्न पूछें",
-      "toolSuggest": "सुझाव दें",
-      "toolRecall": "सहेजी यादें वापस लाएँ",
-      "toolRepoClone": "रिपॉज़िटरी क्लोन करें",
+      "toolTodo": "कार्य सूची",
+      "toolSkill": "कौशल लोड करना",
+      "toolLsp": "भाषा सर्वर तक पहुँच",
+      "toolBrowser": "ब्राउज़र तक पहुँच",
+      "toolNotebook": "नोटबुक तक पहुँच",
+      "toolBoard": "बोर्ड तक पहुँच",
+      "toolQuestion": "आपसे प्रश्न पूछना",
+      "toolSuggest": "सुझाव",
+      "toolRecall": "मेमोरी रिकॉल",
+      "toolRepoClone": "रिपॉज़िटरी क्लोन करना",
       "toolRepoOverview": "रिपॉज़िटरी अवलोकन",
       "toolSemanticSearch": "अर्थ आधारित खोज",
       "toolGrep": "टेक्स्ट खोजें",
@@ -2541,7 +2549,7 @@
   "voiceInput": {
     "listening": "सुनना जारी है…",
     "allow": "अनुमति दें",
-    "onlineMessage": "यह डिवाइस आवाज़ को ऑफ़लाइन टेक्स्ट में नहीं बदल सकता। आपकी रिकॉर्डिंग टेक्स्ट में बदलने के लिए {{provider}} को भेजी जाती है। Kilo ऑडियो सहेजकर नहीं रखता।",
+    "onlineMessage": "यह डिवाइस ऑफ़लाइन आवाज़ को टेक्स्ट में नहीं बदल सकता। आपकी रिकॉर्डिंग टेक्स्ट में बदलने के लिए {{provider}} को भेजी जाती है। Kilo ऑडियो सहेजकर नहीं रखता।",
     "onlineTitle": "आवाज़ ऑनलाइन प्रोसेस होती है",
     "start": "वॉइस इनपुट शुरू करें",
     "stop": "वॉइस इनपुट रोकें",
@@ -2554,7 +2562,7 @@
     "busy": "वॉइस इनपुट व्यस्त है। फिर से कोशिश करें।",
     "stopped": "वॉइस इनपुट रुक गया। फिर से कोशिश करने के लिए माइक्रोफ़ोन पर टैप करें।",
     "unavailableDevice": "इस डिवाइस पर वॉइस इनपुट उपलब्ध नहीं है।",
-    "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है।",
+    "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है। इसकी ऑफ़लाइन स्पीच फ़ाइलें इंस्टॉल करें या ऐप की कोई दूसरी भाषा इस्तेमाल करें।",
     "languageNotInstalledTitle": "{{language}} के लिए वॉइस इनपुट अभी तैयार नहीं है",
     "languageNotInstalledMessage": "{{language}} के लिए ऑफ़लाइन स्पीच फ़ाइलें इंस्टॉल नहीं हैं और ऑनलाइन ट्रांसक्रिप्शन बंद है। वॉइस इनपुट इस्तेमाल करने के लिए फ़ाइलें डाउनलोड करें या ऑनलाइन ट्रांसक्रिप्शन दोबारा चालू करें।",
     "downloadOfflineModel": "डाउनलोड",
@@ -2593,7 +2601,7 @@
     "cliCantReceiveFilesMessage": "इस सत्र को चलाने वाला Kilo CLI फ़ाइलें प्राप्त नहीं कर सकता। उस मशीन पर CLI अपडेट करें या किसी नए सत्र में साझा करें।",
     "contentlessMessage": "साझा करने के लिए कुछ नहीं है — कोई टेक्स्ट या फ़ाइल शामिल नहीं थी।",
     "couldNotReadContent": "साझा की गई सामग्री पढ़ी नहीं जा सकी।",
-    "onlyFirstFilesAttached_one": "केवल पहली {{displayCount}} फ़ाइल संलग्न की जाएँगी।",
+    "onlyFirstFilesAttached_one": "केवल पहली {{displayCount}} फ़ाइल संलग्न की जाएगी।",
     "onlyFirstFilesAttached_other": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।"
   },
   "kiloPass": {
@@ -2772,7 +2780,7 @@
       "pending": "{{displayCount}} लंबित",
       "retryChecks": "जाँचें फिर से करें",
       "skipped": "{{displayCount}} छोड़ी गईं",
-      "skipped_one": "{{displayCount}} छोड़ी गईं",
+      "skipped_one": "{{displayCount}} छोड़ी गई",
       "skipped_other": "{{displayCount}} छोड़ी गईं",
       "title": "जाँचें",
       "viewOnGitHub": "GitHub पर PR देखें",
@@ -2783,7 +2791,7 @@
       "addToReview": "समीक्षा में जोड़ें",
       "comment": "टिप्पणी करें",
       "commentBody": "टिप्पणी का टेक्स्ट",
-      "commentBodyPlaceholder": "आपकी टिप्पणी",
+      "commentBodyPlaceholder": "टिप्पणी लिखें…",
       "commentNow": "अभी टिप्पणी करें",
       "discardMessage": "आपका ड्राफ़्ट मिट जाएगा।",
       "discardTitle": "टिप्पणी छोड़ दें?",
@@ -2812,7 +2820,7 @@
       "gitlabInstanceMismatchTitle": "GitLab कनेक्शन किसी अन्य इंस्टेंस के लिए है",
       "gitlabInstanceMismatchDescription": "आपका GitLab कनेक्शन {{connected}} के लिए है, लेकिन यह मर्ज रिक्वेस्ट {{requested}} पर है। इसकी समीक्षा करने के लिए उस इंस्टेंस पर GitLab कनेक्ट करें।",
       "checkActiveConnection": "कनेक्शन सक्रिय है, लेकिन यह आइटम अभी भी लोड नहीं हो सकता।",
-      "bitbucketOrgOnlyDescription": "इसके Bitbucket पुल रिक्वेस्ट समीक्षित करने के लिए ऊपर दिए गए खाते को एक संगठन में बदलें।",
+      "bitbucketOrgOnlyDescription": "ऊपर दिए गए खाते को संगठन पर स्विच करें, ताकि उस संगठन की Bitbucket पुल रिक्वेस्ट समीक्षित की जा सकें।",
       "bitbucketOrgOnlyNoOrganizationDescription": "इस खाते में अभी तक कोई संगठन नहीं है। संगठन बनाने या किसी संगठन में शामिल होने के बाद ही Bitbucket पुल रिक्वेस्ट समीक्षित किए जा सकते हैं।",
       "gitlabReconnectAdminOnlyDescription": "इसे फिर से कनेक्ट करने के लिए संगठन के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।",
       "bitbucketNotConnectedTitle": "Bitbucket कनेक्ट नहीं है",
@@ -2822,9 +2830,9 @@
     },
     "connectionExpired": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
     "couldNotLoadPullRequest": "पुल रिक्वेस्ट लोड नहीं हो सकी।",
-    "reviewServiceUnavailable": "सेवा अनुपलब्ध है",
-    "reviewServiceUnavailableDescription": "सेवा अस्थायी रूप से अनुपलब्ध है। शीघ्र ही फिर से प्रयास करें।",
-    "couldNotOpenGitHubAppSettings": "GitHub ऐप की सेटिंग नहीं खुल सकीं।",
+    "reviewServiceUnavailable": "समीक्षा सेवा अनुपलब्ध है",
+    "reviewServiceUnavailableDescription": "समीक्षा सेवा अस्थायी रूप से अनुपलब्ध है। शीघ्र ही फिर से प्रयास करें।",
+    "couldNotOpenGitHubAppSettings": "GitHub ऐप की सेटिंग्स नहीं खुल सकीं।",
     "description": "विवरण",
     "discussion": {
       "acceptTerms": "स्वीकार करें",
@@ -2878,7 +2886,7 @@
       "fixWithKiloPrompt": "कृपया निम्नलिखित पुल रिक्वेस्ट टिप्पणी को सुलझाएँ: {{link}}",
       "commentBadRequest": "यह टिप्पणी पोस्ट नहीं की जा सकती। हो सकता है कि पुल रिक्वेस्ट बदल गया हो।",
       "commentForbidden": "आपको इस पुल रिक्वेस्ट पर टिप्पणी करने की अनुमति नहीं है।",
-      "replyPlaceholder": "आपका उत्तर…",
+      "replyPlaceholder": "उत्तर लिखें…",
       "reportContent": "सामग्री की शिकायत करें",
       "reportUser": "उपयोगकर्ता की शिकायत करें",
       "resolveThread": "थ्रेड हल करें",
@@ -2980,10 +2988,10 @@
       "retryLoadingMoreFiles": "और फ़ाइलें लोड करने की फिर से कोशिश करें",
       "title": "फ़ाइलें",
       "viewedCount": "{{viewed}}/{{total}} देखी गईं",
-      "viewedCount_one": "{{viewed}}/{{total}} देखी गईं",
+      "viewedCount_one": "{{viewed}}/{{total}} देखी गई",
       "viewedCount_other": "{{viewed}}/{{total}} देखी गईं",
       "viewedOfListed": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं",
-      "viewedOfListed_one": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं",
+      "viewedOfListed_one": "सूचीबद्ध फ़ाइल में से {{viewed}}/{{total}} देखी गई",
       "viewedOfListed_other": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं"
     },
     "fileRows": {
@@ -3044,7 +3052,7 @@
       "expandLinesOfContext_other": "संदर्भ की {{displayCount}} पंक्तियाँ दिखाएँ",
       "expandMoreLines_one": "{{displayCount}} और पंक्ति दिखाएँ ({{start}}–{{end}})",
       "expandMoreLines_other": "{{displayCount}} और पंक्तियाँ दिखाएँ ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} फ़ाइलें लोड हुईं",
+      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} फ़ाइल लोड हुई",
       "loadedOfTotalFiles_other": "{{loaded}}/{{total}} फ़ाइलें लोड हुईं"
     },
     "inbox": {
@@ -3160,7 +3168,7 @@
       "file_other": "फ़ाइलें",
       "file_one": "फ़ाइल",
       "stateMerged": "मर्ज हो गया",
-      "stateOpen": "ओपन",
+      "stateOpen": "खुली",
       "stateOpenApproved": "खुली · स्वीकृत",
       "stateOpenChangesRequested": "खुली · बदलाव माँगे गए",
       "stateOpenReviewRequired": "खुली · समीक्षा आवश्यक",
@@ -3224,12 +3232,14 @@
       "pendingComment_one": "लंबित टिप्पणी",
       "summaryOptional": "सारांश (वैकल्पिक)",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। ",
-      "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। ",
+      "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट की गई। ",
       "partialPostedFresh_other": "{{displayFreshCount}} टिप्पणियाँ पोस्ट की गईं। ",
       "partialPostedStale": "{{displayStaleCount}} टिप्पणियाँ पुराने कमिट से जुड़ी हैं, इसलिए वे आपकी कतार में ही हैं।",
-      "partialPostedStale_one": "{{displayStaleCount}} टिप्पणियाँ पुराने कमिट से जुड़ी हैं, इसलिए वे आपकी कतार में ही हैं।",
+      "partialPostedStale_one": "{{displayStaleCount}} टिप्पणी पुराने कमिट से जुड़ी है, इसलिए वह आपकी कतार में ही है।",
       "partialPostedStale_other": "{{displayStaleCount}} टिप्पणियाँ पुराने कमिट से जुड़ी हैं, इसलिए वे आपकी कतार में ही हैं।",
       "submitCountOfTotal": "{{displayTotalCount}} में से {{displayFreshCount}} टिप्पणियाँ भेजें",
+      "submitCountOfTotal_one": "{{displayTotalCount}} में से {{displayFreshCount}} टिप्पणी भेजें",
+      "submitCountOfTotal_other": "{{displayTotalCount}} में से {{displayFreshCount}} टिप्पणियाँ भेजें",
       "submitReview": "समीक्षा भेजें",
       "blockedRequestChanges": "बदलाव का अनुरोध करने के लिए सारांश या कम से कम एक टिप्पणी जोड़ें।",
       "blockedComment": "टिप्पणी वाली समीक्षा पोस्ट करने के लिए सारांश या कम से कम एक टिप्पणी जोड़ें।"
@@ -3439,7 +3449,7 @@
       "planStatusLapsed": " · समाप्त",
       "planEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है।",
       "manageBilling": "बिलिंग प्रबंधित करें",
-      "renamePlaceholder": "संगठन का नाम",
+      "renamePlaceholder": "संगठन का नाम डालें",
       "renameTitle": "संगठन का नाम बदलें"
     },
     "inviteMember": {
@@ -3679,7 +3689,7 @@
       "efficient": "स्वचालित कुशल",
       "small": "स्वचालित छोटा",
       "free": "स्वचालित निःशुल्क",
-      "organization": "संस्था स्वचालित"
+      "organization": "स्वचालित संगठन"
     },
     "dataCollected": "डेटा संग्रह चालू",
     "free": "निःशुल्क",
@@ -3698,7 +3708,7 @@
     "title": "विश्वसनीय होस्ट",
     "subtitle": "वे होस्ट जिन्हें बिना पूछे खोलने की अनुमति है",
     "emptyTitle": "कोई विश्वसनीय होस्ट नहीं",
-    "emptyDescription": "किसी लिंक के होस्ट पर भरोसा करने के बाद उसके लिंक दोबारा पूछे बिना खुलते हैं।",
+    "emptyDescription": "जब आप किसी लिंक के होस्ट या किसी छवि होस्ट पर भरोसा करते हैं, तो वह बिना दोबारा पूछे खुल जाता है।",
     "imagesSectionTitle": "विश्वसनीय छवि होस्ट",
     "imagesSectionDescription": "इन होस्ट की छवियाँ दोबारा पूछे बिना लोड होती हैं।",
     "imagesSectionEmpty": "कोई विश्वसनीय छवि होस्ट नहीं",
@@ -3732,13 +3742,13 @@
     "nextRun": "अगला रन",
     "wasDue": "अपेक्षित था",
     "waitingForYou": "आपका इंतज़ार",
-    "nextScheduled": "अगले निर्धारित",
+    "nextScheduled": "अगला निर्धारित रन",
     "answerNeeded": "जवाब चाहिए",
     "waitingToRetry": "फिर कोशिश का इंतज़ार",
     "step": {
       "editing": "संपादन",
       "reading": "पढ़ना",
-      "running": "चलाएँ",
+      "running": "चलाना",
       "searching": "वेब खोज",
       "thinking": "गहराई से सोच"
     },
@@ -3920,7 +3930,7 @@
       "discoverySucceeded": "मॉडल मिल गए। नीचे चुनें कि किन्हें जोड़ना है।",
       "discoveryFailed": "मॉडल खोज विफल रही या इसका समर्थन नहीं है। आपके मैन्युअल रूप से जोड़े गए मॉडल अपरिवर्तित हैं।",
       "checkConnection": "मॉडल कनेक्शन जाँचें",
-      "checkHelp": "$t(modelChat.backends.checkConnection) चुने गए प्रोटोकॉल और मॉडल का उपयोग करके इस एंडपॉइंट को एक छोटा इन्फ़रेंस अनुरोध भेजता है। प्रदाता इसके लिए शुल्क ले सकता है।",
+      "checkHelp": "«$t(modelChat.backends.checkConnection)» बटन चुने गए प्रोटोकॉल और मॉडल का उपयोग करके इस एंडपॉइंट को एक छोटा इन्फ़रेंस अनुरोध भेजता है। प्रदाता इसके लिए शुल्क ले सकता है।",
       "connectionSucceeded": "मॉडल ने इस प्रोटोकॉल का उपयोग करके अनुरोध पूरा किया।",
       "connectionFailed": "मॉडल अनुरोध पूरा नहीं कर सका। API का मूल URL, प्रोटोकॉल, प्रमाणीकरण विवरण और मॉडल ID जाँचें।",
       "requestTimedOut": "एंडपॉइंट ने समय पर जवाब नहीं दिया। API का मूल URL और अपना कनेक्शन जाँचें, फिर से कोशिश करें।",
@@ -4027,7 +4037,7 @@
       "loadingModel": "मॉडल का विवरण लोड हो रहा है",
       "couldNotLoadModel": "यह मॉडल लोड नहीं हो सका",
       "noFiles": "ऐसी कोई फ़ाइल नहीं जिसे यह ऐप चला सके",
-      "noFilesDescription": "यह ऐप केवल एक GGUF फ़ाइल वाले मॉडल चलाता है।",
+      "noFilesDescription": "यह ऐप उन मॉडलों को चलाता है जो एक पूरी GGUF फ़ाइल होते हैं, और इस रिपॉज़िटरी में ऐसी कोई फ़ाइल नहीं है।",
       "tooLargeTitle": "यह मॉडल शायद न चले",
       "tooLargeMessage": "{{name}} को शायद इस डिवाइस से ज़्यादा मेमोरी चाहिए। मॉडल के जवाब देते समय ऐप बंद हो सकता है। फिर भी डाउनलोड करें?",
       "downloadAnyway": "फिर भी डाउनलोड करें"
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "प्रदाता अभी उपलब्ध नहीं है। थोड़ी देर में फिर से भेजें।"
   },
   "settingsTools": {
-    "confirmTitle": "यह बदलाव पुष्टि करें?"
+    "confirmTitle": "यह बदलाव पुष्टि करें?",
+    "guarded": {
+      "spendAlertsOff": "खर्च अलर्ट बंद करें? खर्च सीमा पार होने और प्रति घंटे होने वाली अचानक बढ़ोतरी के बारे में आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "balanceAlertsOff": "बैलेंस अलर्ट बंद करें? आपके क्रेडिट कम होने पर आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "securityFindingsOff": "सुरक्षा निष्कर्ष बंद करें? नए सुरक्षा निष्कर्षों के बारे में आपको सूचनाएँ मिलनी बंद हो जाएँगी।",
+      "hideBalanceOn": "अपने बैलेंस छिपाएँ? क्रेडिट बैलेंस अब प्रोफ़ाइल स्क्रीन और संगठन हब पर नहीं दिखेंगे।"
+    }
   },
   "appActions": {
     "start": {
@@ -4087,7 +4103,7 @@
       "promptRequired": "एजेंट शुरू करने के लिए प्रॉम्प्ट चाहिए। एक प्रॉम्प्ट जोड़ें और इसे फिर से चलाएँ।",
       "repositoryRequired": "एजेंट शुरू करने के लिए रिपॉज़िटरी चाहिए। Kilo खोलें और एक चुनें, फिर इसे दोबारा चलाएँ।",
       "repositoryUnknown": "Kilo, {{repository}} को GitHub या GitLab रिपॉज़िटरी के रूप में नहीं पहचानता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।",
-      "repositoryUnsupported": "{{repository}} एक Bitbucket रिपॉज़िटरी है — एजेंट शुरू करें अभी इसका उपयोग नहीं कर सकता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।"
+      "repositoryUnsupported": "{{repository}} एक Bitbucket रिपॉज़िटरी है — ‘एजेंट शुरू करें’ अभी इसका उपयोग नहीं कर सकता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।"
     }
   },
   "launcher": {
@@ -4466,7 +4482,8 @@
       "couldNotLoad": "सूचियाँ लोड नहीं हो सकीं",
       "noRepository": "कोई रिपॉज़िटरी नहीं",
       "rowA11y": "{{name}}, {{openCount}}",
-      "openCount_one": "{{count}} खुले",
+      "openCount_zero": "{{count}} खुले",
+      "openCount_one": "{{count}} खुला",
       "openCount_other": "{{count}} खुले",
       "archived_one": "संग्रहित ({{count}})",
       "archived_other": "संग्रहित ({{count}})",
@@ -4811,12 +4828,12 @@
     "neverExpires": "कभी समाप्त नहीं होगा",
     "includesNewMessages": "नए संदेश शामिल हैं।",
     "excludesNewMessages": "नए संदेश शामिल नहीं हैं।",
-    "superseded": "इस लिंक को किसी दूसरे डिवाइस से बदल दिया गया है, इसलिए यह अब काम नहीं करता।"
+    "superseded": "यह लिंक कहीं और से बदल दिया गया है, इसलिए यह अब काम नहीं करता।"
   },
   "sharedSession": {
     "startedAt": "{{time}} पर शुरू हुआ",
     "title": "शेयर किया गया सत्र",
-    "someone": "कोई व्यक्ति",
+    "someone": "किसी व्यक्ति",
     "sharedBy": "{{owner}} द्वारा शेयर किया गया",
     "unavailableTitle": "लिंक उपलब्ध नहीं है",
     "unavailableDescription": "यह शेयर लिंक समाप्त हो चुका है या रद्द कर दिया गया है।",
@@ -4837,10 +4854,10 @@
     "inputDescription": "Enkrypt AI के साथ हर इनपुट को स्कैन करता है, जिसमें टूल परिणाम भी शामिल हैं। Enkrypt उपलब्ध न होने पर अनुरोध अस्वीकार किए जाने के बजाय बिना स्कैन किए भेज दिए जाते हैं।",
     "outputTitle": "आउटपुट गार्डरेल्स",
     "outputDescription": "सदस्यों को प्राप्त होने से पहले प्रतिक्रियाओं को Enkrypt AI के साथ स्कैन करता है। जब तक आप इसे चालू नहीं करते, यह बंद रहता है।",
-    "detectorsHint": "ब्लॉक करें विकल्प फ़्लैग किए गए अनुरोध को अस्वीकार करता है। केवल लॉग करें विकल्प उसे बिना अनुरोध में देरी किए रिकॉर्ड करता है।",
-    "detectorsHintOutput": "ब्लॉक करें विकल्प फ़्लैग की गई प्रतिक्रिया को विफल करता है। केवल लॉग करें विकल्प उसे बिना प्रतिक्रिया में देरी किए रिकॉर्ड करता है।",
+    "detectorsHint": "ब्लॉक करें विकल्प फ़्लैग किए गए अनुरोध को अस्वीकार करता है। केवल लॉग करें विकल्प पहचान को बिना अनुरोध में देरी किए रिकॉर्ड करता है।",
+    "detectorsHintOutput": "ब्लॉक करें विकल्प फ़्लैग की गई प्रतिक्रिया को विफल करता है। केवल लॉग करें विकल्प पहचान को बिना प्रतिक्रिया में देरी किए रिकॉर्ड करता है।",
     "choiceLog": "केवल लॉग करें",
-    "applyTo": "लागू करें",
+    "applyTo": "इन पर लागू करें",
     "applyToAllMembers": "सभी सदस्य",
     "applyKiloDefault": "Kilo डिफ़ॉल्ट लागू करें",
     "invalidSavedTitle": "सहेजी गई इनपुट डिटेक्टर सेटिंग्स पढ़ी नहीं जा सकतीं",
@@ -4977,6 +4994,7 @@
     "providersDescription": "इस संगठन के लिए Kilo का उस प्रदाता की ओर रूटिंग रोकने हेतु किसी प्रदाता को बंद करें।",
     "providersNeedCatalog": "पूरा मॉडल कैटलॉग लोड होने तक प्रदाता स्विच केवल पढ़ने योग्य रहते हैं। उन्हें संपादित करने के लिए ऊपर फिर से कोशिश करें।",
     "providersEmpty": "इस खोज से कोई प्रदाता मेल नहीं खाता।",
+    "providersNone": "इस संगठन के लिए कोई प्रदाता उपलब्ध नहीं है।",
     "allowAllShown": "दिखाए गए सभी को अनुमति दें",
     "denyAllShown": "दिखाए गए सभी को अस्वीकार करें",
     "gatewaysDescription": "Kilo मॉडल अनुरोधों को Vercel AI Gateway या OpenRouter के माध्यम से रूट करता है। अक्षम गेटवे उन अनुरोधों को विफल कर देता है।",

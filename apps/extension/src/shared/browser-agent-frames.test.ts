@@ -278,6 +278,66 @@ describe('scoped snapshot', () => {
     expect(session.refs.at(-1)?.map(entry => entry.ref)).toStrictEqual(['e2']);
   });
 
+  it('asks the hidden-text probe about the names the snapshot prints and nothing else', async () => {
+    const expressions: string[] = [];
+    const session = createFakeSession({
+      ...snapshotHandlers({
+        nodes: [
+          { childIds: ['2', '3'], nodeId: '1', role: { value: 'RootWebArea' } },
+          {
+            backendDOMNodeId: 31,
+            name: { value: '  hidden banner ' },
+            nodeId: '2',
+            role: { value: 'StaticText' },
+          },
+          {
+            backendDOMNodeId: 32,
+            name: { value: 'Submit' },
+            nodeId: '3',
+            role: { value: 'StaticText' },
+          },
+        ],
+      }),
+      'DOM.getFrameOwner': () => ({ backendNodeId: 10 }),
+      'Runtime.evaluate': params => {
+        expressions.push(String(params?.['expression']));
+
+        return { result: { value: '{"hidden":[],"values":[]}' } };
+      },
+    });
+
+    await captureAgentSnapshotView(session, {
+      readableOrigins: ['https://app.example.com', 'https://pay.example.com'],
+    });
+
+    const hiddenProbes = expressions.filter(expression => expression.includes('CANDIDATES'));
+
+    // One probe per readable frame, each carrying the printed names once, trimmed, in print order.
+    expect(hiddenProbes).toHaveLength(2);
+    for (const probe of hiddenProbes) {
+      expect(probe).toContain('new Set(["Submit","hidden banner"])');
+    }
+  });
+
+  it('runs no hidden-text probe when the snapshot prints no name', async () => {
+    const expressions: string[] = [];
+    const session = createFakeSession({
+      ...snapshotHandlers({ nodes: [{ nodeId: '1', role: { value: 'RootWebArea' } }] }),
+      'Accessibility.getFullAXTree': () => ({
+        nodes: [{ nodeId: '1', role: { value: 'RootWebArea' } }],
+      }),
+      'Runtime.evaluate': params => {
+        expressions.push(String(params?.['expression']));
+
+        return { result: { value: '{"hidden":[],"values":[]}' } };
+      },
+    });
+
+    await captureAgentSnapshotView(session, { readableOrigins: ['https://app.example.com'] });
+
+    expect(expressions.some(expression => expression.includes('CANDIDATES'))).toBe(false);
+  });
+
   it('renders the withheld line at the iframe’s depth', () => {
     const snapshot = buildScopedSnapshot({
       ownerFrameByBackendNodeId: new Map([[10, 'f1']]),

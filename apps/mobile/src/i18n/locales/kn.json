@@ -19,7 +19,9 @@
     "presenceStatus": "ಹೋಸ್ಟ್‌ಗಳು: {{connection}}",
     "commandStatus": "ಕಮಾಂಡ್ ವಿತರಣೆ: {{status}}",
     "delivered": "ತಲುಪಿಸಲಾಗಿದೆ",
-    "expired": "ಅವಧಿ ಮುಗಿದಿದೆ"
+    "expired": "ಅವಧಿ ಮುಗಿದಿದೆ",
+    "recoveryGaps_one": "ಈ ಪ್ರತಿಲೇಖನದ {{displayCount}} ಭಾಗ ಕಾಣೆಯಾಗಿದೆ.",
+    "recoveryGaps_other": "ಈ ಪ್ರತಿಲೇಖನದ {{displayCount}} ಭಾಗಗಳು ಕಾಣೆಯಾಗಿವೆ."
   },
   "common": {
     "manageOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ",
@@ -963,6 +965,8 @@
       "pendingComment": "ಬಾಕಿ ಇರುವ ಟಿಪ್ಪಣಿಗಳು",
       "pendingComment_other": "ಬಾಕಿ ಇರುವ ಟಿಪ್ಪಣಿಗಳು",
       "submitCountOfTotal": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
       "submitReview": "ಪರಿಶೀಲನೆಯನ್ನು ಸಲ್ಲಿಸಿ",
       "partialPostedFresh": "{{displayFreshCount}} ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} ನ Bitbucket ಸಂಪರ್ಕವನ್ನು ಕಂಪ್ಯೂಟರ್‌ನಿಂದ ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
+      "managedOnWebTitle": "ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ",
+      "managedOnWebShort": "ಈ ಸಂಪರ್ಕವನ್ನು ಕಂಪ್ಯೂಟರ್‌ನಿಂದ ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
+      "managedOnWebRepositories": "{{organization}} ಗಾಗಿ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಕಂಪ್ಯೂಟರ್‌ನಿಂದ ವೆಬ್‌ನಲ್ಲಿ ಆಯ್ಕೆಮಾಡಿ.",
       "description": "{{organization}} ಗಾಗಿ ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್ ರಚಿಸಿ, ಅದನ್ನು ಕೆಳಗೆ ಅಂಟಿಸಿ.",
       "descriptionReconnect": "{{organization}} ಗಾಗಿ ಹೊಸ ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್ ರಚಿಸಿ, ಅದನ್ನು ಕೆಳಗೆ ಅಂಟಿಸಿ.",
       "descriptionOverview": "{{organization}} ಗಾಗಿ ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್ ರಚಿಸಿ, ಅದನ್ನು ಮುಂದಿನ ಪರದೆಯಲ್ಲಿ ಅಂಟಿಸಿ.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
       "statusUnavailable": "ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ",
+      "needsAttention": "ಗಮನ ಅಗತ್ಯವಿದೆ",
       "platforms": "ವೇದಿಕೆಗಳು",
       "activity": "ಚಟುವಟಿಕೆ"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ",
       "noModelsDescription": "ಆಯ್ಕೆ ಮಾಡಲು ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+      "allUnavailableTitle": "ಯಾವುದೇ ಮಾದರಿಯನ್ನು ಬಳಸಲಾಗುವುದಿಲ್ಲ",
+      "allUnavailableDescription": "ಪೂರೈಕೆದಾರ ಕೀ ಸೇರಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "favorites": "ಮೆಚ್ಚಿನವುಗಳು"
     },
     "modelSelector": {
@@ -3617,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "ಸಂಸ್ಥೆಯ ಹೆಸರು ಬದಲಾಯಿಸಿ",
-      "renamePlaceholder": "ಸಂಸ್ಥೆಯ ಹೆಸರು",
+      "renamePlaceholder": "ಸಂಸ್ಥೆಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
       "balance": "ಉಳಿಕೆ",
       "plan": "ಯೋಜನೆ",
       "planTeams": "Teams",
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "ಪ್ರೊವೈಡರ್ ಈಗ ಲಭ್ಯವಿಲ್ಲ. ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಕಳುಹಿಸಿ."
   },
   "settingsTools": {
-    "confirmTitle": "ಈ ಬದಲಾವಣೆ ದೃಢೀಕರಿಸುವುದೇ?"
+    "confirmTitle": "ಈ ಬದಲಾವಣೆ ದೃಢೀಕರಿಸುವುದೇ?",
+    "guarded": {
+      "spendAlertsOff": "ವೆಚ್ಚ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಆಫ್ ಮಾಡುವುದೇ? ವೆಚ್ಚದ ಮಿತಿ ದಾಟುವಿಕೆಗಳು ಮತ್ತು ಪ್ರತಿ ಗಂಟೆಯ ಏರಿಕೆಗಳ ಬಗ್ಗೆ ನಿಮಗೆ ಅಧಿಸೂಚನೆಗಳು ಬರುವುದು ನಿಲ್ಲುತ್ತದೆ.",
+      "balanceAlertsOff": "ಬ್ಯಾಲೆನ್ಸ್ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಆಫ್ ಮಾಡುವುದೇ? ನಿಮ್ಮ ಕ್ರೆಡಿಟ್ಗಳು ಕಡಿಮೆಯಾದಾಗ ನಿಮಗೆ ಅಧಿಸೂಚನೆಗಳು ಬರುವುದು ನಿಲ್ಲುತ್ತದೆ.",
+      "securityFindingsOff": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗಳನ್ನು ಆಫ್ ಮಾಡುವುದೇ? ಹೊಸ ಭದ್ರತಾ ಸಂಶೋಧನೆಗಳ ಬಗ್ಗೆ ನಿಮಗೆ ಅಧಿಸೂಚನೆಗಳು ಬರುವುದು ನಿಲ್ಲುತ್ತದೆ.",
+      "hideBalanceOn": "ನಿಮ್ಮ ಬ್ಯಾಲೆನ್ಸ್ಗಳನ್ನು ಮರೆಮಾಡುವುದೇ? ಕ್ರೆಡಿಟ್ ಬ್ಯಾಲೆನ್ಸ್ಗಳು ಇನ್ನು ಮುಂದೆ ಪ್ರೊಫೈಲ್ ಪರದೆಗಳಲ್ಲಿ ಮತ್ತು ಸಂಸ್ಥೆಯ ಹಬ್‌ನಲ್ಲಿ ಕಾಣಿಸುವುದಿಲ್ಲ."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "ಈ ಸಂಸ್ಥೆಗೆ Kilo ಅದಕ್ಕೆ ಮಾರ್ಗನಿರ್ದೇಶಿಸುವುದನ್ನು ನಿಲ್ಲಿಸಲು ಪೂರೈಕೆದಾರರನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಿ.",
     "providersNeedCatalog": "ಪೂರ್ಣ ಮಾದರಿ ಕ್ಯಾಟಲಾಗ್ ಲೋಡ್ ಆಗುವವರೆಗೆ ಪೂರೈಕೆದಾರರ ಸ್ವಿಚ್‌ಗಳು ಓದಲು ಮಾತ್ರ ಆಗಿರುತ್ತವೆ. ಅವುಗಳನ್ನು ಸಂಪಾದಿಸಲು ಮೇಲೆ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "providersEmpty": "ಈ ಹುಡುಕಾಟಕ್ಕೆ ಯಾವುದೇ ಪೂರೈಕೆದಾರರು ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ.",
+    "providersNone": "ಈ ಸಂಸ್ಥೆಗೆ ಯಾವುದೇ ಪೂರೈಕೆದಾರರು ಲಭ್ಯವಿಲ್ಲ.",
     "allowAllShown": "ತೋರಿಸಿರುವ ಎಲ್ಲವನ್ನೂ ಅನುಮತಿಸಿ",
     "denyAllShown": "ತೋರಿಸಿರುವ ಎಲ್ಲವನ್ನೂ ನಿರಾಕರಿಸಿ",
     "gatewaysDescription": "Kilo ಮಾದರಿ ವಿನಂತಿಗಳನ್ನು Vercel AI Gateway ಅಥವಾ OpenRouter ಮೂಲಕ ಮಾರ್ಗನಿರ್ದೇಶಿಸುತ್ತದೆ. ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಿದ ಪ್ರವೇಶದ್ವಾರವು ಆ ವಿನಂತಿಗಳನ್ನು ವಿಫಲಗೊಳಿಸುತ್ತದೆ.",

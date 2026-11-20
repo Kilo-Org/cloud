@@ -19,7 +19,9 @@
     "presenceStatus": "ម៉ាស៊ីន: {{connection}}",
     "commandStatus": "ការបញ្ជូនពាក្យបញ្ជា: {{status}}",
     "delivered": "បានបញ្ជូន",
-    "expired": "បានផុតកំណត់"
+    "expired": "បានផុតកំណត់",
+    "recoveryGaps_one": "ផ្នែកចំនួន {{displayCount}} នៃប្រតិចារិកនេះបាត់។",
+    "recoveryGaps_other": "ផ្នែកចំនួន {{displayCount}} នៃប្រតិចារិកនេះបាត់។"
   },
   "common": {
     "manageOnWeb": "គ្រប់គ្រងនៅលើគេហទំព័រ",
@@ -963,6 +965,8 @@
       "pendingComment": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "pendingComment_other": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "submitCountOfTotal": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
+      "submitCountOfTotal_one": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
+      "submitCountOfTotal_other": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
       "submitReview": "ដាក់ស្នើលទ្ធផលពិនិត្យ",
       "partialPostedFresh": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
       "partialPostedFresh_one": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "ការតភ្ជាប់ Bitbucket របស់ {{organization}} ត្រូវបានគ្រប់គ្រងនៅលើវេបតាមកុំព្យូទ័រ។",
+      "managedOnWebTitle": "គ្រប់គ្រងនៅលើវេប",
+      "managedOnWebShort": "ការតភ្ជាប់នេះត្រូវបានគ្រប់គ្រងនៅលើវេបតាមកុំព្យូទ័រ។",
+      "managedOnWebRepositories": "ជ្រើសរើសឃ្លាំងផ្ទុកសម្រាប់ {{organization}} នៅលើវេបតាមកុំព្យូទ័រ។",
       "description": "បង្កើតថូខឹនចូលប្រើកន្លែងធ្វើការសម្រាប់ {{organization}} រួចបិទភ្ជាប់វាខាងក្រោម។",
       "descriptionReconnect": "បង្កើតថូខឹនចូលប្រើកន្លែងធ្វើការថ្មីសម្រាប់ {{organization}} រួចបិទភ្ជាប់វាខាងក្រោម។",
       "descriptionOverview": "បង្កើតថូខឹនចូលប្រើកន្លែងធ្វើការសម្រាប់ {{organization}} រួចបិទភ្ជាប់វានៅលើអេក្រង់បន្ទាប់។",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "កំពុងពិនិត្យ…",
       "statusUnavailable": "មិនអាចមើលស្ថានភាពបាន",
+      "needsAttention": "ត្រូវការការយកចិត្តទុកដាក់",
       "platforms": "វេទិកា",
       "activity": "សកម្មភាព"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "ជ្រើសរើសម៉ូដែល",
       "noModelsDescription": "គ្មានម៉ូដែលណាអាចជ្រើសរើសបានទេ។",
+      "allUnavailableTitle": "គ្មានម៉ូដែលណាអាចប្រើបានទេ",
+      "allUnavailableDescription": "បន្ថែមសោអ្នកផ្តល់សេវា រួចព្យាយាមម្តងទៀត។",
       "favorites": "ចំណូលចិត្ត"
     },
     "modelSelector": {
@@ -3617,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "ប្តូរឈ្មោះអង្គការ",
-      "renamePlaceholder": "ឈ្មោះអង្គការ",
+      "renamePlaceholder": "បញ្ចូលឈ្មោះអង្គការ",
       "balance": "សមតុល្យ",
       "plan": "គម្រោង",
       "planTeams": "Teams",
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "អ្នកផ្តល់សេវាមិនអាចប្រើបាននៅពេលនេះទេ។ ផ្ញើម្ដងទៀតក្នុងពេលឆាប់ៗ។"
   },
   "settingsTools": {
-    "confirmTitle": "បញ្ជាក់ការផ្លាស់ប្តូរនេះ?"
+    "confirmTitle": "បញ្ជាក់ការផ្លាស់ប្តូរនេះ?",
+    "guarded": {
+      "spendAlertsOff": "បិទការជូនដំណឹងអំពីការចំណាយ? អ្នកនឹងឈប់ទទួលបានការជូនដំណឹងអំពីការឆ្លងកាត់កម្រិតចំណាយ និងការកើនឡើងរាល់ម៉ោង។",
+      "balanceAlertsOff": "បិទការជូនដំណឹងអំពីសមតុល្យ? អ្នកនឹងឈប់ទទួលបានការជូនដំណឹងនៅពេលក្រេឌីតរបស់អ្នកជិតអស់។",
+      "securityFindingsOff": "បិទការរកឃើញអំពីសុវត្ថិភាព? អ្នកនឹងឈប់ទទួលបានការជូនដំណឹងអំពីការរកឃើញសុវត្ថិភាពថ្មីៗ។",
+      "hideBalanceOn": "លាក់សមតុល្យរបស់អ្នក? សមតុល្យក្រេឌីតនឹងលែងបង្ហាញនៅលើអេក្រង់ប្រវត្តិរូប និងមជ្ឈមណ្ឌលអង្គការ។"
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "បិទអ្នកផ្តល់សេវាមួយ ដើម្បីឈប់ឱ្យ Kilo បញ្ជូនសំណើទៅវាសម្រាប់អង្គការនេះ។",
     "providersNeedCatalog": "កុងតាក់អ្នកផ្តល់សេវានៅតែអាចអានបានតែប៉ុណ្ណោះ រហូតដល់កាតាឡុកម៉ូដែលពេញលេញត្រូវបានផ្ទុក។ ចុច ព្យាយាមម្តងទៀត ខាងលើ ដើម្បីកែសម្រួលវា។",
     "providersEmpty": "គ្មានអ្នកផ្តល់សេវាត្រូវនឹងការស្វែងរកនេះទេ។",
+    "providersNone": "មិនមានអ្នកផ្តល់សេវាណាមួយដែលអាចប្រើបានសម្រាប់អង្គការនេះទេ។",
     "allowAllShown": "អនុញ្ញាតទាំងអស់ដែលបានបង្ហាញ",
     "denyAllShown": "បដិសេធទាំងអស់ដែលបានបង្ហាញ",
     "gatewaysDescription": "Kilo បញ្ជូនសំណើម៉ូដែលតាមរយៈ Vercel AI Gateway ឬ OpenRouter។ ច្រកផ្លូវដែលបានបិទ នឹងធ្វើឱ្យសំណើទាំងនោះបរាជ័យ។",

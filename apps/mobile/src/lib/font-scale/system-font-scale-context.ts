@@ -25,3 +25,26 @@ export function useLiveFontScale(): number {
   const { fontScale } = useWindowDimensions();
   return live ?? fontScale;
 }
+
+/**
+ * The system font scale at and above which the shell lays text out for a large
+ * font instead of truncating it: a settings row stacks its tile above its text,
+ * a row title and a header title may take a second line, a key/value row puts
+ * its value under its label, and a header's inline cluster (the account picker)
+ * takes its own row under the title. Android's two largest font sizes (1.8 and
+ * 2.0) reach it.
+ */
+export const LARGE_FONT_SCALE = 1.8;
+
+/**
+ * The scale the provider resolved for layout decisions: the live value, or
+ * React Native's window value where the build has no live module (iOS). The
+ * provider reads both once for the whole tree, so a row decides its shape from
+ * context alone. `null` outside the provider, which reads as the default scale.
+ */
+export const LayoutFontScaleContext = createContext<number | null>(null);
+
+/** Whether the system font scale has reached {@link LARGE_FONT_SCALE}. */
+export function useIsLargeFontScale(): boolean {
+  return (useContext(LayoutFontScaleContext) ?? 1) >= LARGE_FONT_SCALE;
+}

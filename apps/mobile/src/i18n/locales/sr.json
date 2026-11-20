@@ -19,7 +19,10 @@
     "presenceStatus": "Hostovi: {{connection}}",
     "commandStatus": "Isporuka komande: {{status}}",
     "delivered": "Isporučeno",
-    "expired": "Isteklo"
+    "expired": "Isteklo",
+    "recoveryGaps_one": "Nedostaje {{displayCount}} deo ovog transkripta.",
+    "recoveryGaps_few": "Nedostaju {{displayCount}} dela ovog transkripta.",
+    "recoveryGaps_other": "Nedostaje {{displayCount}} delova ovog transkripta."
   },
   "common": {
     "manageOnWeb": "Upravljaj na vebu",
@@ -980,6 +983,9 @@
       "pendingComment": "komentara na čekanju",
       "pendingComment_other": "komentara na čekanju",
       "submitCountOfTotal": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_one": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_few": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_other": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
       "submitReview": "Pošalji pregled",
       "partialPostedFresh": "Broj objavljenih komentara: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Broj objavljenih komentara: {{displayFreshCount}}. ",
@@ -1415,6 +1421,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom sa {{organization}} upravlja se na vebu, sa računara.",
+      "managedOnWebTitle": "Upravlja se na vebu",
+      "managedOnWebShort": "Ova veza se upravlja na vebu, sa računara.",
+      "managedOnWebRepositories": "Izaberi repozitorijume za {{organization}} na vebu, sa računara.",
       "description": "Kreiraj token za pristup radnom prostoru za {{organization}} i nalepi ga ispod.",
       "descriptionReconnect": "Kreiraj novi token za pristup radnom prostoru za {{organization}} i nalepi ga ispod.",
       "descriptionOverview": "Kreiraj token za pristup radnom prostoru za {{organization}} i nalepi ga na sledećem ekranu.",
@@ -1438,6 +1447,7 @@
     "platformList": {
       "checking": "Provera…",
       "statusUnavailable": "Status nedostupan",
+      "needsAttention": "Potrebna pažnja",
       "platforms": "Platforme",
       "activity": "Aktivnost"
     },
@@ -2834,6 +2844,8 @@
     "modelPicker": {
       "title": "Izbor modela",
       "noModelsDescription": "Nema dostupnih modela za izbor.",
+      "allUnavailableTitle": "Nijedan model ne može da se koristi",
+      "allUnavailableDescription": "Dodaj ključ provajdera pa pokušaj ponovo.",
       "favorites": "Omiljeni"
     },
     "modelSelector": {
@@ -3677,7 +3689,7 @@
     },
     "hub": {
       "renameTitle": "Preimenuj organizaciju",
-      "renamePlaceholder": "Naziv organizacije",
+      "renamePlaceholder": "Unesite naziv organizacije",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4139,7 +4151,13 @@
     "providerUnavailable": "Pružalac usluge je trenutno nedostupan. Pošalji ponovo za koji trenutak."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrditi ovu promenu?"
+    "confirmTitle": "Potvrditi ovu promenu?",
+    "guarded": {
+      "spendAlertsOff": "Isključiti upozorenja o potrošnji? Ne biste više dobijali obaveštenja o prekoračenju pragova potrošnje i naglim skokovima potrošnje po satu.",
+      "balanceAlertsOff": "Isključiti upozorenja o stanju? Ne biste više dobijali obaveštenja kada vam krediti budu pri kraju.",
+      "securityFindingsOff": "Isključiti bezbednosne nalaze? Ne biste više dobijali obaveštenja o novim bezbednosnim nalazima.",
+      "hideBalanceOn": "Sakriti vaša stanja? Stanja kredita se više ne bi prikazivala na ekranima profila i u centru organizacije."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,6 +5071,7 @@
     "providersDescription": "Isključite pružaoca da Kilo za ovu organizaciju prestane da usmerava na njega.",
     "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita ceo katalog modela. Da biste ih menjali, dodirnite Pokušaj ponovo iznad.",
     "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",
+    "providersNone": "Nema dostupnih pružalaca za ovu organizaciju.",
     "allowAllShown": "Dozvoli sve prikazano",
     "denyAllShown": "Zabrani sve prikazano",
     "gatewaysDescription": "Kilo usmerava zahteve upućene modelima kroz Vercel AI Gateway ili OpenRouter. Onemogućen prolaz odbija te zahteve.",

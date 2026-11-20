@@ -19,7 +19,9 @@
     "presenceStatus": "హోస్ట్‌లు: {{connection}}",
     "commandStatus": "కమాండ్ డెలివరీ: {{status}}",
     "delivered": "చేరింది",
-    "expired": "గడువు ముగిసింది"
+    "expired": "గడువు ముగిసింది",
+    "recoveryGaps_one": "ఈ ట్రాన్స్క్రిప్ట్‌లోని {{displayCount}} భాగం కనిపించడం లేదు.",
+    "recoveryGaps_other": "ఈ ట్రాన్స్క్రిప్ట్‌లోని {{displayCount}} భాగాలు కనిపించడం లేదు."
   },
   "common": {
     "manageOnWeb": "వెబ్‌లో నిర్వహించండి",
@@ -963,6 +965,8 @@
       "pendingComment": "ఇంకా పంపని వ్యాఖ్యలు",
       "pendingComment_other": "ఇంకా పంపని వ్యాఖ్యలు",
       "submitCountOfTotal": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
+      "submitCountOfTotal_one": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
+      "submitCountOfTotal_other": "మొత్తం {{displayTotalCount}} వ్యాఖ్యల్లో {{displayFreshCount}} వ్యాఖ్యలను సమర్పించండి",
       "submitReview": "సమీక్షను సమర్పించండి",
       "partialPostedFresh": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "పోస్ట్ చేసిన వ్యాఖ్యల సంఖ్య: {{displayFreshCount}}. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} యొక్క Bitbucket కనెక్షన్ కంప్యూటర్ నుండి వెబ్‌లో నిర్వహించబడుతుంది.",
+      "managedOnWebTitle": "వెబ్‌లో నిర్వహించబడుతుంది",
+      "managedOnWebShort": "ఈ కనెక్షన్ కంప్యూటర్ నుండి వెబ్‌లో నిర్వహించబడుతుంది.",
+      "managedOnWebRepositories": "కంప్యూటర్ నుండి వెబ్‌లో {{organization}} కోసం రిపాజిటరీలను ఎంచుకోండి.",
       "description": "{{organization}} కోసం వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, కింద అతికించండి.",
       "descriptionReconnect": "{{organization}} కోసం కొత్త వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, కింద అతికించండి.",
       "descriptionOverview": "{{organization}} కోసం వర్క్‌స్పేస్ యాక్సెస్ టోకెన్‌ను సృష్టించి, తదుపరి స్క్రీన్‌లో అతికించండి.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "తనిఖీ చేస్తోంది…",
       "statusUnavailable": "స్థితి అందుబాటులో లేదు",
+      "needsAttention": "శ్రద్ధ అవసరం",
       "platforms": "ప్లాట్‌ఫారమ్‌లు",
       "activity": "కార్యాచరణ"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "మోడల్‌ను ఎంచుకోండి",
       "noModelsDescription": "ఎంచుకోవడానికి మోడళ్లు అందుబాటులో లేవు.",
+      "allUnavailableTitle": "ఏ మోడల్‌ను ఉపయోగించలేము",
+      "allUnavailableDescription": "ప్రొవైడర్ కీని జోడించి మళ్లీ ప్రయత్నించండి.",
       "favorites": "ఇష్టమైనవి"
     },
     "modelSelector": {
@@ -3617,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "సంస్థ పేరు మార్చండి",
-      "renamePlaceholder": "సంస్థ పేరు",
+      "renamePlaceholder": "సంస్థ పేరును నమోదు చేయండి",
       "balance": "బ్యాలెన్స్",
       "plan": "ప్లాన్",
       "planTeams": "Teams",
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "సేవా ప్రదాత ప్రస్తుతం అందుబాటులో లేరు. కొద్దిసేపట్లో మళ్లీ పంపండి."
   },
   "settingsTools": {
-    "confirmTitle": "ఈ మార్పును నిర్ధారించాలా?"
+    "confirmTitle": "ఈ మార్పును నిర్ధారించాలా?",
+    "guarded": {
+      "spendAlertsOff": "ఖర్చు హెచ్చరికలను ఆఫ్ చేయాలా? ఖర్చు పరిమితి దాటినప్పుడు మరియు గంటవారీ పెరుగుదలల గురించి మీకు నోటిఫికేషన్లు రావడం ఆగిపోతుంది.",
+      "balanceAlertsOff": "బ్యాలెన్స్ హెచ్చరికలను ఆఫ్ చేయాలా? మీ క్రెడిట్లు తగ్గిపోతున్నప్పుడు మీకు నోటిఫికేషన్లు రావడం ఆగిపోతుంది.",
+      "securityFindingsOff": "భద్రతా ఫైండింగ్స్‌ను ఆఫ్ చేయాలా? కొత్త భద్రతా ఫైండింగ్స్ గురించి మీకు నోటిఫికేషన్లు రావడం ఆగిపోతుంది.",
+      "hideBalanceOn": "మీ బ్యాలెన్స్‌లను దాచాలా? క్రెడిట్ బ్యాలెన్స్‌లు ఇకపై ప్రొఫైల్ స్క్రీన్‌లు మరియు సంస్థ హబ్‌లో కనిపించవు."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "ఈ సంస్థ కోసం Kilo దానికి రూటింగ్ చేయడాన్ని ఆపడానికి ప్రొవైడర్ను ఆఫ్ చేయండి.",
     "providersNeedCatalog": "పూర్తి మోడల్ కేటలాగ్ లోడ్ అయ్యే వరకు ప్రొవైడర్ స్విచ్‌లు చదవడానికి మాత్రమే ఉంటాయి. వాటిని మార్చడానికి పైన ఉన్న మళ్లీ ప్రయత్నించండి నొక్కండి.",
     "providersEmpty": "ఈ శోధనకు ఏ ప్రొవైడర్లు సరిపోలలేదు.",
+    "providersNone": "ఈ సంస్థ కోసం ఏ ప్రొవైడర్లు అందుబాటులో లేవు.",
     "allowAllShown": "చూపిన అన్నింటినీ అనుమతించు",
     "denyAllShown": "చూపిన అన్నింటినీ నిరాకరించు",
     "gatewaysDescription": "Kilo మోడల్ అభ్యర్థనలను Vercel AI Gateway లేదా OpenRouter ద్వారా రూట్ చేస్తుంది. నిలిపివేయబడిన గేట్వే ఆ అభ్యర్థనలను విఫలం చేస్తుంది.",

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type BackendStoreCreditProduct,
+  getStoreCreditExpiryCaption,
   getStoreCreditExpiryMessageKey,
   joinStoreCreditProducts,
 } from './store-products';
@@ -118,5 +119,55 @@ describe('getStoreCreditExpiryMessageKey', () => {
 
   it('does not invent a deadline while the backend has no product policy', () => {
     expect(getStoreCreditExpiryMessageKey(product, 'play')).toBeUndefined();
+  });
+});
+
+describe('getStoreCreditExpiryCaption', () => {
+  const catalog = (
+    policy: NonNullable<BackendStoreCreditProduct['creditExpiryPolicy']>
+  ): BackendStoreCreditProduct[] =>
+    backendProducts.map(({ amountUsd, appleProductId, googleProductId }) => ({
+      amountUsd,
+      appleProductId,
+      googleProductId,
+      creditExpiryPolicy: policy,
+    }));
+
+  it('states the non-expiring Play policy for a uniform catalog that never expires', () => {
+    expect(getStoreCreditExpiryCaption(catalog('never'), 'play')).toEqual({
+      key: 'credits.playNonexpiring',
+      expires: false,
+    });
+  });
+
+  it('states the App Store policy for an App Store catalog', () => {
+    expect(getStoreCreditExpiryCaption(catalog('one_year'), 'app_store')).toEqual({
+      key: 'credits.appStoreExpiry',
+      expires: false,
+    });
+  });
+
+  it('states the one-year Play policy for a uniform catalog that expires', () => {
+    expect(getStoreCreditExpiryCaption(catalog('one_year'), 'play')).toEqual({
+      key: 'credits.playOneYearExpiry',
+      expires: true,
+    });
+  });
+
+  it('states no group sentence for a catalog whose packs mix policies', () => {
+    const [firstPack, ...rest] = catalog('never');
+    if (firstPack === undefined) {
+      throw new Error('expected a catalog');
+    }
+    const mixed: BackendStoreCreditProduct[] = [
+      { ...firstPack, creditExpiryPolicy: 'one_year' },
+      ...rest,
+    ];
+
+    expect(getStoreCreditExpiryCaption(mixed, 'play')).toBeUndefined();
+  });
+
+  it('states no group sentence while a pack has no backend policy', () => {
+    expect(getStoreCreditExpiryCaption(backendProducts, 'play')).toBeUndefined();
   });
 });

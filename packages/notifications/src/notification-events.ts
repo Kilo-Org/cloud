@@ -40,3 +40,14 @@ export const securityLifecyclePayloadShape = {
   remediationId: nonEmptyStringSchema.optional(),
   prUrl: nonEmptyStringSchema.optional(),
 };
+
+// The fields a security-finding event carries on every path: the visible push in
+// `push-data.ts` and the internal dispatch request in `rpc-schemas.ts` both carry
+// them. The dispatch request deliberately adds finding content the push must not
+// carry (`notificationKind`, `severity`, `repoFullName`, `title`, `ghsaId`), so
+// only this identity pair belongs here. Declared once so a rename or a changed
+// bound cannot reach one path and miss the other.
+export const securityFindingPayloadShape = {
+  findingId: nonEmptyStringSchema,
+  scope: nonEmptyStringSchema,
+};

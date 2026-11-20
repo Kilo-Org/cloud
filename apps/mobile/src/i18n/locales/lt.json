@@ -19,7 +19,11 @@
     "presenceStatus": "Vykdymo procesai: {{connection}}",
     "commandStatus": "Komandos pristatymas: {{status}}",
     "delivered": "Pristatyta",
-    "expired": "Galiojimas baigėsi"
+    "expired": "Galiojimas baigėsi",
+    "recoveryGaps_one": "Trūksta {{displayCount}} šio įrašo dalies.",
+    "recoveryGaps_few": "Trūksta {{displayCount}} šio įrašo dalių.",
+    "recoveryGaps_many": "Trūksta {{displayCount}} šio įrašo dalies.",
+    "recoveryGaps_other": "Trūksta {{displayCount}} šio įrašo dalių."
   },
   "common": {
     "manageOnWeb": "Tvarkyti žiniatinklyje",
@@ -997,6 +1001,10 @@
       "pendingComment": "nepateiktų komentarų",
       "pendingComment_other": "nepateiktų komentarų",
       "submitCountOfTotal": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
+      "submitCountOfTotal_one": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
+      "submitCountOfTotal_few": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
+      "submitCountOfTotal_many": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
+      "submitCountOfTotal_other": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
       "submitReview": "Pateikti peržiūrą",
       "partialPostedFresh": "Paskelbtų komentarų: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Paskelbtų komentarų: {{displayFreshCount}}. ",
@@ -1439,6 +1447,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
+      "managedOnWebTitle": "Valdoma žiniatinklyje",
+      "managedOnWebShort": "Šis ryšys valdomas žiniatinklyje naudojant kompiuterį.",
+      "managedOnWebRepositories": "Pasirinkite {{organization}} saugyklas žiniatinklyje naudodami kompiuterį.",
       "description": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "descriptionReconnect": "Sukurk naują {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "descriptionOverview": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį kitame ekrane.",
@@ -1462,6 +1473,7 @@
     "platformList": {
       "checking": "Tikrinama…",
       "statusUnavailable": "Būsena nepasiekiama",
+      "needsAttention": "Reikia dėmesio",
       "platforms": "Platformos",
       "activity": "Veikla"
     },
@@ -2884,6 +2896,8 @@
     "modelPicker": {
       "title": "Modelio pasirinkimas",
       "noModelsDescription": "Nėra modelių, kuriuos galėtumėte pasirinkti.",
+      "allUnavailableTitle": "Nė vieno modelio negalima naudoti",
+      "allUnavailableDescription": "Pridėkite teikėjo raktą ir bandykite dar kartą.",
       "favorites": "Mėgstamiausi"
     },
     "modelSelector": {
@@ -3737,7 +3751,7 @@
     },
     "hub": {
       "renameTitle": "Pervadinti organizaciją",
-      "renamePlaceholder": "Organizacijos pavadinimas",
+      "renamePlaceholder": "Įveskite organizacijos pavadinimą",
       "balance": "Likutis",
       "plan": "Planas",
       "planTeams": "Teams",
@@ -4201,7 +4215,13 @@
     "providerUnavailable": "Paslaugos teikėjas šiuo metu nepasiekiamas. Netrukus siųskite dar kartą."
   },
   "settingsTools": {
-    "confirmTitle": "Patvirtinti šį pakeitimą?"
+    "confirmTitle": "Patvirtinti šį pakeitimą?",
+    "guarded": {
+      "spendAlertsOff": "Išjungti išlaidų įspėjimus? Nustotumėte gauti pranešimus apie išlaidų slenksčio viršijimą ir valandinius šuolius.",
+      "balanceAlertsOff": "Išjungti likučio įspėjimus? Nustotumėte gauti pranešimus, kai kreditai artėja prie nulio.",
+      "securityFindingsOff": "Išjungti saugumo radinius? Nustotumėte gauti pranešimus apie naujus saugumo radinius.",
+      "hideBalanceOn": "Slėpti savo likučius? Kreditų likučiai neberodomi profilio ekranuose ir organizacijos centre."
+    }
   },
   "appActions": {
     "start": {
@@ -5129,6 +5149,7 @@
     "providersDescription": "Išjunkite teikėją, kad Kilo nebesiųstų jam užklausų šioje organizacijoje.",
     "providersNeedCatalog": "Teikėjų jungikliai lieka tik skaitomi, kol neįkeliamas visas modelių katalogas. Norėdami juos redaguoti, viršuje bakstelėkite Bandyti dar kartą.",
     "providersEmpty": "Nė vienas teikėjas neatitinka šios paieškos.",
+    "providersNone": "Šioje organizacijoje nėra prieinamų teikėjų.",
     "allowAllShown": "Leisti visus rodomus",
     "denyAllShown": "Drausti visus rodomus",
     "gatewaysDescription": "Kilo nukreipia modelių užklausas per Vercel AI Gateway arba OpenRouter. Kai vartai išjungti, tos užklausos nepavyksta.",

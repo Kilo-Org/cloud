@@ -19,7 +19,10 @@
     "presenceStatus": "Resursdatori: {{connection}}",
     "commandStatus": "Komandas piegāde: {{status}}",
     "delivered": "Piegādāts",
-    "expired": "Termiņš beidzies"
+    "expired": "Termiņš beidzies",
+    "recoveryGaps_zero": "Nav pazudušu šī ieraksta daļu.",
+    "recoveryGaps_one": "Trūkst {{displayCount}} šī ieraksta daļas.",
+    "recoveryGaps_other": "Trūkst {{displayCount}} šī ieraksta daļu."
   },
   "common": {
     "manageOnWeb": "Pārvaldi tīmeklī",
@@ -980,6 +983,9 @@
       "pendingComment": "neiesniegti komentāri",
       "pendingComment_other": "neiesniegti komentāri",
       "submitCountOfTotal": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_zero": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_one": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_other": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
       "submitReview": "Iesniegt pārskatīšanas rezultātus",
       "partialPostedFresh": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
       "partialPostedFresh_zero": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
@@ -1415,6 +1421,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebTitle": "Pārvaldīts tīmeklī",
+      "managedOnWebShort": "Šis savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebRepositories": "Izvēlies repozitorijus priekš {{organization}} tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionReconnect": "Izveido jaunu darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionOverview": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to nākamajā ekrānā.",
@@ -1438,6 +1447,7 @@
     "platformList": {
       "checking": "Pārbauda…",
       "statusUnavailable": "Statuss nav pieejams",
+      "needsAttention": "Nepieciešama rīcība",
       "platforms": "Platformas",
       "activity": "Darbības"
     },
@@ -2834,6 +2844,8 @@
     "modelPicker": {
       "title": "Modeļa izvēle",
       "noModelsDescription": "Nav pieejamu modeļu, ko izvēlēties.",
+      "allUnavailableTitle": "Nevienu modeli nevar izmantot",
+      "allUnavailableDescription": "Pievieno nodrošinātāja atslēgu un mēģini vēlreiz.",
       "favorites": "Izlase"
     },
     "modelSelector": {
@@ -3677,7 +3689,7 @@
     },
     "hub": {
       "renameTitle": "Pārdēvēt organizāciju",
-      "renamePlaceholder": "Organizācijas nosaukums",
+      "renamePlaceholder": "Ievadiet organizācijas nosaukumu",
       "balance": "Atlikums",
       "plan": "Plāns",
       "planTeams": "Teams",
@@ -4139,7 +4151,13 @@
     "providerUnavailable": "Pakalpojumu sniedzējs šobrīd nav pieejams. Nosūti vēlreiz pēc brīža."
   },
   "settingsTools": {
-    "confirmTitle": "Apstiprināt šo izmaiņu?"
+    "confirmTitle": "Apstiprināt šo izmaiņu?",
+    "guarded": {
+      "spendAlertsOff": "Vai izslēgt tēriņu brīdinājumus? Jūs vairs nesaņemsit paziņojumus par tēriņu sliekšņu pārsniegšanu un pēkšņiem tēriņu kāpumiem stundas laikā.",
+      "balanceAlertsOff": "Vai izslēgt atlikuma brīdinājumus? Jūs vairs nesaņemsit paziņojumus, kad jūsu kredītu atlikums kļūs zems.",
+      "securityFindingsOff": "Vai izslēgt drošības atklājumus? Jūs vairs nesaņemsit paziņojumus par jauniem drošības atklājumiem.",
+      "hideBalanceOn": "Vai paslēpt savus atlikumus? Kredītu atlikumi vairs neparādīsies profila ekrānos un organizācijas centrā."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,6 +5071,7 @@
     "providersDescription": "Izslēdziet nodrošinātāju, lai Kilo pārtrauktu maršrutēšanu uz to šai organizācijai.",
     "providersNeedCatalog": "Nodrošinātāju slēdži paliek tikai lasāmi, līdz tiek ielādēts pilns modeļu katalogs. Lai tos rediģētu, augstāk nospiediet Mēģināt vēlreiz.",
     "providersEmpty": "Neviens nodrošinātājs neatbilst šim meklējumam.",
+    "providersNone": "Šai organizācijai nav pieejams neviens nodrošinātājs.",
     "allowAllShown": "Atļaut visus redzamos",
     "denyAllShown": "Liegt visus redzamos",
     "gatewaysDescription": "Kilo maršrutē modeļu pieprasījumus caur Vercel AI Gateway vai OpenRouter. Atspējota vārteja liek šiem pieprasījumiem neizdoties.",

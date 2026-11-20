@@ -11,8 +11,9 @@
 
 import * as Crypto from 'expo-crypto';
 
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import { detectRepositoryPlatform } from '@/components/agents/new-session-repository-state';
-import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { type ParsedActionRepository } from '@/lib/app-actions/app-action-contract';
 import { i18n } from '@/i18n';
 import { readStoredValue } from '@/lib/auth/secure-store-value';

@@ -19,7 +19,11 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregue",
-    "expired": "Expirado"
+    "expired": "Expirado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrição.",
+    "recoveryGaps_many": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_other": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_zero": "Faltam {{displayCount}} partes desta transcrição."
   },
   "common": {
     "manageOnWeb": "Gerir na web",
@@ -998,6 +1002,10 @@
       "pendingComment_other": "comentários pendentes",
       "pendingComment_zero": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
       "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
@@ -1439,6 +1447,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
+      "managedOnWebTitle": "Gerida na Web",
+      "managedOnWebShort": "Esta ligação é gerida na Web, a partir de um computador.",
+      "managedOnWebRepositories": "Escolhe os repositórios de {{organization}} na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
       "descriptionReconnect": "Cria um novo token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
       "descriptionOverview": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o no ecrã seguinte.",
@@ -1462,6 +1473,7 @@
     "platformList": {
       "checking": "A verificar…",
       "statusUnavailable": "Estado indisponível",
+      "needsAttention": "Requer atenção",
       "platforms": "Plataformas",
       "activity": "Atividade"
     },
@@ -2884,7 +2896,9 @@
     "modelPicker": {
       "title": "Selecionar modelo",
       "favorites": "Favoritos",
-      "noModelsDescription": "Não há modelos disponíveis para selecionar."
+      "noModelsDescription": "Não há modelos disponíveis para selecionar.",
+      "allUnavailableTitle": "Não é possível utilizar nenhum modelo",
+      "allUnavailableDescription": "Adiciona uma chave de fornecedor e tenta novamente."
     },
     "modelSelector": {
       "provider": "Fornecedor {{id}}",
@@ -3737,7 +3751,7 @@
     },
     "hub": {
       "renameTitle": "Renomear organização",
-      "renamePlaceholder": "Nome da organização",
+      "renamePlaceholder": "Introduza um nome para a organização",
       "balance": "Saldo",
       "plan": "Plano",
       "planTeams": "Teams",
@@ -4201,7 +4215,13 @@
     "providerUnavailable": "O fornecedor está indisponível neste momento. Volta a enviar dentro de instantes."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmar esta alteração?"
+    "confirmTitle": "Confirmar esta alteração?",
+    "guarded": {
+      "spendAlertsOff": "Desativar alertas de gastos? Deixaria de receber notificações sobre ultrapassagens dos limites de gastos e picos horários.",
+      "balanceAlertsOff": "Desativar alertas de saldo? Deixaria de receber notificações quando os seus créditos estiverem quase esgotados.",
+      "securityFindingsOff": "Desativar deteções de segurança? Deixaria de receber notificações sobre novas deteções de segurança.",
+      "hideBalanceOn": "Ocultar os seus saldos? Os saldos de créditos deixariam de aparecer nos ecrãs de perfil e no hub da organização."
+    }
   },
   "appActions": {
     "start": {
@@ -5129,6 +5149,7 @@
     "providersDescription": "Desative um fornecedor para impedir o Kilo de encaminhar pedidos para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos fornecedores ficam só de leitura até o catálogo completo de modelos ser carregado. Toque em Tentar novamente acima para os editar.",
     "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",
+    "providersNone": "Nenhum fornecedor está disponível para esta organização.",
     "allowAllShown": "Permitir todos os apresentados",
     "denyAllShown": "Negar todos os apresentados",
     "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",

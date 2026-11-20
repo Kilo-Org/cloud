@@ -19,7 +19,9 @@
     "presenceStatus": "Хосттар: {{connection}}",
     "commandStatus": "Команданың жеткізілуі: {{status}}",
     "delivered": "Жеткізілді",
-    "expired": "Мерзімі өтті"
+    "expired": "Мерзімі өтті",
+    "recoveryGaps_one": "Бұл транскрипттің {{displayCount}} бөлігі жоқ.",
+    "recoveryGaps_other": "Бұл транскрипттің {{displayCount}} бөлігі жоқ."
   },
   "common": {
     "manageOnWeb": "Вебте басқару",
@@ -963,6 +965,8 @@
       "pendingComment": "жіберілмеген пікір",
       "pendingComment_other": "жіберілмеген пікір",
       "submitCountOfTotal": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
+      "submitCountOfTotal_one": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
+      "submitCountOfTotal_other": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
       "submitReview": "Тексеру нәтижесін жіберу",
       "partialPostedFresh": "{{displayFreshCount}} пікір жарияланды. ",
       "partialPostedFresh_one": "{{displayFreshCount}} пікір жарияланды. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} үшін Bitbucket қосылымы компьютерден веб арқылы басқарылады.",
+      "managedOnWebTitle": "Веб арқылы басқарылады",
+      "managedOnWebShort": "Бұл қосылым компьютерден веб арқылы басқарылады.",
+      "managedOnWebRepositories": "{{organization}} үшін репозиторийлерді компьютерден веб арқылы таңдаңыз.",
       "description": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жасап, төмендегі өріске қойыңыз.",
       "descriptionReconnect": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жаңадан жасап, төмендегі өріске қойыңыз.",
       "descriptionOverview": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жасап, оны келесі экранда қойыңыз.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "Тексерілуде…",
       "statusUnavailable": "Күй қолжетімсіз",
+      "needsAttention": "Назар қажет",
       "platforms": "Платформалар",
       "activity": "Әрекеттер"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "Модельді таңдау",
       "noModelsDescription": "Таңдауға болатын модельдер жоқ.",
+      "allUnavailableTitle": "Ешбір модельді пайдалану мүмкін емес",
+      "allUnavailableDescription": "Провайдер кілтін қосыңыз, содан кейін қайталап көріңіз.",
       "favorites": "Таңдаулылар"
     },
     "modelSelector": {
@@ -3617,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Ұйым атауын өзгерту",
-      "renamePlaceholder": "Ұйым атауы",
+      "renamePlaceholder": "Ұйым атауын енгізіңіз",
       "balance": "Баланс",
       "plan": "Жоспар",
       "planTeams": "Teams",
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "Қызмет ұсынушы қазір қолжетімсіз. Жақында қайта жіберіңіз."
   },
   "settingsTools": {
-    "confirmTitle": "Осы өзгеріс расталсын ба?"
+    "confirmTitle": "Осы өзгеріс расталсын ба?",
+    "guarded": {
+      "spendAlertsOff": "Шығыс ескертулерін өшіру керек пе? Шығыс шегінен асу және сағаттық құлдырау туралы хабарламаларды алуды тоқтатасыз.",
+      "balanceAlertsOff": "Баланс ескертулерін өшіру керек пе? Кредиттеріңіз азайған кезде хабарламаларды алуды тоқтатасыз.",
+      "securityFindingsOff": "Қауіпсіздік мәселелері бойынша ескертулерді өшіру керек пе? Жаңа қауіпсіздік мәселелері туралы хабарламаларды алуды тоқтатасыз.",
+      "hideBalanceOn": "Баланстарыңызды жасыру керек пе? Кредит баланстары енді профиль экрандарында және ұйым хабында көрсетілмейді."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "Бұл ұйым үшін Kilo осы провайдерге бағыттауды тоқтатуы үшін провайдерді өшіріңіз.",
     "providersNeedCatalog": "Модельдердің толық каталогы жүктелгенше провайдер ауыстырғыштары тек оқуға арналған күйде қалады. Оларды өңдеу үшін жоғарыдағы Қайталап көру түймесін басыңыз.",
     "providersEmpty": "Бұл іздеуге сәйкес провайдерлер жоқ.",
+    "providersNone": "Бұл ұйым үшін қолжетімді провайдерлер жоқ.",
     "allowAllShown": "Көрсетілгендердің барлығына рұқсат ету",
     "denyAllShown": "Көрсетілгендердің барлығына тыйым салу",
     "gatewaysDescription": "Kilo модель сұрауларын Vercel AI Gateway немесе OpenRouter арқылы бағыттайды. Өшірулі шлюз осы сұрауларды сәтсіз етеді.",

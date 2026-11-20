@@ -2,6 +2,7 @@ const mockFindGitLabIntegrationByWebhookToken = jest.fn();
 const mockHandleMergeRequest = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
+const STORED_WEBHOOK_EVENT = { id: 'event-1', createdAt: '2026-11-19T10:00:00.000Z' };
 const mockVerifyGitLabWebhookToken = jest.fn();
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
@@ -91,7 +92,7 @@ describe('GitLab webhook route', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockVerifyGitLabWebhookToken.mockReturnValue(true);
-    mockLogWebhookEvent.mockResolvedValue({ id: 'event-1', isDuplicate: false });
+    mockLogWebhookEvent.mockResolvedValue({ event: STORED_WEBHOOK_EVENT, isDuplicate: false });
     mockHandleMergeRequest.mockResolvedValue(
       Response.json({ message: 'Code review queued', reviewId: 'review-1' }, { status: 202 })
     );
@@ -107,7 +108,7 @@ describe('GitLab webhook route', () => {
     expect(mockHandleMergeRequest).toHaveBeenCalledTimes(1);
     expect(mockHandleMergeRequest).toHaveBeenCalledWith(expect.anything(), row);
     expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
-    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith('event-1', {
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(STORED_WEBHOOK_EVENT, {
       processed: true,
       processed_at: expect.any(String),
       handlers_triggered: ['code_review'],

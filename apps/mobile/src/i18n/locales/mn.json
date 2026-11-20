@@ -19,7 +19,9 @@
     "presenceStatus": "Хостууд: {{connection}}",
     "commandStatus": "Командын хүргэлт: {{status}}",
     "delivered": "Хүргэгдсэн",
-    "expired": "Хугацаа нь дууссан"
+    "expired": "Хугацаа нь дууссан",
+    "recoveryGaps_one": "Энэ тэмдэглэлийн {{displayCount}} хэсэг дутуу байна.",
+    "recoveryGaps_other": "Энэ тэмдэглэлийн {{displayCount}} хэсэг дутуу байна."
   },
   "common": {
     "manageOnWeb": "Вэб дээр удирдах",
@@ -963,6 +965,8 @@
       "pendingComment": "илгээгээгүй сэтгэгдэл",
       "pendingComment_other": "илгээгээгүй сэтгэгдэл",
       "submitCountOfTotal": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
+      "submitCountOfTotal_one": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
+      "submitCountOfTotal_other": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
       "submitReview": "Шалгалтын дүнг илгээх",
       "partialPostedFresh": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
       "partialPostedFresh_one": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ийн Bitbucket холболтыг компьютерээс вэб дээр удирддаг.",
+      "managedOnWebTitle": "Вэб дээр удирддаг",
+      "managedOnWebShort": "Энэ холболтыг компьютерээс вэб дээр удирддаг.",
+      "managedOnWebRepositories": "{{organization}}-д зориулсан репозиторуудыг компьютерээс вэб дээр сонгоно уу.",
       "description": "{{organization}}-д зориулсан ажлын талбарын хандалтын токен үүсгээд доор буулгана уу.",
       "descriptionReconnect": "{{organization}}-д зориулсан шинэ ажлын талбарын хандалтын токен үүсгээд доор буулгана уу.",
       "descriptionOverview": "{{organization}}-д зориулсан ажлын талбарын хандалтын токен үүсгээд дараагийн дэлгэц дээр буулгана уу.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "Шалгаж байна…",
       "statusUnavailable": "Төлөв тодорхойгүй",
+      "needsAttention": "Анхаарал шаардлагатай",
       "platforms": "Платформууд",
       "activity": "Үйл ажиллагаа"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "Загвар сонгох",
       "noModelsDescription": "Сонгох боломжтой загвар алга.",
+      "allUnavailableTitle": "Ямар ч загварыг ашиглах боломжгүй",
+      "allUnavailableDescription": "Үйлчилгээ үзүүлэгчийн түлхүүр нэмээд дахин оролдоно уу.",
       "favorites": "Дуртай загварууд"
     },
     "modelSelector": {
@@ -3617,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Байгууллагын нэрийг өөрчлөх",
-      "renamePlaceholder": "Байгууллагын нэр",
+      "renamePlaceholder": "Байгууллагын нэрийг оруулна уу",
       "balance": "Үлдэгдэл",
       "plan": "Төлөвлөгөө",
       "planTeams": "Teams",
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "Үйлчилгээ үзүүлэгч одоогоор боломжгүй байна. Хэсэг хугацааны дараа дахин илгээнэ үү."
   },
   "settingsTools": {
-    "confirmTitle": "Энэ өөрчлөлтийг баталгаажуулах уу?"
+    "confirmTitle": "Энэ өөрчлөлтийг баталгаажуулах уу?",
+    "guarded": {
+      "spendAlertsOff": "Зарцуулалтын анхааруулгыг унтраах уу? Зарцуулалтын босго давсны болон цагийн доторх огцом өсөлтийн талаарх мэдэгдэл танд ирэхээ болино.",
+      "balanceAlertsOff": "Үлдэгдлийн анхааруулгыг унтраах уу? Таны кредит багасах үед мэдэгдэл ирэхээ болино.",
+      "securityFindingsOff": "Аюулгүй байдлын илрүүлэлтийг унтраах уу? Шинэ аюулгүй байдлын илрүүлэлтийн талаарх мэдэгдэл ирэхээ болино.",
+      "hideBalanceOn": "Үлдэгдлээ нуух уу? Кредитийн үлдэгдэл профайлын дэлгэцүүд болон байгууллагын төвд цаашид харагдахгүй болно."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "Нийлүүлэгчийг унтраавал энэ байгууллагын хувьд Kilo түүн рүү чиглүүлэхээ болино.",
     "providersNeedCatalog": "Загварын бүрэн каталог ачаалагдах хүртэл нийлүүлэгчийн унтраалгууд зөвхөн унших горимд байна. Тэдгээрийг засахын тулд дээрх Дахин оролдох товчийг дарна уу.",
     "providersEmpty": "Энэ хайлтад тохирох нийлүүлэгч байхгүй.",
+    "providersNone": "Энэ байгууллагад ашиглах боломжтой нийлүүлэгч байхгүй.",
     "allowAllShown": "Харагдаж буй бүгдийг зөвшөөрөх",
     "denyAllShown": "Харагдаж буй бүгдийг хориглох",
     "gatewaysDescription": "Kilo загварын хүсэлтүүдийг Vercel AI Gateway эсвэл OpenRouter-оор дамжуулна. Идэвхгүй гарц эдгээр хүсэлтийг амжилтгүй болгоно.",

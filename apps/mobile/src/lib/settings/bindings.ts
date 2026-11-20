@@ -9,6 +9,7 @@ import {
 import { queryClient } from '@/lib/query-client';
 import { trpcClient } from '@/lib/trpc';
 
+import { confirmSettingChange } from './confirm';
 import { type SettingBinding } from './types';
 
 /**
@@ -60,11 +61,24 @@ export const unknownSetting = (name: string): ToolFailure =>
 
 export const changed = (name: string, value: string): string => `${name} set to ${value}`;
 
+/**
+ * A boolean setting whose one guarded direction asks the person first.
+ *
+ * `confirmWhen` is value-triggered: it returns the dialog body for the value
+ * that needs the person's ok, and nothing for the value that writes at once. A
+ * refused confirmation writes nothing and fails the tool call.
+ */
+export type BooleanSettingOptions = Readonly<{
+  confirmWhen?: (value: boolean) => string | undefined;
+}>;
+
 /** A boolean setting over a synchronous module-store writer. */
+// eslint-disable-next-line max-params -- the name, its store's read and write, and the value-triggered confirm are the binding's inputs
 export function booleanSetting(
   name: string,
   read: () => boolean,
-  write: (next: boolean) => void
+  write: (next: boolean) => void,
+  opts?: BooleanSettingOptions
 ): SettingBinding {
   return {
     read,
@@ -73,8 +87,22 @@ export function booleanSetting(
       if (!parsed.success) {
         return Effect.fail(invalidValue(name, value, 'a boolean, true or false'));
       }
-      write(parsed.data);
-      return Effect.succeed(changed(name, String(parsed.data)));
+      const next = parsed.data;
+      const summary = opts?.confirmWhen?.(next);
+      if (summary === undefined) {
+        write(next);
+        return Effect.succeed(changed(name, String(next)));
+      }
+      return Effect.flatMap(confirmSettingChange(summary), confirmed =>
+        confirmed
+          ? Effect.sync(() => {
+              write(next);
+              return changed(name, String(next));
+            })
+          : Effect.fail(
+              failure(`The person did not confirm the change to ${name}. Nothing was changed.`)
+            )
+      );
     },
   };
 }
@@ -144,10 +172,15 @@ export function listSetting(
   };
 }
 
-/** A boolean the server owns; the write goes through tRPC and the cache is refreshed. */
+/**
+ * A boolean the server owns; the write goes through tRPC and the cache is
+ * refreshed. `confirmWhen` works like the one on `booleanSetting`: it returns
+ * the dialog body for the guarded value, and nothing asks for the other one.
+ */
 export function notificationBooleanSetting(
   name: string,
-  key: NotificationCategoryKey
+  key: NotificationCategoryKey,
+  opts?: BooleanSettingOptions
 ): SettingBinding {
   return {
     readEffect: () => Effect.map(readNotificationPreferences(), preferences => preferences[key]),
@@ -157,7 +190,7 @@ export function notificationBooleanSetting(
         return Effect.fail(invalidValue(name, value, 'a boolean, true or false'));
       }
       const next = parsed.data;
-      return Effect.tryPromise({
+      const writeNext = Effect.tryPromise({
         try: async () => {
           await trpcClient.user.setNotificationPreferences.mutate({ [key]: next });
           await queryClient.invalidateQueries({ queryKey: NOTIFICATION_PREFERENCES_QUERY_KEY });
@@ -165,6 +198,17 @@ export function notificationBooleanSetting(
         },
         catch: error => failure(`Could not change ${name}: ${String(error)}`),
       });
+      const summary = opts?.confirmWhen?.(next);
+      if (summary === undefined) {
+        return writeNext;
+      }
+      return Effect.flatMap(confirmSettingChange(summary), confirmed =>
+        confirmed
+          ? writeNext
+          : Effect.fail(
+              failure(`The person did not confirm the change to ${name}. Nothing was changed.`)
+            )
+      );
     },
   };
 }

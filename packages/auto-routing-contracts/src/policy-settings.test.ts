@@ -15,6 +15,7 @@ import {
 const computedAt = '2026-06-01T00:00:00.000Z';
 
 const base: PolicySettingSource = {
+  router: 'efficient',
   minAccuracy: 0.7,
   accuracyNoiseBand: 0.05,
   productionTokenProfile: null,
@@ -189,8 +190,33 @@ describe('policy setting resolution', () => {
   it('authors every fixed value to fit its own setting', () => {
     for (const key of POLICY_SETTING_KEYS) {
       const meta: PolicySettingMeta = POLICY_SETTINGS[key];
-      if (meta.kind !== 'fixed' || meta.fixed === null) continue;
-      expect(POLICY_SETTING_VALUE_SCHEMAS[key].safeParse(meta.fixed).success).toBe(true);
+      if (meta.kind !== 'fixed') continue;
+      const values = 'fixedByRouter' in meta ? Object.values(meta.fixedByRouter) : [meta.fixed];
+      for (const value of values) {
+        if (value === null) continue;
+        expect(POLICY_SETTING_VALUE_SCHEMAS[key].safeParse(value).success).toBe(true);
+      }
+    }
+  });
+
+  it('measures efficient deciders three times and frontier deciders once', () => {
+    const stored = parseStoredPolicyOverrides({ deciderRepetitions: 5 });
+    for (const [router, repetitions] of [
+      ['efficient', 3],
+      ['frontier', 1],
+    ] as const) {
+      const config = { ...base, router, policyOverrides: stored };
+      expect(resolveEffectivePolicy(config)).toMatchObject({
+        deciderRepetitions: repetitions,
+        classifierRepetitions: 1,
+      });
+      expect(resolvePolicySettings(config).deciderRepetitions).toMatchObject({
+        kind: 'fixed',
+        effective: repetitions,
+        override: null,
+        computed: null,
+        reason: expect.any(String),
+      });
     }
   });
 });

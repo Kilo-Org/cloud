@@ -7,7 +7,7 @@
     "directory": "תיקיית עבודה",
     "createSession": "יצירת סשן בפרוטוקול נייטיב",
     "queueIfOffline": "הוספת הפרומפט לתור אם המארח לא מחובר",
-    "prompt": "פרומפט או /command",
+    "prompt": "פרומפט או \u2066/command\u2069",
     "localClear": "ניקוי התצוגה המקומית",
     "abort": "עצירת הסבב",
     "failed": "פעולת השליטה מרחוק בפרוטוקול נייטיב נכשלה",
@@ -19,7 +19,10 @@
     "presenceStatus": "מארחים: {{connection}}",
     "commandStatus": "מסירת הפקודה: {{status}}",
     "delivered": "נמסרה",
-    "expired": "פג התוקף"
+    "expired": "פג התוקף",
+    "recoveryGaps_one": "חסר חלק {{displayCount}} מתמלול זה.",
+    "recoveryGaps_two": "חסרים {{displayCount}} חלקים מתמלול זה.",
+    "recoveryGaps_other": "חסרים {{displayCount}} חלקים מתמלול זה."
   },
   "common": {
     "manageOnWeb": "ניהול באתר",
@@ -699,6 +702,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
+      "managedOnWebTitle": "מנוהל באתר",
+      "managedOnWebShort": "החיבור הזה מנוהל באתר דרך מחשב.",
+      "managedOnWebRepositories": "בחר את המאגרים עבור {{organization}} באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "descriptionReconnect": "צור אסימון גישה חדש לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "descriptionOverview": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו במסך הבא.",
@@ -737,6 +743,7 @@
     "platformList": {
       "activity": "פעילות",
       "checking": "בבדיקה…",
+      "needsAttention": "נדרש טיפול",
       "platforms": "פלטפורמות",
       "statusUnavailable": "המצב אינו זמין"
     },
@@ -2253,6 +2260,8 @@
     "modelPicker": {
       "title": "בחירת מודל",
       "noModelsDescription": "אין מודלים זמינים לבחירה.",
+      "allUnavailableTitle": "לא ניתן להשתמש באף מודל",
+      "allUnavailableDescription": "הוסף מפתח ספק ונסה שוב.",
       "favorites": "מועדפים"
     },
     "modelSelector": {
@@ -3286,6 +3295,9 @@
       "partialPostedStale_two": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "partialPostedStale_other": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "submitCountOfTotal": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_one": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_two": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_other": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
       "submitReview": "שליחת סקירה",
       "pendingComment_two": "תגובות ממתינות",
       "blockedRequestChanges": "הוסף סיכום או לפחות תגובה אחת כדי לבקש שינויים.",
@@ -3498,7 +3510,7 @@
       "planStatusLapsed": " · הסתיים",
       "planEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה.",
       "manageBilling": "ניהול חיובים",
-      "renamePlaceholder": "שם הארגון",
+      "renamePlaceholder": "יש להזין שם לארגון",
       "renameTitle": "שינוי שם הארגון"
     },
     "inviteMember": {
@@ -4139,7 +4151,13 @@
     "providerUnavailable": "הספק אינו זמין כרגע. שלחו שוב בקרוב."
   },
   "settingsTools": {
-    "confirmTitle": "לאשר את השינוי הזה?"
+    "confirmTitle": "לאשר את השינוי הזה?",
+    "guarded": {
+      "spendAlertsOff": "לכבות התראות הוצאה? תפסיקו לקבל התראות על חציית ספי הוצאה ועל קפיצות שעתיות.",
+      "balanceAlertsOff": "לכבות התראות יתרה? תפסיקו לקבל התראות כשהקרדיטים שלכם אוזלים.",
+      "securityFindingsOff": "לכבות ממצאי אבטחה? תפסיקו לקבל התראות על ממצאי אבטחה חדשים.",
+      "hideBalanceOn": "להסתיר את היתרות שלכם? יתרות הקרדיט לא יופיעו יותר במסכי הפרופיל ובמרכז הארגון."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,6 +5071,7 @@
     "providersDescription": "כבה ספק כדי למנוע מ-Kilo לנתב אליו בקשות עבור הארגון הזה.",
     "providersNeedCatalog": "מתגי הספקים יישארו לקריאה בלבד עד שקטלוג המודלים המלא ייטען. לחץ על ניסיון חוזר למעלה כדי לערוך אותם.",
     "providersEmpty": "אין ספקים שמתאימים לחיפוש הזה.",
+    "providersNone": "אין ספקים זמינים עבור הארגון הזה.",
     "allowAllShown": "אשר את כל המוצגים",
     "denyAllShown": "חסום את כל המוצגים",
     "gatewaysDescription": "Kilo מנתב בקשות מודל דרך Vercel AI Gateway או OpenRouter. שער מושבת מכשיל את הבקשות האלה.",

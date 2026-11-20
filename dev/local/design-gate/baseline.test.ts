@@ -39,7 +39,12 @@ const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
 const INTENT_SOURCE =
   'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n';
 
-function syntheticRepo(t: TestContext, proofManifest = manifest, intentSource = INTENT_SOURCE) {
+const INLINE_INTENT =
+  'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n';
+const FORMATTED_INTENT =
+  'export function redirectSystemPath({\n  path,\n  initial,\n}: {\n  path: string;\n  initial: boolean;\n}): string | null {\n  return initial ? path : null;\n}\n';
+
+function syntheticRepo(t: TestContext, proofManifest = manifest, intent = INLINE_INTENT) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-proof-git-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, 'repo');
@@ -53,7 +58,7 @@ function syntheticRepo(t: TestContext, proofManifest = manifest, intentSource = 
   git('config', 'user.email', 'synthetic@example.invalid');
   git('config', 'user.name', 'Synthetic design proof');
   for (const [file, content] of [
-    [INTENT, intentSource],
+    [INTENT, intent],
     [PRODUCT, 'export default function Card() { return "base product"; }\n'],
   ]) {
     fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
@@ -114,6 +119,22 @@ test('real git preparation keeps true base/head product and generates identical 
   validatePreparedSource(preparation, 'base', preparation.base.directory);
   validatePreparedSource(preparation, 'head', preparation.head.directory);
   await assert.rejects(() => prepareProof(fixture), /EEXIST/);
+});
+
+test('a formatted native-intent declaration still receives the generated diagnostic branch', async t => {
+  const fixture = syntheticRepo(t, manifest, FORMATTED_INTENT);
+  const preparation = await prepareProof(fixture);
+  validatePreparedSource(preparation, 'head', preparation.head.directory);
+  const generated = fs.readFileSync(path.join(preparation.head.directory, INTENT), 'utf8');
+  assert.match(
+    generated,
+    /export function redirectSystemPath\(\{\n {2}path,\n {2}initial,\n\}: \{/
+  );
+  const returned = generated.indexOf('return "/(auth)/design-proof-card"');
+  assert.ok(returned > generated.indexOf('export function redirectSystemPath('));
+  // The branch is the branch's own line inside the body, not a rewrite of the
+  // formatted declaration around it.
+  assert.match(generated, /\{\n {2}if \(__DEV__ && !initial/);
 });
 
 test('preparation rejects symbolic refs, unrelated histories and unsafe executable-source manifests', async t => {
@@ -500,6 +521,72 @@ test('pre-existing findings are not attributed to head', async t => {
       .introduced.length,
     0
   );
+});
+
+/** The finding the dev-overlay rule writes for a LogBox error over a screen. */
+function logBoxOverlay(text: string): Finding {
+  return {
+    rule: 'dev-overlay',
+    severity: 'error',
+    cell: 'base',
+    target: TARGET.id,
+    element: {
+      index: 0,
+      path: 'testID:logbox_notification_message_text',
+      tag: 'Paragraph',
+      testID: 'logbox_notification_message_text',
+      text,
+      rect: [60.95, 830.48, 303.62, 22.86],
+    },
+    measured: 22.86,
+    expected: 'no LogBox toast painted over the screen',
+    unit: 'dp',
+    message: `LogBox painted "${text}" over this screen`,
+  };
+}
+
+test('a screen captured under a LogBox error makes the pair inconclusive, never introduced', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  const message = 'Text strings must be rendered within a <Text> component.';
+  capture(preparation, 'base', baseRun);
+  capture(preparation, 'head', headRun, { findings: [logBoxOverlay(message)] });
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  // The capture shows the toast, not the screen, so the screens were never
+  // compared and the overlay is never head's regression.
+  assert.equal(result.status, 'inconclusive');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, [
+    `head: a LogBox error painted over base/${TARGET.id}: ${message}`,
+  ]);
+});
+
+test('a LogBox error only in the base is a fix, not a blocked pair', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  const message = 'Text strings must be rendered within a <Text> component.';
+  // The base run's own report and exit status carry its overlay error; the head
+  // is what a critic reads, so a clean head means the screens were compared.
+  capture(preparation, 'base', baseRun, { findings: [logBoxOverlay(message)] });
+  capture(preparation, 'head', headRun);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, []);
 });
 
 test('a landing notice persisted in both findings artifacts still compares', async t => {

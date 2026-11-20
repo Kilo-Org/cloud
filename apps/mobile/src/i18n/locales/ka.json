@@ -19,7 +19,9 @@
     "presenceStatus": "ჰოსტები: {{connection}}",
     "commandStatus": "ბრძანების მიწოდება: {{status}}",
     "delivered": "მიწოდებულია",
-    "expired": "ვადაგასულია"
+    "expired": "ვადაგასულია",
+    "recoveryGaps_one": "ამ ტრანსკრიპტის {{displayCount}} ნაწილი აკლია.",
+    "recoveryGaps_other": "ამ ტრანსკრიპტის {{displayCount}} ნაწილი აკლია."
   },
   "common": {
     "manageOnWeb": "ვებში მართვა",
@@ -963,6 +965,8 @@
       "pendingComment": "გაუგზავნელი კომენტარი",
       "pendingComment_other": "გაუგზავნელი კომენტარი",
       "submitCountOfTotal": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
+      "submitCountOfTotal_one": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
+      "submitCountOfTotal_other": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
       "submitReview": "შემოწმების შედეგის გაგზავნა",
       "partialPostedFresh": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",
       "partialPostedFresh_one": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ის Bitbucket-თან კავშირი იმართება ვებში, კომპიუტერიდან.",
+      "managedOnWebTitle": "იმართება ვებში",
+      "managedOnWebShort": "ეს კავშირი იმართება ვებში, კომპიუტერიდან.",
+      "managedOnWebRepositories": "აირჩიე რეპოზიტორიები {{organization}}-ისთვის ვებში, კომპიუტერიდან.",
       "description": "შექმენი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი ქვემოთ.",
       "descriptionReconnect": "შექმენი ახალი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი ქვემოთ.",
       "descriptionOverview": "შექმენი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი შემდეგ ეკრანზე.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "მოწმდება…",
       "statusUnavailable": "სტატუსი ხელმისაწვდომი არ არის",
+      "needsAttention": "ყურადღება სჭირდება",
       "platforms": "პლატფორმები",
       "activity": "აქტივობა"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "მოდელის არჩევა",
       "noModelsDescription": "ამჟამად ასარჩევი მოდელები არ არის.",
+      "allUnavailableTitle": "არცერთი მოდელის გამოყენება შეუძლებელია",
+      "allUnavailableDescription": "დაამატეთ პროვაიდერის გასაღები და სცადეთ ხელახლა.",
       "favorites": "რჩეულები"
     },
     "modelSelector": {
@@ -3617,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "ორგანიზაციის სახელის შეცვლა",
-      "renamePlaceholder": "ორგანიზაციის სახელი",
+      "renamePlaceholder": "შეიყვანეთ ორგანიზაციის სახელი",
       "balance": "ბალანსი",
       "plan": "გეგმა",
       "planTeams": "Teams",
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "პროვაიდერი ახლა მიუწვდომელია. გაგზავნეთ ხელახლა ცოტა ხანში."
   },
   "settingsTools": {
-    "confirmTitle": "დავადასტუროთ ეს ცვლილება?"
+    "confirmTitle": "დავადასტუროთ ეს ცვლილება?",
+    "guarded": {
+      "spendAlertsOff": "გამორთოთ ხარჯვის შეტყობინებები? თქვენ აღარ მიიღებთ შეტყობინებებს ხარჯვის ზღვრის გადაკვეთისა და საათობრივი ნახტომების შესახებ.",
+      "balanceAlertsOff": "გამორთოთ ბალანსის შეტყობინებები? თქვენ აღარ მიიღებთ შეტყობინებებს, როდესაც თქვენი კრედიტები ამოიწურება.",
+      "securityFindingsOff": "გამორთოთ უსაფრთხოების აღმოჩენები? თქვენ აღარ მიიღებთ შეტყობინებებს ახალი უსაფრთხოების აღმოჩენების შესახებ.",
+      "hideBalanceOn": "დამალოთ თქვენი ბალანსები? კრედიტის ბალანსები აღარ გამოჩნდება პროფილის ეკრანებსა და ორგანიზაციის ჰაბზე."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "გამორთეთ პროვაიდერი, რომ Kilo-მ ამ ორგანიზაციისთვის მასზე მარშრუტიზაცია შეწყვიტოს.",
     "providersNeedCatalog": "პროვაიდერების გადამრთველები მხოლოდ წაკითხვადი რჩება, სანამ მოდელების სრული კატალოგი არ ჩაიტვირთება. მათი რედაქტირებისთვის დააჭირეთ ზემოთ ღილაკს ხელახლა ცდა.",
     "providersEmpty": "ამ ძიებას არცერთი პროვაიდერი არ ემთხვევა.",
+    "providersNone": "ამ ორგანიზაციისთვის არცერთი პროვაიდერი არ არის ხელმისაწვდომი.",
     "allowAllShown": "ყველა ნაჩვენებულის დაშვება",
     "denyAllShown": "ყველა ნაჩვენებულის აკრძალვა",
     "gatewaysDescription": "Kilo მოდელის მოთხოვნებს Vercel AI Gateway-ის ან OpenRouter-ის მეშვეობით მარშრუტიზაციას უკეთებს. გამორთული გეითვეი ამ მოთხოვნებს წარუმატებელს ხდის.",

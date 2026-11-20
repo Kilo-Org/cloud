@@ -198,36 +198,24 @@ const INSTRUMENT_FILES = [
 ] as const;
 
 /**
- * The offset just after the body brace of `redirectSystemPath`, where a diagnostic branch may be
- * inserted. The signature may wrap across lines and may declare a return type, so the parameter
- * list is closed by counting parentheses at brace depth zero rather than by matching one line.
+ * The index just after the opening brace of `redirectSystemPath`'s body. The
+ * declaration's own line breaks belong to the formatter — it wraps the
+ * parameters onto separate lines — so the body brace is found by scanning the
+ * signature instead of matching one written form. A parentheses depth of zero
+ * separates the body brace from the destructured parameter and its object type.
  */
-function diagnosticInsertionPoint(source: string): number {
-  const unsupported = new Error('Unsupported native-intent diagnostic insertion point');
-  const start = source.indexOf('export function redirectSystemPath(');
-  if (start < 0 || source.includes('export function redirectSystemPath(', start + 1)) {
-    throw unsupported;
+function redirectSystemPathBodyStart(intent: string): number {
+  const signature = 'export function redirectSystemPath(';
+  const start = intent.indexOf(signature);
+  if (start === -1) throw new Error('Unsupported native-intent diagnostic insertion point');
+  let parens = 0;
+  for (let index = start + signature.length - 1; index < intent.length; index += 1) {
+    const character = intent[index];
+    if (character === '(') parens += 1;
+    else if (character === ')') parens -= 1;
+    else if (character === '{' && parens === 0) return index + 1;
   }
-  let parentheses = 0;
-  let braces = 0;
-  let close = -1;
-  for (let index = start; index < source.length; index += 1) {
-    const char = source[index];
-    if (char === '{') braces += 1;
-    else if (char === '}') braces -= 1;
-    else if (braces === 0 && char === '(') parentheses += 1;
-    else if (braces === 0 && char === ')') {
-      parentheses -= 1;
-      if (parentheses === 0) {
-        close = index;
-        break;
-      }
-    }
-  }
-  if (close < 0) throw unsupported;
-  const body = source.indexOf('{', close);
-  if (body < 0) throw unsupported;
-  return body + 1;
+  throw new Error('Unsupported native-intent diagnostic insertion point');
 }
 
 function generatedFiles(
@@ -299,11 +287,9 @@ function generatedFiles(
       `  if (__DEV__ && !initial && ${JSON.stringify([target.link, target.route, target.route.slice(1)])}.includes(path)) return ${JSON.stringify(`/${target.screen}`)};`
     );
   }
-  // The signature wraps differently across formatter runs and may declare a return type, so find
-  // the closing parenthesis of the parameter list by counting, then take the body brace after it.
   if (branches.length > 0) {
-    const at = diagnosticInsertionPoint(intent);
-    intent = `${intent.slice(0, at)}\n${branches.join('\n')}${intent.slice(at)}`;
+    const bodyStart = redirectSystemPathBodyStart(intent);
+    intent = `${intent.slice(0, bodyStart)}\n${branches.join('\n')}${intent.slice(bodyStart)}`;
   }
   intent += `\n// Temporary diagnostic source receipt; forces stale Metro bundles to fail closed.\nif (__DEV__) (globalThis as typeof globalThis & { ${MARKER}?: string }).${MARKER} = ${JSON.stringify(marker)};\n`;
   files.set(INTENT, intent);
@@ -784,6 +770,22 @@ export async function compareProof(
       ...readiness.map(reason => `${revision}: ${reason}`),
       ...receipt.readiness.map(reason => `${revision}: ${reason}`)
     );
+    // A screen captured under a LogBox error shows the toast, not the screen, so
+    // the two runs were never compared on that screen. Only the head is
+    // blocking: its toast is what the critic would read, and it is a reason to
+    // call the pair inconclusive rather than an introduced finding, which would
+    // present a dev overlay as a product regression. A base toast with a clean
+    // head is a fix, so the pair still compares; the base run's own report and
+    // its exit status already carry that error.
+    if (revision === 'head')
+      reasons.push(
+        ...run.findings
+          .filter(entry => entry.rule === 'dev-overlay' && entry.severity === 'error')
+          .map(
+            entry =>
+              `${revision}: a LogBox error painted over ${entry.cell}/${entry.target}: ${entry.element.text?.trim() || entry.message}`
+          )
+      );
     return run;
   });
   const [base, head] = runs;

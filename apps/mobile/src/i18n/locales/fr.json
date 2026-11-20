@@ -19,7 +19,10 @@
     "presenceStatus": "Hôtes : {{connection}}",
     "commandStatus": "Transmission de la commande : {{status}}",
     "delivered": "Transmise",
-    "expired": "Expirée"
+    "expired": "Expirée",
+    "recoveryGaps_one": "Il manque {{displayCount}} partie de cette transcription.",
+    "recoveryGaps_many": "Il manque {{displayCount}} parties de cette transcription.",
+    "recoveryGaps_other": "Il manque {{displayCount}} parties de cette transcription."
   },
   "common": {
     "manageOnWeb": "Gérer sur le web",
@@ -666,6 +669,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",
+      "managedOnWebTitle": "Géré sur le web",
+      "managedOnWebShort": "Cette connexion se gère sur le web, depuis un ordinateur.",
+      "managedOnWebRepositories": "Choisissez les dépôts de {{organization}} sur le web, depuis un ordinateur.",
       "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "descriptionOverview": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le sur l'écran suivant.",
@@ -704,6 +710,7 @@
     "platformList": {
       "activity": "Activité",
       "checking": "Vérification…",
+      "needsAttention": "Attention nécessaire",
       "platforms": "Plateformes",
       "statusUnavailable": "État indisponible"
     },
@@ -2149,6 +2156,8 @@
     "modelPicker": {
       "title": "Choix du modèle",
       "noModelsDescription": "Aucun modèle n'est disponible.",
+      "allUnavailableTitle": "Aucun modèle ne peut être utilisé",
+      "allUnavailableDescription": "Ajoutez une clé de fournisseur et réessayez.",
       "favorites": "Favoris"
     },
     "modelSelector": {
@@ -3286,6 +3295,9 @@
       "partialPostedStale_many": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
       "partialPostedStale_other": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
       "submitCountOfTotal": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
+      "submitCountOfTotal_many": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
       "submitReview": "Envoyer la revue",
       "pendingComment_many": "commentaires en attente",
       "blockedRequestChanges": "Ajoutez un résumé ou au moins un commentaire pour demander des modifications.",
@@ -3498,7 +3510,7 @@
       "planStatusLapsed": " · Expiré",
       "planEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif.",
       "manageBilling": "Gérer la facturation",
-      "renamePlaceholder": "Nom de l'organisation",
+      "renamePlaceholder": "Saisissez un nom d'organisation",
       "renameTitle": "Renommer l'organisation"
     },
     "inviteMember": {
@@ -4139,7 +4151,13 @@
     "providerUnavailable": "Le fournisseur est indisponible pour le moment. Renvoyez le message dans quelques instants."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmer cette modification ?"
+    "confirmTitle": "Confirmer cette modification ?",
+    "guarded": {
+      "spendAlertsOff": "Désactiver les alertes de dépenses ? Vous ne recevrez plus de notifications en cas de franchissement de seuil de dépenses ou de pics horaires.",
+      "balanceAlertsOff": "Désactiver les alertes de solde ? Vous ne recevrez plus de notifications lorsque vos crédits sont bas.",
+      "securityFindingsOff": "Désactiver les résultats de sécurité ? Vous ne recevrez plus de notifications concernant les nouveaux résultats de sécurité.",
+      "hideBalanceOn": "Masquer vos soldes ? Les soldes de crédits n'apparaîtront plus sur les écrans de profil et dans le hub de l'organisation."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,6 +5071,7 @@
     "providersDescription": "Désactivez un fournisseur pour que Kilo cesse de lui acheminer les requêtes de cette organisation.",
     "providersNeedCatalog": "Les interrupteurs des fournisseurs restent en lecture seule tant que le catalogue complet des modèles n'est pas chargé. Appuyez sur Réessayer ci-dessus pour les modifier.",
     "providersEmpty": "Aucun fournisseur ne correspond à cette recherche.",
+    "providersNone": "Aucun fournisseur n'est disponible pour cette organisation.",
     "allowAllShown": "Autoriser tous ceux affichés",
     "denyAllShown": "Refuser tous ceux affichés",
     "gatewaysDescription": "Kilo achemine les requêtes de modèles via Vercel AI Gateway ou OpenRouter. Une passerelle désactivée fait échouer ces requêtes.",

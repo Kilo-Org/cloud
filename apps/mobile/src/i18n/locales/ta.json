@@ -19,7 +19,9 @@
     "presenceStatus": "ஹோஸ்ட்கள்: {{connection}}",
     "commandStatus": "கட்டளை வழங்கல்: {{status}}",
     "delivered": "வழங்கப்பட்டது",
-    "expired": "காலாவதியானது"
+    "expired": "காலாவதியானது",
+    "recoveryGaps_one": "இந்த உரைநகலின் {{displayCount}} பகுதி காணவில்லை.",
+    "recoveryGaps_other": "இந்த உரைநகலின் {{displayCount}} பகுதிகள் காணவில்லை."
   },
   "common": {
     "manageOnWeb": "இணையத்தில் நிர்வகிக்கவும்",
@@ -963,6 +965,8 @@
       "pendingComment": "நிலுவையிலுள்ள கருத்துகள்",
       "pendingComment_other": "நிலுவையிலுள்ள கருத்துகள்",
       "submitCountOfTotal": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
+      "submitCountOfTotal_one": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
+      "submitCountOfTotal_other": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
       "submitReview": "மதிப்பாய்வைச் சமர்ப்பிக்கவும்",
       "partialPostedFresh": "இடுகையிட்ட கருத்துகள்: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "இடுகையிட்ட கருத்துகள்: {{displayFreshCount}}. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-இன் Bitbucket இணைப்பு கணினியிலிருந்து இணையத்தில் நிர்வகிக்கப்படுகிறது.",
+      "managedOnWebTitle": "இணையத்தில் நிர்வகிக்கப்படுகிறது",
+      "managedOnWebShort": "இந்த இணைப்பு கணினியிலிருந்து இணையத்தில் நிர்வகிக்கப்படுகிறது.",
+      "managedOnWebRepositories": "{{organization}}-க்கான ரெப்பாசிட்டரிகளைக் கணினியிலிருந்து இணையத்தில் தேர்ந்தெடுக்கவும்.",
       "description": "{{organization}}-க்கான பணியிட அணுகல் டோக்கனை உருவாக்கிக் கீழே ஒட்டவும்.",
       "descriptionReconnect": "{{organization}}-க்கான புதிய பணியிட அணுகல் டோக்கனை உருவாக்கிக் கீழே ஒட்டவும்.",
       "descriptionOverview": "{{organization}}-க்கான பணியிட அணுகல் டோக்கனை உருவாக்கி, அடுத்த திரையில் ஒட்டவும்.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "சரிபார்க்கிறது…",
       "statusUnavailable": "நிலை கிடைக்கவில்லை",
+      "needsAttention": "கவனம் தேவை",
       "platforms": "தளங்கள்",
       "activity": "செயல்பாடு"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "மாதிரியைத் தேர்ந்தெடுக்கவும்",
       "noModelsDescription": "தேர்ந்தெடுக்கக்கூடிய மாதிரிகள் எதுவும் இல்லை.",
+      "allUnavailableTitle": "எந்த மாதிரியையும் பயன்படுத்த முடியாது",
+      "allUnavailableDescription": "வழங்குநர் விசையைச் சேர்த்து, மீண்டும் முயற்சிக்கவும்.",
       "favorites": "பிடித்தவை"
     },
     "modelSelector": {
@@ -3617,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "நிறுவனத்தின் பெயரை மாற்றவும்",
-      "renamePlaceholder": "நிறுவனத்தின் பெயர்",
+      "renamePlaceholder": "நிறுவனத்தின் பெயரை உள்ளிடவும்",
       "balance": "இருப்பு",
       "plan": "திட்டம்",
       "planTeams": "Teams",
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "வழங்குநர் இப்போது கிடைக்கவில்லை. சற்று நேரத்தில் மீண்டும் அனுப்பவும்."
   },
   "settingsTools": {
-    "confirmTitle": "இந்த மாற்றத்தை உறுதிப்படுத்தவா?"
+    "confirmTitle": "இந்த மாற்றத்தை உறுதிப்படுத்தவா?",
+    "guarded": {
+      "spendAlertsOff": "செலவு எச்சரிக்கைகளை அணைக்கவா? செலவு வரம்பு தாண்டுதல்கள் மற்றும் மணிநேர உயர்வுகள் பற்றிய அறிவிப்புகள் வருவது நிற்கும்.",
+      "balanceAlertsOff": "இருப்பு எச்சரிக்கைகளை அணைக்கவா? உங்கள் கிரெடிட்கள் குறையும்போது அறிவிப்புகள் வருவது நிற்கும்.",
+      "securityFindingsOff": "பாதுகாப்பு கண்டுபிடிப்புகளை அணைக்கவா? புதிய பாதுகாப்பு கண்டுபிடிப்புகள் பற்றிய அறிவிப்புகள் வருவது நிற்கும்.",
+      "hideBalanceOn": "உங்கள் இருப்புகளை மறைக்கவா? கிரெடிட் இருப்புகள் சுயவிவரத் திரைகளிலும் நிறுவன மையத்திலும் இனி காட்டப்படாது."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "ஒரு வழங்குநரை அணைத்தால் இந்த நிறுவனத்திற்கு Kilo அதற்கு வழிமாற்றுவதை நிறுத்தும்.",
     "providersNeedCatalog": "முழு மாடல் பட்டியல் ஏற்றப்படும் வரை வழங்குநர் ஸ்விட்சுகள் படிக்க மட்டுமே. அவற்றைத் திருத்த மேலே உள்ள மீண்டும் முயற்சிக்கவும் என்பதைத் தட்டவும்.",
     "providersEmpty": "இந்தத் தேடலுக்கு எந்த வழங்குநரும் பொருந்தவில்லை.",
+    "providersNone": "இந்த நிறுவனத்திற்கு எந்த வழங்குநரும் கிடைக்கவில்லை.",
     "allowAllShown": "காட்டப்பட்ட அனைத்தையும் அனுமதி",
     "denyAllShown": "காட்டப்பட்ட அனைத்தையும் மறு",
     "gatewaysDescription": "Kilo மாடல் கோரிக்கைகளை Vercel AI Gateway அல்லது OpenRouter வழியாக வழிமாற்றுகிறது. முடக்கப்பட்ட நுழைவாயில் அந்தக் கோரிக்கைகளைத் தோல்வியடையச் செய்யும்.",

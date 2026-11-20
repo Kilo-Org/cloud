@@ -3,7 +3,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createBrowserTabGroupController } from './browser-tab-groups';
-import type { BrowserTabGroupController } from './browser-tab-groups';
+import type {
+  BrowserTabGroupController,
+  BrowserTabGroupPersistence,
+  PersistedTabGroupSession,
+} from './browser-tab-groups';
 import { createTabLeaseRegistry } from './browser-tab-leases';
 import type { TabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
@@ -5421,6 +5425,108 @@ describe('agent browser calls', () => {
         toolName: 'browser_snapshot',
       })
     ).resolves.toMatchObject({ kind: 'result', result: { ok: false } });
+  });
+
+  it('serves a session from a restarted worker on the tab its group had', async () => {
+    // `storage.session` as both workers share it.
+    const store: { sessions?: PersistedTabGroupSession[] } = {};
+    const persistence: BrowserTabGroupPersistence = {
+      read: async () => store.sessions,
+      write: async sessions => {
+        store.sessions = [...sessions];
+      },
+    };
+    const groupsOfWorker = () =>
+      createBrowserTabGroupController({
+        api: { tabQuery: async () => [{ active: true, id: TAB_ID }] },
+        persistence,
+      });
+    const before = await createHarness({ share: false, tabGroups: groupsOfWorker() });
+    const first = createRuntimeBrowserBridge({ runtime: () => before.runtime });
+
+    await first.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await first.shareActiveTab({ controllerId: 'controller-1', sessionHandle: 'session-1' });
+    await vi.waitFor(() => {
+      expect(store.sessions?.[0]?.tabs).toStrictEqual([TAB_ID]);
+    });
+
+    // The worker stops: nothing in memory survives, storage.session does.
+    const after = await createHarness({ share: false, tabGroups: groupsOfWorker() });
+    const second = createRuntimeBrowserBridge({ runtime: () => after.runtime });
+    const snapshot = await second.callTool('controller-1', {
+      arguments: {},
+      authorized: [readGrant],
+      name: 'browser_snapshot',
+      sessionHandle: 'session-1',
+    });
+
+    expect(snapshot).toMatchObject({ content: [{ type: 'text' }] });
+    expect(after.runtime.listSessions()).toStrictEqual([
+      { ended: false, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ]);
+  });
+
+  it('restores a session without the tab that closed while no worker ran', async () => {
+    const stored: PersistedTabGroupSession[] = [
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID, 99], title: 'Work' },
+    ];
+    const tab: BrowserTabInfo = { id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` };
+    const { runtime } = await createHarness({
+      share: false,
+      tabGroups: createBrowserTabGroupController({
+        api: {},
+        persistence: { read: async () => stored, write: async () => {} },
+      }),
+      tabsApi: {
+        get: async tabId => {
+          if (tabId !== TAB_ID) {
+            throw new Error(`No tab with id: ${tabId}.`);
+          }
+
+          return tab;
+        },
+        query: async () => [tab],
+      },
+    });
+
+    await runtime.restoreSessions();
+
+    expect(runtime.listSessions()).toStrictEqual([
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ]);
+  });
+
+  it('reads the stored sessions again after a failed read', async () => {
+    const stored: PersistedTabGroupSession[] = [
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ];
+    let readable = false;
+    const tab: BrowserTabInfo = { id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` };
+    const { runtime } = await createHarness({
+      share: false,
+      tabGroups: createBrowserTabGroupController({
+        api: {},
+        persistence: {
+          read: () =>
+            readable ? Promise.resolve(stored) : Promise.reject(new Error('storage busy')),
+          write: async () => {},
+        },
+      }),
+      tabsApi: { get: async () => tab, query: async () => [tab] },
+    });
+
+    await runtime.restoreSessions();
+    expect(runtime.listSessions()).toStrictEqual([]);
+
+    readable = true;
+    await runtime.restoreSessions();
+    expect(runtime.listSessions()).toStrictEqual([
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ]);
   });
 
   it('drops console entries whose source is a withheld frame origin', async () => {

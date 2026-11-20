@@ -135,7 +135,9 @@ export function BitbucketOverview({
           title={t('prReview.connect.bitbucketNotConnectedTitle')}
           description={
             canConnect && readinessData
-              ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
+              ? t('codeReviewer.bitbucketConnect.descriptionOverview', {
+                  organization: organizationName,
+                })
               : t('codeReviewer.bitbucket.notConnectedReadOnly')
           }
           action={

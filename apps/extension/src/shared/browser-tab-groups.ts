@@ -70,13 +70,22 @@ export interface BrowserShareTabInput extends BrowserSessionRef {
 export interface BrowserTabGroupOpenResult {
   readonly groupId?: number | undefined;
 }
-export interface BrowserShareTabResult {
-  readonly groupId?: number | undefined;
-  readonly tabId: number;
-}
+/** `shareActiveTab`'s outcome; only `shared` grouped and recorded the tab. */
+export type BrowserShareTabResult =
+  | { readonly kind: 'shared'; readonly groupId?: number | undefined; readonly tabId: number }
+  /** The browser reported no active tab. */
+  | { readonly kind: 'no_tab' }
+  /** The tab is in another live session's reach (D9). */
+  | { readonly kind: 'held'; readonly tabId: number }
+  | { readonly kind: 'no_session' };
+/** `adoptEnded`'s outcome: `kept` is a session that already owns tabs, `none` means nothing had ended. */
+export type BrowserTabGroupAdoptResult =
+  | { readonly groupId?: number | undefined; readonly kind: 'adopted' }
+  | { readonly kind: 'kept' }
+  | { readonly kind: 'none' };
 
 export interface BrowserTabGroupController {
-  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupOpenResult>;
+  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupAdoptResult>;
   readonly closeSession: (input: BrowserSessionRef) => Promise<void>;
   readonly isTabAllowed: (sessionHandle: string, tabId: number) => boolean;
   readonly listSessions: () => BrowserTabGroupSessionSummary[];
@@ -293,7 +302,13 @@ export const createBrowserTabGroupController = ({
     persist();
     return created;
   };
+  /** A tab sits in one group at a time: joining this session's group takes it out of every other session's record. */
   const recordTab = (session: SessionState, tabId: number): void => {
+    for (const other of sessions.values()) {
+      if (other !== session) {
+        other.tabs = other.tabs.filter(id => id !== tabId);
+      }
+    }
     if (!session.tabs.includes(tabId)) {
       session.tabs.push(tabId);
       persist();
@@ -426,7 +441,7 @@ export const createBrowserTabGroupController = ({
    */
   const adoptEnded = async ({
     sessionHandle,
-  }: BrowserSessionRef): Promise<BrowserTabGroupOpenResult> => {
+  }: BrowserSessionRef): Promise<BrowserTabGroupAdoptResult> => {
     const ended = [...sessions.values()].filter(session => session.ended);
     const adopted = ended.reduce<SessionState | undefined>(
       (best, session) =>
@@ -435,9 +450,12 @@ export const createBrowserTabGroupController = ({
     );
     const existing = sessions.get(sessionHandle);
 
-    if (adopted === undefined || (existing !== undefined && existing.tabs.length > 0)) {
+    if (existing !== undefined && existing.tabs.length > 0) {
+      return { kind: 'kept' };
+    }
+    if (adopted === undefined) {
       ensureSession(sessionHandle);
-      return {};
+      return { kind: 'none' };
     }
 
     // The group outlives its session's handle: re-key it to the caller, or the caller could not reach a single tab in it.
@@ -448,33 +466,38 @@ export const createBrowserTabGroupController = ({
     delete adopted.endedAt;
     persist();
     if (adopted.groupId === undefined) {
-      return {};
+      return { kind: 'adopted' };
     }
     // `update` cannot clear a colour, so the collapsed state alone reports "live".
     await updateGroup(adopted.groupId, {
       collapsed: false,
       title: browserTabGroupTitle(adopted.title),
     });
-    return { groupId: adopted.groupId };
+    return { groupId: adopted.groupId, kind: 'adopted' };
   };
 
   const shareActiveTab = async (input: BrowserShareTabInput): Promise<BrowserShareTabResult> => {
     const session = sessions.get(input.sessionHandle);
     const resolved = input.tabId ?? (await activeTabId());
-    // 0 is not a tab id: no tab was known, so nothing was grouped or recorded.
     if (resolved === undefined) {
-      return session?.groupId === undefined ? { tabId: 0 } : { groupId: session.groupId, tabId: 0 };
+      return { kind: 'no_tab' };
     }
     if (session === undefined) {
-      return { tabId: resolved };
+      return { kind: 'no_session' };
+    }
+    // `/browser share` names no tab: the user's active tab must not reach into another live session's group (D9).
+    // A tab the runtime names itself (a session's new tab, a popup of its own tab) is the caller's already.
+    const holder = input.tabId === undefined ? sessionForTab(resolved) : undefined;
+    if (holder !== undefined && holder !== input.sessionHandle) {
+      return { kind: 'held', tabId: resolved };
     }
     recordTab(session, resolved);
     if (api.group !== undefined) {
       await groupTab(session, resolved);
     }
     return session.groupId === undefined
-      ? { tabId: resolved }
-      : { groupId: session.groupId, tabId: resolved };
+      ? { kind: 'shared', tabId: resolved }
+      : { groupId: session.groupId, kind: 'shared', tabId: resolved };
   };
 
   const tabsForSession = (sessionHandle: string): number[] => {

@@ -318,6 +318,15 @@ type ScreenHeaderProps = {
    */
   inlineActionsWidth?: number;
   /**
+   * Width, in dp, of the fixed-size parts inside a pinned `inlineActions`
+   * cluster (`allowInlineActionsStacking={false}`): an icon button beside the
+   * account picker, and the picker's own chevron. The pinned slot gives way
+   * before the title, so without this floor a large font scale could shrink it
+   * below a part that cannot shrink, and that part would paint past the
+   * header's edge. Omit it for a cluster whose every part truncates.
+   */
+  inlineActionsMinWidth?: number;
+  /**
    * Keep the `inlineActions` cluster on the title row even when the shared-row
    * check would reflow it. That check reserves a readable title, and the home
    * header's heading is a fixed 40dp mark with no text, so the reserve does not
@@ -461,6 +470,7 @@ export function ScreenHeader({
   headerRightShrinks = false,
   inlineActions,
   inlineActionsWidth,
+  inlineActionsMinWidth,
   allowInlineActionsStacking = true,
   modal,
   modalTopInset = 'android-window-top',
@@ -507,6 +517,13 @@ export function ScreenHeader({
       titleMinWidth,
       contentInset,
     });
+  // A caller that turns the reflow off keeps its inline controls beside the
+  // title on every window, so on that row the title is the primary text and the
+  // controls (a tab root's account picker) are secondary: they truncate first,
+  // and the title keeps its own width until the controls have nothing left to
+  // give. The heading then sits on its content's basis instead of a zero one
+  // (see `inlineActionsSlot`).
+  const pinnedInlineActions = inlineActions != null && !allowInlineActionsStacking;
 
   // Which of the heading's lines the header paints, which decides whether the
   // header centres a leading spacer opposite the back control.
@@ -799,7 +816,7 @@ export function ScreenHeader({
   const titleRow = (
     <View className={titleBandClass}>
       {backControl}
-      <View className="min-w-0 flex-1">{titleNode}</View>
+      <View className={cn('min-w-0', pinnedInlineActions ? 'shrink' : 'flex-1')}>{titleNode}</View>
     </View>
   );
   // The heading is one block on the 14dp page gutter. Inside it every line
@@ -808,7 +825,9 @@ export function ScreenHeader({
   // column, so the block needs no surface of its own. The eyebrow and subtitle
   // rows keep the control's column as a spacer without the band's height, so
   // the band's extra space stays on the title's line alone.
-  const headingBlockClassName = 'min-w-0 flex-1 justify-center';
+  const headingBlockClassName = pinnedInlineActions
+    ? 'min-w-0 grow shrink justify-center'
+    : 'min-w-0 flex-1 justify-center';
   const titledHeading = (
     <View className={headingBlockClassName}>
       {eyebrowSlot ? (
@@ -962,16 +981,24 @@ export function ScreenHeader({
   // "TRENUTAČNO AKTIVNO" / "PRETHODNE SESIJE" beside the filter) stays legible
   // instead of squeezing the 30px title into a mid-word break.
   //
-  // A caller that turns the reflow off has to cap the slot instead: the heading
-  // is `flex-1` over a zero basis, so an unbounded trailing cluster resolves
-  // all negative free space on itself and leaves the heading at zero width,
-  // where a fixed-size child such as the Home mark paints under the cluster.
-  // The half-row cap is the same one `headerRightShrinks` uses; with it the
-  // free space can never go negative, so the heading always keeps its share.
+  // A caller that turns the reflow off has to cap the slot instead: the half-row
+  // cap is the same one `headerRightShrinks` uses, so a fixed-size heading such
+  // as the Home mark always keeps the other half. Within the cap the controls
+  // give way first. The heading sits on its content's basis, and Yoga splits a
+  // shortfall by shrink factor times basis, so the slot's 100x factor takes
+  // nearly all of it: a long account name ends in an ellipsis while "Chat" and
+  // its BETA pill keep their width. The slot never gives way below the fixed
+  // controls the caller declares (`inlineActionsMinWidth`); past that floor the
+  // title truncates instead.
   const inlineActionsSlot =
     inlineActions && !stackInlineActions ? (
       <View
-        className={cn('ms-3 min-w-0 shrink', !allowInlineActionsStacking && 'max-w-[50%]')}
+        className={cn('ms-3 min-w-0', pinnedInlineActions ? 'max-w-[50%] shrink-[100]' : 'shrink')}
+        style={
+          pinnedInlineActions && inlineActionsMinWidth !== undefined
+            ? { minWidth: inlineActionsMinWidth }
+            : undefined
+        }
         onLayout={onInlineActionsLayout}
       >
         {inlineActions}

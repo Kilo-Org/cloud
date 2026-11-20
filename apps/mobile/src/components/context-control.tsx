@@ -27,6 +27,15 @@ import { cn } from '@/lib/utils';
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
 
 /**
+ * The width, in dp, the inline control never gives up: its trailing glyph box
+ * (`size-5`, 17.5 dp at the 14 dp rem) and the row's `gap-1` (3.5 dp). The
+ * label truncates; this part cannot. A header that pins the control beside its
+ * title floors the slot by it (`ScreenHeader` `inlineActionsMinWidth`), so the
+ * chevron never paints outside the slot.
+ */
+export const CONTEXT_CONTROL_INLINE_MIN_DP = 21;
+
+/**
  * The caller supplies its cached memberships; the picker does not fetch data.
  * Returns the opener for its control: the picker is the shared
  * `/context-picker` formSheet route, so every surface presents the same sheet

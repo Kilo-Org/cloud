@@ -159,7 +159,7 @@ type KiloPassCaller = {
       | 'kilo_pass_not_sold_in_app'
       | 'unsupported_combination'
       | null;
-    cta: { label: string | null; action: 'none' | 'open_web' | 'open_native' };
+    cta: { label: string | null; action: 'none' | 'open_web' };
     webUrl: string | null;
     program: string | null;
   }>;

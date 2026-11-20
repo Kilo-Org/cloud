@@ -169,13 +169,7 @@ export async function consumeDataExportDownloadCode(challengeId: string): Promis
   await db
     .update(magic_link_tokens)
     .set({ consumed_at: sql`NOW()`, reserved_until: null })
-    .where(
-      and(
-        eq(magic_link_tokens.challenge_id, challengeId),
-        eq(magic_link_tokens.purpose, DOWNLOAD_CODE_PURPOSE),
-        isNull(magic_link_tokens.consumed_at)
-      )
-    );
+    .where(and(challengeFilter(challengeId), isNull(magic_link_tokens.consumed_at)));
 }
 
 /**
@@ -186,25 +180,12 @@ export async function releaseDataExportDownloadCode(challengeId: string): Promis
   await db
     .update(magic_link_tokens)
     .set({ reserved_until: null })
-    .where(
-      and(
-        eq(magic_link_tokens.challenge_id, challengeId),
-        eq(magic_link_tokens.purpose, DOWNLOAD_CODE_PURPOSE),
-        isNull(magic_link_tokens.consumed_at)
-      )
-    );
+    .where(and(challengeFilter(challengeId), isNull(magic_link_tokens.consumed_at)));
 }
 
 /** Drop a freshly minted code when its email could not be delivered. */
 export async function deleteDataExportDownloadCode(challengeId: string): Promise<void> {
-  await db
-    .delete(magic_link_tokens)
-    .where(
-      and(
-        eq(magic_link_tokens.challenge_id, challengeId),
-        eq(magic_link_tokens.purpose, DOWNLOAD_CODE_PURPOSE)
-      )
-    );
+  await db.delete(magic_link_tokens).where(challengeFilter(challengeId));
 }
 
 export const __test__ = {

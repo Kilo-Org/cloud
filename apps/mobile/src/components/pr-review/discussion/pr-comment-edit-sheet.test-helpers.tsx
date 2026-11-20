@@ -53,9 +53,10 @@ export function saveButton(renderer: ReactTestRenderer): ReactTestInstance {
   return buttonByText(renderer, i18n.t('common.save'));
 }
 
-export function pressCancel(renderer: ReactTestRenderer): void {
+/** The sheet's one way out: the header close. */
+export function pressClose(renderer: ReactTestRenderer): void {
   act(() => {
-    (buttonByText(renderer, i18n.t('common.cancel')).props.onPress as () => void)();
+    (renderer.root.findByType('PrFormSheetHeader').props.onBack as () => void)();
   });
 }
 

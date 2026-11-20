@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
+/* eslint-disable max-lines, typescript-eslint/consistent-type-definitions -- One storage record holds the controllers, the refused controllers and the stopped handles, and every write must keep all three; AGENTS.md prefers type over interface. */
 import { z } from 'zod';
 import type { LocalAgentTransport } from './envelope';
 import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
@@ -13,7 +13,10 @@ import type { LocalAgentStorageArea } from './storage';
  */
 
 export const LOCAL_AGENT_CONTROLLERS_STORAGE_KEY = 'session:kiloLocalAgentControllers';
-
+/** Enough disconnected controllers for every CLI the user could have running at once. */
+const REVOKED_CONTROLLER_LIMIT = 64;
+/** What a disconnected controller's calls answer, with the `user_stopped` code. */
+export const LOCAL_AGENT_DISCONNECTED_MESSAGE = 'The user disconnected this agent.';
 /** Enough stopped handles to answer a CLI that raced its own revoke, and nothing more. */
 const STOPPED_SESSION_LIMIT = 256;
 
@@ -54,26 +57,36 @@ const controllerSchema = z.object({
 export const localAgentControllersSchema = z
   .object({
     controllers: z.array(controllerSchema).default([]),
-    /** Handles a Stop all or a switch-off ended, oldest first. */
+    /* Controllers the user disconnected. The hub announces them again after every
+       reconnect, so they stay refused until their CLI connection ends. */
+    revoked: z.array(z.uuid()).default([]),
+    /** Handles a Stop all, a switch-off or a Disconnect ended, oldest first. */
     stopped: z.array(z.string()).default([]),
   })
   .strip();
-
-type LocalAgentControllersState = z.infer<typeof localAgentControllersSchema>;
 
 export type LocalAgentSession = z.infer<typeof sessionSchema>;
 
 export type LocalAgentController = z.infer<typeof controllerSchema>;
 
+type LocalAgentRegistryState = z.infer<typeof localAgentControllersSchema>;
+
 export type LocalAgentControllerRegistry = {
   listControllers(): Promise<LocalAgentController[]>;
   listConnectedAgents(): Promise<LocalAgentConnectedAgent[]>;
+  /** False, and nothing recorded, for a controller the user disconnected. */
   registerController(input: {
     controllerId: string;
     transport: LocalAgentTransport;
     hubId?: string;
-  }): Promise<void>;
+  }): Promise<boolean>;
+  /** The controller's CLI connection ended: its row goes, and so does any refusal. */
   removeController(controllerId: string): Promise<LocalAgentController | null>;
+  /**
+   * The user disconnected the controller: its row goes, it is refused from now
+   * on, and its sessions' handles are remembered as stopped by the user.
+   */
+  revokeController(controllerId: string): Promise<LocalAgentController | null>;
   openSession(
     controllerId: string,
     input: LocalAgentSessionInput
@@ -86,22 +99,30 @@ export type LocalAgentControllerRegistry = {
    * stopped by the user, and reports what was revoked.
    */
   takeAllSessions(): Promise<{ controllerId: string; sessionHandle: string }[]>;
-  /** Whether a Stop all or a switch-off ended this handle. */
+  /** Whether a Stop all, a switch-off or a Disconnect ended this handle; false when storage cannot be read. */
   wasStopped(sessionHandle: string): Promise<boolean>;
 };
 
-const loadState = async (storage: LocalAgentStorageArea): Promise<LocalAgentControllersState> => {
+const loadRegistryState = async (
+  storage: LocalAgentStorageArea
+): Promise<LocalAgentRegistryState> => {
   const parsed = localAgentControllersSchema.safeParse(
     await storage.getItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY)
   );
 
-  return parsed.success ? parsed.data : { controllers: [], stopped: [] };
+  return parsed.success ? parsed.data : { controllers: [], revoked: [], stopped: [] };
 };
+
+const withStopped = (
+  stopped: readonly string[],
+  sessions: readonly { readonly sessionHandle: string }[]
+): string[] =>
+  [...stopped, ...sessions.map(session => session.sessionHandle)].slice(-STOPPED_SESSION_LIMIT);
 
 export const loadLocalAgentControllers = async (
   storage: LocalAgentStorageArea
 ): Promise<LocalAgentController[]> => {
-  const { controllers } = await loadState(storage);
+  const { controllers } = await loadRegistryState(storage);
 
   return controllers;
 };
@@ -146,21 +167,34 @@ export const createLocalAgentControllerRegistry = ({
 }): LocalAgentControllerRegistry => {
   const runExclusive = createSerialTaskQueue();
 
-  const readControllers = (): Promise<LocalAgentController[]> => loadLocalAgentControllers(storage);
-
-  const writeControllers = async (controllers: LocalAgentController[]): Promise<void> => {
-    const { stopped } = await loadState(storage);
-
-    await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, { controllers, stopped });
+  const writeState = async (state: LocalAgentRegistryState): Promise<void> => {
+    await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, state);
   };
 
-  const listControllers = (): Promise<LocalAgentController[]> => readControllers();
+  /**
+   * Drops the controller's row; `refuse` keeps it out until its CLI connection
+   * ends and remembers its sessions as stopped by the user.
+   */
+  const dropController = (controllerId: string, refuse: boolean) =>
+    runExclusive(async () => {
+      const state = await loadRegistryState(storage);
+      const removed = state.controllers.find(entry => entry.controllerId === controllerId) ?? null;
+      const revoked = state.revoked.filter(entry => entry !== controllerId);
+
+      await writeState({
+        controllers: state.controllers.filter(entry => entry.controllerId !== controllerId),
+        revoked: refuse ? [...revoked, controllerId].slice(-REVOKED_CONTROLLER_LIMIT) : revoked,
+        stopped: refuse ? withStopped(state.stopped, removed?.sessions ?? []) : state.stopped,
+      });
+
+      return removed;
+    });
 
   return {
     closeSession: (controllerId, sessionHandle) =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const controller = controllers.find(entry => entry.controllerId === controllerId);
+        const state = await loadRegistryState(storage);
+        const controller = state.controllers.find(entry => entry.controllerId === controllerId);
         const remaining = controller?.sessions.filter(
           session => session.sessionHandle !== sessionHandle
         );
@@ -172,51 +206,63 @@ export const createLocalAgentControllerRegistry = ({
         const closed = remaining.length !== controller.sessions.length;
 
         if (closed) {
-          await writeControllers(
-            controllers.map(entry =>
+          await writeState({
+            ...state,
+            controllers: state.controllers.map(entry =>
               entry.controllerId === controllerId ? replaceSessions(entry, remaining) : entry
-            )
-          );
+            ),
+          });
         }
 
         return closed;
       }),
 
-    listConnectedAgents: async () => connectedAgentsOf(await readControllers()),
+    listConnectedAgents: async () => connectedAgentsOf(await loadLocalAgentControllers(storage)),
 
-    listControllers,
+    listControllers: () => loadLocalAgentControllers(storage),
 
     openSession: (controllerId, input) =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const controller = controllers.find(entry => entry.controllerId === controllerId);
+        const state = await loadRegistryState(storage);
+        const controller = state.controllers.find(entry => entry.controllerId === controllerId);
 
         if (controller === undefined) {
-          throw new LocalAgentRpcError(
-            LOCAL_AGENT_ERROR_CODES.blocked,
-            'This controller is not connected.'
-          );
+          throw state.revoked.includes(controllerId)
+            ? new LocalAgentRpcError(
+                LOCAL_AGENT_ERROR_CODES.userStopped,
+                LOCAL_AGENT_DISCONNECTED_MESSAGE
+              )
+            : new LocalAgentRpcError(
+                LOCAL_AGENT_ERROR_CODES.blocked,
+                'This controller is not connected.'
+              );
         }
 
         const sessionHandle = createHandle();
-        await writeControllers(
-          controllers.map(entry =>
+        await writeState({
+          ...state,
+          controllers: state.controllers.map(entry =>
             entry.controllerId === controllerId
               ? replaceSessions(entry, [
                   ...entry.sessions,
                   { ...input, openedAt: now(), sessionHandle },
                 ])
               : entry
-          )
-        );
+          ),
+        });
 
         return { sessionHandle };
       }),
 
     registerController: input =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const existing = controllers.find(entry => entry.controllerId === input.controllerId);
+        const state = await loadRegistryState(storage);
+
+        if (state.revoked.includes(input.controllerId)) {
+          return false;
+        }
+
+        const existing = state.controllers.find(entry => entry.controllerId === input.controllerId);
         const next: LocalAgentController = existing ?? {
           connectedAt: now(),
           controllerId: input.controllerId,
@@ -225,29 +271,24 @@ export const createLocalAgentControllerRegistry = ({
           ...(input.hubId === undefined ? {} : { hubId: input.hubId }),
         };
 
-        await writeControllers([
-          ...controllers.filter(entry => entry.controllerId !== input.controllerId),
-          next,
-        ]);
+        await writeState({
+          ...state,
+          controllers: [
+            ...state.controllers.filter(entry => entry.controllerId !== input.controllerId),
+            next,
+          ],
+        });
+
+        return true;
       }),
 
-    removeController: controllerId =>
-      runExclusive(async () => {
-        const controllers = await readControllers();
-        const removed = controllers.find(entry => entry.controllerId === controllerId);
+    removeController: controllerId => dropController(controllerId, false),
 
-        if (removed === undefined) {
-          return null;
-        }
-
-        await writeControllers(controllers.filter(entry => entry.controllerId !== controllerId));
-
-        return removed;
-      }),
+    revokeController: controllerId => dropController(controllerId, true),
 
     sessionOwner: sessionHandle =>
       runExclusive(async () => {
-        const controllers = await readControllers();
+        const controllers = await loadLocalAgentControllers(storage);
 
         return controllers.find(controller =>
           controller.sessions.some(session => session.sessionHandle === sessionHandle)
@@ -256,7 +297,7 @@ export const createLocalAgentControllerRegistry = ({
 
     takeAllSessions: () =>
       runExclusive(async () => {
-        const state = await loadState(storage);
+        const state = await loadRegistryState(storage);
         const revoked = state.controllers.flatMap(controller =>
           controller.sessions.map(session => ({
             controllerId: controller.controllerId,
@@ -264,21 +305,25 @@ export const createLocalAgentControllerRegistry = ({
           }))
         );
 
-        await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, {
+        await writeState({
+          ...state,
           controllers: [],
-          stopped: [...state.stopped, ...revoked.map(entry => entry.sessionHandle)].slice(
-            -STOPPED_SESSION_LIMIT
-          ),
-        } satisfies LocalAgentControllersState);
+          stopped: withStopped(state.stopped, revoked),
+        });
 
         return revoked;
       }),
 
     wasStopped: sessionHandle =>
       runExclusive(async () => {
-        const { stopped } = await loadState(storage);
+        // Every request asks this first: storage trouble must not turn every agent call into an internal error.
+        try {
+          const { stopped } = await loadRegistryState(storage);
 
-        return stopped.includes(sessionHandle);
+          return stopped.includes(sessionHandle);
+        } catch {
+          return false;
+        }
       }),
   };
 };

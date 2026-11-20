@@ -9,6 +9,7 @@ import {
   glanceableAgentsSnapshotSchema,
   glanceableStatusKind,
   isEligibleGlanceableWork,
+  isIdleOnlyGlanceableWork,
   isStartableGlanceableWork,
   newestGlanceableResult,
   oldestNeedsInputSince,
@@ -563,6 +564,26 @@ describe('isEligibleGlanceableWork and revision discard', () => {
     expect(unparseable.revision).toBe(current.revision);
     expect(shouldDiscardGlanceableRevision(unparseable, current)).toBe(false);
     expect(shouldDiscardGlanceableRevision(current, unparseable)).toBe(true);
+  });
+});
+
+describe('isIdleOnlyGlanceableWork', () => {
+  // The predicate takes the counts shape, so a caller holding only counts (the
+  // followed-session counts, for example) states the rule without building a
+  // snapshot. Idle work keeps a card alive; nothing else may raise one.
+  it('reads idle-only from a bare counts object', () => {
+    expect(isIdleOnlyGlanceableWork({ running: 0, needsInput: 0, idle: 2, scheduled: 0 })).toBe(
+      true
+    );
+    expect(isIdleOnlyGlanceableWork({ running: 1, needsInput: 0, idle: 2, scheduled: 0 })).toBe(
+      false
+    );
+    expect(isIdleOnlyGlanceableWork({ running: 0, needsInput: 0, idle: 0, scheduled: 1 })).toBe(
+      false
+    );
+    expect(isIdleOnlyGlanceableWork({ running: 0, needsInput: 0, idle: 0, scheduled: 0 })).toBe(
+      false
+    );
   });
 });
 

@@ -24,6 +24,7 @@ import {
 import { useAuth } from '@/lib/auth/auth-context';
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 import { fenceActiveSessionsQuery } from '@/lib/query-client';
 
 /** The interval the repo shipped before the poll moved out of React Query. */
@@ -265,7 +266,15 @@ export function useActiveSessionsFloorPoll({
         // The floor poll must never blank or error a list it did not fetch:
         // the initial fetch and the pull-to-refresh path own those states. An
         // abort is this hook's own cleanup, not a failure worth reporting.
-        if (__DEV__ && !controller.signal.aborted) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        // The poll runs outside React Query, so the query cache never sees
+        // its failure. A refused session credential still goes to the one
+        // auth handler, which refreshes the token or ends the session, as a
+        // 401 on any query does.
+        void handleTrpcQueryError(error);
+        if (__DEV__) {
           // eslint-disable-next-line no-console -- dev-only visibility for a swallowed poll failure
           console.warn('[active-sessions] floor poll failed', error);
         }

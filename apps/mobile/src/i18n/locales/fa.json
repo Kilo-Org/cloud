@@ -7,7 +7,7 @@
     "directory": "پوشهٔ کاری",
     "createSession": "ایجاد نشست نیتیو",
     "queueIfOffline": "قرار دادن پرامپت در صف اگر میزبان آفلاین است",
-    "prompt": "پرامپت یا /command",
+    "prompt": "پرامپت یا \u2066/command\u2069",
     "localClear": "پاک کردن نمای محلی",
     "abort": "لغو نوبت",
     "failed": "عملیات دسترسی از راه دور نیتیو ناموفق بود",
@@ -19,7 +19,9 @@
     "presenceStatus": "میزبان‌ها: {{connection}}",
     "commandStatus": "تحویل فرمان: {{status}}",
     "delivered": "تحویل داده شد",
-    "expired": "منقضی شد"
+    "expired": "منقضی شد",
+    "recoveryGaps_one": "{{displayCount}} بخش از این رونوشت موجود نیست.",
+    "recoveryGaps_other": "{{displayCount}} بخش از این رونوشت موجود نیست."
   },
   "common": {
     "manageOnWeb": "مدیریت در وب",
@@ -963,6 +965,8 @@
       "pendingComment": "نظر در انتظار ارسال",
       "pendingComment_other": "نظر در انتظار ارسال",
       "submitCountOfTotal": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
+      "submitCountOfTotal_one": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
+      "submitCountOfTotal_other": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
       "submitReview": "ارسال بازبینی",
       "partialPostedFresh": "{{displayFreshCount}} نظر ارسال شد. ",
       "partialPostedFresh_one": "{{displayFreshCount}} نظر ارسال شد. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "انتخاب مدل",
       "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست.",
+      "allUnavailableTitle": "هیچ مدلی قابل استفاده نیست",
+      "allUnavailableDescription": "یک کلید ارائه‌دهنده اضافه کنید، سپس دوباره تلاش کنید.",
       "favorites": "موارد دلخواه"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "تغییر نام سازمان",
-      "renamePlaceholder": "نام سازمان",
+      "renamePlaceholder": "نام سازمان را وارد کنید",
       "balance": "موجودی",
       "plan": "طرح",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "با خاموش کردن یک ارائه‌دهنده، Kilo دیگر درخواست‌های این سازمان را به آن هدایت نمی‌کند.",
     "providersNeedCatalog": "کلیدهای ارائه‌دهنده تا زمانی که فهرست کامل مدل‌ها بارگیری نشود فقط‌خواندنی می‌مانند. برای ویرایش آن‌ها، روی تلاش مجدد در بالا ضربه بزنید.",
     "providersEmpty": "هیچ ارائه‌دهنده‌ای با این جست‌وجو مطابقت ندارد.",
+    "providersNone": "هیچ ارائه‌دهنده‌ای برای این سازمان در دسترس نیست.",
     "allowAllShown": "مجاز کردن همه موارد نمایش‌داده‌شده",
     "denyAllShown": "ممنوع کردن همه موارد نمایش‌داده‌شده",
     "gatewaysDescription": "Kilo درخواست‌های مدل را از طریق Vercel AI Gateway یا OpenRouter هدایت می‌کند. اگر درگاهی غیرفعال باشد، این درخواست‌ها ناموفق می‌شوند.",

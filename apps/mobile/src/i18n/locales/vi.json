@@ -19,7 +19,9 @@
     "presenceStatus": "Máy chủ: {{connection}}",
     "commandStatus": "Trạng thái gửi lệnh: {{status}}",
     "delivered": "Đã gửi đến nơi",
-    "expired": "Đã hết hạn"
+    "expired": "Đã hết hạn",
+    "recoveryGaps_one": "Thiếu {{displayCount}} phần của bản ghi này.",
+    "recoveryGaps_other": "Thiếu {{displayCount}} phần của bản ghi này."
   },
   "common": {
     "manageOnWeb": "Quản lý trên web",
@@ -2231,6 +2233,8 @@
     "modelPicker": {
       "title": "Chọn mô hình",
       "noModelsDescription": "Không có mô hình nào để chọn.",
+      "allUnavailableTitle": "Không có mô hình nào dùng được",
+      "allUnavailableDescription": "Thêm khóa nhà cung cấp rồi thử lại.",
       "favorites": "Mục yêu thích"
     },
     "modelSelector": {
@@ -3234,6 +3238,8 @@
       "partialPostedStale_one": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
       "partialPostedStale_other": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
       "submitCountOfTotal": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
+      "submitCountOfTotal_one": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
+      "submitCountOfTotal_other": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
       "submitReview": "Gửi kết quả rà soát",
       "blockedRequestChanges": "Thêm tóm tắt hoặc ít nhất một bình luận để yêu cầu thay đổi.",
       "blockedComment": "Thêm tóm tắt hoặc ít nhất một bình luận để gửi bản đánh giá dưới dạng bình luận."
@@ -3443,7 +3449,7 @@
       "planStatusLapsed": " · Đã kết thúc",
       "planEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động.",
       "manageBilling": "Quản lý thanh toán",
-      "renamePlaceholder": "Tên tổ chức",
+      "renamePlaceholder": "Nhập tên tổ chức",
       "renameTitle": "Đổi tên tổ chức"
     },
     "inviteMember": {
@@ -4987,6 +4993,7 @@
     "providersDescription": "Tắt một nhà cung cấp để ngăn Kilo định tuyến đến nhà cung cấp đó cho tổ chức này.",
     "providersNeedCatalog": "Các công tắc nhà cung cấp sẽ ở chế độ chỉ đọc cho đến khi danh mục mô hình đầy đủ được tải. Nhấn Thử lại ở trên để chỉnh sửa.",
     "providersEmpty": "Không có nhà cung cấp nào khớp với tìm kiếm này.",
+    "providersNone": "Không có nhà cung cấp nào khả dụng cho tổ chức này.",
     "allowAllShown": "Cho phép tất cả mục đang hiển thị",
     "denyAllShown": "Từ chối tất cả mục đang hiển thị",
     "gatewaysDescription": "Kilo định tuyến yêu cầu mô hình qua Vercel AI Gateway hoặc OpenRouter. Cổng kết nối bị tắt sẽ làm các yêu cầu đó thất bại.",

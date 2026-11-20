@@ -19,7 +19,9 @@
     "presenceStatus": "Abasingathi: {{connection}}",
     "commandStatus": "Ukulethwa komyalo: {{status}}",
     "delivered": "Kulethiwe",
-    "expired": "Kuphelelwe yisikhathi"
+    "expired": "Kuphelelwe yisikhathi",
+    "recoveryGaps_one": "Ingxenye {{displayCount}} yalo mbhalo ilahlekile.",
+    "recoveryGaps_other": "Izingxenye {{displayCount}} zalo mbhalo zilahlekile."
   },
   "common": {
     "manageOnWeb": "Phatha kuwebhu",
@@ -963,6 +965,8 @@
       "pendingComment": "amazwana angakathunyelwa",
       "pendingComment_other": "amazwana angakathunyelwa",
       "submitCountOfTotal": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
+      "submitCountOfTotal_one": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
+      "submitCountOfTotal_other": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
       "submitReview": "Thumela umbiko wokuhlola",
       "partialPostedFresh": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",
       "partialPostedFresh_one": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Khetha imodeli",
       "noModelsDescription": "Awekho amamodeli ongawakhetha.",
+      "allUnavailableTitle": "Awekho amamodeli angasetshenziswa",
+      "allUnavailableDescription": "Engeza ukhiye womhlinzeki bese uzama futhi.",
       "favorites": "Okuthandwayo"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Qamba kabusha inhlangano",
-      "renamePlaceholder": "Igama lenhlangano",
+      "renamePlaceholder": "Faka igama lenhlangano",
       "balance": "Ibhalansi",
       "plan": "Uhlelo",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Cisha umhlinzeki ukuze uvimbe i-Kilo ekudluliseleni izicelo kuwo kule nhlangano.",
     "providersNeedCatalog": "Amaswishi abahlinzeki ahlala engokufunda kuphela kuze kulayishwe ikhathalogi ephelele yamamodeli. Thepha Zama futhi ngenhla ukuze uwahlele.",
     "providersEmpty": "Abekho abahlinzeki abahambisana nalokhu kusesha.",
+    "providersNone": "Akukho bahlinzeki abatholakalayo kule nhlangano.",
     "allowAllShown": "Vumela konke okubonisiwe",
     "denyAllShown": "Nqaba konke okubonisiwe",
     "gatewaysDescription": "I-Kilo idlulisela izicelo zamamodeli nge-Vercel AI Gateway noma nge-OpenRouter. Isango elikhutshaziwe lehluleka lezo zicelo.",

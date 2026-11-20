@@ -19,7 +19,12 @@
     "presenceStatus": "Óstaigh: {{connection}}",
     "commandStatus": "Seachadadh an ordaithe: {{status}}",
     "delivered": "Seachadta",
-    "expired": "Imithe in éag"
+    "expired": "Imithe in éag",
+    "recoveryGaps_one": "Tá {{displayCount}} chuid den tras-scríobh seo ar iarraidh.",
+    "recoveryGaps_two": "Tá {{displayCount}} chuid den tras-scríobh seo ar iarraidh.",
+    "recoveryGaps_few": "Tá {{displayCount}} chuid den tras-scríobh seo ar iarraidh.",
+    "recoveryGaps_many": "Tá {{displayCount}} gcuid den tras-scríobh seo ar iarraidh.",
+    "recoveryGaps_other": "Tá {{displayCount}} cuid den tras-scríobh seo ar iarraidh."
   },
   "common": {
     "manageOnWeb": "Bainistigh ar an ngréasán",
@@ -1014,6 +1019,11 @@
       "pendingComment": "trácht ar feitheamh",
       "pendingComment_other": "trácht ar feitheamh",
       "submitCountOfTotal": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_one": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_two": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_few": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_many": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
+      "submitCountOfTotal_other": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
       "submitReview": "Seol an t-athbhreithniú",
       "partialPostedFresh": "Líon na dtráchtanna a postáladh: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Líon na dtráchtanna a postáladh: {{displayFreshCount}}. ",
@@ -2938,6 +2948,8 @@
     "modelPicker": {
       "title": "Roghnaigh samhail",
       "noModelsDescription": "Níl aon samhail ar fáil le roghnú.",
+      "allUnavailableTitle": "Ní féidir aon samhail a úsáid",
+      "allUnavailableDescription": "Cuir eochair soláthraí leis, ansin bain triail as arís.",
       "favorites": "Cinn is fearr leat"
     },
     "modelSelector": {
@@ -3801,7 +3813,7 @@
     },
     "hub": {
       "renameTitle": "Athainmnigh an eagraíocht",
-      "renamePlaceholder": "Ainm na heagraíochta",
+      "renamePlaceholder": "Cuir isteach ainm eagraíochta",
       "balance": "Iarmhéid",
       "plan": "Plean",
       "planTeams": "Teams",
@@ -5215,6 +5227,7 @@
     "providersDescription": "Múch soláthraí chun Kilo a stopadh ó ródú chuige don eagraíocht seo.",
     "providersNeedCatalog": "Fanann lasca na soláthraithe inléite amháin go dtí go lódálfar an catalóg iomlán samhlacha. Bain triail eile as thuas chun iad a chur in eagar.",
     "providersEmpty": "Níl aon soláthraí ag teacht leis an gcuardach seo.",
+    "providersNone": "Níl aon soláthraí ar fáil don eagraíocht seo.",
     "allowAllShown": "Ceadaigh gach rud atá le feiceáil",
     "denyAllShown": "Diúltaigh do gach rud atá le feiceáil",
     "gatewaysDescription": "Ródálann Kilo iarratais samhla trí Vercel AI Gateway nó OpenRouter. Teipeann geata atá múchta ar na hiarratais sin.",

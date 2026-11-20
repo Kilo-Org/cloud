@@ -7,7 +7,7 @@
     "directory": "بوخچەی کارکردن",
     "createSession": "دانیشتنێکی نەیتیڤ دروست بکە",
     "queueIfOffline": "ئەگەر هۆست ئۆفلاین بوو، پڕۆمپت بخەرە ڕیزەوە",
-    "prompt": "پڕۆمپت یان /command",
+    "prompt": "پڕۆمپت یان \u2066/command\u2069",
     "localClear": "دیمەنی ناوخۆیی پاک بکەرەوە",
     "abort": "نۆرەکە بوەستێنە",
     "failed": "کرداری کۆنترۆڵی دوورەوەی نەیتیڤ سەرکەوتوو نەبوو",
@@ -19,7 +19,9 @@
     "presenceStatus": "هۆستەکان: {{connection}}",
     "commandStatus": "گەیاندنی فەرمان: {{status}}",
     "delivered": "گەیەندرا",
-    "expired": "بەسەرچوو"
+    "expired": "بەسەرچوو",
+    "recoveryGaps_one": "{{displayCount}} بەشی ئەم تۆمارە ونە.",
+    "recoveryGaps_other": "{{displayCount}} بەش لەم تۆمارە ونن."
   },
   "common": {
     "manageOnWeb": "لەسەر وێب بەڕێوەی ببە",
@@ -963,6 +965,8 @@
       "pendingComment": "بۆچوونی نەنێردراو",
       "pendingComment_other": "بۆچوونی نەنێردراو",
       "submitCountOfTotal": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
+      "submitCountOfTotal_one": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
+      "submitCountOfTotal_other": "{{displayFreshCount}} لە {{displayTotalCount}} بۆچوون بنێرە",
       "submitReview": "ناردنی پێداچوونەوە",
       "partialPostedFresh": "{{displayFreshCount}} بۆچوون بڵاو کرایەوە. ",
       "partialPostedFresh_one": "{{displayFreshCount}} بۆچوون بڵاو کرایەوە. ",
@@ -2788,7 +2792,9 @@
     "modelPicker": {
       "title": "هەڵبژاردنی مۆدێل",
       "favorites": "دڵخوازەکان",
-      "noModelsDescription": "هیچ مۆدێلێک بۆ هەڵبژاردن بەردەست نییە."
+      "noModelsDescription": "هیچ مۆدێلێک بۆ هەڵبژاردن بەردەست نییە.",
+      "allUnavailableTitle": "هیچ مۆدێلێک ناتوانرێت بەکاربهێنرێت",
+      "allUnavailableDescription": "کلیلێکی دابینکەر زیاد بکە، پاشان دووبارە هەوڵ بدەوە."
     },
     "modelSelector": {
       "provider": "دابینکەر: {{id}}",
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "گۆڕینی ناوی ڕێکخراوە",
-      "renamePlaceholder": "ناوی ڕێکخراوە",
+      "renamePlaceholder": "ناوێک بۆ ڕێکخراوە بنووسە",
       "balance": "باڵانس",
       "plan": "پلان",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "دابینکەرێک ناچالاک بکە بۆ ئەوەی Kilo بۆ ئەم ڕێکخراوە داواکارییەکان ئاڕاستەی نەکات.",
     "providersNeedCatalog": "سویچەکانی دابینکەر تەنها بۆ خوێندنەوە دەمێننەوە تا کەتەلۆگی تەواوی مۆدێلەکان بار دەبێت. بۆ دەستکاریکردنیان، لە سەرەوە کرتە لە دووبارە هەوڵدانەوە بکە.",
     "providersEmpty": "هیچ دابینکەرێک لەگەڵ ئەم گەڕانە ناگونجێت.",
+    "providersNone": "هیچ دابینکەرێک بۆ ئەم ڕێکخراوە بەردەست نییە.",
     "allowAllShown": "ڕێگەدان بە هەموو پیشاندراوەکان",
     "denyAllShown": "ڕەتکردنەوەی هەموو پیشاندراوەکان",
     "gatewaysDescription": "Kilo داواکارییەکانی مۆدێل لە ڕێگەی Vercel AI Gateway یان OpenRouter ئاڕاستە دەکات. ئەگەر دەروازەیەک ناچالاک بێت، ئەو داواکارییانە سەرناکەون.",

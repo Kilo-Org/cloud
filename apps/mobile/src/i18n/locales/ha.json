@@ -19,7 +19,9 @@
     "presenceStatus": "Na'urorin masauki: {{connection}}",
     "commandStatus": "Isar da umarni: {{status}}",
     "delivered": "An isar",
-    "expired": "Lokaci ya ƙare"
+    "expired": "Lokaci ya ƙare",
+    "recoveryGaps_one": "{{displayCount}} sashe na wannan rubutun ya ɓace.",
+    "recoveryGaps_other": "{{displayCount}} sassa na wannan rubutun sun ɓace."
   },
   "common": {
     "manageOnWeb": "Sarrafa a yanar gizo",
@@ -963,6 +965,8 @@
       "pendingComment": "tsokace-tsokacen da ke jiran aikawa",
       "pendingComment_other": "tsokace-tsokacen da ke jiran aikawa",
       "submitCountOfTotal": "Aika tsokaci {{displayFreshCount}} cikin {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Aika tsokaci {{displayFreshCount}} cikin {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Aika tsokaci {{displayFreshCount}} cikin {{displayTotalCount}}",
       "submitReview": "Aika bita",
       "partialPostedFresh": "An wallafa tsokaci {{displayFreshCount}}. ",
       "partialPostedFresh_one": "An wallafa tsokaci {{displayFreshCount}}. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Zaɓi samfuri",
       "noModelsDescription": "Babu samfuran da za a zaɓa.",
+      "allUnavailableTitle": "Babu wani samfuri da za a iya amfani da shi",
+      "allUnavailableDescription": "Ƙara maɓallin mai samarwa ka sake gwadawa.",
       "favorites": "Waɗanda ka fi so"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Canza sunan ƙungiya",
-      "renamePlaceholder": "Sunan ƙungiya",
+      "renamePlaceholder": "Shigar da sunan ƙungiya",
       "balance": "Ragowar kuɗi",
       "plan": "Tsari",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Kashe mai bayarwa don hana Kilo tura buƙatu zuwa gare shi ga wannan ƙungiya.",
     "providersNeedCatalog": "Maɓallan masu bayarwa za su kasance na karatu kawai har sai cikakken kundin samfura ya loda. Danna Sake gwadawa a sama don gyara su.",
     "providersEmpty": "Babu masu bayarwa da suka dace da wannan bincike.",
+    "providersNone": "Babu masu bayarwa da ke samuwa ga wannan ƙungiya.",
     "allowAllShown": "Ba da izini ga duk waɗanda aka nuna",
     "denyAllShown": "Hana duk waɗanda aka nuna",
     "gatewaysDescription": "Kilo yana tura buƙatun samfuri ta Vercel AI Gateway ko OpenRouter. Ƙofar shiga da aka kashe tana sa waɗannan buƙatun su gaza.",

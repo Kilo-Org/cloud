@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregado",
-    "expired": "Caducado"
+    "expired": "Caducado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrición.",
+    "recoveryGaps_other": "Faltan {{displayCount}} partes desta transcrición."
   },
   "common": {
     "manageOnWeb": "Xestionar na web",
@@ -963,6 +965,8 @@
       "pendingComment": "comentarios pendentes",
       "pendingComment_other": "comentarios pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
       "submitReview": "Enviar a revisión",
       "partialPostedFresh": "Comentarios publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentarios publicados: {{displayFreshCount}}. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Seleccionar modelo",
       "noModelsDescription": "Non hai modelos dispoñibles para seleccionar.",
+      "allUnavailableTitle": "Non se pode usar ningún modelo",
+      "allUnavailableDescription": "Engade unha clave de provedor e téntao de novo.",
       "favorites": "Favoritos"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Renomear organización",
-      "renamePlaceholder": "Nome da organización",
+      "renamePlaceholder": "Introduce un nome para a organización",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Desactiva un provedor para impedir que Kilo encamiñe solicitudes cara a el para esta organización.",
     "providersNeedCatalog": "Os interruptores dos provedores permanecen en modo só lectura ata que se cargue o catálogo completo de modelos. Toca en Tentar de novo arriba para editalos.",
     "providersEmpty": "Ningún provedor coincide con esta busca.",
+    "providersNone": "Non hai ningún provedor dispoñible para esta organización.",
     "allowAllShown": "Permitir todos os mostrados",
     "denyAllShown": "Denegar todos os mostrados",
     "gatewaysDescription": "Kilo encamiña as solicitudes dos modelos a través de Vercel AI Gateway ou OpenRouter. Unha pasarela desactivada fai fallar esas solicitudes.",

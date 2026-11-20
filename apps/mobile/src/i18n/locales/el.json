@@ -19,7 +19,9 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Παράδοση εντολής: {{status}}",
     "delivered": "Παραδόθηκε",
-    "expired": "Έληξε"
+    "expired": "Έληξε",
+    "recoveryGaps_one": "Λείπει {{displayCount}} τμήμα αυτού του μεταγραμμένου κειμένου.",
+    "recoveryGaps_other": "Λείπουν {{displayCount}} τμήματα αυτού του μεταγραμμένου κειμένου."
   },
   "common": {
     "manageOnWeb": "Διαχείριση στο web",
@@ -963,6 +965,8 @@
       "pendingComment": "εκκρεμή σχόλια",
       "pendingComment_other": "εκκρεμή σχόλια",
       "submitCountOfTotal": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
+      "submitCountOfTotal_one": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
+      "submitCountOfTotal_other": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
       "submitReview": "Υποβολή αξιολόγησης",
       "partialPostedFresh": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Επιλογή μοντέλου",
       "noModelsDescription": "Δεν υπάρχουν διαθέσιμα μοντέλα για επιλογή.",
+      "allUnavailableTitle": "Κανένα μοντέλο δεν μπορεί να χρησιμοποιηθεί",
+      "allUnavailableDescription": "Πρόσθεσε κλειδί παρόχου και δοκίμασε ξανά.",
       "favorites": "Αγαπημένα"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Μετονομασία οργανισμού",
-      "renamePlaceholder": "Όνομα οργανισμού",
+      "renamePlaceholder": "Εισαγάγετε όνομα οργανισμού",
       "balance": "Υπόλοιπο",
       "plan": "Πλάνο",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Απενεργοποιήστε έναν πάροχο για να σταματήσει το Kilo να δρομολογεί αιτήματα σε αυτόν για αυτόν τον οργανισμό.",
     "providersNeedCatalog": "Οι διακόπτες παρόχων παραμένουν μόνο για ανάγνωση μέχρι να φορτωθεί ο πλήρης κατάλογος μοντέλων. Πατήστε Νέα προσπάθεια παραπάνω για να τους επεξεργαστείτε.",
     "providersEmpty": "Κανένας πάροχος δεν ταιριάζει με αυτήν την αναζήτηση.",
+    "providersNone": "Δεν υπάρχουν διαθέσιμοι πάροχοι για αυτόν τον οργανισμό.",
     "allowAllShown": "Αποδοχή όλων των εμφανιζόμενων",
     "denyAllShown": "Αποκλεισμός όλων των εμφανιζόμενων",
     "gatewaysDescription": "Το Kilo δρομολογεί τα αιτήματα μοντέλων μέσω του Vercel AI Gateway ή του OpenRouter. Μια απενεργοποιημένη πύλη προκαλεί αποτυχία σε αυτά τα αιτήματα.",

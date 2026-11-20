@@ -19,7 +19,9 @@
     "presenceStatus": "Хостове: {{connection}}",
     "commandStatus": "Доставка на командата: {{status}}",
     "delivered": "Доставено",
-    "expired": "Изтекло"
+    "expired": "Изтекло",
+    "recoveryGaps_one": "Липсва {{displayCount}} част от този транскрипт.",
+    "recoveryGaps_other": "Липсват {{displayCount}} части от този транскрипт."
   },
   "common": {
     "manageOnWeb": "Управлявай в уеб",
@@ -963,6 +965,8 @@
       "pendingComment": "неизпратени коментара",
       "pendingComment_other": "неизпратени коментара",
       "submitCountOfTotal": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
+      "submitCountOfTotal_one": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
+      "submitCountOfTotal_other": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
       "submitReview": "Изпрати прегледа",
       "partialPostedFresh": "Публикувани коментари: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Публикувани коментари: {{displayFreshCount}}. ",
@@ -2788,7 +2792,9 @@
     "modelPicker": {
       "title": "Избор на модел",
       "favorites": "Любими",
-      "noModelsDescription": "Няма налични модели за избор."
+      "noModelsDescription": "Няма налични модели за избор.",
+      "allUnavailableTitle": "Няма модели, които могат да се използват",
+      "allUnavailableDescription": "Добави ключ за доставчик и опитай отново."
     },
     "modelSelector": {
       "provider": "Доставчик {{id}}",
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Преименувай организацията",
-      "renamePlaceholder": "Име на организацията",
+      "renamePlaceholder": "Въведете име на организацията",
       "balance": "Наличност",
       "plan": "План",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Изключете доставчик, за да спрете Kilo да пренасочва заявки към него за тази организация.",
     "providersNeedCatalog": "Превключвателите на доставчиците остават само за четене, докато не се зареди пълният каталог с модели. Докоснете Опитай отново по-горе, за да ги редактирате.",
     "providersEmpty": "Няма доставчици, отговарящи на това търсене.",
+    "providersNone": "Няма налични доставчици за тази организация.",
     "allowAllShown": "Разреши всички показани",
     "denyAllShown": "Забрани всички показани",
     "gatewaysDescription": "Kilo пренасочва заявките към моделите през Vercel AI Gateway или OpenRouter. Ако шлюзът е изключен, тези заявки са неуспешни.",

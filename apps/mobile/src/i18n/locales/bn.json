@@ -19,7 +19,9 @@
     "presenceStatus": "হোস্ট: {{connection}}",
     "commandStatus": "কমান্ড ডেলিভারি: {{status}}",
     "delivered": "পৌঁছেছে",
-    "expired": "মেয়াদ শেষ"
+    "expired": "মেয়াদ শেষ",
+    "recoveryGaps_one": "এই ট্রান্সক্রিপ্টের {{displayCount}}টি অংশ অনুপস্থিত।",
+    "recoveryGaps_other": "এই ট্রান্সক্রিপ্টের {{displayCount}}টি অংশ অনুপস্থিত।"
   },
   "common": {
     "manageOnWeb": "ওয়েবে পরিচালনা করুন",
@@ -963,6 +965,8 @@
       "pendingComment": "অপেক্ষমাণ মন্তব্য",
       "pendingComment_other": "অপেক্ষমাণ মন্তব্য",
       "submitCountOfTotal": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
+      "submitCountOfTotal_one": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
+      "submitCountOfTotal_other": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
       "submitReview": "পর্যালোচনা জমা দিন",
       "partialPostedFresh": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
       "partialPostedFresh_one": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
@@ -2788,7 +2792,9 @@
     "modelPicker": {
       "title": "মডেল নির্বাচন",
       "favorites": "পছন্দের তালিকা",
-      "noModelsDescription": "বেছে নেওয়ার মতো কোনো মডেল নেই।"
+      "noModelsDescription": "বেছে নেওয়ার মতো কোনো মডেল নেই।",
+      "allUnavailableTitle": "কোনো মডেল ব্যবহার করা যাবে না",
+      "allUnavailableDescription": "একটি প্রোভাইডার কী যোগ করুন, তারপর আবার চেষ্টা করুন।"
     },
     "modelSelector": {
       "provider": "প্রোভাইডার {{id}}",
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "সংস্থার নাম পরিবর্তন করুন",
-      "renamePlaceholder": "সংস্থার নাম",
+      "renamePlaceholder": "সংস্থার একটি নাম লিখুন",
       "balance": "ব্যালেন্স",
       "plan": "প্ল্যান",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "কোনো প্রোভাইডার বন্ধ করলে Kilo এই প্রতিষ্ঠানের অনুরোধ আর সেটিতে রাউট করবে না।",
     "providersNeedCatalog": "সম্পূর্ণ মডেল ক্যাটালগ লোড না হওয়া পর্যন্ত প্রোভাইডার সুইচগুলো শুধু পড়ার জন্য থাকবে। এগুলো সম্পাদনা করতে উপরের আবার চেষ্টা করুন বোতামে ট্যাপ করুন।",
     "providersEmpty": "এই অনুসন্ধানের সাথে কোনো প্রোভাইডার মেলেনি।",
+    "providersNone": "এই প্রতিষ্ঠানের জন্য কোনো প্রোভাইডার উপলব্ধ নেই।",
     "allowAllShown": "দেখানো সবগুলো অনুমোদন করুন",
     "denyAllShown": "দেখানো সবগুলো নিষিদ্ধ করুন",
     "gatewaysDescription": "Kilo মডেলের অনুরোধ Vercel AI Gateway বা OpenRouter-এর মাধ্যমে রাউট করে। কোনো গেটওয়ে বন্ধ থাকলে সেই অনুরোধগুলো ব্যর্থ হয়।",

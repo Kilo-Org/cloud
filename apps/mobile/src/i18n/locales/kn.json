@@ -19,7 +19,9 @@
     "presenceStatus": "ಹೋಸ್ಟ್‌ಗಳು: {{connection}}",
     "commandStatus": "ಕಮಾಂಡ್ ವಿತರಣೆ: {{status}}",
     "delivered": "ತಲುಪಿಸಲಾಗಿದೆ",
-    "expired": "ಅವಧಿ ಮುಗಿದಿದೆ"
+    "expired": "ಅವಧಿ ಮುಗಿದಿದೆ",
+    "recoveryGaps_one": "ಈ ಪ್ರತಿಲೇಖನದ {{displayCount}} ಭಾಗ ಕಾಣೆಯಾಗಿದೆ.",
+    "recoveryGaps_other": "ಈ ಪ್ರತಿಲೇಖನದ {{displayCount}} ಭಾಗಗಳು ಕಾಣೆಯಾಗಿವೆ."
   },
   "common": {
     "manageOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ",
@@ -963,6 +965,8 @@
       "pendingComment": "ಬಾಕಿ ಇರುವ ಟಿಪ್ಪಣಿಗಳು",
       "pendingComment_other": "ಬಾಕಿ ಇರುವ ಟಿಪ್ಪಣಿಗಳು",
       "submitCountOfTotal": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
       "submitReview": "ಪರಿಶೀಲನೆಯನ್ನು ಸಲ್ಲಿಸಿ",
       "partialPostedFresh": "{{displayFreshCount}} ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ",
       "noModelsDescription": "ಆಯ್ಕೆ ಮಾಡಲು ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+      "allUnavailableTitle": "ಯಾವುದೇ ಮಾದರಿಯನ್ನು ಬಳಸಲಾಗುವುದಿಲ್ಲ",
+      "allUnavailableDescription": "ಪೂರೈಕೆದಾರ ಕೀ ಸೇರಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "favorites": "ಮೆಚ್ಚಿನವುಗಳು"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "ಸಂಸ್ಥೆಯ ಹೆಸರು ಬದಲಾಯಿಸಿ",
-      "renamePlaceholder": "ಸಂಸ್ಥೆಯ ಹೆಸರು",
+      "renamePlaceholder": "ಸಂಸ್ಥೆಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
       "balance": "ಉಳಿಕೆ",
       "plan": "ಯೋಜನೆ",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "ಈ ಸಂಸ್ಥೆಗೆ Kilo ಅದಕ್ಕೆ ಮಾರ್ಗನಿರ್ದೇಶಿಸುವುದನ್ನು ನಿಲ್ಲಿಸಲು ಪೂರೈಕೆದಾರರನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಿ.",
     "providersNeedCatalog": "ಪೂರ್ಣ ಮಾದರಿ ಕ್ಯಾಟಲಾಗ್ ಲೋಡ್ ಆಗುವವರೆಗೆ ಪೂರೈಕೆದಾರರ ಸ್ವಿಚ್‌ಗಳು ಓದಲು ಮಾತ್ರ ಆಗಿರುತ್ತವೆ. ಅವುಗಳನ್ನು ಸಂಪಾದಿಸಲು ಮೇಲೆ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "providersEmpty": "ಈ ಹುಡುಕಾಟಕ್ಕೆ ಯಾವುದೇ ಪೂರೈಕೆದಾರರು ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ.",
+    "providersNone": "ಈ ಸಂಸ್ಥೆಗೆ ಯಾವುದೇ ಪೂರೈಕೆದಾರರು ಲಭ್ಯವಿಲ್ಲ.",
     "allowAllShown": "ತೋರಿಸಿರುವ ಎಲ್ಲವನ್ನೂ ಅನುಮತಿಸಿ",
     "denyAllShown": "ತೋರಿಸಿರುವ ಎಲ್ಲವನ್ನೂ ನಿರಾಕರಿಸಿ",
     "gatewaysDescription": "Kilo ಮಾದರಿ ವಿನಂತಿಗಳನ್ನು Vercel AI Gateway ಅಥವಾ OpenRouter ಮೂಲಕ ಮಾರ್ಗನಿರ್ದೇಶಿಸುತ್ತದೆ. ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಿದ ಪ್ರವೇಶದ್ವಾರವು ಆ ವಿನಂತಿಗಳನ್ನು ವಿಫಲಗೊಳಿಸುತ್ತದೆ.",

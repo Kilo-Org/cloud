@@ -19,7 +19,10 @@
     "presenceStatus": "Hostovi: {{connection}}",
     "commandStatus": "Isporuka naredbe: {{status}}",
     "delivered": "Isporučeno",
-    "expired": "Isteklo"
+    "expired": "Isteklo",
+    "recoveryGaps_one": "Nedostaje {{displayCount}} dio ovog transkripta.",
+    "recoveryGaps_few": "Nedostaju {{displayCount}} dijela ovog transkripta.",
+    "recoveryGaps_other": "Nedostaje {{displayCount}} dijelova ovog transkripta."
   },
   "common": {
     "manageOnWeb": "Upravljaj na webu",
@@ -980,6 +983,9 @@
       "pendingComment": "neposlanih komentara",
       "pendingComment_other": "neposlanih komentara",
       "submitCountOfTotal": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_one": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_few": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_other": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
       "submitReview": "Pošalji pregled",
       "partialPostedFresh": "Broj objavljenih komentara: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Broj objavljenih komentara: {{displayFreshCount}}. ",
@@ -2838,6 +2844,8 @@
     "modelPicker": {
       "title": "Odaberi model",
       "noModelsDescription": "Nema dostupnih modela za odabir.",
+      "allUnavailableTitle": "Nijedan model nije moguće koristiti",
+      "allUnavailableDescription": "Dodaj ključ pružatelja usluga, a zatim pokušaj ponovno.",
       "favorites": "Favoriti"
     },
     "modelSelector": {
@@ -3681,7 +3689,7 @@
     },
     "hub": {
       "renameTitle": "Preimenuj organizaciju",
-      "renamePlaceholder": "Naziv organizacije",
+      "renamePlaceholder": "Unesite naziv organizacije",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -5063,6 +5071,7 @@
     "providersDescription": "Isključite pružatelja kako Kilo za ovu organizaciju ne bi usmjeravao zahtjeve na njega.",
     "providersNeedCatalog": "Prekidači pružatelja ostaju samo za čitanje dok se ne učita cijeli katalog modela. Dodirnite Pokušaj ponovno iznad kako biste ih mogli uređivati.",
     "providersEmpty": "Nijedan pružatelj ne odgovara ovom pretraživanju.",
+    "providersNone": "Nema dostupnih pružatelja za ovu organizaciju.",
     "allowAllShown": "Dopusti sve prikazano",
     "denyAllShown": "Zabrani sve prikazano",
     "gatewaysDescription": "Kilo usmjerava zahtjeve modela kroz Vercel AI Gateway ili OpenRouter. Onemogućen pristupnik odbija te zahtjeve.",

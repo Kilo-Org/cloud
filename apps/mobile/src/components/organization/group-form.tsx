@@ -6,6 +6,7 @@ import { View } from 'react-native';
 
 import { GroupMemberPicker } from '@/components/organization/group-member-picker';
 import {
+  filterOrgGroupMembers,
   isOrgGroupFormDirty,
   isOrgGroupFormDraft,
   ORG_GROUP_DESCRIPTION_MAX_LENGTH,
@@ -317,13 +318,7 @@ function GroupFormBody({ organizationId, group, draft }: GroupFormBodyProps) {
   const activeMembers: readonly ActiveOrgMember[] = (orgWithMembers.data?.members ?? []).filter(
     member => isActiveOrgMember(member)
   );
-  const query = memberQuery.trim().toLowerCase();
-  const visibleMembers =
-    query.length === 0
-      ? activeMembers
-      : activeMembers.filter(member =>
-          `${member.name} ${member.email}`.toLowerCase().includes(query)
-        );
+  const visibleMembers = filterOrgGroupMembers(activeMembers, memberQuery);
   const visibleMemberIds = visibleMembers.map(member => member.id);
   const selectedVisibleCount = visibleMemberIds.filter(id => memberIds.includes(id)).length;
   const allVisibleSelected =

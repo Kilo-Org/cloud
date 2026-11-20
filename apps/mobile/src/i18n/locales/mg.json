@@ -19,7 +19,9 @@
     "presenceStatus": "Milina: {{connection}}",
     "commandStatus": "Fanaterana baiko: {{status}}",
     "delivered": "Voatolotra",
-    "expired": "Lany fe-potoana"
+    "expired": "Lany fe-potoana",
+    "recoveryGaps_one": "Misy ampahany {{displayCount}} amin'ity fandikana ity tsy hita.",
+    "recoveryGaps_other": "Misy ampahany {{displayCount}} amin'ity fandikana ity tsy hita."
   },
   "common": {
     "manageOnWeb": "Tantano amin'ny tranonkala",
@@ -963,6 +965,8 @@
       "pendingComment": "fanehoan-kevitra miandry",
       "pendingComment_other": "fanehoan-kevitra miandry",
       "submitCountOfTotal": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
       "submitReview": "Alefaso ny fandinihana",
       "partialPostedFresh": "Hevitra {{displayFreshCount}} no navoaka. ",
       "partialPostedFresh_one": "Hevitra {{displayFreshCount}} no navoaka. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Safidio ny modely",
       "noModelsDescription": "Tsy misy modely azo fidina.",
+      "allUnavailableTitle": "Tsy misy modely azo ampiasaina",
+      "allUnavailableDescription": "Ampio lakilen'ny mpamatsy ary andramo indray.",
       "favorites": "Ankafizinao"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Ovao ny anaran'ny fikambanana",
-      "renamePlaceholder": "Anaran'ny fikambanana",
+      "renamePlaceholder": "Ampidiro ny anaran'ny fikambanana",
       "balance": "Ambim-bola",
       "plan": "Drafitra",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Vonoy ny mpamatsy iray mba hampitsahatra ny fandefasan'ny Kilo ny fangatahana ho azy ho an'ity fikambanana ity.",
     "providersNeedCatalog": "Tsy azo ovaina ny bokotra famonoana sy fandrehitra ny mpamatsy mandra-pahavitan'ny fampidirana ny katalaogin'ny modely feno. Tsindrio ny Andramo indray etsy ambony mba hanovana azy ireo.",
     "providersEmpty": "Tsy misy mpamatsy mifanaraka amin'ity fikarohana ity.",
+    "providersNone": "Tsy misy mpamatsy azo ampiasaina ho an'ity fikambanana ity.",
     "allowAllShown": "Avelao daholo izay aseho",
     "denyAllShown": "Lavina daholo izay aseho",
     "gatewaysDescription": "Ny Kilo dia mandefa fangatahana modely amin'ny alalan'ny Vercel AI Gateway na OpenRouter. Ny vavahady voavono dia mahatonga ireo fangatahana ireo tsy hahomby.",

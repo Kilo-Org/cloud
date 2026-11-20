@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { securityLifecyclePayloadShape } from './notification-events';
+import { securityFindingPayloadShape, securityLifecyclePayloadShape } from './notification-events';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { pushDataSchema, cloudAgentSessionRaiseShape } from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
@@ -399,8 +399,7 @@ export const internalDispatchSecurityFindingRequestSchema = z.object({
   kind: z.literal('security_finding'),
   recipientUserId: nonEmptyStringSchema,
   notificationId: nonEmptyStringSchema,
-  findingId: nonEmptyStringSchema,
-  scope: nonEmptyStringSchema,
+  ...securityFindingPayloadShape,
   notificationKind: z.enum(['new_finding', 'sla_warning', 'sla_breach']),
   severity: nonEmptyStringSchema,
   repoFullName: nonEmptyStringSchema,

@@ -19,7 +19,9 @@
     "presenceStatus": "होस्टहरू: {{connection}}",
     "commandStatus": "कमान्ड डेलिभरी: {{status}}",
     "delivered": "पुर्‍याइयो",
-    "expired": "म्याद सकियो"
+    "expired": "म्याद सकियो",
+    "recoveryGaps_one": "यो ट्रान्सक्रिप्टको {{displayCount}} भाग हराइरहेको छ।",
+    "recoveryGaps_other": "यो ट्रान्सक्रिप्टका {{displayCount}} भाग हराइरहेका छन्।"
   },
   "common": {
     "manageOnWeb": "वेबमा व्यवस्थापन गर्नुहोस्",
@@ -963,6 +965,8 @@
       "pendingComment": "नपठाइएका टिप्पणीहरू",
       "pendingComment_other": "नपठाइएका टिप्पणीहरू",
       "submitCountOfTotal": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
+      "submitCountOfTotal_one": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
+      "submitCountOfTotal_other": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
       "submitReview": "समीक्षा पठाउनुहोस्",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
       "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
@@ -2788,7 +2792,9 @@
     "modelPicker": {
       "title": "मोडेल छनोट",
       "favorites": "मनपर्ने",
-      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।"
+      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।",
+      "allUnavailableTitle": "कुनै पनि मोडेल प्रयोग गर्न सकिँदैन",
+      "allUnavailableDescription": "प्रदायक कुञ्जी थपेर फेरि प्रयास गर्नुहोस्।"
     },
     "modelSelector": {
       "provider": "प्रदायक {{id}}",
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "संस्थाको नाम बदल्नुहोस्",
-      "renamePlaceholder": "संस्थाको नाम",
+      "renamePlaceholder": "संस्थाको नाम लेख्नुहोस्",
       "balance": "मौज्दात",
       "plan": "प्लान",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "यो संस्थाका लागि Kilo ले त्यसमार्फत रुटिङ गर्न रोक्न प्रदायक बन्द गर्नुहोस्।",
     "providersNeedCatalog": "पूर्ण मोडेल क्याटलग लोड नभएसम्म प्रदायक स्विचहरू पढ्न मात्र मिल्ने रहन्छन्। तिनलाई सम्पादन गर्न माथिको फेरि प्रयास गर्नुहोस् मा ट्याप गर्नुहोस्।",
     "providersEmpty": "यो खोजसँग कुनै प्रदायक मेल खाँदैन।",
+    "providersNone": "यो संस्थाका लागि कुनै पनि प्रदायक उपलब्ध छैन।",
     "allowAllShown": "देखाइएका सबैलाई अनुमति दिनुहोस्",
     "denyAllShown": "देखाइएका सबैलाई अस्वीकार गर्नुहोस्",
     "gatewaysDescription": "Kilo ले मोडेल अनुरोधहरू Vercel AI Gateway वा OpenRouter मार्फत रुट गर्छ। अक्षम गरिएको गेटवेले ती अनुरोधहरू असफल बनाउँछ।",

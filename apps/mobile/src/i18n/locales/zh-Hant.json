@@ -19,7 +19,9 @@
     "presenceStatus": "主機：{{connection}}",
     "commandStatus": "命令傳送狀態：{{status}}",
     "delivered": "已送達",
-    "expired": "已過期"
+    "expired": "已過期",
+    "recoveryGaps_one": "此對話記錄缺少 {{displayCount}} 個部分。",
+    "recoveryGaps_other": "此對話記錄缺少 {{displayCount}} 個部分。"
   },
   "common": {
     "manageOnWeb": "在網頁上管理",
@@ -2231,6 +2233,8 @@
     "modelPicker": {
       "title": "選取模型",
       "noModelsDescription": "沒有可選取的模型。",
+      "allUnavailableTitle": "沒有可使用的模型",
+      "allUnavailableDescription": "請新增供應商金鑰，然後再試一次。",
       "favorites": "我的最愛"
     },
     "modelSelector": {
@@ -3234,6 +3238,8 @@
       "partialPostedStale_one": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
       "partialPostedStale_other": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
       "submitCountOfTotal": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
+      "submitCountOfTotal_one": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
+      "submitCountOfTotal_other": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
       "submitReview": "送出審查",
       "blockedRequestChanges": "請先填寫摘要或新增至少一則留言，才能要求變更。",
       "blockedComment": "請先填寫摘要或新增至少一則留言，才能送出留言型審查。"
@@ -3443,7 +3449,7 @@
       "planStatusLapsed": " · 已結束",
       "planEnded": "組織的試用期已結束，且沒有使用中的方案。",
       "manageBilling": "管理帳單",
-      "renamePlaceholder": "組織名稱",
+      "renamePlaceholder": "請輸入組織名稱",
       "renameTitle": "重新命名組織"
     },
     "inviteMember": {
@@ -4987,6 +4993,7 @@
     "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
     "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
     "providersEmpty": "沒有符合此搜尋的供應商。",
+    "providersNone": "此組織沒有可用的供應商。",
     "allowAllShown": "允許所有顯示項目",
     "denyAllShown": "拒絕所有顯示項目",
     "gatewaysDescription": "Kilo 會透過 Vercel AI Gateway 或 OpenRouter 路由模型請求。停用的閘道會使這些請求失敗。",

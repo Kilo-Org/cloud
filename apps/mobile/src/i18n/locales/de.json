@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Befehlszustellung: {{status}}",
     "delivered": "Zugestellt",
-    "expired": "Abgelaufen"
+    "expired": "Abgelaufen",
+    "recoveryGaps_one": "{{displayCount}} Teil dieses Transkripts fehlt.",
+    "recoveryGaps_other": "{{displayCount}} Teile dieses Transkripts fehlen."
   },
   "common": {
     "manageOnWeb": "Im Web verwalten",
@@ -2231,6 +2233,8 @@
     "modelPicker": {
       "title": "Modell wählen",
       "noModelsDescription": "Es stehen keine Modelle zur Auswahl.",
+      "allUnavailableTitle": "Kein Modell kann verwendet werden",
+      "allUnavailableDescription": "Füge einen Anbieterschlüssel hinzu und versuche es erneut.",
       "favorites": "Favoriten"
     },
     "modelSelector": {
@@ -3234,6 +3238,8 @@
       "partialPostedStale_one": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "partialPostedStale_other": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "submitCountOfTotal": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitCountOfTotal_one": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitCountOfTotal_other": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
       "submitReview": "Prüfung senden",
       "blockedRequestChanges": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um Änderungen anzufordern.",
       "blockedComment": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um ein Review mit Kommentaren zu senden."
@@ -3443,7 +3449,7 @@
       "planStatusLapsed": " · Beendet",
       "planEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan.",
       "manageBilling": "Abrechnung verwalten",
-      "renamePlaceholder": "Name der Organisation",
+      "renamePlaceholder": "Gib einen Namen für die Organisation ein",
       "renameTitle": "Organisation umbenennen"
     },
     "inviteMember": {
@@ -4987,6 +4993,7 @@
     "providersDescription": "Deaktiviere einen Anbieter, damit Kilo für diese Organisation nicht mehr an ihn weiterleitet.",
     "providersNeedCatalog": "Anbieter-Schalter bleiben schreibgeschützt, bis der vollständige Modellkatalog geladen ist. Tippe oben auf Erneut versuchen, um sie zu bearbeiten.",
     "providersEmpty": "Keine Anbieter entsprechen dieser Suche.",
+    "providersNone": "Für diese Organisation sind keine Anbieter verfügbar.",
     "allowAllShown": "Alle angezeigten zulassen",
     "denyAllShown": "Alle angezeigten sperren",
     "gatewaysDescription": "Kilo leitet Modellanfragen über Vercel AI Gateway oder OpenRouter weiter. Bei einem deaktivierten Gateway schlagen diese Anfragen fehl.",

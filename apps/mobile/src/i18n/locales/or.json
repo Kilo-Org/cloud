@@ -19,7 +19,9 @@
     "presenceStatus": "ହୋଷ୍ଟ: {{connection}}",
     "commandStatus": "କମାଣ୍ଡ ବିତରଣ: {{status}}",
     "delivered": "ବିତରିତ",
-    "expired": "ମିଆଦ ସମାପ୍ତ"
+    "expired": "ମିଆଦ ସମାପ୍ତ",
+    "recoveryGaps_one": "ଏହି ଟ୍ରାନ୍ସକ୍ରିପ୍ଟର {{displayCount}} ଅଂଶ ନାହିଁ।",
+    "recoveryGaps_other": "ଏହି ଟ୍ରାନ୍ସକ୍ରିପ୍ଟର {{displayCount}} ଅଂଶ ନାହିଁ।"
   },
   "common": {
     "manageOnWeb": "ୱେବରେ ପରିଚାଳନା କରନ୍ତୁ",
@@ -963,6 +965,8 @@
       "pendingComment": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "pendingComment_other": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "submitCountOfTotal": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
       "submitReview": "ସମୀକ୍ଷା ଦାଖଲ କରନ୍ତୁ",
       "partialPostedFresh": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
       "partialPostedFresh_one": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
@@ -2788,7 +2792,9 @@
     "modelPicker": {
       "title": "ମଡେଲ୍ ବାଛନ୍ତୁ",
       "favorites": "ପସନ୍ଦର ମଡେଲ୍",
-      "noModelsDescription": "ବାଛିବାକୁ କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ।"
+      "noModelsDescription": "ବାଛିବାକୁ କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ।",
+      "allUnavailableTitle": "କୌଣସି ମଡେଲ୍ ବ୍ୟବହାର କରାଯାଇପାରିବ ନାହିଁ",
+      "allUnavailableDescription": "ଏକ ପ୍ରଦାନକାରୀ କୀ ଯୋଡ଼ନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "modelSelector": {
       "provider": "ସେବା ପ୍ରଦାନକାରୀ {{id}}",
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "ସଂଗଠନର ନାମ ବଦଳାନ୍ତୁ",
-      "renamePlaceholder": "ସଂଗଠନର ନାମ",
+      "renamePlaceholder": "ଏକ ସଂଗଠନର ନାମ ଲେଖନ୍ତୁ",
       "balance": "ବ୍ୟାଲାନ୍ସ",
       "plan": "ଯୋଜନା",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "ଏହି ସଂସ୍ଥା ପାଇଁ Kilo ଏହା ଆଡକୁ ରୁଟିଂ କରିବା ବନ୍ଦ କରିବାକୁ ଏକ ପ୍ରଦାତାକୁ ବନ୍ଦ କରନ୍ତୁ।",
     "providersNeedCatalog": "ସମ୍ପୂର୍ଣ୍ଣ ମଡେଲ କାଟାଲଗ ଲୋଡ ନହେବା ପର୍ଯ୍ୟନ୍ତ ପ୍ରଦାତା ସ୍ୱିଚଗୁଡ଼ିକ କେବଳ ପଢ଼ିବା ପାଇଁ ରହିବ। ସେଗୁଡ଼ିକୁ ସମ୍ପାଦନ କରିବାକୁ ଉପରେ ଥିବା ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ ଟାପ କରନ୍ତୁ।",
     "providersEmpty": "ଏହି ଖୋଜ ସହିତ କୌଣସି ପ୍ରଦାତା ମେଳ ଖାଉନାହିଁ।",
+    "providersNone": "ଏହି ସଂସ୍ଥା ପାଇଁ କୌଣସି ପ୍ରଦାତା ଉପଲବ୍ଧ ନାହିଁ।",
     "allowAllShown": "ଦେଖାଯାଉଥିବା ସମସ୍ତଙ୍କୁ ଅନୁମତି ଦିଅନ୍ତୁ",
     "denyAllShown": "ଦେଖାଯାଉଥିବା ସମସ୍ତଙ୍କୁ ବାରଣ କରନ୍ତୁ",
     "gatewaysDescription": "Kilo ମଡେଲ ଅନୁରୋଧଗୁଡ଼ିକୁ Vercel AI Gateway କିମ୍ବା OpenRouter ମାଧ୍ୟମରେ ରୁଟ କରେ। ନିଷ୍କ୍ରିୟ ଗେଟୱେ ସେହି ଅନୁରୋଧଗୁଡ଼ିକୁ ବିଫଳ କରେ।",

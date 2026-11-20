@@ -19,7 +19,9 @@
     "presenceStatus": "હોસ્ટ: {{connection}}",
     "commandStatus": "આદેશ ડિલિવરી: {{status}}",
     "delivered": "પહોંચાડાયું",
-    "expired": "સમયસીમા સમાપ્ત"
+    "expired": "સમયસીમા સમાપ્ત",
+    "recoveryGaps_one": "આ ટ્રાન્સક્રિપ્ટનો {{displayCount}} ભાગ ખૂટે છે.",
+    "recoveryGaps_other": "આ ટ્રાન્સક્રિપ્ટના {{displayCount}} ભાગ ખૂટે છે."
   },
   "common": {
     "manageOnWeb": "વેબ પર મેનેજ કરો",
@@ -963,6 +965,8 @@
       "pendingComment": "મોકલવાની બાકી ટિપ્પણીઓ",
       "pendingComment_other": "મોકલવાની બાકી ટિપ્પણીઓ",
       "submitCountOfTotal": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
+      "submitCountOfTotal_one": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
+      "submitCountOfTotal_other": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
       "submitReview": "સમીક્ષા મોકલો",
       "partialPostedFresh": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "મોડલ પસંદ કરો",
       "noModelsDescription": "પસંદ કરવા માટે કોઈ મોડલ ઉપલબ્ધ નથી.",
+      "allUnavailableTitle": "કોઈ પણ મોડલનો ઉપયોગ કરી શકાતો નથી",
+      "allUnavailableDescription": "પ્રદાતાની કી ઉમેરો, પછી ફરી પ્રયાસ કરો.",
       "favorites": "મનપસંદ"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "સંસ્થાનું નામ બદલો",
-      "renamePlaceholder": "સંસ્થાનું નામ",
+      "renamePlaceholder": "સંસ્થાનું નામ દાખલ કરો",
       "balance": "બેલેન્સ",
       "plan": "પ્લાન",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "આ સંસ્થા માટે Kilo તેના તરફ રૂટ કરવાનું બંધ કરવા પ્રદાતાને બંધ કરો.",
     "providersNeedCatalog": "સંપૂર્ણ મૉડલ કૅટલૉગ લોડ ન થાય ત્યાં સુધી પ્રદાતા સ્વિચ ફક્ત વાંચવા માટે રહે છે. તેમને સંપાદિત કરવા ઉપર ફરી પ્રયાસ કરો.",
     "providersEmpty": "આ શોધ સાથે કોઈ પ્રદાતા મેળ ખાતા નથી.",
+    "providersNone": "આ સંસ્થા માટે કોઈ પ્રદાતા ઉપલબ્ધ નથી.",
     "allowAllShown": "બતાવેલા બધાને મંજૂર કરો",
     "denyAllShown": "બતાવેલા બધાને નકારો",
     "gatewaysDescription": "Kilo મોડેલ વિનંતીઓને Vercel AI Gateway અથવા OpenRouter દ્વારા રૂટ કરે છે. નિષ્ક્રિય ગેટવે તે વિનંતીઓને નિષ્ફળ કરે છે.",

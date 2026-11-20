@@ -19,7 +19,9 @@
     "presenceStatus": "Gashere: {{connection}}",
     "commandStatus": "Bevelaflewering: {{status}}",
     "delivered": "Afgelewer",
-    "expired": "Verval"
+    "expired": "Verval",
+    "recoveryGaps_one": "{{displayCount}} deel van hierdie transkripsie ontbreek.",
+    "recoveryGaps_other": "{{displayCount}} dele van hierdie transkripsie ontbreek."
   },
   "common": {
     "manageOnWeb": "Bestuur op die web",
@@ -963,6 +965,8 @@
       "pendingComment": "hangende kommentare",
       "pendingComment_other": "hangende kommentare",
       "submitCountOfTotal": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
+      "submitCountOfTotal_one": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
+      "submitCountOfTotal_other": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
       "submitReview": "Dien hersiening in",
       "partialPostedFresh": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
@@ -2788,7 +2792,9 @@
     "modelPicker": {
       "title": "Kies model",
       "favorites": "Gunstelinge",
-      "noModelsDescription": "Geen modelle is beskikbaar om te kies nie."
+      "noModelsDescription": "Geen modelle is beskikbaar om te kies nie.",
+      "allUnavailableTitle": "Geen modelle kan gebruik word nie",
+      "allUnavailableDescription": "Voeg 'n verskaffersleutel by en probeer dan weer."
     },
     "modelSelector": {
       "provider": "Verskaffer {{id}}",
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Hernoem organisasie",
-      "renamePlaceholder": "Organisasienaam",
+      "renamePlaceholder": "Voer 'n organisasienaam in",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Skakel 'n verskaffer af sodat Kilo nie meer vir hierdie organisasie daarheen roeteer nie.",
     "providersNeedCatalog": "Verskafferskakelaars bly leesalleen totdat die volledige modelkatalogus gelaai het. Tik hierbo op Probeer weer om hulle te wysig.",
     "providersEmpty": "Geen verskaffers pas by hierdie soektog nie.",
+    "providersNone": "Geen verskaffers is vir hierdie organisasie beskikbaar nie.",
     "allowAllShown": "Laat almal wat gewys word toe",
     "denyAllShown": "Weier almal wat gewys word",
     "gatewaysDescription": "Kilo roeteer modelversoeke deur Vercel AI Gateway of OpenRouter. 'n Afgeskakelde gateway laat daardie versoeke misluk.",

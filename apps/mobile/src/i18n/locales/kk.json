@@ -19,7 +19,9 @@
     "presenceStatus": "Хосттар: {{connection}}",
     "commandStatus": "Команданың жеткізілуі: {{status}}",
     "delivered": "Жеткізілді",
-    "expired": "Мерзімі өтті"
+    "expired": "Мерзімі өтті",
+    "recoveryGaps_one": "Бұл транскрипттің {{displayCount}} бөлігі жоқ.",
+    "recoveryGaps_other": "Бұл транскрипттің {{displayCount}} бөлігі жоқ."
   },
   "common": {
     "manageOnWeb": "Вебте басқару",
@@ -963,6 +965,8 @@
       "pendingComment": "жіберілмеген пікір",
       "pendingComment_other": "жіберілмеген пікір",
       "submitCountOfTotal": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
+      "submitCountOfTotal_one": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
+      "submitCountOfTotal_other": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
       "submitReview": "Тексеру нәтижесін жіберу",
       "partialPostedFresh": "{{displayFreshCount}} пікір жарияланды. ",
       "partialPostedFresh_one": "{{displayFreshCount}} пікір жарияланды. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Модельді таңдау",
       "noModelsDescription": "Таңдауға болатын модельдер жоқ.",
+      "allUnavailableTitle": "Ешбір модельді пайдалану мүмкін емес",
+      "allUnavailableDescription": "Провайдер кілтін қосыңыз, содан кейін қайталап көріңіз.",
       "favorites": "Таңдаулылар"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Ұйым атауын өзгерту",
-      "renamePlaceholder": "Ұйым атауы",
+      "renamePlaceholder": "Ұйым атауын енгізіңіз",
       "balance": "Баланс",
       "plan": "Жоспар",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Бұл ұйым үшін Kilo осы провайдерге бағыттауды тоқтатуы үшін провайдерді өшіріңіз.",
     "providersNeedCatalog": "Модельдердің толық каталогы жүктелгенше провайдер ауыстырғыштары тек оқуға арналған күйде қалады. Оларды өңдеу үшін жоғарыдағы Қайталап көру түймесін басыңыз.",
     "providersEmpty": "Бұл іздеуге сәйкес провайдерлер жоқ.",
+    "providersNone": "Бұл ұйым үшін қолжетімді провайдерлер жоқ.",
     "allowAllShown": "Көрсетілгендердің барлығына рұқсат ету",
     "denyAllShown": "Көрсетілгендердің барлығына тыйым салу",
     "gatewaysDescription": "Kilo модель сұрауларын Vercel AI Gateway немесе OpenRouter арқылы бағыттайды. Өшірулі шлюз осы сұрауларды сәтсіз етеді.",

@@ -13,6 +13,7 @@ import { RowChevron } from '@/components/ui/row-chevron';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
+import { foldForSearch } from '@/i18n/fold-for-search';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
@@ -96,9 +97,15 @@ export function ProviderKeyProviderPickerScreen({
     // would otherwise stop matching the `…-ai-…` id it used to.
     const nameNeedle = trimmed.toLocaleLowerCase(i18n.language);
     const idNeedle = trimmed.toLocaleLowerCase(ID_FOLD_LOCALE);
+    // A display name is folded as well, so "cafe" finds "Café": the accented
+    // spelling is what the row shows, and the typist may offer the plain letter.
+    // A query that folds to nothing is all diacritics and keeps the raw
+    // comparison alone, rather than matching every name.
+    const foldedNeedle = foldForSearch(trimmed);
     return rows.filter(
       provider =>
         provider.name.toLocaleLowerCase(i18n.language).includes(nameNeedle) ||
+        (foldedNeedle !== '' && foldForSearch(provider.name).includes(foldedNeedle)) ||
         provider.id.toLocaleLowerCase(ID_FOLD_LOCALE).includes(idNeedle)
     );
   }, [providers.data, query, i18n.language]);

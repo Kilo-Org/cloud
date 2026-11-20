@@ -19,7 +19,9 @@
     "presenceStatus": "Verter: {{connection}}",
     "commandStatus": "Kommandolevering: {{status}}",
     "delivered": "Levert",
-    "expired": "Utløpt"
+    "expired": "Utløpt",
+    "recoveryGaps_one": "{{displayCount}} del av denne transkripsjonen mangler.",
+    "recoveryGaps_other": "{{displayCount}} deler av denne transkripsjonen mangler."
   },
   "common": {
     "manageOnWeb": "Administrer på nettet",
@@ -963,6 +965,8 @@
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Send gjennomgang",
       "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er publisert. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er publisert. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "Velg modell",
       "noModelsDescription": "Det er ingen modeller å velge mellom.",
+      "allUnavailableTitle": "Ingen modeller kan brukes",
+      "allUnavailableDescription": "Legg til en leverandørnøkkel, og prøv igjen.",
       "favorites": "Favoritter"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Gi organisasjonen nytt navn",
-      "renamePlaceholder": "Organisasjonsnavn",
+      "renamePlaceholder": "Skriv inn et organisasjonsnavn",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "Slå av en leverandør for å hindre at Kilo ruter til den for denne organisasjonen.",
     "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
     "providersEmpty": "Ingen leverandører samsvarer med dette søket.",
+    "providersNone": "Ingen leverandører er tilgjengelige for denne organisasjonen.",
     "allowAllShown": "Tillat alle viste",
     "denyAllShown": "Nekt alle viste",
     "gatewaysDescription": "Kilo ruter modellforespørsler gjennom Vercel AI Gateway eller OpenRouter. En deaktivert inngangsportal får disse forespørslene til å feile.",

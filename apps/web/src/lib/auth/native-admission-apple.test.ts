@@ -297,6 +297,13 @@ describe('verifyAppleAttestation certificate chain', () => {
     );
     expect(result).toEqual({ ok: false, error: 'RP_ID_MISMATCH' });
   });
+
+  test('rejects a string that is not base64-encoded CBOR', async () => {
+    // `Buffer.from(..., 'base64')` never throws; it drops the characters it
+    // cannot decode and yields garbage bytes, which the CBOR decoder refuses.
+    const result = await verifyAppleAttestation('not base64 or cbor', challenge, keyId, bundleId);
+    expect(result).toEqual({ ok: false, error: 'INVALID_ATTEST_FORMAT' });
+  });
 });
 
 // ── Assertion verification ─────────────────────────────────────────────────
@@ -365,6 +372,17 @@ describe('verifyAppleAssertion', () => {
       publicKeySpkiBase64
     );
 
+    expect(result).toEqual({ ok: false, error: 'INVALID_ASSERTION' });
+  });
+
+  test('rejects a string that is not base64-encoded CBOR', async () => {
+    // `Buffer.from(..., 'base64')` never throws; the garbage bytes it yields
+    // are refused by the CBOR decoder.
+    const result = await verifyAppleAssertion(
+      clientDataHash,
+      'not base64 or cbor',
+      publicKeySpkiBase64
+    );
     expect(result).toEqual({ ok: false, error: 'INVALID_ASSERTION' });
   });
 });

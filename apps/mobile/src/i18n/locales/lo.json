@@ -19,7 +19,9 @@
     "presenceStatus": "ໂຮສ: {{connection}}",
     "commandStatus": "ການສົ່ງຄຳສັ່ງ: {{status}}",
     "delivered": "ສົ່ງເຖິງແລ້ວ",
-    "expired": "ໝົດອາຍຸແລ້ວ"
+    "expired": "ໝົດອາຍຸແລ້ວ",
+    "recoveryGaps_one": "ພາກສ່ວນ {{displayCount}} ຂອງບັນທຶກນີ້ຂາດຫາຍ.",
+    "recoveryGaps_other": "ພາກສ່ວນ {{displayCount}} ຂອງບັນທຶກນີ້ຂາດຫາຍ."
   },
   "common": {
     "manageOnWeb": "ຈັດການໃນເວັບ",
@@ -963,6 +965,8 @@
       "pendingComment": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "pendingComment_other": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "submitCountOfTotal": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
+      "submitCountOfTotal_one": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
+      "submitCountOfTotal_other": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
       "submitReview": "ສົ່ງຜົນການກວດສອບ",
       "partialPostedFresh": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
       "partialPostedFresh_one": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
@@ -2788,6 +2792,8 @@
     "modelPicker": {
       "title": "ເລືອກໂມເດວ",
       "noModelsDescription": "ບໍ່ມີໂມເດວໃຫ້ເລືອກ.",
+      "allUnavailableTitle": "ບໍ່ມີໂມເດວໃດທີ່ໃຊ້ໄດ້",
+      "allUnavailableDescription": "ເພີ່ມຄີຂອງຜູ້ໃຫ້ບໍລິການ ແລ້ວລອງໃໝ່.",
       "favorites": "ລາຍການທີ່ມັກ"
     },
     "modelSelector": {
@@ -3621,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "ປ່ຽນຊື່ອົງກອນ",
-      "renamePlaceholder": "ຊື່ອົງກອນ",
+      "renamePlaceholder": "ໃສ່ຊື່ອົງກອນ",
       "balance": "ຍອດເງິນຄົງເຫຼືອ",
       "plan": "ແຜນ",
       "planTeams": "Teams",
@@ -4987,6 +4993,7 @@
     "providersDescription": "ປິດຜູ້ໃຫ້ບໍລິການເພື່ອຢຸດການກຳນົດເສັ້ນທາງຂອງ Kilo ໄປຫາຜູ້ນັ້ນສຳລັບອົງກອນນີ້.",
     "providersNeedCatalog": "ສະວິດຜູ້ໃຫ້ບໍລິການຈະອ່ານໄດ້ຢ່າງດຽວຈົນກວ່າລາຍການໂມເດວທັງໝົດຈະໂຫຼດແລ້ວ. ກົດ ລອງໃໝ່ ຂ້າງເທິງເພື່ອແກ້ໄຂ.",
     "providersEmpty": "ບໍ່ມີຜູ້ໃຫ້ບໍລິການທີ່ກົງກັບການຄົ້ນຫານີ້.",
+    "providersNone": "ບໍ່ມີຜູ້ໃຫ້ບໍລິການທີ່ມີຢູ່ສຳລັບອົງກອນນີ້.",
     "allowAllShown": "ອະນຸຍາດທັງໝົດທີ່ສະແດງ",
     "denyAllShown": "ປະຕິເສດທັງໝົດທີ່ສະແດງ",
     "gatewaysDescription": "Kilo ກຳນົດເສັ້ນທາງຄຳຮ້ອງຂໍຕົວແບບຜ່ານ Vercel AI Gateway ຫຼື OpenRouter. ປະຕູເຊື່ອມຕໍ່ທີ່ປິດຈະເຮັດໃຫ້ຄຳຮ້ອງຂໍເຫຼົ່ານັ້ນລົ້ມເຫຼວ.",

@@ -17,9 +17,13 @@ import {
   getSecurityDeadlinePresentation,
   getSecurityFindingAnalysisState,
   getSupersedingFindingId,
+  hasRegisteredRemediationAttempt,
   isActiveRemediationStatus,
+  isSupersededFinding,
+  remediationNeedsAnalysisRefresh,
   type SecurityFinding,
   type SecurityFindingAnalysis,
+  type SecurityRemediationSignal,
 } from './presentation';
 
 type SandboxAnalysis = NonNullable<SecurityFindingAnalysis['sandboxAnalysis']>;
@@ -468,6 +472,16 @@ describe('getFindingLifecycleStatusPresentation', () => {
       )
     ).toMatchObject({ label: 'Superseded', tone: 'neutral' });
   });
+
+  it('does not call a non-ignored finding superseded', () => {
+    // A superseded reason only means superseded while the row is ignored; a
+    // fixed row that kept the reason shows its own status.
+    expect(
+      getFindingLifecycleStatusPresentation(
+        makeFinding({ status: 'fixed', ignored_reason: 'superseded:finding-2' })
+      )
+    ).toMatchObject({ label: 'Fixed', tone: 'success' });
+  });
 });
 
 describe('getSupersedingFindingId', () => {
@@ -484,6 +498,31 @@ describe('getSupersedingFindingId', () => {
       getSupersedingFindingId(makeFinding({ status: 'ignored', ignored_reason: 'not_exploitable' }))
     ).toBeNull();
     expect(getSupersedingFindingId(makeFinding({ status: 'open' }))).toBeNull();
+  });
+});
+
+describe('isSupersededFinding', () => {
+  it('is true only for an ignored finding that names its replacement', () => {
+    expect(
+      isSupersededFinding(
+        makeFinding({ status: 'ignored', ignored_reason: 'superseded:finding-2' })
+      )
+    ).toBe(true);
+  });
+
+  it('is false for a dismissed finding without a replacement', () => {
+    expect(
+      isSupersededFinding(makeFinding({ status: 'ignored', ignored_reason: 'not_used' }))
+    ).toBe(false);
+  });
+
+  it('is false when a row kept the replacement reference after leaving ignored', () => {
+    // Both surfaces derive their superseding id through this predicate, so a
+    // stale reference on a fixed row must not read as superseded.
+    expect(
+      isSupersededFinding(makeFinding({ status: 'fixed', ignored_reason: 'superseded:finding-2' }))
+    ).toBe(false);
+    expect(isSupersededFinding(makeFinding({ status: 'open' }))).toBe(false);
   });
 });
 
@@ -747,6 +786,119 @@ describe('getRemediationUnavailableCopy', () => {
     expect(getRemediationUnavailableCopy('toString')).toBe(
       'Remediation is unavailable for this finding.'
     );
+  });
+});
+
+// The rule shared with web's FindingDetailDialog and the mobile detail panels.
+function makeRemediationSignal(
+  overrides: Partial<SecurityRemediationSignal> = {}
+): SecurityRemediationSignal {
+  return { remediationAttempts: [], ...overrides };
+}
+
+function staleCapability(
+  reasons: { startReason?: string | null; retryReason?: string | null } = {
+    startReason: 'stale_analysis',
+  }
+) {
+  return {
+    startReason: reasons.startReason ?? null,
+    retryReason: reasons.retryReason ?? null,
+  };
+}
+
+describe('hasRegisteredRemediationAttempt', () => {
+  it('reports no attempt for the empty signal', () => {
+    expect(hasRegisteredRemediationAttempt(makeRemediationSignal())).toBe(false);
+  });
+
+  it('counts an attempt in the history list', () => {
+    expect(
+      hasRegisteredRemediationAttempt(makeRemediationSignal({ remediationAttempts: [{}] }))
+    ).toBe(true);
+  });
+
+  it('counts a summary latest attempt id', () => {
+    expect(
+      hasRegisteredRemediationAttempt(
+        makeRemediationSignal({ remediationSummary: { latestAttemptId: 'attempt-1' } })
+      )
+    ).toBe(true);
+  });
+
+  it('counts a nested latest attempt id', () => {
+    expect(
+      hasRegisteredRemediationAttempt(
+        makeRemediationSignal({ remediationSummary: { latestAttempt: { id: 'attempt-1' } } })
+      )
+    ).toBe(true);
+  });
+});
+
+describe('remediationNeedsAnalysisRefresh', () => {
+  it('refreshes when a stale start reason has no attempt', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({ remediationCapability: staleCapability() })
+      )
+    ).toBe(true);
+  });
+
+  it('refreshes on a stale retry reason', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationCapability: staleCapability({ retryReason: 'stale_analysis' }),
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('stays quiet once an attempt exists in the history', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationAttempts: [{}],
+          remediationCapability: staleCapability(),
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('stays quiet when the summary records a latest attempt id', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationCapability: staleCapability(),
+          remediationSummary: { latestAttemptId: 'attempt-1' },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('stays quiet when the summary records a nested attempt id', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationCapability: staleCapability(),
+          remediationSummary: { latestAttempt: { id: 'attempt-1' } },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('stays quiet for an unrelated rejection reason', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationCapability: staleCapability({ startReason: 'analysis_required' }),
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('stays quiet when the capability is missing', () => {
+    expect(remediationNeedsAnalysisRefresh(makeRemediationSignal())).toBe(false);
   });
 });
 

@@ -2,6 +2,7 @@
 import {
   getSecurityAnalysisDetailPresentation,
   getSecurityFindingAnalysisState,
+  remediationNeedsAnalysisRefresh,
 } from '@kilocode/app-shared/security-agent';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
 import { View } from 'react-native';
@@ -39,8 +40,9 @@ import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
-import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
+import { type SecurityAnalysis } from '@/lib/security-agent';
 import {
   getAnalysisCapacityBlockedHint,
   getSecurityAnalysisDetailDescription,
@@ -80,6 +82,7 @@ export function FindingAnalysisPanel({
 }: Readonly<FindingAnalysisPanelProps>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const mutedDisabledInk = useMutedDisabledInk();
   const { i18n, t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -93,10 +96,12 @@ export function FindingAnalysisPanel({
 
   if (isLoading && !analysis) {
     return (
-      <View className={SCREEN_BODY_CLASS}>
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <Skeleton className="h-32 w-full rounded-xl" />
-        {dialog}
+      <View style={sideInsetStyle}>
+        <View className={SCREEN_BODY_CLASS}>
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          {dialog}
+        </View>
       </View>
     );
   }

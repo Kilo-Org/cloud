@@ -6,7 +6,7 @@ import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
-import { ContextControl } from '@/components/context-control';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -274,6 +274,7 @@ function ScopedChatListScreen() {
           headerRight={<BackendSettingsControl />}
           inlineActions={<ContextControl />}
           allowInlineActionsStacking={false}
+          inlineActionsMinWidth={CONTEXT_CONTROL_INLINE_MIN_DP}
         />
         <View className="flex-1">{renderBody()}</View>
         {showFab && (

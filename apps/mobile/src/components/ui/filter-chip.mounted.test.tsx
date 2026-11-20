@@ -85,7 +85,7 @@ it('rings the selected chip with a muted neutral edge, keeping its surface and l
   expect(ring).toContain('inset-0');
 });
 
-it('draws the unselected chip edge in the page border token', () => {
+it('draws the unselected chip edge in the control border token', () => {
   const root = render(false);
   const chip = chipProps(root.findByType(Pressable));
   expect(chip.className).not.toContain('bg-secondary');
@@ -93,7 +93,10 @@ it('draws the unselected chip edge in the page border token', () => {
   const edges = root.findAllByType('View');
   expect(edges).toHaveLength(1);
   const edge = chipProps(edges[0] as TestRenderer.ReactTestInstance).className ?? '';
-  expect(edge).toContain('border-border');
+  // `border` is the 9% hairline between stacked rows and drew no chip edge; the
+  // control border is the one an input and an outlined button paint.
+  expect(edge).toContain('border-input');
+  expect(edge).not.toContain('border-border');
   expect(edge).not.toContain('border-muted-foreground');
   expect(edge).toContain('absolute');
   expect(edge).toContain('inset-0');

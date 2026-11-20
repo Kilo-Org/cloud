@@ -12,17 +12,8 @@ import {
   toneColor,
   type ToneKey,
 } from '@/lib/agent-color';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { isNarrowLayout } from '@/lib/narrow-layout';
-
-/**
- * At/above this Dynamic Type scale, ConfigureRow stacks the icon above the
- * title block so long labels never clip against the chevron in a side row.
- * Matches the tab-label wrap threshold used elsewhere in the shell. A window
- * narrower than `NARROW_LAYOUT_WIDTH` squeezes the same text block and takes
- * the same presentation.
- */
-const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
 type ConfigureRowProps = {
   icon: ComponentType<LucideProps>;
@@ -105,12 +96,14 @@ export function ConfigureRow({
 }: Readonly<ConfigureRowProps>) {
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
-  // A narrow window squeezes the flexible text block between the fixed icon
-  // tile and the chevron exactly as a large font scale does, until a whole word
-  // no longer fits and Android breaks it mid-word ("Gene ral", 160 dp, e1,
-  // 2026-09-21). Both cases get the stacked presentation, which hands the
-  // title the row's full width.
-  const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
+  // At a large font scale the row stacks the icon above the title block so a
+  // long label never clips against the chevron in a side row. A narrow window
+  // squeezes the flexible text block between the fixed icon tile and the
+  // chevron exactly as a large font scale does, until a whole word no longer
+  // fits and Android breaks it mid-word ("Gene ral", 160 dp, e1, 2026-09-21).
+  // Both cases get the stacked presentation, which hands the title the row's
+  // full width.
+  const stack = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
   // A semantic tone outranks the curated destination hue, and a row carrying
   // neither keeps the shared neutral tile. A settings list is not a list of
   // agents: hashing each title into the agent hue ramp gave one list (Language

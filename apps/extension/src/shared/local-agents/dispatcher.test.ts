@@ -137,7 +137,10 @@ describe('local agent dispatcher', () => {
         name: 'browser_snapshot',
         sessionHandle,
       })
-    ).rejects.toMatchObject({ code: -32_602 });
+    ).rejects.toMatchObject({
+      code: -32_006,
+      message: 'This agent session is no longer open in the browser.',
+    });
     expect(fake.callTool).not.toHaveBeenCalled();
 
     await expect(
@@ -168,7 +171,7 @@ describe('local agent dispatcher', () => {
 
     await expect(
       dispatcher.handle(CONTROLLER, 'session.close', { sessionHandle })
-    ).rejects.toMatchObject({ code: -32_602 });
+    ).rejects.toMatchObject({ code: -32_006 });
   });
 
   it('keeps the session row when the runtime cannot close it', async () => {

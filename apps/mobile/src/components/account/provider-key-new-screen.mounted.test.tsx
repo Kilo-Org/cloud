@@ -194,12 +194,16 @@ afterEach(() => {
 });
 
 describe('ProviderKeyNewScreen', () => {
-  it('names the chosen provider and masks the key field', async () => {
+  it('names the chosen provider in the header subtitle and masks the key field', async () => {
     const root = await mount();
 
+    // The provider is the header's subtitle, not a body line that read as a
+    // field label with no field under it.
+    const [header] = root.findAll(node => Object.is(node.type, 'ScreenHeader'));
+    expect(header?.props.subtitle).toBe('Anthropic');
     expect(
       root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
-    ).toContain('Anthropic');
+    ).not.toContain('Anthropic');
     expect(apiKeyField(root).props.secureTextEntry).toBe(true);
   });
 

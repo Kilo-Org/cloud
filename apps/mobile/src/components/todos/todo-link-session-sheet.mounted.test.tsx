@@ -55,9 +55,8 @@ vi.mock('@/components/ui/sheet', () => ({
 vi.mock('@/components/agents/session-detail-rename-state', () => ({
   namedSessionTitle: (title: string | null) => title,
 }));
-vi.mock('@/components/agents/session-list-helpers', () => ({
+vi.mock('@kilocode/app-shared/git-url-project', () => ({
   formatGitUrlProject: (gitUrl: string) => gitUrl,
-  projectOptionKey: (value: string) => value.toLowerCase(),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),

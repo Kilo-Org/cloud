@@ -172,6 +172,7 @@
     "generating": "ජනනය කරමින්…",
     "working": "ක්‍රියාත්මකයි",
     "yourOwnRepositories": "ඔබේම කේත ගබඩා",
+    "organizationRepositories": "සංවිධානයේ කේත ගබඩා",
     "dismissed": "ඉවතලා ඇත",
     "agent": "නියෝජිතයා",
     "durationMinuteShort": "මිනි",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "දළ දැක්ම",
       "files": "ගොනු",
-      "discussion": "සාකච්ඡාව"
+      "discussion": "සාකච්ඡාව",
+      "discussionAccessibility_one": "{{title}}: අදහස් 1 ක්",
+      "discussionAccessibility": "{{title}}: අදහස් {{displayCount}}ක්",
+      "discussionAccessibility_other": "{{title}}: අදහස් {{displayCount}}ක්"
     },
     "fileStatus": {
       "modified": "වෙනස් කර ඇත",
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "අභිරුචි උපදෙස්",
-      "deprecation": "අභිරුචි උපදෙස් පහසුකම ඉවත් කිරීමට සැලසුම් කර ඇත. ඒ වෙනුවට මෙම මාර්ගෝපදේශ ඔබේ ගබඩාවේ REVIEW.md ගොනුවකට ගෙන යන්න.",
+      "deprecation": "අභිරුචි උපදෙස් පහසුකම ඉවත් කරනු ලැබේ. ඒ වෙනුවට මෙම මාර්ගෝපදේශ ඔබේ ගබඩාවේ REVIEW.md ගොනුවකට ගෙන යන්න.",
       "placeholder": "උදා. අපගේ දෝෂ හැසිරවීමේ රීති අනුගමනය කරන බව තහවුරු කරන්න…",
       "clearTitle": "අභිරුචි උපදෙස් ඉවත් කරන්නද?",
       "clearMessage": "හිස් ක්ෂේත්‍රයක් සුරැකීමෙන් මෙම සමාලෝචකයා සඳහා ගබඩා කර ඇති අභිරුචි උපදෙස් මකා දැමේ."
@@ -1387,8 +1391,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "managedOnWebTitle": "වෙබය හරහා කළමනාකරණය කෙරේ",
+      "managedOnWebShort": "මෙම සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "managedOnWebRepositories": "{{organization}} සඳහා පරිගණකයකින් වෙබය හරහා රෙපොසිටරි තෝරන්න.",
       "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
+      "descriptionOverview": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා ඊළඟ තිරයේ අලවන්න.",
       "scopes": "ගිණුම: කියවීම · ගබඩා: කියවීම/ලිවීම · PR: කියවීම · වෙබ්හුක්: කියවීම/ලිවීම",
       "tokenPlaceholder": "වැඩබිම් ප්‍රවේශ ටෝකනය",
       "tokenRefused": "Bitbucket මෙම වැඩබිම් ප්‍රවේශ ටෝකනය පිළිගත්තේ නැත. එහි ඉහත අවසර ඇත්දැයි පරීක්ෂා කර, නැවත උත්සාහ කරන්න."
@@ -1409,6 +1417,7 @@
     "platformList": {
       "checking": "පරීක්ෂා කරමින්…",
       "statusUnavailable": "තත්ත්වය ලබා ගත නොහැක",
+      "needsAttention": "අවධානය අවශ්‍යයි",
       "platforms": "වේදිකා",
       "activity": "ක්‍රියාකාරකම්"
     },
@@ -3183,6 +3192,8 @@
     "retryHint": "Kilo Pass තත්ත්වය නැවත ලබාගැනීමට උත්සාහ කරයි.",
     "endedOn": "{{date}} දින අවසන් විය",
     "notAvailableInApp": "Kilo Pass යෙදුමේ ලබාගත නොහැක.",
+    "notAvailableTitle": "Kilo Pass යෙදුමේ නොමැත",
+    "noPassDescription": "මෙම ගිණුමට Kilo Pass එකක් නොමැත.",
     "statusActive": "සක්‍රීය",
     "statusTrialing": "අත්හදා බැලීමේ",
     "statusPastDue": "ගෙවීම කල් ඉකුත් වී ඇත",
@@ -3465,7 +3476,7 @@
       "retentionLimit": "නවතම ඉන්වොයිසි පෙන්වයි."
     },
     "lowBalanceAlert": {
-      "enableA11y": "ශේෂය අඩු වූ විට දැනුම්දීම සක්‍රීය කරන්න",
+      "subtitle": "මෙම සංවිධානයේ ශේෂය ඔබ සකසන මුදලට වඩා අඩු වූ විට ඔබ ලැයිස්තුගත කරන ලිපිනවලට ඊමේල් මගින් දැනුම්දීමක් යවන්න.",
       "notifyEmailsLabel": "දැනුම්දීම් ලබන ඊමේල් ලිපින",
       "permissionDenied": "බිල්පත් දැනුම්දීම් කළමනාකරණය කිරීමට ඔබට අවසර නොමැත.",
       "separateEmailsHint": "ඊමේල් ලිපින කිහිපයක් ඇතුළත් කරන්නේ නම්, ඒවා කොමාවලින් වෙන් කරන්න.",
@@ -3612,8 +3623,7 @@
       "renameTitle": "සංවිධානයේ නම වෙනස් කරන්න",
       "renamePlaceholder": "සංවිධානයේ නම",
       "balance": "ශේෂය",
-      "organizationSeats": "සංවිධානයේ සාමාජික ස්ථාන",
-      "plan": "සංවිධානයේ සැලැස්ම",
+      "plan": "සැලැස්ම",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · කාලය අවසන් වී ඇත",
@@ -3647,7 +3657,8 @@
     "signupStepUp": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.moreSignInOptions)' භාවිත කරන්න.",
     "signupStepUpApple": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithApple)' භාවිත කරන්න.",
     "signupStepUpGoogle": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithGoogle)' භාවිත කරන්න.",
-    "invalidCode": "එම කේතය වැරදියි. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "signupStepUpBack": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට ආපසු ගොස් '$t(login.moreSignInOptions)' භාවිත කරන්න.",
+    "invalidCode": "එම කේතය වැරදියි හෝ කල් ඉකුත් වී ඇත. කරුණාකර නැවත උත්සාහ කරන්න, නැතහොත් '$t(login.resendCode)' භාවිත කරන්න.",
     "codeInProgress": "ඔබේ කේතය සකසනු ලැබේ. මොහොතක් රැඳී සිට නැවත උත්සාහ කරන්න.",
     "tooManyAttempts": "උත්සාහ කළ වාර ගණන වැඩියි. කරුණාකර නව කේතයක් ඉල්ලන්න.",
     "invalidToken": "පිවිසීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -3916,6 +3927,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) තෝරාගත් ප්‍රොටෝකෝලය සහ ආකෘතිය භාවිත කර මෙම අන්ත ලක්ෂ්‍යයට කෙටි අනුමාන ඉල්ලීමක් යවයි. සැපයුම්කරු ඒ සඳහා ගාස්තුවක් අය කළ හැක.",
       "connectionSucceeded": "ආකෘතිය මෙම ප්‍රොටෝකෝලය භාවිත කර ඉල්ලීමක් සම්පූර්ණ කළේය.",
       "connectionFailed": "ආකෘතියට ඉල්ලීමක් සම්පූර්ණ කළ නොහැකි විය. API මූලය, ප්‍රොටෝකෝලය, පිවිසුම් තොරතුරු සහ ආකෘති හැඳුනුම් අංකය පරීක්ෂා කරන්න.",
+      "requestTimedOut": "අන්ත ලක්ෂ්‍යය නියමිත වේලාවට පිළිතුරු දුන්නේ නැත. API මූලය සහ ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "requestUnauthorized": "අන්ත ලක්ෂ්‍යය පිවිසුම් තොරතුරු ප්‍රතික්ෂේප කළේය. API යතුර සහ අභිරුචි ශීර්ෂ පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "requestNotFound": "අන්ත ලක්ෂ්‍යය හෝ ආකෘතිය සොයාගත නොහැකි විය. API මූලය සහ ආකෘති හැඳුනුම් අංකය පරීක්ෂා කරන්න.",
+      "requestRateLimited": "අන්ත ලක්ෂ්‍යය ඉල්ලීම් සීමා කරයි. මොහොතක් රැඳී නැවත උත්සාහ කරන්න.",
+      "requestUnavailable": "අන්ත ලක්ෂ්‍යය දැනට ලබා ගත නොහැක. මොහොතකින් නැවත උත්සාහ කරන්න.",
+      "requestUnreachable": "අන්ත ලක්ෂ්‍යයට ළඟා විය නොහැකි විය. API මූලය සහ ඔබගේ සම්බන්ධතාවය පරීක්ෂා කරන්න.",
+      "requestInvalidResponse": "අන්ත ලක්ෂ්‍යය අපේක්ෂිත ආකෘතියෙන් පිළිතුරු දුන්නේ නැත. API මූලය සහ ප්‍රොටෝකෝලය සේවාදායකය සමඟ ගැළපේ දැයි පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "discoveryNoModels": "අන්ත ලක්ෂ්‍යය ආකෘති කිසිවක් ලැයිස්තුගත නොකළේය. ආකෘති අතින් ඇතුළත් කරන්න.",
+      "connectionIncomplete": "ආකෘතිය පිළිතුරු දුන් නමුත් සම්පූර්ණ කළේ නැත. නැවත උත්සාහ කරන්න, නැතහොත් ආකෘති හැඳුනුම් අංකය සහ ප්‍රොටෝකෝලය පරීක්ෂා කරන්න.",
       "invalidInput": "පසුපස සේවාවේ නමක්, වලංගු ශීර්ෂ සහ අනන්‍ය හැඳුනුම් අංකයක් හා නමක් ඇති අවම වශයෙන් එක් ආකෘතියක් ඇතුළත් කරන්න. ටෝකන සීමා ධන පූර්ණ සංඛ්‍යා විය යුතුය.",
       "invalidUrl": "පිවිසුම් තොරතුරු, විමසුමක් හෝ ඛණ්ඩයක් නොමැති HTTP හෝ HTTPS API මූලයක් ඇතුළත් කරන්න.",
       "publicHttp": "පොදු HTTP අන්ත ලක්ෂ්‍ය සඳහා අවසර නැත. HTTPS හෝ පෞද්ගලික දේශීය අන්ත ලක්ෂ්‍යයක් භාවිත කරන්න.",
@@ -4054,7 +4074,11 @@
     "reasoningEffort": {
       "modelFlag": "මෙම ආකෘතිය සිතීමේ මට්ටමට සහාය දක්වයි"
     },
-    "creditsRequired": "මෙම පණිවිඩය යැවීමට ප්‍රමාණවත් ක්‍රෙඩිට් නැත."
+    "creditsRequired": "මෙම පණිවිඩය යැවීමට ප්‍රමාණවත් ක්‍රෙඩිට් නැත.",
+    "providerKeyRefused": "සැපයුම්කරු පිවිසුම් තොරතුරු ප්‍රතික්ෂේප කළේය. එහි API යතුර පරීක්ෂා කර නැවත යවන්න.",
+    "providerModelMissing": "මෙම බැක්එන්ඩ් තවදුරටත් මෙම ආකෘතිය සපයන්නේ නැත. වෙනත් එකක් තෝරන්න.",
+    "providerRateLimited": "සැපයුම්කරු ඉල්ලීම් සීමා කරයි. මොහොතක් රැඳී නැවත යවන්න.",
+    "providerUnavailable": "සැපයුම්කරු දැනට ලබා ගත නොහැක. කෙටි වේලාවකින් නැවත යවන්න."
   },
   "settingsTools": {
     "confirmTitle": "මෙම වෙනස තහවුරු කරන්නද?"
@@ -4429,6 +4453,7 @@
     "pickPackToBuyAgain": "නව මිලදී ගැනීමක් ආරම්භ කිරීමට ඉහතින් පැකේජයක් තෝරන්න.",
     "purchasePending": "වෙළඳසැල තවමත් මෙම ගෙවීම සකසමින් පවතී. ගාස්තුව අනුමත කළ විගස ඔබගේ ක්‍රෙඩිට් ලැබෙනු ඇත.",
     "buyAgain": "නැවත මිලදී ගන්න",
+    "checkPurchase": "මිලදී ගැනීම පරීක්ෂා කරන්න",
     "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
     "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
   },
@@ -4522,7 +4547,9 @@
     },
     "saveSheet": {
       "title": "ලැයිස්තුවකට සුරකින්න",
-      "saved": "{{list}} වෙත සුරකින ලදී"
+      "saved": "{{list}} වෙත සුරකින ලදී",
+      "saveFailed": "කටයුත්ත සුරැකීමට නොහැකි විය. ඔබගේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "saveRefused": "කටයුත්ත මෙම ලැයිස්තුවට සුරැකීමට නොහැකි විය. වෙනත් ලැයිස්තුවක් තෝරන්න."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4561,7 @@
     "empty": "මෙම වාර්තා කාල පරාසය තුළ ක්‍රියාකාරකම් නැත.",
     "emptyHint": "කාලසටහන්ගත වාර්තාවක ක්‍රියාකාරකම් ඇති විට ඔබේ cloud සහ CLI කේතකරණ සැසි මෙහි දිස්වේ.",
     "loadError": "වාර්තා පූරණය කළ නොහැකි විය",
+    "estimateLoadError": "ඇස්තමේන්තුව පූරණය කළ නොහැකි විය.",
     "view": "වාර්තාව කියවන්න",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4801,7 +4829,7 @@
   },
   "organizationGuardrails": {
     "title": "AI ආරක්ෂක වැටවල්",
-    "permissionDenied": "AI ආරක්ෂක වැටවල් කළමනාකරණය කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකයින්ට පමණයි.",
+    "permissionDenied": "AI ආරක්ෂක වැටවල් කළමනාකරණය කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකයින්ට පමණයි. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI ආරක්ෂක වැටවල් සබල කර නැත",
     "unavailable": "Kilo ඉල්ලීම මත සංවිධානයක් සඳහා AI ආරක්ෂක වැටවල් සබල කරයි. {{supportEmail}} අමතන්න, Kilo කණ්ඩායම එය ඔබේ සංවිධානය සඳහා සබල කරයි.",
     "contactSupport": "සහාය කණ්ඩායම අමතන්න",
@@ -4939,7 +4967,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ව්‍යවසාය විශේෂාංගය",
-    "enterpriseOnly": "මෙය ව්‍යවසාය සඳහා පමණක් වන විශේෂාංගයකි.",
+    "enterpriseOnly": "සපයන්නන් සහ ආකෘති Enterprise සැලසුමේදී ලබා ගත හැක.",
     "readOnly": "මෙම සැකසුම් වෙනස් කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකයින්ට පමණයි.",
     "loadError": "සපයන්නන් සහ ආකෘති පූරණය කළ නොහැකි විය",
     "tabModels": "ආකෘති",

@@ -172,6 +172,7 @@
     "generating": "Ag giniúint…",
     "working": "Ag obair",
     "yourOwnRepositories": "Do stóir féin",
+    "organizationRepositories": "Stóir na heagraíochta",
     "dismissed": "Curtha as an áireamh",
     "agent": "Gníomhaire",
     "durationMinuteShort": "min",
@@ -1092,7 +1093,13 @@
     "tabs": {
       "overview": "Forléargas",
       "files": "Comhaid",
-      "discussion": "Plé"
+      "discussion": "Plé",
+      "discussionAccessibility_one": "{{title}}: 1 trácht",
+      "discussionAccessibility": "{{title}}: {{displayCount}} trácht",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} trácht",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} thrácht",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} thrácht",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} dtrácht"
     },
     "fileStatus": {
       "modified": "Modhnaithe",
@@ -1292,7 +1299,7 @@
     },
     "instructions": {
       "title": "Treoracha saincheaptha",
-      "deprecation": "Tá sé beartaithe deireadh a chur le treoracha saincheaptha. Bog na treoirlínte seo go comhad REVIEW.md i do stór ina ionad.",
+      "deprecation": "Bainfear na treoracha saincheaptha. Bog na treoirlínte seo go comhad REVIEW.md i do stór ina ionad.",
       "placeholder": "m.sh. Ár ngnáis maidir le láimhseáil earráidí a chur i bhfeidhm…",
       "clearTitle": "Bain na treoracha saincheaptha?",
       "clearMessage": "Má shábhálann tú réimse folamh, scriostar na treoracha saincheaptha atá stóráilte don athbhreithneoir seo."
@@ -1456,8 +1463,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
+      "managedOnWebTitle": "Bainistithe ar an ngréasán",
+      "managedOnWebShort": "Bainistítear an nasc seo ar an ngréasán ó ríomhaire.",
+      "managedOnWebRepositories": "Roghnaigh stórais do {{organization}} ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh thíos é.",
       "descriptionReconnect": "Cruthaigh comhartha rochtana nua don spás oibre do {{organization}} agus greamaigh thíos é.",
+      "descriptionOverview": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh é ar an gcéad scáileán eile.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
       "tokenPlaceholder": "Comhartha rochtana don spás oibre",
       "tokenRefused": "Níor ghlac Bitbucket leis an gcomhartha rochtana spáis oibre seo. Seiceáil go bhfuil na scóip thuas aige, ansin triail arís."
@@ -1478,6 +1489,7 @@
     "platformList": {
       "checking": "Ag seiceáil…",
       "statusUnavailable": "Níl an stádas ar fáil",
+      "needsAttention": "Aird ag teastáil",
       "platforms": "Ardáin",
       "activity": "Gníomhaíocht"
     },
@@ -3357,6 +3369,8 @@
     "retryHint": "Déanann sé iarracht eile stádas Kilo Pass a lódáil.",
     "endedOn": "Críochnaithe {{date}}",
     "notAvailableInApp": "Níl Kilo Pass ar fáil san aip.",
+    "notAvailableTitle": "Níl Kilo Pass san aip",
+    "noPassDescription": "Níl Kilo Pass ag an gcuntas seo.",
     "statusActive": "Gníomhach",
     "statusTrialing": "Ar thriail",
     "statusPastDue": "Íocaíocht thar téarma",
@@ -3639,7 +3653,7 @@
       "retentionLimit": "Taispeántar na sonraisc is déanaí."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Cumasaigh foláireamh faoi iarmhéid íseal",
+      "subtitle": "Seol foláireamh trí ríomhphost chuig na seoltaí a liostálann tú nuair a thiteann iarmhéid na heagraíochta seo faoi bhun na suime a shocraíonn tú.",
       "notifyEmailsLabel": "Seoltaí ríomhphoist le haghaidh foláireamh",
       "permissionDenied": "Níl cead agat foláirimh billeála a bhainistiú.",
       "separateEmailsHint": "Scar na seoltaí ríomhphoist le camóga.",
@@ -3789,8 +3803,7 @@
       "renameTitle": "Athainmnigh an eagraíocht",
       "renamePlaceholder": "Ainm na heagraíochta",
       "balance": "Iarmhéid",
-      "organizationSeats": "Suíocháin eagraíochta",
-      "plan": "Plean eagraíochta",
+      "plan": "Plean",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Thart",
@@ -3827,7 +3840,8 @@
     "signupStepUp": "Chun cruthú do chuntais a chríochnú, úsáid '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Chun cruthú do chuntais a chríochnú, úsáid '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Chun cruthú do chuntais a chríochnú, úsáid '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Tá an cód sin mícheart. Bain triail as arís le do thoil.",
+    "signupStepUpBack": "Chun cruthú do chuntais a chríochnú, téigh ar ais agus úsáid '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Tá an cód sin mícheart nó imithe in éag. Bain triail as arís nó úsáid '$t(login.resendCode)'.",
     "codeInProgress": "Tá do chód á phróiseáil. Fan nóiméad agus bain triail as arís.",
     "tooManyAttempts": "An iomarca iarrachtaí. Iarr cód nua le do thoil.",
     "invalidToken": "Theip ar an síniú isteach. Bain triail eile as.",
@@ -4099,6 +4113,15 @@
       "checkHelp": "Seolann $t(modelChat.backends.checkConnection) iarratas gairid tátail chuig an gcríochphointe seo leis an bprótacal agus an tsamhail roghnaithe. D'fhéadfadh an soláthraí táille a ghearradh air.",
       "connectionSucceeded": "Chuir an tsamhail iarratas i gcrích leis an bprótacal seo.",
       "connectionFailed": "Níorbh fhéidir leis an tsamhail iarratas a chur i gcrích. Seiceáil fréamh an API, an prótacal, na dintiúir agus aitheantas na samhla.",
+      "requestTimedOut": "Níor fhreagair an críochphointe in am. Seiceáil fréamh an API agus do nasc, agus bain triail eile as.",
+      "requestUnauthorized": "Dhiúltaigh an críochphointe do na dintiúir. Seiceáil an eochair API agus na ceanntásca saincheaptha, agus bain triail eile as.",
+      "requestNotFound": "Níor aimsíodh an críochphointe ná an tsamhail. Seiceáil fréamh an API agus aitheantas na samhla.",
+      "requestRateLimited": "Tá an críochphointe ag teorannú iarratas. Fan nóiméad agus bain triail eile as.",
+      "requestUnavailable": "Níl an críochphointe ar fáil faoi láthair. Bain triail eile as i gceann nóiméid.",
+      "requestUnreachable": "Níorbh fhéidir teacht ar an críochphointe. Seiceáil fréamh an API agus do nasc.",
+      "requestInvalidResponse": "D'fhreagair an críochphointe i bhformáid nach bhfuiltear ag súil léi. Seiceáil go n-oireann fréamh an API agus an prótacal don fhreastalaí, ansin bain triail eile as.",
+      "discoveryNoModels": "Níor liostaigh an críochphointe aon samhail. Cuir isteach samhlacha de láimh.",
+      "connectionIncomplete": "D'fhreagair an tsamhail ach níor chríochnaigh sí. Bain triail eile as, nó seiceáil aitheantas na samhla agus an prótacal.",
       "invalidInput": "Cuir isteach ainm cúlchórais, ceanntásca bailí agus samhail amháin ar a laghad a bhfuil aitheantas agus ainm uathúil aici. Ní mór gur slánuimhreacha deimhneacha iad na teorainneacha comharthaí.",
       "invalidUrl": "Cuir fréamh API HTTP nó HTTPS isteach gan dintiúir, teaghrán fiosrúcháin ná blúire.",
       "publicHttp": "Ní cheadaítear críochphointí poiblí HTTP. Úsáid HTTPS nó críochphointe áitiúil príobháideach.",
@@ -4237,7 +4260,11 @@
     "reasoningEffort": {
       "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     },
-    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh."
+    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh.",
+    "providerKeyRefused": "Dhiúltaigh an soláthraí do na dintiúir. Seiceáil a eochair API, agus seol arís.",
+    "providerModelMissing": "Ní fhreastalaíonn an cúlchóras seo ar an tsamhail seo a thuilleadh. Roghnaigh ceann eile.",
+    "providerRateLimited": "Tá an soláthraí ag teorannú iarratas. Fan nóiméad agus seol arís.",
+    "providerUnavailable": "Níl an soláthraí ar fáil faoi láthair. Seol arís go luath."
   },
   "settingsTools": {
     "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?"
@@ -4630,6 +4657,7 @@
     "pickPackToBuyAgain": "Roghnaigh pacáiste thuas chun ceannach nua a thosú.",
     "purchasePending": "Tá an siopa fós ag próiseáil na híocaíochta seo. Gheobhaidh tú do chreidmheasanna a luaithe a cheadóidh sé an muirear.",
     "buyAgain": "Ceannaigh arís",
+    "checkPurchase": "Seiceáil an ceannach",
     "purchaseOwnedByAnotherAccount": "Baineann na creidmheasanna ar an Apple Account seo le cuntas Kilo eile. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid.",
     "purchaseOwnedByAnotherAccountPlay": "Baineann na creidmheasanna ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid."
   },
@@ -4735,7 +4763,9 @@
     },
     "saveSheet": {
       "title": "Sábháil le liosta",
-      "saved": "Sábháilte i {{list}}"
+      "saved": "Sábháilte i {{list}}",
+      "saveFailed": "Níorbh fhéidir an tasc a shábháil. Seiceáil do cheangal agus bain triail eile as.",
+      "saveRefused": "Níorbh fhéidir an tasc a shábháil sa liosta seo. Roghnaigh liosta eile."
     }
   },
   "agentBriefing": {
@@ -4747,6 +4777,7 @@
     "empty": "Gan aon ghníomhaíocht san fhuinneog tuarascála seo",
     "emptyHint": "Taispeánfar do sheisiúin chódála scamaill agus CLI anseo nuair a bhíonn gníomhaíocht i dtuarascáil sceidealaithe.",
     "loadError": "Níorbh fhéidir tuarascálacha a lódáil",
+    "estimateLoadError": "Níorbh fhéidir an meastachán a lódáil.",
     "view": "Léigh an tuarascáil",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5026,7 +5057,7 @@
   },
   "organizationGuardrails": {
     "title": "Ráillí Cosanta AI",
-    "permissionDenied": "Ní féidir ach le húinéirí agus riarthóirí na heagraíochta Ráillí Cosanta AI a bhainistiú.",
+    "permissionDenied": "Ní féidir ach le húinéirí agus riarthóirí na heagraíochta Ráillí Cosanta AI a bhainistiú. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Níl Ráillí Cosanta AI cumasaithe",
     "unavailable": "Cumasaíonn Kilo Ráillí Cosanta AI d'eagraíocht ar iarratas. Déan teagmháil le {{supportEmail}}, agus déanfaidh foireann Kilo iad a chur ar siúl d'eagraíocht.",
     "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta",
@@ -5164,7 +5195,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Gné fiontraíochta",
-    "enterpriseOnly": "Níl an ghné seo ar fáil ach d’fhiontair.",
+    "enterpriseOnly": "Tá soláthraithe agus samhlacha ar fáil ar an bplean Enterprise.",
     "readOnly": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta na socruithe seo a athrú.",
     "loadError": "Níorbh fhéidir soláthraithe agus samhlacha a lódáil",
     "tabModels": "Samhlacha",

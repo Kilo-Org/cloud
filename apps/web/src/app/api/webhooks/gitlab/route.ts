@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
           ? { type: 'org' as const, id: integration.owned_by_organization_id }
           : ({ type: 'user' as const, id: integration.owned_by_user_id } as Owner);
 
-        const { id, isDuplicate } = await logWebhookEvent({
+        const { event, isDuplicate } = await logWebhookEvent({
           owner,
           platform: PLATFORM.GITLAB,
           event_type: eventType,
@@ -102,16 +102,16 @@ export async function POST(request: NextRequest) {
 
         if (isDuplicate) {
           logExceptInTest('Duplicate webhook event detected');
-          return { isDuplicate: true, webhookEventId: id };
+          return { isDuplicate: true, webhookEvent: event };
         }
-        return { isDuplicate: false, webhookEventId: id };
+        return { isDuplicate: false, webhookEvent: event };
       } catch (error) {
         logExceptInTest('Error logging webhook event:', error);
         captureException(error, {
           tags: { source: 'gitlab_webhook_event_logging' },
           extra: { event_type: eventType, event_action: action },
         });
-        return { isDuplicate: false, webhookEventId: undefined };
+        return { isDuplicate: false, webhookEvent: undefined };
       }
     };
 
@@ -146,9 +146,9 @@ export async function POST(request: NextRequest) {
       const result = await handleMergeRequest(parseResult.data, integration);
 
       // Mark webhook event as processed
-      if (logResult.webhookEventId) {
+      if (logResult.webhookEvent) {
         try {
-          await updateWebhookEvent(logResult.webhookEventId, {
+          await updateWebhookEvent(logResult.webhookEvent, {
             processed: true,
             processed_at: new Date().toISOString(),
             handlers_triggered: ['code_review'],

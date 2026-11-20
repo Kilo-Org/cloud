@@ -74,8 +74,12 @@ describe('security finding push keys', () => {
 
   it('translates the shared body sentence into the token language', () => {
     const bodyKey = pushBodyCatalogKey('internal.securityFindingSlaWarning');
-    expect(translatePush('es', bodyKey, FINDING_PARAMS)).toBe('XSS in admin en acme/api');
-    expect(translatePush('en', bodyKey, FINDING_PARAMS)).toBe('XSS in admin in acme/api');
+    expect(
+      translatePush('es', bodyKey, FINDING_PARAMS, '{{findingTitle}} in {{repoFullName}}')
+    ).toBe('XSS in admin en acme/api');
+    expect(
+      translatePush('en', bodyKey, FINDING_PARAMS, '{{findingTitle}} in {{repoFullName}}')
+    ).toBe('XSS in admin in acme/api');
   });
 });
 
@@ -193,7 +197,15 @@ describe('shipped push catalogs', () => {
         if (own === key) {
           failures.push(`${locale} ${key}: catalog holds the key itself`);
         }
-        const rendered = translatePush(locale, key, params);
+        // The production callers all pass the English copy as the fallback;
+        // this catalog audit renders with the same argument.
+        const english = ownEntry(en, key);
+        const rendered = translatePush(
+          locale,
+          key,
+          params,
+          typeof english === 'string' ? english : key
+        );
         if (typeof rendered !== 'string' || rendered.trim() === '') {
           failures.push(`${locale} ${key}: rendered an empty string`);
           continue;

@@ -34,7 +34,7 @@ export function isLiveUpdateCapable(): boolean {
 // capability gate, not a build-order placeholder: on iOS the require throws and
 // the iOS sink registered by `@/glanceable-ios/register` stands alone.
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, unicorn/prefer-module -- the capability gate above needs a CommonJS require so it can catch the iOS load failure
   require('@/glanceable-android/register');
 } catch {
   // No Android notification surface on this platform.

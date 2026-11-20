@@ -9,8 +9,10 @@ import { cn } from '@/lib/utils';
  *
  * Every chip paints its edge as an absolutely positioned overlay, so neither
  * state's size, padding or hit area changes when the selection moves. An
- * unselected chip draws the palette's `border` token, which is what makes it
- * read as a chip on the page rather than as loose text; the selected one keeps
+ * unselected chip draws the palette's `input` token — the control border a text
+ * field and an outlined button paint — because `border` is the hairline between
+ * two stacked neighbours (9% ink light, 7% white dark) and at chip size it read
+ * as no edge at all; the selected one keeps
  * the row's neutral `secondary` surface and paints the stronger 1 dp
  * `muted-foreground` ring over the same edge. Its label stays in the default
  * `foreground` ink. The fill alone separates from the page by only 1.1:1 light
@@ -45,7 +47,7 @@ export function FilterChip({
         pointerEvents="none"
         className={cn(
           'absolute inset-0 rounded-md border',
-          selected ? 'border-muted-foreground' : 'border-border'
+          selected ? 'border-muted-foreground' : 'border-input'
         )}
       />
       <Text>{label}</Text>

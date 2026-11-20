@@ -45,7 +45,7 @@ vi.mock('@/components/agents/session-preview-transcript', () => ({
 }));
 // The `owner/repo` pin is covered by its own suite; here it only has to reach
 // the eyebrow line.
-vi.mock('@/components/agents/session-list-helpers', () => ({
+vi.mock('@kilocode/app-shared/git-url-project', () => ({
   formatGitUrlProject: (gitUrl: string) => gitUrl,
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));

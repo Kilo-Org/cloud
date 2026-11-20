@@ -761,19 +761,28 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
 
 /**
  * The post-action check for a navigate: a redirect moved the tab to another
- * origin than the one the navigation was approved for. The caller must ask for
- * that origin and decide whether to stay.
+ * origin than the one the navigation was approved for. A landing origin the
+ * call may already open or read is the redirect's answer; any other origin
+ * must be asked for before the tab may stay there.
  */
 export const postAgentNavigate = async (
   session: Pick<BrowserToolPageSession, 'isolatedProbe' | 'send'>,
-  approvedOrigin: string
+  approvedOrigin: string,
+  authorized: readonly BrowserGrant[]
 ): Promise<BrowserOriginChanged | undefined> => {
   const frames = await readAgentFrameTree(session);
   const finalOrigin = mainFrameOf(frames)?.origin;
 
-  return finalOrigin === undefined || finalOrigin === approvedOrigin
-    ? undefined
-    : { from: approvedOrigin, kind: 'origin_changed', to: finalOrigin };
+  if (
+    finalOrigin === undefined ||
+    finalOrigin === approvedOrigin ||
+    isOriginGranted(authorized, 'navigate', finalOrigin) ||
+    isOriginGranted(authorized, 'read', finalOrigin)
+  ) {
+    return undefined;
+  }
+
+  return { from: approvedOrigin, kind: 'origin_changed', to: finalOrigin };
 };
 
 /**

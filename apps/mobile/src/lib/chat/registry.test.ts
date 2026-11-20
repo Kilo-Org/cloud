@@ -3534,6 +3534,33 @@ describe('what a chat has used', () => {
     expect(snapshotOf(opened).record.usage).toEqual({ 'vendor/summary': CALL });
     expect(recorded.get(opened)).toEqual({ 'vendor/summary': CALL });
   });
+
+  it('counts what the session reported before the person stopped the answer', async () => {
+    routedTotals.set(opened, new Map([['vendor/summary', CALL]]));
+    await say(
+      opened,
+      { text: 'after compaction', images: [] },
+      { model: 'kilo/one', effort: null }
+    );
+    await settled();
+
+    await stopChat(opened);
+    await settled();
+
+    expect(snapshotOf(opened).record.usage).toEqual({ 'vendor/summary': CALL });
+    expect(recorded.get(opened)).toEqual({ 'vendor/summary': CALL });
+  });
+
+  it('counts nothing for a stopped call the provider never reported', async () => {
+    await answer('one', 'kilo/one');
+    await say(opened, { text: 'two', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await stopChat(opened);
+    await settled();
+
+    expect(snapshotOf(opened).record.usage).toEqual({ 'kilo/one': CALL });
+  });
 });
 
 describe('remote servers after a restart', () => {

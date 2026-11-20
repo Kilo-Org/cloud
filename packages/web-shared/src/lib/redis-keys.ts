@@ -43,6 +43,10 @@ export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
+/** Enkrypt guardrail calls started in one minute; `minute` counts minutes since the Unix epoch. */
+export const enkryptCallsMinuteRedisKey = (minute: number) =>
+  redisKey(`enkrypt:calls:v1:${minute}`);
+
 export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
   redisKey(`organization:non-trial-enterprise:${organizationId}`);
 

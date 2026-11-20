@@ -287,6 +287,20 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
       mockRedisValues.set(key, typeof value === 'string' ? value : JSON.stringify(value));
       return 'OK';
     }),
+    pipeline: jest.fn(() => {
+      const commands: Array<() => void> = [];
+      const pipeline = {
+        incrby: (key: string, increment: number) => {
+          commands.push(() =>
+            mockRedisValues.set(key, String(Number(mockRedisValues.get(key) ?? 0) + increment))
+          );
+          return pipeline;
+        },
+        expire: () => pipeline,
+        exec: async () => commands.forEach(command => command()),
+      };
+      return pipeline;
+    }),
   },
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
@@ -5859,6 +5873,11 @@ describe('Enkrypt output guardrail', () => {
     expect(
       mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.guardrail ?? 'input')
     ).toEqual(expect.arrayContaining(['input', 'output']));
+    const callCounts = [...mockRedisValues]
+      .filter(([key]) => key.startsWith('enkrypt:calls:v1:'))
+      .reduce((sum, [, value]) => sum + Number(value), 0);
+    expect(callCounts).toBe(fetchSpy.mock.calls.length);
+    expect(callCounts).toBe(2);
   });
 
   it.each(cases)(

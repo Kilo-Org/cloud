@@ -28,6 +28,7 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
 import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 import { staleOrganizationScopeExit } from './organization-scope-model';
+import { TrialOfferNote } from './trial-offer-note';
 
 /** One line under the field: a failure the person can act on, or a result. */
 type CreateMessage = { text: string; tone: 'error' | 'notice' };
@@ -97,38 +98,6 @@ function NameField({ disabled, textProps, onChangeText, onSubmitEditing }: NameF
         accessibilityState={{ disabled }}
       />
     </>
-  );
-}
-
-/**
- * The offer line, with its height owned whether or not it is stated. A hidden
- * copy of the sentence lays the line out at the device width and font scale, so
- * a cold start that has not answered and an account the create procedure grants
- * nothing to reserve the same space and never move the form. Only an explicit
- * eligible answer paints it, and the hidden copy is not read aloud.
- */
-function TrialOfferNote({
-  offersTrial,
-  testIDPrefix,
-}: Readonly<{ offersTrial: boolean; testIDPrefix: string }>) {
-  const { t } = useTranslation();
-  return (
-    <View>
-      <View
-        className="opacity-0"
-        pointerEvents="none"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        testID={`${testIDPrefix}-reserve`}
-      >
-        <Text variant="caption">{t('organization.create.trialNote')}</Text>
-      </View>
-      {offersTrial ? (
-        <View className="absolute inset-0 justify-center" testID={testIDPrefix}>
-          <Text variant="caption">{t('organization.create.trialNote')}</Text>
-        </View>
-      ) : null}
-    </View>
   );
 }
 

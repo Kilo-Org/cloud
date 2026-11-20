@@ -689,12 +689,12 @@ test('apply closes a queued chunk left behind by runs that are already terminal'
     });
     insertChunk(f.sqlite, { runId: 'run-done-a', model: 'vendor/a', chunk: 1, status: 'queued' });
     insertChunk(f.sqlite, { runId: 'run-done-b', model: 'vendor/b', chunk: 0, status: 'pending' });
-    // A profile nobody owns any more: the park statement is the third settle write.
-    insertProfile(f.sqlite, { model: 'vendor/orphan', status: 'error_pending' });
+    insertProfile(f.sqlite, { model: 'vendor/orphan', status: 'running', runId: 'run-done-b' });
 
     const before = snapshot(f.sqlite);
     assert.equal(before.running_runs, 0, 'precondition: no live run to cancel');
     assert.ok(before.unfinished_chunks > 0, 'precondition: an unfinished chunk survives');
+    assert.equal(before.running_profiles, 1);
 
     const result = await run(f.path, ['--apply', ...BASE_ARGS]);
     assert.equal(result.code, EXIT.ok, JSON.stringify(result.events));
@@ -719,7 +719,15 @@ test('apply closes a queued chunk left behind by runs that are already terminal'
     );
     const after = snapshot(f.sqlite);
     assert.equal(after.unfinished_chunks, 0);
-    assert.equal(after.running_profiles, 0, 'the orphaned running profile is parked');
+    const parked = f.sqlite
+      .prepare(
+        "SELECT status, run_id, requested_at FROM benchmark_profiles WHERE model = 'vendor/orphan'"
+      )
+      .get();
+    assert.deepEqual(
+      { ...parked },
+      { status: 'pending', run_id: null, requested_at: PARKED_REQUESTED_AT }
+    );
   } finally {
     f.close();
   }

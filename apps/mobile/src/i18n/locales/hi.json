@@ -1104,7 +1104,7 @@
         "findingDismissed": "खारिज किया गया",
         "findingSeverityChanged": "गंभीरता बदली गई",
         "findingStatusChange": "स्थिति बदली गई",
-        "findingSuperseded": "बदला गया",
+        "findingSuperseded": "प्रतिस्थापित किया गया",
         "remediationBlocked": "सुधार अवरुद्ध हुआ",
         "remediationCancelled": "रद्द किया गया",
         "remediationFailed": "सुधार विफल रहा",
@@ -1219,7 +1219,7 @@
       "dueThisWeekDetail_one": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "dueThisWeekDetail_other": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "noDeadline": "कोई समय सीमा नहीं",
-      "reviewSlaAssignment": "तय की गई SLA समय सीमाओं की समीक्षा करें",
+      "reviewSlaAssignment": "SLA निर्धारण की समीक्षा करें",
       "allOpenFindingsTracked": "सभी अनसुलझी समस्याओं की निगरानी जारी"
     },
     "dismiss": {
@@ -1272,7 +1272,7 @@
       "couldNotLoad": "समस्याएँ लोड नहीं हो सकीं।",
       "couldNotLoadMore": "और समस्याएँ लोड नहीं हो सकीं।",
       "emptyDescription": "अभी किसी अनसुलझी समस्या पर ध्यान देने की ज़रूरत नहीं है।",
-      "emptyTitle": "कोई अनसुलझी समस्या नहीं",
+      "emptyTitle": "कोई खुली समस्या नहीं",
       "noMatchesDescription": "चुने हुए फ़िल्टर बदलकर या हटाकर देखें।",
       "noMatchesTitle": "फ़िल्टर से मेल खाने वाली कोई समस्या नहीं"
     },
@@ -1395,7 +1395,7 @@
       "findingAlreadyDismissed": "समस्या पहले ही खारिज की जा चुकी है।",
       "findingDismissed": "समस्या खारिज की गई।",
       "noRemediationsQueued": "कोई मौजूदा समस्या कतार में नहीं जोड़ी गई।",
-      "remediationsQueued": "मौजूदा सुधारों के अनुरोध कतार में जोड़े गए।",
+      "remediationsQueued": "मौजूदा सुधार कतार में जोड़े गए।",
       "analysisComplete": "विश्लेषण पूरा हुआ।",
       "syncComplete": "सिंक पूरा हुआ।"
     },
@@ -1426,7 +1426,7 @@
       "failedDescription": "सुरक्षा एजेंट विश्लेषण पूरा नहीं कर सका।",
       "extractionFailedDescription": "तकनीकी रिपोर्ट को संरचित परिणाम में नहीं बदला जा सका।",
       "exploitableDescription": "एप्लिकेशन कोड प्रभावित सुविधा तक पहुँच सकता है।",
-      "notExploitable": "कोड तक पहुँच संभव नहीं",
+      "notExploitable": "पहुँच योग्य पथ नहीं",
       "notExploitableDescription": "इस रिपॉज़िटरी में प्रभावित सुविधा तक पहुँचने वाला कोई कोड पथ नहीं मिला।",
       "unknown": "समीक्षा आवश्यक",
       "unknownDescription": "विश्लेषण से यह पुष्टि नहीं हो सकी कि कोड असुरक्षित सुविधा तक पहुँच सकता है या नहीं।",
@@ -1475,7 +1475,7 @@
     "remediationUnavailable": {
       "findingNotFound": "सुरक्षा समस्या अब मौजूद नहीं है।",
       "approvalRequired": "स्वचालित सुधार के लिए मंज़ूरी ज़रूरी है। मंज़ूरी देने के लिए सुधार खुद शुरू करें।",
-      "findingNotOpen": "समस्या अब अनसुलझी नहीं है।",
+      "findingNotOpen": "समस्या अब खुली नहीं है।",
       "repoNotInScope": "रिपॉज़िटरी को सुरक्षा एजेंट के लिए नहीं चुना गया है।",
       "analysisRequired": "सुधार शुरू करने से पहले कोडबेस का विश्लेषण करें।",
       "staleAnalysis": "विश्लेषण के बाद समस्या बदल गई है। सुधार शुरू करने से पहले विश्लेषण फिर से चलाएँ।",

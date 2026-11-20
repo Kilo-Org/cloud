@@ -1802,7 +1802,7 @@
       "dueThisWeekDetail_few": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "dueThisWeekDetail_other": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "noDeadline": "Brez roka",
-      "reviewSlaAssignment": "Preglej dodeljene roke SLA",
+      "reviewSlaAssignment": "Preglej dodeljevanje rokov SLA",
       "allOpenFindingsTracked": "Spremljajo se vse odprte ugotovitve"
     },
     "dismiss": {

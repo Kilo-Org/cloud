@@ -1724,7 +1724,7 @@
       "dueThisWeekDetail_one": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "dueThisWeekDetail_other": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "noDeadline": "म्याद छैन",
-      "reviewSlaAssignment": "तोकिएको SLA समीक्षा गर्नुहोस्",
+      "reviewSlaAssignment": "SLA तोकाईको समीक्षा गर्नुहोस्",
       "allOpenFindingsTracked": "सबै खुला सुरक्षा समस्याको निगरानी भइरहेको"
     },
     "dismiss": {

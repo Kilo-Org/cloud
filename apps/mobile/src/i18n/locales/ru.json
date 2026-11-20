@@ -1251,7 +1251,7 @@
       "dueThisWeekDetail_many": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
       "dueThisWeekDetail_other": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
       "noDeadline": "Без срока",
-      "reviewSlaAssignment": "Проверить назначенные сроки SLA",
+      "reviewSlaAssignment": "Проверить назначение сроков SLA",
       "allOpenFindingsTracked": "Все открытые уязвимости отслеживаются"
     },
     "dismiss": {
@@ -1460,7 +1460,7 @@
       "failedDescription": "Агент безопасности не смог завершить анализ.",
       "extractionFailedDescription": "Не удалось извлечь структурированный результат из технического отчёта.",
       "exploitableDescription": "Код приложения может вызвать уязвимую функцию.",
-      "notExploitable": "Уязвимый код недостижим",
+      "notExploitable": "Недостижимый путь",
       "notExploitableDescription": "В этом репозитории не найден путь выполнения кода, ведущий к уязвимой функции.",
       "unknown": "Требует проверки",
       "unknownDescription": "Не удалось установить, может ли код приложения вызвать уязвимую функцию.",

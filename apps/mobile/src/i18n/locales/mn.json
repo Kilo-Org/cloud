@@ -1724,7 +1724,7 @@
       "dueThisWeekDetail_one": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "dueThisWeekDetail_other": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "noDeadline": "Хугацаагүй",
-      "reviewSlaAssignment": "Тогтоосон SLA хугацааг шалгах",
+      "reviewSlaAssignment": "SLA оноолтыг шалгах",
       "allOpenFindingsTracked": "Бүх шийдээгүй асуудлыг хянаж байна"
     },
     "dismiss": {
@@ -1843,7 +1843,7 @@
       "couldNotLoadMore": "Дараагийн асуудлуудыг ачаалж чадсангүй.",
       "noMatchesTitle": "Шүүлтүүрт тохирох асуудал байхгүй",
       "noMatchesDescription": "Сонгосон шүүлтүүрүүдийг өөрчлөх эсвэл арилгахыг оролдоно уу.",
-      "emptyTitle": "Шийдээгүй асуудал байхгүй",
+      "emptyTitle": "Нээлттэй асуудал байхгүй",
       "emptyDescription": "Одоогоор анхаарах шаардлагатай шийдээгүй асуудал байхгүй."
     },
     "findingRow": {

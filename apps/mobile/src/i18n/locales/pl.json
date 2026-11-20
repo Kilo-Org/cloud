@@ -1251,7 +1251,7 @@
       "dueThisWeekDetail_many": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "dueThisWeekDetail_other": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "noDeadline": "Brak terminu",
-      "reviewSlaAssignment": "Sprawdź przypisane terminy SLA",
+      "reviewSlaAssignment": "Sprawdź przydział SLA",
       "allOpenFindingsTracked": "Wszystkie otwarte problemy są monitorowane"
     },
     "dismiss": {

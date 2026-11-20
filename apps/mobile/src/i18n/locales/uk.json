@@ -1251,7 +1251,7 @@
       "dueThisWeekDetail_many": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "dueThisWeekDetail_other": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",
-      "reviewSlaAssignment": "Перевірити встановлені терміни за SLA",
+      "reviewSlaAssignment": "Перевірити призначення термінів за SLA",
       "allOpenFindingsTracked": "Усі відкриті проблеми відстежуються"
     },
     "dismiss": {
@@ -1460,7 +1460,7 @@
       "failedDescription": "Агент безпеки не зміг завершити аналіз.",
       "extractionFailedDescription": "Технічний звіт не вдалося перетворити на структурований результат.",
       "exploitableDescription": "У коді застосунку є шлях до вразливої функції.",
-      "notExploitable": "Недосяжний код",
+      "notExploitable": "Недосяжний шлях",
       "notExploitableDescription": "У цьому репозиторії не знайдено шляху виконання до вразливої функції.",
       "unknown": "Потребує перевірки",
       "unknownDescription": "Не вдалося підтвердити, чи є в коді шлях до вразливої функції.",

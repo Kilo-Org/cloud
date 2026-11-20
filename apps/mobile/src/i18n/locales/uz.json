@@ -1985,7 +1985,7 @@
       "failedDescription": "Xavfsizlik agenti tahlilni yakunlay olmadi.",
       "extractionFailedDescription": "Texnik hisobotni tuzilmali natijaga aylantirib bo'lmadi.",
       "exploitableDescription": "Ilova kodi zaiflik mavjud funksiyani chaqira oladi.",
-      "notExploitable": "Kodga yetib borib bo‘lmaydi",
+      "notExploitable": "Yetib bo'lmaydigan yo'l",
       "notExploitableDescription": "Bu repozitoriyada zaiflik mavjud funksiyaga olib boradigan kod yo'li topilmadi.",
       "unknown": "Ko‘rib chiqish kerak",
       "unknownDescription": "Tahlil zaiflik mavjud funksiyani chaqirish mumkinligini tasdiqlay olmadi.",

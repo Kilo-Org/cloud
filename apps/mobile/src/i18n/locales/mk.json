@@ -1724,7 +1724,7 @@
       "dueThisWeekDetail_one": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "dueThisWeekDetail_other": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
-      "reviewSlaAssignment": "Провери ги доделените рокови според SLA",
+      "reviewSlaAssignment": "Провери доделувањето на рокови според SLA",
       "allOpenFindingsTracked": "Се следат сите отворени наоди"
     },
     "dismiss": {

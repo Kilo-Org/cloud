@@ -1724,7 +1724,7 @@
       "dueThisWeekDetail_one": "От тях {{exploitable}} с потвърдена възможност за атака",
       "dueThisWeekDetail_other": "От тях {{exploitable}} с потвърдена възможност за атака",
       "noDeadline": "Няма краен срок",
-      "reviewSlaAssignment": "Прегледай зададените срокове по SLA",
+      "reviewSlaAssignment": "Прегледай задаването на срокове по SLA",
       "allOpenFindingsTracked": "Всички отворени проблеми се проследяват"
     },
     "dismiss": {

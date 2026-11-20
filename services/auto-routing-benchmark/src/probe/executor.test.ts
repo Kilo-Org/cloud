@@ -239,21 +239,14 @@ beforeEach(async () => {
         body,
       });
       const reply = replies.shift() ?? { status: 500, body: '{"error":"no reply queued"}' };
-      const respond = () => {
-        res.writeHead(reply.status, {
-          'content-type': reply.contentType ?? 'text/event-stream',
-        });
-        res.end(reply.body);
-      };
       if (reply.hold === 'before-headers') return;
-      if (reply.hold === 'after-headers') {
-        res.writeHead(reply.status, {
-          'content-type': reply.contentType ?? 'text/event-stream',
-        });
-        return;
-      }
-      if (reply.delayMs === undefined) respond();
-      else setTimeout(respond, reply.delayMs);
+      res.writeHead(reply.status, {
+        'content-type': reply.contentType ?? 'text/event-stream',
+      });
+      res.flushHeaders();
+      if (reply.hold === 'after-headers') return;
+      if (reply.delayMs === undefined) res.end(reply.body);
+      else setTimeout(() => res.end(reply.body), reply.delayMs);
     });
   });
   const listening = Promise.withResolvers<void>();
@@ -283,6 +276,7 @@ function run(
     model?: string;
     variant?: string | null;
     fetchImpl?: typeof fetch;
+    now?: number;
   } = {}
 ) {
   return runProbeCaseViaGateway({
@@ -293,7 +287,7 @@ function run(
     kiloToken: 'user-token',
     kiloApiUrl: baseUrl(),
     orgId: 'org-1',
-    now: new Date('2026-11-20T09:00:00.000Z').getTime(),
+    now: overrides.now ?? new Date('2026-11-20T09:00:00.000Z').getTime(),
     fetchImpl: overrides.fetchImpl,
   });
 }
@@ -366,6 +360,15 @@ describe('probe executor — responses endpoint', () => {
     expect(
       gradeProbeOutput(probeCase.check, { text: answer.text, toolCalls: answer.tools.calls })
     ).toBe(1);
+  });
+
+  it('measures latency to the end of the reply stream, not to the response headers', async () => {
+    // A real delay through a real socket: only then does the header time differ from the
+    // stream end, which is the elapsed time this assertion is about.
+    replies.push({ status: 200, body: responsesCall(0.0012, 7), delayMs: 120 });
+    const result = await run({ now: Date.now() });
+    expect(result.exitCode).toBe(0);
+    expect(result.latencyMs).toBeGreaterThanOrEqual(100);
   });
 
   it('prices an uncosted reply at the catalog rates instead of recording no cost', async () => {

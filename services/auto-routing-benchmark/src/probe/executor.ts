@@ -213,10 +213,9 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
     if (!isTimeout(error, signal)) throw error;
     return { ...unbilledFailure(PROBE_TIMEOUT_DIAGNOSTIC, Date.now() - startedAt), timedOut: true };
   }
-  const latencyMs = Date.now() - startedAt;
-
   if (!response.ok) {
     const detail = (await response.text().catch(() => '')).slice(0, 400);
+    const latencyMs = Date.now() - startedAt;
     const stderr = `HTTP ${response.status} ${detail}`;
     if (UNKNOWN_MODEL_STATUS.has(response.status)) {
       return { ...unbilledFailure(stderr, latencyMs), unavailableModelId: request.model };
@@ -225,6 +224,7 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
   }
 
   const read = await readStream(response);
+  const latencyMs = Date.now() - startedAt;
   const reply = parseProbeStream(template.endpoint, read.body);
   const billed = (reply.costUsd ?? 0) > 0 || (reply.outputTokens ?? 0) > 0;
   const produced = billed || reply.text.length > 0 || reply.toolCalls.length > 0;

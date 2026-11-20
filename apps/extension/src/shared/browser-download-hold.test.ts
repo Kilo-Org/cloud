@@ -238,7 +238,6 @@ const makeHold = (downloads: FakeDownloads) => {
   const reports: string[] = [];
   const hold = createDownloadHold({
     cancel: downloads.api.cancel,
-    erase: downloads.api.erase,
     onReport: report => {
       reports.push(`${report.kept ? 'may-have-saved' : 'stopped'}:${report.filename}`);
     },

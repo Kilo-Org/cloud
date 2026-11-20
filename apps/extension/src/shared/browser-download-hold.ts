@@ -403,13 +403,11 @@ const waitFor = (milliseconds: number): Promise<void> => {
 
 export const createDownloadHold = ({
   cancel,
-  erase,
   now = Date.now,
   onReport,
   search,
 }: {
   readonly cancel: (itemId: number) => Promise<void>;
-  readonly erase?: ((itemId: number) => Promise<void> | undefined) | undefined;
   readonly now?: () => number;
   /** Called once per report as it is queued, so a worker that sleeps before the next call does not lose it. */
   readonly onReport?: ((report: DownloadHoldReport, session: string) => void) | undefined;
@@ -693,13 +691,14 @@ export const createDownloadHold = ({
   };
 
   /**
-   * `held` → `blocked`: cancel before `suggest`, confirm the state, erase the
-   * history entry, then answer Chrome. A cancel that threw, an item the browser
-   * had already completed, or one it cannot describe is `escaped` instead: the
-   * file may exist, and the report says so.
+   * `held` → `blocked`: cancel before `suggest`, confirm the state, then answer Chrome. A cancel that threw, an item
+   * the browser had already completed, or one it cannot describe is `escaped` instead: the file may exist, and the
+   * report says so.
    *
-   * The verdict is written last, after its report is queued: a call's settle ends on a settled state, and the call
-   * that reads its reports must not find a verdict it was never told about.
+   * The stopped item is left in the browser's download list, as the runtime's own guard leaves it: the cancel is
+   * Chrome's own proof that no file exists, and the user can still see that the attempt was interrupted. The verdict
+   * is written last, after its report is queued: a call's settle ends on a settled state, and the call that reads its
+   * reports must not find a verdict it was never told about.
    */
   const block = async (state: TrackedDownload, suggest: SuggestFilename): Promise<void> => {
     if (state.kind !== 'held') {
@@ -716,14 +715,6 @@ export const createDownloadHold = ({
 
     // The browser refused to cancel: the file may exist, and the model is told so before anything else.
     const settled = cancelled ? await settledFor(state) : escape(state, 'cancel-failed');
-
-    if (erase !== undefined) {
-      try {
-        await erase(state.itemId);
-      } catch {
-        // The history entry stays; the file is already gone.
-      }
-    }
 
     // Only after the cancel: `suggest` satisfies "exactly once", and no file can be renamed into place.
     suggest();
@@ -987,6 +978,7 @@ export const createDownloadHold = ({
         if (tab.session === session) {
           tabs.delete(tabId);
           announcements.delete(tabId);
+          settledFiles.delete(tabId);
           navigations.delete(tabId);
         }
       }
@@ -1093,6 +1085,7 @@ export const createDownloadHold = ({
     tab: input => {
       if ('detach' in input) {
         announcements.delete(input.detach);
+        settledFiles.delete(input.detach);
         tabs.delete(input.detach);
         navigations.delete(input.detach);
 

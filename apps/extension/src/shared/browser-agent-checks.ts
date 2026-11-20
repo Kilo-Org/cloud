@@ -214,7 +214,7 @@ export const downloadStoppedWithoutPermissionError = (filename: string): string 
 export const alsoStoppedDownloadsText = (filenames: readonly string[]): string => {
   const names = [...new Set(filenames)].join(', ');
 
-  return `${names}: the download was stopped before it was saved — each file needs its own approval.`;
+  return `${names}: the download was stopped before it was saved — each file needs its own approval, and the permission covers one download at a time.`;
 };
 
 /**

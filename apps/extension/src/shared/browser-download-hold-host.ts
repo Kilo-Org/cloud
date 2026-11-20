@@ -103,7 +103,6 @@ interface SessionStorageApi {
 /** The `chrome.downloads` slice the hold needs. */
 interface DownloadsApi extends DeterminingFilenameDownloadsApi {
   readonly cancel: (downloadId: number) => Promise<void>;
-  readonly erase?: ((query: { readonly id: number }) => Promise<void> | undefined) | undefined;
   readonly search?: (query: {
     readonly id?: number;
   }) => Promise<readonly { readonly id: number; readonly state?: string }[]> | undefined;
@@ -188,7 +187,6 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold =>
 
       await api.cancel(itemId);
     },
-    erase: itemId => globals.downloads()?.erase?.({ id: itemId }),
     onReport: (report, session) => {
       recordOf(session).owed = [...recordOf(session).owed, report];
       void write();

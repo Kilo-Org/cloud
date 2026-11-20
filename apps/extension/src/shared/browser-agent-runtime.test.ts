@@ -5708,7 +5708,6 @@ describe('the download hold on a real call', () => {
     const reports: DownloadHoldReport[] = [];
     const hold = createDownloadHold({
       cancel: async itemId => downloads.api.cancel?.(itemId),
-      erase: async itemId => downloads.api.erase?.({ id: itemId }),
       onReport: report => reports.push(report),
       search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
     });
@@ -6011,7 +6010,6 @@ describe('a download the dialog answer starts', () => {
     const reports: DownloadHoldReport[] = [];
     const hold = createDownloadHold({
       cancel: async itemId => downloads.api.cancel?.(itemId),
-      erase: async itemId => downloads.api.erase?.({ id: itemId }),
       onReport: report => reports.push(report),
       search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
     });

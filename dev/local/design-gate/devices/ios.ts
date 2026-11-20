@@ -20,7 +20,11 @@ function waitSync(ms: number): void {
 }
 
 /** The two UI orientations a gate cell asks for; `pud` is not a cell. */
-export type DisplayOrientation = 'portrait' | 'portraitUpsideDown' | 'landscapeLeft' | 'landscapeRight';
+export type DisplayOrientation =
+  | 'portrait'
+  | 'portraitUpsideDown'
+  | 'landscapeLeft'
+  | 'landscapeRight';
 
 export type IosDisplay = {
   /** Point size of the primary display, from its pixel size and UI scale. */

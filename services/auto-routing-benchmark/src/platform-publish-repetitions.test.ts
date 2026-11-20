@@ -1,7 +1,12 @@
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TAXONOMY_ROUTE_KEYS, type AutoRouter } from '@kilocode/auto-routing-contracts';
+import {
+  TAXONOMY_ROUTE_KEYS,
+  taxonomyRouteKey,
+  type AutoRouter,
+} from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
+import { PROBE_CASES } from './datasets/probe-cases';
 import { getLatestRoutingTable, replaceConfig } from './db';
 import { computeEngineIdentity, publishPlatformRoutingTable } from './run';
 
@@ -78,6 +83,16 @@ describe('platform publish under router decider repetitions (migrated SQLite)', 
          VALUES (?, ?, '', ?, ?, 0.001, 800, 800, 30, 0, 900, 0)`
       );
       for (const routeKey of TAXONOMY_ROUTE_KEYS) summary.run(runId, model, routeKey, accuracy);
+      // Revision 3 is active: a pair without probe results is ineligible on the agentic
+      // routes, so every ready run carries them.
+      const probe = sqlite.prepare(
+        `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+          rep, prompt_revision)
+         VALUES (?, ?, '', ?, ?, 1, 800, 0, 3)`
+      );
+      for (const probeCase of PROBE_CASES) {
+        probe.run(runId, model, probeCase.id, taxonomyRouteKey(probeCase));
+      }
     }
   }
 

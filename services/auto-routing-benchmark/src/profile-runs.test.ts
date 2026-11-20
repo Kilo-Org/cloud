@@ -3,7 +3,8 @@ import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
 import type * as SchedulerModule from './scheduler';
 import type * as SubscriptionsModule from './subscriptions';
-import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
+import type * as EligibilityModule from './probe/eligibility';
+import { TAXONOMY_ROUTE_KEYS, benchmarkPairKey } from '@kilocode/auto-routing-contracts';
 import type {
   PolicySettingComputedMap,
   PolicySettingOverrides,
@@ -66,6 +67,16 @@ vi.mock('./cli-runner', async importOriginal => {
     warmUpCliContainer: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+// These suites publish a fully measured pool; the ineligible branch is covered by
+// `src/probe/eligibility.test.ts` and `src/probe/publish.test.ts`.
+const missingProbeResults = vi.hoisted(() =>
+  vi.fn<(db: unknown, params: unknown) => Promise<Set<string>>>(async () => new Set<string>())
+);
+vi.mock('./probe/eligibility', async importOriginal => ({
+  ...(await importOriginal<typeof EligibilityModule>()),
+  pairsMissingProbeResults: missingProbeResults,
+}));
 
 vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
@@ -1174,7 +1185,7 @@ describe('decider run completion', () => {
     ).toEqual(['platform/a', 'platform/b']);
   });
 
-  it('publishes every route while the probe revision is not active', async () => {
+  it('drops a pair without probe results from the agentic routes after activation', async () => {
     vi.mocked(getLatestRoutingTable).mockResolvedValue(
       liveRoutingTable([
         { model: 'platform/a', variant: null },
@@ -1228,16 +1239,21 @@ describe('decider run completion', () => {
       ...summariesFor('platform/a', null, 'revision-3-a'),
       ...summariesFor('platform/b', 'high', 'revision-2-b'),
     ]);
+    missingProbeResults.mockResolvedValueOnce(
+      new Set([benchmarkPairKey({ model: 'platform/b', variant: 'high' })])
+    );
 
     await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
 
-    // `ACTIVE_MEASUREMENT_REVISION` is below the probe revision, so mixed gradings neither
-    // hold the table nor narrow a route: probe route eligibility starts with activation.
+    // Revision 3 is active: `b` lacks the probes, so its agentic results are dropped and
+    // every other route keeps both pairs' measurements.
     const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
     expect(table.routes['agentic_execution/tool_usage'].map(candidate => candidate.model)).toEqual([
       'platform/a',
-      'platform/b',
     ]);
+    expect(
+      table.routes['implementation/code_generation'].map(candidate => candidate.model)
+    ).toEqual(['platform/a', 'platform/b']);
   });
 
   it('does not hold the frontier table for an efficient-only grading revision', async () => {

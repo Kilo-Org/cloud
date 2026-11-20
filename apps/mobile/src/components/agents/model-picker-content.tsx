@@ -15,6 +15,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { providerKeyAddHref } from '@/lib/byok/provider-key-scope';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
+import { useModelPickerPick } from '@/lib/hooks/use-model-picker-pick';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -22,7 +23,7 @@ import {
   favoriteToggleAction,
   type ModelPickerRow,
 } from '@/lib/model-picker-rows';
-import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
+import { resolveModelPickerSelection } from '@/lib/picker-bridge';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
@@ -54,21 +55,18 @@ export function ModelPickerContent() {
   const [bridge, setBridge] = useState(() => modelPickerSlot.get(routeKey));
   const [selectedModel, setSelectedModel] = useState(bridge?.currentValue ?? '');
   const [selectedVariant, setSelectedVariant] = useState(bridge?.currentVariant ?? '');
-  const bridgeRef = useRef(bridge);
-  const selectedModelRef = useRef(selectedModel);
   const selectedVariantRef = useRef(selectedVariant);
-  const selectionChangedRef = useRef(false);
-  // Set only by the closes that keep the pick: Done, and the pick's own close
-  // (a single-effort model, or an effort chip). Every other way out — Cancel,
-  // Android Back, an iOS swipe-down — leaves it unset, so the focus cleanup
-  // drops a pick still waiting for its effort and the caller keeps its model.
-  const commitOnCloseRef = useRef(false);
+  const { heldPick, holdPick, clearPick, commitPick } = useModelPickerPick(routeKey);
+  // The route the sheet's state was read for. The same key re-focusing keeps
+  // what the sheet shows; a different key is a different picker and reads the
+  // slot again.
+  const initialisedKeyRef = useRef(routeKey);
   const closePickerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closePicker = useCallback(() => {
-    commitOnCloseRef.current = true;
+    commitPick();
     router.back();
-  }, [router]);
+  }, [commitPick, router]);
 
   const cancelPicker = useCallback(() => {
     router.back();
@@ -81,18 +79,20 @@ export function ModelPickerContent() {
 
   useFocusEffect(
     useCallback(() => {
-      const nextBridge = modelPickerSlot.get(routeKey);
-      const nextModel = nextBridge?.currentValue ?? '';
-      const nextVariant = nextBridge?.currentVariant ?? '';
+      // A blur and the re-focus after it re-run this effect. The pick and the
+      // rows the person is choosing between stay as they are; only a sheet
+      // that is now showing another route's picker reads the slot again.
+      if (initialisedKeyRef.current !== routeKey) {
+        initialisedKeyRef.current = routeKey;
+        const nextBridge = modelPickerSlot.get(routeKey);
+        const nextVariant = nextBridge?.currentVariant ?? '';
 
-      bridgeRef.current = nextBridge;
-      selectedModelRef.current = nextModel;
-      selectedVariantRef.current = nextVariant;
-      selectionChangedRef.current = false;
-      commitOnCloseRef.current = false;
-      setBridge(nextBridge);
-      setSelectedModel(nextModel);
-      setSelectedVariant(nextVariant);
+        clearPick();
+        selectedVariantRef.current = nextVariant;
+        setBridge(nextBridge);
+        setSelectedModel(nextBridge?.currentValue ?? '');
+        setSelectedVariant(nextVariant);
+      }
       setSearch('');
       searchInputRef.current?.clear();
 
@@ -102,18 +102,9 @@ export function ModelPickerContent() {
           closePickerTimerRef.current = null;
         }
 
-        const activeBridge = bridgeRef.current;
-        if (activeBridge && selectionChangedRef.current && commitOnCloseRef.current) {
-          commitModelPickerSelection(
-            activeBridge,
-            selectedModelRef.current,
-            selectedVariantRef.current
-          );
-        }
         modelPickerSlot.clear(routeKey);
-        bridgeRef.current = undefined;
       };
-    }, [routeKey])
+    }, [clearPick, routeKey])
   );
 
   const rows = useMemo<ModelPickerRow[]>(
@@ -154,9 +145,23 @@ export function ModelPickerContent() {
     (variant: string) => {
       selectionHaptic();
       dismissSearchPickerKeyboard();
-      selectionChangedRef.current = true;
       selectedVariantRef.current = variant;
       setSelectedVariant(variant);
+
+      // A chip belongs to the row the sheet has selected, so the effort it
+      // picks either joins the pick waiting for its close or makes the row the
+      // sheet opened on a pick of its own.
+      const pending = heldPick();
+      const option =
+        pending?.selection.option ??
+        bridge?.options.find(candidate => candidate.id === selectedModel);
+      const pickedThrough = pending?.bridge ?? bridge;
+      if (option !== undefined && pickedThrough !== undefined) {
+        const selection = resolveModelPickerSelection({ options: [option] }, option.id, variant);
+        if (selection !== null) {
+          holdPick(pickedThrough, selection);
+        }
+      }
 
       if (closePickerTimerRef.current) {
         clearTimeout(closePickerTimerRef.current);
@@ -166,7 +171,7 @@ export function ModelPickerContent() {
         closePicker();
       }, 175);
     },
-    [closePicker]
+    [bridge, closePicker, heldPick, holdPick, selectedModel]
   );
 
   const handleSelectModel = useCallback(
@@ -184,8 +189,7 @@ export function ModelPickerContent() {
       // row's check mark and its thinking-effort chips are visible whether or
       // not the sheet stays open for a variant choice.
       dismissSearchPickerKeyboard();
-      selectionChangedRef.current = true;
-      selectedModelRef.current = option.id;
+      holdPick(bridge, selection);
       selectedVariantRef.current = selection.variant;
       setSelectedModel(option.id);
       setSelectedVariant(selection.variant);
@@ -193,7 +197,7 @@ export function ModelPickerContent() {
         closePicker();
       }
     },
-    [acceptsVariant, bridge, closePicker]
+    [acceptsVariant, bridge, closePicker, holdPick]
   );
 
   // A remote session whose CLI reports no models projects one row with

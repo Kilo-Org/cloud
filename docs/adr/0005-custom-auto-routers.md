@@ -468,8 +468,12 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
    usage schema. Migration `0038` creates the case fence, request tables, receipts, and attempt
    history. It also adds `benchmark_runs.admission_marker` without backfill.
    The readiness migration adds one epoch row per base router. It does not invalidate results or
-   rebuild a table. The serving Worker checks that epoch before it reuses cached custom rankings.
-   During a staggered rollout, an older benchmark Worker can still return the full pool table.
+   rebuild a table. Each custom routing request reads that epoch by key before reusing cached
+   rankings. A shared gateway benchmark changes the epoch with its ready profile, so the next
+   request can use that result. Owner-local client measurements remain separate and can take up to
+   the existing cache limit of 60 seconds to appear. If the epoch is unavailable, the serving
+   Worker reads the full pool table and shares that read with concurrent requests. If both reads
+   fail, it returns a retryable error instead of serving an unverified cached table.
    The wrapper holds dispatch while it drains active work, applies migrations, deploys the
    benchmark Worker, and waits for a changed container image. Verify the platform funding
    organization and its executor membership before dispatch resumes. The Worker, web, and

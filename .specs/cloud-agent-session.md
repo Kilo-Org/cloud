@@ -79,6 +79,37 @@ repository.
 
 ## Rules
 
+### Network secrets
+
+1. Environment and profile editors MUST list **Network secrets** separately from environment variables.
+   Commands can read environment values, including values hidden after save.
+2. A network secret MUST have a variable name, a write-only value, and one to ten exact allowed domains.
+   An environment or profile MUST hold at most twenty network secrets.
+   One name MUST NOT be both an environment variable and a network secret in the same source.
+3. A workspace with network secrets MUST use Cloudflare Containers. Another provider MUST fail
+   with `Network secrets require a Cloudflare sandbox`. It MUST NOT receive plaintext instead.
+4. Commands MUST receive an opaque placeholder, during workspace setup and during agent execution.
+   Cloudflare snapshot build scripts MUST also receive a build-scoped placeholder.
+   A Vercel snapshot builder MUST refuse network secrets, without plaintext fallback.
+   Build placeholders MUST stop working when the build ends. The editor MUST explain that saved
+   configuration files must reference the variable, not an expanded build placeholder.
+   Kilo MUST substitute it only in request headers or Basic passwords, for HTTPS on port 443
+   to a bound domain. Restricted network access MUST include these domains.
+5. A placeholder sent to a wrong domain MUST fail with `403 network_secret_host_mismatch`.
+   A denied response MUST identify the domain and, when known, the variable name, never its value
+   or placeholder. Unknown aliases and unsupported locations MUST fail closed.
+   A resolution fault MUST report `503 network_secret_unavailable`, not an unknown secret.
+   Its `retryable` field MUST reflect whether the resolver permits retry. Policy failures MUST use a permanent denial.
+6. Network secrets MUST follow the existing environment/profile/inline precedence per variable name.
+   A later representation MUST remove earlier representations of that name.
+   Inline public requests MUST NOT supply network secrets in this phase.
+7. Workspace creation MUST capture its network-secret configuration once. Sibling chats and
+   new physical allocations MUST retain that configuration and its placeholders.
+   Edits MUST apply to new workspaces, not change an existing workspace silently.
+8. The editor MUST explain domain reachability, token scope, response echo risk, and client token-format checks.
+   Network secrets restrict where Kilo sends a value, not which actions the agent can perform there.
+   Kilo MUST NOT promise response redaction or protection for raw TCP, SSH, or database protocols.
+
 ### Start
 
 1. A session MUST have a connected git provider and a selected repository before

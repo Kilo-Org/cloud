@@ -13,6 +13,9 @@ export type ProfileOwnerType = ProfileOwner['type'];
 
 /** Profile variable response type (for API responses). Secret values are masked. */
 export type ProfileVarResponse = {
+  delivery?: 'env' | 'network';
+  allowedHosts?: string[] | null;
+  locations?: string[] | null;
   key: string;
   value: string; // Masked as '***' for secrets
   isSecret: boolean;

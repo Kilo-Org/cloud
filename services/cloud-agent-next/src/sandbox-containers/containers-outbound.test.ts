@@ -13,6 +13,7 @@ vi.mock('../sandbox-outbound.js', () => ({
 }));
 
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
+import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { ContainersOutbound, type ContainersOutboundProps } from './containers-outbound.js';
 import type { getSentryConfig } from '../shared/sentry.js';
 import {
@@ -37,6 +38,7 @@ const sentry = {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -55,6 +57,70 @@ function auditFixture() {
 }
 
 describe('ContainersOutbound egress enforcement', () => {
+  it('denies a blocked destination before resolving a network secret', async () => {
+    const { props, env, recordEgressRequest } = auditFixture();
+    const resolveCredential = vi.fn();
+    const sandboxControl = {
+      getByName: () => ({ resolveCredential }),
+    } as unknown as Cloudflare.Env['SANDBOX_CONTROL'];
+    const alias = createControlPlaneCredential('ses-audit', 'secret');
+
+    const response = await outbound(props, { ...env, SANDBOX_CONTROL: sandboxControl }).fetch(
+      new Request('https://outside.test/', { headers: { authorization: `Bearer ${alias}` } })
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe('Egress destination disallowed');
+    expect(resolveCredential).not.toHaveBeenCalled();
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+    expect(recordEgressRequest).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ hostname: 'outside.test', decision: 'denied' })
+    );
+  });
+
+  it.each([true, false])(
+    'commits both credential decisions in one audit call (available: %s)',
+    async available => {
+      const { props, env, recordEgressRequest } = auditFixture();
+      const first = createControlPlaneCredential('ses-audit', 'secret');
+      const second = createControlPlaneCredential('ses-audit', 'secret');
+      const resolveCredential = async ({ credential }: { credential: string }) => ({
+        type: 'network',
+        key: credential === first ? 'FIRST' : 'SECOND',
+        value: 'synthetic-upstream-value',
+        allowedHosts: ['example.com'],
+        locations: ['header'],
+      });
+      const sandboxControl = {
+        getByName: () => ({ resolveCredential }),
+      } as unknown as Cloudflare.Env['SANDBOX_CONTROL'];
+      const upstream = vi.fn(async () => new Response('forwarded'));
+      vi.stubGlobal('fetch', upstream);
+      recordEgressRequest.mockImplementation(async () => {
+        expect(upstream).not.toHaveBeenCalled();
+        if (!available) throw new Error('Synthetic audit failure');
+      });
+
+      const response = await outbound(props, { ...env, SANDBOX_CONTROL: sandboxControl }).fetch(
+        new Request('https://example.com/', { headers: { 'x-first': first, 'x-second': second } })
+      );
+
+      expect(response.status).toBe(available ? 200 : 502);
+      expect(recordEgressRequest).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          decision: 'allowed',
+          credentialDecisions: [
+            { credentialKey: 'FIRST', credentialDecision: 'substituted' },
+            { credentialKey: 'SECOND', credentialDecision: 'substituted' },
+          ],
+        })
+      );
+      expect(JSON.stringify(recordEgressRequest.mock.calls)).not.toMatch(
+        /kcp1\.|synthetic-upstream-value/
+      );
+      expect(upstream).toHaveBeenCalledTimes(available ? 1 : 0);
+    }
+  );
   it.each([undefined, false])(
     'does not write audit records when opted out: %s',
     async egressAudit => {

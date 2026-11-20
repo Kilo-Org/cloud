@@ -125,6 +125,8 @@ export const environmentBuildRequestResultSchema = z.discriminatedUnion('status'
       reason: z.enum([
         'not_found',
         'unsupported_provider',
+        'network_secrets_require_cloudflare',
+        'network_secret_configuration_invalid',
         'billing_blocked',
         'container_limit_reached',
         'repository_unauthorized',

@@ -54,6 +54,11 @@ export const scopeGrants = sqliteTable('scope_grants', {
   grant: text('grant').notNull(),
 });
 
+export const networkSecretSnapshots = sqliteTable('network_secret_snapshots', {
+  scope_id: text('scope_id').primaryKey(),
+  secrets: text('secrets').notNull(),
+});
+
 export const workspaceDiskSnapshots = sqliteTable('workspace_disk_snapshots', {
   workspace_id: text('workspace_id').primaryKey(),
   data: text('data', { mode: 'json' }).notNull(),

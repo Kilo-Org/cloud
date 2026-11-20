@@ -1209,7 +1209,7 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
     github: CAPABILITY,
     gitlab: GITLAB_CAPABILITY,
     bitbucket: 'kbb1.opaque',
-  } satisfies Record<Exclude<ControlCredentialPurpose, 'kilo'>, string>;
+  } satisfies Record<Exclude<ControlCredentialPurpose, 'kilo' | 'secret'>, string>;
 
   function fixture() {
     const resolveCredential = vi.fn().mockResolvedValue(null);

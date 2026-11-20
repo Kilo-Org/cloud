@@ -2821,8 +2821,9 @@ export const createBrowserToolSession = ({
    * url decides it: any other url-only update is a document still committing,
    * and a tab that reports complete before the new document commits is not done.
    * The wait is bounded: a page that never finishes loading answers with what
-   * the tab shows then, and an action the browser never reports on answers
-   * `nothingHappened` instead of claiming a navigation that did not run.
+   * the tab shows then, and an action the browser never reports on at all
+   * answers `nothingHappened` after a short grace instead of claiming a
+   * navigation that did not run. A reported navigation keeps the full timeout.
    */
   const loadInTab = async (
     start: () => Promise<{ readonly error?: string }>,
@@ -2839,6 +2840,7 @@ export const createBrowserToolSession = ({
     const loaded = Promise.withResolvers<void>();
     let loading = false;
     let quiet = false;
+    let reported = false;
     let grace: ReturnType<typeof setTimeout> | undefined = undefined;
     const listener = (
       updatedTabId: number,
@@ -2848,6 +2850,9 @@ export const createBrowserToolSession = ({
         return;
       }
 
+      // The browser reported on this tab: the action did something, so its load is awaited up to the full timeout instead of the quiet grace.
+      reported = true;
+      clearTimeout(grace);
       loading ||= changeInfo.status === 'loading';
 
       if (loading && changeInfo.status === 'complete') {
@@ -2879,8 +2884,10 @@ export const createBrowserToolSession = ({
 
       // Nothing the browser reports arrives for an action that changed nothing (back with no history entry); a short grace ends that wait instead of the full timeout.
       grace = setTimeout(() => {
-        quiet = true;
-        loaded.resolve();
+        if (!reported) {
+          quiet = true;
+          loaded.resolve();
+        }
       }, SCRIPTING_NAVIGATION_QUIET_MS);
       await loaded.promise;
       clearTimeout(grace);

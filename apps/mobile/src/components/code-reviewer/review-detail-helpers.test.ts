@@ -277,8 +277,13 @@ describe('findingsEmptyCopyKey', () => {
     );
   });
 
-  it('keeps the failure copy for a failed review', () => {
+  it('names no results for a failed review without repeating the failure', () => {
     expect(findingsEmptyCopyKey('failed')).toBe('codeReviewer.reviewDetail.findingsUnavailable');
+    const line = i18n.t('codeReviewer.reviewDetail.findingsUnavailable');
+    // The badge and the reason card state the failure, so this line only says
+    // that the review produced no results.
+    expect(line).not.toBe(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(line).not.toMatch(/fail/i);
   });
 
   it('reports an ended review with no findings as a result', () => {

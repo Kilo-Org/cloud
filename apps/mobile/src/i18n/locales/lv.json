@@ -1301,7 +1301,7 @@
       "couldNotGetLatest": "Neizdevās iegūt jaunākos datus.",
       "byline": "#{{number}} autors: {{author}}",
       "noFindings": "Nav konstatējumu.",
-      "findingsUnavailable": "Rezultāti nav pieejami, jo šī koda pārskatīšana neizdevās.",
+      "findingsUnavailable": "Nav rezultātu",
       "findingsInProgress": "Šī pārskatīšana vēl notiek. Konstatējumi šeit parādīsies, kad tā tiks pabeigta.",
       "findingsEndedWithoutResults": "Šī pārskatīšana tika pārtraukta, pirms tika iegūti kādi konstatējumi.",
       "serviceUnavailable": "Neizdevās izveidot savienojumu ar koda pārskatīšanas pakalpojumu. Atkārtojiet koda pārskatīšanu, kad pakalpojums būs pieejams.",

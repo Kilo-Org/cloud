@@ -772,7 +772,7 @@
       "gateHidden": "Oculto",
       "gateNone": "Ninguno",
       "noFindings": "No hay hallazgos.",
-      "findingsUnavailable": "Los resultados no están disponibles porque esta revisión falló.",
+      "findingsUnavailable": "No hay resultados",
       "findingsInProgress": "Esta revisión aún está en curso. Los hallazgos aparecerán aquí cuando termine.",
       "findingsEndedWithoutResults": "Esta revisión terminó antes de generar hallazgos.",
       "serviceUnavailable": "No se pudo conectar con el servicio de revisión de código. Vuelve a intentar la revisión cuando el servicio esté disponible.",

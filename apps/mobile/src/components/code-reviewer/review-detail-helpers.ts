@@ -9,10 +9,12 @@ import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required
  * The catalog key for the findings section while it has no finding to draw.
  * The copy is a function of the review's status, never of the empty list alone:
  * "No findings" is a result, and only a review that ended with no result may
- * claim one. A review still in flight has not produced findings yet, a failed
- * review produced none, and a cancelled or interrupted review ended before it
- * could — three different sentences, so the screen never reports a clean run
- * for a review that has not finished.
+ * claim one. A review still in flight has not produced findings yet and a
+ * cancelled or interrupted review ended before it could, so the screen never
+ * reports a clean run for a review that has not finished. A failed review
+ * reads "No results": the line says only that the review produced no results,
+ * because the status badge and the failure reason card above it already carry
+ * the failure, and the findings section never repeats an outcome.
  */
 export function findingsEmptyCopyKey(status: string): string {
   if (status === 'failed') {

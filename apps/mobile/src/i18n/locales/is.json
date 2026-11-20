@@ -1274,7 +1274,7 @@
       "couldNotGetLatest": "Ekki tókst að sækja nýjustu gögnin.",
       "byline": "#{{number}} eftir {{author}}",
       "noFindings": "Engin frávik fundust.",
-      "findingsUnavailable": "Niðurstöður eru ekki tiltækar þar sem þessi yfirferð mistókst.",
+      "findingsUnavailable": "Engar niðurstöður",
       "findingsInProgress": "Þessi yfirferð er enn í gangi. Frávik birtast hér þegar henni er lokið.",
       "findingsEndedWithoutResults": "Þessari yfirferð lauk áður en nein frávik komu fram.",
       "serviceUnavailable": "Ekki náðist samband við kóðayfirferðarþjónustuna. Reyndu yfirferðina aftur þegar þjónustan er tiltæk.",

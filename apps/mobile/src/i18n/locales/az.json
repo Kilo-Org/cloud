@@ -1274,7 +1274,7 @@
       "couldNotGetLatest": "Ən son məlumatları almaq mümkün olmadı.",
       "byline": "#{{number}} · Müəllif: {{author}}",
       "noFindings": "Tapıntı yoxdur.",
-      "findingsUnavailable": "Bu kod yoxlaması uğursuz olduğu üçün nəticələr əlçatan deyil.",
+      "findingsUnavailable": "Nəticə yoxdur",
       "findingsInProgress": "Bu kod yoxlaması hələ davam edir. Bitəndə tapıntılar burada görünəcək.",
       "findingsEndedWithoutResults": "Bu kod yoxlaması hər hansı bir tapıntı meydana gəlmədən başa çatdı.",
       "serviceUnavailable": "Kod yoxlaması xidmətinə qoşulmaq mümkün olmadı. Xidmət əlçatan olduqda yoxlamanı təkrarla.",

@@ -775,7 +775,7 @@
       "gateHidden": "مخفي",
       "gateNone": "لا شيء",
       "noFindings": "لا توجد نتائج.",
-      "findingsUnavailable": "النتائج غير متاحة لأن هذه المراجعة فشلت.",
+      "findingsUnavailable": "لا توجد نتائج",
       "findingsInProgress": "هذه المراجعة لا تزال قيد التنفيذ. ستظهر النتائج هنا عند اكتمالها.",
       "findingsEndedWithoutResults": "انتهت هذه المراجعة قبل أن تنتج أي نتائج.",
       "serviceUnavailable": "تعذّر الاتصال بخدمة مراجعة الكود. أعد المراجعة عندما تصبح الخدمة متاحة.",

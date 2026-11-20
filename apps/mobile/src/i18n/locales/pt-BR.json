@@ -740,7 +740,7 @@
       "gateHidden": "Não exibido",
       "gateNone": "Nenhum",
       "noFindings": "Nenhuma ocorrência foi encontrada.",
-      "findingsUnavailable": "Os resultados não estão disponíveis porque esta revisão falhou.",
+      "findingsUnavailable": "Nenhum resultado",
       "findingsInProgress": "Esta revisão ainda está em andamento. As ocorrências aparecerão aqui quando ela terminar.",
       "findingsEndedWithoutResults": "Esta revisão foi encerrada antes de encontrar qualquer ocorrência.",
       "serviceUnavailable": "Não foi possível conectar ao serviço de revisão de código. Tente revisar novamente quando o serviço estiver disponível.",

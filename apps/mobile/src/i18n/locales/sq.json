@@ -1274,7 +1274,7 @@
       "couldNotGetLatest": "Nuk u morën të dhënat më të fundit.",
       "byline": "#{{number}} nga {{author}}",
       "noFindings": "Nuk ka gjetje.",
-      "findingsUnavailable": "Rezultatet nuk janë të disponueshme sepse ky shqyrtim dështoi.",
+      "findingsUnavailable": "Nuk ka rezultate",
       "findingsInProgress": "Ky shqyrtim është ende në zhvillim. Gjetjet shfaqen këtu kur ai të përfundojë.",
       "findingsEndedWithoutResults": "Ky shqyrtim përfundoi përpara se të jepte ndonjë gjetje.",
       "serviceUnavailable": "Nuk u arrit lidhja me shërbimin e shqyrtimit të kodit. Riprovo shqyrtimin kur shërbimi të jetë i disponueshëm.",

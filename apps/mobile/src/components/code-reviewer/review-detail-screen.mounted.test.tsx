@@ -709,6 +709,10 @@ describe('ReviewDetailScreen empty council', () => {
     const texts = renderScreen();
     expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
     expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+    // The danger reason card above states the failure, so the Findings line
+    // itself must not repeat it.
+    const findingsLine = i18n.t('codeReviewer.reviewDetail.findingsUnavailable');
+    expect(findingsLine).not.toBe(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
   });
 
   it.each(['failed', 'completed'])('preserves findings from a %s review', status => {

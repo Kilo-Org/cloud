@@ -112,9 +112,10 @@ export function LegalDocumentScreen({
             <Text>{t('common.legalDocumentEnglishOnly')}</Text>
           </Card>
         ) : null}
-        {/* Selectable text takes the Android tap before the anchor's press
-            handler, so an in-content link would never open; it also exposes
-            every block as a press target to a screen reader. */}
+        {/* A selectable body becomes one focusable selection block per
+            paragraph group, so a screen reader meets legal prose as controls.
+            The body reads as plain text instead, as every other link-bearing
+            markdown surface renders it. */}
         <MarkdownText
           value={state.html}
           documentDirection="ltr"

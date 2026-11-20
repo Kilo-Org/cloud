@@ -127,14 +127,14 @@ afterEach(async () => {
 });
 
 describe('LegalDocumentScreen body selection', () => {
-  it('renders the body as plain text, so an in-content link tap reaches its handler', async () => {
+  it('renders the body as plain text, not as a focusable selection block', async () => {
     await i18n.changeLanguage('en');
     const renderer = mountScreen();
 
     const bodies = renderer.root.findAll(isBody);
     expect(bodies).toHaveLength(1);
-    // A selectable body takes the Android tap before the anchor's press
-    // handler and exposes every block as a press target.
+    // A selectable body becomes one focusable selection block per paragraph
+    // group, so a screen reader meets prose as controls.
     expect(bodies[0]?.props.selectable).toBe(false);
   });
 });

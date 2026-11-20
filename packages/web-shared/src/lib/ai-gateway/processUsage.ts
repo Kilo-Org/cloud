@@ -342,9 +342,10 @@ export async function toInsertableDbUsageRecord(
     generation_time: usageStats.generation_time,
     // Custom LLM routes supply their own upstream credentials without using a user's BYOK key.
     is_byok:
-      provider === 'custom' || provider === 'custom-public' || provider === 'partner'
-        ? true
-        : usageStats.is_byok,
+      provider === 'custom' ||
+      provider === 'custom-public' ||
+      provider === 'partner' ||
+      usageStats.is_byok,
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,

@@ -1,5 +1,6 @@
 import type {
   AutoRouter,
+  BenchmarkConfig,
   BenchmarkProfileEntryStatus,
   BenchmarkProfileFailure,
   BenchmarkProfileQuotaError,
@@ -244,6 +245,23 @@ function missingStatus(entry: BenchmarkPair): BenchmarkProfileEntryStatus {
     entry,
     status: 'failed',
     failureReason: MISSING_PROFILE_FAILURE_REASON,
+  };
+}
+
+/** Reported status of one planned pair, without waiting on a batch that may not run. */
+function plannedStatus(
+  entry: BenchmarkPair,
+  classification: AdmissionClass
+): BenchmarkProfileEntryStatus {
+  if (classification.kind === 'admit') return pendingStatus(entry);
+  return {
+    entry,
+    status: classification.status,
+    failureReason:
+      classification.status === 'failed'
+        ? boundFailureReason(classification.failureReason)
+        : null,
+    ...(classification.failure ? { failure: classification.failure } : {}),
   };
 }
 
@@ -536,7 +554,7 @@ export type RegisterProfilesInput = {
  */
 export async function registerProfiles(
   db: D1Database,
-  config: PolicySettingSource,
+  config: PolicySettingSource & Pick<BenchmarkConfig, 'userQueuePaused'>,
   input: RegisterProfilesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   assertUniquePairs(input.pairs);
@@ -570,6 +588,20 @@ export async function registerProfiles(
       retryKeys.has(benchmarkPairKey(entry))
     ),
   }));
+
+  // Operator pause on the owner queue: nothing is inserted, charged, or claimed, and
+  // no quota is spent. The caller still learns each pair's current status, and the
+  // next registration after the pause lifts admits the pool.
+  if (config.userQueuePaused) {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_profile_admission_paused',
+        ownerType: input.ownerType,
+        pairs: input.pairs.length,
+      })
+    );
+    return { statuses: plan.map(({ entry, classification }) => plannedStatus(entry, classification)) };
+  }
 
   const chargedAdmissions = plan.filter(
     p => p.classification.kind === 'admit' && p.classification.charged
@@ -666,15 +698,7 @@ export async function registerProfiles(
       if (currentRow) return statusFromRow(entry, currentRow);
       return pendingStatus(entry);
     }
-    return {
-      entry,
-      status: classification.status,
-      failureReason:
-        classification.status === 'failed'
-          ? boundFailureReason(classification.failureReason)
-          : null,
-      ...(classification.failure ? { failure: classification.failure } : {}),
-    };
+    return plannedStatus(entry, classification);
   });
 
   return { statuses };

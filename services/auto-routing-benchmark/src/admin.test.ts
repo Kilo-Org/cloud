@@ -70,11 +70,13 @@ const TEST_CONFIG_ROWS = {
     user_max_concurrency: 40,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
     benchmark_org_id: TEST_CONFIG.benchmarkOrgId,
+    user_queue_paused: false,
     classifier_repetitions: 1,
     decider_repetitions: 1,
     classifier_max_p95_latency_ms: 1000,
     policy_overrides: null,
     policy_computed: null,
+    user_queue_paused: false,
     updated_at: '2026-06-01T00:00:00.000Z',
     updated_by: null,
   },
@@ -309,9 +311,26 @@ beforeEach(() => {
     );
     CREATE TABLE scheduler_settings (
       id INTEGER PRIMARY KEY, slots INTEGER, model_concurrency INTEGER,
+      per_run_usd REAL, per_day_usd REAL, per_owner_day_usd REAL,
       updated_at TEXT, updated_by TEXT
     );
-    CREATE TABLE benchmark_runs (id TEXT, kind TEXT, status TEXT, started_at TEXT);
+    CREATE TABLE benchmark_runs (
+      id TEXT, kind TEXT, status TEXT, started_at TEXT,
+      spent_usd REAL NOT NULL DEFAULT 0, spend_owner_type TEXT, spend_owner_id TEXT,
+      spend_pause_scope TEXT
+    );
+    CREATE TABLE benchmark_config (router TEXT PRIMARY KEY, user_queue_paused INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE benchmark_spend_ledger (
+      day TEXT, owner_type TEXT, owner_id TEXT, spent_usd REAL NOT NULL, updated_at TEXT,
+      PRIMARY KEY (day, owner_type, owner_id)
+    );
+    CREATE TABLE case_results (
+      run_id TEXT, model TEXT, variant TEXT, case_id TEXT, rep INTEGER,
+      cost_usd REAL, error TEXT, timed_out INTEGER
+    );
+    CREATE TABLE scheduler_executions (
+      run_id TEXT, model TEXT, variant TEXT, case_id TEXT, rep INTEGER, started_at INTEGER
+    );
     CREATE TABLE scheduler_runs (run_id TEXT);
     CREATE TABLE scheduler_chunks (run_id TEXT, model TEXT, variant TEXT, rep INTEGER, status TEXT);
     CREATE TABLE run_lane_failures (run_id TEXT, model TEXT, variant TEXT, rep INTEGER);
@@ -3021,7 +3040,8 @@ describe('router selection', () => {
     expect(listRuns).toHaveBeenCalledWith(
       env.BENCH_DB,
       20,
-      expect.objectContaining({ router: 'frontier' })
+      expect.objectContaining({ router: 'frontier' }),
+      { perRunUsd: expect.any(Number) }
     );
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
   });
@@ -3093,5 +3113,94 @@ describe('body router selection', () => {
       expect.objectContaining({ router: 'frontier' }),
       expect.objectContaining({ ownerId: 'owner' })
     );
+  });
+});
+
+describe('operator user queue pause', () => {
+  const pausedConfigRows = () => ({
+    ...TEST_CONFIG_ROWS,
+    config: { ...TEST_CONFIG_ROWS.config, user_queue_paused: true },
+  });
+
+  it('starts no user run while paused and leaves the platform drain unaffected', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(pausedConfigRows());
+    vi.mocked(listPendingCurrentProfiles).mockImplementation(async (_db, _filter, purpose) =>
+      purpose === 'platform'
+        ? [{ model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' }]
+        : [{ model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' }]
+    );
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'both' });
+
+    expect(res.status).toBe(202);
+    expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual(['platform']);
+    expect(listPendingCurrentProfiles).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'user'
+    );
+  });
+
+  it('starts no user run at all while paused', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(pausedConfigRows());
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ runId: null, startedRuns: [] });
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
+  });
+
+  it('flips only the stored pause column', async () => {
+    sqlite
+      .prepare("INSERT INTO benchmark_config (router, user_queue_paused) VALUES ('efficient', 0)")
+      .run();
+
+    const res = await authedPost('/admin/config/user-queue', { paused: true });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ router: 'efficient', paused: true });
+    const row = sqlite
+      .prepare("SELECT user_queue_paused FROM benchmark_config WHERE router = 'efficient'")
+      .get() as { user_queue_paused: number };
+    expect(row.user_queue_paused).toBe(1);
+    // A pause is one column: it never rewrites pools, policy or provenance.
+    expect(replaceConfig).not.toHaveBeenCalled();
+  });
+
+  it('answers a router with no saved config with 400', async () => {
+    const res = await authedPost('/admin/config/user-queue', { paused: true });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: 'benchmark config not set for the efficient router',
+    });
+  });
+
+  it('resumes a run paused at a spend cap', async () => {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, kind, status, started_at, spend_pause_scope)
+         VALUES ('run-paused', 'decider', 'running', '2026-06-01T00:00:00.000Z', 'day')`
+      )
+      .run();
+
+    const res = await authedPost('/admin/runs/run-paused/resume', {});
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ resumed: true });
+    const row = sqlite
+      .prepare("SELECT spend_pause_scope FROM benchmark_runs WHERE id = 'run-paused'")
+      .get() as { spend_pause_scope: string | null };
+    expect(row.spend_pause_scope).toBeNull();
+  });
+
+  it('answers an unknown run with 404', async () => {
+    const res = await authedPost('/admin/runs/missing/resume', {});
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'Run not found' });
   });
 });

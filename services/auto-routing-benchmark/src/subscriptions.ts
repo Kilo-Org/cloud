@@ -235,6 +235,20 @@ async function admitSubscriptionPairs(
   pairs: readonly BenchmarkPair[],
   revision: string
 ): Promise<void> {
+  // Operator pause on the owner queue. Every caller writes the snapshot (with the
+  // `revision` this admission is guarded on) before calling here, so a paused save
+  // records the pool and admits nothing; the next save after the pause lifts passes
+  // the same revision and admits it then. The platform queue is never paused.
+  if (config.userQueuePaused && owner.ownerType !== 'platform') {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_profile_admission_paused',
+        ownerType: owner.ownerType,
+        pairs: pairs.length,
+      })
+    );
+    return;
+  }
   const now = new Date().toISOString();
   const flag = owner.ownerType === 'platform' ? 'platform_requested' : 'user_requested';
   if (!pairs.length) return;

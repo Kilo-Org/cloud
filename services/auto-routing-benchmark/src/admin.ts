@@ -43,7 +43,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
-import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import { getBenchmarkConfig, saveBenchmarkConfig, saveUserQueuePaused } from './config';
 import { registerProfileRefreshRoute } from './admin-profile-refresh';
 import { debugRunCli } from './cli-runner';
 import { assembleCustomRoutingTable } from './custom-routing-table';
@@ -80,6 +80,7 @@ import {
   requeueRetryableCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
+import { readRunSpendState, readSpendTotals, resumeRunFromSpendCap, utcDayOf } from './spend';
 import { loadRunModelTotals, loadRunTotals } from './run-totals';
 import { loadRoutingTableResponse } from './routing-table-response';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
@@ -122,6 +123,9 @@ const DebugCliRequestSchema = z.object({
   model: z.string().trim().min(1),
   prompt: z.string().min(1),
 });
+
+/** Operator switch on the owner queue; flips one column and nothing else. */
+const UserQueuePauseSchema = z.object({ paused: z.boolean() });
 
 function requestRouter(c: Context<HonoEnv>) {
   return AutoRouterSchema.parse(c.req.query('router') ?? DEFAULT_AUTO_ROUTER);
@@ -415,15 +419,33 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
+  // Operator switch on the owner queue. One column, so a pause cannot rewrite pools,
+  // policy or provenance the way a full config save would.
+  app.post(
+    '/admin/config/user-queue',
+    zodJsonValidator(UserQueuePauseSchema, { errorMessage: 'Invalid user queue request' }),
+    async c => {
+      const router = requestRouter(c);
+      const { paused } = c.req.valid('json');
+      if (!(await saveUserQueuePaused(c.env.BENCH_DB, router, paused))) {
+        return c.json({ error: `benchmark config not set for the ${router} router` }, 400);
+      }
+      console.log(JSON.stringify({ event: 'benchmark_user_queue_paused', router, paused }));
+      return c.json({ router, paused });
+    }
+  );
+
   app.get('/admin/scheduler-config', async c => {
     const { overrides, ...updated } = await getSchedulerOverrides(c.env.BENCH_DB);
-    const { settings, spendCaps } = resolveSchedulerConfig(
+    const { config, settings, spendCaps } = resolveSchedulerConfig(
       c.env.BENCHMARK_SCHEDULER_CONFIG,
       overrides
     );
+    const totals = await readSpendTotals(c.env.BENCH_DB, utcDayOf(new Date()));
     return c.json({
       settings: withLegacySchedulerSettings(settings),
       spendCaps,
+      spendToday: { day: totals.day, spentUsd: totals.dayUsd, perDayUsd: config.perDayUsd },
       ...updated,
     } satisfies BenchmarkSchedulerConfigResponse);
   });
@@ -439,13 +461,15 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         c.req.valid('json'),
         c.req.header('x-updated-by') ?? null
       );
-      const { settings, spendCaps } = resolveSchedulerConfig(
+      const { config, settings, spendCaps } = resolveSchedulerConfig(
         c.env.BENCHMARK_SCHEDULER_CONFIG,
         overrides
       );
+      const totals = await readSpendTotals(c.env.BENCH_DB, utcDayOf(new Date()));
       return c.json({
         settings: withLegacySchedulerSettings(settings),
         spendCaps,
+        spendToday: { day: totals.day, spentUsd: totals.dayUsd, perDayUsd: config.perDayUsd },
         ...updated,
       } satisfies BenchmarkSchedulerConfigResponse);
     }
@@ -458,12 +482,22 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     const purpose = BenchmarkRunPurposeSchema.safeParse(c.req.query('purpose'));
     const listRouter =
       kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c);
+    // Each run reports its spend against the live per-run cap.
+    const { config: schedulerConfig } = resolveSchedulerConfig(
+      c.env.BENCHMARK_SCHEDULER_CONFIG,
+      (await getSchedulerOverrides(c.env.BENCH_DB)).overrides
+    );
     const [runs, runningRunIds] = await Promise.all([
-      listRuns(c.env.BENCH_DB, limit, {
-        kind: kind.success ? kind.data : undefined,
-        purpose: purpose.success ? purpose.data : undefined,
-        router: listRouter,
-      }),
+      listRuns(
+        c.env.BENCH_DB,
+        limit,
+        {
+          kind: kind.success ? kind.data : undefined,
+          purpose: purpose.success ? purpose.data : undefined,
+          router: listRouter,
+        },
+        { perRunUsd: schedulerConfig.perRunUsd }
+      ),
       listRunningRunIds(c.env.BENCH_DB, requestRouter(c)),
     ]);
     // Progress is display-only: a failed count query must not hide the run list.
@@ -525,6 +559,15 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       summaries,
       ...(modelTotals ? { modelTotals } : {}),
     } satisfies BenchmarkRunSummariesResponse);
+  });
+
+  // Manual resume of a run paused at a spend cap. The row keeps every result it measured;
+  // the in-flight guard re-pauses it when the caps still leave no room.
+  app.post('/admin/runs/:runId/resume', async c => {
+    const runId = c.req.param('runId');
+    if (!(await readRunSpendState(c.env.BENCH_DB, runId)))
+      return c.json({ error: 'Run not found' }, 404);
+    return c.json({ resumed: await resumeRunFromSpendCap(c.env.BENCH_DB, runId) });
   });
 
   app.post(

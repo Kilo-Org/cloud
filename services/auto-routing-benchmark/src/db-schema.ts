@@ -794,13 +794,7 @@ export const benchmarkBudgetHolds = sqliteTable(
   },
   table => [
     primaryKey({
-      columns: [
-        table.router,
-        table.model,
-        table.variant,
-        table.engine_identity,
-        table.repetitions,
-      ],
+      columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
     }),
   ]
 );

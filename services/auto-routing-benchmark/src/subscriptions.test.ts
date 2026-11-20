@@ -755,3 +755,39 @@ describe('saved daily benchmark subscriptions', () => {
     ).toEqual({ count: 0 });
   });
 });
+
+describe('operator user queue pause', () => {
+  const paused = { ...config, userQueuePaused: true } as BenchmarkConfig;
+  const admitted = () =>
+    sqlite.prepare('SELECT model, status FROM benchmark_profiles ORDER BY model').all();
+
+  it('records the snapshot rows but admits no profile while the owner queue is paused', async () => {
+    await syncSubscriptionSnapshot(env, paused, owner, pool);
+
+    expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual([
+      { model: '~vendor/latest', pairs: [{ model: 'vendor/M', variant: null }], servingPairs: [], resolutionError: null },
+    ]);
+    expect(sqlite.prepare('SELECT * FROM benchmark_subscriptions').all()).toHaveLength(1);
+    expect(admitted()).toEqual([]);
+  });
+
+  it('admits the saved pool on the next save after the pause lifts', async () => {
+    await syncSubscriptionSnapshot(env, paused, owner, pool);
+    expect(admitted()).toEqual([]);
+
+    await syncSubscriptionSnapshot(env, config, owner, pool);
+
+    expect(admitted()).toEqual([{ model: 'vendor/M', status: 'pending' }]);
+  });
+
+  it('still admits the platform queue while the owner queue is paused', async () => {
+    sqlite
+      .prepare("INSERT INTO config_decider_models VALUES ('efficient', '~vendor/latest')")
+      .run();
+    const platformConfig = { ...paused, deciderModels: [{ id: '~vendor/latest' }] };
+
+    await syncSubscriptionSnapshot(env, platformConfig, PLATFORM_SUBSCRIPTION_OWNER, pool);
+
+    expect(admitted()).toEqual([{ model: 'vendor/M', status: 'pending' }]);
+  });
+});

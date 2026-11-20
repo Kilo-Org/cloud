@@ -111,3 +111,21 @@ export async function saveBenchmarkConfig(
   // The computed map is server-owned: an admin save must not clear it.
   return { ...stamped, policyComputed: existing?.policyComputed ?? null };
 }
+
+/**
+ * Flips the operator pause on the owner queue with a one-column UPDATE. Deliberately
+ * not part of `saveBenchmarkConfig`: a pause must not rewrite pools, policy or
+ * provenance, and a config save carrying no `userQueuePaused` leaves the flag alone.
+ * Returns false when no config row exists for the router yet.
+ */
+export async function saveUserQueuePaused(
+  db: D1Database,
+  router: AutoRouter,
+  paused: boolean
+): Promise<boolean> {
+  const result = await db
+    .prepare('UPDATE benchmark_config SET user_queue_paused = ? WHERE router = ?')
+    .bind(paused ? 1 : 0, router)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}

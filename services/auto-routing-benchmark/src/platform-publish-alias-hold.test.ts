@@ -202,6 +202,29 @@ describe('publishPlatformRoutingTable — an alias move holds the live table, th
     expect(snapshot.entries[0]?.servingPairs).toEqual([{ model: NEXT, variant: null }]);
   });
 
+  it('keeps the predecessor serving when the moved target fails to measure', async () => {
+    const liveVersion = await bootstrapLiveTable();
+    await moveAlias();
+    sqlite
+      .prepare("UPDATE benchmark_profiles SET status = 'failed' WHERE router = ? AND model = ?")
+      .run(router, NEXT);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const published = await publishPlatformRoutingTable(env, catalogFetch, router);
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
+
+    // The alias still points at the failed target while its predecessor serves: the
+    // table keeps the predecessor rather than dropping the alias.
+    expect(published).toBeNull();
+    expect(events.map(entry => entry.event)).toContain(
+      'routing_table_publish_skipped_serving_target_pending'
+    );
+    const live = await getLatestRoutingTable(env.BENCH_DB, router);
+    expect(live?.table.version).toBe(liveVersion);
+    expect((live?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([LIVE]);
+  });
+
   it('names the reason when the platform row has no configuration', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(await publishPlatformRoutingTable(env, catalogFetch, router)).toBeNull();

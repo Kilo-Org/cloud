@@ -1931,26 +1931,22 @@ describe('processJob — canonical registry publication', () => {
   });
 });
 
-describe('publishPlatformRoutingTable — serving pair retention', () => {
+describe('publishPlatformRoutingTable — a live pair that lost its measurement', () => {
   const aliasA = '~vendor/a-latest';
   const aliasB = '~vendor/b-latest';
-  const aliasC = '~vendor/c-latest';
-  const unready = 'vendor/unready';
-  const retired = 'vendor/retired';
   const steady = 'vendor/steady';
+  const target = 'vendor/target';
 
-  async function blockedPublish(status: 'failed' | 'pending') {
+  async function publishWithLoss(status: 'failed' | 'pending' | 'running') {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
         Response.json({
           data: [
-            { id: aliasA, alias_target: unready },
-            { id: unready },
-            { id: aliasB, alias_target: retired },
-            { id: retired },
-            { id: aliasC, alias_target: steady },
+            { id: aliasA, alias_target: steady },
             { id: steady },
+            { id: aliasB, alias_target: target },
+            { id: target },
           ],
         })
       )
@@ -1959,25 +1955,19 @@ describe('publishPlatformRoutingTable — serving pair retention', () => {
     if (!baseConfig) throw new Error('config missing');
     vi.mocked(getBenchmarkConfig).mockResolvedValue({
       ...baseConfig,
-      deciderModels: [{ id: aliasA }, { id: aliasB }, { id: aliasC }],
+      deciderModels: [{ id: aliasA }, { id: aliasB }],
     });
     vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
       {
         model: aliasA,
-        pairs: [{ model: unready, variant: null }],
-        servingPairs: [],
+        pairs: [{ model: steady, variant: null }],
+        servingPairs: [{ model: steady, variant: null }],
         resolutionError: null,
       },
       {
         model: aliasB,
-        pairs: [{ model: retired, variant: null }],
-        servingPairs: [],
-        resolutionError: null,
-      },
-      {
-        model: aliasC,
-        pairs: [{ model: steady, variant: null }],
-        servingPairs: [{ model: steady, variant: null }],
+        pairs: [{ model: target, variant: null }],
+        servingPairs: [{ model: target, variant: null }],
         resolutionError: null,
       },
     ]);
@@ -1985,26 +1975,69 @@ describe('publishPlatformRoutingTable — serving pair retention', () => {
       { model: steady, variant: '', run_id: 'run-steady' },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: unready, variant: '', status },
-      { model: retired, variant: '', status: 'failed' },
-      { model: steady, variant: '', status: 'ready' },
+      { model: steady, variant: null, status: 'ready' },
+      { model: target, variant: null, status },
     ]);
     vi.mocked(getLatestRoutingTable).mockResolvedValue({
       table: {
         version: 'previous',
-        routes: { 'implementation/code_generation': [{ model: steady }, { model: retired }] },
+        routes: {
+          'implementation/code_generation': [{ model: steady }, { model: target }],
+        },
       },
     } as never);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        runId: 'run-steady',
+        model: steady,
+        variant: null,
+        routeKey,
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
+        avgLatencyMs: 100,
+        p50LatencyMs: 90,
+        p95LatencyMs: 120,
+        cases: 5,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const published = await publishPlatformRoutingTable(env, fetch, 'efficient');
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
     log.mockRestore();
-    return published;
+    return { published, events };
   }
 
-  it('keeps the live table when a target whose replacement failed or is still pending lost its result', async () => {
-    for (const status of ['failed', 'pending'] as const) {
-      expect(await blockedPublish(status)).toBeNull();
-      expect(vi.mocked(saveRoutingTable)).not.toHaveBeenCalled();
+  it('drops a settled failed pair and publishes the rest of the table', async () => {
+    const { published, events } = await publishWithLoss('failed');
+    expect(published).not.toBeNull();
+    expect(saveRoutingTable).toHaveBeenCalledOnce();
+    expect(events).toContainEqual({
+      event: 'routing_table_publish_dropped_failed_pairs',
+      router: 'efficient',
+      dropped: [{ model: target, variant: null, status: 'failed' }],
+    });
+    const table = vi.mocked(saveRoutingTable).mock.calls[0]?.[1];
+    expect(
+      table?.routes['implementation/code_generation'].map(candidate => candidate.model)
+    ).toEqual([steady]);
+  });
+
+  it('holds the table while the loss is a measurement still in flight', async () => {
+    for (const status of ['pending', 'running'] as const) {
+      vi.mocked(saveRoutingTable).mockClear();
+      const { published, events } = await publishWithLoss(status);
+      expect(published).toBeNull();
+      expect(saveRoutingTable).not.toHaveBeenCalled();
+      expect(events.map(entry => entry.event)).toContain(
+        'routing_table_publish_skipped_serving_pair_unready'
+      );
     }
   });
 });

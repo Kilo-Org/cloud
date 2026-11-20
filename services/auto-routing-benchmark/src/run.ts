@@ -55,7 +55,6 @@ import {
   listPendingCurrentProfiles,
   listReadyCurrentProfilesForEntries,
   listStaleRunningDeciderRuns,
-  requeueRetryableCurrentProfiles,
   failPendingProfiles,
   markProfilesFailedForEntries,
   markProfilesFailedForRun,
@@ -470,11 +469,6 @@ export async function syncPlatformRegistry(
 ): Promise<{ desiredEntries: number }> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return { desiredEntries: 0 };
-  const current = {
-    router,
-    engineIdentity: computeEngineIdentity('decider', router),
-    repetitions: resolveEffectivePolicy(config).deciderRepetitions,
-  };
   const snapshot = await syncSubscriptionSnapshot(
     env,
     config,
@@ -483,15 +477,15 @@ export async function syncPlatformRegistry(
     { fetchImpl }
   );
   const desired = snapshotPairs(snapshot);
-  await syncPlatformRegistryRows(env.BENCH_DB, current, desired);
-  // A platform pair whose measurement failed stays `failed` (the claim below leaves
-  // status alone), and the publish holds the live table while a still-target pair is
-  // unready. Without this the router would stay frozen until an operator requeued it,
-  // so take back the rows whose retry window has passed. `unavailable` rows are
-  // excluded by the requeue itself: a permanent model failure needs an operator.
-  const requeued = await requeueRetryableCurrentProfiles(env.BENCH_DB, current, 'platform');
-  if (requeued > 0)
-    console.log(JSON.stringify({ event: 'benchmark_platform_retry_requeued', router, requeued }));
+  await syncPlatformRegistryRows(
+    env.BENCH_DB,
+    {
+      router,
+      engineIdentity: computeEngineIdentity('decider', router),
+      repetitions: resolveEffectivePolicy(config).deciderRepetitions,
+    },
+    desired
+  );
   return { desiredEntries: desired.length };
 }
 
@@ -601,10 +595,10 @@ export async function publishPlatformRoutingTable(
   // `desired` is the serving set, which `servingSubscriptionSnapshot` already restricts
   // to ready rows, so it cannot show that a live pair is about to disappear. The live
   // table can: a pair it serves, that is still a target, and that has no ready row under
-  // this engine would drop out of the new build. That is a re-measurement in flight, an
-  // engine bump, or a failed replacement whose previous target is still serving, and
-  // either way the existing table stays. Only a pair that left the target set may drop,
-  // and that happens once its alias promoted a ready replacement.
+  // this engine would drop out of the new build. A measurement in flight holds the whole
+  // table until it settles. A settled failure has nothing coming: holding on it froze
+  // every other table change for the router until an operator re-admitted that pair by
+  // hand, so the pair leaves the table (the rest still publishes) and is named instead.
   const previous = await getLatestRoutingTable(env.BENCH_DB, router).catch(() => null);
   const readyPairs = new Set(
     readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant))
@@ -623,10 +617,13 @@ export async function publishPlatformRoutingTable(
       }
     }
   }
-  const dropped = [...livePairs.values()].find(pair => {
+  const unreadyLivePairs = [...livePairs.values()].filter(pair => {
     const key = exactPairKey(pair.model, pair.variant);
     return !readyPairs.has(key) && targets.has(key);
   });
+  const settledFailure = (pair: { model: string; variant: string | null }) =>
+    statusByPair.get(exactPairKey(pair.model, pair.variant)) === 'failed';
+  const dropped = unreadyLivePairs.find(pair => !settledFailure(pair));
   if (dropped) {
     console.log(
       JSON.stringify({
@@ -638,6 +635,19 @@ export async function publishPlatformRoutingTable(
     );
     return null;
   }
+  const leftOut = unreadyLivePairs.filter(settledFailure);
+  if (leftOut.length > 0)
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_publish_dropped_failed_pairs',
+        router,
+        dropped: leftOut.map(pair => ({
+          model: pair.model,
+          variant: pair.variant,
+          status: statusByPair.get(exactPairKey(pair.model, pair.variant)),
+        })),
+      })
+    );
 
   const [summaries, perCaseResults] = await Promise.all([
     getSummariesForRuns(env.BENCH_DB, [...new Set(readyEntries.map(r => r.runId))]),

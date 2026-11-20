@@ -709,7 +709,7 @@
       "managedOnWebRepositories": "请在电脑上通过网页版为 {{organization}} 选择仓库。",
       "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
       "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
-      "descriptionOverview": "为 {{organization}} 创建工作区访问令牌，然后在下一个页面中粘贴。",
+      "descriptionOverview": "创建工作区访问令牌，然后在下一个页面中粘贴。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌",
       "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"

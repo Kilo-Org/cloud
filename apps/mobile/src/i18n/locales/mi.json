@@ -1405,7 +1405,7 @@
       "managedOnWebRepositories": "Kōwhiria ngā pūranga mō {{organization}} i runga ipurangi, mā tētahi rorohiko.",
       "description": "Hangaia he tohu uru mokowāmahi mō {{organization}}, kātahi ka whakapiri ki raro nei.",
       "descriptionReconnect": "Hangaia he tohu uru mokowāmahi hōu mō {{organization}}, kātahi ka whakapiri ki raro nei.",
-      "descriptionOverview": "Hangaia he tohu uru mokowāmahi mō {{organization}}, kātahi ka whakapiri ki te mata e whai ake nei.",
+      "descriptionOverview": "Hangaia he tohu uru mokowāmahi, kātahi ka whakapiri ki te mata e whai ake nei.",
       "scopes": "Pūkete: pānui · Pūranga: pānui/tuhi · Tono kume: pānui · Matau tukutuku: pānui/tuhi",
       "tokenPlaceholder": "Tohu uru mokowāmahi",
       "tokenRefused": "Kāore a Bitbucket i whakaae ki tēnei tohu uru mokowāmahi. Tirohia kei a ia ngā whakaaetanga kei runga ake nei, kātahi ka whakamātau anō."

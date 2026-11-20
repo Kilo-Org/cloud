@@ -1405,7 +1405,7 @@
       "managedOnWebRepositories": "Dooro keydadka {{organization}} ee shabakadda adigoo kombiyuutar isticmaalaya.",
       "description": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "descriptionReconnect": "Abuur summad gelitaan cusub oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
-      "descriptionOverview": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna ku dheji shaashadda xigta.",
+      "descriptionOverview": "Abuur summad gelitaan oo goobta shaqada ah, ka dibna ku dheji shaashadda xigta.",
       "scopes": "Akoonka: akhrin · Kaydadka: akhrin/qorid · Codsiyada isku darka: akhrin · Ogeysiisyada shabakadda: akhrin/qorid",
       "tokenPlaceholder": "Summadda gelitaanka goobta shaqada",
       "tokenRefused": "Bitbucket ma aqbalin summaddan gelitaanka goobta shaqada. Hubi inay leedahay oggolaanshaha sare, ka dibna isku day mar kale."

@@ -1497,7 +1497,7 @@
       "managedOnWebRepositories": "Choose repositories for {{organization}} on the web from a computer.",
       "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
       "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
-      "descriptionOverview": "Create a Workspace Access Token for {{organization}}, then paste it on the next screen.",
+      "descriptionOverview": "Create a Workspace Access Token, then paste it on the next screen.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
       "tokenPlaceholder": "Workspace access token",
       "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."

@@ -1459,7 +1459,7 @@
       "managedOnWebRepositories": "Vyberte repozitáře pro {{organization}} na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
-      "descriptionOverview": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej na další obrazovce.",
+      "descriptionOverview": "Vytvořte přístupový token pracovního prostoru a vložte jej na další obrazovce.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
       "tokenPlaceholder": "Přístupový token pracovního prostoru",
       "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."

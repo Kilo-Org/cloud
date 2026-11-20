@@ -1405,7 +1405,7 @@
       "managedOnWebRepositories": "{{organization}}iif kuusaalee weebii irratti kompiitara irraa filadhu.",
       "description": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "descriptionReconnect": "{{organization}}iif tokanii haaraa hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
-      "descriptionOverview": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii fuula itti aanu irratti maxxansi.",
+      "descriptionOverview": "Tokanii hayyama iddoo hojii uumiitii fuula itti aanu irratti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
       "tokenPlaceholder": "Tokanii hayyama iddoo hojii",
       "tokenRefused": "Bitbucket tokanii hayyama iddoo hojii kana hin fudhanne. Hayyamoonni armaan olii isa keessa jiraachuu mirkaneessi, sana booda ammas yaali."

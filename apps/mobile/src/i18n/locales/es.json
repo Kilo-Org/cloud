@@ -710,7 +710,7 @@
       "managedOnWebRepositories": "Elige los repositorios para {{organization}} en la web desde un ordenador.",
       "description": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
       "descriptionReconnect": "Crea un nuevo token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
-      "descriptionOverview": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo en la siguiente pantalla.",
+      "descriptionOverview": "Crea un token de acceso del espacio de trabajo y pégalo en la siguiente pantalla.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso del espacio de trabajo",
       "tokenRefused": "Bitbucket no ha aceptado este token de acceso del espacio de trabajo. Comprueba que tiene los permisos indicados arriba y vuelve a intentarlo."

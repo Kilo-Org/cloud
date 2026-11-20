@@ -1,5 +1,5 @@
-import { isValidElement, type ReactNode } from 'react';
-import { I18nManager, type StyleProp, type TextStyle } from 'react-native';
+import { createElement, Fragment, isValidElement, type ReactNode } from 'react';
+import { I18nManager, type StyleProp, StyleSheet, type TextStyle } from 'react-native';
 
 /**
  * RN 0.86 does not resolve `textAlign: 'auto'` from the native layout
@@ -227,6 +227,30 @@ export function contentTextDirection(children: ReactNode): TextStyle | undefined
 const RIGHT_TO_LEFT_MARK = '\u200F';
 
 /**
+ * Whether a caller's own style names a base direction, through `direction` or
+ * `writingDirection`. A caller that names one has said what the paragraph's
+ * direction is: a value that names a path, a command or an identifier pins left
+ * to right (`LTR_TEXT_DIRECTION`), and appending a right-to-left mark would lay
+ * that value out in an order its reader did not ask for. Naming the property
+ * with either value counts, because the mark only decides the direction the
+ * caller left open.
+ *
+ * The style is flattened so the test sees the same single object React Native
+ * draws, and an array of style entries, an inline object and a registered sheet
+ * entry all reach their properties.
+ */
+export function pinsTextDirection(style: StyleProp<TextStyle> | undefined): boolean {
+  if (style === undefined) {
+    return false;
+  }
+  const flat: TextStyle | null | undefined = StyleSheet.flatten(style);
+  if (!flat) {
+    return false;
+  }
+  return flat.direction !== undefined || flat.writingDirection !== undefined;
+}
+
+/**
  * `children` with a right-to-left mark in front when an app label has to lay
  * out right to left for the interface's sake, not its own first letter's.
  * Android resolves a paragraph's direction from its first strong character, and
@@ -236,24 +260,34 @@ const RIGHT_TO_LEFT_MARK = '\u200F';
  * interface's start edge for the paragraph, and the label's own words keep
  * their own direction after it.
  *
- * The mark applies only when the interface is right to left, the tree holds an
- * Arabic or Hebrew letter (`hasRtlScript`), and the tree's first letter is not
- * a right-to-left one (`RTL_LETTER`). Copy that already opens right to left
- * needs no mark, and Latin-only copy such as `Sentry.` keeps its own base
- * direction, so its full stop stays at the end of the word.
+ * The mark applies only when the interface is right to left, `holdsRtlScript`
+ * is true — the tree holds an Arabic or Hebrew letter (`hasRtlScript`) — and
+ * the tree's first letter is not a right-to-left one (`RTL_LETTER`). Copy that
+ * already opens right to left needs no mark, and Latin-only copy such as
+ * `Sentry.` keeps its own base direction, so its full stop stays at the end of
+ * the word.
  *
- * A string child takes the mark in front of it; any other node gets the mark as
- * its first sibling.
+ * The caller passes the script flag it already computed, so this helper reads
+ * one letter instead of scanning the whole tree again: `firstLetter` stops at
+ * the first one.
+ *
+ * A string child takes the mark in front of it, in one run. Any other node gets
+ * the mark as its first sibling, in a fragment: the child keeps its own
+ * identity, so a lone element child is not re-wrapped and React logs no
+ * missing-key warning.
  */
-export function rtlBaseMarkedChildren(children: ReactNode): ReactNode {
-  if (!I18nManager.isRTL || !hasRtlScript(children)) {
+export function rtlBaseMarkedChildren(children: ReactNode, holdsRtlScript: boolean): ReactNode {
+  if (!I18nManager.isRTL || !holdsRtlScript) {
     return children;
   }
   const letter = firstLetter(children);
   if (letter === undefined || RTL_LETTER.test(letter)) {
     return children;
   }
-  return isStringChild(children) ? RIGHT_TO_LEFT_MARK + children : [RIGHT_TO_LEFT_MARK, children];
+  if (isStringChild(children)) {
+    return RIGHT_TO_LEFT_MARK + children;
+  }
+  return createElement(Fragment, null, RIGHT_TO_LEFT_MARK, children);
 }
 
 /**

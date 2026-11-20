@@ -9,10 +9,17 @@ import {
 } from '@/components/ui/text.mounted.test-helpers';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({
-  I18nManager: i18nManager,
-  Text: 'Text',
-}));
+vi.mock('react-native', async () => {
+  // A `vi.mock` factory runs before this file's imports are initialised, so the
+  // shared flatten comes in dynamically. The primitive reads a caller's own base
+  // direction through `StyleSheet.flatten` (`pinsTextDirection`).
+  const { flattenStyle: flatten } = await import('@/test/style-sheet-mock');
+  return {
+    I18nManager: i18nManager,
+    StyleSheet: { create: (styles: unknown) => styles, flatten },
+    Text: 'Text',
+  };
+});
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
 // The mark is a right-to-left mark (U+200F): a strong character with no width
@@ -72,5 +79,39 @@ describe('Text app copy base mark', () => {
     );
 
     expect(hostText(root).children).toEqual(['Send the report to your team.']);
+  });
+
+  // A caller that names a base direction has said what the paragraph's direction
+  // is: the value is a path, a command or an identifier pinned with
+  // `LTR_TEXT_DIRECTION`, and a mark would lay it out in an order its reader did
+  // not ask for (`pinsTextDirection`).
+  it('adds no mark when the caller pins its own base direction', () => {
+    i18nManager.isRTL = true;
+    const root = mountTextTree(createElement(Text, { style: { direction: 'ltr' } }, MIXED));
+
+    expect(hostText(root).children).toEqual([MIXED]);
+  });
+
+  it('adds no mark through a caller pin inside a style array', () => {
+    i18nManager.isRTL = true;
+    const root = mountTextTree(
+      createElement(Text, { style: [{ letterSpacing: 0 }, { writingDirection: 'ltr' }] }, MIXED)
+    );
+
+    expect(hostText(root).children).toEqual([MIXED]);
+  });
+
+  // `Slot.Text` takes one element child and passes the props to it, so the
+  // primitive must not add a sibling in front of that child.
+  it('adds no mark with asChild, which takes one element child', () => {
+    i18nManager.isRTL = true;
+    const root = mountTextTree(
+      createElement(Text, { asChild: true }, createElement('Text', null, MIXED))
+    );
+    const [slot] = root.findAll(node => Object.is(node.type, 'Slot.Text'));
+    const inner = slot?.children ?? [];
+
+    expect(inner).toHaveLength(1);
+    expect(hostText(root).children).toEqual([MIXED]);
   });
 });

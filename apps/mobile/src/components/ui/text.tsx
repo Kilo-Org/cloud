@@ -11,6 +11,7 @@ import {
   contentTextDirection,
   hasRtlScript,
   NATURAL_LETTER_SPACING,
+  pinsTextDirection,
   RTL_WRITING_DIRECTION,
   rtlBaseMarkedChildren,
   withoutMonoFamily,
@@ -182,11 +183,22 @@ function Text({
   // sets a text view's own direction, and Android resolves a paragraph from its
   // first strong character, so app copy that opens on a Latin product name
   // needs a right-to-left mark in front of it (`rtlBaseMarkedChildren`).
-  // Content names its own first letter's direction and gets no mark, and
-  // `Slot.Text` takes one element child, so `asChild` passes the children
-  // through unchanged (`asChild` has no call site in the app today).
-  const renderedChildren =
-    asChild || direction === 'auto' ? props.children : rtlBaseMarkedChildren(props.children);
+  // Content names its own first letter's direction and gets no mark; `asChild`
+  // passes one element child through, which `Slot.Text` takes unchanged
+  // (`asChild` has no call site in the app today); and a caller that names a
+  // base direction of its own — a path, a command, an identifier pinned with
+  // `LTR_TEXT_DIRECTION` — has said what that direction is, so its copy keeps
+  // the base direction it asked for (`pinsTextDirection`).
+  //
+  // Cached against the child tree, the caller's style and the script flag the
+  // scan above already computed, so a re-render with unchanged props reads no
+  // character of the copy.
+  const renderedChildren = React.useMemo(() => {
+    if (asChild || direction === 'auto' || pinsTextDirection(props.style)) {
+      return props.children;
+    }
+    return rtlBaseMarkedChildren(props.children, isRtlScript);
+  }, [asChild, direction, isRtlScript, props.children, props.style]);
   // The direction and reset land in the same array the component has always
   // built, so a non-eyebrow text node's style never grows an empty entry; the
   // eyebrow's line box leads its own array, before `props.style`, so a caller's

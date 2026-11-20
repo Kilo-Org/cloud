@@ -12,10 +12,17 @@ import {
 import { NATURAL_LETTER_SPACING, RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({
-  I18nManager: i18nManager,
-  Text: 'Text',
-}));
+vi.mock('react-native', async () => {
+  // A `vi.mock` factory runs before this file's imports are initialised, so the
+  // shared flatten comes in dynamically. The primitive reads a caller's own base
+  // direction through `StyleSheet.flatten` (`pinsTextDirection`).
+  const { flattenStyle: flatten } = await import('@/test/style-sheet-mock');
+  return {
+    I18nManager: i18nManager,
+    StyleSheet: { create: (styles: unknown) => styles, flatten },
+    Text: 'Text',
+  };
+});
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
 function hostStyle(root: ReactTestInstance): Record<string, unknown>[] {

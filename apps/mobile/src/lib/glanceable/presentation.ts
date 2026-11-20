@@ -50,7 +50,8 @@ export type GlanceableCountFormat = (value: number) => string;
  * nodes — the hero's numeral beside its label — where a whole sentence cannot
  * be one string, and each node still has to agree with the other.
  *
- * The Android Home widget and its notification read these. The iOS widget
+ * Only the Android Home copy builder reads these; the notification and the
+ * one-string surfaces read the whole-line family below. The iOS widget
  * layouts still draw the uninflected noun: its native store rebuilds every
  * count label from a kind-to-copy map (`HomeWidgetRefreshStore.swift`), so a
  * plural-selected label chosen here would not survive the write. The

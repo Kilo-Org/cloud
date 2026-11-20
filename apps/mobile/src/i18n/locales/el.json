@@ -3756,7 +3756,7 @@
       "running_one": "Σε εξέλιξη",
       "running_other": "Σε εξέλιξη",
       "scheduled_one": "Προγραμματισμένο",
-      "scheduled_other": "Προγραμματισμένο",
+      "scheduled_other": "Προγραμματισμένα",
       "idle_one": "Σε αδράνεια",
       "idle_other": "Σε αδράνεια"
     },
@@ -3766,7 +3766,7 @@
       "running_one": "{{displayCount}} Σε εξέλιξη",
       "running_other": "{{displayCount}} Σε εξέλιξη",
       "scheduled_one": "{{displayCount}} Προγραμματισμένο",
-      "scheduled_other": "{{displayCount}} Προγραμματισμένο",
+      "scheduled_other": "{{displayCount}} Προγραμματισμένα",
       "idle_one": "{{displayCount}} Σε αδράνεια",
       "idle_other": "{{displayCount}} Σε αδράνεια"
     },

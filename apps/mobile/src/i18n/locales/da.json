@@ -3756,9 +3756,9 @@
       "running_one": "I gang",
       "running_other": "I gang",
       "scheduled_one": "Planlagt",
-      "scheduled_other": "Planlagt",
+      "scheduled_other": "Planlagte",
       "idle_one": "Inaktiv",
-      "idle_other": "Inaktiv"
+      "idle_other": "Inaktive"
     },
     "count": {
       "needsInput_one": "{{displayCount}} Afventer svar",
@@ -3766,9 +3766,9 @@
       "running_one": "{{displayCount}} I gang",
       "running_other": "{{displayCount}} I gang",
       "scheduled_one": "{{displayCount}} Planlagt",
-      "scheduled_other": "{{displayCount}} Planlagt",
+      "scheduled_other": "{{displayCount}} Planlagte",
       "idle_one": "{{displayCount}} Inaktiv",
-      "idle_other": "{{displayCount}} Inaktiv"
+      "idle_other": "{{displayCount}} Inaktive"
     },
     "footer": {
       "checked": "Kontrolleret {{time}}",

@@ -3756,7 +3756,7 @@
       "running_one": "Arbetar",
       "running_other": "Arbetar",
       "scheduled_one": "Schemalagd",
-      "scheduled_other": "Schemalagd",
+      "scheduled_other": "Schemalagda",
       "idle_one": "Vilande",
       "idle_other": "Vilande"
     },
@@ -3766,7 +3766,7 @@
       "running_one": "{{displayCount}} Arbetar",
       "running_other": "{{displayCount}} Arbetar",
       "scheduled_one": "{{displayCount}} Schemalagd",
-      "scheduled_other": "{{displayCount}} Schemalagd",
+      "scheduled_other": "{{displayCount}} Schemalagda",
       "idle_one": "{{displayCount}} Vilande",
       "idle_other": "{{displayCount}} Vilande"
     },

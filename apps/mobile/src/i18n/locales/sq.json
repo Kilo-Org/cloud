@@ -3756,7 +3756,7 @@
       "running_one": "Duke punuar",
       "running_other": "Duke punuar",
       "scheduled_one": "E planifikuar",
-      "scheduled_other": "E planifikuar",
+      "scheduled_other": "Të planifikuara",
       "idle_one": "Në pritje",
       "idle_other": "Në pritje"
     },
@@ -3766,7 +3766,7 @@
       "running_one": "{{displayCount}} Duke punuar",
       "running_other": "{{displayCount}} Duke punuar",
       "scheduled_one": "{{displayCount}} E planifikuar",
-      "scheduled_other": "{{displayCount}} E planifikuar",
+      "scheduled_other": "{{displayCount}} Të planifikuara",
       "idle_one": "{{displayCount}} Në pritje",
       "idle_other": "{{displayCount}} Në pritje"
     },

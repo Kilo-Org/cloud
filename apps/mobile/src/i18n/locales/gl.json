@@ -3756,7 +3756,7 @@
       "running_one": "Traballando",
       "running_other": "Traballando",
       "scheduled_one": "Programada",
-      "scheduled_other": "Programada",
+      "scheduled_other": "Programadas",
       "idle_one": "En espera",
       "idle_other": "En espera"
     },
@@ -3766,7 +3766,7 @@
       "running_one": "{{displayCount}} Traballando",
       "running_other": "{{displayCount}} Traballando",
       "scheduled_one": "{{displayCount}} Programada",
-      "scheduled_other": "{{displayCount}} Programada",
+      "scheduled_other": "{{displayCount}} Programadas",
       "idle_one": "{{displayCount}} En espera",
       "idle_other": "{{displayCount}} En espera"
     },

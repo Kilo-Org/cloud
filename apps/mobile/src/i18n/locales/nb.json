@@ -3756,9 +3756,9 @@
       "running_one": "Jobber",
       "running_other": "Jobber",
       "scheduled_one": "Planlagt",
-      "scheduled_other": "Planlagt",
+      "scheduled_other": "Planlagte",
       "idle_one": "Ledig",
-      "idle_other": "Ledig"
+      "idle_other": "Ledige"
     },
     "count": {
       "needsInput_one": "{{displayCount}} Venter på svar",
@@ -3766,9 +3766,9 @@
       "running_one": "{{displayCount}} Jobber",
       "running_other": "{{displayCount}} Jobber",
       "scheduled_one": "{{displayCount}} Planlagt",
-      "scheduled_other": "{{displayCount}} Planlagt",
+      "scheduled_other": "{{displayCount}} Planlagte",
       "idle_one": "{{displayCount}} Ledig",
-      "idle_other": "{{displayCount}} Ledig"
+      "idle_other": "{{displayCount}} Ledige"
     },
     "footer": {
       "checked": "Sjekket {{time}}",

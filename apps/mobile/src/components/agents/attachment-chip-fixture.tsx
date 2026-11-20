@@ -1,8 +1,10 @@
+/* eslint-disable no-literal-copy/no-literal-copy -- Development-only attachment chip fixture; its title never ships. */
 import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/screen-header';
 import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
 
 import { AttachmentPreviewStrip } from './attachment-preview-strip';
@@ -120,16 +122,21 @@ export function AttachmentChipFixture() {
     [localUri, markdownUri]
   );
 
+  // The header names the screen for a reader that navigates by headings; the
+  // strip keeps its place above the bottom inset, where the composer holds it.
   return (
-    <View className="flex-1 justify-end bg-background pb-2">
-      <AttachmentPreviewStrip
-        attachments={attachments}
-        onRemove={() => undefined}
-        onRetry={() => undefined}
-        onMove={() => undefined}
-        onReorder={() => undefined}
-      />
-      <View style={{ height: insets.bottom }} />
+    <View className="flex-1 bg-background">
+      <ScreenHeader title="Attachment chips" />
+      <View className="flex-1 justify-end pb-2">
+        <AttachmentPreviewStrip
+          attachments={attachments}
+          onRemove={() => undefined}
+          onRetry={() => undefined}
+          onMove={() => undefined}
+          onReorder={() => undefined}
+        />
+        <View style={{ height: insets.bottom }} />
+      </View>
     </View>
   );
 }

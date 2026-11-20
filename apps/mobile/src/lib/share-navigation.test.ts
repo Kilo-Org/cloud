@@ -393,6 +393,45 @@ describe('share navigation durable persistence', () => {
     expect(queued.length).toBe(SHARE_PAYLOAD_MAX_ENTRIES);
   });
 
+  it('restores the hinted destination when the queue has one slot left', async () => {
+    // The account committed the destination the hint names, then a newer
+    // composer delivery.
+    setSharePersistUserId('u1');
+    const hinted = stageDestination('hinted');
+    const newer = stageDestination('newer');
+    await persistShareNavigationNow();
+
+    // Process death; the destinations staged before the account resolved come
+    // back first and leave a single free slot.
+    __resetPendingShareNavigationForTests();
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId(null);
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES - 1; i += 1) {
+      setPendingShareNavigation({ href: `/(app)/agent-chat/live-${i}`, shareId: null });
+    }
+
+    // The payload restore brings both staged payloads back, so both retained
+    // destinations are deliverable when the queue merges its draft.
+    setSharePersistUserId('u1');
+    restoreSharePayload(hinted, { text: 'hinted', files: [], failedFiles: [] }, 'u1');
+    restoreSharePayload(newer, { text: 'newer', files: [], failedFiles: [] }, 'u1');
+    await restoreShareNavigation('u1', hinted);
+
+    const queued: (string | null)[] = [];
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES + 1; i += 1) {
+      const next = takePendingShareNavigation();
+      if (next === null) {
+        break;
+      }
+      queued.push(next.shareId);
+    }
+    // The hinted delivery survives because the gate can only re-open on it, the
+    // newer one is the destination that did not fit, and the cap holds.
+    expect(queued).toContain(hinted);
+    expect(queued).not.toContain(newer);
+    expect(queued.length).toBeLessThanOrEqual(SHARE_PAYLOAD_MAX_ENTRIES);
+  });
+
   it('stops restoring when the account changes during the read', async () => {
     setSharePersistUserId('userA');
     saveDraft('userA', SHARE_NAV_DRAFT_KEY, [

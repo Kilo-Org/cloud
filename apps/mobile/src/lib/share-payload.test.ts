@@ -653,6 +653,43 @@ describe('share payload durable persistence', () => {
     expect(live.length).toBe(SHARE_PAYLOAD_MAX_ENTRIES - 1);
   });
 
+  it('restores the hinted share when a newer retained entry competes for the last slot', async () => {
+    // A capture the person is about to deliver holds a slot while no account
+    // has resolved yet.
+    setSharePersistUserId(null);
+    putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+
+    // The account staged the share the hint names first, then handed a newer
+    // one to the composer.
+    setSharePersistUserId('u1');
+    const hinted = putSharePayload({ text: 'hinted', files: [], failedFiles: [] });
+    const newer = putSharePayload({ text: 'newer', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+    await persistPendingShareIdDraft('u1', hinted);
+
+    // Process death. The captures no account staged come back first and leave a
+    // single free slot, which only the newer retained entry would have taken.
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId(null);
+    const live: string[] = [];
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES - 2; i += 1) {
+      live.push(putSharePayload({ text: `capture-${i}`, files: [], failedFiles: [] }));
+    }
+    live.push(putSharePayload({ text: 'captured-out', files: [], failedFiles: [] }));
+
+    setSharePersistUserId('u1');
+    await restoreSharePayloads('u1', hinted);
+
+    // The hint survives because the gate can only re-open on it, the newer
+    // entry is the one that did not fit, and the cap still holds.
+    expect(peekSharePayload(hinted)?.text).toBe('hinted');
+    expect(peekSharePayload(newer)).toBeNull();
+    const staged = [...live, hinted, newer];
+    expect(staged.filter(id => peekSharePayload(id) !== null).length).toBeLessThanOrEqual(
+      SHARE_PAYLOAD_MAX_ENTRIES
+    );
+  });
+
   it('never restores one capture under a second account', async () => {
     const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
 

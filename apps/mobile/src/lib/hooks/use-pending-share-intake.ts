@@ -80,10 +80,12 @@ export function usePendingShareIntake(input: {
     []
   );
 
-  // Cold-start share restore. Order matters: payloads first, then the
-  // navigation queue (deliveries point at restored payloads), then the pending
-  // id — and only when its payload still exists. A restored id with an empty
-  // map is the existing stale-share empty path, so it must not re-arm the gate.
+  // Cold-start share restore. The pending-share hint is read first: it is the
+  // only thing that re-opens the gate after process death, so both restores
+  // select the entry it names before anything else. Payloads still restore
+  // before the navigation queue, because deliveries point at restored payloads.
+  // The gate arms only when the hinted payload still exists; a restored id with
+  // an empty map is the existing stale-share empty path.
   useEffect(() => {
     let cancelled = false;
 
@@ -92,18 +94,19 @@ export function usePendingShareIntake(input: {
       if (!userId) {
         return;
       }
-      await restoreSharePayloads(userId);
-      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
-        return;
-      }
-      await restoreShareNavigation(userId);
+      const pendingId = await loadPendingShareIdDraft(userId);
       // `cancelled` is set by the cleanup below; the previous check narrows the
       // fall-through path, but the variable is genuinely mutable.
       // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
       if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
         return;
       }
-      const pendingId = await loadPendingShareIdDraft(userId);
+      await restoreSharePayloads(userId, pendingId);
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
+        return;
+      }
+      await restoreShareNavigation(userId, pendingId);
       // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
       if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
         return;

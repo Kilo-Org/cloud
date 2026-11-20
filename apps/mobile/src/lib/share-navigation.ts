@@ -92,8 +92,19 @@ export function takePendingShareNavigation(): PendingShareNavigation | null {
  * memory-only place while the account's own draft resumes beside it, so the
  * next snapshot can never erase the account's retained draft. No-op while
  * signed out, or when no draft exists.
+ *
+ * `pendingShareId` is the durable pending-share hint the cold-start restore
+ * reads to re-open the gate, and it is the only thing that restore reads after
+ * these restores. The hinted destination is therefore pushed first: when it is
+ * deliverable at all, the selection keeps it, and only the room that is left
+ * goes to the newest other destinations. Without that rule a newer destination
+ * (a composer handoff committed after the share) fills the last slot the hint
+ * needs, and the account's destination is lost with no gate to show it again.
  */
-export async function restoreShareNavigation(userId: string): Promise<void> {
+export async function restoreShareNavigation(
+  userId: string,
+  pendingShareId: ShareId | null = null
+): Promise<void> {
   if (!userId) {
     return;
   }
@@ -111,19 +122,31 @@ export async function restoreShareNavigation(userId: string): Promise<void> {
   if (!draft) {
     return;
   }
-  // Merge in recorded order without evicting: a destination this process staged
-  // stays deliverable, and the NEWEST retained destinations that fit fill the
-  // room that is left, matching the store's drop-the-oldest policy. A
-  // payload-bearing destination is queued only when its payload is staged, so
-  // delivery never receives an id the store cannot resolve; a destination with
-  // no payload (a Review PR route) has nothing to resolve and always queues.
+  // Merge without evicting: a destination this process staged stays
+  // deliverable. The hinted destination is pushed first so a deliverable hint
+  // always keeps its slot when any room exists; the newest other retained
+  // destinations then fill the room that is left, matching the store's
+  // drop-the-oldest policy. A payload-bearing destination is queued only when
+  // its payload is staged, so delivery never receives an id the store cannot
+  // resolve; a destination with no payload (a Review PR route) has nothing to
+  // resolve and always queues.
   const free = SHARE_PAYLOAD_MAX_ENTRIES - pendingQueue.length;
   const deliverable = draft.filter(
     entry => entry.shareId === null || peekSharePayload(entry.shareId) !== null
   );
   // `slice(-0)` is `slice(0)`, so no room must select nothing explicitly.
   const room = Math.max(free, 0);
-  for (const entry of room === 0 ? [] : deliverable.slice(-room)) {
+  const hinted =
+    room > 0 && pendingShareId !== null
+      ? deliverable.find(entry => entry.shareId === pendingShareId)
+      : undefined;
+  const others = deliverable.filter(entry => entry !== hinted);
+  const spare = room - (hinted === undefined ? 0 : 1);
+  const selected = [
+    ...(hinted === undefined ? [] : [hinted]),
+    ...(spare > 0 ? others.slice(-spare) : []),
+  ];
+  for (const entry of selected) {
     pendingQueue.push({
       pending: { href: entry.href, shareId: entry.shareId },
       stagedUserId: userId,

@@ -302,10 +302,21 @@ export function clearSharePayload(id: ShareId): void {
  * account resolved (null stamp) keeps its memory-only place while the account's
  * own draft resumes next to it, so the next snapshot can never erase the
  * account's retained draft. Each restored entry's files are reconciled against
- * the filesystem: a missing cache copy moves its name into `failedFiles` and is
- * dropped from `files`. A restored id that is already staged is left alone.
+ * the filesystem: a missing cache copy moves its name into `failedFiles` and
+ * is dropped from `files`. A restored id that is already staged is left alone.
+ *
+ * `pendingShareId` is the durable pending-share hint the cold-start restore
+ * reads to re-open the gate, and it is the only thing that restore reads after
+ * this fill. The hint is therefore selected first: when it is retained at all,
+ * the selection keeps it, and only the room that is left goes to the newest
+ * other entries. Without that rule a newer retained entry (a composer handoff
+ * staged after the share) takes the last slot the hint needs, and the account's
+ * staged share is lost with no gate to show it again.
  */
-export async function restoreSharePayloads(userId: string): Promise<void> {
+export async function restoreSharePayloads(
+  userId: string,
+  pendingShareId: ShareId | null = null
+): Promise<void> {
   if (!userId) {
     return;
   }
@@ -332,18 +343,28 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
   }
 
   // Merge in recorded order, never clearing an entry staged by another owner.
-  // The store is one bounded FIFO, so the restore takes the NEWEST retained
-  // entries that fit instead of evicting: what this process already staged
-  // stays readable to the delivery that is about to consume it, and the newest
-  // retained share is the one a pending-share hint is most likely to name.
+  // The store is one bounded FIFO, so the restore fills only the room that is
+  // left instead of evicting: what this process already staged stays readable
+  // to the delivery that is about to consume it. The hint is selected first so
+  // a retained hint always fits when any room exists; the newest other retained
+  // entries then take the rest, which is the drop-oldest order of the store.
   const free = SHARE_PAYLOAD_MAX_ENTRIES - payloads.size;
   const retained = draft.order.filter(id => draft.entries[id] !== undefined && !payloads.has(id));
   // `slice(-0)` is `slice(0)`, so no room must select nothing explicitly.
   const room = Math.max(free, 0);
+  const selected = new Set<ShareId>();
+  if (room > 0 && pendingShareId !== null && retained.includes(pendingShareId)) {
+    selected.add(pendingShareId);
+  }
+  const spare = room - selected.size;
+  const others = retained.filter(id => !selected.has(id));
+  for (const id of spare > 0 ? others.slice(-spare) : []) {
+    selected.add(id);
+  }
   const restored: SharePayload[] = [];
-  for (const id of room === 0 ? [] : retained.slice(-room)) {
+  for (const id of retained) {
     const entry = draft.entries[id];
-    if (entry !== undefined) {
+    if (selected.has(id) && entry !== undefined) {
       const payload: SharePayload = {
         text: entry.text,
         files: entry.files.map(file => ({ name: file.name, uri: file.uri })),

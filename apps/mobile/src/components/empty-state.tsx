@@ -140,7 +140,11 @@ function EmptyStateBody({
             />
           </View>
         )}
-        <View className="items-center gap-1 max-w-sm">
+        {/* The reading measure is the full form's alone. In the compact form
+            the band is already short, so the cap would add a line exactly where
+            vertical room is what the compact form buys; a landscape window's
+            content box is wider than the cap anyway. */}
+        <View className={cn('items-center gap-1', !compact && 'max-w-sm')}>
           <Text
             variant="large"
             className={cn('text-center', compact ? compactTitleClassName : undefined)}
@@ -159,9 +163,9 @@ function EmptyStateBody({
               <Text
                 variant="muted"
                 className="text-center"
-                // The block is capped at `max-w-sm`, so a long sentence wraps here;
-                // greedy wrap would leave one word alone on the second line.
-                // Android-only; iOS ignores the prop.
+                // The full form's block is capped at `max-w-sm`, so a long
+                // sentence wraps there; greedy wrap would leave one word alone
+                // on the second line. Android-only; iOS ignores the prop.
                 textBreakStrategy="balanced"
               >
                 {description}

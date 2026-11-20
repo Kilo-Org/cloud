@@ -10,6 +10,7 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Copy } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
@@ -20,10 +21,10 @@ export function TriggerUrlCard({ url }: Readonly<{ url: string }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   return (
-    <View className="gap-1">
-      <Text variant="muted">{t('cloudAgent.triggers.webhookUrl')}</Text>
+    <View className="gap-1.5">
+      <FormFieldLabel label={t('cloudAgent.triggers.webhookUrl')} />
       <View className="flex-row items-center gap-2">
-        <Text variant="mono" className="min-w-0 flex-1 text-xs">
+        <Text variant="mono" className="min-w-0 flex-1 self-start text-xs">
           {url}
         </Text>
         <IconButton

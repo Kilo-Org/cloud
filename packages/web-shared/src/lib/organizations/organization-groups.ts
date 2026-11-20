@@ -68,7 +68,7 @@ export function normalizeOrganizationGroupPolicy(
         'An organization model access policy entry or size is over the maximum. Remove or shorten allow-list entries before saving.',
     });
   }
-  return normalized;
+  return parsed.data;
 }
 
 function upsertPolicy(

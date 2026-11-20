@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import * as z from 'zod';
 import {
   MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES,
   MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH,
@@ -25,6 +26,45 @@ function selectedPolicy(modelCount: number, providerCount = 0) {
       provider_allow_list: Array.from({ length: providerCount }, (_, index) => `provider-${index}`),
     },
   } satisfies OrganizationGroupModelAccessPolicy;
+}
+
+/** A selection whose every entry and count is at the documented maximum. */
+function selectionAtLimits(entryCharacter: string) {
+  return {
+    type: 'model_access',
+    data: {
+      mode: 'selected',
+      model_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_MODEL_IDS }, () =>
+        entryCharacter.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)
+      ),
+      provider_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS }, () =>
+        entryCharacter.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH)
+      ),
+    },
+  } satisfies OrganizationGroupModelAccessPolicy;
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * The `description` of the `selected` mode member in a policy schema's JSON
+ * Schema, reached without casts: the mode union sits behind `data`.
+ */
+function selectedMemberDescription(schema: z.ZodType): unknown {
+  const json: unknown = z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' });
+  if (!isJsonRecord(json) || !isJsonRecord(json.properties)) return undefined;
+  const data = json.properties.data;
+  if (!isJsonRecord(data) || !Array.isArray(data.oneOf)) return undefined;
+  const member = data.oneOf.find(
+    candidate =>
+      isJsonRecord(candidate) &&
+      isJsonRecord(candidate.properties) &&
+      isJsonRecord(candidate.properties.mode) &&
+      candidate.properties.mode.const === 'selected'
+  );
+  return isJsonRecord(member) ? member.description : undefined;
 }
 
 describe('model access policy catalog limits', () => {
@@ -151,30 +191,70 @@ describe('model access policy catalog limits', () => {
     expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
   });
 
-  it('requires a selection to fit the documented serialized size', () => {
-    const policy = {
+  it('accepts the largest documented selection made of ASCII entries', () => {
+    const policy = selectionAtLimits('m');
+
+    expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
+  });
+
+  it('accepts the largest documented selection made of three-byte characters', () => {
+    const policy = selectionAtLimits('\u20ac');
+    const bytes = new TextEncoder().encode(JSON.stringify(policy.data)).length;
+
+    expect(bytes).toBeLessThan(MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES);
+    expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
+  });
+
+  it('accepts a model id and a provider slug made of printable text only', () => {
+    const modelPolicy = {
       type: 'model_access',
       data: {
         mode: 'selected',
-        model_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_MODEL_IDS }, () =>
-          'm'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)
-        ),
-        provider_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS }, () =>
-          'p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH)
-        ),
+        model_allow_list: ['\u0001'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)],
+        provider_allow_list: [],
       },
     } satisfies OrganizationGroupModelAccessPolicy;
-    expect(new TextEncoder().encode(JSON.stringify(policy.data)).length).toBeGreaterThan(
-      MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES
-    );
 
-    const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
+    const modelResult = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(modelPolicy);
 
-    expect(result.success).toBe(false);
-    if (result.success) throw new Error('Expected a selection above the documented size to fail');
-    expect(result.error.issues).toEqual([
-      expect.objectContaining({ code: 'custom', message: 'Policy too large', path: ['data'] }),
+    expect(modelResult.success).toBe(false);
+    if (modelResult.success) throw new Error('Expected a non-printable model id to be refused');
+    expect(modelResult.error.issues).toEqual([
+      expect.objectContaining({
+        code: 'custom',
+        message: 'Control characters are not allowed',
+        path: ['data', 'model_allow_list', 0],
+      }),
     ]);
+
+    const providerPolicy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: [],
+        provider_allow_list: [`${'p'.repeat(30)}\u0001${'p'.repeat(30)}`],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    const providerResult = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(providerPolicy);
+
+    expect(providerResult.success).toBe(false);
+    if (providerResult.success)
+      throw new Error('Expected a non-printable provider slug to be refused');
+    expect(providerResult.error.issues).toEqual([
+      expect.objectContaining({
+        code: 'custom',
+        message: 'Control characters are not allowed',
+        path: ['data', 'provider_allow_list', 0],
+      }),
+    ]);
+  });
+
+  it('documents the serialized size bound in the write schema JSON Schema but not the stored reader', () => {
+    expect(selectedMemberDescription(OrganizationGroupModelAccessPolicyWriteSchema)).toBe(
+      `Together the allow lists must serialize to at most ${MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES} bytes of UTF-8 JSON.`
+    );
+    expect(selectedMemberDescription(OrganizationGroupModelAccessPolicySchema)).toBeUndefined();
   });
 
   it('parses every policy mode through both schemas', () => {
@@ -197,6 +277,19 @@ describe('model access policy catalog limits', () => {
         mode: 'selected',
         model_allow_list: [`vendor/${'m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)}`],
         provider_allow_list: ['p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH + 1)],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    expect(OrganizationGroupModelAccessPolicySchema.parse(policy)).toEqual(policy);
+  });
+
+  it('parses every stored policy document the reader may hold', () => {
+    const policy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: ['vendor/\u0001model'],
+        provider_allow_list: ['p\u0001p'],
       },
     } satisfies OrganizationGroupModelAccessPolicy;
 

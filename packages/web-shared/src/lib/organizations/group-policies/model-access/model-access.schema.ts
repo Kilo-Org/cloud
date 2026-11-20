@@ -6,17 +6,24 @@ export const MAX_ORGANIZATION_GROUP_MODEL_IDS = 2_000;
 export const MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS = 500;
 export const MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH = 200;
 export const MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH = 64;
-export const MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES = 256 * 1024;
+export const MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES = 2 * 1024 * 1024;
 const utf8 = new TextEncoder();
 
+/** An allow-list entry. A maximum length selects the bounded write entry. */
 const modelIdEntry = (maxLength: number | undefined) => {
   const entry = z.string().trim().min(1);
-  return maxLength === undefined ? entry : entry.max(maxLength);
+  if (maxLength === undefined) return entry;
+  return entry
+    .max(maxLength)
+    .refine(value => !/\p{Cc}/u.test(value), 'Control characters are not allowed');
 };
 
 const providerSlugEntry = (maxLength: number | undefined) => {
   const entry = z.string().trim().min(1);
-  return maxLength === undefined ? entry : entry.max(maxLength);
+  if (maxLength === undefined) return entry;
+  return entry
+    .max(maxLength)
+    .refine(value => !/\p{Cc}/u.test(value), 'Control characters are not allowed');
 };
 
 /**
@@ -46,10 +53,11 @@ function modelAccessPolicyData(bounds: {
     z.object({ mode: z.literal('none') }).strict(),
     maxBytes === undefined
       ? selected
-      : selected.refine(
-          data => utf8.encode(JSON.stringify(data)).length <= maxBytes,
-          'Policy too large'
-        ),
+      : selected
+          .refine(data => utf8.encode(JSON.stringify(data)).length <= maxBytes, 'Policy too large')
+          .describe(
+            `Together the allow lists must serialize to at most ${maxBytes} bytes of UTF-8 JSON.`
+          ),
   ]);
 }
 

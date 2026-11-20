@@ -15,6 +15,7 @@ import type { AuditLogAction } from '@kilocode/web-shared/lib/organizations/audi
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   OrganizationGroupInputSchema,
+  OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
@@ -89,6 +90,21 @@ describe('organization group policies', () => {
         provider_allow_list: ['openai'],
       },
     });
+  });
+
+  it('returns the value the write schema parsed for a selected model access policy', () => {
+    const policy = {
+      type: 'model_access' as const,
+      data: {
+        mode: 'selected' as const,
+        model_allow_list: [' openai/gpt-4o '],
+        provider_allow_list: [' openai '],
+      },
+    };
+
+    expect(normalizeOrganizationGroupPolicy(policy)).toEqual(
+      OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)
+    );
   });
 
   it('refuses a selected policy entry over the documented length', () => {

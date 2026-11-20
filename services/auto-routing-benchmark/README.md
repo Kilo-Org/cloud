@@ -1200,6 +1200,123 @@ Runbook, after the whole stack is merged and deployed (the migration applies on 
    `GET /admin/routing-table` shows a new version.
 4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
    its run.
+
+## Adding a model: the flow
+
+Three entry paths put a model into the benchmark, and all three converge on one registry row
+per exact `(model, variant)` pair under the live engine identity and repetitions.
+
+| Entry path | Who starts it | Code |
+|---|---|---|
+| Admin Policy tab → **Save config** | an admin, in the console | `apps/web/src/app/admin/api/auto-routing/benchmark-config/route.ts` → `PUT /admin/config` (`src/admin.ts:267`), then `syncRegistryAfterConfigSave` → `syncPlatformRegistry` (`src/run.ts:465`) |
+| Owner custom router save (gateway entries) | the router's owner, in their own console | `apps/web/src/lib/auto-routing-custom-routers.ts` → `POST /admin/profiles/register` (`src/admin.ts:565`) → `registerProfiles` (`src/profiles.ts:537`) |
+| Alias target moves (e.g. `~openai/gpt-sol-latest` → a new concrete id) | nobody — the daily cron | `dailyReconcileSubscriptions` (`src/subscriptions.ts:685`) at `0 5 * * *` |
+
+### Steps, with what is manual and what is a wait
+
+Each step names the code that performs it. **Manual** means a human click or API call;
+everything else is automatic. **Wait** is the delay the flow itself imposes.
+
+| # | Step | Manual / automatic | Wait | Code |
+|---|---|---|---|---|
+| 1 | Pick the model and save the router config | **manual** (console Policy tab → Save config) | none; the save returns the saved config plus `warnings` | `src/admin.ts:267`, `src/admin.ts:196` (`syncRegistryAfterConfigSave`) |
+| 2 | Registry sync: expand the model through the live catalog into every supported effort, insert `pending` rows | automatic, inside the save request | none — runs before the response | `src/run.ts:465`, `src/db.ts:1751` (`syncPlatformRegistryRows`), `src/db.ts:1778` |
+| 3 | Routing table republish (the save also flushes an unchanged table) | automatic, inside the save request | none | `src/admin.ts:196`, `src/run.ts:516` |
+| 4 | Queue drain: claim the pending rows into a run | automatic. The per-minute cron drains both queues; a decider run reaching a terminal state drains immediately; the admin can also press **Run platform queue** / **Run user queue** | **up to 60 s** (cron tick) if nobody presses Run; the queue's run slot must be free (see "several runs per queue" below) | `src/index.ts:159` → `src/run.ts:382`, `src/run.ts:425` |
+| 5 | Run start: claim registry rows, insert the run row, copy reusable prior results | automatic, same drain pass | none | `src/run.ts:860` (`startRun`), `src/db.ts:1136` |
+| 6 | Initialization: materialize one scheduler chunk per case per lane | automatic, on the next dispatch pass | **bounded 20 s per pass**; a large run needs several passes (one pass writes 50 chunks per batch) | `src/scheduler.ts:232` (`scheduleRunChunks`), `src/run.ts:1191`, `src/run.ts:1310` |
+| 7 | Dispatch: claim chunks that fit the scheduler caps and enqueue them | automatic | none once initialized | `src/scheduler.ts:488`, `src/run.ts:1310` |
+| 8 | Cases execute in the runner container; each result posts to `/container/case-result` | automatic | **the measurement itself** — this dominates: minutes to hours depending on the entry count and model latency | `src/scheduler.ts:863` (`beginPaidCase`), `src/run.ts:1674` |
+| 9 | Finalization: aggregate summaries, flip entries ready/failed, mark the run completed | automatic, on the dispatch pass that sees the run settled | none | `src/run.ts:2641` (`finalizeRunIfComplete`) |
+| 10 | Profile ready: the registry row carries `run_id` provenance | automatic, same pass | none | `src/db.ts:1319` (`markProfilesReadyForRun`), `src/profile-failure.ts` |
+| 11 | Routing table publish with the new pair | automatic, same pass (and any save) | refuses until **every** serving pair has a ready current-engine row | `src/run.ts:516`, `src/run.ts:2641` |
+| 12 | Console: runs list, per-model cost table and routing table show the result | automatic on page load / refetch | none | `apps/web/src/app/admin/auto-routing/BenchmarksSection.tsx` |
+
+### Expected time per step
+
+Measured on the local stack with synthetic case results standing in for inference
+(`/tmp/ar-bench/flow/`, 1440 px captures) and on production since the 2026-11-20 fixes.
+
+| Step | Local stack | Production |
+|---|---|---|
+| 1–3 save (console click → 200 with `warnings: []`) | 0.4–1.1 s | same code path |
+| 1–3 save when the catalog mint fails | 0.3–0.4 s, `warnings: ["registry_sync_failed"]`, config still saved | — |
+| 4 drain | 0.6 s when triggered by hand; up to 60 s from the cron | 3–62 s measured (p50 12 s platform, 62 s owner) |
+| 5 run row written | within the drain response | same |
+| 6 initialization | 22 s for 294 chunks / one lane; a 4426-chunk run took about 4 min of passes | 30–40 s before the first case on small platform runs; minutes on a 100-entry batch |
+| 7 → 8 first case started | 3 s after the run row | 13–40 s |
+| 8 first case result | 1–12 s (seeded) | 13–37 s |
+| 8 whole run | seeded instantly; not representative | p50 ≈ 38 min for 10 frontier pairs × 294 cases; ≈ 94 min for one efficient model × 576 cases × 3 reps |
+| 9–11 ready + published | 0.1 s (seeded → one dispatch tick) | 0.2–5 s after the run completes |
+
+End to end for one model through the admin path with a real measurement: allow **15 min to
+2 h** for an efficient model (576 cases × 3 reps at the current caps) and **10–50 min** for a
+frontier model, plus at most a minute of drain and a minute of initialization. Production
+before the 2026-11-20 fixes took hours longer: p50 admit→ready was 2.9 h (platform) and
+5.8 h (owner), and admit→published 46 h; after them the same measurements are 38 min
+(platform) and 56–94 min (owner), and publish lands within seconds of run completion.
+
+### What the console shows at each step
+
+- **Policy tab, right after the save**: the model row is in the decider list, and its effort
+  coverage line reads `N of M measured · <effort>: pending` for the sync's new rows. A save
+  that could not sync shows a destructive banner naming why (`registry_sync_failed`,
+  `routing_table_publish_failed`) plus "save again to retry now".
+- **Benchmarks tab, Decider Registry**: pending / running / ready / failed counts per queue,
+  and the per-entry status list under the current engine identity.
+- **Benchmarks tab, runs list**: a `Platform queue` or `User queue` run row with its status
+  (`running` with a progress bar, then `completed` or `failed`), its total cost, cases and
+  errored count. Expand a run for a per-model table of **Accuracy, Cost / case, Total cost,
+  Cases, Errors**, and the model-id filter above it.
+- **Benchmarks tab, Failed models**: every failed pair with a `Permanent` / `Retryable` badge,
+  its class, reason, first/last failure and attempts, the next retry time, and a per-row
+  **Re-admit**.
+- **Routing table tab**: the published version, its generation time, and per route each
+  ranked pair with accuracy and average cost. A pair appears only once it is measured.
+
+### Failure states
+
+A failed entry is `failed` (retryable) or `unavailable` (permanent), classified in
+`src/profile-failure.ts`:
+
+- **Permanent (terminal)**: `catalog_absent`, `context_too_small`, `model_not_found`,
+  `unsupported`. The row goes `unavailable` at once with no retry time. It stays out of the
+  routing table but does not hold the table back — a live pair that has no ready row and no
+  measurement in flight leaves the table and is named in the publish log instead.
+- **Retryable — model tier**: `provider_unavailable`, `model_resolution`. Counts against the
+  model's budget (`PROFILE_MODEL_FAILURE_BUDGET = 3` consecutive failed runs).
+- **Retryable — infrastructure tier**: `ambiguous_execution`, `container_capacity`,
+  `catalog_load`, `grader`, `run_timed_out`, `orphaned_claim`, `run_init_failed`, `unknown`.
+  Only the overall budget (`PROFILE_FAILURE_BUDGET = 5`) applies, so an outage that never
+  clears still ends.
+- Exhausting either budget makes the failure permanent. The next retry waits
+  `2^(attempts-1)` hours, capped at 24.
+
+Recovery: **Requeue retryable** (admin, `POST /admin/registry/requeue`) puts every retryable
+row of a queue back to `pending` once its retry window has passed, charging no owner quota.
+A permanent row moves only through its own **Re-admit** (`POST /admin/registry/refresh`,
+`mode: repair_unavailable`), which is also how a confirmed provider fix re-admits a model
+whose budget ran out.
+
+### The remaining waits, and why they stay
+
+- **Up to 60 s before a drain claims the new rows.** The cron tick is the backstop for every
+  admission path; the admin **Run platform queue** / **Run user queue** buttons and the
+  drain after any decider run already skip it. It stays because owner registrations arrive
+  at arbitrary times and a drain is the only thing that can start their run.
+- **The queue's active run must finish.** One active run per `(router, queue)`. A new model
+  waits behind the pair batch already in flight. More runs per queue is proposed separately
+  and is what removes this wait.
+- **Initialization at 20 s per pass.** A D1 write budget, not a policy choice: one pass
+  writes 50 chunks per batch so a big run never holds a single transaction open. A run
+  needing more passes just takes longer before its first case.
+- **The measurement itself.** Nothing removes it: it is the paid inference the benchmark
+  exists to perform.
+- **Publish waits for every serving pair.** The table is republished from the registry only
+  when all pairs it serves are current. This is what keeps a half-measured alias move from
+  degrading the live table; it is also why one stuck pair used to hold the whole table
+  (fixed 2026-11-20: a settled failure now leaves the table instead of blocking it).
+
 ## Custom routers and client measurements
 
 ADR 0005 custom routers rank a pool of gateway and client entries against one base

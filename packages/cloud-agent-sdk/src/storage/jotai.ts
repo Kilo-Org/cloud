@@ -213,6 +213,7 @@ function createJotaiStorage(
       flushPendingDeltas();
       const arr = partsMap.get(messageId) ?? [];
       const nextArr = upsertPartDroppingStaleSyntheticParts(
+        messageId,
         arr,
         part,
         eventTime,

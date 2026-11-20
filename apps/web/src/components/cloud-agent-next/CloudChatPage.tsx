@@ -66,6 +66,7 @@ import { TranscriptStatusSlot } from './TranscriptStatusSlot';
 import { ComposerContextLine } from './ComposerContextLine';
 import { CurrentTaskList } from './CurrentTaskList';
 import { SessionBackgroundActivityStrip } from './BackgroundActivityStrip';
+import { SessionAgentBoard } from './AgentBoardDrawer';
 import { getCurrentTodos } from './current-todos';
 import { useCloudThreadScroll } from './assistant-ui/use-cloud-thread-scroll';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
@@ -1962,9 +1963,15 @@ export default function CloudChatPage({
                                       : currentTodos
                                   }
                                 />
-                                <SessionBackgroundActivityStrip
-                                  onOpenChildSession={handleOpenTopLevelChildSession}
-                                />
+                                <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                                  <SessionBackgroundActivityStrip
+                                    onOpenChildSession={handleOpenTopLevelChildSession}
+                                  />
+                                  <SessionAgentBoard
+                                    onOpenChildSession={handleOpenTopLevelChildSession}
+                                    portalContainer={childSessionDrawerContainer}
+                                  />
+                                </div>
                               </div>
                             )}
                             {isReadOnly &&

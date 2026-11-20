@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-import { checkParsedFile } from './check-classes.mjs';
+import { LAYOUT_RULES, checkParsedFile } from './check-classes.mjs';
 import { parseSourceEntry } from '../lib/source-files.mjs';
 
 // The rule cases read the repository's own files: the checker resolves the app's
@@ -25,7 +25,7 @@ import { parseSourceEntry } from '../lib/source-files.mjs';
 // they build one.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
-const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'fs-entries.mjs', 'source-files.mjs'];
 
 /**
  * The diagnostics of one file, straight from the checker's own export. A
@@ -46,12 +46,17 @@ function checkAll(files) {
 /**
  * A root mirroring the repository layout, for the probes and the CLI case.
  *
+ * `globalCss` decides the app's stylesheet: left out, the app's own
+ * `apps/mobile/src/global.css` is copied, so the theme tokens resolve; a string
+ * is written there instead, so a case can break the `@theme inline` block; null
+ * writes no file, so a case can read the missing-file failure.
+ *
  * `mkdtempSync` returns a path under the platform's symlinked temporary
  * directory on macOS (`/var` → `/private/var`), and the entry-point check
  * compares the script's real path with `process.argv[1]`, so the root is
  * canonicalised: a spawned audit then recognises itself and runs.
  */
-function makeFixture(context, files) {
+function makeFixture(context, files, globalCss) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'check-classes-')));
   context.after(() => rmSync(root, { recursive: true, force: true }));
 
@@ -71,7 +76,13 @@ function makeFixture(context, files) {
   for (const name of SHARED_SCANNERS) {
     copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
   }
-  copyFileSync(join(MOBILE_ROOT, 'src/global.css'), join(root, 'apps/mobile/src/global.css'));
+  const stylesheet = join(root, 'apps/mobile/src/global.css');
+  mkdirSync(dirname(stylesheet), { recursive: true });
+  if (globalCss === undefined) {
+    copyFileSync(join(MOBILE_ROOT, 'src/global.css'), stylesheet);
+  } else if (globalCss !== null) {
+    writeFileSync(stylesheet, globalCss);
+  }
   symlinkSync(join(MOBILE_ROOT, 'node_modules'), join(root, 'apps/mobile/node_modules'), 'dir');
   // The parser is a root dependency, resolved the way the repository resolves it.
   symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
@@ -882,6 +893,33 @@ function layoutProblems(relative, text) {
   return check(relative, text).filter(problem => /\[L\d+\]/.test(problem));
 }
 
+// The table is the only description of the layout rules, and the header says so.
+// These three properties are what makes that claim hold instead of drift: a new
+// rule cannot arrive with no detector, no two rules can share an id, and no rule
+// can name two detectors and leave the dispatch to pick one.
+test('states every layout rule once, with the detector that finds it', () => {
+  const ids = LAYOUT_RULES.map(rule => rule.id);
+  assert.deepEqual([...ids].sort(), [...new Set(ids)].sort(), 'two layout rules share an id');
+  for (const rule of LAYOUT_RULES) {
+    const detectors = ['patterns', 'detectSurface', 'detect'].filter(
+      field => rule[field] !== undefined
+    );
+    assert.equal(
+      detectors.length,
+      1,
+      `layout rule ${rule.id} must carry exactly one detector, has [${detectors.join(', ')}]`
+    );
+    assert.equal(
+      typeof rule.advice,
+      'string',
+      `layout rule ${rule.id} must name the primitive that replaces it`
+    );
+    if (rule.patterns !== undefined) {
+      assert.ok(rule.patterns.length > 0, `layout rule ${rule.id} has no pattern`);
+    }
+  }
+});
+
 test('flags arbitrary spacing outside the allowlist and passes it inside', () => {
   const found = layoutProblems(SCREEN_FILE, screen('<View className="mt-[6px]" />'));
   assert.equal(found.length, 1);
@@ -948,6 +986,52 @@ test('accepts px-4 and vertical padding on a scroll body', () => {
     ),
     []
   );
+});
+
+test('reads every scroll container in both RTL rules', () => {
+  // The two rules read one inventory, so a container the gutter rule used to
+  // miss is judged on its content container and one the className rule used to
+  // miss is judged on its own className.
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<FlatList contentContainerClassName="px-6" />')).join('\n'),
+    /\[L2\] "px-6 on <FlatList> contentContainerClassName"/
+  );
+  assert.match(
+    screenProblems(screen('<FlatList className="px-3" />')).join('\n'),
+    /<FlatList> carries "px-3" on its own className/
+  );
+  for (const tag of ['DetailScreenScrollView', 'SheetScrollView']) {
+    assert.match(
+      layoutProblems(SCREEN_FILE, screen(`<${tag} contentContainerClassName="px-6" />`)).join('\n'),
+      new RegExp(`\\[L2\\] "px-6 on <${tag}> contentContainerClassName"`),
+      tag
+    );
+    assert.match(
+      screenProblems(screen(`<${tag} className="px-3" />`)).join('\n'),
+      new RegExp(`<${tag}> carries "px-3" on its own className`),
+      tag
+    );
+  }
+});
+
+test('accepts the px-4 gutter on every scroll container and its Animated form', () => {
+  for (const tag of [
+    'ScrollView',
+    'TabScreenScrollView',
+    'DetailScreenScrollView',
+    'SheetScrollView',
+    'FlatList',
+    'FlashList',
+    'KeyboardAwareScrollView',
+    'Animated.ScrollView',
+    'Animated.FlatList',
+  ]) {
+    assert.deepEqual(
+      layoutProblems(SCREEN_FILE, screen(`<${tag} contentContainerClassName="px-4" />`)),
+      [],
+      tag
+    );
+  }
 });
 
 test('flags a header className that writes the page gutter', () => {
@@ -1317,6 +1401,27 @@ test('follows a local component that draws the sheet header', () => {
   );
 });
 
+test('does not accept a nested sheet header drawn through a local component', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      'function AdvancedContent() {\n' +
+      '  return <SheetHeader title="Advanced" onDone={onClose} />;\n' +
+      '}\n' +
+      'export function Screen() {\n' +
+      '  return (\n' +
+      '    <Sheet visible onClose={onClose}>\n' +
+      '      <Sheet visible={other} onClose={onClose}>\n' +
+      '        <AdvancedContent />\n' +
+      '      </Sheet>\n' +
+      '    </Sheet>\n' +
+      '  );\n' +
+      '}'
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:7: \[L11\] "<Sheet>"/);
+});
+
 test('flags horizontal padding on a CenteredState content container', () => {
   for (const classes of ['px-6', 'ps-3', 'pe-1', 'pl-2', 'pr-2', 'p-3']) {
     const found = layoutProblems(
@@ -1488,4 +1593,102 @@ test('writes the baseline with --write-layout-baseline', context => {
       'apps/mobile/src/screen.tsx': { L1: 1, L3: 1, L4: 1 },
     }
   );
+});
+
+// A stylesheet the theme read cannot use: the block a moved or renamed
+// global.css would lose. The audit must report why the one theme-dependent
+// rule was skipped instead of ending on that read, and every other rule's
+// findings must still print.
+const THEME_SOURCE = 'export const a = <View className="leading-9 bg-primary/50" />;\n';
+
+test('skips only the theme rule and keeps the other findings when global.css has no @theme block', context => {
+  const root = makeFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    ':root { --x: 1; }\n'
+  );
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(no @theme inline block\)/
+  );
+  // The ban the other rules still make reaches the report.
+  assert.match(result.stderr, /leading-9/);
+  // The skipped rule's own diagnostic must not claim the token was checked.
+  assert.doesNotMatch(result.stderr, /bg-primary\/50/);
+  assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+  assert.doesNotMatch(result.stderr, /Error:/);
+  // A stack trace means the theme read escaped the problem list.
+  assert.doesNotMatch(result.stderr, /\n\s+at /);
+});
+
+test('names the missing global.css and keeps the other findings', context => {
+  const root = makeFixture(context, { 'apps/mobile/src/screen.tsx': THEME_SOURCE }, null);
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(ENOENT/
+  );
+  assert.match(result.stderr, /leading-9/);
+  assert.doesNotMatch(result.stderr, /bg-primary\/50/);
+  assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+  assert.doesNotMatch(result.stderr, /Error:/);
+});
+
+test('--write-layout-baseline reports a theme failure instead of rewriting the baseline', context => {
+  const root = makeFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    ':root { --x: 1; }\n'
+  );
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'tools/nativewind/check-classes.mjs'), '--write-layout-baseline'],
+    { cwd: root, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(
+    result.stderr,
+    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(no @theme inline block\)/
+  );
+  assert.match(result.stderr, /check-classes: 1 problem\(s\)/);
+  assert.doesNotMatch(result.stdout, /wrote/);
+  // A baseline written here would record a tree the audit never checked.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('reports an @theme inline block holding no colour token as the theme failure', context => {
+  const root = makeFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    ':root {}\n@theme inline {\n  --font-sans: var(--font-x);\n}\n'
+  );
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /no --color token in the @theme inline block/);
+  assert.match(result.stderr, /leading-9/);
+  // The rule has no token to build its pattern from, so it must not run.
+  assert.doesNotMatch(result.stderr, /bg-primary\/50/);
+  assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
 });

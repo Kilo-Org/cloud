@@ -30,7 +30,13 @@ import {
 // The checker parses with oxc through the shared scanner, so the command
 // fixtures link the repository's dependency tree at their own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_MODULES = [
+  'ast.mjs',
+  'catalogs.mjs',
+  'entry-point.mjs',
+  'fs-entries.mjs',
+  'source-files.mjs',
+];
 // The checker the command fixtures run, read once so a copy is always the text
 // this suite's assertions were written against.
 const CHECKER_SOURCE = readFileSync(new URL('./check-plurals.mjs', import.meta.url), 'utf8');

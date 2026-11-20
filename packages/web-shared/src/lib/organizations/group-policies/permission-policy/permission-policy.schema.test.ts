@@ -30,7 +30,6 @@ test('retains explicit empty shell maps, unknown tool keys, and absent fallbacks
       type: 'agent_permissions',
       data: { schema_version: 1, shell: {}, tools: { custom_tool: { rules: [] }, bash: 'ask' } },
     },
-    { type: 'client_access', data: fixtures.layered.policy.client_access.layers[0] },
   ];
   expect(OrganizationGroupPoliciesSchema.parse(policies)).toStrictEqual(policies);
   expect(OrganizationGroupPoliciesSchema.safeParse([...policies, policies[1]]).success).toBe(false);
@@ -49,32 +48,19 @@ test.each([
   ).toBe(false);
 });
 
-test.each([
-  { mode: 'allowlist', clients: [], unknown_clients: 'allow' },
-  { mode: 'allowlist', clients: [{ feature: 'unrecognized' }] },
-  { mode: 'allowlist', clients: [{ feature: 'cli', min_version: '1.2.3-01' }] },
-  { mode: 'allowlist', clients: [{ feature: 'cli' }, { feature: 'cli' }] },
-  { mode: 'blocklist', clients: [{ feature: 'cli', min_version: '1.2.3' }] },
-])('rejects an invalid client admission predicate: %j', policy => {
+test('rejects the retired client-access policy in active contracts', () => {
+  const retired = {
+    type: 'client_access',
+    data: { schema_version: 1, mode: 'allowlist', clients: [{ feature: 'cli' }] },
+  };
+  expect(OrganizationPermissionPolicySchema.safeParse(retired).success).toBe(false);
+  expect(OrganizationGroupPoliciesSchema.safeParse([retired]).success).toBe(false);
   expect(
-    OrganizationPermissionPolicySchema.safeParse({
-      type: 'client_access',
-      data: { schema_version: 1, ...policy },
+    MemberPermissionPolicySchema.safeParse({
+      ...fixtures.enabled_empty,
+      policy: { client_access: { layers: [retired.data] } },
     }).success
   ).toBe(false);
-});
-
-test('accepts a full SemVer including prerelease and build metadata', () => {
-  expect(
-    OrganizationPermissionPolicySchema.safeParse({
-      type: 'client_access',
-      data: {
-        schema_version: 1,
-        mode: 'allowlist',
-        clients: [{ feature: 'cli', min_version: '1.2.3-beta.1+build.009' }],
-      },
-    }).success
-  ).toBe(true);
 });
 
 test('rejects oversized stored documents and effective policies instead of dropping layers', () => {

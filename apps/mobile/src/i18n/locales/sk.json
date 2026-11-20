@@ -19,7 +19,11 @@
     "presenceStatus": "Hostitelia: {{connection}}",
     "commandStatus": "Doručenie príkazu: {{status}}",
     "delivered": "Doručené",
-    "expired": "Platnosť vypršala"
+    "expired": "Platnosť vypršala",
+    "recoveryGaps_one": "Chýba {{displayCount}} časť tohto prepisu.",
+    "recoveryGaps_few": "Chýbajú {{displayCount}} časti tohto prepisu.",
+    "recoveryGaps_many": "Chýba {{displayCount}} časti tohto prepisu.",
+    "recoveryGaps_other": "Chýba {{displayCount}} častí tohto prepisu."
   },
   "common": {
     "manageOnWeb": "Spravovať na webe",
@@ -172,6 +176,7 @@
     "generating": "Generuje sa…",
     "working": "Pracuje sa",
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
+    "organizationRepositories": "Repozitáre organizácie",
     "dismissed": "Ignorované",
     "agent": "agent",
     "durationMinuteShort": "min",
@@ -996,6 +1001,10 @@
       "pendingComment": "neodoslaných komentárov",
       "pendingComment_other": "neodoslaných komentárov",
       "submitCountOfTotal": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_one": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_few": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_many": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_other": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
       "submitReview": "Odoslať kontrolu",
       "partialPostedFresh": "Počet odoslaných komentárov: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Počet odoslaných komentárov: {{displayFreshCount}}. ",
@@ -1070,7 +1079,12 @@
     "tabs": {
       "overview": "Prehľad",
       "files": "Súbory",
-      "discussion": "Diskusia"
+      "discussion": "Diskusia",
+      "discussionAccessibility_one": "{{title}}: 1 komentár",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentárov",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentárov",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentáre",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentára"
     },
     "fileStatus": {
       "modified": "Upravené",
@@ -1269,7 +1283,7 @@
     },
     "instructions": {
       "title": "Vlastné pokyny",
-      "deprecation": "Podpora vlastných pokynov sa plánuje ukončiť. Presuňte tieto pokyny do súboru REVIEW.md vo svojom repozitári.",
+      "deprecation": "Vlastné pokyny budú odstránené. Presuňte tieto pokyny do súboru REVIEW.md vo svojom repozitári.",
       "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…",
       "clearTitle": "Odstrániť vlastné pokyny?",
       "clearMessage": "Uloženie prázdneho poľa odstráni vlastné pokyny uložené pre tohto recenzenta."
@@ -1433,8 +1447,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "managedOnWebTitle": "Spravuje sa na webe",
+      "managedOnWebShort": "Toto pripojenie sa spravuje na webe z počítača.",
+      "managedOnWebRepositories": "Vyberte repozitáre pre {{organization}} na webe z počítača.",
       "description": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
       "descriptionReconnect": "Vytvorte nový prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
+      "descriptionOverview": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho na ďalšej obrazovke.",
       "scopes": "Účet: čítanie · Repozitáre: čítanie/zápis · PR: čítanie · Webhooky: čítanie/zápis",
       "tokenPlaceholder": "Prístupový token pracovného priestoru",
       "tokenRefused": "Bitbucket neprijal tento token pracovného priestoru. Skontrolujte, či má oprávnenia uvedené vyššie, a potom to skúste znova."
@@ -1455,6 +1473,7 @@
     "platformList": {
       "checking": "Kontroluje sa…",
       "statusUnavailable": "Stav nie je dostupný",
+      "needsAttention": "Vyžaduje pozornosť",
       "platforms": "Platformy",
       "activity": "Aktivita"
     },
@@ -2877,6 +2896,8 @@
     "modelPicker": {
       "title": "Vybrať model",
       "noModelsDescription": "Na výber nie sú žiadne modely.",
+      "allUnavailableTitle": "Nedá sa použiť žiadny model",
+      "allUnavailableDescription": "Pridaj kľúč poskytovateľa a skús to znova.",
       "favorites": "Obľúbené"
     },
     "modelSelector": {
@@ -3299,6 +3320,8 @@
     "retryHint": "Znova načíta stav Kilo Pass.",
     "endedOn": "Skončené {{date}}",
     "notAvailableInApp": "Kilo Pass nie je dostupný v aplikácii.",
+    "notAvailableTitle": "Kilo Pass sa v aplikácii neponúka",
+    "noPassDescription": "Tento účet nemá Kilo Pass.",
     "statusActive": "Aktívne",
     "statusTrialing": "Skúšobné obdobie",
     "statusPastDue": "Platba po splatnosti",
@@ -3581,7 +3604,7 @@
       "retentionLimit": "Zobrazujú sa najnovšie faktúry."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Zapnúť upozornenie na nízky zostatok",
+      "subtitle": "Keď zostatok tejto organizácie klesne pod nastavenú sumu, na zadané adresy sa odošle e-mailové upozornenie.",
       "notifyEmailsLabel": "E-mailové adresy na upozornenia",
       "permissionDenied": "Nemáš povolenie spravovať upozornenia na fakturáciu.",
       "separateEmailsHint": "Viaceré e-mailové adresy oddeľ čiarkami.",
@@ -3728,10 +3751,9 @@
     },
     "hub": {
       "renameTitle": "Premenovať organizáciu",
-      "renamePlaceholder": "Názov organizácie",
+      "renamePlaceholder": "Zadajte názov organizácie",
       "balance": "Zostatok",
-      "organizationSeats": "Miesta v organizácii",
-      "plan": "Plán organizácie",
+      "plan": "Plán",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Skončený",
@@ -3767,7 +3789,8 @@
     "signupStepUp": "Na dokončenie vytvorenia účtu použi „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithGoogle)“.",
-    "invalidCode": "Tento kód je nesprávny. Skús to znova.",
+    "signupStepUpBack": "Na dokončenie vytvorenia účtu sa vráť späť a použi „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Skús to znova alebo použi „$t(login.resendCode)“.",
     "codeInProgress": "Tvoj kód sa spracúva. Chvíľu počkaj a skús to znova.",
     "tooManyAttempts": "Príliš veľa pokusov. Vyžiadaj si nový kód.",
     "invalidToken": "Prihlásenie zlyhalo. Skús to znova.",
@@ -4038,6 +4061,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) odošle na tento koncový bod krátku požiadavku na inferenciu pomocou vybraného protokolu a modelu. Poskytovateľ si za ňu môže účtovať poplatok.",
       "connectionSucceeded": "Model úspešne spracoval požiadavku pomocou tohto protokolu.",
       "connectionFailed": "Model nedokázal spracovať požiadavku. Skontrolujte základnú URL API, protokol, prihlasovacie údaje a ID modelu.",
+      "requestTimedOut": "Koncový bod včas neodpovedal. Skontrolujte základnú URL API a pripojenie a skúste to znova.",
+      "requestUnauthorized": "Koncový bod odmietol prihlasovacie údaje. Skontrolujte API kľúč a vlastné hlavičky a skúste to znova.",
+      "requestNotFound": "Koncový bod alebo model sa nenašiel. Skontrolujte základnú URL API a ID modelu.",
+      "requestRateLimited": "Koncový bod obmedzuje požiadavky. Chvíľu počkajte a skúste to znova.",
+      "requestUnavailable": "Koncový bod je teraz nedostupný. Skúste to o chvíľu znova.",
+      "requestUnreachable": "Koncový bod sa nepodarilo dosiahnuť. Skontrolujte základnú URL API a pripojenie.",
+      "requestInvalidResponse": "Koncový bod neodpovedal v očakávanom formáte. Skontrolujte, či základná URL API a protokol zodpovedajú serveru, a skúste to znova.",
+      "discoveryNoModels": "Koncový bod neuviedol žiadne modely. Zadajte modely ručne.",
+      "connectionIncomplete": "Model odpovedal, ale nedokončil odpoveď. Skúste to znova alebo skontrolujte ID modelu a protokol.",
       "invalidInput": "Zadajte názov servera, platné hlavičky a aspoň jeden model s jedinečným ID a názvom. Limity tokenov musia byť kladné celé čísla.",
       "invalidUrl": "Zadajte základnú URL API s HTTP alebo HTTPS bez prihlasovacích údajov, parametrov dopytu alebo fragmentu.",
       "publicHttp": "Verejné koncové body HTTP nie sú povolené. Použite HTTPS alebo súkromný lokálny koncový bod.",
@@ -4176,10 +4208,20 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
     },
-    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov."
+    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov.",
+    "providerKeyRefused": "Poskytovateľ odmietol prihlasovacie údaje. Skontrolujte jeho API kľúč a skúste odoslať znova.",
+    "providerModelMissing": "Tento backend už tento model neposkytuje. Vyberte iný.",
+    "providerRateLimited": "Poskytovateľ obmedzuje požiadavky. Chvíľu počkajte a skúste odoslať znova.",
+    "providerUnavailable": "Poskytovateľ je teraz nedostupný. O chvíľu skúste odoslať znova."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrdiť túto zmenu?"
+    "confirmTitle": "Potvrdiť túto zmenu?",
+    "guarded": {
+      "spendAlertsOff": "Vypnúť upozornenia na výdavky? Prestanete dostávať oznámenia o prekročení prahov výdavkov a o hodinových špičkách.",
+      "balanceAlertsOff": "Vypnúť upozornenia na zostatok? Prestanete dostávať oznámenia, keď budete mať málo kreditov.",
+      "securityFindingsOff": "Vypnúť bezpečnostné zistenia? Prestanete dostávať oznámenia o nových bezpečnostných zisteniach.",
+      "hideBalanceOn": "Skryť zostatky? Zostatky kreditov sa už nebudú zobrazovať na obrazovkách profilu a v centre organizácie."
+    }
   },
   "appActions": {
     "start": {
@@ -4563,6 +4605,7 @@
     "pickPackToBuyAgain": "Ak chcete začať nový nákup, vyberte balík vyššie.",
     "purchasePending": "Obchod túto platbu ešte spracúva. Kredity dostanete hneď, ako schváli transakciu.",
     "buyAgain": "Kúpiť znova",
+    "checkPurchase": "Skontrolovať nákup",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
   },
@@ -4664,7 +4707,9 @@
     },
     "saveSheet": {
       "title": "Uložiť do zoznamu",
-      "saved": "Uložené do zoznamu {{list}}"
+      "saved": "Uložené do zoznamu {{list}}",
+      "saveFailed": "Úlohu sa nepodarilo uložiť. Skontrolujte pripojenie a skúste to znova.",
+      "saveRefused": "Úlohu sa nepodarilo uložiť do tohto zoznamu. Vyberte iný zoznam."
     }
   },
   "agentBriefing": {
@@ -4676,6 +4721,7 @@
     "empty": "Žiadna aktivita v tomto okne prehľadu",
     "emptyHint": "Vaše cloudové a CLI relácie programovania sa tu zobrazia, keď má naplánovaný prehľad aktivitu.",
     "loadError": "Prehľady sa nepodarilo načítať",
+    "estimateLoadError": "Odhad sa nepodarilo načítať.",
     "view": "Čítať prehľad",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4951,7 +4997,7 @@
   },
   "organizationGuardrails": {
     "title": "AI ochranné mechanizmy",
-    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia.",
+    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI ochranné mechanizmy nie sú zapnuté",
     "unavailable": "Kilo zapína AI ochranné mechanizmy pre organizáciu na požiadanie. Kontaktujte {{supportEmail}} a tím Kilo ich zapne pre vašu organizáciu.",
     "contactSupport": "Kontaktovať podporu",
@@ -5089,7 +5135,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Podniková funkcia",
-    "enterpriseOnly": "Toto je funkcia určená iba pre podniky.",
+    "enterpriseOnly": "Poskytovatelia a modely sú dostupné v pláne Enterprise.",
     "readOnly": "Tieto nastavenia môžu meniť iba vlastníci organizácie a správcovia.",
     "loadError": "Poskytovateľov a modely nebolo možné načítať",
     "tabModels": "Modely",
@@ -5103,6 +5149,7 @@
     "providersDescription": "Vypnutím poskytovateľa zastavíte smerovanie Kilo naň pre túto organizáciu.",
     "providersNeedCatalog": "Prepínače poskytovateľov zostanú iba na čítanie, kým sa nenačíta celý katalóg modelov. Ak ich chcete upraviť, ťuknite vyššie na Skúsiť znova.",
     "providersEmpty": "Tomuto hľadaniu nezodpovedajú žiadni poskytovatelia.",
+    "providersNone": "Pre túto organizáciu nie sú k dispozícii žiadni poskytovatelia.",
     "allowAllShown": "Povoliť všetky zobrazené",
     "denyAllShown": "Zamietnuť všetky zobrazené",
     "gatewaysDescription": "Kilo smeruje požiadavky na modely cez Vercel AI Gateway alebo OpenRouter. Vypnutá brána spôsobí zlyhanie týchto požiadaviek.",

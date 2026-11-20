@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { useContextPicker } from '@/components/context-control';
@@ -16,9 +17,14 @@ import { useTRPC } from '@/lib/trpc';
  * `(app)/context-picker` over this fixture. A pick switches the account's
  * active organization; the gate only reads, and the account that runs it is a
  * development account.
+ *
+ * Link: `kiloapp:///dev/account-picker-sheet-fixture`, mapped in
+ * `src/app/+native-intent.tsx`.
  */
 export function AccountPickerSheetFixture() {
   const trpc = useTRPC();
+  const router = useRouter();
+  const navigation = useNavigation();
   const organizations = useQuery(trpc.organizations.list.queryOptions());
   const { openPicker } = useContextPicker(organizations.data);
   // The header's control refuses to open while the list is still loading, so
@@ -34,6 +40,26 @@ export function AccountPickerSheetFixture() {
     setOpened(true);
     openPicker();
   }, [opened, organizations.data, openPicker]);
+
+  // This route draws nothing of its own, so once the picker is gone (Done, a
+  // pick, Back or a swipe down) it leaves too: the person returns to the
+  // screen that opened the link instead of a blank page. A focus event comes
+  // only from a transition, so it fires when the picker above is dismissed and
+  // never for the focus this route already held when the picker was pushed.
+  useEffect(
+    () =>
+      navigation.addListener('focus', () => {
+        if (!opened) {
+          return;
+        }
+        if (router.canGoBack()) {
+          router.back();
+          return;
+        }
+        router.replace('/');
+      }),
+    [navigation, opened, router]
+  );
 
   return null;
 }

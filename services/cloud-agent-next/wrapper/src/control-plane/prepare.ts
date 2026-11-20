@@ -968,8 +968,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // by keeping the route directory, even when its roots now live inside it.
       if (stored.repoFullName === undefined) return stored.directory === spec.directory;
       const index = roots.findIndex(root => root.directory === stored.directory);
-      if (index < 0) return false;
-      const incoming = roots[index]!;
+      const incoming = index < 0 ? undefined : roots[index];
+      if (incoming === undefined) return false;
       const requestedBranch =
         incoming.spec.branchMode === 'working' ? undefined : incoming.spec.branch;
       return reconciled.inspections[index] === 'same' && requestedBranch === stored.requestedBranch;

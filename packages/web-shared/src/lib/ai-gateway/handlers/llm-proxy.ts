@@ -12,6 +12,7 @@ import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { sendUpstreamAttemptWithByokFailover } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
+import type { SendUpstreamAttemptResult } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -87,6 +88,8 @@ import {
   requestBenchmarkAdmission,
   signedModelViolation,
 } from '@kilocode/web-shared/lib/ai-gateway/benchmark-case-admission';
+import { recordTerminalNoChargeReceipt } from '@kilocode/web-shared/lib/ai-gateway/terminal-no-charge-receipt';
+import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type { BenchmarkGatewayAssignment } from '@kilocode/auto-routing-contracts';
 
@@ -116,6 +119,26 @@ function llmProxyPath(url: URL): LlmProxyPath | null {
     default:
       return null;
   }
+}
+
+/**
+ * The status a benchmark call's terminal zero-charge receipt should carry, or null when the
+ * gateway cannot prove the provider was never dialled.
+ *
+ * A benchmark case reaches `unknown-gateway-model` only from the model-availability check and a
+ * `notInvoked` error only from a refusal the provider layer recorded before it opened a
+ * connection. Both would otherwise leave the admitted model request with no native row, so the
+ * Worker's receipt read would stay `pending` forever and block that payer's next admit. Every
+ * other outcome stays pending: the provider may already have billed the call.
+ */
+export function benchmarkTerminalNoChargeStatus(
+  benchmark: BenchmarkCaseContext | undefined,
+  attempt: SendUpstreamAttemptResult
+): number | null {
+  if (!benchmark) return null;
+  if (attempt.type === 'unknown-gateway-model') return 404;
+  if (attempt.type === 'error' && attempt.notInvoked === true) return attempt.response.status;
+  return null;
 }
 
 export async function handleLlmProxyRequest(
@@ -577,6 +600,10 @@ export async function handleLlmProxyRequest(
     benchmark ? [] : failoverRoutes
   );
   if (failoverAttempts) providerMetadataCapture?.captureByokFailoverAttempts(failoverAttempts);
+  const terminalStatus = benchmarkTerminalNoChargeStatus(benchmark, attempt);
+  if (terminalStatus !== null) {
+    recordTerminalNoChargeReceipt(usageContext, terminalStatus, logMicrodollarUsage, after);
+  }
   if (attempt.type === 'unknown-gateway-model') {
     return unknownModelResponse(effectiveModelIdLowerCased);
   }

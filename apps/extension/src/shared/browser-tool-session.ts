@@ -1239,8 +1239,15 @@ window.resizeTo(width, height);
 return __finish('Resized the window to ' + width + 'x' + height + '.');`;
 
 /** The caller a scripting tool runs for: its ref registry, and its read grants when it is an agent. */
+/** The scripting frame a caller's last `browser_type` focused; `undefined` means the tab's own document. */
+interface FocusedFrame {
+  frameId: number | undefined;
+}
+
 interface ScriptingCallContext {
   readonly refs: Map<string, BrowserToolRefEntry>;
+  /** The frame the last `browser_type` focused, so a following `browser_press_key` types into it. */
+  readonly focusedFrame: FocusedFrame;
   readonly scope?: BrowserToolCallScope | undefined;
 }
 
@@ -1606,6 +1613,8 @@ export const createBrowserToolSession = ({
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
   const defaultRefs = new Map<string, BrowserToolRefEntry>();
+  // The unbound view's focused frame, kept beside its refs.
+  const defaultFocusedFrame: FocusedFrame = { frameId: undefined };
   let attached = false;
   let disposed = false;
   let focusEmulated = false;
@@ -3385,7 +3394,10 @@ export const createBrowserToolSession = ({
           return { error: 'browser_press_key needs a key.', ok: false };
         }
 
-        return runPageTool(buildPressKeyPageScript({ key: parsed.data.key }));
+        // The key goes to the document that holds the focus: the frame of the last typed ref, else the tab's own.
+        return runPageTool(buildPressKeyPageScript({ key: parsed.data.key }), {
+          frameId: call.focusedFrame.frameId,
+        });
       }
 
       case 'browser_resize': {
@@ -3524,6 +3536,9 @@ export const createBrowserToolSession = ({
         if ('error' in resolved) {
           return { error: resolved.error, ok: false };
         }
+
+        // A following `browser_press_key` (Enter to submit, Tab to move on) belongs to this field's document, not the top one.
+        call.focusedFrame.frameId = resolved.frameId;
 
         return runPageTool(
           buildTypePageScript({
@@ -3705,6 +3720,8 @@ export const createBrowserToolSession = ({
     refs: Map<string, BrowserToolRefEntry>,
     guard?: BrowserToolCallGuard
   ): BrowserToolSession => {
+    // The frame the caller's last `browser_type` focused; a later call of the same caller presses its keys there.
+    const focusedFrame: FocusedFrame = { frameId: undefined };
     const throwIfCancelled = (): void => {
       if (guard?.cancelled() === true) {
         throw new Error(TAB_TAKEN_ERROR);
@@ -3718,7 +3735,8 @@ export const createBrowserToolSession = ({
       bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey), guard),
       callTool: (toolName, args, scope) => {
         throwIfCancelled();
-        return runCallTool(toolName, args ?? {}, { refs, scope });
+
+        return runCallTool(toolName, args ?? {}, { focusedFrame, refs, scope });
       },
       captureViewportImage: (format, options, callGuard) => {
         throwIfCancelled();
@@ -3776,7 +3794,11 @@ export const createBrowserToolSession = ({
     ...isolatedProbeMember,
     bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
     callTool: (toolName, args, scope) =>
-      runCallTool(toolName, args ?? {}, { refs: defaultRefs, scope }),
+      runCallTool(toolName, args ?? {}, {
+        focusedFrame: defaultFocusedFrame,
+        refs: defaultRefs,
+        scope,
+      }),
     captureViewportImage,
     childFrames: () => new Map(childFrames),
     consoleMessages: () => [...consoleBuffer],

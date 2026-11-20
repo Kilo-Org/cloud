@@ -550,6 +550,7 @@ const createFramedScriptingSession = () => {
         });
         await withPageGlobals(
           {
+            KeyboardEvent: dom.window.KeyboardEvent,
             MouseEvent: dom.window.MouseEvent,
             document: dom.window.document,
             location: dom.window.location,
@@ -2036,6 +2037,36 @@ describe('browser tool session scripting backend', () => {
       nodeId: 0,
       selector: 'body > button',
     });
+  });
+
+  it('presses a key in the frame a typed ref focused, not the top document', async () => {
+    const { mainWorldFrames, pay, session, shop } = createFramedScriptingSession();
+    const pressed: string[] = [];
+
+    for (const [name, dom] of [
+      ['shop', shop],
+      ['pay', pay],
+    ] as const) {
+      dom.window.document.addEventListener('keydown', () => {
+        pressed.push(name);
+      });
+    }
+
+    await session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    await session.callTool(
+      'browser_type',
+      { target: 'e4', text: 'igor@example.com' },
+      { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+    );
+    mainWorldFrames.length = 0;
+
+    await expect(session.callTool('browser_press_key', { key: 'Enter' })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Pressed Enter.',
+    });
+    // Enter must reach the field's own document: the top document's <iframe> element would swallow it.
+    expect(pressed).toStrictEqual(['pay']);
+    expect(mainWorldFrames).toStrictEqual([4]);
   });
 
   it('caps a caller’s merged refs, dropping the oldest earlier refs first', async () => {

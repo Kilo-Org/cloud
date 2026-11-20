@@ -2,11 +2,15 @@ import {
   cleanupDbForTest,
   pool,
   db,
+  createReadDb,
   isUSRegion,
-  selectReplicaUrl,
+  replicaAffinityKey,
+  selectReplicaIndex,
+  selectReplicaUrls,
   shouldExitOnPoolError,
   sql,
 } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleDatabase } from '@kilocode/web-shared/lib/drizzle';
 import { exa_usage_log, http_ip, http_user_agent } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -83,73 +87,71 @@ describe('drizzle', () => {
 
     it('uses the primary in local development even when replicas are configured', () => {
       expect(
-        selectReplicaUrl({
+        selectReplicaUrls({
           primaryUrl,
           nodeEnv: 'development',
           vercelRegion: undefined,
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: ['postgres://eu-replica'],
         })
-      ).toBe(primaryUrl);
+      ).toEqual([primaryUrl]);
     });
 
     it('preserves EU replica selection for regionless non-development processes', () => {
       expect(
-        selectReplicaUrl({
+        selectReplicaUrls({
           primaryUrl,
           nodeEnv: 'production',
           vercelRegion: undefined,
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: ['postgres://eu-replica'],
-          random: () => 0,
         })
-      ).toBe('postgres://eu-replica');
+      ).toEqual(['postgres://eu-replica']);
     });
 
     it('uses the US replica in a US Vercel region', () => {
       expect(
-        selectReplicaUrl({
+        selectReplicaUrls({
           primaryUrl,
           nodeEnv: 'production',
           vercelRegion: 'sfo1',
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: ['postgres://eu-replica'],
         })
-      ).toBe('postgres://us-replica');
+      ).toEqual(['postgres://us-replica']);
     });
 
-    it('selects between EU replicas in an EU Vercel region', () => {
+    it('uses every EU replica in an EU Vercel region', () => {
       expect(
-        selectReplicaUrl({
+        selectReplicaUrls({
           primaryUrl,
           nodeEnv: 'production',
           vercelRegion: 'fra1',
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: ['postgres://eu-1', 'postgres://eu-2'],
-          random: () => 0.75,
         })
-      ).toBe('postgres://eu-2');
+      ).toEqual(['postgres://eu-1', 'postgres://eu-2']);
     });
 
     it('falls back to the primary when the regional replica is unavailable', () => {
       expect(
-        selectReplicaUrl({
+        selectReplicaUrls({
           primaryUrl,
           nodeEnv: 'production',
           vercelRegion: 'sfo1',
           usReplicaUrl: undefined,
           euReplicaUrls: ['postgres://eu-replica'],
         })
-      ).toBe(primaryUrl);
+      ).toEqual([primaryUrl]);
       expect(
-        selectReplicaUrl({
+        selectReplicaUrls({
           primaryUrl,
           nodeEnv: 'production',
           vercelRegion: 'fra1',
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: [],
         })
-      ).toBe(primaryUrl);
+      ).toEqual([primaryUrl]);
     });
   });
 
@@ -158,7 +160,11 @@ describe('drizzle', () => {
       jest.restoreAllMocks();
     });
 
-    async function readHostAtStartup(vercelRegion: string, disabled: string) {
+    async function readHostAtStartup(
+      vercelRegion: string,
+      disabled: string,
+      overrides: Record<string, string> = {}
+    ) {
       jest.replaceProperty(process, 'env', {
         ...process.env,
         VERCEL_REGION: vercelRegion,
@@ -169,6 +175,7 @@ describe('drizzle', () => {
         POSTGRES_REPLICA_EU_URL: 'postgres://eu-1.example/db',
         POSTGRES_REPLICA_EU_URL_2: 'postgres://eu-2.example/db',
         POSTGRES_REPLICAS_DISABLED: disabled,
+        ...overrides,
       });
       jest.spyOn(Math, 'random').mockReturnValue(0.75);
 
@@ -201,6 +208,129 @@ describe('drizzle', () => {
         'POSTGRES_REPLICAS_DISABLED names unknown replicas: ["us_west"]; valid names: us-west, eu-central-1, eu-central-2'
       );
     });
+
+    it('skips a replica whose URL does not parse, without logging the URL', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const invalidUrl = 'postgres://user:secret@eu-2.example:notaport/db';
+
+      await expect(
+        readHostAtStartup('fra1', '', { POSTGRES_REPLICA_EU_URL_2: invalidUrl })
+      ).resolves.toBe('eu-1.example');
+
+      expect(warn).toHaveBeenCalledWith('Skipping read replica eu-central-2: its URL is invalid');
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('secret');
+    });
+  });
+
+  describe('replica affinity', () => {
+    const addresses = Array.from({ length: 200 }, (_, i) => `203.0.${i >> 4}.${i}`);
+
+    it('sends one address to the same replica every time', () => {
+      for (const ip of addresses) {
+        expect(selectReplicaIndex(ip, 2, 0)).toBe(selectReplicaIndex(ip, 2, 1));
+      }
+    });
+
+    it('spreads addresses across replicas', () => {
+      const onFirst = addresses.filter(ip => selectReplicaIndex(ip, 2, 0) === 0).length;
+      expect(onFirst).toBeGreaterThan(60);
+      expect(onFirst).toBeLessThan(140);
+    });
+
+    it('depends on more than the parity of odd characters', () => {
+      // Every address here has the same number of odd digits; plain FNV-1a % 2 puts them all
+      // on one replica.
+      const sameParity = Array.from({ length: 40 }, (_, i) => `10.0.${2 * i}.${2 * i}`);
+      const indexes = new Set(sameParity.map(ip => selectReplicaIndex(ip, 2, 0)));
+      expect(indexes.size).toBe(2);
+    });
+
+    it('uses the instance fallback without an address', () => {
+      expect(selectReplicaIndex(null, 2, 1)).toBe(1);
+      expect(selectReplicaIndex(null, 2, 0)).toBe(0);
+    });
+
+    it('needs no choice for a single replica', () => {
+      expect(selectReplicaIndex('203.0.113.1', 1, 0)).toBe(0);
+    });
+
+    it('keys an IPv6 address by its /64 prefix', () => {
+      expect(replicaAffinityKey('2001:db8:1:2:aaaa::1')).toBe(
+        replicaAffinityKey('2001:db8:1:2:bbbb:cccc:dddd:eeee')
+      );
+      expect(replicaAffinityKey('2001:db8:1:2::1')).not.toBe(replicaAffinityKey('2001:db8:1:3::1'));
+      expect(replicaAffinityKey('203.0.113.1')).toBe('203.0.113.1');
+    });
+
+    it('keys an IPv4-mapped address as its IPv4 address in either form', () => {
+      expect(replicaAffinityKey('::ffff:192.0.2.1')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('::ffff:c000:201')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('::FFFF:C000:0201')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('0:0:0:0:0:ffff:192.0.2.1')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('0:0:0:0:0:FFFF:c000:201')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('2001:db8:1:2::192.0.2.1')).toBe(
+        replicaAffinityKey('2001:db8:1:2::1')
+      );
+      expect(replicaAffinityKey('::ffff:c000:202')).not.toBe(replicaAffinityKey('::ffff:c000:201'));
+    });
+  });
+
+  describe('createReadDb', () => {
+    const contextSymbol = Symbol.for('@vercel/request-context');
+    const global = globalThis as typeof globalThis & {
+      [contextSymbol]?: { get: () => { headers?: Record<string, string> } };
+    };
+    let headers: Record<string, string> | undefined;
+
+    function fakeDb(name: string) {
+      const db = {
+        name,
+        whoami(this: { name: string }) {
+          return this.name;
+        },
+      };
+      return db as unknown as DrizzleDatabase;
+    }
+    const dbs = [fakeDb('eu-1'), fakeDb('eu-2')];
+    const nameOf = (db: DrizzleDatabase) => (db as unknown as { whoami(): string }).whoami();
+
+    beforeEach(() => {
+      headers = undefined;
+      global[contextSymbol] = { get: () => ({ headers }) };
+    });
+    afterEach(() => {
+      delete global[contextSymbol];
+    });
+
+    it('returns the only database unwrapped', () => {
+      expect(createReadDb([dbs[0]!])).toBe(dbs[0]);
+    });
+
+    it('routes each request to the replica its client address selects', () => {
+      const readDb = createReadDb(dbs);
+      const first = addressFor(0);
+      const second = addressFor(1);
+      headers = { 'x-vercel-forwarded-for': `${first}, 10.0.0.1` };
+      expect(nameOf(readDb)).toBe('eu-1');
+      headers = { 'x-real-ip': second };
+      expect(nameOf(readDb)).toBe('eu-2');
+      headers = { 'x-vercel-forwarded-for': first };
+      expect(nameOf(readDb)).toBe('eu-1');
+    });
+
+    it('stays on one replica without a request', () => {
+      const readDb = createReadDb(dbs);
+      const name = nameOf(readDb);
+      for (let i = 0; i < 20; i++) expect(nameOf(readDb)).toBe(name);
+    });
+
+    function addressFor(index: number): string {
+      const ip = Array.from({ length: 50 }, (_, i) => `198.51.100.${i}`).find(
+        candidate => selectReplicaIndex(candidate, 2, -1) === index
+      );
+      if (!ip) throw new Error(`no address hashes to replica ${index}`);
+      return ip;
+    }
   });
 
   describe('cleanupDbForTest', () => {

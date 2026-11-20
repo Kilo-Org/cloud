@@ -1391,7 +1391,8 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
+      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
+      "notConnectedReadOnlyPlan": "Percubaan organisasi telah tamat, jadi pemilik mesti mengemas kini bil di kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",
@@ -3627,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Namakan semula organisasi",
-      "renamePlaceholder": "Nama organisasi",
+      "renamePlaceholder": "Masukkan nama organisasi",
       "balance": "Baki",
       "plan": "Pelan",
       "planTeams": "Teams",

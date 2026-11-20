@@ -1469,7 +1469,8 @@
     "followReviewMd": "Lean REVIEW.md",
     "followReviewMdSubtitle": "Lean na treoracha sna comhaid REVIEW.md i ngach stór",
     "bitbucket": {
-      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal."
+      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
+      "notConnectedReadOnlyPlan": "Tá tréimhse trialach na heagraíochta thart, mar sin caithfidh úinéir an billeáil a nuashonrú ag kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
@@ -3813,7 +3814,7 @@
     },
     "hub": {
       "renameTitle": "Athainmnigh an eagraíocht",
-      "renamePlaceholder": "Ainm na heagraíochta",
+      "renamePlaceholder": "Cuir isteach ainm eagraíochta",
       "balance": "Iarmhéid",
       "plan": "Plean",
       "planTeams": "Teams",

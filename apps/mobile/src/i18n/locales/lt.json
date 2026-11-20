@@ -1443,7 +1443,8 @@
     "followReviewMd": "Laikytis REVIEW.md instrukcijų",
     "followReviewMdSubtitle": "Laikytis kiekvienos saugyklos REVIEW.md faile pateiktų instrukcijų",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai."
+      "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
+      "notConnectedReadOnlyPlan": "Organizacijos bandomasis laikotarpis baigėsi, todėl savininkas turi atnaujinti atsiskaitymą adresu kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
@@ -3751,7 +3752,7 @@
     },
     "hub": {
       "renameTitle": "Pervadinti organizaciją",
-      "renamePlaceholder": "Organizacijos pavadinimas",
+      "renamePlaceholder": "Įveskite organizacijos pavadinimą",
       "balance": "Likutis",
       "plan": "Planas",
       "planTeams": "Teams",

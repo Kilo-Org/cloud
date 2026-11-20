@@ -1443,7 +1443,8 @@
     "followReviewMd": "Выконваць інструкцыі REVIEW.md",
     "followReviewMdSubtitle": "Выконваць інструкцыі з файла REVIEW.md у кожным рэпазіторыі",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не падключаны. Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць."
+      "notConnectedReadOnly": "Bitbucket не падключаны. Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
+      "notConnectedReadOnlyPlan": "Пробны перыяд арганізацыі скончыўся, таму ўладальнік павінен абнавіць плацежныя даныя на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Падключэнне Bitbucket для {{organization}} кіруецца ў вэб-версіі з камп'ютара.",
@@ -1802,7 +1803,7 @@
       "dueThisWeekDetail_many": "З гэтых праблем {{exploitable}} можна выкарыстаць у атацы",
       "dueThisWeekDetail_other": "З гэтых праблем {{exploitable}} можна выкарыстаць у атацы",
       "noDeadline": "Няма тэрміну",
-      "reviewSlaAssignment": "Праверце прызначаныя тэрміны SLA",
+      "reviewSlaAssignment": "Праверце прызначэнне тэрмінаў SLA",
       "allOpenFindingsTracked": "Усе адкрытыя праблемы адсочваюцца"
     },
     "dismiss": {
@@ -2069,7 +2070,7 @@
       "failedDescription": "Агент бяспекі не змог завяршыць аналіз.",
       "extractionFailedDescription": "Тэхнічную справаздачу не атрымалася пераўтварыць у структураваны вынік.",
       "exploitableDescription": "Код праграмы можа выклікаць уразлівую функцыю.",
-      "notExploitable": "Код недасягальны",
+      "notExploitable": "Недасягальны шлях",
       "notExploitableDescription": "У гэтым рэпазіторыі не знойдзены шлях выканання да ўразлівай функцыі.",
       "unknown": "Патрабуе праверкі",
       "unknownDescription": "Аналіз не пацвердзіў, ці можа код выклікаць уразлівую функцыю.",
@@ -3751,7 +3752,7 @@
     },
     "hub": {
       "renameTitle": "Перайменаваць арганізацыю",
-      "renamePlaceholder": "Назва арганізацыі",
+      "renamePlaceholder": "Увядзіце назву арганізацыі",
       "balance": "Баланс",
       "plan": "План",
       "planTeams": "Teams",

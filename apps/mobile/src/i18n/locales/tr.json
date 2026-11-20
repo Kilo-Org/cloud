@@ -697,7 +697,8 @@
     },
     "autoReviews": "Otomatik incelemeler",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
+      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
+      "notConnectedReadOnlyPlan": "Kuruluşun deneme süresi sona erdi, bu yüzden sahibin kilo.ai adresinden faturalandırmayı güncellemesi gerekiyor."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
@@ -3449,7 +3450,7 @@
       "planStatusLapsed": " · Sona erdi",
       "planEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok.",
       "manageBilling": "Faturalandırmayı yönet",
-      "renamePlaceholder": "Kuruluş adı",
+      "renamePlaceholder": "Bir kuruluş adı girin",
       "renameTitle": "Kuruluşu yeniden adlandır"
     },
     "inviteMember": {

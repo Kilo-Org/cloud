@@ -699,7 +699,8 @@
     },
     "autoReviews": "Автоматичні перевірки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати."
+      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати.",
+      "notConnectedReadOnlyPlan": "Пробний період організації завершився, тож власник має оновити платіжні дані на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Підключенням Bitbucket для {{organization}} можна керувати лише у вебверсії з комп'ютера.",
@@ -1251,7 +1252,7 @@
       "dueThisWeekDetail_many": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "dueThisWeekDetail_other": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",
-      "reviewSlaAssignment": "Перевірити встановлені терміни за SLA",
+      "reviewSlaAssignment": "Перевірити призначення термінів за SLA",
       "allOpenFindingsTracked": "Усі відкриті проблеми відстежуються"
     },
     "dismiss": {
@@ -1460,7 +1461,7 @@
       "failedDescription": "Агент безпеки не зміг завершити аналіз.",
       "extractionFailedDescription": "Технічний звіт не вдалося перетворити на структурований результат.",
       "exploitableDescription": "У коді застосунку є шлях до вразливої функції.",
-      "notExploitable": "Недосяжний код",
+      "notExploitable": "Недосяжний шлях",
       "notExploitableDescription": "У цьому репозиторії не знайдено шляху виконання до вразливої функції.",
       "unknown": "Потребує перевірки",
       "unknownDescription": "Не вдалося підтвердити, чи є в коді шлях до вразливої функції.",
@@ -3571,7 +3572,7 @@
       "planStatusLapsed": " · Завершився",
       "planEnded": "Пробний період організації завершився, і вона не має активного плану.",
       "manageBilling": "Керувати оплатою",
-      "renamePlaceholder": "Назва організації",
+      "renamePlaceholder": "Введіть назву організації",
       "renameTitle": "Перейменувати організацію"
     },
     "inviteMember": {

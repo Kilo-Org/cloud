@@ -697,7 +697,8 @@
     },
     "autoReviews": "Tinjauan otomatis",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya."
+      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
+      "notConnectedReadOnlyPlan": "Masa percobaan organisasi telah berakhir, jadi pemilik harus memperbarui penagihan di kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
@@ -3449,7 +3450,7 @@
       "planStatusLapsed": " · Berakhir",
       "planEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif.",
       "manageBilling": "Kelola penagihan",
-      "renamePlaceholder": "Nama organisasi",
+      "renamePlaceholder": "Masukkan nama organisasi",
       "renameTitle": "Ganti nama organisasi"
     },
     "inviteMember": {

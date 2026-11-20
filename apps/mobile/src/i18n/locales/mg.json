@@ -1391,7 +1391,8 @@
     "followReviewMd": "Araho ny REVIEW.md",
     "followReviewMdSubtitle": "Araho ny torolalana ao amin'ny rakitra REVIEW.md isaky ny tahirin-kaody",
     "bitbucket": {
-      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy."
+      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+      "notConnectedReadOnlyPlan": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana, ka tsy maintsy manavao ny faktiora ao amin'ny kilo.ai ny tompony."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ny fifandraisana Bitbucket amin'ny {{organization}} dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
@@ -3627,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Ovao ny anaran'ny fikambanana",
-      "renamePlaceholder": "Anaran'ny fikambanana",
+      "renamePlaceholder": "Ampidiro ny anaran'ny fikambanana",
       "balance": "Ambim-bola",
       "plan": "Drafitra",
       "planTeams": "Teams",

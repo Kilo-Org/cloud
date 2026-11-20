@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.md का निर्देशन पालना गर्नुहोस्",
     "followReviewMdSubtitle": "हरेक रिपोजिटरीको REVIEW.md फाइलमा भएका निर्देशन पालना गर्नुहोस्",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जडान भएको छैन। संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।"
+      "notConnectedReadOnly": "Bitbucket जडान भएको छैन। संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।",
+      "notConnectedReadOnlyPlan": "संस्थाको परीक्षण अवधि सकिएको छ, त्यसैले मालिकले kilo.ai मा बिलिङ अद्यावधिक गर्नुपर्छ।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} को Bitbucket जडान कम्प्युटरबाट वेबमा व्यवस्थापन गरिन्छ।",
@@ -1724,7 +1725,7 @@
       "dueThisWeekDetail_one": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "dueThisWeekDetail_other": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "noDeadline": "म्याद छैन",
-      "reviewSlaAssignment": "तोकिएको SLA समीक्षा गर्नुहोस्",
+      "reviewSlaAssignment": "SLA तोकाईको समीक्षा गर्नुहोस्",
       "allOpenFindingsTracked": "सबै खुला सुरक्षा समस्याको निगरानी भइरहेको"
     },
     "dismiss": {
@@ -3627,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "संस्थाको नाम बदल्नुहोस्",
-      "renamePlaceholder": "संस्थाको नाम",
+      "renamePlaceholder": "संस्थाको नाम लेख्नुहोस्",
       "balance": "मौज्दात",
       "plan": "प्लान",
       "planTeams": "Teams",

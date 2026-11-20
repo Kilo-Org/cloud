@@ -1391,7 +1391,8 @@
     "followReviewMd": "Следи REVIEW.md",
     "followReviewMdSubtitle": "Почитувај ги упатствата во датотеката REVIEW.md во секое складиште",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат."
+      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
+      "notConnectedReadOnlyPlan": "Пробниот период на организацијата заврши, затоа сопственикот мора да го ажурира наплатувањето на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Врската со Bitbucket на {{organization}} се управува преку веб од компјутер.",
@@ -1724,7 +1725,7 @@
       "dueThisWeekDetail_one": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "dueThisWeekDetail_other": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
-      "reviewSlaAssignment": "Провери ги доделените рокови според SLA",
+      "reviewSlaAssignment": "Провери доделувањето на рокови според SLA",
       "allOpenFindingsTracked": "Се следат сите отворени наоди"
     },
     "dismiss": {
@@ -3627,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Преименувај организација",
-      "renamePlaceholder": "Име на организацијата",
+      "renamePlaceholder": "Внесете име на организацијата",
       "balance": "Состојба",
       "plan": "План",
       "planTeams": "Teams",

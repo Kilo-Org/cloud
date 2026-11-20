@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.md нұсқауларын орындау",
     "followReviewMdSubtitle": "Әр репозиторийдегі REVIEW.md файлының нұсқауларын орындау",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады."
+      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
+      "notConnectedReadOnlyPlan": "Ұйымның сынақ мерзімі аяқталды, сондықтан иесі kilo.ai сайтында төлемді жаңартуы керек."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} үшін Bitbucket қосылымы компьютерден веб арқылы басқарылады.",
@@ -3627,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Ұйым атауын өзгерту",
-      "renamePlaceholder": "Ұйым атауы",
+      "renamePlaceholder": "Ұйым атауын енгізіңіз",
       "balance": "Баланс",
       "plan": "Жоспар",
       "planTeams": "Teams",

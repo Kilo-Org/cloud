@@ -701,7 +701,8 @@
     },
     "autoReviews": "مراجعات تلقائية",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه."
+      "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
+      "notConnectedReadOnlyPlan": "انتهت الفترة التجريبية للمؤسسة، لذا يجب على المالك تحديث الفوترة على ⁨kilo.ai⁩."
     },
     "bitbucketConnect": {
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
@@ -1283,7 +1284,7 @@
       "dueThisWeekDetail_many": "منها {{exploitable}} مؤكدة القابلية للاستغلال",
       "dueThisWeekDetail_other": "منها {{exploitable}} مؤكدة القابلية للاستغلال",
       "noDeadline": "لا يوجد موعد نهائي",
-      "reviewSlaAssignment": "مراجعة المواعيد المحددة حسب SLA",
+      "reviewSlaAssignment": "مراجعة تعيين الـSLA",
       "allOpenFindingsTracked": "تُتابَع جميع النتائج المفتوحة"
     },
     "dismiss": {
@@ -3693,7 +3694,7 @@
       "planStatusLapsed": " · منتهية",
       "planEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة.",
       "manageBilling": "إدارة الفوترة",
-      "renamePlaceholder": "اسم المؤسسة",
+      "renamePlaceholder": "أدخل اسم المؤسسة",
       "renameTitle": "إعادة تسمية المؤسسة"
     },
     "inviteMember": {

@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "Az adattárankénti REVIEW.md utasításfájlok követése",
     "bitbucket": {
-      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják."
+      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
+      "notConnectedReadOnlyPlan": "A szervezet próbaidőszaka lejárt, ezért a tulajdonosnak frissítenie kell a számlázást a kilo.ai oldalon."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
@@ -3627,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Szervezet átnevezése",
-      "renamePlaceholder": "Szervezet neve",
+      "renamePlaceholder": "Add meg a szervezet nevét",
       "balance": "Egyenleg",
       "plan": "Csomag",
       "planTeams": "Teams",

@@ -697,7 +697,8 @@
     },
     "autoReviews": "自动审查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。"
+      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。",
+      "notConnectedReadOnlyPlan": "组织的试用期已结束，因此所有者必须前往 kilo.ai 更新账单信息。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
@@ -3449,7 +3450,7 @@
       "planStatusLapsed": " · 已结束",
       "planEnded": "组织的试用期已结束，且没有生效的套餐。",
       "manageBilling": "管理账单",
-      "renamePlaceholder": "组织名称",
+      "renamePlaceholder": "请输入组织名称",
       "renameTitle": "重命名组织"
     },
     "inviteMember": {

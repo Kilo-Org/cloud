@@ -1443,7 +1443,8 @@
     "followReviewMd": "Řídit se pokyny v REVIEW.md",
     "followReviewMdSubtitle": "Dodržovat pokyny ze souboru REVIEW.md v každém repozitáři",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace."
+      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
+      "notConnectedReadOnlyPlan": "Zkušební období organizace skončilo, takže vlastník musí aktualizovat fakturaci na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
@@ -3751,7 +3752,7 @@
     },
     "hub": {
       "renameTitle": "Přejmenovat organizaci",
-      "renamePlaceholder": "Název organizace",
+      "renamePlaceholder": "Zadejte název organizace",
       "balance": "Zůstatek",
       "plan": "Plán",
       "planTeams": "Teams",

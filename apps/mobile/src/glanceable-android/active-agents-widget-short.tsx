@@ -11,6 +11,7 @@ import {
   estimateWidth,
   type Frame,
   type Ink,
+  insideBand,
   label,
   lineBox,
   PAD,
@@ -188,7 +189,7 @@ function landscapeLead(f: Frame, cy: number): Lead {
       draw: (x, width) => [
         label(f, 'status', {
           x,
-          baseline: centredBaseline(14, cy),
+          baseline: insideBand({ value, size: 14, baseline: centredBaseline(14, cy), top: PAD }),
           width,
           value,
           size: 14,
@@ -245,14 +246,15 @@ function landscapeTail(f: Frame) {
 
 function landscapeLocked(f: Frame, x: number, cy: number) {
   const size = 16;
+  const value = f.copy.status ?? '';
   return [
     // The body (86% of the box) starts the lead, like the status does in the other states.
     ...lock(f, { cx: x + size * 0.43, cy, size }),
     label(f, 'status', {
       x: x + size + LANDSCAPE_LOGO_GAP,
-      baseline: centredBaseline(14, cy),
+      baseline: insideBand({ value, size: 14, baseline: centredBaseline(14, cy), top: PAD }),
       width: f.width - PAD - (x + size + LANDSCAPE_LOGO_GAP),
-      value: f.copy.status ?? '',
+      value,
       size: 14,
       weight: '600',
     }),
@@ -287,6 +289,7 @@ export function landscape(f: Frame): ReactNode[] {
             gap: 6,
             fill: false,
             parts,
+            top: PAD,
           }),
         ]
       : [];

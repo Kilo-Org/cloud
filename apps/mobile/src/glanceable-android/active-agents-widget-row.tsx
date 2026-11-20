@@ -10,6 +10,7 @@ import {
   centredBaseline,
   estimateWidth,
   type Frame,
+  insideBand,
   label,
   lineBox,
   PAD,
@@ -55,7 +56,9 @@ function header(f: Frame) {
     nodes.push(
       label(f, 'footer', {
         x: PAD + 20,
-        baseline,
+        // The design centres the line on HEADER_CY, and a fallback font's taller
+        // box would rise out of the band above it: keep the box inside the band.
+        baseline: insideBand({ value: copy.footer, size: 11, baseline, top: PAD }),
         width: f.width - 2 * PAD - 20,
         value: copy.footer,
         size: 11,

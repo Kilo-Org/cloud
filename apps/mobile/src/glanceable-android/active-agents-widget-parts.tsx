@@ -4,6 +4,7 @@
 import { FlexWidget, type HexColor, TextWidget } from 'react-native-android-widget';
 
 import { type AndroidWidgetHomeCopy } from './home-copy';
+import { ascent, BASELINE, LATIN_LINE, lineBox, wideAdvance } from './script-metrics';
 import { type AndroidWidgetProps } from './widget-props';
 
 /**
@@ -65,29 +66,61 @@ export function dotInk(kind: Copy['primaryKind']): keyof Palette {
 export const PAD = 14;
 export const CARD_PAD = 16;
 
-const TALL_SCRIPT = /[\u0600-\u08FF\u0900-\u0DFF]/u;
-
-/** Roboto's ascent plus font padding above the baseline, per unit of font size. */
-const BASELINE = 1.056;
-
-const LATIN_LINE = 1.32;
-
 /**
  * The line box a TextView draws one line in: Roboto with font padding (1.32em),
- * or the taller fallback box Arabic-Indic and Devanagari need (1.62em).
+ * or the box of the fallback font the line's script draws in.
  */
-export function lineBox(value: string, size: number): number {
-  return Math.ceil(size * (TALL_SCRIPT.test(value) ? 1.62 : LATIN_LINE));
-}
+export { lineBox };
 
-/** Top of the box whose Latin baseline sits at `baseline`; a taller script keeps the same centre. */
+/** Top of the box whose baseline sits at `baseline`, from the ascent of the font that draws `value`. */
 export function boxTop(value: string, size: number, baseline: number): number {
-  return baseline - BASELINE * size - (lineBox(value, size) - Math.ceil(size * LATIN_LINE)) / 2;
+  return baseline - ascent(value, size) - (lineBox(value, size) - Math.ceil(size * LATIN_LINE)) / 2;
 }
 
 /** The baseline whose line box (Latin or taller script) ends at `bottom`. */
 export function baselineAbove(value: string, size: number, bottom: number): number {
   return bottom - lineBox(value, size) - boxTop(value, size, 0);
+}
+
+/** The baseline whose line box (Latin or taller script) starts at `top`. */
+export function baselineIn(value: string, size: number, top: number): number {
+  return top + ascent(value, size) + (lineBox(value, size) - Math.ceil(size * LATIN_LINE)) / 2;
+}
+
+/** Float noise below a twentieth of a dp is not an overflow; the design grid is in whole dp. */
+const BAND_SLACK = 0.05;
+
+/** One line placed inside a band: which edge it must stay clear of, and how many lines it draws. */
+type BandSpec = {
+  value: string;
+  size: number;
+  baseline: number;
+  lines?: number;
+  top?: number;
+  bottom?: number;
+};
+
+/**
+ * A design baseline moved inside its band. A fallback font's taller box would
+ * otherwise rise above the top edge or end below the bottom one; the overflow
+ * comes out of the slack on the other side, and Latin text — whose box is the
+ * design's own — keeps the baseline it was given, to the tenth of a dp.
+ */
+export function insideBand(spec: BandSpec): number {
+  const { value, size, baseline } = spec;
+  if (spec.top !== undefined) {
+    const floor = baselineIn(value, size, spec.top);
+    if (floor - baseline > BAND_SLACK) {
+      return floor;
+    }
+  }
+  if (spec.bottom !== undefined) {
+    const end = boxTop(value, size, baseline) + lineBox(value, size) * (spec.lines ?? 1);
+    if (end - spec.bottom > BAND_SLACK) {
+      return baseline - (end - spec.bottom);
+    }
+  }
+  return baseline;
 }
 
 /** The baseline that centres a line of `size` on `cy`; a taller script grows evenly about it. */
@@ -99,7 +132,7 @@ export function centredBaseline(size: number, cy: number): number {
 export function estimateWidth(value: string, size: number, bold = false): number {
   let ems = 0;
   for (const char of value) {
-    if (/[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFF00-\uFF60]/u.test(char)) {
+    if (wideAdvance(char)) {
       ems += 1;
     } else if (/[\s.,:;'|!ilI]/u.test(char)) {
       ems += 0.28;
@@ -256,10 +289,16 @@ export function textRow(
     gap: number;
     fill: boolean;
     parts: Part[];
+    /** The band's top edge; a taller fallback box moves down into it instead of above it. */
+    top?: number;
   }
 ) {
   const height = Math.max(...spec.parts.map(part => lineBox(part.value, spec.size)));
   const tallest = spec.parts.find(part => lineBox(part.value, spec.size) === height)?.value ?? '';
+  const baseline =
+    spec.top === undefined
+      ? spec.baseline
+      : insideBand({ value: tallest, size: spec.size, baseline: spec.baseline, top: spec.top });
   const children = spec.parts.map((part, index) =>
     part.flex === true ? (
       flexText(f, `${key}-${index}`, { ...part, size: spec.size })
@@ -282,7 +321,7 @@ export function textRow(
   const row = { flexDirection: 'row', alignItems: 'center', flexGap: spec.gap } as const;
   const rect = place(f, {
     x: spec.x,
-    y: boxTop(tallest, spec.size, spec.baseline),
+    y: boxTop(tallest, spec.size, baseline),
     width: spec.width,
     height,
   });

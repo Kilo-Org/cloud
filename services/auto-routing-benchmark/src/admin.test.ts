@@ -24,7 +24,7 @@ import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { PROBE_CASES } from './datasets/probe-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { computeEngineIdentity, publishPlatformRoutingTable } from './run';
+import { computeEngineIdentity, publishPlatformRoutingTable, RunAlreadyActiveError } from './run';
 import {
   ACTIVE_MEASUREMENT_REVISION,
   deciderCasesForRouter,
@@ -800,6 +800,46 @@ describe('PUT /admin/config', () => {
     await expect(res.json()).resolves.toMatchObject({
       warnings: [],
       drain: { runId: null, entryCount: 0, skipped: 'active_run' },
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+  });
+
+  it('reports a slot taken after the pre-check as active_run', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    // The pre-check saw a free slot; another drain inserted its run before this
+    // one's insert, so `startRun` reports the slot as taken.
+    vi.mocked(insertRun).mockRejectedValueOnce(new RunAlreadyActiveError('decider', 'run-winner'));
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      warnings: [],
+      drain: { runId: null, entryCount: 0, skipped: 'active_run' },
+    });
+  });
+
+  it('reports a batch another queue claimed as nothing_pending', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    // The user queue claimed every row between this drain's read and its claim,
+    // so this run has nothing to measure.
+    vi.mocked(markProfilesRunningForRun).mockResolvedValueOnce([]);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      warnings: [],
+      drain: { runId: null, entryCount: 0, skipped: 'nothing_pending' },
     });
     expect(insertRun).not.toHaveBeenCalled();
   });

@@ -1250,6 +1250,8 @@ export async function drainQueue(
     return { runId: result.runId, entryCount: result.enqueuedModels };
   } catch (error) {
     if (error instanceof RunAlreadyActiveError) {
+      // Another drain won the slot between our read and our insert.
+      options.skipped?.push('active_run');
       console.log(
         JSON.stringify({
           event: 'benchmark_queue_drain_skipped_slot_occupied',
@@ -1262,6 +1264,7 @@ export async function drainQueue(
     if (error instanceof NoEntriesClaimedError) {
       // The other queue claimed this whole batch between our read and our
       // claim. The pairs are being measured; nothing to do.
+      options.skipped?.push('nothing_pending');
       console.log(JSON.stringify({ event: 'benchmark_queue_drain_batch_already_claimed', queue }));
       return null;
     }

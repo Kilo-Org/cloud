@@ -8,13 +8,17 @@ import {
   type HomeWidgetData,
   type HomeWidgetPresentation,
 } from '@kilocode/app-shared/home-widget';
+import { type TOptions } from 'i18next';
 
 import {
+  type GlanceableCountFormat,
   glanceableCountLines,
+  glanceableCountNoun,
   glanceableScheduledAt,
   glanceableSpokenLabel,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
+  type GlanceableTranslate,
   primaryGlanceableCount,
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
@@ -25,7 +29,6 @@ import {
   type AndroidWidgetHomeCopy,
   buildAndroidHomeCopy,
   type GlanceableClockFormat,
-  type GlanceableCountFormat,
 } from './home-copy';
 
 export type GlanceableAgoFormat = (at: string) => string;
@@ -72,7 +75,7 @@ function homeSnapshotFor(
 export function buildAndroidWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   formatCount: GlanceableCountFormat = String,
   _formatAgo: GlanceableAgoFormat = String,
   formatClock: GlanceableClockFormat = String,
@@ -90,8 +93,8 @@ export function buildAndroidWidgetProps(
   const feedback = home.status === 'content' ? getSurfaceExtras().actionFeedback : null;
   const scheduledAt = showCounts ? glanceableScheduledAt(snapshot) : null;
   // Both platforms name the empty state by its New agent action.
-  const copy = (key: string): string =>
-    translate(key === 'glanceable.empty' ? 'glanceable.noneWaiting' : key);
+  const copy = (key: string, options?: TOptions): string =>
+    translate(key === 'glanceable.empty' ? 'glanceable.noneWaiting' : key, options);
   return {
     home,
     homeCopy: buildAndroidHomeCopy(home, translate, formatCount, formatClock, feedback),
@@ -99,9 +102,10 @@ export function buildAndroidWidgetProps(
     countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
       kind: line.kind,
       count: formatCount(line.count),
-      label: translate(line.key),
+      label: glanceableCountNoun(line.kind, line.count, translate),
     })),
-    primaryLabel: primary === null ? null : translate(primary.key),
+    primaryLabel:
+      primary === null ? null : glanceableCountNoun(primary.kind, primary.count, translate),
     scheduledTime: scheduledAt === null ? null : formatClock(scheduledAt),
     actionFeedback: feedback,
     actions: {

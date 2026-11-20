@@ -6,6 +6,7 @@ import {
   type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { copyTranslate } from './copy.test-helpers';
 import {
   glanceableCountLines,
   glanceableScheduledAt,
@@ -184,14 +185,14 @@ describe('numeric spoken label', () => {
       sessions: [{ status: 'busy' }, { status: 'busy' }, { status: 'question' }],
     });
     expect(glanceableSpokenLabel(happy, {}, key => key)).toBe(
-      '1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
+      'glanceable.count.needsInput, glanceable.count.running, glanceable.openAgents'
     );
   });
 
   it('speaks the status word, numeric counts, then Open agents for stale', () => {
     const stale = snapshot({ sessions: [{ status: 'busy' }], status: 'stale' });
     expect(glanceableSpokenLabel(stale, {}, key => key)).toBe(
-      'glanceable.stale, 1 common.working, glanceable.openAgents'
+      'glanceable.stale, glanceable.count.running, glanceable.openAgents'
     );
   });
 
@@ -213,10 +214,12 @@ describe('numeric spoken label', () => {
 
 describe('numeric spoken label', () => {
   const copy: Record<string, string> = {
-    'glanceable.needsInput': 'Needs input',
-    'common.idle': 'Idle',
-    'common.working': 'Working',
-    'common.scheduled': 'Scheduled',
+    'glanceable.count.needsInput_one': '{{displayCount}} Needs input',
+    'glanceable.count.needsInput_other': '{{displayCount}} Needs input',
+    'glanceable.count.running_one': '{{displayCount}} Working',
+    'glanceable.count.running_other': '{{displayCount}} Working',
+    'glanceable.count.idle_one': '{{displayCount}} Idle',
+    'glanceable.count.idle_other': '{{displayCount}} Idle',
     'glanceable.waiting': 'Waiting for agents',
     'glanceable.empty': 'No work in progress',
     'glanceable.stale': 'Updates delayed',
@@ -225,7 +228,7 @@ describe('numeric spoken label', () => {
     'glanceable.privacy': 'Open Kilo to see agents',
     'glanceable.openAgents': 'Open agents',
   };
-  const translate = (key: string): string => copy[key] ?? key;
+  const translate = copyTranslate(copy);
   const mixed = {
     ...snapshot({ sessions: [{ status: 'busy' }] }),
     needsInput: 2,

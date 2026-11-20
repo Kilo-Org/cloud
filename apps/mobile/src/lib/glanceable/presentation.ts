@@ -1,4 +1,5 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type TOptions } from 'i18next';
 
 /**
  * Maps the snapshot plus optional surface flags to the locked copy keys, the
@@ -32,6 +33,68 @@ export type GlanceableCountLine = {
   kind: GlanceableCountKind;
   count: number;
 };
+
+/**
+ * The translator a glanceable surface passes in. Type-only: this module stays
+ * free of the i18n runtime, so the shared policy can run in a test, a headless
+ * widget task, or the iOS extension without loading a catalog.
+ */
+export type GlanceableTranslate = (key: string, options?: TOptions) => string;
+
+/** The language's formatting of a count, injected so no formatter is imported here. */
+export type GlanceableCountFormat = (value: number) => string;
+
+/**
+ * The count's noun, in the form its own number selects. No placeholder: the
+ * split layouts draw the number and its noun as two separately styled text
+ * nodes — the hero's numeral beside its label — where a whole sentence cannot
+ * be one string, and each node still has to agree with the other.
+ */
+export const GLANCEABLE_COUNT_NOUN_KEY = {
+  needsInput: 'glanceable.countNoun.needsInput',
+  running: 'glanceable.countNoun.running',
+  scheduled: 'glanceable.countNoun.scheduled',
+  idle: 'glanceable.countNoun.idle',
+} as const satisfies Record<GlanceableCountKind, string>;
+
+/**
+ * The whole count line, number included. The surfaces that draw one string —
+ * the ongoing notification, the spoken label — read this instead of pasting a
+ * formatted number onto a verb, so the catalog owns the word order and the
+ * agreement.
+ */
+export const GLANCEABLE_COUNT_MESSAGE_KEY = {
+  needsInput: 'glanceable.count.needsInput',
+  running: 'glanceable.count.running',
+  scheduled: 'glanceable.count.scheduled',
+  idle: 'glanceable.count.idle',
+} as const satisfies Record<GlanceableCountKind, string>;
+
+/** The count's noun for `kind`, translated in `count`'s plural form. */
+export function glanceableCountNoun(
+  kind: GlanceableCountKind,
+  count: number,
+  t: GlanceableTranslate
+): string {
+  return t(GLANCEABLE_COUNT_NOUN_KEY[kind], { count });
+}
+
+/**
+ * The whole count line for `kind`: `formatCount`'s rendering of the number in
+ * the message's `{{displayCount}}`, with the plural form selected from `count`.
+ */
+// eslint-disable-next-line max-params -- kind, count, the injected number formatter and the translator are the four facts a count line is made of
+export function glanceableCountMessage(
+  kind: GlanceableCountKind,
+  count: number,
+  formatCount: GlanceableCountFormat,
+  t: GlanceableTranslate
+): string {
+  return t(GLANCEABLE_COUNT_MESSAGE_KEY[kind], {
+    count,
+    displayCount: formatCount(count),
+  });
+}
 
 /**
  * Rank order: what the user must act on, then what is making progress, then
@@ -135,7 +198,7 @@ export function glanceableSpokenLabelKeys(
 export function glanceableSpokenLabel(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string
+  translate: GlanceableTranslate
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   const parts: string[] = [];
@@ -143,8 +206,10 @@ export function glanceableSpokenLabel(
     parts.push(translate(GLANCEABLE_STATUS_COPY_KEY[status]));
   }
   if (status === 'happy' || status === 'stale') {
-    for (const { key, count } of glanceableCountLines(snapshot).filter(line => line.count > 0)) {
-      parts.push(`${count} ${translate(key)}`);
+    for (const { kind, count } of glanceableCountLines(snapshot).filter(
+      line => line.count > 0
+    )) {
+      parts.push(glanceableCountMessage(kind, count, String, translate));
     }
   }
   parts.push(translate('glanceable.openAgents'));

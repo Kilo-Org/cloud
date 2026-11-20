@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one props builder: the accessory, Home, gallery, stale and expiry frames share a single snapshot policy */
 import {
   buildGlanceableSnapshot,
   GLANCEABLE_STALE_MS,
@@ -18,11 +19,13 @@ import { type GlanceableLiveActivityContentState } from '@kilocode/notifications
 import {
   type GlanceableCountKind,
   glanceableCountLines,
+  glanceableCountNoun,
   glanceableScheduledAt,
   glanceableSpokenLabel,
   type GlanceableStatus,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
+  type GlanceableTranslate,
   primaryGlanceableCount,
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
@@ -130,7 +133,7 @@ export type GlanceableWidgetProps = Partial<GlanceableViewProps> & {
 function newestTitleFor(
   extras: GlanceableSurfaceExtras,
   status: GlanceableStatus,
-  translate: (key: string) => string
+  translate: GlanceableTranslate
 ): string | null {
   if (status !== 'happy' && status !== 'stale') {
     return null;
@@ -156,7 +159,7 @@ function newestTitleFor(
 export function buildGlanceableViewProps(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   homeData?: HomeWidgetData,
   now = Date.now()
 ): GlanceableViewProps {
@@ -167,7 +170,7 @@ export function buildGlanceableViewProps(
   const status = resolveGlanceableStatus(snapshot, flags);
   const showCounts = status === 'happy' || status === 'stale';
   const countLines = (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
-    label: translate(line.key),
+    label: glanceableCountNoun(line.kind, line.count, translate),
     kind: line.kind,
     count: line.count,
   }));
@@ -199,7 +202,8 @@ export function buildGlanceableViewProps(
     home,
     statusLine: statusKey === null ? null : copy(statusKey),
     countLines,
-    primaryLabel: primary === null ? null : translate(primary.key),
+    primaryLabel:
+      primary === null ? null : glanceableCountNoun(primary.kind, primary.count, translate),
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
     newestTitle,
@@ -261,7 +265,7 @@ export function toWidgetProps(props: GlanceableViewProps): Partial<GlanceableVie
  */
 function buildStaleWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
-  translate: (key: string) => string
+  translate: GlanceableTranslate
 ): Partial<GlanceableViewProps> {
   return toWidgetProps(buildGlanceableViewProps({ ...snapshot, status: 'stale' }, {}, translate));
 }
@@ -285,7 +289,7 @@ const GALLERY_SESSIONS: HomeWidgetSessionRow[] = [
 
 /** Props for the gallery preview kind the widget extension draws in the picker. */
 export function buildGalleryPreviewProps(
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   now = Date.now()
 ): Partial<GlanceableViewProps> {
   const checked = new Date(now);
@@ -317,7 +321,7 @@ export function buildGalleryPreviewProps(
  */
 export function staleTimelineFrame(
   snapshot: GlanceableAgentsSnapshot,
-  translate: (key: string) => string
+  translate: GlanceableTranslate
 ): { date: Date; props: Partial<GlanceableViewProps> }[] {
   if (snapshot.status !== 'happy') {
     return [];
@@ -331,7 +335,7 @@ export function staleTimelineFrame(
 /** Accessory expiry retracts its counts; Home retains the same confirmed work. */
 export function buildExpiredWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
-  translate: (key: string) => string
+  translate: GlanceableTranslate
 ): Partial<GlanceableViewProps> {
   return toWidgetProps(
     buildGlanceableViewProps(
@@ -391,7 +395,7 @@ function frameStatus(
 export function widgetTimelineFrames(
   snapshot: GlanceableAgentsSnapshot,
   props: Partial<GlanceableViewProps>,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   homeData?: HomeWidgetData
 ): { date: Date; props: Partial<GlanceableViewProps> }[] | null {
   if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {

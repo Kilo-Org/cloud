@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildGlanceableSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { buildHomeWidgetData, type HomeWidgetSessionRow } from '@kilocode/app-shared/home-widget';
 
+import { copyTranslate } from '@/lib/glanceable/copy.test-helpers';
 import { type GlanceableActionFeedback, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
 import { type WidgetFamily } from 'expo-widgets';
@@ -81,12 +82,16 @@ const NOW = 1_750_000_000_000;
 const MINUTE = 60_000;
 const APPROVAL_KEY = 'a'.repeat(64);
 const ENGLISH: Record<string, string> = {
-  'glanceable.needsInput': 'Needs input',
-  'common.working': 'Working',
-  'common.scheduled': 'Scheduled',
-  'common.idle': 'Idle',
+  'glanceable.countNoun.needsInput_one': 'Needs input',
+  'glanceable.countNoun.needsInput_other': 'Needs input',
+  'glanceable.countNoun.running_one': 'Working',
+  'glanceable.countNoun.running_other': 'Working',
+  'glanceable.countNoun.scheduled_one': 'Scheduled',
+  'glanceable.countNoun.scheduled_other': 'Scheduled',
+  'glanceable.countNoun.idle_one': 'Idle',
+  'glanceable.countNoun.idle_other': 'Idle',
 };
-const translate = (key: string) => ENGLISH[key] ?? key;
+const translate = copyTranslate(ENGLISH);
 
 type Options = {
   feedback?: GlanceableActionFeedback;

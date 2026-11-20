@@ -153,6 +153,15 @@ export const GLANCEABLE_FIXTURES = {
       ...many({ status: 'idle', count: 999, ago: 60 }),
     ],
   },
+  'plural-counts': {
+    description:
+      'Count inflections: 1 needs input, 2 working, 5 idle, so every family shows its singular and plural form.',
+    rows: () => [
+      ...many({ status: 'permission', count: 1, ago: 12 }),
+      ...many({ status: 'busy', count: 2, ago: 4 }),
+      ...many({ status: 'idle', count: 5, ago: 40 }),
+    ],
+  },
   'long-title': {
     description: 'Mixed counts with a very long newest-session title.',
     rows: () => [

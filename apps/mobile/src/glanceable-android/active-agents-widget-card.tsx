@@ -154,7 +154,7 @@ export function countLines(
         x: spec.x + 12,
         baseline,
         width: spec.width,
-        value: `${line.count} ${line.label}`,
+        value: line.text,
         size: 13,
       }),
     ];

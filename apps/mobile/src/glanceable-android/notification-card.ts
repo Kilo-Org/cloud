@@ -1,7 +1,8 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type TOptions } from 'i18next';
 
-import { i18n } from '@/i18n';
 import { getSurfaceExtras } from '@/lib/glanceable/surface-extras';
+import { glanceableTranslate } from '@/lib/glanceable/translate';
 import { getWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
 
@@ -14,8 +15,8 @@ import {
   terminalNotificationContent,
 } from './ongoing-notification';
 
-function translate(key: string): string {
-  return i18n.t(key);
+function translate(key: string, options?: TOptions): string {
+  return glanceableTranslate(key, options);
 }
 
 /**

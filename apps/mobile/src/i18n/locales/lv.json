@@ -4246,7 +4246,7 @@
     "personalDefaultDescription": "Automātiski ielādēts, ja nevienai krātuvei nav piesprausta profila.",
     "organizationDefaultDescription": "Automātiski ielādēts dalībniekiem, kuriem nav personisku noklusējuma.",
     "setAsDefault": "Iestatīt kā noklusējumu",
-    "saveFailed": "Nevarēja saglabāt profilu. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+    "saveFailed": "Nevarēja saglabāt profilu. Mēģiniet vēlreiz.",
     "organizationRoleRequired": "Organizācijas profilus var mainīt tikai organizācijas īpašnieki un administratori.",
     "deleteTitle": "Dzēst profilu",
     "deleteMessage": "Tādējādi profils un tā iestatījumi tiek neatgriezeniski noņemti. Šo darbību nevar atsaukt.",

@@ -4176,7 +4176,7 @@
     "personalDefaultDescription": "Automatikoki kargatzen da biltegirik ez dagoenean ainguratuta dagoen profilik.",
     "organizationDefaultDescription": "Lehenetsi pertsonalik ez duten kideentzat automatikoki kargatu da.",
     "setAsDefault": "Ezarri lehenetsi gisa",
-    "saveFailed": "Ezin izan da profila gorde. Egiaztatu zure konexioa eta saiatu berriro.",
+    "saveFailed": "Ezin izan da profila gorde. Saiatu berriro.",
     "organizationRoleRequired": "Erakundeko jabeek eta administratzaileek soilik alda dezakete erakundearen profila.",
     "deleteTitle": "Ezabatu profila",
     "deleteMessage": "Honek profila eta bere ezarpenak betiko kentzen ditu. Hau ezin da desegin.",

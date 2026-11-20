@@ -4176,7 +4176,7 @@
     "personalDefaultDescription": "Outomaties gelaai wanneer geen bewaarplek 'n vasgespelde profiel het nie.",
     "organizationDefaultDescription": "Outo-gelaai vir lede wat geen persoonlike verstek het nie.",
     "setAsDefault": "Stel as verstek",
-    "saveFailed": "Kon nie profiel stoor nie. Kontroleer jou verbinding en probeer weer.",
+    "saveFailed": "Kon nie profiel stoor nie. Probeer weer.",
     "organizationRoleRequired": "Slegs organisasie-eienaars en administrateurs kan organisasieprofiele verander.",
     "deleteTitle": "Vee profiel uit",
     "deleteMessage": "Dit verwyder die profiel en sy instellings permanent. Dit kan nie ongedaan gemaak word nie.",

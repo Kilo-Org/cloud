@@ -4176,7 +4176,7 @@
     "personalDefaultDescription": "Heç bir repozitorda bərkidilmiş profil olmadıqda avtomatik yüklənir.",
     "organizationDefaultDescription": "Şəxsi defoltu olmayan üzvlər üçün avtomatik yüklənir.",
     "setAsDefault": "Defolt olaraq təyin edin",
-    "saveFailed": "Profili yadda saxlamaq mümkün olmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+    "saveFailed": "Profili yadda saxlamaq mümkün olmadı. Yenidən cəhd edin.",
     "organizationRoleRequired": "Təşkilat profillərini yalnız təşkilat sahibləri və inzibatçılar dəyişə bilər.",
     "deleteTitle": "Profili silin",
     "deleteMessage": "Bu, profili və onun parametrlərini həmişəlik silir. Bu geri qaytarıla bilməz.",

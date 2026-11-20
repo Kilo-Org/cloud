@@ -4176,7 +4176,7 @@
     "personalDefaultDescription": "Ngarkohet automatikisht kur asnjë depo nuk ka një profil të gozhduar.",
     "organizationDefaultDescription": "Ngarkohet automatikisht për anëtarët që nuk kanë parazgjedhje personale.",
     "setAsDefault": "Cakto si parazgjedhje",
-    "saveFailed": "Profili nuk mund të ruhej. Kontrollo lidhjen dhe provo përsëri.",
+    "saveFailed": "Profili nuk mund të ruhej. Provo përsëri.",
     "organizationRoleRequired": "Vetëm pronarët e organizatës dhe administratorët mund të ndryshojnë profilet e organizatës.",
     "deleteTitle": "Fshi profilin",
     "deleteMessage": "Kjo heq përgjithmonë profilin dhe cilësimet e tij. Kjo nuk mund të zhbëhet.",

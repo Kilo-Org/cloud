@@ -4316,7 +4316,7 @@
     "personalDefaultDescription": "Carregado automaticamente quando nenhum repositório possui um perfil fixado.",
     "organizationDefaultDescription": "Carregado automaticamente para membros que não possuem padrão pessoal.",
     "setAsDefault": "Definir como padrão",
-    "saveFailed": "Não foi possível salvar o perfil. Verifique sua conexão e tente novamente.",
+    "saveFailed": "Não foi possível salvar o perfil. Tente novamente.",
     "organizationRoleRequired": "Somente proprietários e administradores da organização podem alterar os perfis da organização.",
     "deleteTitle": "Excluir perfil",
     "deleteMessage": "Isso remove permanentemente o perfil e suas configurações. Isto não pode ser desfeito.",

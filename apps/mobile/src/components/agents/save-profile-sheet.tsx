@@ -63,7 +63,7 @@ type SaveProfileFailure =
   | { readonly kind: 'refused'; readonly message: string }
   | { readonly kind: 'unknown' };
 
-/** The sheet's one line for a failure: the server's sentence, or the neutral connection line. */
+/** The sheet's one line for a failure: the server's sentence, or the neutral retry line. */
 function saveFailureMessage(t: (key: string) => string, failure: SaveProfileFailure): string {
   switch (failure.kind) {
     case 'refused': {

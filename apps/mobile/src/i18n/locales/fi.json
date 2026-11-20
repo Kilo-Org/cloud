@@ -4176,7 +4176,7 @@
     "personalDefaultDescription": "Ladataan automaattisesti, kun missään koodivarastossa ei ole kiinnitettyä profiilia.",
     "organizationDefaultDescription": "Ladataan automaattisesti jäsenille, joilla ei ole henkilökohtaista oletusprofiilia.",
     "setAsDefault": "Aseta oletusprofiiliksi",
-    "saveFailed": "Profiilia ei voitu tallentaa. Tarkista yhteytesi ja yritä uudelleen.",
+    "saveFailed": "Profiilia ei voitu tallentaa. Yritä uudelleen.",
     "organizationRoleRequired": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa organisaation profiilia.",
     "deleteTitle": "Poista profiili",
     "deleteMessage": "Tämä poistaa profiilin ja sen asetukset pysyvästi. Tätä ei voi kumota.",

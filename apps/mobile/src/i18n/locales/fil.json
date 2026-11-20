@@ -4176,7 +4176,7 @@
     "personalDefaultDescription": "Awtomatikong na-load kapag walang repository na may naka-pin na profile.",
     "organizationDefaultDescription": "Awtomatikong na-load para sa mga miyembrong walang personal na default.",
     "setAsDefault": "Itakda bilang default",
-    "saveFailed": "Hindi ma-save ang profile. I-check ang iyong koneksyon at subukang muli.",
+    "saveFailed": "Hindi ma-save ang profile. Subukang muli.",
     "organizationRoleRequired": "Mga may-ari ng organisasyon at admin lang ang maaaring baguhin ang profile ng organisasyon.",
     "deleteTitle": "Tanggalin ang profile",
     "deleteMessage": "Permanente nitong inaalis ang profile at mga setting nito. Hindi na ito maaaring bawiin.",

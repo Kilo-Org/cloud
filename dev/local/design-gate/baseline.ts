@@ -433,10 +433,17 @@ function generatedFiles(
   }
   const declaration =
     'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {';
+  // Prettier wraps the same declaration across five lines; accept that form as
+  // the same insertion point so a formatted product file still prepares.
+  const declarationWrapped =
+    'export function redirectSystemPath({\n  path,\n  initial,\n}: {\n  path: string;\n  initial: boolean;\n}): string | null {';
+  const declarationUsed = intent.includes(declaration) ? declaration : declarationWrapped;
   if (branches.length > 0) {
-    if (intent.split(declaration).length !== 2)
+    if (intent.split(declarationUsed).length !== 2)
       throw new Error('Unsupported native-intent diagnostic insertion point');
-    intent = intent.replace(declaration, `${declaration}\n${branches.join('\n')}`);
+    // The branch literals are JSON strings of deep links and route names, so
+    // the replacement carries no `$` patterns and string replace is safe.
+    intent = intent.replace(declarationUsed, `${declarationUsed}\n${branches.join('\n')}`);
   }
   intent += `\n// Temporary diagnostic source receipt; forces stale Metro bundles to fail closed.\nif (__DEV__) (globalThis as typeof globalThis & { ${MARKER}?: string }).${MARKER} = ${JSON.stringify(marker)};\n`;
   files.set(INTENT, intent);

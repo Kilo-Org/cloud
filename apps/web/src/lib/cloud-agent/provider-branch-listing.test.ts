@@ -724,6 +724,35 @@ describe('getProviderBranchHead', () => {
       })
     ).rejects.toBe(failure);
   });
+
+  it('keeps a rate limit retryable on a personal connection', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+
+  it('keeps a rate limit retryable on an exact supplied integration', async () => {
+    mockGetGitHubIntegrationById.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+        githubIntegrationId: 'intg_github_exact',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
 });
 
 describe('getProviderBranchHead (organization github installations)', () => {

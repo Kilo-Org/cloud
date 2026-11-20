@@ -621,13 +621,15 @@ async function getGitHubBranchHead(
 
   /**
    * One installation with no alternative to walk to, so its answer is the
-   * connection's own: a refused credential takes the reconnect state, the same
-   * class the branch list answers for one connection.
+   * connection's own: a refused credential takes the reconnect state and a
+   * rate limit stays retryable, the same classes the branch list answers for
+   * one connection.
    */
   const callOnly = async (integration: GitHubIntegrationRow): Promise<ProviderBranchHead> => {
     try {
       return await call(integration);
     } catch (error) {
+      if (isGitHubRateLimitError(error)) throw githubRateLimitTrpcError(error);
       if (refusalStatus(error) === 401) throw githubCredentialRefusedTrpcError(error);
       throw error;
     }

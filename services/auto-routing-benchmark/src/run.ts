@@ -444,14 +444,18 @@ export async function drainQueues(
   // admin who pressed a button needs to be told the queue is wedged instead of
   // being shown "nothing to run".
   errors?: unknown[],
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  // A caller that reconciled the platform queue itself, in this same request
+  // (the config save), skips the drain's own reconcile. It would read the same
+  // saved decider list and write the same rows again.
+  options: { skipPlatformSync?: boolean; skipped?: DrainSkipReason[] } = {}
 ): Promise<StartedQueueRun[]> {
   const queues: BenchmarkRunPurpose[] =
     selector === 'both' ? ['platform', 'user'] : [selector satisfies BenchmarkRunPurpose];
   const started: StartedQueueRun[] = [];
   for (const queue of queues) {
     try {
-      const drained = await drainQueue(env, queue, router);
+      const drained = await drainQueue(env, queue, router, options);
       if (drained) started.push({ ...drained, router, purpose: queue });
     } catch (error) {
       errors?.push(error);
@@ -1151,16 +1155,29 @@ export async function startRun(
   return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
 }
 
+/**
+ * Why a queue drain started no run. `active_run` means the queue's slot is
+ * taken and the new work waits for it; `nothing_pending` means the queue holds
+ * nothing to claim, so it waits for a registration, not for a run to end.
+ */
+export type DrainSkipReason = 'active_run' | 'nothing_pending';
+
 export async function drainQueue(
   env: Env,
   queue: BenchmarkRunPurpose,
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  options: { skipPlatformSync?: boolean; skipped?: DrainSkipReason[] } = {}
 ): Promise<{ runId: string; entryCount: number } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
-  if (!config) return null;
+  if (!config) {
+    // No saved config means no registry rows to claim: nothing is pending.
+    options.skipped?.push('nothing_pending');
+    return null;
+  }
 
   const active = await getRunningRun(env.BENCH_DB, 'decider', queue, router);
   if (active) {
+    options.skipped?.push('active_run');
     console.log(
       JSON.stringify({
         event: 'benchmark_queue_drain_skipped_slot_occupied',
@@ -1172,7 +1189,8 @@ export async function drainQueue(
   }
 
   // Reconcile saved snapshots, not the live alias targets.
-  if (queue === 'platform') await syncPlatformRegistry(env, fetch, router);
+  if (queue === 'platform' && !options.skipPlatformSync)
+    await syncPlatformRegistry(env, fetch, router);
 
   const engineIdentity = computeEngineIdentity('decider', router);
   const repetitions = resolveEffectivePolicy(config).deciderRepetitions;
@@ -1181,7 +1199,10 @@ export async function drainQueue(
   const current = { router, engineIdentity, repetitions };
   const pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
   const remeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
-  if (pending.length === 0 && remeasures.length === 0) return null;
+  if (pending.length === 0 && remeasures.length === 0) {
+    options.skipped?.push('nothing_pending');
+    return null;
+  }
   const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveRunIdentity(config));
   const checked = pending.map(row => ({
     row,
@@ -1204,7 +1225,12 @@ export async function drainQueue(
     ...remeasures,
     ...available.slice(0, Math.max(0, maxEntries - remeasures.length)),
   ];
-  if (queued.length === 0) return null;
+  if (queued.length === 0) {
+    // Every pending row this drain found is unavailable, so the queue has
+    // nothing claimable — the same answer as an empty queue.
+    options.skipped?.push('nothing_pending');
+    return null;
+  }
 
   const batch = queued.slice(0, maxEntries);
   const entries: RunModelEntry[] = batch.map(row => ({
@@ -1228,6 +1254,8 @@ export async function drainQueue(
     return { runId: result.runId, entryCount: result.enqueuedModels };
   } catch (error) {
     if (error instanceof RunAlreadyActiveError) {
+      // Another drain won the slot between our read and our insert.
+      options.skipped?.push('active_run');
       console.log(
         JSON.stringify({
           event: 'benchmark_queue_drain_skipped_slot_occupied',
@@ -1240,6 +1268,7 @@ export async function drainQueue(
     if (error instanceof NoEntriesClaimedError) {
       // The other queue claimed this whole batch between our read and our
       // claim. The pairs are being measured; nothing to do.
+      options.skipped?.push('nothing_pending');
       console.log(JSON.stringify({ event: 'benchmark_queue_drain_batch_already_claimed', queue }));
       return null;
     }

@@ -152,6 +152,7 @@ import {
 } from './db';
 import {
   NoEntriesClaimedError,
+  type DrainSkipReason,
   drainQueue,
   drainQueues,
   failRunAndDrain,
@@ -1324,6 +1325,45 @@ describe('decider run completion', () => {
 });
 
 describe('drainQueue', () => {
+  it('records why it started nothing: an occupied slot, an empty queue or no config', async () => {
+    const skipped: DrainSkipReason[] = [];
+
+    // Empty queue: no pending row, no queued re-measure.
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+    await expect(drainQueue(env, 'user', 'efficient', { skipped })).resolves.toBeNull();
+    expect(skipped).toEqual(['nothing_pending']);
+
+    // Occupied slot.
+    skipped.length = 0;
+    vi.mocked(getRunningRun).mockImplementation(async (_db, _kind, purpose) =>
+      purpose === 'user' ? runningRun('user-busy', 'user') : undefined
+    );
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'm/pending', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    await expect(drainQueue(env, 'user', 'efficient', { skipped })).resolves.toBeNull();
+    expect(skipped).toEqual(['active_run']);
+
+    // Every pending row this drain found is unexecutable, so nothing is claimable.
+    skipped.length = 0;
+    vi.mocked(getRunningRun).mockResolvedValue(undefined);
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue({
+      data: [{ id: 'platform/a', supported_parameters: [] }],
+    });
+    await expect(drainQueue(env, 'user', 'efficient', { skipped })).resolves.toBeNull();
+    expect(skipped).toEqual(['nothing_pending']);
+
+    // No saved config: there is no registry to claim from.
+    skipped.length = 0;
+    vi.mocked(getConfigRows).mockResolvedValue({
+      config: null,
+      classifierModels: [],
+      deciderModels: [],
+    });
+    await expect(drainQueue(env, 'user', 'efficient', { skipped })).resolves.toBeNull();
+    expect(skipped).toEqual(['nothing_pending']);
+  });
+
   it('starts the oldest pending batch of the requested queue', async () => {
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/old', variant: 'a', requested_at: '2026-06-01T00:00:00.000Z' },

@@ -337,6 +337,30 @@ export const BenchmarkConfigSaveWarningSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('routing_table_publish_failed'), message: z.string() }),
 ]);
 export type BenchmarkConfigSaveWarning = z.infer<typeof BenchmarkConfigSaveWarningSchema>;
+// Outcome of the platform-queue drain a save runs after its registry sync and
+// publish. A separate field rather than a `warnings` kind: `warnings` is a
+// discriminated union, so an older web release would reject a kind it does not
+// know and show the whole save as failed. An unknown top-level key is stripped
+// by that release instead, so this only ever adds information.
+export const BenchmarkConfigSaveDrainSchema = z.object({
+  // The run the save started, or null when nothing was pending (every pair
+  // already measured or in flight) or the queue's run slot was occupied.
+  runId: z.string().nullable(),
+  entryCount: z.number().int(),
+  // Set when the drain did not start a run in this request: `active_run` when
+  // the queue already had one, `nothing_pending` when the queue had nothing to
+  // claim (an owner run in flight, or every pair already measured), `timeout`
+  // when the bounded drain exceeded its deadline, `failed` when it threw. The
+  // per-minute scheduler picks the work up either way.
+  //
+  // This field is new in the release that added drain-on-save, so no released
+  // web parses it. When adding a member, remember a released web parses this
+  // object with its own enum: an unknown value fails its whole save, so a new
+  // member has to reach the web before the worker emits it.
+  skipped: z.enum(['active_run', 'nothing_pending', 'timeout', 'failed']).nullable(),
+});
+export type BenchmarkConfigSaveDrain = z.infer<typeof BenchmarkConfigSaveDrainSchema>;
+
 // config is null until an admin saves one — the worker never fabricates a
 // default config, and runs cannot start without a saved one.
 export const BenchmarkConfigResponseSchema = z.object({
@@ -346,6 +370,9 @@ export const BenchmarkConfigResponseSchema = z.object({
   policySettings: PolicySettingsStateSchema.nullable().optional(),
   // PUT only. Optional so GET responses and older workers still parse.
   warnings: z.array(BenchmarkConfigSaveWarningSchema).optional(),
+  // PUT only. Optional so a GET, or a response from a worker that predates the
+  // drain-on-save, still parses.
+  drain: BenchmarkConfigSaveDrainSchema.optional(),
 });
 export const StartBenchmarkRunRequestSchema = z.object({
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),

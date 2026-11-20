@@ -54,6 +54,7 @@ type RunOptions = {
   router?: 'efficient' | 'frontier';
   purpose?: 'platform' | 'user';
   kind?: 'classifier' | 'decider';
+  startedAt?: string;
 };
 
 function insertRun(sqlite: DatabaseSync, id: string, options: RunOptions = {}) {
@@ -69,7 +70,7 @@ function insertRun(sqlite: DatabaseSync, id: string, options: RunOptions = {}) {
       options.router ?? 'efficient',
       options.kind ?? 'decider',
       options.purpose ?? 'platform',
-      new Date(NOW).toISOString()
+      options.startedAt ?? new Date(NOW).toISOString()
     );
 }
 
@@ -660,6 +661,35 @@ describe('scheduler (production migrations and real SQLite)', () => {
     await claimMany(db, config, 12, 'custom-shares');
     expect(liveChunks(sqlite).filter(row => row.run_id === 'platform')).toHaveLength(2);
     expect(liveChunks(sqlite).filter(row => row.run_id === 'user')).toHaveLength(6);
+  });
+
+  it("claims a newer same-share run's idle model before models that already hold slots", async () => {
+    insertRun(sqlite, 'user-large', { purpose: 'user' });
+    await scheduleRunChunks(db, {
+      runId: 'user-large',
+      entries: independentEntries(3),
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+    });
+    const held = await claimMany(db, schedulerConfig('{"slots":3}'), 3, 'large');
+    expect(new Set(held.map(claim => claim.model)).size).toBe(3);
+    insertRun(sqlite, 'user-small', {
+      purpose: 'user',
+      startedAt: new Date(NOW + 60_000).toISOString(),
+    });
+    await scheduleRunChunks(db, {
+      runId: 'user-small',
+      entries: [{ model: 'new/model', variant: '' }],
+      repetitions: 1,
+      caseIds: ['case-a', 'case-b', 'case-c'],
+      chunkSize: 1,
+    });
+
+    const next = await claimScheduledChunks(db, schedulerConfig('{"slots":4}'), NOW, 'small');
+
+    expect(next).toHaveLength(1);
+    expect(next[0]).toMatchObject({ run_id: 'user-small', model: 'new/model', chunk: 0 });
   });
 
   it('lets models that share every catalog provider each reach their own model cap', async () => {
@@ -1546,9 +1576,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(failedPlan).toContain(
       'SEARCH chunk USING INDEX IX_scheduler_chunks_lane (status=? AND run_id=?)'
     );
-    expect(failedPlan).toContain(
-      'SCAN run USING INDEX UQ_benchmark_runs_one_running_per_router_kind_purpose'
-    );
+    expect(failedPlan).toContain('SCAN run USING INDEX IX_benchmark_runs_running');
     for (const sql of [SCHEDULER_PRUNE_EXECUTIONS_SQL, SCHEDULER_PRUNE_MARKERS_SQL]) {
       const plan = explainPlan(sqlite, sql);
       expect(plan).toContain('SCAN marker');

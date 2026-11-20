@@ -1034,7 +1034,7 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them. `PUT` saves, then syncs the platform registry and republishes the routing table before responding. A failed step does not undo the save: the response is 200 with `warnings` (`registry_sync_failed`, which skips the publish, or `routing_table_publish_failed`), each naming the retry (the daily `0 5 * * *` platform sync, or saving again) |
 | `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots` and `modelConcurrency` (the retired provider limits are accepted and ignored for one web release) |
-| `GET /admin/runs` | List runs without their summaries. Read-only; the per-minute cron sweeps stale `running` runs. `hasRunningRun` reports whether any run of the router is running, whatever the `kind`/`purpose` filter. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
+| `GET /admin/runs` | List runs without their summaries. Read-only; the per-minute cron sweeps stale `running` runs. `runningRunIds` lists every running run of the router, whatever the `kind`/`purpose` filter; the admin panel polls while it is non-empty and refreshes the routing table, config and registry whenever a run leaves it. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
 | `GET /admin/runs/:runId/summaries` | One run's model summaries; 404 when the run does not exist or belongs to another router (classifier runs are shared) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`); `202` once a run row exists, with initialization left to the dispatcher |
 | `GET /admin/registry` | Queue counts, exact platform entry statuses and the failed entries of both queues (retryable and permanent, with class, attempts and retry window) under the current engine identity and repetitions |
@@ -1072,12 +1072,31 @@ row is global, so the pair is benchmarked once and serves both.
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
 | Execution share | Efficient and frontier each have default weight 2 | Efficient and frontier each have default weight 1 |
-| Run lifecycle | One active run per router/queue | One active owner run per router |
+| Run lifecycle | Up to 4 active runs per router/queue, one of them starting | Up to 4 active owner runs per router, one of them starting |
 
 All four shares use the same bounded chunk scheduler and borrow unused capacity.
 `benchmark_runs.max_concurrency` is retained for storage compatibility but new decider
 runs write zero: it is not an execution reservation. Registry admission is still atomic
 per exact pair, and the per-router/queue run lifecycle gate remains independent of slots.
+
+A drain of one router/queue starts a new run for the oldest pending entries while earlier
+runs of that queue are still measuring, so a newly added model does not wait for the
+active run to finish. The drain skips the queue while one of its runs is still starting
+(it has no `scheduler_runs` marker yet: reuse copies and chunk creation are still in
+progress), logging `benchmark_queue_drain_skipped_run_starting`, and while
+`MAX_RUNNING_RUNS_PER_QUEUE` (4) runs are active, logging
+`benchmark_queue_drain_skipped_queue_full`. The run row is inserted by one conditional
+statement that repeats both checks, so overlapping drains (the timer, a finishing run, an
+admin request) cannot start two runs that are both starting or a fifth active run: the
+refused drain hands its claimed pairs back to `pending` and logs the same skip event.
+Concurrent drains claim disjoint pairs; a drain that finds every pair claimed logs
+`benchmark_queue_drain_batch_already_claimed`.
+Runs of one router/queue share its execution share. Within the share the scheduler
+prefers the model with the fewest live chunks, then the older run, so a small new run
+gets its first chunks as soon as its models hold fewer slots than the earlier run's
+models. Each dispatch pass finalizes every settled run, up to the 16 that the four queues
+can hold. Classifier runs stay one at a time: `POST /admin/runs` answers 409 while one
+is active.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
 If a desired pair remains pending or running, the previous table stays live.
@@ -1145,10 +1164,13 @@ below).
 **Per-queue drain** (after any decider terminal state, on the admin's manual
 trigger, and on the one-minute cron):
 
-1. If that queue's run is active, leave its pending registry rows alone.
+1. Skip the queue when one of its runs is still starting (it has no `scheduler_runs`
+   marker yet) or when it already holds `MAX_RUNNING_RUNS_PER_QUEUE` active runs; either
+   way its pending registry rows are left alone.
 2. Otherwise take up to 100 current-engine entries oldest-`requested_at`-first.
-3. `startRun(purpose: queue, entries: snapshot)` persists the workload, then the
-   global scheduler claims only the chunks that fit its current caps.
+3. `startRun(purpose: queue, entries: snapshot)` writes the run row and wakes the
+   dispatcher, which materializes the chunks; the global scheduler then claims only the
+   chunks that fit its current caps.
 
 A row wanted by both queues appears in both listings; whichever run claims it
 first flips it to `running`, so it is still measured exactly once.
@@ -1222,7 +1244,7 @@ everything else is automatic. **Wait** is the delay the flow itself imposes.
 | 1 | Pick the model and save the router config | **manual** (console Policy tab → Save config) | none; the save returns the saved config, its `warnings`, and the `drain` outcome | `registerAdminRoutes` (PUT /admin/config), `syncRegistryAfterConfigSave` (`src/admin.ts`) |
 | 2 | Registry sync: expand the model through the live catalog into every supported effort, insert `pending` rows | automatic, inside the save request | none — runs before the response | `syncPlatformRegistry` (`src/run.ts`), `syncPlatformRegistryRows` (`src/db.ts`) |
 | 3 | Routing table republish (the save also flushes an unchanged table) | automatic, inside the save request | none | `syncRegistryAfterConfigSave` → `publishPlatformRoutingTable` (`src/run.ts`) |
-| 4 | Queue drain: claim the pending rows into a run | automatic. The save drains the **platform** queue itself right after the publish; the per-minute cron still drains both queues for owner registrations, and a decider run reaching a terminal state drains immediately | **none for the platform queue** on a save (bounded at 5 s, then deferred to the cron). Owner registrations still wait **up to 60 s**; the queue's run slot must be free (see "several runs per queue" below) | `drainPlatformAfterConfigSave` (`src/admin.ts`); the scheduled handler (`src/index.ts`) → `sweepStaleRunsAndDrain` → `drainQueues` (`src/run.ts`) |
+| 4 | Queue drain: claim the pending rows into a run | automatic. The save drains the **platform** queue itself right after the publish; the per-minute cron still drains both queues for owner registrations, and a decider run reaching a terminal state drains immediately | **none for the platform queue** on a save (bounded at 5 s, then deferred to the cron). Owner registrations still wait **up to 60 s**; the queue must be able to start a run, i.e. none of its runs is still starting and it holds fewer than `MAX_RUNNING_RUNS_PER_QUEUE` active runs (see "The two registry queues") | `drainPlatformAfterConfigSave` (`src/admin.ts`); the scheduled handler (`src/index.ts`) → `sweepStaleRunsAndDrain` → `drainQueues` (`src/run.ts`) |
 | 5 | Run start: claim registry rows, insert the run row, copy reusable prior results | automatic, same drain pass | none | `startRun` (`src/run.ts`), `markProfilesRunningForRun` (`src/db.ts`), `reuseDeciderCaseResults` (`src/db.ts`, in the dispatcher's initialization) |
 | 6 | Initialization: materialize one scheduler chunk per case per lane | automatic, on the next dispatch pass | **bounded 20 s per pass**; a large run needs several passes (one pass writes 50 chunks per batch) | `scheduleRunChunks` (`src/scheduler.ts`), `initializeScheduledRun` (`src/run.ts`) |
 | 7 | Dispatch: claim chunks that fit the scheduler caps and enqueue them | automatic | none once initialized | `claimScheduledChunks` (`src/scheduler.ts`), `dispatchScheduler` (`src/run.ts`) |
@@ -1262,8 +1284,9 @@ before the 2026-11-20 fixes took hours longer: p50 admit→ready was 2.9 h (plat
   coverage line reads `N of M measured · <effort>: pending` for the sync's new rows. A save
   that could not sync shows a destructive banner naming why (`registry_sync_failed`,
   `routing_table_publish_failed`) plus "save again to retry now". A save whose platform drain
-  did not start a run is not an error: its `drain.skipped` says `active_run` (the queue's run
-  slot is taken), `nothing_pending` (every pair is already measured or in flight), `timeout`
+  did not start a run is not an error: its `drain.skipped` says `active_run` (one of the
+  queue's runs is still starting, or it already holds `MAX_RUNNING_RUNS_PER_QUEUE` active
+  runs), `nothing_pending` (every pair is already measured or in flight), `timeout`
   or `failed`, and the Benchmarks tab shows the new `Platform queue` run as soon as the cron
   picks it up (within a minute).
 - **Benchmarks tab, Decider Registry**: pending / running / ready / failed counts per queue,
@@ -1310,8 +1333,9 @@ in `skipped`.
 
 - **No wait on the admin path.** A save that adds a model drains the platform queue in the
   same request, so the run exists by the time the save answers — no **Run platform queue**
-  click and no cron wait. The drain is bounded at 5 s; if it is slow, or the queue's slot is
-  taken, the save still answers 200 with the saved config and reports why in `drain`:
+  click and no cron wait. The drain is bounded at 5 s; if it is slow, or the queue is
+  already starting a run or holds `MAX_RUNNING_RUNS_PER_QUEUE` active runs, the save still
+  answers 200 with the saved config and reports why in `drain`:
   `skipped: 'timeout' | 'failed' | 'active_run' | 'nothing_pending'`. A drain that outlives
   the deadline is not abandoned: the save hands its promise to the request's
   `ctx.waitUntil`, so a claim that already started a run still records it, and the
@@ -1320,9 +1344,12 @@ in `skipped`.
   `POST /admin/profiles/register`, which is not a benchmark config save and does not drain;
   the cron tick starts it. It stays because owner registrations arrive at arbitrary times
   and a drain is the only thing that can start their run.
-- **The queue's active run must finish.** One active run per `(router, queue)`. A new model
-  waits behind the pair batch already in flight. More runs per queue is proposed separately
-  and is what removes this wait.
+- **The queue's earlier runs.** A queue holds up to 4 active runs and starts one at a
+  time, so a new model gets its own run on the next drain instead of waiting behind the
+  pair batch already in flight; see "The two registry queues". Runs of one
+  `(router, queue)` share its execution share, and inside it the scheduler prefers the
+  model with the fewest live chunks, so the new run's first cases start as soon as its
+  models hold fewer slots than the earlier runs' models.
 - **Initialization at 20 s per pass.** A D1 write budget, not a policy choice: one pass
   writes 50 chunks per batch so a big run never holds a single transaction open. A run
   needing more passes just takes longer before its first case.

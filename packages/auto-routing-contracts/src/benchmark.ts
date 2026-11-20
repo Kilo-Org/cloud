@@ -341,11 +341,11 @@ export type BenchmarkRunAdminResponseRun = BenchmarkRun & BenchmarkRunAdminLegac
 
 export const BenchmarkRunsResponseSchema = z.object({
   runs: z.array(BenchmarkRunSchema),
-  // Whether any run of the requested router is running, whatever the list
-  // filter, so one request per poll both lists runs and decides whether to
-  // keep polling. Absent from workers that predate it; readers then fall back
-  // to the listed runs.
-  hasRunningRun: z.boolean().optional(),
+  // Ids of every running run of the requested router, whatever the list filter,
+  // so one request per poll both lists runs and tells which runs are still
+  // going. Absent from workers that predate it; readers then fall back to the
+  // listed runs.
+  runningRunIds: z.array(z.string()).optional(),
 });
 export type BenchmarkRunsResponse = z.infer<typeof BenchmarkRunsResponseSchema>;
 /**

@@ -275,10 +275,11 @@ export function PartDetailTransitionFixture({
     shownMessages = mediaMessages;
   }
   const openedPartId = media !== undefined ? MEDIA_PART : initialPartId;
-
-  return (
-    <PartDetailSheetHost messages={shownMessages}>
-      <OpenInitialPart partId={openedPartId} />
+  // The media variants exist to show the sheet's attachment surface. The
+  // transcript and composer behind it belong to the chat fixture and are not
+  // part of what those states measure, so they stay out of this variant.
+  const behindSheet =
+    media === undefined ? (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('common.chat')} />
         <KeyboardFollowPane>
@@ -310,6 +311,12 @@ export function PartDetailTransitionFixture({
         </KeyboardFollowPane>
         <View style={{ height: bottom }} />
       </View>
+    ) : null;
+
+  return (
+    <PartDetailSheetHost messages={shownMessages}>
+      <OpenInitialPart partId={openedPartId} />
+      {behindSheet}
     </PartDetailSheetHost>
   );
 }

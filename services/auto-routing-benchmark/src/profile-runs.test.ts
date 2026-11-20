@@ -1722,7 +1722,7 @@ describe('frontier router runs', () => {
     expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(0);
   });
 
-  it('publishes the frontier router threshold from its effective policy values', async () => {
+  function mockFrontierPublishInputs() {
     mockConfig({ router: 'frontier', min_accuracy: 0.8, frontier_min_accuracy_delta: 0.1 });
     vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
       {
@@ -1756,6 +1756,10 @@ describe('frontier router runs', () => {
         avgReasoningTokens: null,
       }))
     );
+  }
+
+  it('publishes the frontier router threshold from its effective policy values', async () => {
+    mockFrontierPublishInputs();
     await publishPlatformRoutingTable(env, catalogFetch, 'frontier');
     // frontierMinAccuracyDelta is fixed at 0, so the stored threshold applies.
     expect(saveRoutingTable).toHaveBeenCalledWith(
@@ -1769,6 +1773,26 @@ describe('frontier router runs', () => {
     expect(kvDelete).toHaveBeenCalledWith('benchmark_routing_table_version_v1:frontier');
     expect(kvDelete).not.toHaveBeenCalledWith('routing_table_v1');
     expect(kvDelete).not.toHaveBeenCalledWith('benchmark_routing_table_version_v1:efficient');
+  });
+
+  it('flushes the gateway key when the version pointer cannot be written', async () => {
+    mockFrontierPublishInputs();
+    kvDelete.mockImplementation(async (key: string) => {
+      if (key === 'benchmark_routing_table_version_v1:frontier') throw new Error('KV 429');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(publishPlatformRoutingTable(env, catalogFetch, 'frontier')).resolves.toEqual({
+      version: expect.any(String),
+    });
+
+    expect(saveRoutingTable).toHaveBeenCalledOnce();
+    expect(kvDelete).toHaveBeenCalledWith('benchmark_routing_table_response_v1:frontier');
+    expect(kvDelete).toHaveBeenLastCalledWith('routing_table_frontier_v1');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('routing_table_version_pointer_failed')
+    );
+    warn.mockRestore();
   });
 
   it('publishes an admin override in place of the stored threshold', async () => {

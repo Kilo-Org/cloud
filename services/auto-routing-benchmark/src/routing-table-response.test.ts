@@ -56,8 +56,12 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
         d1Reads++;
       }),
       AUTO_ROUTING_CONFIG: {
-        async get(key: string) {
+        async get(key: string, options?: KVNamespaceGetOptions<'text'>) {
           if (kvFailure) throw kvFailure;
+          // Workers KV rejects a cacheTtl below its minimum, 30 s since January 2026.
+          if (options?.cacheTtl !== undefined && options.cacheTtl < 30) {
+            throw new Error(`Invalid cacheTtl of ${options.cacheTtl}.`);
+          }
           return store.get(key)?.value ?? null;
         },
         async getWithMetadata(key: string) {
@@ -135,13 +139,70 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
     });
   });
 
-  it('reads D1 without caching until a publish has named a version', async () => {
+  it('seeds a missing pointer from D1 and caches the body', async () => {
     await saveRoutingTable(db, table('v1'), '2026-11-19T23:00:00.000Z');
     const expected = await previousResponse();
 
     expect(await (await get()).text()).toBe(expected.body);
+    const readsAfterSeed = d1Reads;
     expect(await (await get()).text()).toBe(expected.body);
+
+    expect(d1Reads).toBe(readsAfterSeed);
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v1 2026-11-19T23:00:00.000Z'
+    );
+  });
+
+  it('leaves no pointer and caches nothing while no table is published', async () => {
+    store.set(routingTableVersionKvKey('efficient'), { value: 'gone 2026', metadata: null });
+
+    expect(await (await get()).text()).toBe('{"table":null,"publishedAt":null}');
+
     expect(store.size).toBe(0);
+  });
+
+  it('corrects a seed written after a publish that raced it', async () => {
+    await saveRoutingTable(db, table('v1'), '2026-11-19T23:00:00.000Z');
+    onPut = async key => {
+      if (key !== routingTableVersionKvKey('efficient')) return;
+      onPut = async () => {};
+      await publish('v2', '2026-11-19T23:30:00.000Z');
+    };
+
+    expect(await servedVersion()).toBe('v1');
+
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v2 2026-11-19T23:30:00.000Z'
+    );
+    expect(store.has(routingTableResponseKvKey('efficient'))).toBe(false);
+    expect(await servedVersion()).toBe('v2');
+    expect(await servedVersion()).toBe('v2');
+  });
+
+  it('serves D1 after a publish that could not move the pointer', async () => {
+    await publish('v1', '2026-11-19T23:00:00.000Z');
+    expect(await servedVersion()).toBe('v1');
+    onPut = async key => {
+      if (key !== routingTableVersionKvKey('efficient')) return;
+      onPut = async () => {};
+      throw new Error('KV 429');
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(publish('v2', '2026-11-19T23:30:00.000Z')).resolves.toBeUndefined();
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('routing_table_version_pointer_failed')
+    );
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v1 2026-11-19T23:00:00.000Z'
+    );
+    expect(store.has(routingTableResponseKvKey('efficient'))).toBe(false);
+    expect(await servedVersion()).toBe('v2');
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v2 2026-11-19T23:30:00.000Z'
+    );
+    expect(await servedVersion()).toBe('v2');
   });
 
   it('serves a newly published table on the next read', async () => {
@@ -176,7 +237,7 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
     expect(await servedVersion()).toBe('v2');
   });
 
-  it('does not cache a table published between the pointer read and the D1 read', async () => {
+  it('confirms a table published between the pointer read and the D1 read before caching it', async () => {
     await publish('v1', '2026-11-19T23:00:00.000Z');
     onBodyRead = async () => {
       onBodyRead = async () => {};
@@ -184,11 +245,12 @@ describe('GET /admin/routing-table (KV in front of D1)', () => {
     };
 
     expect(await servedVersion()).toBe('v2');
-    expect(store.has(routingTableResponseKvKey('efficient'))).toBe(false);
-    expect(await servedVersion()).toBe('v2');
     expect(store.get(routingTableResponseKvKey('efficient'))?.metadata).toEqual({
       token: 'v2 2026-11-19T23:30:00.000Z',
     });
+    expect(store.get(routingTableVersionKvKey('efficient'))?.value).toBe(
+      'v2 2026-11-19T23:30:00.000Z'
+    );
   });
 
   it('moves a pointer that a concurrent publish overtook to the latest table', async () => {

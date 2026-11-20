@@ -954,10 +954,14 @@ attaches the dedicated infrastructure and keeps the existing producer routing.
    is hidden: set it to `false`, deploy that settings version, and confirm that version is the
    only active deployment, as described under [Cutover switch](#cutover-switch).
 2. Deploy usage-ingest normally. Preparation inspects every queue, then creates or reuses the
-   dedicated DLQ (EU, 14-day retention, no consumer, read back) and then the source (EU, delivery
-   not paused, at least the four-day default retention, read back), after the shared and hedge
+   dedicated DLQ (EU, 14-day retention, no consumer, read back) and then the source (EU,
+   at least the four-day default retention, read back), after the shared and hedge
    pairs, and detaches nothing. It stops before any write if an existing member fails those
-   checks. Wrangler then uploads the Worker with provisioning disabled and attaches the dedicated
+   checks or the source's `delivery_paused` value is explicitly `true` or malformed. An omitted
+   `delivery_paused` response or explicit `false` is accepted; omission is API-shape compatibility,
+   not proof of active delivery. Operator verification of attachment, staging processing and the
+   production source stall alert below still gates production cutover.
+   Wrangler then uploads the Worker with provisioning disabled and attaches the dedicated
    consumer beside the existing two. Tagged usage still goes to the shared queue.
 3. o11y deploys from the same merge, possibly in parallel, and enrolls the production tagged
    DLQ in the [dead-letter alert](#dead-letter-alert); its tagged DLQ evaluation errors until step
@@ -1001,7 +1005,10 @@ it.
   harmless. Rerun.
 - Preparation stops because the dedicated source is paused: resume its delivery deliberately
   (only after confirming why it was paused), then rerun the deployment. Preparation never
-  resumes it.
+  resumes it. A present malformed `delivery_paused` value also stops preparation; investigate the
+  response before rerunning. An omitted value or explicit `false` is accepted, but omission does
+  not prove active delivery or waive attachment, staging processing or production source stall
+  alert verification before production cutover.
 - The Worker uploads but the dedicated consumer is not attached: with the switch off nothing
   publishes there. Do not enable the switch; rerun the deployment and repeat the readback.
 

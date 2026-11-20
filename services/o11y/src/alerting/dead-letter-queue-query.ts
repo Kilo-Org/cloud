@@ -9,11 +9,8 @@ type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 /** Resolves the DLQ by name on every run, so a recreated queue needs no config change. */
 export async function queryDeadLetterQueue(
   env: QueryEnv,
-  fetchFn: FetchFn = fetch
+  fetchFn: FetchFn = fetch,
+  queueName: string = DEAD_LETTER_QUEUE_NAME
 ): Promise<QueueBacklogMetrics> {
-  return queryQueueBacklog(
-    env,
-    fetchFn,
-    await resolveQueueId(env, fetchFn, DEAD_LETTER_QUEUE_NAME)
-  );
+  return queryQueueBacklog(env, fetchFn, await resolveQueueId(env, fetchFn, queueName));
 }

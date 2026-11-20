@@ -6420,7 +6420,7 @@ describe('the download hold on a real call', () => {
       });
 
       // The item carries no referrer, so the announcement just emitted is the only attribution it has.
-      hold.handle({ filename: 'report.txt', id: 71, referrer: undefined, url }, () => {});
+      hold.handle({ filename: 'report.txt', id: 71, url }, () => {});
 
       const outcome = await call;
 

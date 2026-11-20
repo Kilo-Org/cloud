@@ -3614,7 +3614,7 @@ export const createBrowserRuntime = ({
         let intercepted: InterceptSettlement = { stopped: [] };
 
         // A Document this call started that the browser has not answered yet: it may still become a file. Hoisted
-        // because both the settle's sign and the blocked answer below need the same reading.
+        // Because both the settle's sign and the blocked answer below need the same reading.
         const hasUnansweredDocument = (): boolean =>
           runSession
             .networkRequests()
@@ -3845,7 +3845,7 @@ export const createBrowserRuntime = ({
           // Approval still unspent and no file of its own, the browser created no item for it — Chrome's own
           // Multiple-downloads limiter refuses it — so the answer says so instead of a success the human cannot trust.
           // A Document this call started and the browser has not answered yet is not that: its item can still arrive,
-          // and calling it blocked would spend the human's approval on a file the browser is still writing.
+          // And calling it blocked would spend the human's approval on a file the browser is still writing.
           if (
             downloadApproved &&
             ownLate.length === 0 &&

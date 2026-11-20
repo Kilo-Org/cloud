@@ -1,10 +1,14 @@
+/* eslint-disable max-lines -- one mounted suite for the create contract: the name gate, the three exits,
+   the failure copy, and the durable draft share one mock harness. */
+
 // Create-organization screen contract: an empty name is refused before any
 // request, a valid one creates with `autoAddCreator`, the new organization
 // becomes the selection and the stack lands on its hub — popped over the hub
 // the boundary entered with, pushed past itself from the Profile entry — a
 // create whose screen was left only refreshes the list, a failed refresh
 // reports the organization without moving the selection, a failure shows the
-// server's copy, and the submit control stays disabled until a name is typed.
+// server's copy, the submit control stays disabled until a name is typed, and
+// the durable draft restores the name and is cleared once the create lands.
 // The tRPC client is mocked so no request leaves the test.
 
 import { createElement } from 'react';
@@ -25,6 +29,24 @@ const mocks = vi.hoisted(() => ({
   setOrganizationId: vi.fn(),
   focused: { current: true },
 }));
+
+// The durable draft, controllable per case: the form keeps its name here
+// because a language-direction change reloads the bundle without cleanup.
+const formDraft = vi.hoisted(() => {
+  const save = vi.fn<(value: unknown) => void>();
+  const clear = vi.fn<() => void>();
+  const current: {
+    kind: 'loading' | 'ready';
+    value: { name: string } | null;
+  } = { kind: 'ready', value: null };
+  const useFormDraft = vi.fn(
+    (_input: { userId?: string; isIdentityLoading: boolean; entityKey: string }) =>
+      current.kind === 'loading'
+        ? { kind: 'loading' as const }
+        : { kind: 'ready' as const, value: current.value, save, clear }
+  );
+  return { save, clear, current, useFormDraft };
+});
 
 // The organization Stack this screen is mounted in. The router doubles below
 // mutate it the way the real one does, so a test reads the end state of a
@@ -68,6 +90,16 @@ vi.mock('@/lib/trpc', () => ({
   trpcClient: { organizations: { create: { mutate: mocks.createMutate } } },
   useTRPC: () => ({ organizations: { list: { queryKey: () => ['organizations.list'] } } }),
 }));
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+
+vi.mock('@/lib/persist/drafts', () => ({
+  CREATE_ORGANIZATION_FORM_DRAFT_KEY: 'organization-create-form',
+}));
+
+vi.mock('@/lib/persist/use-form-draft', () => ({ useFormDraft: formDraft.useFormDraft }));
 
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => mocks }));
 
@@ -172,6 +204,10 @@ beforeEach(() => {
   mocks.replace.mockClear();
   mocks.setOrganizationId.mockClear();
   mocks.focused.current = true;
+  formDraft.save.mockClear();
+  formDraft.clear.mockClear();
+  formDraft.current.kind = 'ready';
+  formDraft.current.value = null;
   errorCopy.lookup.mockClear();
   router.dismissTo.mockClear();
   router.push.mockClear();
@@ -401,6 +437,66 @@ describe('CreateOrganizationScreen', () => {
     // One argument: no role is read, so the line names the owner who can change
     // a plan and offers no step.
     expect(errorCopy.lookup.mock.calls[0]).toHaveLength(1);
+    unmount();
+  });
+
+  it('shows the restored name and keeps it submittable', async () => {
+    formDraft.current.value = { name: 'Restored Org' };
+    const { renderer, unmount } = await mount();
+
+    // A create has no server row: the body mounts on the stored draft, so the
+    // uncontrolled field's first (and only) value is the restored name.
+    expect(inputOf(renderer).props.defaultValue).toBe('Restored Org');
+    expect(submitOf(renderer).props.disabled).toBe(false);
+    expect(formDraft.useFormDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', entityKey: 'organization-create-form' })
+    );
+    unmount();
+  });
+
+  it('keeps the chrome with an empty disabled field while the draft loads', async () => {
+    formDraft.current.kind = 'loading';
+    const { renderer, unmount } = await mount();
+
+    // The same rows as the loaded body, so nothing moves when the draft lands.
+    expect(inputOf(renderer).props.defaultValue).toBe('');
+    expect(inputOf(renderer).props.editable).toBe(false);
+    expect(submitOf(renderer).props.disabled).toBe(true);
+    unmount();
+  });
+
+  it('saves the typed name and clears the entry instead of saving an empty name', async () => {
+    const { renderer, unmount } = await mount();
+
+    await type(renderer, 'Acme');
+    expect(formDraft.save).toHaveBeenLastCalledWith({ name: 'Acme' });
+
+    await type(renderer, '');
+    // An empty field is no draft: it clears the entry rather than storing ''.
+    expect(formDraft.clear).toHaveBeenCalledTimes(1);
+    expect(formDraft.save).not.toHaveBeenCalledWith({ name: '' });
+
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    expect(mocks.createMutate).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('clears the draft once the create lands', async () => {
+    mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(mocks.setOrganizationId).toHaveBeenCalledWith('org-new');
+    // The draft became the organization's record: it must not seed a later
+    // create, so the completion drops it before the list refresh.
+    expect(formDraft.clear).toHaveBeenCalledTimes(1);
     unmount();
   });
 });

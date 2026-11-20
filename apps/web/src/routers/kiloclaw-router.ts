@@ -3,6 +3,7 @@ import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.se
 
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
 import {
   baseProcedure,
   createTRPCRouter,
@@ -3009,6 +3010,7 @@ async function cancelKiloclawPlanSwitchForRow(params: {
   }
 
   if (subscription.stripe_schedule_id) {
+    assertKiloClawPaidHostingAvailable();
     const released = await releaseScheduleIfActive(subscription.stripe_schedule_id);
     if (!released) {
       throw new TRPCError({
@@ -3069,6 +3071,20 @@ async function cancelKiloclawPlanSwitchForRow(params: {
     },
   });
 }
+
+function assertKiloClawPaidHostingAvailable() {
+  if (!isKiloClawPaidHostingAvailable()) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'KiloClaw no longer accepts new hosting purchases or renewals.',
+    });
+  }
+}
+
+const paidHostingProcedure = baseProcedure.use(({ next }) => {
+  assertKiloClawPaidHostingAvailable();
+  return next();
+});
 
 export const kiloclawRouter = createTRPCRouter({
   getChangelog: baseProcedure.query(() => {
@@ -4835,7 +4851,7 @@ export const kiloclawRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  continueCommitAsStandard: baseProcedure
+  continueCommitAsStandard: paidHostingProcedure
     .input(KiloclawInstanceInputSchema)
     .output(KiloclawMutationResultSchema)
     .mutation(async ({ ctx, input }) => {
@@ -4850,7 +4866,7 @@ export const kiloclawRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  acceptConversionAtInstance: baseProcedure
+  acceptConversionAtInstance: paidHostingProcedure
     .input(KiloclawInstanceInputSchema)
     .output(KiloclawMutationResultSchema)
     .mutation(async ({ ctx, input }) => {
@@ -4876,7 +4892,7 @@ export const kiloclawRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  reactivateSubscriptionAtInstance: baseProcedure
+  reactivateSubscriptionAtInstance: paidHostingProcedure
     .input(KiloclawInstanceInputSchema)
     .output(KiloclawMutationResultSchema)
     .mutation(async ({ ctx, input }) => {
@@ -4891,7 +4907,7 @@ export const kiloclawRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  switchPlanAtInstance: baseProcedure
+  switchPlanAtInstance: paidHostingProcedure
     .input(KiloclawInstanceSwitchPlanInputSchema)
     .output(KiloclawMutationResultSchema)
     .mutation(async ({ ctx, input }) => {
@@ -4922,7 +4938,7 @@ export const kiloclawRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  createSubscriptionCheckout: baseProcedure
+  createSubscriptionCheckout: paidHostingProcedure
     .input(
       KiloclawOptionalInstanceInputSchema.extend({
         plan: z.enum(['commit', 'standard']),
@@ -5111,7 +5127,7 @@ export const kiloclawRouter = createTRPCRouter({
       return { url: typeof session.url === 'string' ? session.url : null };
     }),
 
-  enrollWithCredits: baseProcedure
+  enrollWithCredits: paidHostingProcedure
     .input(
       z.object({
         plan: z.enum(['commit', 'standard']),
@@ -5217,7 +5233,7 @@ export const kiloclawRouter = createTRPCRouter({
       throwCreditReprovisionRecoveryUnavailable();
     }),
 
-  createKiloPassUpsellCheckout: baseProcedure
+  createKiloPassUpsellCheckout: paidHostingProcedure
     .input(
       z.object({
         instanceId: z.string().uuid().optional(),
@@ -5531,7 +5547,7 @@ export const kiloclawRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  acceptConversion: baseProcedure.mutation(async ({ ctx }) => {
+  acceptConversion: paidHostingProcedure.mutation(async ({ ctx }) => {
     const { subscription } = await getDisplayedPersonalKiloclawSubscription({
       userId: ctx.user.id,
     });
@@ -5558,7 +5574,7 @@ export const kiloclawRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  reactivateSubscription: baseProcedure.mutation(async ({ ctx }) => {
+  reactivateSubscription: paidHostingProcedure.mutation(async ({ ctx }) => {
     const { subscription } = await getDisplayedPersonalKiloclawSubscription({
       userId: ctx.user.id,
     });
@@ -5575,7 +5591,7 @@ export const kiloclawRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  switchPlan: baseProcedure
+  switchPlan: paidHostingProcedure
     .input(z.object({ toPlan: z.enum(['commit', 'standard']) }))
     .mutation(async ({ ctx, input }) => {
       const requestedAt = new Date();

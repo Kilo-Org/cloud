@@ -19,7 +19,12 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Twassil tal-kmand: {{status}}",
     "delivered": "Imwassal",
-    "expired": "Skada"
+    "expired": "Skada",
+    "recoveryGaps_one": "Nieqes {{displayCount}} parti min dan traskrizzjoni.",
+    "recoveryGaps_two": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni.",
+    "recoveryGaps_few": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni.",
+    "recoveryGaps_many": "Nieqes {{displayCount}} parti min dan traskrizzjoni.",
+    "recoveryGaps_other": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni."
   },
   "common": {
     "manageOnWeb": "Immaniġġja fuq il-web",
@@ -138,6 +143,7 @@
     "keepRunning": "Ħallih għaddej",
     "newSession": "Sessjoni ġdida",
     "noModelsAvailable": "L-ebda mudell disponibbli",
+    "modelRetires": "Jirtira {{date}}",
     "notFound": "Ma nstabx.",
     "online": "Onlajn",
     "open": "Iftaħ {{name}}",
@@ -181,7 +187,9 @@
     "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
     "privateRepositoryA11y": "{{name}}, repositorju privat",
     "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss.",
-    "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova."
+    "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova.",
+    "organizationTrialEndedBillingAtKiloAi": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni fuq kilo.ai, imbagħad terġa' tipprova.",
+    "viewOnGitHub": "Ara l-PR fuq GitHub"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -275,6 +283,9 @@
     "credits": "Krediti",
     "failedToLoadBalance": "Ma setax jitgħabba l-bilanċ. Tektek biex terġa' tipprova.",
     "balanceLoadFailed": "Ma setax jitgħabba l-bilanċ",
+    "balanceUnreachable": "Ma setgħetx waslet għas-server. Erġa' pprova.",
+    "balanceAccessDenied": "M'għandekx permess tara dan il-bilanċ.",
+    "balanceUnavailable": "Il-bilanċ ma setax jitgħabba.",
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
@@ -505,7 +516,7 @@
     "changelogFixesPolish": "Tiswijiet u titjib fl-applikazzjoni kollha.",
     "changelogAreas": {
       "signIn": "Dħul",
-      "profileOrganizations": "Profil u organizzazzjonijiet"
+      "profileOrganizations": "Profil & organizzazzjonijiet"
     }
   },
   "preferences": {
@@ -780,6 +791,12 @@
       "couldNotLoadMore": "Ma setgħux jitgħabbew aktar kummenti.",
       "retryLoadingMore": "Erġa' pprova tgħabbi aktar kummenti",
       "loadMoreComments": "Għabbi aktar kummenti",
+      "conversationTruncated": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_one": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_two": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_few": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_many": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_other": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
       "addReaction": "Żid reazzjoni",
       "reactionPill": "reazzjoni {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reazzjoni",
@@ -918,7 +935,6 @@
       "noAccess": "M'għandekx aċċess għall-kontrolli ta' dan ir-repożitorju.",
       "couldNotLoad": "Ma setgħux jitgħabbew il-kontrolli.",
       "retryChecks": "Erġa' pprova tgħabbi l-kontrolli",
-      "viewOnGitHub": "Ara l-PR fuq GitHub",
       "noChecksReported": "L-ebda kontroll irrapportat",
       "passed": "{{displayCount}} għaddew",
       "passed_one": "{{displayCount}} għaddew",
@@ -1014,6 +1030,11 @@
       "pendingComment": "kummenti pendenti",
       "pendingComment_other": "kummenti pendenti",
       "submitCountOfTotal": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_one": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_two": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_few": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_many": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_other": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
       "submitReview": "Ibgħat ir-reviżjoni",
       "partialPostedFresh": "Kummenti ppubblikati: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Kummenti ppubblikati: {{displayFreshCount}}. ",
@@ -1459,13 +1480,16 @@
     "followReviewMd": "Segwi REVIEW.md",
     "followReviewMdSubtitle": "Segwi l-fajls tal-istruzzjonijiet REVIEW.md ta' kull repożitorju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh."
+      "notConnectedReadOnlyPlan": "Il-prova tal-organizzazzjoni ntemmet, għalhekk is-sid irid jaġġorna l-fatturazzjoni fuq kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' {{organization}} tiġi ġestita fuq il-web minn kompjuter.",
+      "managedOnWebTitle": "Tiġi ġestita fuq il-web",
+      "managedOnWebShort": "Din il-konnessjoni tiġi ġestita fuq il-web minn kompjuter.",
+      "managedOnWebRepositories": "Agħżel ir-repożitorji għal {{organization}} fuq il-web minn kompjuter.",
       "description": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
       "descriptionReconnect": "Oħloq token ta' aċċess ġdid għall-ispazju tax-xogħol għal {{organization}} u waħħlu hawn taħt.",
-      "descriptionOverview": "Oħloq token ta' aċċess għall-ispazju tax-xogħol għal {{organization}}, imbagħad waħħlu fl-iskrin li jmiss.",
+      "descriptionOverview": "Oħloq token ta' aċċess għall-ispazju tax-xogħol, imbagħad waħħlu fl-iskrin li jmiss.",
       "scopes": "Kont: qari · Repożitorji: qari/kitba · PRs: qari · Webhooks: qari/kitba",
       "tokenPlaceholder": "Token ta' aċċess għall-ispazju tax-xogħol",
       "tokenRefused": "Bitbucket ma aċċettax dan it-token tal-ispazju tax-xogħol. Iċċekkja li għandu l-permessi ta' hawn fuq, imbagħad ipprova mill-ġdid."
@@ -1486,13 +1510,14 @@
     "platformList": {
       "checking": "Qed jiġi ċċekkjat…",
       "statusUnavailable": "Stat mhux disponibbli",
+      "needsAttention": "Attenzjoni meħtieġa",
       "platforms": "Pjattaformi",
       "activity": "Attività"
     },
     "providerConnect": {
-      "githubApp": "l-App ta' GitHub",
+      "githubApp": "l-app ta' GitHub",
       "githubError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitHub. Jekk jogħġbok erġa' pprova.",
-      "gitlabAccount": "il-Kont ta' GitLab",
+      "gitlabAccount": "il-kont ta' GitLab",
       "gitlabError": "Ma setgħetx tinfetaħ il-konfigurazzjoni ta' GitLab. Jekk jogħġbok erġa' pprova.",
       "description": "Ikkonnettja {{label}} ta' Kilo biex tirrevedi l-PRs awtomatikament."
     },
@@ -2934,6 +2959,8 @@
     "modelPicker": {
       "title": "Agħżel il-mudell",
       "noModelsDescription": "M'hemm l-ebda mudell disponibbli biex tagħżel.",
+      "allUnavailableTitle": "L-ebda mudell ma jista' jintuża",
+      "allUnavailableDescription": "Żid ċavetta tal-fornitur, imbagħad erġa' pprova.",
       "favorites": "Favoriti"
     },
     "modelSelector": {
@@ -3797,7 +3824,7 @@
     },
     "hub": {
       "renameTitle": "Ibdel l-isem tal-organizzazzjoni",
-      "renamePlaceholder": "Isem l-organizzazzjoni",
+      "renamePlaceholder": "Daħħal isem għall-organizzazzjoni",
       "balance": "Bilanċ",
       "plan": "Pjan",
       "planTeams": "Teams",
@@ -4263,7 +4290,13 @@
     "providerUnavailable": "Il-fornitur mhux disponibbli bħalissa. Erġa' ibgħat fi ftit ħin."
   },
   "settingsTools": {
-    "confirmTitle": "Tikkonferma din il-bidla?"
+    "confirmTitle": "Tikkonferma din il-bidla?",
+    "guarded": {
+      "spendAlertsOff": "Titfi l-avviżi dwar in-nefqa? Ma tibqax tirċievi notifiki dwar qbiż tal-limiti tan-nefqa u żidiet fis-siegħa.",
+      "balanceAlertsOff": "Titfi l-avviżi dwar il-bilanċ? Ma tibqax tirċievi notifiki meta l-krediti tiegħek jonqsu.",
+      "securityFindingsOff": "Titfi s-sejbiet tas-sigurtà? Ma tibqax tirċievi notifiki dwar sejbiet ġodda tas-sigurtà.",
+      "hideBalanceOn": "Taħbi l-bilanċi tiegħek? Il-bilanċi tal-krediti ma jibqgħux jidhru fl-iskrins tal-profil u fl-hub tal-organizzazzjoni."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,7 +5086,7 @@
   },
   "organizationGuardrails": {
     "title": "Gwardjani tal-IA",
-    "permissionDenied": "Sidien u amministraturi tal-organizzazzjoni biss jistgħu jimmaniġġjaw il-Gwardjani tal-IA.",
+    "permissionDenied": "Sidien u amministraturi tal-organizzazzjoni biss jistgħu jimmaniġġjaw il-Gwardjani tal-IA. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Il-Gwardjani tal-IA mhumiex attivati",
     "unavailable": "Kilo jattiva l-Gwardjani tal-IA għal organizzazzjoni fuq talba. Ikkuntattja lil {{supportEmail}}, u t-tim ta' Kilo jattivahom għall-organizzazzjoni tiegħek.",
     "contactSupport": "Ikkuntattja l-appoġġ",
@@ -5065,12 +5098,15 @@
     "inputDescription": "Jiskennja kull dħul b'Enkrypt AI, inklużi r-riżultati tal-għodod. Meta Enkrypt ma jkunx disponibbli, it-talbiet jintbagħtu mingħajr skennjar minflok ma jiġu rrifjutati.",
     "outputTitle": "Gwardjani tal-ħruġ",
     "outputDescription": "Jiskennja r-risposti b'Enkrypt AI qabel ma jirċevuhom il-membri. Mitfi sakemm ma tattivahx.",
+    "outputUnavailable": "Kilo ma attivatx ix-xkennjar tal-ħruġ għal din l-organizzazzjoni, għalhekk ir-risposti ma jiġux iċċekkjati u m'hemm xejn x'issettja hawn. Ikkuntattja lil {{supportEmail}} biex titlob dan.",
     "detectorsHint": "Il-modalità Imblokka tirrifjuta talba mmarkata. Il-modalità Irreġistra biss tirreġistraha mingħajr ma tdewwem it-talba.",
     "detectorsHintOutput": "Il-modalità Imblokka tfalli risposta mmarkata. Il-modalità Irreġistra biss tirreġistraha mingħajr ma tdewwem ir-risposta.",
     "choiceLog": "Irreġistra biss",
     "applyTo": "Applika għal",
     "applyToAllMembers": "Il-membri kollha",
     "applyKiloDefault": "Applika l-Valur Predefinit ta' Kilo",
+    "applyKiloDefaultEnglishNote": "It-test tal-politika predefinita ta' Kilo huwa bl-Ingliż, għax Kilo Gateway japplikah eżattament kif miktub.",
+    "applyKiloDefaultReplaceMessage": "Il-politika predefinita ta' Kilo hija miktuba bl-Ingliż u tissostitwixxi dak li stabbilixxeit f'Vjolazzjoni tal-politika. It-test li daħħalt fil-qasam tat-test tal-politika ma jistax jiġi rkuprat.",
     "invalidSavedTitle": "L-impostazzjonijiet tad-detetturi tad-dħul salvati ma jistgħux jinqraw",
     "invalidSavedBody": "It-talbiet jiġu mblokkati sakemm id-detetturi tad-dħul jiġu salvati mill-ġdid. Id-detetturi hawn taħt jibdew mill-Predefinit ta' Kilo.",
     "invalidSavedOutputTitle": "L-impostazzjonijiet tad-detetturi tal-ħruġ salvati ma jistgħux jinqraw",
@@ -5205,6 +5241,8 @@
     "providersDescription": "Itfi fornitur biex twaqqaf lil Kilo milli jidderieġi lejh għal din l-organizzazzjoni.",
     "providersNeedCatalog": "Is-swiċċijiet tal-fornituri jibqgħu biss għall-qari sakemm jitgħabba l-katalgu sħiħ tal-mudelli. Agħfas Erġa' pprova hawn fuq biex teditjahom.",
     "providersEmpty": "Ebda fornitur ma jaqbel ma' din it-tfittxija.",
+    "providersNone": "M'hemm l-ebda fornitur disponibbli għal din l-organizzazzjoni.",
+    "providersUnavailable": "Il-lista tal-fornituri ma setgħetx titgħabba.",
     "allowAllShown": "Ippermetti kollha li jidhru",
     "denyAllShown": "Irrifjuta kollha li jidhru",
     "gatewaysDescription": "Kilo jidderieġi t-talbiet tal-mudelli permezz ta' Vercel AI Gateway jew OpenRouter. Portal mitfi jfalli dawk it-talbiet.",

@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import {
+  cloudAgentPromptSchema,
   ParentCallbackTargetSchema,
   requestedEnvironmentSchema,
 } from '@kilocode/worker-utils/cloud-agent-authority';
@@ -465,7 +466,7 @@ const PrepareSessionSharedFields = {
 };
 
 const PrepareSessionNonCloneVariant = z.object({
-  prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
+  prompt: cloudAgentPromptSchema,
   initialMessageId: messageIdNextSchema.optional(),
   initialPayload: sendMessageNextPayloadSchema.optional(),
   autoInitiate: z.boolean().optional(),
@@ -535,7 +536,14 @@ export const basePrepareSessionNextSchema = z
   .refine(data => data.stackOnWorktreeId === undefined || data.upstreamBranch === undefined, {
     message: 'A stacked workspace cannot use an upstream branch',
     path: ['upstreamBranch'],
-  });
+  })
+  .refine(
+    data => data.initialPayload?.type !== 'prompt' || data.initialPayload.prompt.trim().length > 0,
+    {
+      message: 'Prompt is required',
+      path: ['initialPayload', 'prompt'],
+    }
+  );
 
 export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema
   .and(

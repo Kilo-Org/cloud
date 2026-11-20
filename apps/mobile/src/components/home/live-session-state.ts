@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { type BannerState } from '@/lib/offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 
 export type LiveSessions = ReturnType<typeof useLiveAgentSessions>;
@@ -41,7 +42,57 @@ export function useLiveSessionContext() {
   };
 }
 
-export function liveSessionContent(context: LiveSessionContext, sessions: LiveSessions) {
+/** What a live surface is showing; `offline` is a state, not a load in flight. */
+export type LiveSessionContent = 'pending' | 'offline' | 'rows' | 'empty' | 'error';
+
+/**
+ * The one classification both live surfaces (Home's card and the Agents list)
+ * read.
+ *
+ * `connectivity` is the committed connectivity the app-wide offline banner
+ * paints. Offline is not loading: a paused first read never settles, so
+ * naming it `offline` is what lets a surface draw the offline state with Retry
+ * instead of the "Loading…" card and skeletons it cannot settle out of. The
+ * paused read still resumes by itself when the connection returns, so the
+ * state clears without the person pressing anything. Rows and a confirmed empty
+ * list stay as they are: they are real answers from before the connection went
+ * away, and the banner already speaks for the connection.
+ */
+export function liveSessionContent(
+  context: LiveSessionContext,
+  sessions: LiveSessions,
+  connectivity: BannerState
+): LiveSessionContent {
+  // Nothing a surface can start while offline lands, so the gate asks only
+  // whether the sessions read is genuinely in flight. The boundary read runs on
+  // `networkMode: 'always'`, so counting its fetch would drop the card to a
+  // skeleton for every background organizations refetch — an app foreground, a
+  // profile focus, or the card's own Retry — and on an organization scope the
+  // failed read would then land the surface on the boundary error instead.
+  const offlineWaiting = connectivity === 'offline' && !sessions.isFetching;
+  if (connectivity === 'offline') {
+    // Offline, the boundary read's own failure is a consequence of the outage,
+    // not a verdict on the scope: it is the read that cannot settle, and on an
+    // organization scope it would otherwise turn the card into "Couldn't load
+    // your organizations" for the rest of the outage (its Retry, an app
+    // foreground, a profile focus). The answers the device already has and the
+    // offline card outrank it. A real refusal still wins: a non-retryable
+    // sessions error is the server's own verdict, not a lost connection.
+    if (sessions.terminalError?.kind === 'non-retryable') {
+      return 'error';
+    }
+    if (sessions.activeSessions.length > 0) {
+      return 'rows';
+    }
+    // A failed live read is the read's own verdict, not the boundary's outage.
+    if (sessions.terminalError) {
+      return 'error';
+    }
+    if (sessions.hasAcceptedSuccess) {
+      return 'empty';
+    }
+    return offlineWaiting ? 'offline' : 'pending';
+  }
   if (context.isResolving) {
     return 'pending';
   }
@@ -54,5 +105,8 @@ export function liveSessionContent(context: LiveSessionContext, sessions: LiveSe
   if (sessions.terminalError) {
     return 'error';
   }
-  return sessions.hasAcceptedSuccess ? 'empty' : 'pending';
+  if (sessions.hasAcceptedSuccess) {
+    return 'empty';
+  }
+  return 'pending';
 }

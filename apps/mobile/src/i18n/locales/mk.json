@@ -19,7 +19,9 @@
     "presenceStatus": "Хостови: {{connection}}",
     "commandStatus": "Испорака на командата: {{status}}",
     "delivered": "Испорачано",
-    "expired": "Истечено"
+    "expired": "Истечено",
+    "recoveryGaps_one": "Недостасува {{displayCount}} дел од овој транскрипт.",
+    "recoveryGaps_other": "Недостасуваат {{displayCount}} делови од овој транскрипт."
   },
   "common": {
     "manageOnWeb": "Управувај на веб",
@@ -138,6 +140,7 @@
     "keepRunning": "Остави да работи",
     "newSession": "Нова сесија",
     "noModelsAvailable": "Нема достапни модели",
+    "modelRetires": "Се повлекува на {{date}}",
     "notFound": "Не е пронајдено.",
     "online": "Онлајн",
     "open": "Отвори {{name}}",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "Пробниот период на организацијата заврши и таа нема активен план. Сопственик на организација може да го ажурира наплатувањето на kilo.ai, а потоа да се обиде повторно.",
     "privateRepositoryA11y": "{{name}}, приватен репозиториум",
     "legalDocumentEnglishOnly": "Овој документ е достапен само на англиски јазик.",
-    "organizationTrialEndedBilling": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето, а потоа да се обидеш повторно."
+    "organizationTrialEndedBilling": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето, а потоа да се обидеш повторно.",
+    "organizationTrialEndedBillingAtKiloAi": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето на kilo.ai, а потоа да се обидеш повторно.",
+    "viewOnGitHub": "Прикажи PR на GitHub"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -275,6 +280,9 @@
     "credits": "Кредити",
     "failedToLoadBalance": "Не успеа вчитувањето на состојбата. Допри за да се обидеш повторно.",
     "balanceLoadFailed": "Не се вчита состојбата",
+    "balanceUnreachable": "Не можеше да се стигне до серверот. Обидете се повторно.",
+    "balanceAccessDenied": "Немате дозвола да го гледате ова салдо.",
+    "balanceUnavailable": "Салдото не можеше да се вчита.",
     "hideBalance": "Скриј ја состојбата",
     "showBalance": "Прикажи ја состојбата",
     "balanceHidden": "Состојбата е скриена",
@@ -505,7 +513,7 @@
     "changelogFixesPolish": "Поправки и подобрувања низ целата апликација.",
     "changelogAreas": {
       "signIn": "Најава",
-      "profileOrganizations": "Профил и организации"
+      "profileOrganizations": "Профил & организации"
     }
   },
   "preferences": {
@@ -750,6 +758,9 @@
       "couldNotLoadMore": "Не успеа вчитувањето на дополнителни коментари.",
       "retryLoadingMore": "Повтори го вчитувањето на дополнителни коментари",
       "loadMoreComments": "Вчитај повеќе коментари",
+      "conversationTruncated": "Се прикажуваат само првите {{displayCount}} коментари.",
+      "conversationTruncated_one": "Се прикажуваат само првите {{displayCount}} коментари.",
+      "conversationTruncated_other": "Се прикажуваат само првите {{displayCount}} коментари.",
       "addReaction": "Додај реакција",
       "reactionPill": "реакција {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакција",
@@ -879,7 +890,6 @@
       "noAccess": "Немаш пристап до проверките за ова складиште.",
       "couldNotLoad": "Не успеа вчитувањето на проверките.",
       "retryChecks": "Обиди се повторно со проверките",
-      "viewOnGitHub": "Прикажи PR на GitHub",
       "noChecksReported": "Нема пријавени проверки",
       "passed": "{{displayCount}} успешни",
       "passed_one": "{{displayCount}} успешни",
@@ -934,9 +944,9 @@
       "checkFailedTitleGitLab": "Не можеше да се провери врската со GitLab",
       "checkFailedTitleBitbucket": "Не можеше да се провери врската со Bitbucket",
       "providerCheckFailedMessage": "Не можеше да се поврзе со провајдерот. Провери ја врската и обиди се повторно.",
-      "reconnectTitle": "Повторно поврзување со GitHub",
-      "reconnectTitleGitLab": "Повторно поврзување со GitLab",
-      "reconnectTitleBitbucket": "Повторно поврзување со Bitbucket",
+      "reconnectTitle": "Поврзи го GitHub повторно",
+      "reconnectTitleGitLab": "Поврзи го GitLab повторно",
+      "reconnectTitleBitbucket": "Поврзи го Bitbucket повторно",
       "reconnectDescription": "Пристапот до твојата сметка на GitHub е отповикан.",
       "gitlabDescription": "Прегледувај merge барања на мобилен уред",
       "gitlabInstanceMismatchTitle": "Поврзувањето со GitLab е за друга инстанца",
@@ -963,6 +973,8 @@
       "pendingComment": "неиспратени коментари",
       "pendingComment_other": "неиспратени коментари",
       "submitCountOfTotal": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
+      "submitCountOfTotal_one": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
+      "submitCountOfTotal_other": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
       "submitReview": "Испрати преглед",
       "partialPostedFresh": "Објавени коментари: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Објавени коментари: {{displayFreshCount}}. ",
@@ -1387,13 +1399,16 @@
     "followReviewMd": "Следи REVIEW.md",
     "followReviewMdSubtitle": "Почитувај ги упатствата во датотеката REVIEW.md во секое складиште",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не е поврзан. Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат."
+      "notConnectedReadOnlyPlan": "Пробниот период на организацијата заврши, затоа сопственикот мора да го ажурира наплатувањето на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Врската со Bitbucket на {{organization}} се управува преку веб од компјутер.",
+      "managedOnWebTitle": "Се управува преку веб",
+      "managedOnWebShort": "Оваа врска се управува преку веб од компјутер.",
+      "managedOnWebRepositories": "Избери ги репозиториумите за {{organization}} преку веб од компјутер.",
       "description": "Создај токен за пристап до работниот простор за {{organization}} и залепи го подолу.",
       "descriptionReconnect": "Создај нов токен за пристап до работниот простор за {{organization}} и залепи го подолу.",
-      "descriptionOverview": "Создај токен за пристап до работниот простор за {{organization}} и залепи го на следниот екран.",
+      "descriptionOverview": "Создај токен за пристап до работниот простор и залепи го на следниот екран.",
       "scopes": "Сметка: читање · Складишта: читање/запишување · Барања за спојување: читање · Веб-куки: читање/запишување",
       "tokenPlaceholder": "Токен за пристап до работниот простор",
       "tokenRefused": "Bitbucket не го прифати овој токен за пристап до работниот простор. Провери дали ги има дозволите наведени погоре, па обиди се повторно."
@@ -1414,13 +1429,14 @@
     "platformList": {
       "checking": "Се проверува…",
       "statusUnavailable": "Статусот е недостапен",
+      "needsAttention": "Бара внимание",
       "platforms": "Платформи",
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "Апликација на GitHub",
+      "githubApp": "апликација на GitHub",
       "githubError": "Не можеше да се отвори поставувањето на GitHub. Обиди се повторно.",
-      "gitlabAccount": "Сметка на GitLab",
+      "gitlabAccount": "сметка на GitLab",
       "gitlabError": "Не можеше да се отвори поставувањето на GitLab. Обиди се повторно.",
       "description": "Поврзи ја {{label}} со Kilo за автоматски преглед на барањата за спојување."
     },
@@ -1716,7 +1732,7 @@
       "dueThisWeekDetail_one": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "dueThisWeekDetail_other": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
-      "reviewSlaAssignment": "Провери ги доделените рокови според SLA",
+      "reviewSlaAssignment": "Провери доделувањето на рокови според SLA",
       "allOpenFindingsTracked": "Се следат сите отворени наоди"
     },
     "dismiss": {
@@ -2784,6 +2800,8 @@
     "modelPicker": {
       "title": "Избор на модел",
       "noModelsDescription": "Нема достапни модели за избор.",
+      "allUnavailableTitle": "Ниту еден модел не може да се користи",
+      "allUnavailableDescription": "Додај клуч за давател и обиди се повторно.",
       "favorites": "Омилени"
     },
     "modelSelector": {
@@ -3617,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "Преименувај организација",
-      "renamePlaceholder": "Име на организацијата",
+      "renamePlaceholder": "Внесете име на организацијата",
       "balance": "Состојба",
       "plan": "План",
       "planTeams": "Teams",
@@ -4077,7 +4095,13 @@
     "providerUnavailable": "Давателот е недостапен во моментов. Испратете повторно наскоро."
   },
   "settingsTools": {
-    "confirmTitle": "Да се потврди оваа промена?"
+    "confirmTitle": "Да се потврди оваа промена?",
+    "guarded": {
+      "spendAlertsOff": "Да се исклучат предупредувањата за трошење? Ќе престанете да добивате известувања за преминување на праговите на трошење и часовни пикови.",
+      "balanceAlertsOff": "Да се исклучат предупредувањата за салдо? Ќе престанете да добивате известувања кога ќе ви останат малку кредити.",
+      "securityFindingsOff": "Да се исклучат безбедносните наоди? Ќе престанете да добивате известувања за нови безбедносни наоди.",
+      "hideBalanceOn": "Да го скриете салдото? Салдата на кредити повеќе нема да се прикажуваат на екраните на профилот и во организацискиот центар."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4849,7 @@
   },
   "organizationGuardrails": {
     "title": "Заштитни механизми за ВИ",
-    "permissionDenied": "Само сопствениците и администраторите на организацијата можат да управуваат со заштитните механизми за ВИ.",
+    "permissionDenied": "Само сопствениците и администраторите на организацијата можат да управуваат со заштитните механизми за ВИ. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Заштитните механизми за ВИ не се активирани",
     "unavailable": "Kilo ги активира заштитните механизми за ВИ за организација на барање. Обратете се на {{supportEmail}}, а тимот на Kilo ги вклучува за вашата организација.",
     "contactSupport": "Контактирај ја поддршката",
@@ -4837,12 +4861,15 @@
     "inputDescription": "Го скенира секој влез со Enkrypt AI, вклучително и резултатите од алатките. Кога Enkrypt AI не е достапен, барањата се испраќаат без скенирање наместо да се отфрлат.",
     "outputTitle": "Излезни заштитни механизми",
     "outputDescription": "Ги скенира одговорите со Enkrypt AI пред членовите да ги добијат. Исклучено е освен ако не го вклучите.",
+    "outputUnavailable": "Kilo не вклучи скенирање на излезот за оваа организација, затоа одговорите не се проверуваат и тука нема што да се постави. Обратете се на {{supportEmail}} за да го побарате тоа.",
     "detectorsHint": "Опцијата Блокирај отфрла означено барање. Опцијата Само евидентирај го запишува без одложување на барањето.",
     "detectorsHintOutput": "Опцијата Блокирај го отфрла означениот одговор. Опцијата Само евидентирај го запишува без одложување на одговорот.",
     "choiceLog": "Само евидентирај",
     "applyTo": "Примени на",
     "applyToAllMembers": "Сите членови",
     "applyKiloDefault": "Примени го стандардното за Kilo",
+    "applyKiloDefaultEnglishNote": "Текстот на стандардната политика на Kilo е на англиски, бидејќи Kilo Gateway го применува точно како што е напишан.",
+    "applyKiloDefaultReplaceMessage": "Стандардната политика на Kilo е напишана на англиски и го заменува тоа што го поставивте во Прекршување на политика. Текстот што го внесовте во полето за текст на политика не може да се врати.",
     "invalidSavedTitle": "Зачуваните поставки за влезните детектори не можат да се прочитаат",
     "invalidSavedBody": "Барањата се блокирани додека влезните детектори повторно не се зачуваат. Детекторите подолу започнуваат од стандардното за Kilo.",
     "invalidSavedOutputTitle": "Зачуваните поставки за излезните детектори не можат да се прочитаат",
@@ -4977,6 +5004,8 @@
     "providersDescription": "Исклучете добавувач за да спречите Kilo да насочува кон него за оваа организација.",
     "providersNeedCatalog": "Прекинувачите за добавувачи остануваат само за читање додека не се вчита целиот каталог на модели. Допрете Обиди се повторно погоре за да ги уредите.",
     "providersEmpty": "Нема добавувачи што одговараат на ова пребарување.",
+    "providersNone": "Нема достапни добавувачи за оваа организација.",
+    "providersUnavailable": "Списокот на добавувачи не можеше да се вчита.",
     "allowAllShown": "Дозволи ги сите прикажани",
     "denyAllShown": "Забрани ги сите прикажани",
     "gatewaysDescription": "Kilo ги насочува барањата за моделите преку Vercel AI Gateway или OpenRouter. Исклучен портал ги отфрла тие барања.",

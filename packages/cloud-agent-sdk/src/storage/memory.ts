@@ -94,7 +94,14 @@ function createMemoryStorage(): SessionStorage {
       const arr = parts.get(messageId) ?? [];
       parts.set(
         messageId,
-        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence, authoritative)
+        upsertPartDroppingStaleSyntheticParts(
+          messageId,
+          arr,
+          part,
+          eventTime,
+          partEvidence,
+          authoritative
+        )
       );
       publishPartsChanged(partsSnapshot, subscribers, messageId);
     },

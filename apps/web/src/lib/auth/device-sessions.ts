@@ -496,20 +496,22 @@ export async function rotateRefreshToken(
  * chooses {@link createDeviceSessionWithCredentials} instead; this function
  * makes no such choice itself.
  *
+ * The session, the attested key and the minted credentials all name the account
+ * of `params.user`, so they cannot disagree.
+ *
  * Returns the session ID and credential pair on success.
  * Throws KeyCollisionError if the key already belongs to a different user.
  */
 export async function createDeviceSessionWithAttestedKey(params: {
-  userId: string;
   userAgent?: string;
   user: User;
   verification: VerifyAdmissionOk;
 }): Promise<SessionCredentialPair & { sessionId: string }> {
   const { credentials, evictedSessionIds } = await db.transaction(async tx => {
-    await persistAttestedKey(params.userId, params.verification, tx);
+    await persistAttestedKey(params.user.id, params.verification, tx);
 
     const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
-      userId: params.userId,
+      userId: params.user.id,
       userAgent: params.userAgent,
     });
 

@@ -22,6 +22,9 @@ const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
+// The side safe areas a landscape phone reports. The suite drives them so the
+// body's inset style can be asserted; every other test leaves them at zero.
+const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 // The empty state's connect action is the provider app install, which only an
 // organization-manage role may run; `canManage` is that role, `canEdit` the
 // wider settings capability the sibling screens use.
@@ -124,7 +127,12 @@ vi.mock('react-native-keyboard-controller', async () => {
 // mocks it. So stub the module's only native dependency instead of the module
 // itself, and keep the real footer and clearance.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: BOTTOM_INSET, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: BOTTOM_INSET,
+    left: sideInsets.left,
+    right: sideInsets.right,
+  }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -352,6 +360,8 @@ function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
 
 beforeEach(() => {
   keyboardStore.setHeight(0);
+  sideInsets.left = 0;
+  sideInsets.right = 0;
   permissionState.status = 'ready';
   permissionState.canEdit = true;
   permissionState.canManage = true;
@@ -368,6 +378,41 @@ beforeEach(() => {
   operationKey.rotateKey.mockClear();
   scrollToSpy.mockClear();
 });
+
+describe.each(['android', 'ios'] as const)(
+  'ManualReviewScreen body side insets on %s',
+  platform => {
+    beforeEach(() => {
+      platformState.OS = platform;
+    });
+
+    it('clears the landscape side insets on the body scroller', async () => {
+      sideInsets.left = 47;
+      sideInsets.right = 0;
+      const { renderer, unmount } = await renderScreen();
+
+      const scrollView = only(findAllOfType(renderer.root, 'ScrollView'), 'scroll view');
+      // A margin, not a padding: the scroller's content container carries the
+      // page gutter, and a padding on the scroller would not narrow its content.
+      // The 8 dp on the other side is the shared helper's corner clearance for a
+      // side status area that leaves the top inset at zero.
+      expect(propOf(scrollView, 'style')).toEqual({ marginLeft: 47, marginRight: 8 });
+      // The gutter itself stays the content container's, so the two add up.
+      expect(String(propOf(scrollView, 'contentContainerClassName'))).toContain('px-4');
+
+      unmount();
+    });
+
+    it('leaves the portrait scroller without an inset style', async () => {
+      const { renderer, unmount } = await renderScreen();
+
+      const scrollView = only(findAllOfType(renderer.root, 'ScrollView'), 'scroll view');
+      expect(propOf(scrollView, 'style')).toBeUndefined();
+
+      unmount();
+    });
+  }
+);
 
 describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on %s', platform => {
   beforeEach(() => {
@@ -1021,6 +1066,35 @@ describe('ManualReviewScreen URL validation', () => {
     const [statusText] = findVisibleStatusTexts(renderer.root);
     expect(statusText?.props.children).toBe(i18n.t('codeReviewer.manualReview.invalidUrl'));
     expect(String(findUrlField(renderer.root).props.className)).toContain('border-destructive');
+
+    unmount();
+  });
+
+  it('starts from a pull request link copied from a sub-page', async () => {
+    platformState.OS = 'android';
+    const { renderer, unmount } = await renderScreen();
+
+    const subPageUrl = `${GITHUB_PR_URL}/files`;
+    const { onChangeText } = findUrlField(renderer.root).props as {
+      onChangeText: (value: string) => void;
+    };
+    act(() => {
+      onChangeText(subPageUrl);
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    const { onPress } = action.props as { onPress: () => void };
+    act(() => {
+      onPress();
+    });
+
+    // A sub-tab link names the same review, so it is a valid draft: no status
+    // line and no error border, and the start carries the URL as copied.
+    expect(findVisibleStatusTexts(renderer.root)).toHaveLength(0);
+    expect(String(findUrlField(renderer.root).props.className)).not.toContain('border-destructive');
+    expect(status.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ url: subPageUrl }),
+      expect.anything()
+    );
 
     unmount();
   });

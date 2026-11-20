@@ -17,6 +17,7 @@ const SCHEMA_SQL = `
     chunk INTEGER NOT NULL DEFAULT 0,
     shard INTEGER NOT NULL DEFAULT 0,
     failed_at TEXT NOT NULL,
+    failure_class TEXT,
     PRIMARY KEY (run_id, model, variant, rep, chunk, shard)
   );
   CREATE TABLE benchmark_profiles (
@@ -27,6 +28,11 @@ const SCHEMA_SQL = `
     status TEXT NOT NULL,
     run_id TEXT,
     failure_reason TEXT,
+    failure_class TEXT,
+    failure_attempts INTEGER NOT NULL DEFAULT 0,
+    model_failure_attempts INTEGER NOT NULL DEFAULT 0,
+    first_failed_at TEXT,
+    retry_after TEXT,
     requested_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     completed_at TEXT,
@@ -87,6 +93,7 @@ function allProfiles(db: DatabaseSync): ProfileRow[] {
 }
 
 const orm = drizzle({} as D1Database);
+const laneDead = { failureClass: 'ambiguous_execution', reason: 'lane dead' } as const;
 const now = '2026-08-07T12:00:00.000Z';
 
 describe('recordLaneFailureStatement (real SQLite)', () => {
@@ -97,7 +104,7 @@ describe('recordLaneFailureStatement (real SQLite)', () => {
     db.exec(SCHEMA_SQL);
   });
 
-  it('inserts the lane-death record', () => {
+  it('inserts the lane-death record with its cause', () => {
     runQuery(
       db,
       toSql(
@@ -108,6 +115,7 @@ describe('recordLaneFailureStatement (real SQLite)', () => {
           rep: 0,
           chunk: 27,
           shard: 0,
+          failureClass: 'provider_unavailable',
           failedAtIso: now,
         })
       )
@@ -123,6 +131,7 @@ describe('recordLaneFailureStatement (real SQLite)', () => {
         chunk: 27,
         shard: 0,
         failed_at: now,
+        failure_class: 'provider_unavailable',
       },
     ]);
   });
@@ -135,6 +144,7 @@ describe('recordLaneFailureStatement (real SQLite)', () => {
       rep: 1,
       chunk: 3,
       shard: 2,
+      failureClass: 'unknown' as const,
       failedAtIso: now,
     };
     runQuery(db, toSql(recordLaneFailureStatement(orm, row)));
@@ -164,7 +174,7 @@ describe('markProfilesFailedForEntriesStatement (real SQLite)', () => {
           orm,
           'run-1',
           [{ model: 'b/dead', variant: '' }],
-          'lane dead',
+          laneDead,
           now
         )
       )
@@ -204,7 +214,7 @@ describe('markProfilesFailedForEntriesStatement (real SQLite)', () => {
             { model: 'b/ready', variant: '' },
             { model: 'c/pending', variant: '' },
           ],
-          'lane dead',
+          laneDead,
           now
         )
       )
@@ -238,7 +248,7 @@ describe('markProfilesFailedForEntriesStatement (real SQLite)', () => {
   it('throws on empty entries instead of degrading to the whole-run form', () => {
     // or(...[]) would drop the entry filter and fail every running row of the
     // run; the builder must refuse before any statement exists.
-    expect(() => markProfilesFailedForEntriesStatement(orm, 'run-1', [], 'lane dead', now)).toThrow(
+    expect(() => markProfilesFailedForEntriesStatement(orm, 'run-1', [], laneDead, now)).toThrow(
       /at least one entry/
     );
   });
@@ -254,7 +264,7 @@ describe('markProfilesFailedForEntriesStatement (real SQLite)', () => {
           orm,
           'run-1',
           [{ model: 'm/x', variant: 'high' }],
-          'lane dead',
+          laneDead,
           now
         )
       )

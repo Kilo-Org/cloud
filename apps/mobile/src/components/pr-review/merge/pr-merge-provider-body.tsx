@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { formatNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { i18n } from '@/i18n';
 
 function providerBlockedReasonText(
@@ -99,12 +100,15 @@ function ProviderAutoMergeBody({
   term,
 }: Readonly<{ mergeState: ProviderPrMergeState | null | undefined; term: string }>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className={SCREEN_BODY_CLASS}>
-      {mergeState ? <MergeRestrictionsList mergeState={mergeState} term={term} /> : null}
-      <Text className="text-sm text-muted-foreground">
-        {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
-      </Text>
+    <View style={sideInsetStyle}>
+      <View className={SCREEN_BODY_CLASS}>
+        {mergeState ? <MergeRestrictionsList mergeState={mergeState} term={term} /> : null}
+        <Text className="text-sm text-muted-foreground">
+          {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -129,6 +133,7 @@ export function PrMergeProviderBody({
   children: ReactNode;
 }>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   function cancelButton() {
     return (
       <Button
@@ -146,8 +151,10 @@ export function PrMergeProviderBody({
   if (providerAutoMerge && autoMergeCapability?.supported === false) {
     return (
       <>
-        <View className="px-4 pt-3">
-          <PrReviewCapabilityBanner capability={autoMergeCapability} />
+        <View style={sideInsetStyle}>
+          <View className="px-4 pt-3">
+            <PrReviewCapabilityBanner capability={autoMergeCapability} />
+          </View>
         </View>
         <View className="flex-1" />
         <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
@@ -176,8 +183,10 @@ export function PrMergeProviderBody({
   if (mergeState && !mergeState.canMerge) {
     return (
       <>
-        <View className={SCREEN_BODY_CLASS}>
-          <MergeRestrictionsList mergeState={mergeState} term={term} />
+        <View style={sideInsetStyle}>
+          <View className={SCREEN_BODY_CLASS}>
+            <MergeRestrictionsList mergeState={mergeState} term={term} />
+          </View>
         </View>
         <View className="flex-1" />
         <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
@@ -187,8 +196,10 @@ export function PrMergeProviderBody({
   return (
     <>
       {mergeState ? (
-        <View className="px-4 pt-3">
-          <MergeRestrictionsList mergeState={mergeState} term={term} />
+        <View style={sideInsetStyle}>
+          <View className="px-4 pt-3">
+            <MergeRestrictionsList mergeState={mergeState} term={term} />
+          </View>
         </View>
       ) : null}
       {children}

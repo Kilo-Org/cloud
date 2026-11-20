@@ -5,6 +5,7 @@ import { createBrowserRuntime } from './browser-runtime';
 import type { BrowserDownloadsApi, BrowserRuntime } from './browser-runtime';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
+import { FIREFOX_PLATFORM_LIMIT } from './browser-tool-session';
 import type { BrowserToolTabsApi } from './browser-tool-session';
 import type {
   BrowserTabInfo,
@@ -588,5 +589,44 @@ describe('opening a session tab', () => {
 
     // A tab opened at the destination would spend a single-use url before the guarded call ran.
     expect(opened?.url).toBe('about:blank');
+  });
+});
+
+describe('a tool the browser cannot run', () => {
+  it('is answered as unsupported before any lease, grant or page script', async () => {
+    const executeScript = vi.fn(async () => []);
+    const leases = createTabLeaseRegistry({});
+    const runtime = createBrowserRuntime({
+      debuggerApi: undefined,
+      downloadsApi: grantedDownloads,
+      leases,
+      scriptingApi: { executeScript },
+      tabsApi: createFakeTabsApi(),
+    });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: TAB_ID });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [] },
+      arguments: { endRef: 'e2', startRef: 'e1' },
+      caller: agent('session-1'),
+      tabId: TAB_ID,
+      toolName: 'browser_drag',
+    });
+
+    expect(outcome).toStrictEqual({
+      kind: 'unsupported',
+      result: {
+        error: `browser_drag is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`,
+        ok: false,
+      },
+    });
+    expect(executeScript).not.toHaveBeenCalled();
+    expect(leases.holder(TAB_ID)).toBeUndefined();
   });
 });

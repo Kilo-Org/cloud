@@ -19,7 +19,9 @@
     "presenceStatus": "Vizio: {{connection}}",
     "commandStatus": "Uwasilishaji wa amri: {{status}}",
     "delivered": "Imewasilishwa",
-    "expired": "Muda wake umeisha"
+    "expired": "Muda wake umeisha",
+    "recoveryGaps_one": "Sehemu {{displayCount}} ya nakala hii haipo.",
+    "recoveryGaps_other": "Sehemu {{displayCount}} za nakala hii hazipo."
   },
   "common": {
     "manageOnWeb": "Dhibiti kwenye wavuti",
@@ -138,10 +140,12 @@
     "keepRunning": "Acha iendelee",
     "newSession": "Kikao kipya",
     "noModelsAvailable": "Hakuna modeli zinazopatikana",
+    "modelRetires": "Itastaafu {{date}}",
     "notFound": "Haikupatikana.",
     "online": "Mtandaoni",
     "open": "Fungua {{name}}",
     "openPullRequest": "Fungua ombi la kuunganisha",
+    "viewOnGitHub": "Angalia PR kwenye GitHub",
     "completed": "Imekamilika",
     "pending": "Inasubiri",
     "running": "Inaendelea",
@@ -181,7 +185,8 @@
     "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
     "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
     "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
-    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena."
+    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena.",
+    "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -275,6 +280,9 @@
     "credits": "Salio",
     "failedToLoadBalance": "Imeshindikana kupakia salio. Gusa ili ujaribu tena.",
     "balanceLoadFailed": "Imeshindikana kupakia salio",
+    "balanceUnreachable": "Imeshindwa kufikia seva. Jaribu tena.",
+    "balanceAccessDenied": "Huna ruhusa kuona salio hili.",
+    "balanceUnavailable": "Salio halikuweza kupakiwa.",
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
@@ -505,7 +513,7 @@
     "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
     "changelogAreas": {
       "signIn": "Kuingia",
-      "profileOrganizations": "Wasifu na mashirika"
+      "profileOrganizations": "Wasifu & mashirika"
     }
   },
   "preferences": {
@@ -750,6 +758,9 @@
       "couldNotLoadMore": "Imeshindikana kupakia maoni zaidi.",
       "retryLoadingMore": "Jaribu tena kupakia maoni zaidi",
       "loadMoreComments": "Pakia maoni zaidi",
+      "conversationTruncated": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
+      "conversationTruncated_one": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
+      "conversationTruncated_other": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
       "addReaction": "Ongeza mwitikio",
       "reactionPill": "mwitikio wa {{emoji}}, {{countLabel}} {{displayCount}}",
       "reaction_one": "mwitikio",
@@ -879,7 +890,6 @@
       "noAccess": "Huna ruhusa ya kuona vipimo vya hazina hii ya msimbo.",
       "couldNotLoad": "Imeshindikana kupakia vipimo.",
       "retryChecks": "Jaribu vipimo tena",
-      "viewOnGitHub": "Angalia PR kwenye GitHub",
       "noChecksReported": "Hakuna vipimo vilivyoripotiwa",
       "passed": "{{displayCount}} vimefaulu",
       "passed_one": "{{displayCount}} vimefaulu",
@@ -963,6 +973,8 @@
       "pendingComment": "maoni yanayosubiri kutumwa",
       "pendingComment_other": "maoni yanayosubiri kutumwa",
       "submitCountOfTotal": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
       "submitReview": "Wasilisha ukaguzi",
       "partialPostedFresh": "Maoni {{displayFreshCount}} yamechapishwa. ",
       "partialPostedFresh_one": "Maoni {{displayFreshCount}} yamechapishwa. ",
@@ -1387,13 +1399,16 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha."
+      "notConnectedReadOnlyPlan": "Kipindi cha majaribio cha shirika kimeisha, kwa hivyo mmiliki anapaswa kusasisha malipo kwenye kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "managedOnWebTitle": "Inasimamiwa kwenye wavuti",
+      "managedOnWebShort": "Muunganisho huu unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "managedOnWebRepositories": "Chagua hazina za {{organization}} kwenye wavuti ukitumia kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
-      "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike kwenye skrini inayofuata.",
+      "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kisha uibandike kwenye skrini inayofuata.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
       "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
       "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
@@ -1414,13 +1429,14 @@
     "platformList": {
       "checking": "Inaangalia…",
       "statusUnavailable": "Hali haipatikani",
+      "needsAttention": "Inahitaji uangalizi",
       "platforms": "Majukwaa",
       "activity": "Shughuli"
     },
     "providerConnect": {
-      "githubApp": "Programu ya GitHub",
+      "githubApp": "programu ya GitHub",
       "githubError": "Imeshindikana kufungua usanidi wa GitHub. Tafadhali jaribu tena.",
-      "gitlabAccount": "Akaunti ya GitLab",
+      "gitlabAccount": "akaunti ya GitLab",
       "gitlabError": "Imeshindikana kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
       "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki."
     },
@@ -2784,6 +2800,8 @@
     "modelPicker": {
       "title": "Chagua modeli",
       "noModelsDescription": "Hakuna modeli zinazopatikana za kuchagua.",
+      "allUnavailableTitle": "Hakuna modeli zinazoweza kutumika",
+      "allUnavailableDescription": "Ongeza ufunguo wa mtoa huduma na ujaribu tena.",
       "favorites": "Vipendwa"
     },
     "modelSelector": {
@@ -3617,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "Badilisha jina la shirika",
-      "renamePlaceholder": "Jina la shirika",
+      "renamePlaceholder": "Weka jina la shirika",
       "balance": "Salio",
       "plan": "Mpango",
       "planTeams": "Teams",
@@ -4077,7 +4095,13 @@
     "providerUnavailable": "Mtoa huduma hapatikani kwa sasa. Tuma tena baada ya muda mfupi."
   },
   "settingsTools": {
-    "confirmTitle": "Thibitisha mabadiliko haya?"
+    "confirmTitle": "Thibitisha mabadiliko haya?",
+    "guarded": {
+      "spendAlertsOff": "Zima arifa za matumizi? Utaacha kupokea arifa kuhusu kuvuka vizingiti vya matumizi na miongezeko ya ghafla ya kila saa.",
+      "balanceAlertsOff": "Zima arifa za salio? Utaacha kupokea arifa salio lako la krediti linapopungua.",
+      "securityFindingsOff": "Zima matokeo ya usalama? Utaacha kupokea arifa kuhusu matokeo mapya ya usalama.",
+      "hideBalanceOn": "Ficha salio lako? Salio la krediti halitaonekana tena kwenye skrini za wasifu na kitovu cha shirika."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4849,7 @@
   },
   "organizationGuardrails": {
     "title": "Vizuizi vya Akili Bandia",
-    "permissionDenied": "Wamiliki na wasimamizi wa shirika pekee wanaweza kudhibiti Vizuizi vya Akili Bandia.",
+    "permissionDenied": "Wamiliki na wasimamizi wa shirika pekee wanaweza kudhibiti Vizuizi vya Akili Bandia. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Vizuizi vya Akili Bandia havijawashwa",
     "unavailable": "Kilo huwasha Vizuizi vya Akili Bandia kwa shirika kwa ombi. Wasiliana na {{supportEmail}}, na timu ya Kilo itaziwasha kwa shirika lako.",
     "contactSupport": "Wasiliana na timu ya usaidizi",
@@ -4837,12 +4861,15 @@
     "inputDescription": "Huchunguza kila ingizo kwa Enkrypt AI, ikiwa ni pamoja na matokeo ya zana. Enkrypt haipopatikana, maombi hutumwa bila kuchunguzwa badala ya kukataliwa.",
     "outputTitle": "Vizuizi vya matokeo",
     "outputDescription": "Huchunguza majibu kwa Enkrypt AI kabla wanachama hawajayapokea. Imezimwa isipokuwa uwashe.",
+    "outputUnavailable": "Kilo haijawasha uchunguzi wa matokeo kwa shirika hili, kwa hivyo majibu hayachunguzwi na hakuna cha kusanidi hapa. Wasiliana na {{supportEmail}} ili kuomba hilo.",
     "detectorsHint": "Zuia hukataa ombi lililoalamishwa. Rekodi tu huliandika bila kuchelewesha ombi.",
     "detectorsHintOutput": "Zuia hufanya jibu lililoalamishwa lishindwe. Rekodi tu huliandika bila kuchelewesha jibu.",
     "choiceLog": "Rekodi tu",
     "applyTo": "Tumia kwa",
     "applyToAllMembers": "Wanachama wote",
     "applyKiloDefault": "Tumia Chaguo-msingi la Kilo",
+    "applyKiloDefaultEnglishNote": "Maandishi ya sera chaguo-msingi ya Kilo yako kwa Kiingereza, kwa sababu Kilo Gateway huitekeleza kama yalivyoandikwa.",
+    "applyKiloDefaultReplaceMessage": "Sera chaguo-msingi ya Kilo imeandikwa kwa Kiingereza na inabadilisha ulichoweka katika Ukiukaji wa sera. Maandishi uliyoweka katika sehemu ya maandishi ya sera hayawezi kurejeshwa.",
     "invalidSavedTitle": "Mipangilio ya vigunduzi vya maingizo iliyohifadhiwa haiwezi kusomwa",
     "invalidSavedBody": "Maombi yanazuiwa hadi vigunduzi vya maingizo vihifadhiwe tena. Vigunduzi vilivyo hapa chini huanza kutoka Chaguo-msingi la Kilo.",
     "invalidSavedOutputTitle": "Mipangilio ya vigunduzi vya matokeo iliyohifadhiwa haiwezi kusomwa",
@@ -4977,6 +5004,8 @@
     "providersDescription": "Zima mtoa huduma ili kuzuia Kilo kupeleka maombi kwake kwa shirika hili.",
     "providersNeedCatalog": "Swichi za watoa huduma zitabaki za kusoma tu hadi orodha kamili ya miundo ipakie. Gusa Jaribu tena hapo juu ili kuzihariri.",
     "providersEmpty": "Hakuna watoa huduma wanaolingana na utafutaji huu.",
+    "providersNone": "Hakuna watoa huduma wanaopatikana kwa shirika hili.",
+    "providersUnavailable": "Orodha ya watoa huduma haikuweza kupakiwa.",
     "allowAllShown": "Ruhusu vitu vyote vinavyoonyeshwa",
     "denyAllShown": "Kataza vitu vyote vinavyoonyeshwa",
     "gatewaysDescription": "Kilo hupeleka maombi ya modeli kupitia Vercel AI Gateway au OpenRouter. Lango lililozimwa hufanya maombi hayo kushindwa.",

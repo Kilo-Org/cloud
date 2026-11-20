@@ -5,6 +5,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as startupTiming from '@/lib/startup-timing';
+import { SPLASH_BACKGROUND_COLOR, SPLASH_DISC_SIZE, SPLASH_LOGO_SIZE } from '@/lib/splash-branding';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -46,6 +47,16 @@ function findByType(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
+}
+
+/** The overlay container: its class carries no colour, because the field is
+ *  painted from the shared constant through `style`. */
+function expectBrandedSurface(root: TestRenderer.ReactTestInstance): void {
+  const container = findByType(root, 'Animated.View')[0];
+  expect(container?.props.className).toBe('absolute inset-0 items-center justify-center');
+  expect(container?.props.style as Record<string, unknown>[]).toContainEqual({
+    backgroundColor: SPLASH_BACKGROUND_COLOR,
+  });
 }
 
 async function mountOverlay(): Promise<TestRenderer.ReactTestRenderer> {
@@ -95,7 +106,10 @@ describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
       // The mark's box is the size the branded splash plugin paints it at
       // (`imageWidth` in app.config.ts), so hiding the native splash never
       // resizes it.
-      expect(logoImages[0]?.props.style).toEqual({ width: 100, height: 100 });
+      expect(logoImages[0]?.props.style).toEqual({
+        width: SPLASH_LOGO_SIZE,
+        height: SPLASH_LOGO_SIZE,
+      });
       // The reveal disc is the mark plus its ring.
       const discStyle = (
         findByType(renderer.root, 'Animated.View')[1]?.props as
@@ -103,12 +117,10 @@ describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
           | undefined
       )?.style;
       expect(discStyle?.[0]).toEqual({
-        width: 120,
-        height: 120,
+        width: SPLASH_DISC_SIZE,
+        height: SPLASH_DISC_SIZE,
       });
-      expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
-        'absolute inset-0 items-center justify-center bg-[#FFDD00]'
-      );
+      expectBrandedSurface(renderer.root);
 
       // The yellow frame forces dark status bar icons in either theme.
       const statusBars = findByType(renderer.root, 'StatusBar');
@@ -153,9 +165,7 @@ describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
 
     expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
     expect(findByType(renderer.root, 'Image')).toHaveLength(1);
-    expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
-      'absolute inset-0 items-center justify-center bg-[#FFDD00]'
-    );
+    expectBrandedSurface(renderer.root);
 
     act(() => {
       renderer.unmount();

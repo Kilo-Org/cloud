@@ -1,9 +1,5 @@
-import type {
-  OrganizationGroupAgentPermissionsPolicy,
-  OrganizationGroupClientAccessPolicy,
-} from '@kilocode/db/schema-types';
+import type { OrganizationGroupAgentPermissionsPolicy } from '@kilocode/db/schema-types';
 import { MAX_ORGANIZATION_GROUPS } from '@kilocode/db/schema-types';
-import { FEATURE_VALUES } from '@kilocode/web-shared/lib/feature-detection';
 import * as z from 'zod';
 
 export const PERMISSION_POLICY_MAX_AGE_SECONDS = 300;
@@ -56,54 +52,13 @@ const AgentPermissionsDataSchema = z
   })
   .refine(data => utf8.encode(JSON.stringify(data)).length <= MAX_POLICY_BYTES, 'Policy too large');
 
-const clientFeature = z.enum(FEATURE_VALUES);
-const minVersion = z
-  .string()
-  .max(100)
-  .regex(
-    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/,
-    'Expected a SemVer version'
-  )
-  .refine(version => version === version.trim(), 'Version must not contain surrounding whitespace');
-
-const ClientAccessDataSchema = z
-  .discriminatedUnion('mode', [
-    z.strictObject({
-      schema_version: z.literal(1),
-      mode: z.literal('allowlist'),
-      clients: z
-        .array(z.strictObject({ feature: clientFeature, min_version: minVersion.optional() }))
-        .max(FEATURE_VALUES.length),
-    }),
-    z.strictObject({
-      schema_version: z.literal(1),
-      mode: z.literal('blocklist'),
-      clients: z.array(z.strictObject({ feature: clientFeature })).max(FEATURE_VALUES.length),
-    }),
-  ])
-  .refine(
-    ({ clients }) => new Set(clients.map(client => client.feature)).size === clients.length,
-    'Duplicate client feature'
-  );
-
 export const OrganizationGroupAgentPermissionsPolicySchema = z.strictObject({
   type: z.literal('agent_permissions'),
   data: AgentPermissionsDataSchema,
 }) satisfies z.ZodType<OrganizationGroupAgentPermissionsPolicy>;
 
-export const OrganizationGroupClientAccessPolicySchema = z.strictObject({
-  type: z.literal('client_access'),
-  data: ClientAccessDataSchema,
-}) satisfies z.ZodType<OrganizationGroupClientAccessPolicy>;
-
-export const OrganizationPermissionPolicyTypeSchema = z.enum([
-  'agent_permissions',
-  'client_access',
-]);
-export const OrganizationPermissionPolicySchema = z.discriminatedUnion('type', [
-  OrganizationGroupAgentPermissionsPolicySchema,
-  OrganizationGroupClientAccessPolicySchema,
-]);
+export const OrganizationPermissionPolicyTypeSchema = z.enum(['agent_permissions']);
+export const OrganizationPermissionPolicySchema = OrganizationGroupAgentPermissionsPolicySchema;
 
 export type OrganizationPermissionPolicy = z.infer<typeof OrganizationPermissionPolicySchema>;
 
@@ -122,9 +77,6 @@ export const MemberPermissionPolicySchema = z
       policy: z.strictObject({
         agent_permissions: z
           .strictObject({ layers: z.array(AgentPermissionsDataSchema).min(1).max(MAX_LAYERS) })
-          .optional(),
-        client_access: z
-          .strictObject({ layers: z.array(ClientAccessDataSchema).min(1).max(MAX_LAYERS) })
           .optional(),
       }),
     }),

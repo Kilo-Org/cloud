@@ -155,9 +155,9 @@ The benchmark worker stays the only writer of measurements and routing tables.
   organization owner, admin, and billing manager.
 - Client latency comes from the uploader's machine.
 - The engine identity stays `router:vN:datasetHash`. The CLI version is deliberately not part of
-  it: the platform container also tracks the latest CLI without changing identity, and a CLI
-  release must not force hours of client re-evals. A change that invalidates results increments
-  `BENCHMARK_ENGINE_VERSION`.
+  it: the platform container pins its CLI version, and a CLI release must not force hours of
+  client re-evals. A change that invalidates results, including a platform CLI bump that changes
+  measurements, increments `BENCHMARK_ENGINE_VERSION`.
 
 ## Client eval protocol
 

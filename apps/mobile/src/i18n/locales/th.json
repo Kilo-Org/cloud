@@ -19,7 +19,9 @@
     "presenceStatus": "โฮสต์: {{connection}}",
     "commandStatus": "การส่งคำสั่ง: {{status}}",
     "delivered": "ส่งถึงแล้ว",
-    "expired": "หมดอายุแล้ว"
+    "expired": "หมดอายุแล้ว",
+    "recoveryGaps_one": "ส่วน {{displayCount}} ของบันทึกนี้หายไป",
+    "recoveryGaps_other": "ส่วน {{displayCount}} ของบันทึกนี้หายไป"
   },
   "common": {
     "manageOnWeb": "จัดการบนเว็บ",
@@ -138,10 +140,12 @@
     "keepRunning": "ให้ทำงานต่อ",
     "newSession": "เซสชันใหม่",
     "noModelsAvailable": "ไม่มีโมเดลที่ใช้งานได้",
+    "modelRetires": "เลิกใช้ {{date}}",
     "notFound": "ไม่พบข้อมูล",
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",
     "openPullRequest": "เปิด PR",
+    "viewOnGitHub": "ดู PR บน GitHub",
     "completed": "เสร็จสิ้น",
     "pending": "รอดำเนินการ",
     "running": "กำลังทำงาน",
@@ -181,7 +185,8 @@
     "organizationTrialEnded": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ เจ้าขององค์กรสามารถอัปเดตการเรียกเก็บเงินได้ที่ kilo.ai แล้วลองอีกครั้ง",
     "privateRepositoryA11y": "{{name}}, รีโพซิทอรีส่วนตัว",
     "legalDocumentEnglishOnly": "เอกสารนี้มีเฉพาะในภาษาอังกฤษเท่านั้น",
-    "organizationTrialEndedBilling": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ คุณสามารถอัปเดตการเรียกเก็บเงินได้ แล้วลองอีกครั้ง"
+    "organizationTrialEndedBilling": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ คุณสามารถอัปเดตการเรียกเก็บเงินได้ แล้วลองอีกครั้ง",
+    "organizationTrialEndedBillingAtKiloAi": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ คุณสามารถอัปเดตการเรียกเก็บเงินได้ที่ kilo.ai แล้วลองอีกครั้ง"
   },
   "language": {
     "restarting": "กำลังเริ่มแอปใหม่เพื่อเปลี่ยนภาษา",
@@ -275,6 +280,9 @@
     "credits": "เครดิต",
     "failedToLoadBalance": "โหลดยอดคงเหลือไม่สำเร็จ แตะเพื่อลองอีกครั้ง",
     "balanceLoadFailed": "โหลดยอดคงเหลือไม่สำเร็จ",
+    "balanceUnreachable": "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองอีกครั้ง",
+    "balanceAccessDenied": "คุณไม่มีสิทธิ์ดูยอดคงเหลือนี้",
+    "balanceUnavailable": "โหลดยอดคงเหลือไม่ได้",
     "hideBalance": "ซ่อนยอดคงเหลือ",
     "showBalance": "แสดงยอดคงเหลือ",
     "balanceHidden": "ยอดคงเหลือถูกซ่อน",
@@ -505,7 +513,7 @@
     "changelogFixesPolish": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
     "changelogAreas": {
       "signIn": "การลงชื่อเข้าใช้",
-      "profileOrganizations": "โปรไฟล์และองค์กร"
+      "profileOrganizations": "โปรไฟล์กับองค์กร"
     }
   },
   "preferences": {
@@ -750,6 +758,9 @@
       "couldNotLoadMore": "ไม่สามารถโหลดความคิดเห็นเพิ่มได้",
       "retryLoadingMore": "ลองโหลดความคิดเห็นเพิ่มอีกครั้ง",
       "loadMoreComments": "โหลดความคิดเห็นเพิ่ม",
+      "conversationTruncated": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
+      "conversationTruncated_one": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
+      "conversationTruncated_other": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
       "addReaction": "แสดงความรู้สึก",
       "reactionPill": "การแสดงความรู้สึก {{emoji}}: {{displayCount}} {{countLabel}}",
       "reaction_one": "การแสดงความรู้สึก",
@@ -879,7 +890,6 @@
       "noAccess": "คุณไม่มีสิทธิ์ดูผลการตรวจสอบของรีโพซิทอรีนี้",
       "couldNotLoad": "ไม่สามารถโหลดผลการตรวจสอบได้",
       "retryChecks": "ลองตรวจสอบอีกครั้ง",
-      "viewOnGitHub": "ดู PR บน GitHub",
       "noChecksReported": "ยังไม่มีรายงานผลการตรวจสอบ",
       "passed": "ผ่าน {{displayCount}} รายการ",
       "passed_one": "ผ่าน {{displayCount}} รายการ",
@@ -963,6 +973,8 @@
       "pendingComment": "ความคิดเห็นที่รอส่ง",
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_one": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_other": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitReview": "ส่งรีวิว",
       "partialPostedFresh": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
       "partialPostedFresh_one": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
@@ -1387,13 +1399,16 @@
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้"
+      "notConnectedReadOnlyPlan": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้ว เจ้าของจึงต้องอัปเดตการเรียกเก็บเงินที่ kilo.ai"
     },
     "bitbucketConnect": {
       "managedOnWeb": "การเชื่อมต่อ Bitbucket ของ {{organization}} ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
+      "managedOnWebTitle": "จัดการบนเว็บ",
+      "managedOnWebShort": "การเชื่อมต่อนี้ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
+      "managedOnWebRepositories": "เลือกที่เก็บสำหรับ {{organization}} บนเว็บจากคอมพิวเตอร์",
       "description": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานสำหรับ {{organization}} แล้ววางโทเค็นด้านล่าง",
       "descriptionReconnect": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานใหม่สำหรับ {{organization}} แล้ววางโทเค็นด้านล่าง",
-      "descriptionOverview": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานสำหรับ {{organization}} แล้ววางโทเค็นในหน้าจอถัดไป",
+      "descriptionOverview": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงาน แล้ววางโทเค็นในหน้าจอถัดไป",
       "scopes": "บัญชี: อ่าน · คลังโค้ด: อ่าน/เขียน · PR: อ่าน · เว็บฮุก: อ่าน/เขียน",
       "tokenPlaceholder": "โทเค็นการเข้าถึงพื้นที่ทำงาน",
       "tokenRefused": "Bitbucket ไม่ยอมรับโทเค็นการเข้าถึงพื้นที่ทำงานนี้ ตรวจสอบว่ามีขอบเขตสิทธิ์ด้านบน แล้วลองอีกครั้ง"
@@ -1414,6 +1429,7 @@
     "platformList": {
       "checking": "กำลังตรวจสอบ…",
       "statusUnavailable": "ไม่สามารถดูสถานะได้",
+      "needsAttention": "ต้องดำเนินการ",
       "platforms": "แพลตฟอร์ม",
       "activity": "กิจกรรม"
     },
@@ -2784,6 +2800,8 @@
     "modelPicker": {
       "title": "เลือกโมเดล",
       "noModelsDescription": "ไม่มีโมเดลให้เลือก",
+      "allUnavailableTitle": "ไม่มีโมเดลใดใช้งานได้",
+      "allUnavailableDescription": "เพิ่มคีย์ผู้ให้บริการ แล้วลองอีกครั้ง",
       "favorites": "รายการโปรด"
     },
     "modelSelector": {
@@ -3617,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "เปลี่ยนชื่อองค์กร",
-      "renamePlaceholder": "ชื่อองค์กร",
+      "renamePlaceholder": "กรอกชื่อองค์กร",
       "balance": "ยอดคงเหลือ",
       "plan": "แผน",
       "planTeams": "Teams",
@@ -4077,7 +4095,13 @@
     "providerUnavailable": "ผู้ให้บริการไม่พร้อมใช้งานในขณะนี้ ส่งอีกครั้งในอีกไม่ช้า"
   },
   "settingsTools": {
-    "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่"
+    "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่",
+    "guarded": {
+      "spendAlertsOff": "ปิดการแจ้งเตือนการใช้จ่ายหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเกี่ยวกับการข้ามเกณฑ์การใช้จ่ายและการพุ่งขึ้นรายชั่วโมง",
+      "balanceAlertsOff": "ปิดการแจ้งเตือนยอดคงเหลือหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเมื่อเครดิตของคุณเหลือน้อย",
+      "securityFindingsOff": "ปิดการแจ้งเตือนการค้นพบด้านความปลอดภัยหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเกี่ยวกับการค้นพบด้านความปลอดภัยใหม่",
+      "hideBalanceOn": "ซ่อนยอดคงเหลือของคุณหรือไม่ ยอดคงเหลือเครดิตจะไม่แสดงบนหน้าจอโปรไฟล์และศูนย์กลางขององค์กรอีกต่อไป"
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4849,7 @@
   },
   "organizationGuardrails": {
     "title": "แนวป้องกัน AI",
-    "permissionDenied": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่จัดการแนวป้องกัน AI ได้",
+    "permissionDenied": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่จัดการแนวป้องกัน AI ได้ $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "แนวป้องกัน AI ยังไม่ได้เปิดใช้งาน",
     "unavailable": "Kilo เปิดใช้งานแนวป้องกัน AI ให้กับองค์กรตามคำขอ ติดต่อ {{supportEmail}} และทีม Kilo จะเปิดให้สำหรับองค์กรของคุณ",
     "contactSupport": "ติดต่อฝ่ายสนับสนุน",
@@ -4837,12 +4861,15 @@
     "inputDescription": "สแกนทุกอินพุตด้วย Enkrypt AI รวมถึงผลลัพธ์จากเครื่องมือ เมื่อ Enkrypt ไม่พร้อมใช้งาน คำขอจะถูกส่งโดยไม่สแกนแทนที่จะถูกปฏิเสธ",
     "outputTitle": "แนวป้องกันเอาต์พุต",
     "outputDescription": "สแกนการตอบกลับด้วย Enkrypt AI ก่อนที่สมาชิกจะได้รับ ปิดไว้เว้นแต่คุณจะเปิดใช้งาน",
+    "outputUnavailable": "Kilo ยังไม่ได้เปิดการสแกนเอาต์พุตสำหรับองค์กรนี้ การตอบกลับจึงไม่ถูกตรวจสอบ และไม่มีอะไรให้ตั้งค่าที่นี่ ติดต่อ {{supportEmail}} เพื่อขอเปิดใช้งาน",
     "detectorsHint": "บล็อกจะปฏิเสธคำขอที่ถูกทำเครื่องหมาย ส่วนบันทึกเท่านั้นจะบันทึกไว้โดยไม่ทำให้คำขอล่าช้า",
     "detectorsHintOutput": "บล็อกจะทำให้การตอบกลับที่ถูกทำเครื่องหมายล้มเหลว ส่วนบันทึกเท่านั้นจะบันทึกไว้โดยไม่ทำให้การตอบกลับล่าช้า",
     "choiceLog": "บันทึกเท่านั้น",
     "applyTo": "ใช้กับ",
     "applyToAllMembers": "สมาชิกทั้งหมด",
     "applyKiloDefault": "ใช้ค่าเริ่มต้นของ Kilo",
+    "applyKiloDefaultEnglishNote": "ข้อความนโยบายเริ่มต้นของ Kilo เป็นภาษาอังกฤษ เพราะ Kilo Gateway นำไปใช้ตามที่เขียนไว้ทุกประการ",
+    "applyKiloDefaultReplaceMessage": "นโยบายเริ่มต้นของ Kilo เขียนเป็นภาษาอังกฤษและแทนที่สิ่งที่คุณตั้งไว้ในการละเมิดนโยบาย ข้อความที่คุณป้อนในช่องข้อความนโยบายกู้คืนไม่ได้",
     "invalidSavedTitle": "ไม่สามารถอ่านการตั้งค่าตัวตรวจจับอินพุตที่บันทึกไว้ได้",
     "invalidSavedBody": "คำขอจะถูกบล็อกจนกว่าจะบันทึกตัวตรวจจับอินพุตอีกครั้ง ตัวตรวจจับด้านล่างจะเริ่มจากค่าเริ่มต้นของ Kilo",
     "invalidSavedOutputTitle": "ไม่สามารถอ่านการตั้งค่าตัวตรวจจับเอาต์พุตที่บันทึกไว้ได้",
@@ -4977,6 +5004,8 @@
     "providersDescription": "ปิดผู้ให้บริการเพื่อหยุดการกำหนดเส้นทางของ Kilo ไปยังผู้ให้บริการนั้นสำหรับองค์กรนี้",
     "providersNeedCatalog": "สวิตช์ผู้ให้บริการจะเป็นแบบอ่านอย่างเดียวจนกว่าแค็ตตาล็อกโมเดลทั้งหมดจะโหลดเสร็จ แตะลองอีกครั้งด้านบนเพื่อแก้ไข",
     "providersEmpty": "ไม่มีผู้ให้บริการที่ตรงกับการค้นหานี้",
+    "providersNone": "ไม่มีผู้ให้บริการที่พร้อมใช้งานสำหรับองค์กรนี้",
+    "providersUnavailable": "โหลดรายการผู้ให้บริการไม่สำเร็จ",
     "allowAllShown": "อนุญาตทั้งหมดที่แสดง",
     "denyAllShown": "ปฏิเสธทั้งหมดที่แสดง",
     "gatewaysDescription": "Kilo กำหนดเส้นทางคำขอของโมเดลผ่าน Vercel AI Gateway หรือ OpenRouter เกตเวย์ที่ปิดใช้งานจะทำให้คำขอเหล่านั้นล้มเหลว",

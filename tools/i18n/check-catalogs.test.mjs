@@ -20,7 +20,13 @@ import { checkCatalogs } from './check-catalogs.mjs';
 // The checker parses with oxc through the shared scanner, so the import-only
 // probe links the repository's dependency tree at its own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_MODULES = [
+  'ast.mjs',
+  'catalogs.mjs',
+  'entry-point.mjs',
+  'fs-entries.mjs',
+  'source-files.mjs',
+];
 const WORDING_EXCEPTIONS = readFileSync(
   new URL('./wording-exceptions.json', import.meta.url),
   'utf8'
@@ -440,6 +446,18 @@ test('ignores a mounted-harness helper while a source file still reports its key
   ]) {
     assert.deepEqual(run({ extraFiles: { [helper]: source } }), []);
   }
+});
+
+test('folds a Devanagari danda as sentence-final punctuation', () => {
+  // The Hindi imperative and its error-message twin differ only by the danda,
+  // so the shared-wording rule must read them as one wording.
+  const found = run({
+    language: 'hi',
+    english: { label: 'Choose a model', error: 'Choose a model.' },
+    translated: { label: 'मॉडल चुनें', error: 'मॉडल चुनें।' },
+    source: "t('label'); t('error');",
+  });
+  assert.deepEqual(found, []);
 });
 
 for (const [language, title, badge] of [
@@ -2984,4 +3002,154 @@ test('rejects an added form that drops the family count its reference lacks', ()
   );
   // One line for the value: the specific count message replaces the general one.
   assert.doesNotMatch(text, /"agents\.items_few" placeholders differ from English/);
+});
+
+// The changelog sentence joins the areas a release touched with
+// `Intl.ListFormat`, so an area label that carries the catalog's own list
+// conjunction doubles it and the reader cannot tell the areas apart.
+const CHANGELOG_AREAS = {
+  profile: {
+    changelogFixesIn: 'Fixes and improvements in {{areas}}.',
+    changelogAreas: {
+      signIn: 'Sign-in',
+      profileOrganizations: 'Profile & organizations',
+    },
+  },
+};
+const CHANGELOG_AREAS_SOURCE = [
+  "t('profile.changelogFixesIn', { areas });",
+  "t('profile.changelogAreas.signIn');",
+  "t('profile.changelogAreas.profileOrganizations');",
+].join('\n');
+
+test('accepts a changelog area label that joins its nouns without the list conjunction', () => {
+  const found = run({
+    language: 'hi',
+    english: CHANGELOG_AREAS,
+    translated: {
+      profile: {
+        changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
+        changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल व संगठन' },
+      },
+    },
+    source: CHANGELOG_AREAS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a changelog area label that carries the catalog list conjunction', () => {
+  const found = run({
+    language: 'hi',
+    english: CHANGELOG_AREAS,
+    translated: {
+      profile: {
+        changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
+        changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल और संगठन' },
+      },
+    },
+    source: CHANGELOG_AREAS_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/hi: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "और"; the changelog sentence joins the areas itself, so join this label's nouns another way$/m
+  );
+});
+
+// The rule reads the conjunction from the platform formatter, so a catalog
+// whose conjunction is a word of its own is caught as well, and one whose
+// label legitimately contains the same letters in another role is not.
+test('rejects the English source label that carries "and"', () => {
+  const found = run({
+    language: 'ru',
+    english: {
+      profile: {
+        changelogFixesIn: 'Fixes and improvements in {{areas}}.',
+        changelogAreas: { signIn: 'Sign-in', profileOrganizations: 'Profile and organizations' },
+      },
+    },
+    translated: {
+      profile: {
+        changelogFixesIn: 'Исправления и улучшения: {{areas}}.',
+        changelogAreas: { signIn: 'Вход', profileOrganizations: 'Профиль и организации' },
+      },
+    },
+    source: CHANGELOG_AREAS_SOURCE,
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^mobile\/en: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "and"/m
+  );
+  assert.match(
+    text,
+    /^mobile\/ru: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "и"/m
+  );
+});
+
+// The sentence also joins the areas that render from shared keys, so those
+// labels obey the same rule: a notification or chat name that carries the
+// conjunction splits one area into two.
+const CHANGELOG_SHARED_AREAS = {
+  common: { chat: 'Chat', notifications: 'Notifications' },
+  integrations: { title: 'Integrations' },
+  profile: {
+    changelogFixesIn: 'Fixes and improvements in {{areas}}.',
+    changelogAreas: { signIn: 'Sign-in', profileOrganizations: 'Profile & organizations' },
+  },
+};
+const CHANGELOG_SHARED_SOURCE = [
+  "t('profile.changelogFixesIn', { areas });",
+  "t('common.chat');",
+  "t('common.notifications');",
+  "t('integrations.title');",
+  "t('profile.changelogAreas.signIn');",
+  "t('profile.changelogAreas.profileOrganizations');",
+].join('\n');
+
+test('rejects a shared area label that carries the list conjunction', () => {
+  const found = run({
+    language: 'fr',
+    english: CHANGELOG_SHARED_AREAS,
+    translated: {
+      common: { chat: 'Discussion', notifications: 'Alertes et notifications' },
+      integrations: { title: 'Intégrations' },
+      profile: {
+        changelogFixesIn: 'Corrections et améliorations dans {{areas}}.',
+        changelogAreas: { signIn: 'Connexion', profileOrganizations: 'Profil & organisations' },
+      },
+    },
+    source: CHANGELOG_SHARED_SOURCE,
+  });
+  assert.match(
+    found.join('\n'),
+    /^mobile\/fr: "common\.notifications" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
+  );
+});
+
+// The app builds its formatters with a named script or region for two
+// catalogs, so the rule has to read the same tag the screen formats with: the
+// Serbian catalog is Latin, while a bare `sr` tag resolves to Cyrillic data.
+test('reads the Serbian conjunction from the Latin script the app formats with', () => {
+  const found = run({
+    language: 'sr',
+    english: CHANGELOG_SHARED_AREAS,
+    translated: {
+      common: { chat: 'Ćaskanje', notifications: 'Obaveštenja' },
+      integrations: { title: 'Integracije' },
+      profile: {
+        changelogFixesIn: 'Ispravke i poboljšanja u {{areas}}.',
+        changelogAreas: { signIn: 'Prijavljivanje', profileOrganizations: 'Profil i organizacije' },
+      },
+    },
+    source: CHANGELOG_SHARED_SOURCE,
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^mobile\/sr: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "i"/m
+  );
+  // The Cyrillic conjunction is not what this catalog renders, so a label that
+  // happens to contain it is no finding.
+  assert.doesNotMatch(text, /contains the list conjunction "и"/);
 });

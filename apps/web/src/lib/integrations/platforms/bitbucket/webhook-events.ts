@@ -1,9 +1,20 @@
 import 'server-only';
 
-import { webhook_events, type WebhookEvent } from '@kilocode/db/schema';
+import {
+  webhook_event_signatures,
+  webhook_events,
+  webhook_events_v2,
+  type WebhookEventV2,
+} from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  claimWebhookEventSignature,
+  legacyWebhookEventIdForSignature,
+  newWebhookEventRef,
+} from '@/lib/integrations/db/webhook-events';
+import { withWebhookEventPartitions } from '@/lib/integrations/db/webhook-event-partitions';
 
 const BitbucketWebhookIdentitySchema = z
   .object({
@@ -36,7 +47,19 @@ type InsertBitbucketWebhookEventInput = {
   identity: BitbucketWebhookIdentity;
 };
 
-function eventMatchesInput(event: WebhookEvent, input: InsertBitbucketWebhookEventInput): boolean {
+/**
+ * A Bitbucket delivery's stored event. Rows read from the pre-partitioning
+ * `webhook_events` table have the same shape.
+ */
+export type BitbucketWebhookEvent = WebhookEventV2;
+
+/** Identifies the stored event; created_at selects its partition. */
+export type BitbucketWebhookEventKey = Pick<BitbucketWebhookEvent, 'id' | 'created_at'>;
+
+function eventMatchesInput(
+  event: BitbucketWebhookEvent,
+  input: InsertBitbucketWebhookEventInput
+): boolean {
   const identity = BitbucketWebhookIdentitySchema.safeParse(event.payload);
   return (
     identity.success &&
@@ -52,33 +75,92 @@ function eventMatchesInput(event: WebhookEvent, input: InsertBitbucketWebhookEve
   );
 }
 
+function v2EventCondition(event: BitbucketWebhookEventKey) {
+  return and(
+    eq(webhook_events_v2.id, event.id),
+    eq(webhook_events_v2.created_at, event.created_at),
+    eq(webhook_events_v2.platform, 'bitbucket')
+  );
+}
+
+// Until the pre-partitioning table ages out, an event accepted before the
+// switch is only stored there. Its id is unique in that table, so created_at
+// is not needed to find it. Remove these fallbacks once that table is dropped.
+function legacyEventCondition(event: BitbucketWebhookEventKey) {
+  return and(eq(webhook_events.id, event.id), eq(webhook_events.platform, 'bitbucket'));
+}
+
+async function loadEvent(
+  executor: DrizzleTransaction,
+  event: BitbucketWebhookEventKey
+): Promise<BitbucketWebhookEvent | null> {
+  const [current] = await executor
+    .select()
+    .from(webhook_events_v2)
+    .where(v2EventCondition(event))
+    .limit(1);
+  if (current) return current;
+  const [legacy] = await executor
+    .select()
+    .from(webhook_events)
+    .where(legacyEventCondition(event))
+    .limit(1);
+  return legacy ?? null;
+}
+
+/**
+ * Stores a new delivery, or loads the event an earlier delivery of the same
+ * signature stored. Throws when the stored event describes a different pull
+ * request, or when its signature is held but the event is gone.
+ */
 export async function insertOrLoadBitbucketWebhookEvent(
   input: InsertBitbucketWebhookEventInput
-): Promise<WebhookEvent> {
-  const [inserted] = await db
-    .insert(webhook_events)
-    .values({
-      owned_by_organization_id: input.organizationId,
-      owned_by_user_id: null,
-      platform: 'bitbucket',
-      event_type: 'pullrequest',
-      event_action: input.eventAction,
-      payload: input.identity,
-      headers: {},
-      event_signature: input.eventSignature,
-    })
-    .onConflictDoNothing({ target: webhook_events.event_signature })
-    .returning();
+): Promise<BitbucketWebhookEvent> {
+  const ref = newWebhookEventRef();
 
-  const event =
-    inserted ??
-    (
-      await db
-        .select()
-        .from(webhook_events)
-        .where(eq(webhook_events.event_signature, input.eventSignature))
-        .limit(1)
-    )[0];
+  const event = await withWebhookEventPartitions(db, () =>
+    db.transaction(async tx => {
+      const legacyId = await legacyWebhookEventIdForSignature(tx, input.eventSignature);
+      if (legacyId) {
+        const [legacy] = await tx
+          .select()
+          .from(webhook_events)
+          .where(eq(webhook_events.id, legacyId))
+          .limit(1);
+        return legacy ?? null;
+      }
+
+      if (await claimWebhookEventSignature(tx, input.eventSignature, ref)) {
+        const [inserted] = await tx
+          .insert(webhook_events_v2)
+          .values({
+            id: ref.id,
+            created_at: ref.createdAt,
+            owned_by_organization_id: input.organizationId,
+            owned_by_user_id: null,
+            platform: 'bitbucket',
+            event_type: 'pullrequest',
+            event_action: input.eventAction,
+            payload: input.identity,
+            headers: {},
+            event_signature: input.eventSignature,
+          })
+          .returning();
+        return inserted ?? null;
+      }
+
+      const [claim] = await tx
+        .select({
+          id: webhook_event_signatures.webhook_event_id,
+          created_at: webhook_event_signatures.webhook_event_created_at,
+        })
+        .from(webhook_event_signatures)
+        .where(eq(webhook_event_signatures.event_signature, input.eventSignature))
+        .limit(1);
+      return claim ? await loadEvent(tx, claim) : null;
+    })
+  );
+
   if (!event || !eventMatchesInput(event, input)) {
     throw new Error('Bitbucket webhook delivery identity conflict');
   }
@@ -86,27 +168,27 @@ export async function insertOrLoadBitbucketWebhookEvent(
 }
 
 export async function recordBitbucketWebhookFailure(
-  eventId: string,
+  event: BitbucketWebhookEventKey,
   safeCode: string
 ): Promise<void> {
+  const errors = [{ handler: 'code_review', message: safeCode.slice(0, 64) }];
+  const updated = await db
+    .update(webhook_events_v2)
+    .set({ errors })
+    .where(and(v2EventCondition(event), eq(webhook_events_v2.processed, false)))
+    .returning({ id: webhook_events_v2.id });
+  if (updated.length > 0) return;
   await db
     .update(webhook_events)
-    .set({
-      errors: [{ handler: 'code_review', message: safeCode.slice(0, 64) }],
-    })
-    .where(and(eq(webhook_events.id, eventId), eq(webhook_events.processed, false)));
+    .set({ errors })
+    .where(and(legacyEventCondition(event), eq(webhook_events.processed, false)));
 }
 
 export async function loadBitbucketWebhookEventInTransaction(
   tx: DrizzleTransaction,
-  eventId: string
-): Promise<WebhookEvent | null> {
-  const [event] = await tx
-    .select()
-    .from(webhook_events)
-    .where(and(eq(webhook_events.id, eventId), eq(webhook_events.platform, 'bitbucket')))
-    .limit(1);
-  return event ?? null;
+  event: BitbucketWebhookEventKey
+): Promise<BitbucketWebhookEvent | null> {
+  return loadEvent(tx, event);
 }
 
 export async function getGreatestProcessedBitbucketObservation(
@@ -114,35 +196,49 @@ export async function getGreatestProcessedBitbucketObservation(
   organizationId: string,
   identity: BitbucketWebhookIdentity
 ): Promise<string | null> {
+  const matches = (table: typeof webhook_events | typeof webhook_events_v2) => sql`
+    ${table.owned_by_organization_id} = ${organizationId}
+      AND ${table.platform} = 'bitbucket'
+      AND ${table.processed} = true
+      AND ${table.payload}->>'integrationId' = ${identity.integrationId}
+      AND ${table.payload}->>'workspaceUuid' = ${identity.workspaceUuid}
+      AND ${table.payload}->>'repositoryUuid' = ${identity.repositoryUuid}
+      AND ${table.payload}->>'pullRequestNumber' = ${String(identity.pullRequestNumber)}
+  `;
+  // GREATEST ignores NULLs, so either table may have no match.
   const result = await tx.execute<{ updated_on: string | null }>(sql`
-    SELECT MAX(${webhook_events.payload}->>'updatedOn') AS updated_on
-    FROM ${webhook_events}
-    WHERE ${webhook_events.owned_by_organization_id} = ${organizationId}
-      AND ${webhook_events.platform} = 'bitbucket'
-      AND ${webhook_events.processed} = true
-      AND ${webhook_events.payload}->>'integrationId' = ${identity.integrationId}
-      AND ${webhook_events.payload}->>'workspaceUuid' = ${identity.workspaceUuid}
-      AND ${webhook_events.payload}->>'repositoryUuid' = ${identity.repositoryUuid}
-      AND ${webhook_events.payload}->>'pullRequestNumber' = ${String(identity.pullRequestNumber)}
+    SELECT GREATEST(
+      (SELECT MAX(${webhook_events_v2.payload}->>'updatedOn') FROM ${webhook_events_v2}
+        WHERE ${matches(webhook_events_v2)}),
+      (SELECT MAX(${webhook_events.payload}->>'updatedOn') FROM ${webhook_events}
+        WHERE ${matches(webhook_events)})
+    ) AS updated_on
   `);
   return result.rows[0]?.updated_on ?? null;
 }
 
 export async function completeBitbucketWebhookEventInTransaction(
   tx: DrizzleTransaction,
-  eventId: string,
+  event: BitbucketWebhookEventKey,
   observation: BitbucketAuthoritativeObservation
 ): Promise<void> {
+  const completion = {
+    payload: observation,
+    processed: true,
+    processed_at: new Date().toISOString(),
+    handlers_triggered: ['code_review'],
+    errors: null,
+  };
   const [completed] = await tx
+    .update(webhook_events_v2)
+    .set(completion)
+    .where(and(v2EventCondition(event), eq(webhook_events_v2.processed, false)))
+    .returning({ id: webhook_events_v2.id });
+  if (completed) return;
+  const [legacyCompleted] = await tx
     .update(webhook_events)
-    .set({
-      payload: observation,
-      processed: true,
-      processed_at: new Date().toISOString(),
-      handlers_triggered: ['code_review'],
-      errors: null,
-    })
-    .where(and(eq(webhook_events.id, eventId), eq(webhook_events.processed, false)))
+    .set(completion)
+    .where(and(legacyEventCondition(event), eq(webhook_events.processed, false)))
     .returning({ id: webhook_events.id });
-  if (!completed) throw new Error('Bitbucket webhook event could not be completed');
+  if (!legacyCompleted) throw new Error('Bitbucket webhook event could not be completed');
 }

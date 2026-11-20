@@ -2,11 +2,30 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MONITORED_QUEUE_ID } from '../src/alerting/queue-backlog';
 import { evaluateAlerts } from '../src/alerting/evaluate';
 import { NATIVE_CONTAINER_APP } from '../src/alerting/container-allocations';
-import { DEAD_LETTER_QUEUE_NAME } from '../src/alerting/dead-letter-queue';
+import {
+  DEAD_LETTER_QUEUE_NAME,
+  ENKRYPT_DEAD_LETTER_QUEUE_NAME,
+} from '../src/alerting/dead-letter-queue';
+
+const USAGE_ID = 'a'.repeat(32);
+const USAGE_NAME = 'usage-ingest-processing-eu';
 
 const DLQ_ID = 'd'.repeat(32);
 
 function deadLetterQueueResponse(url: string, backlogCount: number): Response | undefined {
+  if (url.includes(`/queues?name=${USAGE_NAME}&page=1`)) {
+    return Response.json({
+      success: true,
+      result: [{ queue_name: USAGE_NAME, queue_id: USAGE_ID }],
+      result_info: { total_pages: 1 },
+    });
+  }
+  if (url.includes(`/queues/${USAGE_ID}/metrics`)) {
+    return Response.json({
+      success: true,
+      result: { backlog_count: 0, backlog_bytes: 0, oldest_message_timestamp_ms: 0 },
+    });
+  }
   if (url.includes(`/queues?name=${DEAD_LETTER_QUEUE_NAME}&page=1`)) {
     return Response.json({
       success: true,
@@ -15,6 +34,25 @@ function deadLetterQueueResponse(url: string, backlogCount: number): Response | 
     });
   }
   if (url.includes(`/queues/${DLQ_ID}/metrics`)) {
+    return Response.json({
+      success: true,
+      result: { backlog_count: backlogCount, backlog_bytes: 0, oldest_message_timestamp_ms: 0 },
+    });
+  }
+  return undefined;
+}
+
+const ENKRYPT_DLQ_ID = 'e'.repeat(32);
+
+function enkryptDeadLetterQueueResponse(url: string, backlogCount: number): Response | undefined {
+  if (url.includes(`/queues?name=${ENKRYPT_DEAD_LETTER_QUEUE_NAME}&page=1`)) {
+    return Response.json({
+      success: true,
+      result: [{ queue_name: ENKRYPT_DEAD_LETTER_QUEUE_NAME, queue_id: ENKRYPT_DLQ_ID }],
+      result_info: { total_pages: 1 },
+    });
+  }
+  if (url.includes(`/queues/${ENKRYPT_DLQ_ID}/metrics`)) {
     return Response.json({
       success: true,
       result: { backlog_count: backlogCount, backlog_bytes: 0, oldest_message_timestamp_ms: 0 },
@@ -92,7 +130,8 @@ describe('evaluateAlerts infrastructure isolation', () => {
             },
           });
         }
-        const deadLetterQueue = deadLetterQueueResponse(url, 0);
+        const deadLetterQueue =
+          deadLetterQueueResponse(url, 0) ?? enkryptDeadLetterQueueResponse(url, 0);
         if (deadLetterQueue) return deadLetterQueue;
         if (url === 'https://hooks.slack.com/page') {
           slackMessages.push(JSON.parse(String(init?.body)));
@@ -138,7 +177,7 @@ describe('evaluateAlerts infrastructure isolation', () => {
 });
 
 describe('evaluateAlerts dead-letter queue', () => {
-  function stubFetch(deadLetterQueue: 'messages' | 'unavailable') {
+  function stubFetch(deadLetterQueue: 'messages' | 'unavailable', enkryptBacklog?: number) {
     const slackMessages: Array<{ webhook: string; body: unknown }> = [];
     vi.stubGlobal(
       'fetch',
@@ -152,6 +191,10 @@ describe('evaluateAlerts dead-letter queue', () => {
         }
         if (deadLetterQueue === 'messages') {
           const response = deadLetterQueueResponse(url, 4);
+          if (response) return response;
+        }
+        if (enkryptBacklog !== undefined) {
+          const response = enkryptDeadLetterQueueResponse(url, enkryptBacklog);
           if (response) return response;
         }
         if (url.startsWith('https://hooks.slack.com/')) {
@@ -198,5 +241,23 @@ describe('evaluateAlerts dead-letter queue', () => {
     expect(String((error as Error).message)).toContain('dead_letter_queue evaluation');
     expect(JSON.stringify(slackMessages)).toContain('Queue Backlog Alert');
     expect(JSON.stringify(slackMessages)).not.toContain('Dead-Letter Queue Alert');
+  });
+
+  it('alerts on the Enkrypt DLQ even when the main DLQ lookup fails', async () => {
+    const kv = makeKv();
+    const slackMessages = stubFetch('unavailable', 2);
+    const error = await evaluateAlerts(makeEnv(kv)).then(
+      () => expect.fail('expected a failure'),
+      (caught: unknown) => caught
+    );
+    expect(String((error as Error).message)).toContain('- dead_letter_queue evaluation');
+    expect(String((error as Error).message)).not.toContain('enkrypt_dead_letter_queue evaluation');
+    const deadLetter = slackMessages.filter(message =>
+      JSON.stringify(message.body).includes('Dead-Letter Queue Alert')
+    );
+    expect(deadLetter.map(message => message.webhook)).toEqual(['https://hooks.slack.com/ticket']);
+    expect(JSON.stringify(deadLetter)).toContain(ENKRYPT_DEAD_LETTER_QUEUE_NAME);
+    expect(kv.store.get(`o11y:dead_letter_queue:${ENKRYPT_DEAD_LETTER_QUEUE_NAME}`)).toBe('2');
+    expect(kv.store.has(`o11y:dead_letter_queue:${DEAD_LETTER_QUEUE_NAME}`)).toBe(false);
   });
 });

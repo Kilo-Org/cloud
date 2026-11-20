@@ -7,9 +7,11 @@ import {
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
   BenchmarkConfigResponseSchema,
+  type BenchmarkConfigSaveWarning,
   BenchmarkRegistryResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkRunsResponseSchema,
+  BenchmarkRunSummariesResponseSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   DEFAULT_BENCHMARK_DECIDER_MODEL_IDS,
@@ -20,11 +22,13 @@ import {
   type BenchmarkPlatformModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
+  type BenchmarkModelTotals,
   type BenchmarkQueueSelector,
   type BenchmarkRegistryQueue,
   type BenchmarkRegistryResponse,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
+  type BenchmarkRunsResponse,
   type PolicySettingState,
   type PolicySettingValue,
   resolvePolicySettings,
@@ -69,7 +73,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
+import { entryMentionsModel, runMentionsModel } from './admin-time';
+import { AdminTimeLabel } from './AdminTimeLabel';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
+import { FailedModels } from './FailedModelsTable';
 import { useSystemOneModelOptions } from './system-one-models';
 
 export function formatAccuracy(n: number): string {
@@ -89,6 +96,20 @@ export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'a
   return candidate.accuracy > 0
     ? candidate.avgCostUsd / candidate.accuracy
     : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * A run or pair total, which is a sum of many small case costs: two decimals
+ * would render every real run as $0.00, so a sub-cent total keeps its own
+ * precision. A non-zero total below that precision never reads as free.
+ */
+export function formatTotalUsd(n: number | null): string {
+  if (n === null) return '—';
+  if (n === 0) return '$0';
+  if (n >= 0.01) return `$${n.toFixed(2)}`;
+  // Small totals stay readable to the sixth decimal, without trailing zeros.
+  const small = Number(n.toFixed(6));
+  return small === 0 ? '<$0.000001' : `$${small}`;
 }
 
 // Below this share of the expected cases the completion rate is still noise, so
@@ -312,6 +333,34 @@ async function fetchBenchmarkRuns(filter: RunFilter, router: AutoRouter) {
   query.set('router', router);
   const response = await adminFetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
+}
+
+async function fetchBenchmarkRunSummaries(runId: string, router: AutoRouter) {
+  const response = await adminFetch(
+    `/admin/api/auto-routing/benchmark-runs/${encodeURIComponent(runId)}/summaries?router=${router}`
+  );
+  return parseAdminResponse(response, BenchmarkRunSummariesResponseSchema);
+}
+
+const RUNS_POLL_INTERVAL_MS = 30_000;
+
+export function responseRunningRunIds(response: BenchmarkRunsResponse): readonly string[] {
+  return (
+    response.runningRunIds ??
+    response.runs.filter(run => run.status === 'running').map(run => run.id)
+  );
+}
+
+/**
+ * Whether a run that was running has since left the running set. Each such run
+ * may have published a routing table or changed the registry, even while other
+ * runs keep going.
+ */
+export function runLeftRunningSet(
+  previous: readonly string[],
+  current: readonly string[]
+): boolean {
+  return previous.some(runId => !current.includes(runId));
 }
 
 async function startBenchmarkRun({
@@ -557,7 +606,7 @@ function UseSystemValueButton({
   );
 }
 
-function BenchmarkConfigEditor({
+export function BenchmarkConfigEditor({
   router,
   config,
   onSaved,
@@ -587,6 +636,9 @@ function BenchmarkConfigEditor({
   // polls; the query also refetches on focus) must not silently overwrite
   // in-progress edits, so the sync effect only resets the form while pristine.
   const [dirty, setDirty] = useState(false);
+  // What the last save could not do after persisting the config; replaced by
+  // the next save.
+  const [saveWarnings, setSaveWarnings] = useState<BenchmarkConfigSaveWarning[]>([]);
 
   // Any user edit goes through this so it marks the form dirty.
   const updateForm = useCallback(
@@ -620,7 +672,10 @@ function BenchmarkConfigEditor({
       setForm(configToFormState(data.config, router));
       setDirty(false);
       onSaved(data);
-      toast.success('Benchmark config saved');
+      const warnings = data.warnings ?? [];
+      setSaveWarnings(warnings);
+      if (warnings.length === 0) toast.success('Benchmark config saved');
+      else toast.warning('Benchmark config saved with warnings');
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to save benchmark config');
@@ -692,6 +747,7 @@ function BenchmarkConfigEditor({
   const policyStates = useMemo(
     () =>
       resolvePolicySettings({
+        router,
         minAccuracy: form.minAccuracy,
         accuracyNoiseBand: form.accuracyNoiseBand,
         productionTokenProfile: parseTokenProfile(form),
@@ -699,7 +755,7 @@ function BenchmarkConfigEditor({
         policyOverrides: policyOverridesFromForm(form.policyOverrides),
         policyComputed: config?.policyComputed ?? null,
       }),
-    [form, config]
+    [form, config, router]
   );
 
   const setOverride = useCallback(
@@ -1096,6 +1152,7 @@ function BenchmarkConfigEditor({
             </>
           ) : null}
         </div>
+        <ConfigSaveWarnings warnings={saveWarnings} />
         {config === null ? (
           <p className="text-muted-foreground text-xs">
             No config saved yet — runs cannot start until one is saved.
@@ -1111,88 +1168,350 @@ function BenchmarkConfigEditor({
   );
 }
 
-function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
+const CONFIG_SAVE_WARNING_TITLES: Record<BenchmarkConfigSaveWarning['kind'], string> = {
+  registry_sync_failed: 'Platform registry not synced',
+  routing_table_publish_failed: 'Routing table not republished',
+};
+
+export function ConfigSaveWarnings({ warnings }: { warnings: BenchmarkConfigSaveWarning[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div role="alert" className="flex flex-col gap-2">
+      {warnings.map(warning => (
+        <div
+          key={warning.kind}
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500"
+        >
+          <p className="font-medium">{CONFIG_SAVE_WARNING_TITLES[warning.kind]}</p>
+          <p className="whitespace-pre-wrap break-words">{warning.message}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Totals for one pair, recomputed from route rows when an older worker sends none. */
+export function modelTotalsFromSummaries(
+  summaries: readonly BenchmarkModelSummary[]
+): BenchmarkModelTotals[] {
+  const groups = new Map<
+    string,
+    BenchmarkModelTotals & {
+      scoreSum: number;
+      costSum: number;
+      costedCases: number;
+      costedKnown: boolean;
+    }
+  >();
+  for (const summary of summaries) {
+    const key = JSON.stringify([summary.model, summary.variant ?? null]);
+    const group = groups.get(key);
+    // `avgCostUsd` is the route's mean over the cases that reported a cost, so
+    // the route's total is that mean times its costed count — never times
+    // `cases`, which also counts the errored and timed-out rows it left out.
+    // A route whose own count is unknown (a row written before the count was
+    // captured) has no denominator, so the pair's cost stays unknown rather
+    // than being charged at the route's mean. A route that reported no cost at
+    // all has a known count of zero: it contributes nothing and its cases are
+    // counted as uncosted.
+    const routeCosted = summary.costedCases ?? null;
+    // A count of zero is known (nothing was priced); a positive count needs the
+    // mean it belongs to. Anything else is a row older than the count.
+    const costKnown = routeCosted === 0 || (routeCosted !== null && summary.avgCostUsd !== null);
+    const costed = costKnown ? (summary.avgCostUsd ?? 0) * (routeCosted ?? 0) : 0;
+    if (group) {
+      group.scoreSum += summary.accuracy * summary.cases;
+      group.costSum += costed;
+      group.costedCases += costKnown ? (routeCosted ?? 0) : 0;
+      group.costedKnown = group.costedKnown && costKnown;
+      group.cases += summary.cases;
+      group.errors += summary.errors;
+      group.timeouts += summary.timeouts;
+    } else {
+      groups.set(key, {
+        model: summary.model,
+        variant: summary.variant,
+        accuracy: 0,
+        routeAccuracy: null,
+        costPerCaseUsd: null,
+        totalCostUsd: null,
+        uncostedCases: 0,
+        cases: summary.cases,
+        errors: summary.errors,
+        timeouts: summary.timeouts,
+        scoreSum: summary.accuracy * summary.cases,
+        costSum: costed,
+        costedCases: costKnown ? (routeCosted ?? 0) : 0,
+        costedKnown: costKnown,
+      });
+    }
+  }
+  return [...groups.values()]
+    .map(({ scoreSum, costSum, costedCases, costedKnown, ...totals }) => ({
+      ...totals,
+      // A pair with no known cost leaves every case unpriced; a priced pair
+      // names just the cases its routes left out. A genuine $0 stays $0, and a
+      // pair whose cases all reported no cost at all has no total to state.
+      uncostedCases: costedKnown ? totals.cases - costedCases : totals.cases,
+      accuracy: totals.cases > 0 ? Number((scoreSum / totals.cases).toFixed(4)) : 0,
+      costPerCaseUsd:
+        costedKnown && costedCases > 0 ? Number((costSum / costedCases).toFixed(8)) : null,
+      totalCostUsd: costedKnown && costedCases > 0 ? Number(costSum.toFixed(8)) : null,
+    }))
+    .toSorted((a, b) => b.accuracy - a.accuracy || a.model.localeCompare(b.model));
+}
+
+/**
+ * Totals for the Models table. The worker's aggregate wins, but an empty array
+ * means it had no case rows to aggregate — a classifier run whose models were
+ * all carried finalizes with only `carried` summaries — so an empty array is
+ * treated as absent and the route rows are folded instead of hiding them.
+ */
+export function resolveModelTotals(
+  summaries: readonly BenchmarkModelSummary[],
+  modelTotals: readonly BenchmarkModelTotals[] | undefined
+): BenchmarkModelTotals[] {
+  if (modelTotals !== undefined && modelTotals.length > 0) return [...modelTotals];
+  return summaries.length > 0 ? modelTotalsFromSummaries(summaries) : [];
+}
+
+function RunTotalsLine({ run }: { run: BenchmarkRun }) {
+  const totals = run.totals;
+  if (!totals) return null;
+  return (
+    <p className="text-muted-foreground mb-2 text-xs tabular-nums">
+      <span className="text-foreground font-medium">{formatTotalUsd(totals.totalCostUsd)}</span>{' '}
+      total cost · {totals.measuredCases} cases measured · {totals.erroredCases} errored
+    </p>
+  );
+}
+
+export function RunSummariesTable({
+  run,
+  router,
+  id,
+}: {
+  run: BenchmarkRun;
+  router: AutoRouter;
+  id: string;
+}) {
   const isDecider = run.kind === 'decider';
+  const running = run.status === 'running';
+  // Mounted only while the row is expanded, so a running run polls only then.
+  // The status is part of the key: a run that finishes fetches its final
+  // summaries once, and a terminal run's summaries never change.
+  const summariesQuery = useQuery({
+    queryKey: ['auto-routing', 'benchmark-run-summaries', router, run.id, run.status],
+    queryFn: () => fetchBenchmarkRunSummaries(run.id, router),
+    staleTime: running ? 0 : Infinity,
+    refetchInterval: running ? RUNS_POLL_INTERVAL_MS : false,
+  });
+  const summaries = summariesQuery.data?.summaries ?? [];
+  const modelTotals = resolveModelTotals(summaries, summariesQuery.data?.modelTotals);
 
   const sortedSummaries: BenchmarkModelSummary[] = isDecider
-    ? [...run.summaries].sort((a, b) => {
+    ? [...summaries].sort((a, b) => {
         const routeDiff = a.routeKey.localeCompare(b.routeKey);
         if (routeDiff !== 0) return routeDiff;
         return b.accuracy - a.accuracy;
       })
-    : run.summaries;
+    : summaries;
 
   return (
     <TableRow className="bg-muted/30">
-      <TableCell colSpan={6} id={id} className="px-4 py-2">
-        {/* Full error text (the collapsed row's Error cell is truncated). */}
+      <TableCell colSpan={RUN_TABLE_COLUMNS} id={id} className="px-4 py-2">
+        {/* Full error text; the collapsed row's Error cell wraps, and this reads
+            the whole message without hunting for the tooltip. */}
         {run.error ? (
-          <div className="border-destructive/40 bg-destructive/10 text-destructive mb-2 rounded-md border px-3 py-2 text-xs whitespace-pre-wrap break-words">
+          <div
+            className="border-destructive/40 bg-destructive/10 text-destructive mb-2 rounded-md border px-3 py-2 text-xs whitespace-pre-wrap break-words"
+            title={run.error}
+          >
             {run.error}
           </div>
         ) : null}
-        {sortedSummaries.length === 0 ? (
+        <RunTotalsLine run={run} />
+        {summariesQuery.isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : summariesQuery.error ? (
+          <p className="text-destructive py-1 text-center text-xs">
+            Summaries unavailable:{' '}
+            {summariesQuery.error instanceof Error
+              ? summariesQuery.error.message
+              : 'request failed'}
+          </p>
+        ) : modelTotals.length === 0 ? (
           <p className="text-muted-foreground py-1 text-center text-xs">No summaries</p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="min-w-max">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Model</TableHead>
-                  {isDecider ? <TableHead className="text-xs">Route</TableHead> : null}
-                  <TableHead className="text-right text-xs">Accuracy</TableHead>
-                  {isDecider ? null : (
-                    <TableHead className="text-right text-xs">Route accuracy</TableHead>
-                  )}
-                  <TableHead className="text-right text-xs">Avg cost</TableHead>
-                  <TableHead className="text-right text-xs">Avg latency</TableHead>
-                  <TableHead className="text-right text-xs">p50 latency</TableHead>
-                  <TableHead className="text-right text-xs">p95 latency</TableHead>
-                  <TableHead className="text-right text-xs">Cases</TableHead>
-                  <TableHead className="text-right text-xs">Errors</TableHead>
-                  <TableHead className="text-right text-xs">Timeouts</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedSummaries.map((s, i) => (
-                  <TableRow key={`${s.model}-${s.routeKey}-${i}`}>
-                    <TableCell className="max-w-56 truncate font-mono text-xs">{s.model}</TableCell>
-                    {isDecider ? (
-                      <TableCell className="font-mono text-xs">{s.routeKey}</TableCell>
-                    ) : null}
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatAccuracy(s.accuracy)}
-                    </TableCell>
+          <div className="flex flex-col gap-3">
+            <div>
+              <h4 className="mb-1 text-xs font-medium">Models</h4>
+              <Table className="w-full table-fixed">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Model</TableHead>
+                    <TableHead className="w-24 text-right text-xs">Accuracy</TableHead>
                     {isDecider ? null : (
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {s.routeAccuracy !== null ? formatAccuracy(s.routeAccuracy) : '—'}
-                      </TableCell>
+                      <TableHead className="w-28 text-right text-xs">Route accuracy</TableHead>
                     )}
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatUsd(s.avgCostUsd)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {s.avgLatencyMs.toFixed(0)} ms
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {s.p50LatencyMs !== null ? `${s.p50LatencyMs.toFixed(0)} ms` : '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {s.p95LatencyMs !== null ? `${s.p95LatencyMs.toFixed(0)} ms` : '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">{s.errors}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">{s.timeouts}</TableCell>
+                    <TableHead className="w-28 text-right text-xs">Cost / case</TableHead>
+                    <TableHead className="w-28 text-right text-xs">Total cost</TableHead>
+                    <TableHead className="w-20 text-right text-xs">Cases</TableHead>
+                    <TableHead className="w-20 text-right text-xs">Errors</TableHead>
+                    <TableHead className="w-20 text-right text-xs">Timeouts</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {modelTotals.map(totals => (
+                    <TableRow key={`${totals.model}-${totals.variant ?? ''}`}>
+                      <TableCell className="max-w-0 text-xs">
+                        <span className="block truncate font-mono" title={totals.model}>
+                          {totals.model}
+                        </span>
+                        {totals.variant ? (
+                          <span className="text-muted-foreground block truncate text-[11px]">
+                            {totals.variant}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatAccuracy(totals.accuracy)}
+                      </TableCell>
+                      {isDecider ? null : (
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {totals.routeAccuracy !== null
+                            ? formatAccuracy(totals.routeAccuracy)
+                            : '—'}
+                        </TableCell>
+                      )}
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatUsd(totals.costPerCaseUsd)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatTotalUsd(totals.totalCostUsd)}
+                        {totals.uncostedCases > 0 ? (
+                          <span className="text-muted-foreground block text-[11px]">
+                            {totals.uncostedCases} uncosted
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {totals.cases}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {totals.errors}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {totals.timeouts}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <Collapsible>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground h-8 justify-start gap-1 px-2 text-xs [&[data-state=open]>svg]:rotate-90"
+                >
+                  <ChevronRight className="size-4" />
+                  Per-route detail ({sortedSummaries.length}{' '}
+                  {sortedSummaries.length === 1 ? 'route' : 'routes'})
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <RunRouteTable summaries={sortedSummaries} isDecider={isDecider} />
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         )}
       </TableCell>
     </TableRow>
   );
 }
+
+/**
+ * Route rows of one run: what each pair scored, cost and waited per route. The
+ * latency tail and the timeout count are the columns that explain a slow or
+ * incomplete run, so they stay here even though the Models table summarizes.
+ */
+export function RunRouteTable({
+  summaries,
+  isDecider,
+}: {
+  summaries: readonly BenchmarkModelSummary[];
+  isDecider: boolean;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <Table className="w-full table-fixed">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xs">Model</TableHead>
+            {isDecider ? <TableHead className="w-40 text-xs">Route</TableHead> : null}
+            <TableHead className="w-20 text-right text-xs">Accuracy</TableHead>
+            {isDecider ? null : (
+              <TableHead className="w-24 text-right text-xs">Route accuracy</TableHead>
+            )}
+            <TableHead className="w-24 text-right text-xs">Avg cost</TableHead>
+            <TableHead className="w-24 text-right text-xs">Avg latency</TableHead>
+            <TableHead className="w-20 text-right text-xs">p50 latency</TableHead>
+            <TableHead className="w-20 text-right text-xs">p95 latency</TableHead>
+            <TableHead className="w-16 text-right text-xs">Cases</TableHead>
+            <TableHead className="w-16 text-right text-xs">Errors</TableHead>
+            <TableHead className="w-16 text-right text-xs">Timeouts</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {summaries.map((s, i) => (
+            <TableRow key={`${s.model}-${s.routeKey}-${i}`}>
+              <TableCell className="max-w-0 font-mono text-xs">
+                <span className="block truncate" title={s.model}>
+                  {s.model}
+                </span>
+              </TableCell>
+              {isDecider ? (
+                <TableCell className="max-w-0 font-mono text-xs">
+                  <span className="block truncate" title={s.routeKey}>
+                    {s.routeKey}
+                  </span>
+                </TableCell>
+              ) : null}
+              <TableCell className="text-right tabular-nums text-xs">
+                {formatAccuracy(s.accuracy)}
+              </TableCell>
+              {isDecider ? null : (
+                <TableCell className="text-right tabular-nums text-xs">
+                  {s.routeAccuracy !== null ? formatAccuracy(s.routeAccuracy) : '—'}
+                </TableCell>
+              )}
+              <TableCell className="text-right tabular-nums text-xs">
+                {formatUsd(s.avgCostUsd)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-xs">
+                {s.avgLatencyMs.toFixed(0)} ms
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-xs">
+                {s.p50LatencyMs !== null ? `${s.p50LatencyMs.toFixed(0)} ms` : '—'}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-xs">
+                {s.p95LatencyMs !== null ? `${s.p95LatencyMs.toFixed(0)} ms` : '—'}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
+              <TableCell className="text-right tabular-nums text-xs">{s.errors}</TableCell>
+              <TableCell className="text-right tabular-nums text-xs">{s.timeouts}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+/** Column count of the runs table, shared by its empty and expanded rows. */
+const RUN_TABLE_COLUMNS = 7;
 
 function statusBadgeVariant(
   status: BenchmarkRun['status']
@@ -1223,7 +1542,29 @@ function RunProgress({
   );
 }
 
-function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
+function RunCostCell({ run }: { run: BenchmarkRun }) {
+  if (!run.totals) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="font-medium">{formatTotalUsd(run.totals.totalCostUsd)}</span>
+      <span className="text-muted-foreground text-[11px]">
+        {run.totals.measuredCases} cases
+        {run.totals.erroredCases > 0 ? ` · ${run.totals.erroredCases} errored` : ''}
+      </span>
+    </div>
+  );
+}
+
+export function BenchmarkRunsTable({
+  runs,
+  router,
+  matchedIds,
+}: {
+  runs: BenchmarkRun[];
+  router: AutoRouter;
+  /** Ids surviving the model filter, or null when no filter is active. */
+  matchedIds: ReadonlySet<string> | null;
+}) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const toggleExpand = useCallback((id: string) => {
@@ -1241,8 +1582,25 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
   if (runs.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={6} className="text-muted-foreground h-16 text-center">
+        <TableCell colSpan={RUN_TABLE_COLUMNS} className="text-muted-foreground h-16 text-center">
           No runs yet
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  const visible = matchedIds === null ? runs : runs.filter(run => matchedIds.has(run.id));
+  if (visible.length === 0) {
+    // An empty page and a page whose runs never reported their models look the
+    // same to the filter, but they mean different things: one is "this model
+    // did not run", the other is "nothing here can answer".
+    const searchable = runs.some(run => (run.models?.length ?? 0) > 0);
+    return (
+      <TableRow>
+        <TableCell colSpan={RUN_TABLE_COLUMNS} className="text-muted-foreground h-16 text-center">
+          {searchable
+            ? 'No run of this list measured that model'
+            : 'No run on this page reports its models yet, so the filter cannot match. Expand a run or reload.'}
         </TableCell>
       </TableRow>
     );
@@ -1250,7 +1608,7 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
 
   return (
     <>
-      {runs.map(run => {
+      {visible.map(run => {
         const expanded = expandedIds.has(run.id);
         const summariesId = `run-summaries-${run.id}`;
         return (
@@ -1281,6 +1639,14 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                 <Badge variant={run.kind === 'classifier' ? 'outline' : 'secondary'}>
                   {runTypeLabel(run)}
                 </Badge>
+                {run.models && run.models.length > 0 ? (
+                  <span
+                    className="text-muted-foreground mt-1 block max-w-56 truncate font-mono text-[11px]"
+                    title={run.models.join(', ')}
+                  >
+                    {run.models.join(', ')}
+                  </span>
+                ) : null}
               </TableCell>
               <TableCell className="py-2">
                 <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
@@ -1290,16 +1656,24 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                   <RunProgress progress={run.progress} startedAt={run.startedAt} />
                 ) : null}
               </TableCell>
-              <TableCell className="py-2 text-xs tabular-nums">{run.startedAt}</TableCell>
-              <TableCell className="py-2 text-xs tabular-nums">{run.completedAt ?? '—'}</TableCell>
-              <TableCell
-                className="py-2 text-xs text-destructive max-w-48 truncate"
-                title={run.error ?? undefined}
-              >
-                {run.error ?? ''}
+              <TableCell className="py-2 text-right text-xs tabular-nums">
+                <RunCostCell run={run} />
+              </TableCell>
+              <TableCell className="py-2 text-xs tabular-nums">
+                <AdminTimeLabel iso={run.startedAt} />
+              </TableCell>
+              <TableCell className="py-2 text-xs tabular-nums">
+                {run.completedAt ? <AdminTimeLabel iso={run.completedAt} /> : '—'}
+              </TableCell>
+              <TableCell className="text-destructive max-w-72 py-2 align-top text-xs">
+                {run.error ? (
+                  <span className="block whitespace-pre-wrap break-words" title={run.error}>
+                    {run.error}
+                  </span>
+                ) : null}
               </TableCell>
             </TableRow>
-            {expanded ? <RunSummariesTable run={run} id={summariesId} /> : null}
+            {expanded ? <RunSummariesTable run={run} router={router} id={summariesId} /> : null}
           </React.Fragment>
         );
       })}
@@ -1489,6 +1863,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
+  const [modelQuery, setModelQuery] = useState('');
 
   const modelsQuery = useModelSelectorList(undefined);
   const modelOptions = useMemo(
@@ -1514,9 +1889,15 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryFn: () => fetchBenchmarkConfig(router),
   });
 
+  // One request per poll: the worker reports whether any run of this router is
+  // running whatever the filter, so the filtered list alone drives polling.
   const runsQuery = useQuery({
     queryKey: ['auto-routing', 'benchmark-runs', router, runFilter],
     queryFn: () => fetchBenchmarkRuns(runFilter, router),
+    refetchInterval: query =>
+      query.state.data && responseRunningRunIds(query.state.data).length > 0
+        ? RUNS_POLL_INTERVAL_MS
+        : false,
   });
 
   const registryQuery = useQuery({
@@ -1529,35 +1910,44 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryFn: () => fetchBenchmarkRoutingTable(router),
   });
 
-  // Run activity drives polling and cache invalidation, so it must not depend
-  // on what the list is filtered to — a platform run finishing while the admin
-  // reads the classifier list is still a completion. On the 'all' filter this
-  // shares its key with runsQuery, so it costs no extra request.
-  const allRunsQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-runs', router, 'all'],
-    queryFn: () => fetchBenchmarkRuns('all', router),
-  });
+  // Undefined while a newly selected filter loads, so switching filters is not
+  // mistaken for a run finishing.
+  const runsData = runsQuery.data;
+  const runningRunIds = useMemo(
+    () => (runsData ? responseRunningRunIds(runsData) : undefined),
+    [runsData]
+  );
+  const hasRunningRun = (runningRunIds?.length ?? 0) > 0;
 
-  const hasRunningRun = allRunsQuery.data?.runs.some(r => r.status === 'running') ?? false;
-  const refetchRuns = runsQuery.refetch;
-  const refetchAllRuns = allRunsQuery.refetch;
-  useEffect(() => {
-    if (!hasRunningRun) return;
-    const id = setInterval(() => {
-      void refetchRuns();
-      void refetchAllRuns();
-    }, 30_000);
-    return () => clearInterval(id);
-  }, [hasRunningRun, refetchRuns, refetchAllRuns]);
+  // 'Find a model' is one client-side substring match over each run's enqueued
+  // model ids, so the answer to "did my new model run, and what did it cost"
+  // costs no request.
+  const runIdsByModel = useMemo(() => {
+    if (modelQuery.trim().length === 0) return null;
+    const ids = new Set<string>();
+    for (const run of runsQuery.data?.runs ?? []) {
+      if (runMentionsModel(run, modelQuery)) ids.add(run.id);
+    }
+    return ids;
+  }, [modelQuery, runsQuery.data]);
 
-  // When the last running run finishes, its completion publishes a routing
-  // table / classifier winner. Those live in their own query caches, so
-  // invalidate them on the running→terminal edge — otherwise the published
-  // routing table keeps showing stale data (or "No routing table published
-  // yet") until a focus refetch or manual reload.
-  const prevHasRunningRun = useRef(hasRunningRun);
+  const filteredFailedEntries = useMemo(
+    () =>
+      (registryQuery.data?.failedEntries ?? []).filter(entry =>
+        entryMentionsModel(entry, modelQuery)
+      ),
+    [modelQuery, registryQuery.data]
+  );
+
+  // A run that finishes publishes a routing table / classifier winner and
+  // settles registry rows. Those live in their own query caches, so invalidate
+  // them whenever a run leaves the running set — otherwise the published
+  // routing table keeps showing stale data while other runs are still going.
+  const prevRunning = useRef<{ router: AutoRouter; runIds: readonly string[] }>(undefined);
   useEffect(() => {
-    if (prevHasRunningRun.current && !hasRunningRun) {
+    if (runningRunIds === undefined) return;
+    const previous = prevRunning.current;
+    if (previous?.router === router && runLeftRunningSet(previous.runIds, runningRunIds)) {
       void queryClient.invalidateQueries({
         queryKey: ['auto-routing', 'benchmark-routing-table', router],
       });
@@ -1568,8 +1958,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
         queryKey: ['auto-routing', 'benchmark-registry', router],
       });
     }
-    prevHasRunningRun.current = hasRunningRun;
-  }, [hasRunningRun, queryClient, router]);
+    prevRunning.current = { router, runIds: runningRunIds };
+  }, [runningRunIds, queryClient, router]);
 
   const startRunMutation = useMutation({
     mutationFn: (input: { kind: BenchmarkKind; force: boolean; queue: BenchmarkQueueSelector }) =>
@@ -1582,7 +1972,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
             : `Classifier benchmark started — ${data.enqueuedModels} models enqueued, ${data.skippedModels.length} skipped`
         );
       } else if (data.startedRuns.length === 0) {
-        // Honest empty result: nothing pending, or the queue's slot is busy.
+        // Honest empty result: nothing pending, or the queue is starting a run or full.
         toast.success('Nothing to run — no pending registry entries for that queue');
       } else {
         toast.success(
@@ -1609,8 +1999,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     onSuccess: data => {
       toast.success(
         data.requeued === 0
-          ? 'No failed entries to requeue'
-          : `${data.requeued} failed ${data.requeued === 1 ? 'entry' : 'entries'} requeued`
+          ? 'No retryable entries are due for a retry'
+          : `${data.requeued} retryable ${data.requeued === 1 ? 'entry' : 'entries'} requeued`
       );
       void queryClient.invalidateQueries({
         queryKey: ['auto-routing', 'benchmark-registry', router],
@@ -1680,6 +2070,40 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
 
         <Card className="rounded-lg">
           <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Find a model</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 p-4 pt-0">
+            <p className="text-muted-foreground text-xs">
+              Filters the runs list and its failed models by model id. The Policy tab keeps every
+              registry row, because effort coverage there must reflect all of them.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="search"
+                value={modelQuery}
+                onChange={event => setModelQuery(event.target.value)}
+                placeholder="Filter by model id, e.g. anthropic/claude"
+                aria-label="Find a model by id"
+                className="h-8 max-w-sm text-xs"
+              />
+              {modelQuery.trim().length > 0 ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setModelQuery('')}>
+                  Clear
+                </Button>
+              ) : null}
+              {modelQuery.trim().length > 0 && runsQuery.data ? (
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {runIdsByModel?.size ?? 0} of {runsQuery.data.runs.length} runs ·{' '}
+                  {filteredFailedEntries.length} failed{' '}
+                  {filteredFailedEntries.length === 1 ? 'entry' : 'entries'}
+                </span>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg">
+          <CardHeader className="p-4 pb-2">
             <CardTitle className="text-base">Decider Registry</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 p-4 pt-0">
@@ -1696,7 +2120,13 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                   : 'Failed to load registry'}
               </div>
             ) : registryQuery.data ? (
-              <RegistrySummary data={registryQuery.data} router={router} />
+              <>
+                <RegistrySummary data={registryQuery.data} router={router} />
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-medium">Failed models</h3>
+                  <FailedModels router={router} entries={filteredFailedEntries} />
+                </div>
+              </>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1743,11 +2173,12 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                 onClick={() => requeueMutation.mutate(router === 'efficient' ? 'both' : 'platform')}
               >
                 <RotateCcw className="size-4" />
-                Requeue failed
+                Requeue retryable
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Queues also drain on a timer. A queue whose run is already active is skipped.
+              Queues also drain on a timer. A queue starts one run at a time and holds up to 4
+              active runs.
             </p>
           </CardContent>
         </Card>
@@ -1831,13 +2262,18 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                     <TableHead className="w-8" />
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
                     <TableHead>Started</TableHead>
                     <TableHead>Completed</TableHead>
                     <TableHead>Error</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <BenchmarkRunsTable runs={runsQuery.data?.runs ?? []} />
+                  <BenchmarkRunsTable
+                    runs={runsQuery.data?.runs ?? []}
+                    router={router}
+                    matchedIds={runIdsByModel}
+                  />
                 </TableBody>
               </Table>
             )}

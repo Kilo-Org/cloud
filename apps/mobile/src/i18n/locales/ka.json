@@ -19,7 +19,9 @@
     "presenceStatus": "ჰოსტები: {{connection}}",
     "commandStatus": "ბრძანების მიწოდება: {{status}}",
     "delivered": "მიწოდებულია",
-    "expired": "ვადაგასულია"
+    "expired": "ვადაგასულია",
+    "recoveryGaps_one": "ამ ტრანსკრიპტის {{displayCount}} ნაწილი აკლია.",
+    "recoveryGaps_other": "ამ ტრანსკრიპტის {{displayCount}} ნაწილი აკლია."
   },
   "common": {
     "manageOnWeb": "ვებში მართვა",
@@ -138,6 +140,7 @@
     "keepRunning": "მუშაობის გაგრძელება",
     "newSession": "ახალი სესია",
     "noModelsAvailable": "მოდელები ხელმისაწვდომი არ არის",
+    "modelRetires": "გაუქმდება {{date}}",
     "notFound": "ვერ მოიძებნა.",
     "online": "ქსელშია",
     "open": "{{name}}-ის გახსნა",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. ორგანიზაციის მფლობელს შეუძლია განაახლოს ბილინგი kilo.ai-ზე, შემდეგ კი ხელახლა სცადოს.",
     "privateRepositoryA11y": "{{name}}, პირადი რეპოზიტორია",
     "legalDocumentEnglishOnly": "ეს დოკუმენტი ხელმისაწვდომია მხოლოდ ინგლისურ ენაზე.",
-    "organizationTrialEndedBilling": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. შეგიძლიათ განაახლოთ ბილინგი, შემდეგ კი ხელახლა სცადოთ."
+    "organizationTrialEndedBilling": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. შეგიძლიათ განაახლოთ ბილინგი, შემდეგ კი ხელახლა სცადოთ.",
+    "organizationTrialEndedBillingAtKiloAi": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. შეგიძლიათ განაახლოთ ბილინგი kilo.ai-ზე, შემდეგ კი ხელახლა სცადოთ.",
+    "viewOnGitHub": "PR-ის ნახვა GitHub-ზე"
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",
@@ -275,6 +280,9 @@
     "credits": "კრედიტები",
     "failedToLoadBalance": "ბალანსის ჩატვირთვა ვერ მოხერხდა. ხელახლა ჩასატვირთად შეეხეთ.",
     "balanceLoadFailed": "ბალანსის ჩატვირთვა ვერ მოხერხდა",
+    "balanceUnreachable": "სერვერთან დაკავშირება ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "balanceAccessDenied": "თქვენ არ გაქვთ ამ ბალანსის ნახვის უფლება.",
+    "balanceUnavailable": "ბალანსის ჩატვირთვა ვერ მოხერხდა.",
     "hideBalance": "ბალანსის დამალვა",
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
@@ -505,7 +513,7 @@
     "changelogFixesPolish": "შესწორებები და გაუმჯობესებები მთელ აპში.",
     "changelogAreas": {
       "signIn": "შესვლა",
-      "profileOrganizations": "პროფილი და ორგანიზაციები"
+      "profileOrganizations": "პროფილი & ორგანიზაციები"
     }
   },
   "preferences": {
@@ -746,6 +754,9 @@
       "comment_one": "1 კომენტარი",
       "comment": "{{displayCount}} კომენტარი",
       "comment_other": "{{displayCount}} კომენტარი",
+      "conversationTruncated": "ნაჩვენებია მხოლოდ პირველი {{displayCount}} კომენტარი.",
+      "conversationTruncated_one": "ნაჩვენებია მხოლოდ პირველი {{displayCount}} კომენტარი.",
+      "conversationTruncated_other": "ნაჩვენებია მხოლოდ პირველი {{displayCount}} კომენტარი.",
       "startedRelative": " · დაიწყო {{relative}}",
       "couldNotLoadMore": "დამატებითი კომენტარების ჩატვირთვა ვერ მოხერხდა.",
       "retryLoadingMore": "დამატებითი კომენტარების ჩატვირთვის ხელახლა ცდა",
@@ -879,7 +890,6 @@
       "noAccess": "ამ საცავის შემოწმებებზე წვდომა არ გაქვს.",
       "couldNotLoad": "შემოწმებების ჩატვირთვა ვერ მოხერხდა.",
       "retryChecks": "შემოწმებების ხელახლა ცდა",
-      "viewOnGitHub": "PR-ის ნახვა GitHub-ზე",
       "noChecksReported": "შემოწმებების მონაცემები არ არის",
       "passed": "{{displayCount}} წარმატებულია",
       "passed_one": "{{displayCount}} წარმატებულია",
@@ -934,9 +944,9 @@
       "checkFailedTitleGitLab": "GitLab-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "providerCheckFailedMessage": "პროვაიდერთან დაკავშირება ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
-      "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
-      "reconnectTitleGitLab": "GitLab-თან ხელახლა დაკავშირება",
-      "reconnectTitleBitbucket": "Bitbucket-თან ხელახლა დაკავშირება",
+      "reconnectTitle": "ხელახლა დააკავშირე GitHub",
+      "reconnectTitleGitLab": "ხელახლა დააკავშირე GitLab",
+      "reconnectTitleBitbucket": "ხელახლა დააკავშირე Bitbucket",
       "reconnectDescription": "GitHub-თან კავშირი გაუქმდა.",
       "gitlabDescription": "შერწყმის მოთხოვნების შემოწმება მობილურზე",
       "gitlabInstanceMismatchTitle": "GitLab-ის დაკავშირება სხვა ინსტანციისთვისაა",
@@ -963,6 +973,8 @@
       "pendingComment": "გაუგზავნელი კომენტარი",
       "pendingComment_other": "გაუგზავნელი კომენტარი",
       "submitCountOfTotal": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
+      "submitCountOfTotal_one": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
+      "submitCountOfTotal_other": "{{displayTotalCount}}-დან {{displayFreshCount}} კომენტარის გაგზავნა",
       "submitReview": "შემოწმების შედეგის გაგზავნა",
       "partialPostedFresh": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",
       "partialPostedFresh_one": "გამოქვეყნდა {{displayFreshCount}} კომენტარი. ",
@@ -1387,13 +1399,16 @@
     "followReviewMd": "REVIEW.md-ის მითითებების დაცვა",
     "followReviewMdSubtitle": "თითოეული რეპოზიტორის REVIEW.md ფაილში მოცემული ინსტრუქციების დაცვა",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket არ არის დაკავშირებული. მისი დაკავშირება მხოლოდ ორგანიზაციის მფლობელებს, ადმინისტრატორებსა და ანგარიშსწორების მენეჯერებს შეუძლიათ."
+      "notConnectedReadOnlyPlan": "ორგანიზაციის საცდელი პერიოდი დასრულდა, ამიტომ მფლობელმა ბილინგი უნდა განაახლოს kilo.ai-ზე."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ის Bitbucket-თან კავშირი იმართება ვებში, კომპიუტერიდან.",
+      "managedOnWebTitle": "იმართება ვებში",
+      "managedOnWebShort": "ეს კავშირი იმართება ვებში, კომპიუტერიდან.",
+      "managedOnWebRepositories": "აირჩიე რეპოზიტორიები {{organization}}-ისთვის ვებში, კომპიუტერიდან.",
       "description": "შექმენი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი ქვემოთ.",
       "descriptionReconnect": "შექმენი ახალი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი ქვემოთ.",
-      "descriptionOverview": "შექმენი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი შემდეგ ეკრანზე.",
+      "descriptionOverview": "შექმენი სამუშაო სივრცის წვდომის ტოკენი და ჩასვი შემდეგ ეკრანზე.",
       "scopes": "ანგარიში: წაკითხვა · რეპოზიტორები: წაკითხვა/ჩაწერა · PR-ები: წაკითხვა · ვებჰუკები: წაკითხვა/ჩაწერა",
       "tokenPlaceholder": "სამუშაო სივრცის წვდომის ტოკენი",
       "tokenRefused": "Bitbucket-მა არ მიიღო ეს სამუშაო სივრცის წვდომის ტოკენი. შეამოწმე, რომ მას აქვს ზემოთ მოცემული ნებართვები, შემდეგ კი სცადე ხელახლა."
@@ -1414,6 +1429,7 @@
     "platformList": {
       "checking": "მოწმდება…",
       "statusUnavailable": "სტატუსი ხელმისაწვდომი არ არის",
+      "needsAttention": "ყურადღება სჭირდება",
       "platforms": "პლატფორმები",
       "activity": "აქტივობა"
     },
@@ -2784,6 +2800,8 @@
     "modelPicker": {
       "title": "მოდელის არჩევა",
       "noModelsDescription": "ამჟამად ასარჩევი მოდელები არ არის.",
+      "allUnavailableTitle": "არცერთი მოდელის გამოყენება შეუძლებელია",
+      "allUnavailableDescription": "დაამატეთ პროვაიდერის გასაღები და სცადეთ ხელახლა.",
       "favorites": "რჩეულები"
     },
     "modelSelector": {
@@ -3617,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "ორგანიზაციის სახელის შეცვლა",
-      "renamePlaceholder": "ორგანიზაციის სახელი",
+      "renamePlaceholder": "შეიყვანეთ ორგანიზაციის სახელი",
       "balance": "ბალანსი",
       "plan": "გეგმა",
       "planTeams": "Teams",
@@ -4077,7 +4095,13 @@
     "providerUnavailable": "პროვაიდერი ახლა მიუწვდომელია. გაგზავნეთ ხელახლა ცოტა ხანში."
   },
   "settingsTools": {
-    "confirmTitle": "დავადასტუროთ ეს ცვლილება?"
+    "confirmTitle": "დავადასტუროთ ეს ცვლილება?",
+    "guarded": {
+      "spendAlertsOff": "გამორთოთ ხარჯვის შეტყობინებები? თქვენ აღარ მიიღებთ შეტყობინებებს ხარჯვის ზღვრის გადაკვეთისა და საათობრივი ნახტომების შესახებ.",
+      "balanceAlertsOff": "გამორთოთ ბალანსის შეტყობინებები? თქვენ აღარ მიიღებთ შეტყობინებებს, როდესაც თქვენი კრედიტები ამოიწურება.",
+      "securityFindingsOff": "გამორთოთ უსაფრთხოების აღმოჩენები? თქვენ აღარ მიიღებთ შეტყობინებებს ახალი უსაფრთხოების აღმოჩენების შესახებ.",
+      "hideBalanceOn": "დამალოთ თქვენი ბალანსები? კრედიტის ბალანსები აღარ გამოჩნდება პროფილის ეკრანებსა და ორგანიზაციის ჰაბზე."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4849,7 @@
   },
   "organizationGuardrails": {
     "title": "ხელოვნური ინტელექტის დამცავი ზღუდეები",
-    "permissionDenied": "მხოლოდ ორგანიზაციის მფლობელებს და ადმინისტრატორებს შეუძლიათ ხელოვნური ინტელექტის დამცავი ზღუდეების მართვა.",
+    "permissionDenied": "მხოლოდ ორგანიზაციის მფლობელებს და ადმინისტრატორებს შეუძლიათ ხელოვნური ინტელექტის დამცავი ზღუდეების მართვა. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ხელოვნური ინტელექტის დამცავი ზღუდეები არ არის ჩართული",
     "unavailable": "Kilo ორგანიზაციისთვის ხელოვნური ინტელექტის დამცავ ზღუდეებს მოთხოვნის საფუძველზე რთავს. დაუკავშირდით {{supportEmail}}-ს და Kilo-ს გუნდი ჩართავს მათ თქვენი ორგანიზაციისთვის.",
     "contactSupport": "მხარდაჭერასთან დაკავშირება",
@@ -4837,12 +4861,15 @@
     "inputDescription": "ყოველ შემავალ მონაცემს ამოწმებს Enkrypt AI-ის საშუალებით, მათ შორის ხელსაწყოების შედეგებს. როცა Enkrypt მიუწვდომელია, მოთხოვნები უარყოფის ნაცვლად შემოწმების გარეშე იგზავნება.",
     "outputTitle": "გამავალი მონაცემების დამცავი ზღუდეები",
     "outputDescription": "პასუხებს ამოწმებს Enkrypt AI-ის საშუალებით, სანამ წევრები მათ მიიღებენ. გამორთულია, თუ არ ჩართავთ.",
+    "outputUnavailable": "Kilo-ს ამ ორგანიზაციისთვის გამავალი მონაცემების სკანირება არ ჩაურთავს, ამიტომ პასუხები არ მოწმდება და აქ დასაყენებელი არაფერია. მოთხოვნისთვის დაუკავშირდით {{supportEmail}}-ს.",
     "detectorsHint": "ბლოკირება უარყოფს მონიშნულ მოთხოვნას. მხოლოდ ჩაწერა მას აღრიცხავს მოთხოვნის შეყოვნების გარეშე.",
     "detectorsHintOutput": "ბლოკირება იწვევს მონიშნული პასუხის ჩავარდნას. მხოლოდ ჩაწერა მას აღრიცხავს პასუხის შეყოვნების გარეშე.",
     "choiceLog": "მხოლოდ ჩაწერა",
     "applyTo": "გამოყენება",
     "applyToAllMembers": "ყველა წევრი",
     "applyKiloDefault": "Kilo-ის ნაგულისხმევის გამოყენება",
+    "applyKiloDefaultEnglishNote": "Kilo-ს ნაგულისხმევი პოლიტიკის ტექსტი ინგლისურადაა, რადგან Kilo Gateway მას ზუსტად ისე იყენებს, როგორც დაწერილია.",
+    "applyKiloDefaultReplaceMessage": "Kilo-ს ნაგულისხმევი პოლიტიკა ინგლისურადაა დაწერილი და ცვლის იმას, რაც პოლიტიკის დარღვევაში დააყენეთ. პოლიტიკის ტექსტის ველში შეყვანილი ტექსტის აღდგენა შეუძლებელია.",
     "invalidSavedTitle": "შენახული შემავალი დეტექტორის პარამეტრები ვერ იკითხება",
     "invalidSavedBody": "მოთხოვნები დაბლოკილია, სანამ შემავალი დეტექტორები ხელახლა არ შეინახება. ქვემოთ მოცემული დეტექტორები იწყება Kilo-ის ნაგულისხმევიდან.",
     "invalidSavedOutputTitle": "შენახული გამავალი დეტექტორის პარამეტრები ვერ იკითხება",
@@ -4977,6 +5004,8 @@
     "providersDescription": "გამორთეთ პროვაიდერი, რომ Kilo-მ ამ ორგანიზაციისთვის მასზე მარშრუტიზაცია შეწყვიტოს.",
     "providersNeedCatalog": "პროვაიდერების გადამრთველები მხოლოდ წაკითხვადი რჩება, სანამ მოდელების სრული კატალოგი არ ჩაიტვირთება. მათი რედაქტირებისთვის დააჭირეთ ზემოთ ღილაკს ხელახლა ცდა.",
     "providersEmpty": "ამ ძიებას არცერთი პროვაიდერი არ ემთხვევა.",
+    "providersNone": "ამ ორგანიზაციისთვის არცერთი პროვაიდერი არ არის ხელმისაწვდომი.",
+    "providersUnavailable": "პროვაიდერების სია ვერ ჩაიტვირთა.",
     "allowAllShown": "ყველა ნაჩვენებულის დაშვება",
     "denyAllShown": "ყველა ნაჩვენებულის აკრძალვა",
     "gatewaysDescription": "Kilo მოდელის მოთხოვნებს Vercel AI Gateway-ის ან OpenRouter-ის მეშვეობით მარშრუტიზაციას უკეთებს. გამორთული გეითვეი ამ მოთხოვნებს წარუმატებელს ხდის.",

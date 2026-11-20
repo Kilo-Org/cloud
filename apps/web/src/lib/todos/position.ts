@@ -5,11 +5,8 @@
 const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 const VALID_KEY = /^[0-9a-z]*[1-9a-z]$/;
 
-function digitAt(key: string, index: number): number {
-  const char = key[index];
-  const digit = char === undefined ? -1 : DIGITS.indexOf(char);
-  if (digit === -1) throw new Error('Invalid position key');
-  return digit;
+function firstDigit(key: string): number {
+  return DIGITS.indexOf(key.charAt(0));
 }
 
 function midpoint(lower: string, upper: string | null): string {
@@ -20,8 +17,8 @@ function midpoint(lower: string, upper: string | null): string {
       return upper.slice(0, shared) + midpoint(lower.slice(shared), upper.slice(shared));
     }
   }
-  const lowerDigit = lower === '' ? 0 : digitAt(lower, 0);
-  const upperDigit = upper === null ? DIGITS.length : digitAt(upper, 0);
+  const lowerDigit = lower === '' ? 0 : firstDigit(lower);
+  const upperDigit = upper === null ? DIGITS.length : firstDigit(upper);
   if (upperDigit - lowerDigit > 1) {
     // Step by one beside an open end so repeated prepends and appends grow
     // keys by one character per run of digits instead of halving each time.

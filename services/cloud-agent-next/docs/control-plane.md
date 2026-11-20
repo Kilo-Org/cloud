@@ -793,7 +793,8 @@ keep environment snapshots and existing history/worktree recovery.
   Missing native sessions use history-only recovery.
   A re-pointed record keeps the fields it already carries, including the wider shapes a record may
   hold: the import accepts a summary that carries file diffs and a revert that carries a patch diff,
-  and serves both back with the record. The native import cannot carry a
+  and the record read back returns the patch diff unchanged and each diff entry with its file,
+  additions, deletions and status. The native import cannot carry a
   session permission ruleset, so the ruleset is applied right after it and, when that could not
   complete, remembered beside the wrapper's durable state. A create path that finds the obligation
   already remembered does not rewrite it. Every prepare settles a remembered ruleset before the

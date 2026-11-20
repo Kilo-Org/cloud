@@ -39,11 +39,15 @@ type ReadRequestBodyResult =
   | { ok: false; code: DeviceAuthRefusalCode };
 
 /**
- * The requesting client named by the body, or null when it names none.
- * A body that names an unusable client is refused rather than trimmed, so the
- * page never shows a description the approver cannot decide on.
+ * The pairing request a caller sent: the client it names, the pending link it
+ * carries, or the reason the body could not be used.
+ *
+ * No body at all keeps the plain flow, because the shipped clients send none. A
+ * named client that fails its schema is refused rather than trimmed, so the page
+ * never shows a description the approver cannot decide on. The failing field
+ * decides which refusal names it.
  */
-async function readRequestingClient(request: Request): Promise<ReadRequestBodyResult> {
+async function readPairingBody(request: Request): Promise<ReadRequestBodyResult> {
   let rawBody: string;
   try {
     rawBody = await request.text();
@@ -85,25 +89,25 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
   const userAgent = headersList.get('user-agent') || undefined;
   const ipAddress = callerAddressOrNull(headersList) ?? undefined;
 
-  const requestingClient = await readRequestingClient(request);
-  if (!requestingClient.ok) {
+  const pairingBody = await readPairingBody(request);
+  if (!pairingBody.ok) {
     return NextResponse.json(
       {
-        error: requestingClient.code,
-        message: refusalCopyFor(requestingClient.code),
+        error: pairingBody.code,
+        message: refusalCopyFor(pairingBody.code),
       },
       { status: 400 }
     );
   }
 
   if (
-    requestingClient.pendingLinkToken &&
-    !(await getPendingLinkBySecret(requestingClient.pendingLinkToken))
+    pairingBody.pendingLinkToken &&
+    !(await getPendingLinkBySecret(pairingBody.pendingLinkToken))
   ) {
     return NextResponse.json(
       {
         error: DEVICE_AUTH_REFUSAL_CODES.pendingLinkExpired,
-        message: 'This sign-in link has expired. Start the sign-in again.',
+        message: refusalCopyFor(DEVICE_AUTH_REFUSAL_CODES.pendingLinkExpired),
       },
       { status: 400 }
     );
@@ -119,9 +123,9 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
     } = await createDeviceAuthRequest({
       userAgent,
       ipAddress,
-      ...(requestingClient.client ? { requestingClient: requestingClient.client } : {}),
-      ...(requestingClient.pendingLinkToken
-        ? { pendingLinkToken: requestingClient.pendingLinkToken }
+      ...(pairingBody.client ? { requestingClient: pairingBody.client } : {}),
+      ...(pairingBody.pendingLinkToken
+        ? { pendingLinkToken: pairingBody.pendingLinkToken }
         : {}),
     });
 

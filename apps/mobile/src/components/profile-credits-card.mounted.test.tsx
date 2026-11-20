@@ -1179,13 +1179,19 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
-  /** The one-row arm's control slot: the row's last child, beside the value column. */
+  /**
+   * The one-row arm's control slot: the row's last child, beside the value column.
+   * The row is reanimated's `Animated.View` (it animates its own layout), which is
+   * not a host `View` in the rendered tree, so it is matched by its classes alone.
+   */
   function controlSlot(renderer: ReactTestRenderer): ReactTestInstance {
-    const row = renderer.root.find(
-      node =>
-        Object.is(node.type, 'View') &&
-        hasClasses(node, ['min-w-0', 'flex-1', 'flex-row', 'items-center', 'gap-1'])
+    const rows = renderer.root.findAll(node =>
+      hasClasses(node, ['min-w-0', 'flex-1', 'flex-row', 'items-center', 'gap-1'])
     );
+    const row = rows[0];
+    if (rows.length !== 1 || row === undefined) {
+      throw new Error(`Expected one one-row arm, received ${rows.length}`);
+    }
     const slot = row.children.at(-1);
     if (slot === undefined || typeof slot === 'string') {
       throw new Error('The one-row arm has no control slot');

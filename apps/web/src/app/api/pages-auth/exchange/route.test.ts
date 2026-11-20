@@ -1,7 +1,11 @@
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
-import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  getProfileOrganizations,
+  getUserOrgMemberships,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
@@ -26,6 +30,11 @@ jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
 
 jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getProfileOrganizations: jest.fn(),
+  getUserOrgMemberships: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
+  resolveSsoAuthorityForDomain: jest.fn(),
 }));
 
 jest.mock('@/lib/user', () => ({
@@ -36,6 +45,8 @@ const mockedFindUserById = jest.mocked(findUserById);
 const mockedGetUserAuthProviders = jest.mocked(getUserAuthProviders);
 const mockedIsUserBlacklistedByDomain = jest.mocked(isUserBlacklistedByDomain);
 const mockedGetProfileOrganizations = jest.mocked(getProfileOrganizations);
+const mockedGetUserOrgMemberships = jest.mocked(getUserOrgMemberships);
+const mockedResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
 
 const NEXTAUTH_TEST_SECRET = 'synthetic-pages-auth-exchange-secret';
 const NOW = new Date('2026-03-01T12:00:00.000Z');
@@ -46,9 +57,17 @@ const DEV_SECRET = 'd'.repeat(40);
 const STATE = 'S'.repeat(43);
 const organizations = [{ id: 'org-1', name: 'Kilo', role: 'member' }];
 
-/** Provider rows as the route reads them; only `provider` and `email` matter. */
-const providerRows = (...rows: [provider: string, email: string][]) =>
-  rows.map(([provider, email]) => ({ provider, email })) as never;
+/**
+ * Provider rows as the route reads them; only `provider`, `email` and
+ * `hosted_domain` matter. An SSO sign-in writes `hosted_domain`; directory sync
+ * leaves it null, which is the default here.
+ */
+const providerRows = (...rows: [provider: string, email: string, hostedDomain?: string][]) =>
+  rows.map(([provider, email, hostedDomain]) => ({
+    provider,
+    email,
+    hosted_domain: hostedDomain ?? null,
+  })) as never;
 
 /** `secret` is sent as a bearer credential; `authorization` replaces the whole header. */
 function exchange(body: unknown, secret: string | null = SECRET, authorization?: string) {
@@ -110,6 +129,14 @@ describe('POST /api/pages-auth/exchange', () => {
     mockedIsUserBlacklistedByDomain.mockResolvedValue(false);
     mockedGetProfileOrganizations.mockResolvedValue(organizations as never);
     mockedGetUserAuthProviders.mockResolvedValue(providerRows(['google', 'ada@kilo.test']));
+    // The domain requires SSO through an organization the account belongs to,
+    // so a case that leaves the key out does so for the reason it names.
+    mockedResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'kilo.test',
+      sourceOrganizationId: 'org-sso',
+    });
+    mockedGetUserOrgMemberships.mockResolvedValue([{ orgId: 'org-sso', role: 'member' }]);
   });
 
   afterEach(() => {
@@ -186,6 +213,91 @@ describe('POST /api/pages-auth/exchange', () => {
         const { user } = await response.json();
         expect(user).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
         expect('verified_email' in user).toBe(false);
+      });
+    });
+
+    describe('for a company SSO sign-in', () => {
+      const send = () => exchange({ code: codeFor(), audience: PAGES, state: STATE });
+
+      async function sentUser() {
+        const response = await send();
+        expect(response.status).toBe(200);
+        return (await response.json()).user;
+      }
+
+      test('carries the primary address when the domain requires SSO through an organization the account belongs to', async () => {
+        mockedGetUserAuthProviders.mockResolvedValueOnce(
+          providerRows(['workos', 'ada@kilo.test', 'kilo.test'])
+        );
+
+        expect(await sentUser()).toEqual({
+          id: 'user-1',
+          name: 'Ada Lovelace',
+          verified_email: 'ada@kilo.test',
+        });
+        expect(mockedResolveSsoAuthorityForDomain).toHaveBeenCalledWith('kilo.test');
+        expect(mockedGetUserOrgMemberships).toHaveBeenCalledWith('user-1');
+      });
+
+      test('ignores case in the row address and domain', async () => {
+        mockedGetUserAuthProviders.mockResolvedValueOnce(
+          providerRows(['workos', 'Ada@Kilo.TEST', 'Kilo.TEST'])
+        );
+
+        expect((await sentUser()).verified_email).toBe('ada@kilo.test');
+      });
+
+      test.each([
+        ['the domain does not require SSO', { status: 'not_required', domain: 'kilo.test' }],
+        [
+          'the domain authority is misconfigured',
+          { status: 'misconfigured', domain: 'kilo.test', reason: 'ambiguous_domain' },
+        ],
+        [
+          'the domain requires SSO through a different organization',
+          { status: 'required', domain: 'kilo.test', sourceOrganizationId: 'org-other' },
+        ],
+      ] as const)('leaves the key out when %s', async (_name, authority) => {
+        mockedGetUserAuthProviders.mockResolvedValueOnce(
+          providerRows(['workos', 'ada@kilo.test', 'kilo.test'])
+        );
+        mockedResolveSsoAuthorityForDomain.mockResolvedValueOnce(authority);
+
+        expect(await sentUser()).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+      });
+
+      test('leaves the key out when the account is not a member of the authority organization', async () => {
+        mockedGetUserAuthProviders.mockResolvedValueOnce(
+          providerRows(['workos', 'ada@kilo.test', 'kilo.test'])
+        );
+        mockedGetUserOrgMemberships.mockResolvedValueOnce([{ orgId: 'org-1', role: 'member' }]);
+
+        expect(await sentUser()).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+      });
+
+      test.each([
+        ['a directory-sync row, which carries no hosted domain', ['workos', 'ada@kilo.test']],
+        ['an SSO row for a different address', ['workos', 'grace@kilo.test', 'kilo.test']],
+        ['an SSO row for a + alias', ['workos', 'ada+pages@kilo.test', 'kilo.test']],
+        [
+          'an SSO row whose domain is not the primary address domain',
+          ['workos', 'ada@kilo.test', 'old.test'],
+        ],
+        ['an Apple row on the SSO domain', ['apple', 'ada@kilo.test', 'kilo.test']],
+      ] as const)(
+        'leaves the key out, without reading the authority, for %s',
+        async (_name, row) => {
+          mockedGetUserAuthProviders.mockResolvedValueOnce(providerRows([...row]));
+
+          expect(await sentUser()).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+          expect(mockedResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+          expect(mockedGetUserOrgMemberships).not.toHaveBeenCalled();
+        }
+      );
+
+      test('does not read the authority for an address another method verified', async () => {
+        expect((await sentUser()).verified_email).toBe('ada@kilo.test');
+        expect(mockedResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
       });
     });
   });

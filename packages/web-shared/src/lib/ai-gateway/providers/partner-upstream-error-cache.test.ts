@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { after } from 'next/server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   getPartnerSession,
   hasRecentPartnerUpstreamError,
@@ -38,10 +39,30 @@ describe('getPartnerSession', () => {
           kind: 'responses',
           body: { model: 'acme/model', input: 'hi', prompt_cache_key: 'session-1' },
         },
+        null,
         'user-1',
         'acme/model'
       )
     ).toEqual(session);
+  });
+
+  it('prefers the task id, from which the gateway derives the upstream prompt cache key', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'acme/model', messages: [], prompt_cache_key: 'client-key' },
+    };
+    expect(getPartnerSession(request, 'task-1', 'user-1', 'acme/model')).toEqual({
+      ...session,
+      promptCacheKey: 'task-1',
+    });
+    expect(
+      getPartnerSession(
+        { kind: 'chat_completions', body: { model: 'acme/model', messages: [] } },
+        'task-1',
+        'user-1',
+        'acme/model'
+      )
+    ).toEqual({ ...session, promptCacheKey: 'task-1' });
   });
 
   it.each([
@@ -52,7 +73,7 @@ describe('getPartnerSession', () => {
     ],
     ['a messages request', { kind: 'messages', body: { model: 'm', messages: [], max_tokens: 1 } }],
   ] as const)('returns null for %s', (_name, request) => {
-    expect(getPartnerSession(request as never, 'user-1', 'acme/model')).toBeNull();
+    expect(getPartnerSession(request as never, null, 'user-1', 'acme/model')).toBeNull();
   });
 });
 

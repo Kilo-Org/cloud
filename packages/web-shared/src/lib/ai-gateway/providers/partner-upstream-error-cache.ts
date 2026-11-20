@@ -14,15 +14,21 @@ export const PARTNER_UPSTREAM_ERROR_TTL_SECONDS = 5 * 60;
 /** One caller's session with one partner, identified by the request's prompt cache key. */
 export type PartnerSession = { userId: string; partnerId: string; promptCacheKey: string };
 
-/** The session of a request that carries a prompt cache key, or null without one. */
+/**
+ * The session of a request that is sent with a prompt cache key, or null without one. Routing runs
+ * before `applyTrackingIds` derives the upstream key from the task id, so this follows the same
+ * precedence: the task id, then the client's own `prompt_cache_key`.
+ */
 export function getPartnerSession(
   request: GatewayRequest,
+  taskId: string | null | undefined,
   userId: string,
   partnerId: string
 ): PartnerSession | null {
   if (request.kind === 'messages') return null;
-  const promptCacheKey = request.body.prompt_cache_key;
-  if (typeof promptCacheKey !== 'string' || !promptCacheKey) return null;
+  const clientKey = request.body.prompt_cache_key;
+  const promptCacheKey = taskId || (typeof clientKey === 'string' ? clientKey : '');
+  if (!promptCacheKey) return null;
   return { userId, partnerId, promptCacheKey };
 }
 

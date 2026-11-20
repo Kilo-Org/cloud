@@ -462,7 +462,7 @@ async function resolvePartnerRoute(
   if (input.boundedSpending) return 'bounded-spending';
   // Implied by an inference region, which admits only Kilo's Vercel AI Gateway route.
   if (input.openRouterDisabled) return 'openrouter-disabled';
-  const session = getPartnerSession(input.request, input.user.id, partner.public_id);
+  const session = getPartnerSession(input.request, input.taskId, input.user.id, partner.public_id);
   // Started now so the Redis read overlaps the provider settings lookups. It never rejects.
   const recentUpstreamError = session ? hasRecentPartnerUpstreamError(session) : null;
   const providerConfig = withIgnoredProviders(
@@ -552,6 +552,8 @@ export type GetProviderInput = {
   isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
+  /** The `x-kilocode-taskid` header, from which the upstream prompt cache key is derived. */
+  taskId?: string | null;
   /** Receives the steps and BYOK candidates behind the result, when the call returns. */
   onDecision?: (decision: ProviderRoutingDecision) => void;
 };

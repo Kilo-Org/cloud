@@ -451,6 +451,19 @@ describe('getProvider skips the partner', () => {
     });
   });
 
+  test('identifies the session by the task id the upstream prompt cache key derives from', async () => {
+    await insertPartner();
+    jest.mocked(hasRecentPartnerUpstreamError).mockResolvedValue(true);
+
+    await expectKiloRouteOnly({ taskId: 'task-1' }, 'recent-upstream-error');
+
+    expect(hasRecentPartnerUpstreamError).toHaveBeenCalledWith({
+      userId: user.id,
+      partnerId: MODEL,
+      promptCacheKey: 'task-1',
+    });
+  });
+
   test('a request without a prompt cache key never reads the session cache', async () => {
     await insertPartner();
     jest.mocked(hasRecentPartnerUpstreamError).mockResolvedValue(true);

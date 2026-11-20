@@ -6,6 +6,19 @@ function stripGitSuffix(value: string): string {
 }
 
 /**
+ * Split a raw URL path into the segments that belong to the project. Empty
+ * segments are dropped, so a trailing slash or a doubled separator adds no
+ * part. A GitLab `-` separator at index 2 or later ends the project path: the
+ * parts after it (`tree`, `blob`, `issues`) address something inside the
+ * repository rather than the repository itself.
+ */
+function projectPathSegments(path: string): string[] {
+  const segments = path.split('/').filter(Boolean);
+  const dashIndex = segments.indexOf('-');
+  return dashIndex >= 2 ? segments.slice(0, dashIndex) : segments;
+}
+
+/**
  * Render a git URL as the `owner/repo` path its labels and filter keys show.
  * One normalizer serves every surface that names a repository, so an https URL,
  * an ssh URL and an already-short `owner/repo` value compare the same way on
@@ -18,10 +31,10 @@ function stripGitSuffix(value: string): string {
  * returned unchanged.
  */
 export function formatGitUrlProject(gitUrl: string): string {
-  const sshMatch = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl);
+  const sshMatch = /^git@[^:]+:(.+)$/.exec(gitUrl);
   const sshPath = sshMatch?.[1];
   if (sshPath) {
-    return stripGitSuffix(decodePercentEncodedSegments(sshPath));
+    return stripGitSuffix(decodePercentEncodedSegments(projectPathSegments(sshPath).join('/')));
   }
 
   const protocolIndex = gitUrl.indexOf('://');
@@ -39,9 +52,7 @@ export function formatGitUrlProject(gitUrl: string): string {
   const pathText = gitUrl.slice(pathStart + 1);
   const pathEnd = pathText.search(/[?#]/);
   const rawPath = pathEnd === -1 ? pathText : pathText.slice(0, pathEnd);
-  const pathParts = rawPath.split('/').filter(Boolean);
-  const dashIndex = pathParts.indexOf('-');
-  const projectParts = dashIndex >= 2 ? pathParts.slice(0, dashIndex) : pathParts;
+  const projectParts = projectPathSegments(rawPath);
 
   if (projectParts.length >= 2) {
     return stripGitSuffix(decodePercentEncodedSegments(projectParts.join('/')));

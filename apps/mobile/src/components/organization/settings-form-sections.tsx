@@ -84,7 +84,12 @@ export function SettingsSection({
   );
 }
 
-/** A row that opens a picker: its label, the current choice, and the disclosure glyph. */
+/**
+ * A row for a setting's current choice: its label and value, plus the
+ * disclosure glyph when pressing it opens a picker. A row without `onPress`
+ * states a value the reader cannot change yet, so it carries neither the glyph
+ * nor a press target and reads as plain text in the same geometry.
+ */
 export function SettingsValueRow({
   label,
   value,
@@ -94,7 +99,7 @@ export function SettingsValueRow({
 }: Readonly<{
   label: string;
   value: string;
-  onPress: () => void;
+  onPress?: () => void;
   disabled?: boolean;
   /** Overrides for a row inside a padded block, e.g. `px-0`. */
   className?: string;
@@ -113,7 +118,7 @@ export function SettingsValueRow({
             <Text variant="caption" className="shrink" numberOfLines={1}>
               {value}
             </Text>
-            <RowChevron />
+            {onPress === undefined ? null : <RowChevron />}
           </View>
         ),
       }}

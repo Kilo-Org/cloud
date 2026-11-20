@@ -119,6 +119,11 @@ export function DestructiveConfirmDialog({
         // The sheet floats above its content, never at the window top, so the
         // header reserves no status-bar clearance.
         topInset="never"
+        // The card draws no handle and no page chrome above the header, so the
+        // header's own padding is the whole band over the title: it takes the
+        // body's inset instead of the default `pt-4`, which left the title with
+        // twice the space over it that its divider leaves under it.
+        padTopToBody
         onDone={() => {
           dismiss(onCancel);
         }}

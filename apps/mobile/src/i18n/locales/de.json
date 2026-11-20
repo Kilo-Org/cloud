@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, privates Repository",
     "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
     "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
+    "organizationTrialEndedBillingAtKiloAi": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "viewOnGitHub": "PR auf GitHub ansehen"
   },
   "language": {
@@ -699,7 +700,6 @@
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
       "notConnectedReadOnlyPlan": "Die Testphase der Organisation ist beendet, daher muss ein Inhaber die Abrechnung unter kilo.ai aktualisieren."
     },
     "bitbucketConnect": {
@@ -709,7 +709,7 @@
       "managedOnWebRepositories": "Wähle die Repositories für {{organization}} im Web über einen Computer aus.",
       "description": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "descriptionReconnect": "Erstelle ein neues Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
-      "descriptionOverview": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es auf dem nächsten Bildschirm ein.",
+      "descriptionOverview": "Erstelle ein Workspace-Zugriffstoken und füge es auf dem nächsten Bildschirm ein.",
       "scopes": "Konto: Lesen · Repositories: Lesen/Schreiben · Pull-Requests: Lesen · Webhooks: Lesen/Schreiben",
       "tokenPlaceholder": "Workspace-Zugriffstoken",
       "tokenRefused": "Bitbucket hat dieses Workspace-Zugriffstoken nicht akzeptiert. Prüfe, ob es die oben genannten Berechtigungen enthält, und versuche es dann erneut."
@@ -4858,12 +4858,15 @@
     "inputDescription": "Prüft jede Eingabe mit Enkrypt AI, einschließlich Tool-Ergebnissen. Wenn Enkrypt nicht verfügbar ist, werden Anfragen ungeprüft gesendet, statt abgelehnt zu werden.",
     "outputTitle": "Ausgabe-Guardrails",
     "outputDescription": "Prüft Antworten mit Enkrypt AI, bevor Mitglieder sie erhalten. Standardmäßig aus.",
+    "outputUnavailable": "Kilo hat die Ausgabeprüfung für diese Organisation nicht aktiviert, daher werden Antworten nicht geprüft und hier gibt es nichts einzustellen. Kontaktiere {{supportEmail}}, um sie anzufordern.",
     "detectorsHint": "Blockieren lehnt eine markierte Anfrage ab. Nur protokollieren zeichnet sie auf, ohne die Anfrage zu verzögern.",
     "detectorsHintOutput": "Blockieren lässt eine markierte Antwort fehlschlagen. Nur protokollieren zeichnet sie auf, ohne die Antwort zu verzögern.",
     "choiceLog": "Nur protokollieren",
     "applyTo": "Anwenden auf",
     "applyToAllMembers": "Alle Mitglieder",
     "applyKiloDefault": "Kilo-Standard anwenden",
+    "applyKiloDefaultEnglishNote": "Der Text der Kilo-Standardrichtlinie ist auf Englisch, weil das Kilo Gateway ihn genau so anwendet, wie er geschrieben ist.",
+    "applyKiloDefaultReplaceMessage": "Die Kilo-Standardrichtlinie ist auf Englisch verfasst und ersetzt, was du unter Richtlinienverstoß festgelegt hast. Der im Feld für den Richtlinientext eingegebene Text kann nicht wiederhergestellt werden.",
     "invalidSavedTitle": "Gespeicherte Einstellungen der Eingabe-Detektoren können nicht gelesen werden",
     "invalidSavedBody": "Anfragen werden blockiert, bis die Eingabe-Detektoren erneut gespeichert werden. Die Detektoren unten basieren auf dem Kilo-Standard.",
     "invalidSavedOutputTitle": "Gespeicherte Einstellungen der Ausgabe-Detektoren können nicht gelesen werden",

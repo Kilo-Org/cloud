@@ -1,5 +1,9 @@
 import { Hono } from 'hono';
-import { AUTO_ROUTERS } from '@kilocode/auto-routing-contracts';
+import {
+  AUTO_ROUTERS,
+  type AutoRouter,
+  type ProductionAutoMetrics,
+} from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
@@ -19,7 +23,7 @@ import {
   sweepStaleRunsAndDrain,
   type BenchmarkJobMessage,
 } from './run';
-import { dailyReconcileSubscriptions } from './subscriptions';
+import { continueDailyReconcile, dailyReconcileSubscriptions } from './subscriptions';
 
 // Queue name of the dead-letter queue, matched against batch.queue.
 const DLQ_NAME = 'auto-routing-benchmark-dlq';
@@ -27,7 +31,107 @@ const DLQ_NAME = 'auto-routing-benchmark-dlq';
 // Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
 export { BenchRunnerContainer } from './bench-runner-container';
 
+type StepResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/**
+ * Runs one router's daily branch with every step isolated. A failed registry sync, drain or
+ * publish still lets the others run, and the alias sync reports its own outcome instead of
+ * throwing, so one D1 error cannot discard the day's detection, queueing and publication.
+ * The summary event carries each step's outcome; a step that fails is also collected for the
+ * scheduled handler's aggregate error.
+ */
+async function runDailyPlatformSync(
+  cron: string,
+  env: Env,
+  router: AutoRouter,
+  production: ProductionAutoMetrics | null,
+  errors: unknown[]
+): Promise<void> {
+  const step = async <T>(name: string, run: () => Promise<T>): Promise<StepResult<T>> => {
+    try {
+      return { ok: true, value: await run() };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_daily_step_failed',
+          cron,
+          router,
+          step: name,
+          error: message,
+        })
+      );
+      errors.push(new Error(`${router} ${name}: ${message}`));
+      return { ok: false, error: message };
+    }
+  };
+
+  const sweep = await step('sweep', () => sweepStaleRuns(env));
+  const aliases = await step('subscriptions', () => dailyReconcileSubscriptions(env, router));
+  if (aliases.ok && aliases.value.platform.status === 'failed')
+    errors.push(new Error(`${router} alias resolution: ${aliases.value.platform.error}`));
+  const registry = await step('registrySync', () => syncPlatformRegistry(env, fetch, router));
+  const optimal = await step('systemOptimal', () =>
+    reevaluateSystemOptimalSettings(env, router, production)
+  );
+  if (optimal.ok && optimal.value) {
+    const computedValues: Record<string, unknown> = {};
+    for (const [key, record] of Object.entries(optimal.value)) {
+      computedValues[key] = { value: record.value, source: record.source };
+    }
+    console.log(
+      JSON.stringify({
+        event: 'system_optimal_settings_computed',
+        cron,
+        router,
+        computed: computedValues,
+      })
+    );
+  }
+  const drain = await step('drain', () => drainQueues(env, 'both', undefined, router));
+  const publish = await step('publish', () => publishPlatformRoutingTable(env, fetch, router));
+
+  console.log(
+    JSON.stringify({
+      event: 'benchmark_daily_sync_summary',
+      cron,
+      router,
+      day: aliases.ok ? aliases.value.day : null,
+      steps: {
+        sweep: sweep.ok
+          ? { status: 'ok', staleRunIds: sweep.value.length }
+          : { status: 'failed', error: sweep.error },
+        subscriptions: aliases.ok
+          ? { platform: aliases.value.platform, owners: aliases.value.owners }
+          : { status: 'failed', error: aliases.error },
+        registrySync: registry.ok
+          ? { status: 'ok', desiredEntries: registry.value.desiredEntries }
+          : { status: 'failed', error: registry.error },
+        systemOptimal: optimal.ok ? { status: 'ok' } : { status: 'failed', error: optimal.error },
+        drain: drain.ok
+          ? { status: 'ok', startedRuns: drain.value.length }
+          : { status: 'failed', error: drain.error },
+        publish: publish.ok
+          ? { status: 'ok', publishedVersion: publish.value?.version ?? null }
+          : { status: 'failed', error: publish.error },
+      },
+    })
+  );
+  console.log(
+    JSON.stringify({
+      event: 'benchmark_platform_sync_completed',
+      cron,
+      router,
+      staleRunIds: sweep.ok ? sweep.value : [],
+      platformEntries: registry.ok ? registry.value.desiredEntries : null,
+      startedRuns: drain.ok ? drain.value : [],
+      publishedVersion: publish.ok ? (publish.value?.version ?? null) : null,
+    })
+  );
+}
+
 export const app = new Hono<HonoEnv>();
+
 // Containers cannot hold the backend secret; the paid-execution claim token
 // authenticates their result instead, so this route precedes the auth middleware.
 app.post('/container/case-result', async c => {
@@ -53,58 +157,11 @@ export default {
       try {
         if (controller.cron !== PLATFORM_SYNC_CRON) {
           const result = await sweepStaleRunsAndDrain(env, router);
-          console.log(
-            JSON.stringify({
-              event: 'benchmark_queue_drain_tick_completed',
-              cron: controller.cron,
-              router,
-              staleRunIds: result.staleRunIds,
-              drained: result.drained,
-            })
-          );
-        } else {
-          const staleRunIds = await sweepStaleRuns(env);
-          await dailyReconcileSubscriptions(env, router).catch(() => {
+          const aliases = await continueDailyReconcile(env, router).catch(error => {
             console.warn(
               JSON.stringify({
-                event: 'benchmark_subscription_daily_failed',
-                category: 'daily_reconciliation',
-                router,
-              })
-            );
-          });
-          const { desiredEntries } = await syncPlatformRegistry(env, fetch, router);
-          const computed = await reevaluateSystemOptimalSettings(env, router, production).catch(
-            error => {
-              console.warn(
-                JSON.stringify({
-                  event: 'system_optimal_settings_skipped',
-                  router,
-                  error: error instanceof Error ? error.message : String(error),
-                })
-              );
-              return null;
-            }
-          );
-          if (computed) {
-            const computedValues: Record<string, unknown> = {};
-            for (const [key, record] of Object.entries(computed)) {
-              computedValues[key] = { value: record.value, source: record.source };
-            }
-            console.log(
-              JSON.stringify({
-                event: 'system_optimal_settings_computed',
+                event: 'benchmark_daily_alias_continued_failed',
                 cron: controller.cron,
-                router,
-                computed: computedValues,
-              })
-            );
-          }
-          const startedRuns = await drainQueues(env, 'both', undefined, router);
-          const published = await publishPlatformRoutingTable(env, fetch, router).catch(error => {
-            console.warn(
-              JSON.stringify({
-                event: 'routing_table_publish_skipped',
                 router,
                 error: error instanceof Error ? error.message : String(error),
               })
@@ -113,15 +170,18 @@ export default {
           });
           console.log(
             JSON.stringify({
-              event: 'benchmark_platform_sync_completed',
+              event: 'benchmark_queue_drain_tick_completed',
               cron: controller.cron,
               router,
-              staleRunIds,
-              platformEntries: desiredEntries,
-              startedRuns,
-              publishedVersion: published?.version ?? null,
+              staleRunIds: result.staleRunIds,
+              drained: result.drained,
+              ...(aliases && {
+                dailyAliasSync: { platform: aliases.platform, owners: aliases.owners },
+              }),
             })
           );
+        } else {
+          await runDailyPlatformSync(controller.cron, env, router, production, errors);
         }
       } catch (error) {
         errors.push(error);

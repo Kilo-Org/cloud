@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
 import type * as SchedulerModule from './scheduler';
@@ -11,7 +11,10 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import type { BenchmarkJobMessage } from './run';
-import { CATALOG_CONTEXT_TOO_SMALL_REASON } from './platform-models';
+import {
+  CATALOG_CONTEXT_TOO_SMALL_REASON,
+  CATALOG_NO_TOOL_SUPPORT_REASON,
+} from './platform-models';
 import {
   claimScheduledChunks,
   finishChunk,
@@ -76,6 +79,7 @@ vi.mock('./db', async importOriginal => {
     listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),
+    failPendingProfiles: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
@@ -131,6 +135,7 @@ import {
   listQueuedRemeasures,
   listStaleRunningDeciderRuns,
   failOrphanedRunningProfiles,
+  failPendingProfiles,
   recordLaneFailure,
   releaseProfileClaims,
   markProfilesFailedForEntries,
@@ -706,6 +711,7 @@ describe('decider run completion', () => {
       token: 'completion-token',
       attempts: 1,
       throttle_deferrals: 0,
+      catalog_deferrals: 0,
     });
     await processJob(env, {
       runId,
@@ -768,6 +774,7 @@ describe('decider run completion', () => {
         chunk: 0,
         shard: 0,
         failed_at: '2026-06-01T01:00:00.000Z',
+        failure_class: 'provider_unavailable',
       },
     ]);
     vi.mocked(getCaseResults).mockResolvedValue(await caseRowsFor(runId, 'vendor/a', ''));
@@ -778,7 +785,7 @@ describe('decider run completion', () => {
       env.BENCH_DB,
       runId,
       [{ model: 'vendor/c', variant: '' }],
-      expect.stringContaining('did not finish')
+      { failureClass: 'provider_unavailable', reason: expect.stringContaining('did not finish') }
     );
     // The ready sweep runs after the per-entry failure, so it only catches A and B.
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
@@ -805,6 +812,7 @@ describe('decider run completion', () => {
         chunk: 0,
         shard: 0,
         failed_at: '2026-06-01T01:00:00.000Z',
+        failure_class: null,
       },
     ]);
     vi.mocked(getCaseResults).mockResolvedValue(await caseRowsFor(runId, 'platform/a', ''));
@@ -815,7 +823,7 @@ describe('decider run completion', () => {
       env.BENCH_DB,
       runId,
       [{ model: 'platform/b', variant: 'high' }],
-      expect.stringContaining('did not finish')
+      { failureClass: 'unknown', reason: expect.stringContaining('did not finish') }
     );
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
     // Old behaviour failed the whole platform run on a dead lane.
@@ -1012,7 +1020,7 @@ describe('decider run completion', () => {
     expect(saveRoutingTable).not.toHaveBeenCalled();
   });
 
-  it('publishes without a live pair whose re-measurement failed', async () => {
+  it('drops a settled failed target and publishes the rest of the table', async () => {
     vi.mocked(getLatestRoutingTable).mockResolvedValue(
       liveRoutingTable([
         { model: 'platform/a', variant: null },
@@ -1047,14 +1055,21 @@ describe('decider run completion', () => {
         avgReasoningTokens: null,
       }))
     );
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
 
     expect(saveRoutingTable).toHaveBeenCalledOnce();
-    const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
+    expect(events).toContainEqual({
+      event: 'routing_table_publish_dropped_failed_pairs',
+      router: 'efficient',
+      dropped: [{ model: 'platform/b', variant: 'high', status: 'failed' }],
+    });
     expect(
-      table.routes['implementation/code_generation'].map(candidate => candidate.model)
-    ).toEqual(['platform/a']);
+      events.some(entry => entry.event === 'routing_table_publish_skipped_serving_pair_unready')
+    ).toBe(false);
   });
 
   it('does not publish a thin table as an engine bump re-measures the live pairs', async () => {
@@ -1152,14 +1167,16 @@ describe('decider run completion', () => {
       { model: 'vendor/next', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
 
-    await failRunAndDrain(env, 'user-fail-1', 'enqueue failed');
+    await failRunAndDrain(env, 'user-fail-1', {
+      failureClass: 'run_init_failed',
+      reason: 'enqueue failed',
+    });
 
     expect(markRunFailed).toHaveBeenCalledWith(env.BENCH_DB, 'user-fail-1', 'enqueue failed');
-    expect(markProfilesFailedForRun).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      'user-fail-1',
-      'enqueue failed'
-    );
+    expect(markProfilesFailedForRun).toHaveBeenCalledWith(env.BENCH_DB, 'user-fail-1', {
+      failureClass: 'run_init_failed',
+      reason: 'enqueue failed',
+    });
     // Both queues have pending work in this mock, so both start a run.
     expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual([
       'platform',
@@ -1222,17 +1239,13 @@ describe('drainQueue', () => {
 
     expect(result!.entryCount).toBe(1);
     expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual(['platform/a']);
-    const db = env.BENCH_DB as unknown as { prepare: Mock<() => { bind: Mock }> };
-    const statement = db.prepare.mock.results.at(-1)?.value;
-    expect(statement?.bind).toHaveBeenCalledWith(
-      expect.stringContaining('unavailable'),
-      expect.any(String),
-      'efficient',
-      'platform/no-parameters',
-      '',
-      expect.any(String),
-      expect.any(Number)
-    );
+    expect(failPendingProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
+      {
+        model: 'platform/no-parameters',
+        variant: '',
+        failure: { failureClass: 'catalog_absent', reason: CATALOG_NO_TOOL_SUPPORT_REASON },
+      },
+    ]);
   });
 
   it('fails a platform model whose context window is below the harness floor with that reason', async () => {
@@ -1249,16 +1262,13 @@ describe('drainQueue', () => {
 
     expect(result!.entryCount).toBe(1);
     expect(vi.mocked(insertRun).mock.calls[0][2].map(row => row.model)).toEqual(['platform/a']);
-    const db = env.BENCH_DB as unknown as { prepare: Mock<() => { bind: Mock }> };
-    expect(db.prepare.mock.results.at(-1)?.value.bind).toHaveBeenCalledWith(
-      CATALOG_CONTEXT_TOO_SMALL_REASON,
-      expect.any(String),
-      'efficient',
-      'platform/small',
-      '',
-      expect.any(String),
-      expect.any(Number)
-    );
+    expect(failPendingProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
+      {
+        model: 'platform/small',
+        variant: '',
+        failure: { failureClass: 'context_too_small', reason: CATALOG_CONTEXT_TOO_SMALL_REASON },
+      },
+    ]);
   });
 
   it('fails an unresolved alias without inserting a run or dispatching CLI work', async () => {
@@ -1400,7 +1410,12 @@ describe('sweepStaleRunsAndDrain', () => {
     // Model that read-after-write rather than pretending the ledger stays empty.
     const laneDeaths: Awaited<ReturnType<typeof listLaneFailures>> = [];
     vi.mocked(recordLaneFailure).mockImplementation(async (_db, row) => {
-      laneDeaths.push({ ...row, run_id: row.runId, failed_at: '2026-06-01T06:00:00.000Z' });
+      laneDeaths.push({
+        ...row,
+        run_id: row.runId,
+        failed_at: '2026-06-01T06:00:00.000Z',
+        failure_class: row.failureClass,
+      });
     });
     vi.mocked(listLaneFailures).mockImplementation(async () => laneDeaths);
 
@@ -1410,13 +1425,19 @@ describe('sweepStaleRunsAndDrain', () => {
     // The unfinished lane is recorded so normal finalization can settle the run.
     expect(recordLaneFailure).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({ runId, model: 'vendor/stuck', variant: '', rep: 0 })
+      expect.objectContaining({
+        runId,
+        model: 'vendor/stuck',
+        variant: '',
+        rep: 0,
+        failureClass: 'run_timed_out',
+      })
     );
     expect(markProfilesFailedForEntries).toHaveBeenCalledWith(
       env.BENCH_DB,
       runId,
       [{ model: 'vendor/stuck', variant: '' }],
-      expect.stringContaining('did not finish')
+      { failureClass: 'run_timed_out', reason: expect.stringContaining('did not finish') }
     );
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
     // The run completed with partial results rather than being failed wholesale.
@@ -1992,6 +2013,7 @@ it('dispatches every claim of one scheduler pass and stops when a pass claims no
     token: 'claim-token',
     attempts: 1,
     throttle_deferrals: 0,
+    catalog_deferrals: 0,
   };
   vi.mocked(claimScheduledChunks)
     .mockResolvedValueOnce([claim, { ...claim, id: 'claim-2', token: 'claim-token-2' }])

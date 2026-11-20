@@ -99,6 +99,12 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo', () => ({ reloadAppAsync }));
+// `apply-language` flushes pending durable drafts before a direction reload.
+// The real module opens the encrypted store, so the flush is a stub here: this
+// suite is about the sheet's own apply states, not the store.
+vi.mock('@/lib/persist/drafts', () => ({
+  flushAllDrafts: vi.fn(() => Promise.resolve(undefined)),
+}));
 
 vi.mock('@/i18n/apply-language', async importOriginal => {
   const actual = await importOriginal<typeof ApplyLanguageModule>();

@@ -185,6 +185,7 @@
     "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa",
     "legalDocumentEnglishOnly": "Dokumentiin kun Afaan Ingiliffaan qofa argama.",
     "organizationTrialEndedBilling": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
+    "organizationTrialEndedBillingAtKiloAi": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii kilo.ai irratti haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
     "viewOnGitHub": "PR GitHub irratti ilaali"
   },
   "language": {
@@ -1395,7 +1396,6 @@
     "followReviewMd": "REVIEW.md hordofi",
     "followReviewMdSubtitle": "Faayiloota qajeelfamaa REVIEW.md kuusaa koodii tokkoon tokkoo keessa jiran kabaji",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "notConnectedReadOnlyPlan": "Yeroon yaalii dhaabbataa xumurameera, kanaaf abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu qaba."
     },
     "bitbucketConnect": {
@@ -1405,7 +1405,7 @@
       "managedOnWebRepositories": "{{organization}}iif kuusaalee weebii irratti kompiitara irraa filadhu.",
       "description": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "descriptionReconnect": "{{organization}}iif tokanii haaraa hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
-      "descriptionOverview": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii fuula itti aanu irratti maxxansi.",
+      "descriptionOverview": "Tokanii hayyama iddoo hojii uumiitii fuula itti aanu irratti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
       "tokenPlaceholder": "Tokanii hayyama iddoo hojii",
       "tokenRefused": "Bitbucket tokanii hayyama iddoo hojii kana hin fudhanne. Hayyamoonni armaan olii isa keessa jiraachuu mirkaneessi, sana booda ammas yaali."
@@ -4858,12 +4858,15 @@
     "inputDescription": "Seensa hunda Enkrypt AI waliin sakatta'a, bu'aa meeshaa dabalatee. Yeroo Enkrypt hin jiraanne, gaaffiiwwan didamuu mannaa osoo hin sakatta'amiin ni ergamu.",
     "outputTitle": "Daangoolee ba'aa",
     "outputDescription": "Deebiiwwan Enkrypt AI waliin osoo miseensonni hin fudhanne dura sakatta'a. Yoo ati hin banne, cufaa ta'a.",
+    "outputUnavailable": "Kilon dhaabbata kanaaf sakatta'iinsa ba'aa hin banne, kanaaf deebiin hin sakatta'amu, asitti wanti qindeessan hin jiru. Kana gaafachuuf {{supportEmail}} qunnamaa.",
     "detectorsHint": "Dhorkuun gaaffii mallatteeffame ni dida. Galmeessuun qofa osoo gaaffii hin turre itti galmeessa.",
     "detectorsHintOutput": "Dhorkuun deebii mallatteeffame ni kasaasa. Galmeessuun qofa osoo deebii hin turre itti galmeessa.",
     "choiceLog": "Galmeessuu qofa",
     "applyTo": "Itti fayyadami",
     "applyToAllMembers": "Miseensota hunda",
     "applyKiloDefault": "Durtii Kilo fayyadami",
+    "applyKiloDefaultEnglishNote": "Barruun imaammata durtii Kilo Afaan Ingiliffaan qofa jira, sababiin isaas Kilo Gateway akkuma barreeffametti sirriitti hojiirra oolcha.",
+    "applyKiloDefaultReplaceMessage": "Imaammatni durtii Kilo Afaan Ingiliffaan barreeffamee jira, akkasumas wanti Cabsa imaammataa keessatti qindeessitan bakka buusa. Barruun dirree barruu imaammataa keessatti galchitan deebi'ee fiduu hin danda'amu.",
     "invalidSavedTitle": "Qindaa'inni qorataa seensaa galmeeffame dubbisamuu hin danda'u",
     "invalidSavedBody": "Gaaffiin ni dhorkama hanga qorattoonni seensaa irra deebi'anii galmeeffamanitti. Qorattoonni armaan gadii Durtii Kilo irraa eegalu.",
     "invalidSavedOutputTitle": "Qindaa'inni qorataa ba'aa galmeeffame dubbisamuu hin danda'u",

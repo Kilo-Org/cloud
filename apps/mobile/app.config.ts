@@ -16,7 +16,11 @@ import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
 // metadata, not app copy — see plugins/withAppIntentLocalizations.js.
 import APP_INTENT_COPY from './plugins/app-intent-copy.json';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
-import { SPLASH_LOGO_SIZE } from './src/lib/splash-branding.ts';
+import {
+  SPLASH_BACKGROUND_COLOR,
+  SPLASH_LOGO_IMAGE,
+  SPLASH_LOGO_SIZE,
+} from './src/lib/splash-branding';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
   assertProductionHost,
@@ -440,11 +444,13 @@ const config: ExpoConfig = {
     // One native splash configuration and shared AnimatedSplashOverlay lifecycle
     // for iOS and Android. The wrapper documents the native backing-surface
     // capability exception and owns its mod ordering with expo-splash-screen.
+    // The asset, colour and size come from src/lib/splash-branding.js, the one
+    // module the overlay reads too, so the two surfaces cannot drift.
     [
       './plugins/withBrandedSplash',
       {
-        image: './assets/images/logo-mark.png',
-        backgroundColor: '#FFDD00',
+        image: SPLASH_LOGO_IMAGE,
+        backgroundColor: SPLASH_BACKGROUND_COLOR,
         imageWidth: SPLASH_LOGO_SIZE,
       },
     ],

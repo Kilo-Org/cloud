@@ -85,8 +85,16 @@ export function ModeSelector({
   const modeIcon = (
     <ModeIcon size={14} color={disabled ? colors.mutedForeground : colors.foreground} />
   );
+  // The field presentation draws the value in the shared select box, so its
+  // line takes the field-select value size; the chip keeps its own `text-sm`.
   const modeLabel = (
-    <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+    <Text
+      className={cn(
+        'font-medium text-foreground',
+        presentation === 'field' ? 'text-base' : 'text-sm'
+      )}
+      numberOfLines={1}
+    >
       {selectedLabel}
     </Text>
   );

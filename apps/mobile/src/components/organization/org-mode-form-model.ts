@@ -4,6 +4,7 @@ import {
   type inferRouterOutputs,
   type MobileRouter,
 } from '@kilocode/trpc/mobile';
+import * as z from 'zod';
 
 type OrgModeOutput =
   inferRouterOutputs<MobileRouter>['organizations']['modes']['list']['modes'][number];
@@ -44,6 +45,34 @@ export type OrgModeFormValues = Readonly<{
   /** The restriction's own label, shown beside the group on the web. */
   editRestrictionLabel: string;
 }>;
+
+/**
+ * A mode form's durable draft: the whole typed form, so a restored draft seeds
+ * every field — not a per-field patch a person would have to reconcile.
+ */
+export type OrgModeFormDraft = OrgModeFormValues;
+
+/**
+ * The draft's stored shape. Strict on purpose: a value that carries any other
+ * key was written by a build with a different form, so the caller reads it as no
+ * draft and leaves it stored rather than coercing a shape it does not know.
+ */
+const orgModeFormDraftSchema = z.strictObject({
+  name: z.string(),
+  slug: z.string(),
+  roleDefinition: z.string(),
+  description: z.string(),
+  whenToUse: z.string(),
+  customInstructions: z.string(),
+  groups: z.array(z.enum(MODE_TOOL_GROUPS)),
+  editFileRegex: z.string(),
+  editRestrictionLabel: z.string(),
+});
+
+/** Shape guard for a stored mode form draft; another build's value is refused. */
+export function isOrgModeFormDraft(value: unknown): value is OrgModeFormDraft {
+  return orgModeFormDraftSchema.safeParse(value).success;
+}
 
 export type OrgModeFormErrorCode =
   | 'nameRequired'

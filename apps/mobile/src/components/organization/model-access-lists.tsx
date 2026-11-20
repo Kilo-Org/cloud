@@ -43,7 +43,7 @@ function ListHeader({
 }>) {
   return (
     <View className="gap-3 pt-3 pb-3">
-      <Text variant="caption">{description}</Text>
+      <Text variant="muted">{description}</Text>
       <SearchField
         defaultValue={search}
         placeholder={searchPlaceholder}

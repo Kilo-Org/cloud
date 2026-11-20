@@ -32,6 +32,11 @@ export default defineConfig({
         suggested_key: { default: 'Alt+Shift+K' },
       },
     },
+    // Firefox's MV3 default also carries `upgrade-insecure-requests`, which turns the local agent hub's
+    // ws://127.0.0.1 socket into wss:// and the handshake never starts; Chrome's default has no such directive.
+    ...(browser === 'firefox'
+      ? { content_security_policy: { extension_pages: "script-src 'self';" } }
+      : {}),
     description: 'Side-panel AI chat agent. Use open-weight or frontier models.',
     host_permissions: [
       '<all_urls>',
@@ -46,7 +51,7 @@ export default defineConfig({
     optional_permissions: ['downloads', 'nativeMessaging'],
     permissions:
       browser === 'firefox'
-        ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabs']
+        ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabGroups', 'tabs']
         : ['alarms', 'contextMenus', 'debugger', 'identity', 'scripting', 'storage', 'tabGroups'],
   }),
   modules: ['@wxt-dev/module-react'],

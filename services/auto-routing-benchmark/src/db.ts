@@ -2,7 +2,9 @@ import type {
   AutoRouter,
   BenchmarkKind,
   BenchmarkModelSummary,
+  BenchmarkProfileFailureClass,
   BenchmarkProfileStatus,
+  BenchmarkRegistryFailedEntry,
   BenchmarkRun,
   BenchmarkRunPurpose,
   ClassifierWinner,
@@ -14,7 +16,6 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
-import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import { POLICY_SETTINGS } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import {
@@ -28,6 +29,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  lte,
   ne,
   notInArray,
   or,
@@ -58,6 +60,13 @@ import {
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
+import {
+  parseProfileState,
+  profileFailureAssignments,
+  profileFailureResetAssignments,
+  wireProfileFailure,
+  type ProfileFailure,
+} from './profile-failure';
 import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
@@ -1117,11 +1126,6 @@ export async function markRunFailed(db: D1Database, runId: string, error: string
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
 }
 
-function boundProfileFailureReason(reason: string): string {
-  if (reason.length <= BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH) return reason;
-  return reason.slice(0, BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH);
-}
-
 /**
  * Mark Benchmark-profile rows claimed by this run as running. Only touches rows
  * still pending (or already running for this run_id) under the exact PK — never
@@ -1300,8 +1304,8 @@ export function markProfilesReadyForRunStatement(
   return orm
     .update(benchmarkProfiles)
     .set({
+      ...profileFailureResetAssignments,
       status: 'ready',
-      failure_reason: null,
       updated_at: nowIso,
       completed_at: nowIso,
     })
@@ -1327,34 +1331,29 @@ export async function markProfilesReadyForRun(
 export function markProfilesFailedForRunStatement(
   orm: ReturnType<typeof drizzle>,
   runId: string,
-  failureReason: string,
+  failure: ProfileFailure,
   nowIso: string
 ) {
   return orm
     .update(benchmarkProfiles)
-    .set({
-      status: 'failed',
-      failure_reason: boundProfileFailureReason(failureReason),
-      updated_at: nowIso,
-      completed_at: nowIso,
-    })
+    .set(profileFailureAssignments(failure, nowIso))
     .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
 }
 
 /**
- * Transition profiles claimed by this run to failed with a bounded reason. Only rows
- * still pointing at this run_id and still running are updated. This run's re-measure
- * claims are dropped; those profiles keep serving their previous measurement.
+ * Transition profiles claimed by this run to failed. Only rows still pointing at this
+ * run_id and still running are updated. This run's re-measure claims are dropped; those
+ * profiles keep serving their previous measurement.
  */
 export async function markProfilesFailedForRun(
   db: D1Database,
   runId: string,
-  failureReason: string,
+  failure: ProfileFailure,
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   const orm = drizzle(db);
   await orm.batch([
-    markProfilesFailedForRunStatement(orm, runId, failureReason, nowIso),
+    markProfilesFailedForRunStatement(orm, runId, failure, nowIso),
     orm.delete(profileRemeasures).where(eq(profileRemeasures.run_id, runId)),
   ]);
 }
@@ -1369,7 +1368,7 @@ export function markProfilesFailedForEntriesStatement(
   runId: string,
   /** Storage-form variant keys ('' = default variant). */
   entries: readonly { model: string; variant: string }[],
-  failureReason: string,
+  failure: ProfileFailure,
   nowIso: string
 ) {
   // or(...[]) evaluates to undefined and the WHERE would degrade to run_id +
@@ -1380,12 +1379,7 @@ export function markProfilesFailedForEntriesStatement(
   }
   return orm
     .update(benchmarkProfiles)
-    .set({
-      status: 'failed',
-      failure_reason: boundProfileFailureReason(failureReason),
-      updated_at: nowIso,
-      completed_at: nowIso,
-    })
+    .set(profileFailureAssignments(failure, nowIso))
     .where(
       and(
         eq(benchmarkProfiles.run_id, runId),
@@ -1407,7 +1401,7 @@ export async function markProfilesFailedForEntries(
   db: D1Database,
   runId: string,
   entries: readonly { model: string; variant: string }[],
-  failureReason: string,
+  failure: ProfileFailure,
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   if (entries.length === 0) return;
@@ -1419,10 +1413,40 @@ export async function markProfilesFailedForEntries(
       orm,
       runId,
       entries.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE),
-      failureReason,
+      failure,
       nowIso
     );
   }
+}
+
+/**
+ * Fail pending current rows the drain found it cannot benchmark, before any paid call.
+ * Only rows still pending are touched, so a concurrent claim or re-admit wins.
+ */
+export async function failPendingProfiles(
+  db: D1Database,
+  current: { router: AutoRouter; engineIdentity: string; repetitions: number },
+  /** Storage-form variant keys ('' = default variant). */
+  entries: readonly { model: string; variant: string; failure: ProfileFailure }[],
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  const orm = drizzle(db);
+  const [first, ...rest] = entries.map(entry =>
+    orm
+      .update(benchmarkProfiles)
+      .set(profileFailureAssignments(entry.failure, nowIso))
+      .where(
+        and(
+          eq(benchmarkProfiles.router, current.router),
+          eq(benchmarkProfiles.model, entry.model),
+          eq(benchmarkProfiles.variant, entry.variant),
+          eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+          eq(benchmarkProfiles.repetitions, current.repetitions),
+          eq(benchmarkProfiles.status, 'pending')
+        )
+      )
+  );
+  if (first !== undefined) await orm.batch([first, ...rest]);
 }
 
 export type RunLaneFailureRow = typeof runLaneFailures.$inferSelect;
@@ -1442,6 +1466,7 @@ export function recordLaneFailureStatement(
     rep: number;
     chunk: number;
     shard: number;
+    failureClass: BenchmarkProfileFailureClass;
     failedAtIso: string;
   }
 ) {
@@ -1455,11 +1480,12 @@ export function recordLaneFailureStatement(
       chunk: row.chunk,
       shard: row.shard,
       failed_at: row.failedAtIso,
+      failure_class: row.failureClass,
     })
     .onConflictDoNothing();
 }
 
-/** Record that a run's lane chunk dead-lettered. Variant in storage form. */
+/** Record that a run's lane died, and why. Variant in storage form. */
 export async function recordLaneFailure(
   db: D1Database,
   row: {
@@ -1470,6 +1496,7 @@ export async function recordLaneFailure(
     rep: number;
     chunk: number;
     shard: number;
+    failureClass: BenchmarkProfileFailureClass;
   },
   failedAtIso: string = new Date().toISOString()
 ): Promise<void> {
@@ -1562,7 +1589,7 @@ export async function listQueuedRemeasures(
     );
 }
 
-/** Registry row counts per status for one queue's current-engine rows. */
+/** Registry row counts per wire status for one queue's current-engine rows. */
 export async function countCurrentProfilesByStatus(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
@@ -1582,7 +1609,12 @@ export async function countCurrentProfilesByStatus(
       )
     )
     .groupBy(benchmarkProfiles.status);
-  return rows.map(row => ({ status: row.status, count: row.n }));
+  const counts = new Map<BenchmarkProfileStatus, number>();
+  for (const row of rows) {
+    const status = row.status === 'unavailable' ? 'failed' : row.status;
+    counts.set(status, (counts.get(status) ?? 0) + row.n);
+  }
+  return [...counts].map(([status, n]) => ({ status, count: n }));
 }
 
 /** Exact platform-pair coverage for the currently measured engine and repetitions. */
@@ -1606,15 +1638,21 @@ export async function listCurrentPlatformProfileStatuses(
       )
     )
     .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));
-  return rows.map(row => ({ ...row, variant: variantFromStorage(row.variant) }));
+  return rows.map(row => ({
+    model: row.model,
+    variant: variantFromStorage(row.variant),
+    status: row.status === 'unavailable' ? 'failed' : row.status,
+  }));
 }
 
 /**
- * Admin requeue: put failed current-engine rows of a queue back to `pending`.
- * Charges no owner quota — this is the admin's own escape hatch, distinct from
- * an owner's Retry. Returns how many rows moved.
+ * Admin requeue: put retryable failed current-engine rows of a queue whose retry window
+ * has passed back to `pending`. Permanently failed rows are never bulk re-admitted. The
+ * failure history stays so the retry budgets keep counting. Charges no owner quota —
+ * this is the admin's own escape hatch, distinct from an owner's Retry. Returns how
+ * many rows moved.
  */
-export async function requeueFailedCurrentProfiles(
+export async function requeueRetryableCurrentProfiles(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   queue: BenchmarkRunPurpose | 'both',
@@ -1635,6 +1673,7 @@ export async function requeueFailedCurrentProfiles(
       status: 'pending',
       run_id: null,
       failure_reason: null,
+      retry_after: null,
       requested_at: nowIso,
       updated_at: nowIso,
       completed_at: null,
@@ -1642,6 +1681,7 @@ export async function requeueFailedCurrentProfiles(
     .where(
       and(
         eq(benchmarkProfiles.status, 'failed'),
+        or(isNull(benchmarkProfiles.retry_after), lte(benchmarkProfiles.retry_after, nowIso)),
         eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
@@ -1656,6 +1696,49 @@ export async function requeueFailedCurrentProfiles(
       )
     );
   return result.meta.changes ?? 0;
+}
+
+/**
+ * Failed current-engine rows, retryable and permanent, that a queue still wants. Rows in
+ * neither queue are left out: no drain would measure them again, so no action applies.
+ */
+export async function listCurrentFailedProfiles(
+  db: D1Database,
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number }
+): Promise<BenchmarkRegistryFailedEntry[]> {
+  const rows = await drizzle(db)
+    .select()
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        inArray(benchmarkProfiles.status, ['failed', 'unavailable']),
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        or(
+          eq(benchmarkProfiles.platform_requested, true),
+          eq(benchmarkProfiles.user_requested, true)
+        )
+      )
+    )
+    .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));
+  return rows.flatMap(row => {
+    const failure = wireProfileFailure(parseProfileState(row));
+    if (!failure) return [];
+    const queues: BenchmarkRunPurpose[] = [
+      ...(row.platform_requested ? ['platform' as const] : []),
+      ...(row.user_requested ? ['user' as const] : []),
+    ];
+    return [
+      {
+        model: row.model,
+        variant: variantFromStorage(row.variant),
+        queues,
+        runId: row.run_id,
+        failure,
+      },
+    ];
+  });
 }
 
 /**
@@ -1858,12 +1941,9 @@ export function failOrphanedRunningProfilesStatement(
 ) {
   return orm
     .update(benchmarkProfiles)
-    .set({
-      status: 'failed',
-      failure_reason: boundProfileFailureReason(failureReason),
-      updated_at: nowIso,
-      completed_at: nowIso,
-    })
+    .set(
+      profileFailureAssignments({ failureClass: 'orphaned_claim', reason: failureReason }, nowIso)
+    )
     .where(
       and(
         eq(benchmarkProfiles.status, 'running'),

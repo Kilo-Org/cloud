@@ -185,7 +185,8 @@
     "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
     "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
     "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
-    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena."
+    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena.",
+    "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -1395,7 +1396,6 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "notConnectedReadOnlyPlan": "Kipindi cha majaribio cha shirika kimeisha, kwa hivyo mmiliki anapaswa kusasisha malipo kwenye kilo.ai."
     },
     "bitbucketConnect": {
@@ -1405,7 +1405,7 @@
       "managedOnWebRepositories": "Chagua hazina za {{organization}} kwenye wavuti ukitumia kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
-      "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike kwenye skrini inayofuata.",
+      "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kisha uibandike kwenye skrini inayofuata.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
       "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
       "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
@@ -4858,12 +4858,15 @@
     "inputDescription": "Huchunguza kila ingizo kwa Enkrypt AI, ikiwa ni pamoja na matokeo ya zana. Enkrypt haipopatikana, maombi hutumwa bila kuchunguzwa badala ya kukataliwa.",
     "outputTitle": "Vizuizi vya matokeo",
     "outputDescription": "Huchunguza majibu kwa Enkrypt AI kabla wanachama hawajayapokea. Imezimwa isipokuwa uwashe.",
+    "outputUnavailable": "Kilo haijawasha uchunguzi wa matokeo kwa shirika hili, kwa hivyo majibu hayachunguzwi na hakuna cha kusanidi hapa. Wasiliana na {{supportEmail}} ili kuomba hilo.",
     "detectorsHint": "Zuia hukataa ombi lililoalamishwa. Rekodi tu huliandika bila kuchelewesha ombi.",
     "detectorsHintOutput": "Zuia hufanya jibu lililoalamishwa lishindwe. Rekodi tu huliandika bila kuchelewesha jibu.",
     "choiceLog": "Rekodi tu",
     "applyTo": "Tumia kwa",
     "applyToAllMembers": "Wanachama wote",
     "applyKiloDefault": "Tumia Chaguo-msingi la Kilo",
+    "applyKiloDefaultEnglishNote": "Maandishi ya sera chaguo-msingi ya Kilo yako kwa Kiingereza, kwa sababu Kilo Gateway huitekeleza kama yalivyoandikwa.",
+    "applyKiloDefaultReplaceMessage": "Sera chaguo-msingi ya Kilo imeandikwa kwa Kiingereza na inabadilisha ulichoweka katika Ukiukaji wa sera. Maandishi uliyoweka katika sehemu ya maandishi ya sera hayawezi kurejeshwa.",
     "invalidSavedTitle": "Mipangilio ya vigunduzi vya maingizo iliyohifadhiwa haiwezi kusomwa",
     "invalidSavedBody": "Maombi yanazuiwa hadi vigunduzi vya maingizo vihifadhiwe tena. Vigunduzi vilivyo hapa chini huanza kutoka Chaguo-msingi la Kilo.",
     "invalidSavedOutputTitle": "Mipangilio ya vigunduzi vya matokeo iliyohifadhiwa haiwezi kusomwa",

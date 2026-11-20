@@ -24,6 +24,7 @@ import {
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
 import { backgroundActivityScenario } from './fake-llm-background-activity.js';
+import { agentBoardChildScenario, agentBoardScenario } from './fake-llm-agent-board.js';
 import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
@@ -1913,6 +1914,8 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     runChildTask(args, ctx, true);
   },
   'background-activity': backgroundActivityScenario,
+  board: agentBoardScenario,
+  'board-child': agentBoardChildScenario,
 
   cron(args, ctx) {
     runSchedule(

@@ -10,7 +10,6 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-
 import { BitbucketOverview } from './bitbucket-overview';
 
 const config = vi.hoisted(() => ({
@@ -28,6 +27,17 @@ const readiness = vi.hoisted(() => ({
   integrationId: 'bitbucket-1' as string | null,
   workspaceSlug: 'ws' as string | undefined,
   fetchStatus: 'idle' as string,
+}));
+
+/** The integration-status read the OAuth verdict comes from. */
+const status = vi.hoisted(() => ({
+  // undefined data = the read is off (no request configured); `null` is not
+  // expressible on this union, so the off state starts as missing.
+  data: undefined as Record<string, unknown> | undefined,
+  isPending: false,
+  isError: false,
+  error: undefined as unknown,
+  refetch: vi.fn(),
 }));
 
 const connectivity = vi.hoisted(() => ({ known: true }));
@@ -117,6 +127,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
+    isPending: false,
     fetchStatus: readiness.fetchStatus,
     data: {
       connected: readiness.connected,
@@ -135,6 +146,17 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: vi.fn(),
   }),
   useSaveReviewConfig: () => ({ isPending: false, mutate: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-bitbucket', () => ({
+  useBitbucketIntegrationStatus: () => ({
+    isLoading: false,
+    isPending: status.isPending,
+    isError: status.isError,
+    isFetching: false,
+    data: status.data,
+    error: status.error,
+    refetch: status.refetch,
+  }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'offline' : 'unknown'),
@@ -207,6 +229,13 @@ beforeEach(() => {
   readiness.integrationId = 'bitbucket-1';
   readiness.workspaceSlug = 'ws';
   readiness.fetchStatus = 'idle';
+  // Default the status read to the token-connection shape its own suite
+  // concerns; the OAuth cases replace this object.
+  status.data = { method: 'workspace_access_token', status: 'connected' };
+  status.isPending = false;
+  status.isError = false;
+  status.error = undefined;
+  status.refetch.mockReset();
   orgBoundaryCalls.length = 0;
   orgBoundary.resolved = true;
   orgBoundary.resolving = false;
@@ -331,14 +360,20 @@ function connectActions(root: TestRenderer.ReactTestRenderer) {
 }
 
 describe('BitbucketOverview not-connected state', () => {
-  it('names the organization in the connect description', async () => {
+  it('names the organization and the next screen in the connect description', async () => {
     readiness.connected = false;
     readiness.integrationId = null;
 
     const root = await renderScreen();
     const text = JSON.stringify(root.toJSON());
 
-    expect(text).toContain('Acme Robotics');
+    // The token field lives on the sheet the action opens, so the copy names
+    // that step; "paste it below" pointed at a button with no field under it.
+    expect(text).toContain(
+      i18n.t('codeReviewer.bitbucketConnect.descriptionOverview', {
+        organization: 'Acme Robotics',
+      })
+    );
     expect(text).not.toContain('{{');
     expect(connectActions(root)).toHaveLength(1);
     expect(orgBoundaryCalls.length).toBeGreaterThan(0);

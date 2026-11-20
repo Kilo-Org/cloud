@@ -5,15 +5,11 @@ import { KeyRound, Pencil, Trash2 } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { RowFrame } from '@/components/ui/row-frame';
 import { formatDate } from '@/lib/format';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { type PasskeyRow } from '@/lib/passkeys/passkey-types';
 import { parseTimestamp } from '@/lib/utils';
-
-/** Matches `ConfigureRow`'s threshold, so a passkey row stacks with every other
- * settings row at the same window width and text scale. */
-const ROW_STACK_FONT_SCALE = 1.8;
 
 /** One passkey: its name (or the default when the server stored none), the date
  * it was added, the date it was last used when the server recorded one, and the
@@ -35,7 +31,7 @@ export function PasskeyListRow({
   const fontScale = useLiveFontScale();
   // A narrow window squeezes the text block exactly as a large font scale does,
   // so both take the stacked presentation the other settings rows use.
-  const stack = fontScale >= ROW_STACK_FONT_SCALE || isNarrowLayout(width);
+  const stack = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
   const name = passkey.name?.trim();
   // Each fact keeps its own line: joining them into one sentence read as a
   // comma splice, and the two dates are scanned independently.

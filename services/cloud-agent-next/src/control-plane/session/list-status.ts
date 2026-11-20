@@ -6,6 +6,7 @@ import {
   publishCloudAgentSessionStatusSchema,
   sessionTitleSchema,
   type PublishCloudAgentSessionStatusParams,
+  type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
 import { withTimeout } from '@kilocode/worker-utils';
 import { logger } from '../../logger.js';
@@ -15,6 +16,8 @@ import type { PendingInteractions } from '../../sandbox-session/sandbox-control-
 const LIST_STATUS_KEY = 'session_list_status';
 export const LIST_STATUS_RETRY_MS = 30_000;
 export const LIST_STATUS_REFRESH_MS = 60_000;
+/** The Kilo v1 session card summary write window; a changed Kilo v2 summary refreshes at this pace. */
+export const LIST_STATUS_SUMMARY_REFRESH_MS = 10_000;
 const PUBLISH_TIMEOUT_MS = 5_000;
 
 type ListStatus = PublishCloudAgentSessionStatusParams['status'];
@@ -99,7 +102,10 @@ export function createSessionListStatusOutbox(input: {
    * rides every snapshot and never moves back. `title` is a native rename: it
    * forces a snapshot, and stays in newer ones until a publication delivers it,
    * naming the snapshot that first carried it so ingest never applies a repeat
-   * of a rename it already applied.
+   * of a rename it already applied. `transcript` is the session card summary
+   * and cost total of a Kilo v2 transcript; it rides every snapshot, and a
+   * changed summary refreshes at most once per summary window, the first one
+   * at once.
    */
   function record(
     identity: Pick<
@@ -108,7 +114,11 @@ export function createSessionListStatusOutbox(input: {
     >,
     status: ListStatus,
     now = Date.now(),
-    observed: { activityAt?: number; title?: string } = {}
+    observed: {
+      activityAt?: number;
+      title?: string;
+      transcript?: { liveSummary: SessionLiveSummary; totalCostMicrodollars: number };
+    } = {}
   ): void {
     const previous = current();
     const recordedActivityAt =
@@ -116,15 +126,27 @@ export function createSessionListStatusOutbox(input: {
         ? -Infinity
         : Date.parse(previous.update.lastActivityAt);
     const activityAt = Math.max(observed.activityAt ?? -Infinity, recordedActivityAt);
+    const sincePrevious =
+      previous === undefined ? Infinity : now - Date.parse(previous.update.occurredAt);
+    const recordedSummary = previous?.update.liveSummary;
+    const summaryChanged =
+      observed.transcript !== undefined &&
+      JSON.stringify(observed.transcript.liveSummary) !== JSON.stringify(recordedSummary);
     // Refresh on observed activity, not a timer that would keep a silent or
     // disconnected runtime looking fresh indefinitely. Busy and retry refresh on
     // any event; other statuses on newer transcript activity, so a wait on input
     // while subagents keep working still proves the session live.
+    const activityDue =
+      sincePrevious >= LIST_STATUS_REFRESH_MS &&
+      (status === 'busy' || status === 'retry' || activityAt > recordedActivityAt);
+    const summaryDue =
+      summaryChanged &&
+      (recordedSummary === undefined || sincePrevious >= LIST_STATUS_SUMMARY_REFRESH_MS);
     if (
       observed.title === undefined &&
       previous?.update.status === status &&
-      ((status !== 'busy' && status !== 'retry' && activityAt <= recordedActivityAt) ||
-        now - Date.parse(previous.update.occurredAt) < LIST_STATUS_REFRESH_MS)
+      !activityDue &&
+      !summaryDue
     )
       return;
     // The ULID source cursor survives eviction and wall-clock rollback. It uses
@@ -150,6 +172,12 @@ export function createSessionListStatusOutbox(input: {
           ? { lastActivityAt: new Date(activityAt).toISOString() }
           : {}),
         ...(rename === undefined ? {} : { rename }),
+        ...(observed.transcript === undefined
+          ? {}
+          : {
+              liveSummary: observed.transcript.liveSummary,
+              totalCostMicrodollars: observed.transcript.totalCostMicrodollars,
+            }),
       },
       dueAt: now,
     });

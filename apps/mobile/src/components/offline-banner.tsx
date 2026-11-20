@@ -39,8 +39,9 @@ export function OfflineBanner() {
 
   // Announce committed transitions only, never the initial state: the first
   // run records the current value without announcing. A cold-start offline
-  // device announces once when the first NetInfo commit lands, one
-  // OFFLINE_BANNER_SHOW_DELAY_MS after launch.
+  // device announces once when its first offline commit lands after this
+  // banner mounted (at once for a definite disconnect, one
+  // OFFLINE_BANNER_SHOW_DELAY_MS after launch otherwise).
   useEffect(() => {
     if (prevRef.current !== null && prevRef.current !== isOffline) {
       announceForA11y(isOffline ? t('offline.noInternet') : t('offline.internetRestored'));

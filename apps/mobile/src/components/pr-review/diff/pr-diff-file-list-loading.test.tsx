@@ -8,6 +8,7 @@ import { PrDiffFileListLoading } from './pr-diff-file-list-loading';
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({

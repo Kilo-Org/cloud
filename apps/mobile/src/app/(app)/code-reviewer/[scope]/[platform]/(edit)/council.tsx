@@ -55,6 +55,7 @@ import {
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import { useTRPC } from '@/lib/trpc';
 
 export default function CouncilRoute() {
@@ -310,6 +311,10 @@ function CouncilScreen({
         <Section label={t('codeReviewer.council.labels')}>
           <Input
             value={labelsText}
+            // A save/refetch rewrites the field's controlled value, so the
+            // framework suggestion popup stays off — it crashes against
+            // rewritten text (see REWRITTEN_INPUT_AUTO_CORRECT).
+            autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
             editable={!disabled}
             accessibilityLabel={t('codeReviewer.council.labels')}
             placeholder={t('codeReviewer.council.labelsPlaceholder')}

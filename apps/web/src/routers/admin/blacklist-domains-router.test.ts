@@ -704,6 +704,15 @@ describe('admin.blacklistDomains.set', () => {
     expect(untouched?.api_token_pepper).toBe('safe-pepper');
   });
 
+  it('returns stored signup TLDs as bare labels, including a legacy trailing dot', async () => {
+    await insertSettings({ ...previousSettings, blocked_signup_tlds: ['.ASIA.'] });
+    const caller = await createCallerForUser(admin.id);
+
+    const loaded = await caller.admin.blacklistDomains.get();
+
+    expect(loaded.blocked_signup_tlds).toEqual(['asia']);
+  });
+
   it('writes domains, settings and editor metadata to Postgres, not Redis', async () => {
     const caller = await createCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();

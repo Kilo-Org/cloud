@@ -36,6 +36,7 @@
     "./byok-errors": "./src/byok-errors.ts",
     "./home-widget": "./src/home-widget.ts",
     "./display-text": "./src/display-text.ts",
+    "./git-url-project": "./src/git-url-project.ts",
     "./tool-detail": "./src/tool-detail/index.ts",
     "./worktree-review": "./src/worktree-review/index.ts",
     "./local-fake-llm": "./src/local-fake-llm.ts"

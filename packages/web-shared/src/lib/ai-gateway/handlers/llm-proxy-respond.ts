@@ -10,6 +10,7 @@ import {
   accountForMicrodollarUsage,
   extractInferenceRegion,
   makeErrorReadable,
+  setResolvedModelHeader,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   logUnrewrittenResponse,
@@ -184,38 +185,42 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     },
   };
   return declineAfterAnswer(
-    await guardEnkryptOutput({
-      response,
-      scan: input.enkryptOutputScan,
-      kind: request.kind,
-      stream: usageContext.isStreaming,
-      signal: input.signal,
-      release: released =>
-        rewriteModelResponse({
-          response: released,
-          model,
-          providerId: provider.type,
-          kind: request.kind,
-          isFree: usageContext.is_free,
-          userByok: usageContext.user_byok,
-          customLlmPricing: usageContext.custom_llm_pricing,
-          logging,
-          responseTransforms: provider.responseTransforms,
-          keepAliveUntilFirstByte: input.keepAliveUntilFirstByte,
-        }),
-      captureReport: input.captureEnkryptOutputReport,
-      captureRequestLogs: logs => {
-        outputRequestLogs = logs;
-      },
-      onReject: async (rejection, verdict) => {
-        if (input.signal.aborted) return;
-        await logUnrewrittenResponse({
-          response: rejection.clone(),
-          model,
-          logging,
-          error: { guardrail_rejection: verdict.action, guardrail: 'output' },
-        });
-      },
-    })
+    setResolvedModelHeader(
+      await guardEnkryptOutput({
+        response,
+        scan: input.enkryptOutputScan,
+        kind: request.kind,
+        stream: usageContext.isStreaming,
+        signal: input.signal,
+        release: released =>
+          rewriteModelResponse({
+            response: released,
+            model,
+            providerId: provider.type,
+            kind: request.kind,
+            isFree: usageContext.is_free,
+            userByok: usageContext.user_byok,
+            customLlmPricing: usageContext.custom_llm_pricing,
+            logging,
+            responseTransforms: provider.responseTransforms,
+            keepAliveUntilFirstByte: input.keepAliveUntilFirstByte,
+          }),
+        captureReport: input.captureEnkryptOutputReport,
+        captureRequestLogs: logs => {
+          outputRequestLogs = logs;
+        },
+        onReject: async (rejection, verdict) => {
+          if (input.signal.aborted) return;
+          await logUnrewrittenResponse({
+            response: rejection.clone(),
+            model,
+            logging,
+            error: { guardrail_rejection: verdict.action, guardrail: 'output' },
+          });
+        },
+      }),
+      model,
+      input.requestedModel
+    )
   );
 }

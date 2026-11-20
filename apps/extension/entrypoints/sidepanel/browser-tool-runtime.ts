@@ -56,7 +56,8 @@ const sendBrowserToolCall = async (
 
 export const executeKiloBrowserToolCall = async (
   event: KiloBrowserToolCallEvent,
-  caller: BrowserCaller
+  caller: BrowserCaller,
+  signal?: AbortSignal
 ): Promise<EvalTabResult> => {
   try {
     const first = await sendBrowserToolCall(event, caller, false);
@@ -66,12 +67,17 @@ export const executeKiloBrowserToolCall = async (
     }
 
     // The tab belongs to a CLI agent; only the user's answer in the panel may take it.
-    const accepted = await requestTabTakeOver({
+    const answer = await requestTabTakeOver({
       sessionTitle: first.request.sessionTitle,
+      signal,
       tabId: first.request.tabId,
     });
 
-    if (!accepted) {
+    if (answer === 'stopped' || signal?.aborted === true) {
+      return { error: 'Stopped before the tab was taken over.', ok: false };
+    }
+
+    if (answer === 'cancel') {
       return {
         error: `The tab stays with ${first.request.sessionTitle}. Ask the user to stop that session or choose another tab.`,
         ok: false,

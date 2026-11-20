@@ -171,11 +171,11 @@ describe('ProviderAllowList rows', () => {
     ]);
   });
 
-  it('keeps the slug and drops the subtitle when the answer carries an empty name', async () => {
+  it('keeps the slug as the title when the answer carries an empty name', async () => {
     const root = await mount(['anthropic'], { anthropic: '' });
 
-    // A blank title with the slug beneath reads as a broken row, so an empty
-    // name is treated like a missing one.
+    // A blank title reads as a broken row, so an empty name is treated like a
+    // missing one.
     expect(rows(root)).toEqual([{ title: 'anthropic', subtitle: undefined }]);
   });
 

@@ -76,16 +76,32 @@ catalogs:
     '@vitest/ui': 5.1.0
     vitest: 5.1.0
 
+# Minutes. A new release must be published for this window, about 4.75 days
+# (114 hours), before the workspace installs it, so a compromised or withdrawn
+# release is caught before it is adopted.
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
+  # The registry serves no `time` metadata for tsx, so pnpm cannot age-check it
+  # and fails the install (ERR_PNPM_MISSING_TIME) when a resolution path such as
+  # the Vercel CLI pulls it in. Exempted by name so both the script runner and
+  # those resolutions install.
   - tsx
+  # expo-dev-client must track the Expo SDK version the app builds against, or
+  # `expo-doctor` fails on the mismatch, so it moves with the SDK before the
+  # window.
   - expo-dev-client
+  # Expo publishes these together with each SDK as transitive dependencies of
+  # expo-dev-client, so they move with it in the same install.
   - expo-dev-launcher
   - expo-dev-menu
   - expo-dev-menu-interface
   - expo-manifests
   - expo-updates-interface
   - '@expo/schema-utils'
+  # The workspace typechecks with this native compiler preview, which publishes a
+  # dev build frequently and is adopted at the newest one. Each bump is inside
+  # the window on the day it lands, and the platform packages are optional
+  # dependencies of the same build, so the whole set is exempt by name.
   - '@typescript/native-preview'
   - '@typescript/native-preview-darwin-arm64'
   - '@typescript/native-preview-darwin-x64'
@@ -450,6 +466,7 @@ patchedDependencies:
   # already drew, so the parent's layout effect and the collection's commit no
   # longer re-enter each other until React's nested update limit. Remove once an
   # upstream release carries every guard.
+  # The version in the key must equal the `minimumReleaseAgeExclude` entry above.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
   # NativeWind's `react-native` proxy names only the exports its wrapper components
   # need; every other export, such as the `AssetRegistry` that expo-asset reads, was

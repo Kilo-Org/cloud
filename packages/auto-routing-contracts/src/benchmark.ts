@@ -358,6 +358,9 @@ export const BenchmarkModelTotalsSchema = z.object({
   costPerCaseUsd: z.number().nullable(),
   totalCostUsd: z.number().nullable(),
   cases: z.number().int().nonnegative(),
+  // Cases that reported no cost. They are outside the mean and the total, which
+  // only cover the cases that did, and the console states them apart.
+  uncostedCases: z.number().int().nonnegative().default(0),
   errors: z.number().int().nonnegative(),
   timeouts: z.number().int().nonnegative(),
 });

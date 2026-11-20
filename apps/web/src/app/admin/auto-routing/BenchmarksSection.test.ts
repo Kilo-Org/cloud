@@ -9,6 +9,7 @@ import type {
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  BenchmarkConfigEditor,
   ConfigSaveWarnings,
   configToFormState,
   effortCoverageForModel,
@@ -36,6 +37,10 @@ jest.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutate: () => {}, isPending: false }),
   useQueryClient: () => ({ invalidateQueries: () => {} }),
 }));
+
+// The model picker reads tRPC user preferences; the effort-coverage column
+// under test does not depend on it.
+jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));
 
 const baseConfig: BenchmarkConfig = {
   ...formStateToConfig(configToFormState(null), null),
@@ -427,6 +432,33 @@ describe('per-model totals from route rows', () => {
     // 10*0.02 + 30*0.04 = 1.4 total; 1.4/40 per case.
     expect(alpha.totalCostUsd).toBeCloseTo(1.4, 6);
     expect(alpha.costPerCaseUsd).toBeCloseTo(0.035, 6);
+    expect(alpha.uncostedCases).toBe(0);
+  });
+
+  it('leaves uncosted cases out of the total instead of charging them the costed rate', () => {
+    // 10 costed cases at $0.10 = $1, plus 30 cases whose cost is unknown.
+    const [alpha] = modelTotalsFromSummaries([
+      summary('vendor/alpha', 'debugging/bug_fixing', 1, 0.1, 10),
+      summary('vendor/alpha', 'implementation/code_generation', 1, null, 30),
+    ]);
+
+    // Extrapolating would report $4; the real total is the $1 that was measured.
+    expect(alpha.totalCostUsd).toBeCloseTo(1, 8);
+    expect(alpha.costPerCaseUsd).toBeCloseTo(0.1, 8);
+    expect(alpha.uncostedCases).toBe(30);
+    // The cases still count for accuracy: they were measured, just not priced.
+    expect(alpha.cases).toBe(40);
+    expect(alpha.accuracy).toBe(1);
+  });
+
+  it('keeps a genuine zero cost as zero rather than unknown', () => {
+    const [free] = modelTotalsFromSummaries([
+      summary('vendor/free', 'debugging/bug_fixing', 1, 0, 12),
+    ]);
+
+    expect(free.totalCostUsd).toBe(0);
+    expect(free.costPerCaseUsd).toBe(0);
+    expect(free.uncostedCases).toBe(0);
   });
 
   it('keeps a pair with no reported cost null rather than zero', () => {
@@ -435,6 +467,7 @@ describe('per-model totals from route rows', () => {
     ]);
     expect(beta.totalCostUsd).toBeNull();
     expect(beta.costPerCaseUsd).toBeNull();
+    expect(beta.uncostedCases).toBe(5);
     expect(beta.accuracy).toBe(0.8);
   });
 
@@ -457,6 +490,7 @@ describe('per-model totals from route rows', () => {
         costPerCaseUsd: null,
         totalCostUsd: null,
         cases: 2,
+        uncostedCases: 2,
         errors: 0,
         timeouts: 0,
       },
@@ -513,6 +547,43 @@ describe('find a model', () => {
   it('shows every run when the query is blank', () => {
     expect(runMentionsModel({ models: [] }, '')).toBe(true);
     expect(runMentionsModel({}, '   ')).toBe(true);
+  });
+});
+
+describe('policy tab effort coverage', () => {
+  it('reads the whole registry, so a filtered run list cannot unmeasure a model', () => {
+    const config: BenchmarkConfig = {
+      ...baseConfig,
+      deciderModels: [{ id: 'vendor/ready-at-two-efforts' }],
+    };
+    const registryEntries = [
+      { model: 'vendor/ready-at-two-efforts', variant: 'low' as const, status: 'ready' as const },
+      { model: 'vendor/ready-at-two-efforts', variant: 'high' as const, status: 'ready' as const },
+      // A row for another model; the run-list filter would have dropped it.
+      { model: 'vendor/other', variant: null, status: 'pending' as const },
+    ];
+
+    const html = renderToStaticMarkup(
+      React.createElement(BenchmarkConfigEditor, {
+        router: 'efficient',
+        config,
+        onSaved: () => {},
+        modelOptions: [
+          {
+            id: 'vendor/ready-at-two-efforts',
+            name: 'Ready at two efforts',
+            reasoningVariants: ['low', 'high'],
+          },
+        ],
+        modelsLoading: false,
+        registryEntries,
+        classifierModelOptions: [],
+        classifierModelsLoading: false,
+        catalogModalities: null,
+      })
+    );
+
+    expect(html).toContain('2 of 2 measured');
   });
 });
 
@@ -583,6 +654,15 @@ describe('runs table cost column', () => {
 
     const none = render([completedRun], new Set(['some-other-run']));
     expect(none).toContain('No run of this list measured that model');
+  });
+
+  it('says the page cannot answer when no run reports its models', () => {
+    const withoutModels: BenchmarkRun[] = [{ ...completedRun, models: undefined }];
+
+    const html = render(withoutModels, new Set(['some-other-run']));
+
+    expect(html).not.toContain('No run of this list measured that model');
+    expect(html).toContain('reports its models yet');
   });
 });
 
@@ -693,6 +773,60 @@ describe('expanded run summaries', () => {
     expect(html).toContain('75.0%');
   });
 
+  it('states how many cases the total leaves out rather than pricing them', () => {
+    mockSummariesQuery.data = {
+      summaries: [summary],
+      modelTotals: [
+        {
+          model: 'vendor/alpha',
+          variant: null,
+          accuracy: 1,
+          routeAccuracy: null,
+          costPerCaseUsd: 0.1,
+          totalCostUsd: 1,
+          cases: 40,
+          uncostedCases: 30,
+          errors: 0,
+          timeouts: 0,
+        },
+      ],
+    };
+
+    const html = renderExpanded();
+
+    // The measured $1 stands, and the 30 unpriced cases are named apart from it
+    // instead of being charged at the costed rate.
+    expect(html).toContain('$1.00');
+    expect(html).toContain('30 uncosted');
+  });
+
+  it('shows no uncosted note when every case reported a cost', () => {
+    mockSummariesQuery.data = {
+      summaries: [summary],
+      modelTotals: [
+        {
+          model: 'vendor/alpha',
+          variant: null,
+          accuracy: 1,
+          routeAccuracy: null,
+          costPerCaseUsd: 0,
+          totalCostUsd: 0,
+          cases: 12,
+          uncostedCases: 0,
+          errors: 0,
+          timeouts: 0,
+        },
+      ],
+    };
+
+    const html = renderExpanded();
+
+    // A genuine zero total renders as $0 (not a dash), and nothing was left out
+    // so there is no note.
+    expect(html).toContain('>$0<');
+    expect(html).not.toContain('uncosted');
+  });
+
   it('prefers the worker aggregate over folding the route rows', () => {
     mockSummariesQuery.data = {
       summaries: [summary],
@@ -705,6 +839,7 @@ describe('expanded run summaries', () => {
           costPerCaseUsd: 0.01,
           totalCostUsd: 1.5,
           cases: 150,
+          uncostedCases: 0,
           errors: 2,
           timeouts: 1,
         },

@@ -46,6 +46,9 @@ function modelTotalsFromRow(row: RunModelTotalsRow): BenchmarkModelTotals {
       row.costSum === null ? null : Number((row.costSum / row.costedCases).toFixed(8)),
     totalCostUsd: row.costSum === null ? null : Number(row.costSum.toFixed(8)),
     cases: row.cases,
+    // The mean and the total cover the costed cases only; the console states
+    // how many cases were left out rather than extrapolating a cost for them.
+    uncostedCases: row.cases - row.costedCases,
     errors: row.errors,
     timeouts: row.timeouts,
   };

@@ -591,7 +591,7 @@ function UseSystemValueButton({
   );
 }
 
-function BenchmarkConfigEditor({
+export function BenchmarkConfigEditor({
   router,
   config,
   onSaved,
@@ -1179,14 +1179,21 @@ export function ConfigSaveWarnings({ warnings }: { warnings: BenchmarkConfigSave
 export function modelTotalsFromSummaries(
   summaries: readonly BenchmarkModelSummary[]
 ): BenchmarkModelTotals[] {
-  const groups = new Map<string, BenchmarkModelTotals & { scoreSum: number; costSum: number }>();
+  const groups = new Map<
+    string,
+    BenchmarkModelTotals & { scoreSum: number; costSum: number; costedCases: number }
+  >();
   for (const summary of summaries) {
     const key = JSON.stringify([summary.model, summary.variant ?? null]);
     const group = groups.get(key);
+    // A route without a cost has an unknown cost per case, not a free one, so
+    // its cases stay out of the sum and are reported apart.
+    const costedCases = summary.avgCostUsd === null ? 0 : summary.cases;
     const costed = summary.avgCostUsd === null ? 0 : summary.avgCostUsd * summary.cases;
     if (group) {
       group.scoreSum += summary.accuracy * summary.cases;
       group.costSum += costed;
+      group.costedCases += costedCases;
       group.cases += summary.cases;
       group.errors += summary.errors;
       group.timeouts += summary.timeouts;
@@ -1198,21 +1205,25 @@ export function modelTotalsFromSummaries(
         routeAccuracy: null,
         costPerCaseUsd: null,
         totalCostUsd: null,
+        uncostedCases: 0,
         cases: summary.cases,
         errors: summary.errors,
         timeouts: summary.timeouts,
         scoreSum: summary.accuracy * summary.cases,
         costSum: costed,
+        costedCases,
       });
     }
   }
   return [...groups.values()]
-    .map(({ scoreSum, costSum, ...totals }) => ({
+    .map(({ scoreSum, costSum, costedCases, ...totals }) => ({
       ...totals,
+      // A pair whose cases all reported a cost of 0 is genuinely free: the total
+      // is 0, not unknown, so only a pair with no costed case stays null.
+      uncostedCases: totals.cases - costedCases,
       accuracy: totals.cases > 0 ? Number((scoreSum / totals.cases).toFixed(4)) : 0,
-      costPerCaseUsd:
-        totals.cases > 0 && costSum > 0 ? Number((costSum / totals.cases).toFixed(8)) : null,
-      totalCostUsd: costSum > 0 ? Number(costSum.toFixed(8)) : null,
+      costPerCaseUsd: costedCases > 0 ? Number((costSum / costedCases).toFixed(8)) : null,
+      totalCostUsd: costedCases > 0 ? Number(costSum.toFixed(8)) : null,
     }))
     .toSorted((a, b) => b.accuracy - a.accuracy || a.model.localeCompare(b.model));
 }
@@ -1345,6 +1356,11 @@ export function RunSummariesTable({
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-xs">
                         {formatTotalUsd(totals.totalCostUsd)}
+                        {totals.uncostedCases > 0 ? (
+                          <span className="text-muted-foreground block text-[11px]">
+                            {totals.uncostedCases} uncosted
+                          </span>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-xs">
                         {totals.cases}
@@ -1542,10 +1558,16 @@ export function BenchmarkRunsTable({
 
   const visible = matchedIds === null ? runs : runs.filter(run => matchedIds.has(run.id));
   if (visible.length === 0) {
+    // An empty page and a page whose runs never reported their models look the
+    // same to the filter, but they mean different things: one is "this model
+    // did not run", the other is "nothing here can answer".
+    const searchable = runs.some(run => (run.models?.length ?? 0) > 0);
     return (
       <TableRow>
         <TableCell colSpan={RUN_TABLE_COLUMNS} className="text-muted-foreground h-16 text-center">
-          No run of this list measured that model
+          {searchable
+            ? 'No run of this list measured that model'
+            : 'No run on this page reports its models yet, so the filter cannot match. Expand a run or reload.'}
         </TableCell>
       </TableRow>
     );
@@ -1877,10 +1899,6 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
       ),
     [modelQuery, registryQuery.data]
   );
-  const filteredRegistryEntries = useMemo(() => {
-    const entries = registryQuery.data?.platformEntries;
-    return entries ? entries.filter(entry => entryMentionsModel(entry, modelQuery)) : entries;
-  }, [modelQuery, registryQuery.data]);
 
   // When the last running run finishes, its completion publishes a routing
   // table / classifier winner. Those live in their own query caches, so
@@ -1999,7 +2017,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
             modelOptions={modelOptions}
             modelsLoading={modelsQuery.isLoading}
             modelsError={modelsError}
-            registryEntries={filteredRegistryEntries}
+            registryEntries={registryQuery.data?.platformEntries}
             classifierModelOptions={systemOneModelsQuery.data ?? []}
             classifierModelsLoading={systemOneModelsQuery.isLoading}
             classifierModelsError={systemOneModelsError}
@@ -2017,8 +2035,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
           </CardHeader>
           <CardContent className="flex flex-col gap-2 p-4 pt-0">
             <p className="text-muted-foreground text-xs">
-              Filters the runs list, its failed models, and the registry rows by model id. One
-              lookup answers whether a model ran, what it scored, and what it cost.
+              Filters the runs list and its failed models by model id. The Policy tab keeps every
+              registry row, because effort coverage there must reflect all of them.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Input

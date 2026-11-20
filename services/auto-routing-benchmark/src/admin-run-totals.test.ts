@@ -322,6 +322,9 @@ describe('admin run totals', () => {
       costPerCaseUsd: 0.03,
       totalCostUsd: 0.06,
       cases: 3,
+      // The third case reported no cost: the console names it apart from the
+      // mean instead of charging it at the costed rate.
+      uncostedCases: 1,
       errors: 1,
       timeouts: 1,
       // One of the two cases that recorded a route hit.
@@ -329,6 +332,11 @@ describe('admin run totals', () => {
     });
     const omega = totals.find(t => t.model === 'vendor/omega');
     // A pair that reported no cost stays null rather than a made-up 0.
-    expect(omega).toMatchObject({ variant: null, costPerCaseUsd: null, totalCostUsd: null });
+    expect(omega).toMatchObject({
+      variant: null,
+      costPerCaseUsd: null,
+      totalCostUsd: null,
+      uncostedCases: 3,
+    });
   });
 });

@@ -957,7 +957,7 @@ describe('admin run cost contracts', () => {
       errors: 2,
       timeouts: 0,
     };
-    expect(BenchmarkModelTotalsSchema.parse(totals)).toEqual(totals);
+    expect(BenchmarkModelTotalsSchema.parse(totals)).toEqual({ ...totals, uncostedCases: 0 });
     expect(
       BenchmarkModelTotalsSchema.parse({ ...totals, costPerCaseUsd: null }).costPerCaseUsd
     ).toBeNull();
@@ -967,7 +967,12 @@ describe('admin run cost contracts', () => {
         summaries: [],
         modelTotals: [totals],
       }).modelTotals
-    ).toEqual([totals]);
+    ).toEqual([{ ...totals, uncostedCases: 0 }]);
+    // A worker that predates the field still parses; every case is assumed
+    // priced, which is what its own mean already asserted.
+    expect(
+      BenchmarkModelTotalsSchema.parse({ ...totals, uncostedCases: undefined }).uncostedCases
+    ).toBe(0);
     // An older worker serves route rows only.
     expect(
       BenchmarkRunSummariesResponseSchema.parse({ summaries: [] }).modelTotals

@@ -50,6 +50,8 @@ vi.mock('./db', async importOriginal => {
   return {
     ...actual,
     countCaseResultsByLane: vi.fn(),
+    copyRemeasureBaselines: vi.fn(),
+    reuseDeciderCaseResults: vi.fn(),
     listLaneFailures: vi.fn(),
     recordLaneFailure: vi.fn(),
     existsNewerCompletedRun: vi.fn(),

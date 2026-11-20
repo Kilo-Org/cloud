@@ -55,7 +55,6 @@ import {
   resolveRunIdentity,
   RunAlreadyActiveError,
   startRun,
-  sweepStaleRuns,
   syncPlatformRegistry,
 } from './run';
 import {
@@ -221,9 +220,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   );
 
   app.get('/admin/runs', async c => {
-    // Sweep stale runs first so a dead/wedged run surfaces as 'failed' (and
-    // frees its slot) without needing a new run to be started.
-    await sweepStaleRuns(c.env);
+    // Reads only: the per-minute cron sweeps stale runs, so listing never writes.
     const limit = Math.min(Number(c.req.query('limit') ?? 20) || 20, 100);
     const kind = BenchmarkKindSchema.safeParse(c.req.query('kind'));
     const purpose = BenchmarkRunPurposeSchema.safeParse(c.req.query('purpose'));
@@ -281,15 +278,20 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
             return c.json({ error: first.message }, 400);
           throw first;
         }
-        return c.json({
-          runId: started[0]?.runId ?? null,
-          enqueuedModels: started.reduce((total, run) => total + run.entryCount, 0),
-          skippedModels: [],
-          startedRuns: started,
-          drainErrors: drainErrors.map(error =>
-            error instanceof Error ? error.message : String(error)
-          ),
-        });
+        // A started run is `running` once its row exists; the dispatcher reuses prior
+        // results and materializes its chunks after this response.
+        return c.json(
+          {
+            runId: started[0]?.runId ?? null,
+            enqueuedModels: started.reduce((total, run) => total + run.entryCount, 0),
+            skippedModels: [],
+            startedRuns: started,
+            drainErrors: drainErrors.map(error =>
+              error instanceof Error ? error.message : String(error)
+            ),
+          },
+          started.length > 0 ? 202 : 200
+        );
       }
       try {
         return c.json({ ...(await startRun(c.env, kind, { force, router })), startedRuns: [] });

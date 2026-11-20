@@ -135,6 +135,7 @@ import {
   getChunk,
   getPaidCaseStartedAt,
   getSchedulerOverrides,
+  hasScheduledChunks,
   hasUnsettledChunks,
   listSettledSchedulerRuns,
   recoverChunks,
@@ -269,8 +270,8 @@ export async function failRunAndDrain(env: Env, runId: string, error: string): P
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 
 // Fails any run still 'running' past the stale threshold (queue retries
-// exhausted / dead-lettered). Called both before starting a run and when
-// listing runs, so a wedged run is recovered without depending on a new run
+// exhausted / dead-lettered). Called before starting a run and by the
+// per-minute cron, so a wedged run is recovered without depending on a new run
 // being started (the UI disables Start while a run shows 'running').
 // Stale DECIDER runs are salvaged per entry first: entries whose lanes all
 // produced results still become `ready`. Only entries with an unfinished lane
@@ -940,32 +941,6 @@ export async function startRun(
     }
     throw error;
   }
-  if (kind === 'decider') {
-    // Re-measured pairs start from their previous run's results; only the cases the old
-    // prompt transport measured unreliably are left to run.
-    const skipOldCaseIds = argvAffectedCases(router).map(benchCase => benchCase.id);
-    try {
-      await copyRemeasureBaselines(env.BENCH_DB, {
-        runId,
-        skipOldCaseIds,
-        promptRevision: PROMPT_TRANSPORT_REVISION,
-      });
-      await reuseDeciderCaseResults(env.BENCH_DB, {
-        runId,
-        router,
-        engineIdentity,
-        repetitions,
-        entries: enqueuedRunEntries,
-        skipOldCaseIds,
-        promptRevision: PROMPT_TRANSPORT_REVISION,
-      });
-    } catch (error) {
-      const reason = `case reuse failed: ${formatError(error).error}`;
-      await markRunFailed(env.BENCH_DB, runId, reason);
-      await markProfilesFailedForRun(env.BENCH_DB, runId, reason);
-      throw error;
-    }
-  }
 
   console.log(
     JSON.stringify({
@@ -1008,16 +983,18 @@ export async function startRun(
     return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
   }
 
-  try {
-    await initializeScheduledRun(env, runId);
-    await dispatchScheduler(env);
-    await finalizeRunIfComplete(env, runId, kind, await getRunState(env, runId));
-  } catch (error) {
-    const reason = `scheduler initialization failed: ${formatError(error).error}`;
-    await markRunFailed(env.BENCH_DB, runId, reason);
-    await markProfilesFailedForRun(env.BENCH_DB, runId, reason);
-    throw error;
-  }
+  // Reuse and chunk materialization run in the dispatcher's initialization pass, which
+  // the per-minute cron retries, so nothing after the run row can fail this start.
+  await env.BENCH_QUEUE.send({
+    runId,
+    kind: 'decider',
+    model: enqueuedRunEntries[0].model,
+    schedulerWake: true,
+  } satisfies BenchmarkJobMessage).catch((error: unknown) => {
+    console.warn(
+      JSON.stringify({ event: 'benchmark_scheduler_wake_failed', runId, ...formatError(error) })
+    );
+  });
   return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
 }
 
@@ -1151,15 +1128,35 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
     benchmarkUserId: run.benchmark_user_id,
     benchmarkOrgId: run.benchmark_org_id,
   });
+  const entries = models
+    .filter(model => model.enqueued)
+    .map(model => ({ model: model.model, variant: variantFromStorage(model.variant) }));
+  // A run's first chunk is written only after every entry's reuse committed, so a run
+  // without chunks is the only one whose reuse may be missing or partial. The copies
+  // skip rows the run already holds, so repeating a failed pass is safe.
+  if (!(await hasScheduledChunks(env.BENCH_DB, runId))) {
+    const skipOldCaseIds = argvAffectedCases(run.router).map(benchCase => benchCase.id);
+    await copyRemeasureBaselines(env.BENCH_DB, {
+      runId,
+      skipOldCaseIds,
+      promptRevision: PROMPT_TRANSPORT_REVISION,
+    });
+    await reuseDeciderCaseResults(env.BENCH_DB, {
+      runId,
+      router: run.router,
+      engineIdentity: run.engine_identity,
+      repetitions: run.repetitions,
+      entries,
+      skipOldCaseIds,
+      promptRevision: PROMPT_TRANSPORT_REVISION,
+    });
+  }
   return scheduleRunChunks(env.BENCH_DB, {
     runId,
-    entries: models
-      .filter(model => model.enqueued)
-      .map(model => ({
-        model: model.model,
-        variant: variantFromStorage(model.variant),
-        providers: catalogModelProviders(catalog, model.model),
-      })),
+    entries: entries.map(entry => ({
+      ...entry,
+      providers: catalogModelProviders(catalog, entry.model),
+    })),
     repetitions: run.repetitions,
     caseIds: deciderCasesForRouter(run.router).map(benchCase => benchCase.id),
     chunkSize: DECIDER_CHUNK_SIZE,

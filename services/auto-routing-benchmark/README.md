@@ -181,9 +181,17 @@ materializes, and a second lease row keeps concurrent dispatchers from initializ
 same time; a pass that completes a run's initialization claims again so its chunks start at
 once.
 
+Starting a decider run writes the run row and returns; it reuses nothing and materializes
+nothing in the request. The first initialization pass copies every entry's compatible prior
+results before it writes any chunk, so a run's chunks exist only once its reuse is complete.
+A pass whose reuse fails writes no chunk, and the next pass repeats the reuse, which skips
+rows the run already holds. The reuse statement filters the prior runs first and then seeks
+each run's pair in `case_results`: D1 keeps no planner statistics, so the join order is
+pinned with `CROSS JOIN`.
+
 Initialization failures stay isolated to their run, so healthy runs can still dispatch.
 A run without its saved execution identity fails and releases its claimed profiles.
-Transient catalog failures leave the run eligible for another initialization attempt.
+Transient catalog or reuse failures leave the run eligible for another initialization attempt.
 
 Run completion accounting reads every case result of the run, so it does not run per
 completed chunk. A completion first asks whether the run still has scheduled work — an
@@ -193,8 +201,10 @@ count as unsettled, so a run with a dead lane still settles once its live lanes 
 runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
 sweep and the dead-letter path remain responsible for runs that settle without a train of
 completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
-completes only the runs that still hold unsettled chunks, and pruning is driven from the
-per-run scheduler markers instead of scanning the chunk, execution or run tables.
+completes only the runs that still hold unsettled chunks, the failed-lane check reads only
+running runs' failed chunks, execution and marker pruning start from the per-run scheduler
+markers, and chunk pruning walks the distinct run ids that still hold chunks, so a run that
+stopped before its marker was written is pruned too.
 
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger records when each paid case started and prevents automatic
@@ -960,8 +970,8 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them |
 | `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
-| `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
-| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
+| `GET /admin/runs` | List runs. Read-only; the per-minute cron sweeps stale `running` runs |
+| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`); `202` once a run row exists, with initialization left to the dispatcher |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
 | `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |

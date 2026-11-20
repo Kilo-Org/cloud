@@ -22,6 +22,7 @@ import {
   setSharePersistUserId,
   SHARE_PAYLOAD_MAX_ENTRIES,
   SHARE_TEXT_MAX_CHARS,
+  type ShareId,
   subscribeAccountStagedShareClear,
   takeSharePayload,
 } from './share-payload';
@@ -912,7 +913,7 @@ describe('share payload account boundary', () => {
   });
 
   it('notifies subscribers only when it dropped a staged payload', () => {
-    const listener = vi.fn<() => void>();
+    const listener = vi.fn<(droppedIds: readonly ShareId[]) => void>();
     const unsubscribe = subscribeAccountStagedShareClear(listener);
     try {
       // Nothing staged: the boundary stays silent, so a share staged before an
@@ -921,9 +922,10 @@ describe('share payload account boundary', () => {
       expect(listener).not.toHaveBeenCalled();
 
       setSharePersistUserId('userA');
-      putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+      const id = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
       clearAccountStagedSharePayloads();
       expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith([id]);
     } finally {
       unsubscribe();
     }
@@ -932,12 +934,32 @@ describe('share payload account boundary', () => {
   it('stops notifying after the subscriber leaves', () => {
     setSharePersistUserId('userA');
     putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
-    const listener = vi.fn<() => void>();
+    const listener = vi.fn<(droppedIds: readonly ShareId[]) => void>();
     subscribeAccountStagedShareClear(listener)();
 
     clearAccountStagedSharePayloads();
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('reports only the account entry it dropped, keeping a signed-out capture readable', () => {
+    const captureId = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+    setSharePersistUserId('userA');
+    const accountId = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+    const listener = vi.fn<(droppedIds: readonly ShareId[]) => void>();
+    const unsubscribe = subscribeAccountStagedShareClear(listener);
+
+    try {
+      clearAccountStagedSharePayloads();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const droppedIds = listener.mock.calls[0]?.[0] ?? [];
+      expect(droppedIds).toEqual([accountId]);
+      expect(droppedIds).not.toContain(captureId);
+      expect(peekSharePayload(captureId)?.text).toBe('captured-out');
+    } finally {
+      unsubscribe();
+    }
   });
 
   it('stops filling the store when the account changes during the read', async () => {
@@ -958,6 +980,106 @@ describe('share payload account boundary', () => {
     await restore;
 
     expect(peekSharePayload('a-id')).toBeNull();
+  });
+
+  it('rewrites the retained draft so a missing copy becomes a failed name', async () => {
+    armDraftStorage();
+    setSharePersistUserId('userA');
+    const id = putSharePayload({
+      text: 'retained text',
+      files: [{ name: 'photo.jpg', uri: 'file:///cache/photo.jpg' }],
+      failedFiles: [],
+    });
+    await persistSharePayloadsNow();
+    // A share copy is reaped before the boundary runs, so its uri is gone.
+    __setCheckFileExistsForTests(() => false);
+
+    clearAccountStagedSharePayloads();
+
+    // The rewrite is fire-and-forget, so the draft settles when it lands.
+    await vi.waitFor(async () => {
+      const draft = await loadDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
+      expect(draft?.entries[id]?.files).toEqual([]);
+    });
+    const draft = await loadDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
+    // The entry stays in the draft and still resumes: only the uri left, and
+    // the name it named reports as one the next sign-in could not reach.
+    expect(draft?.order).toEqual([id]);
+    expect(draft?.entries[id]?.text).toBe('retained text');
+    expect(draft?.entries[id]?.failedFiles).toEqual(['photo.jpg']);
+  });
+
+  it('leaves a surviving copy in the rewritten draft', async () => {
+    armDraftStorage();
+    setSharePersistUserId('userA');
+    const id = putSharePayload({
+      text: 'retained text',
+      files: [{ name: 'photo.jpg', uri: 'file:///cache/photo.jpg' }],
+      failedFiles: [],
+    });
+    await persistSharePayloadsNow();
+    __setCheckFileExistsForTests(() => true);
+    const writesBefore = kvMock.setItem.mock.calls.length;
+
+    clearAccountStagedSharePayloads();
+
+    // Wait for the rewrite itself, so the assertions below cannot pass on the
+    // draft the persist wrote before the boundary ran.
+    await vi.waitFor(() => {
+      expect(kvMock.setItem.mock.calls.length).toBeGreaterThan(writesBefore);
+    });
+    const draft = await loadDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
+    expect(draft?.entries[id]?.files).toEqual([
+      { name: 'photo.jpg', uri: 'file:///cache/photo.jpg' },
+    ]);
+    expect(draft?.entries[id]?.failedFiles).toEqual([]);
+    expect(draft?.entries[id]?.text).toBe('retained text');
+  });
+
+  it('does not rewrite a draft for an account that is no longer the persist scope', async () => {
+    armDraftStorage();
+    setSharePersistUserId('userA');
+    const id = putSharePayload({
+      text: 'staged by a',
+      files: [{ name: 'photo.jpg', uri: 'file:///cache/photo.jpg' }],
+      failedFiles: [],
+    });
+    await persistSharePayloadsNow();
+    __setCheckFileExistsForTests(() => false);
+
+    // Hold the rewrite's draft read, so the scope change is guaranteed to land
+    // between that read and the write it would otherwise make.
+    const armedRead = kvMock.getItem.getMockImplementation();
+    const readHeld = Promise.withResolvers<boolean>();
+    let holdNextRead = true;
+    kvMock.getItem.mockImplementation(async (scope, k) => {
+      if (holdNextRead) {
+        holdNextRead = false;
+        await readHeld.promise;
+      }
+      return armedRead?.(scope, k) ?? null;
+    });
+    const readsBefore = kvMock.getItem.mock.calls.length;
+    const writesBefore = kvMock.setItem.mock.calls.length;
+
+    clearAccountStagedSharePayloads();
+    // The boundary returns synchronously while its rewrite is parked on the
+    // draft read; the scope moves before that read settles.
+    await vi.waitFor(() => {
+      expect(kvMock.getItem.mock.calls.length).toBeGreaterThan(readsBefore);
+    });
+    setSharePersistUserId('userB');
+    readHeld.resolve(true);
+    await drainAsync();
+
+    // The rewrite read the draft and then declined to write it, so the draft is
+    // exactly what the departing account left behind.
+    expect(kvMock.setItem.mock.calls.length).toBe(writesBefore);
+    const draft = await loadDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
+    expect(draft?.entries[id]?.files).toEqual([
+      { name: 'photo.jpg', uri: 'file:///cache/photo.jpg' },
+    ]);
+    expect(draft?.entries[id]?.failedFiles).toEqual([]);
   });
 });
 

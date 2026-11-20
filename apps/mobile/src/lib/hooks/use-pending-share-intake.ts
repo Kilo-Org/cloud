@@ -65,15 +65,19 @@ export function usePendingShareIntake(input: {
   const pendingShareIdEpochRef = useRef(0);
 
   // Staged share deliveries belong to the account that staged them. The shared
-  // account boundary drops them, and this subscription resets the pending slot
-  // in step, so the slot always describes a staged share that exists. The
-  // epoch bump also abandons a cold-start restore that is in flight. The
-  // notification fires only when a stamped entry was dropped, so a share staged
-  // before an account resolves keeps its slot for a same-process sign-in
-  // (DEC-01).
+  // account boundary drops them and names the dropped ids, so this
+  // subscription resets the pending slot only when that slot names one of
+  // them: the slot then always describes a staged share that exists, and a
+  // share staged before an account resolves keeps its slot for a same-process
+  // sign-in (DEC-01). The epoch bump also abandons a cold-start restore that is
+  // in flight.
   useEffect(
     () =>
-      subscribeAccountStagedShareClear(() => {
+      subscribeAccountStagedShareClear(droppedIds => {
+        const pendingId = pendingShareIdRef.current;
+        if (pendingId === null || !droppedIds.includes(pendingId)) {
+          return;
+        }
         pendingShareIdEpochRef.current += 1;
         setPendingShareId(null);
       }),

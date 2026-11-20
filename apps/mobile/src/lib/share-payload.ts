@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- the in-memory store, its durable draft snapshot, the account boundary, and the cache-file hygiene share one module so their scope rules stay in one place */
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import * as Sentry from '@sentry/react-native';
 import * as Crypto from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
 import { type ShareIntent } from 'expo-share-intent';
@@ -52,8 +53,12 @@ export type StagedSharePayload = { payload: SharePayload; stagedUserId: string |
 const payloads = new Map<ShareId, StagedSharePayload>();
 const insertionOrder: ShareId[] = [];
 
-/** Listeners the account boundary notifies after it dropped staged payloads. */
-const accountStagedClearListeners = new Set<() => void>();
+/**
+ * Listeners the account boundary notifies after it dropped staged payloads,
+ * with the ids it dropped so a subscriber can tell whether its own slot still
+ * names a staged entry.
+ */
+const accountStagedClearListeners = new Set<(droppedIds: readonly ShareId[]) => void>();
 
 // Signed-in user id that scopes durable persistence. When null, every
 // persist/clear helper no-ops (DEC-01 account scope): a share captured while
@@ -296,6 +301,26 @@ export function clearSharePayload(id: ShareId): void {
 }
 
 /**
+ * Reconciles one payload's attachment copies against the filesystem: a file
+ * whose uri no longer exists moves its name into `failedFiles` and leaves
+ * `files`, and a file that is still there keeps its place. The text is
+ * untouched, so a payload whose copies all vanished still resumes as its text
+ * plus the names it could not reach.
+ */
+function reconcilePayloadFiles(payload: SharePayload): SharePayload {
+  const kept: AgentAttachmentCandidate[] = [];
+  const failed = [...payload.failedFiles];
+  for (const file of payload.files) {
+    if (checkFileExists(file.uri)) {
+      kept.push(file);
+    } else {
+      failed.push(file.name);
+    }
+  }
+  return { text: payload.text, files: kept, failedFiles: failed };
+}
+
+/**
  * Restores the payloads map from the durable draft for `userId`. Merges the
  * draft in beside whatever the store already holds: an entry this process
  * staged for `userId` wins over the draft, and a capture staged before an
@@ -361,36 +386,20 @@ export async function restoreSharePayloads(
   for (const id of spare > 0 ? others.slice(-spare) : []) {
     selected.add(id);
   }
-  const restored: SharePayload[] = [];
   for (const id of retained) {
     const entry = draft.entries[id];
     if (selected.has(id) && entry !== undefined) {
-      const payload: SharePayload = {
+      // Each restored entry's files are reconciled against the filesystem on
+      // the way in, so a missing cache copy reports as a failed name instead
+      // of resuming as a file nobody can open.
+      const payload = reconcilePayloadFiles({
         text: entry.text,
         files: entry.files.map(file => ({ name: file.name, uri: file.uri })),
         failedFiles: [...entry.failedFiles],
-      };
+      });
       payloads.set(id, { payload, stagedUserId: userId });
       insertionOrder.push(id);
-      restored.push(payload);
     }
-  }
-
-  // Then reconcile each restored payload's files against the filesystem.
-  for (const payload of restored) {
-    const kept: AgentAttachmentCandidate[] = [];
-    const failed = [...payload.failedFiles];
-    for (const file of payload.files) {
-      if (checkFileExists(file.uri)) {
-        kept.push(file);
-      } else {
-        failed.push(file.name);
-      }
-    }
-    payload.files.length = 0;
-    payload.files.push(...kept);
-    payload.failedFiles.length = 0;
-    payload.failedFiles.push(...failed);
   }
 }
 
@@ -401,13 +410,21 @@ export async function restoreSharePayloads(
  * with that account leave with it.
  *
  * A payload staged while signed out keeps its place (DEC-01 account scope): it
- * is memory-only, and a same-process sign-in still opens the gate for it. This
- * call never persists; it runs at a boundary, not inside an account session.
+ * is memory-only, and a same-process sign-in still opens the gate for it.
  * An account's own draft keeps the staged share for that account's next
- * sign-in.
+ * sign-in, trimmed to the attachment copies that still exist: the boundary
+ * reconciles every entry in that account's retained draft against the
+ * filesystem, so the next sign-in resumes the text and reports the copies it
+ * can no longer reach instead of resuming files that are already gone. The
+ * trim is fire-and-forget — this call stays synchronous — and the draft write
+ * is fenced to the account whose draft it describes.
+ *
+ * Subscribers receive the ids dropped here, in insertion order, so a subscriber
+ * holding one pending id can tell whether its slot still names a staged entry.
  */
 export function clearAccountStagedSharePayloads(): void {
   const dropped = [...payloads].filter(([, entry]) => entry.stagedUserId !== null);
+  const droppedIds: ShareId[] = [];
   for (const [id, entry] of dropped) {
     payloads.delete(id);
     const index = insertionOrder.indexOf(id);
@@ -415,6 +432,7 @@ export function clearAccountStagedSharePayloads(): void {
       insertionOrder.splice(index, 1);
     }
     discardPayloadCacheFiles(entry.payload);
+    droppedIds.push(id);
   }
   if (dropped.length === 0) {
     return;
@@ -422,16 +440,66 @@ export function clearAccountStagedSharePayloads(): void {
   // The pending slot lives in the root layout and resets with the payloads, so
   // the shell and the store always describe the same staged share.
   for (const listener of accountStagedClearListeners) {
-    listener();
+    listener(droppedIds);
   }
+  // Then trim each departing account's retained draft. `reapTempFiles({ all:
+  // true })` in `clearSessionScopedState` deletes every share copy before this
+  // boundary runs, so a draft left naming those uris could only ever reopen
+  // text at that account's next sign-in: reconciliing it now is what lets the
+  // resume deliver the copies that survive and report the rest. The whole
+  // draft is reconciled, not just the dropped ids, because the boundary
+  // removes the account's copies whatever entry named them.
+  //
+  // The boundary stays synchronous, and the inner handler owns the rejection
+  // so it can never surface as an unhandled rejection or reach the caller.
+  void (async () => {
+    try {
+      const { loadDraft, saveDraft, flushDraft, SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft } =
+        await getDrafts();
+      const departing = new Set<string>();
+      for (const [, entry] of dropped) {
+        if (entry.stagedUserId !== null) {
+          departing.add(entry.stagedUserId);
+        }
+      }
+      await Promise.all(
+        [...departing].map(async userId => {
+          const draft = await loadDraft(userId, SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
+          // The persist scope can move while the draft read is in flight, and
+          // a rewrite belongs to the account whose copies it describes: a
+          // draft read for an account that is no longer the persist scope is
+          // left exactly as it was.
+          if (getSharePersistUserId() !== userId || draft === null) {
+            return;
+          }
+          // Every entry stays in the draft: only file uris leave (as failed
+          // names), so an entry whose copies all vanished still resumes its
+          // text. `order` is untouched.
+          const entries = Object.fromEntries(
+            Object.entries(draft.entries).map(([id, entry]) => [id, reconcilePayloadFiles(entry)])
+          );
+          saveDraft(userId, SHARE_PAYLOADS_DRAFT_KEY, { order: draft.order, entries });
+          await flushDraft(userId, SHARE_PAYLOADS_DRAFT_KEY);
+        })
+      );
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { 'error.subsystem': 'share', 'error.operation': 'rewrite_retained_draft' },
+      });
+    }
+  })();
 }
 
 /**
  * Subscribe to the account boundary dropping staged payloads. The root layout
  * uses it to reset its pending share id; it fires only when a stamped entry
- * was dropped, so a capture staged before an account resolves keeps its slot.
+ * was dropped, and it passes the dropped ids so the subscriber resets its slot
+ * only when that slot names one of them: a capture staged before an account
+ * resolves keeps its slot.
  */
-export function subscribeAccountStagedShareClear(listener: () => void): () => void {
+export function subscribeAccountStagedShareClear(
+  listener: (droppedIds: readonly ShareId[]) => void
+): () => void {
   accountStagedClearListeners.add(listener);
   return () => {
     accountStagedClearListeners.delete(listener);

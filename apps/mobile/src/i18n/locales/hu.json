@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "A szolgáltatók kapcsolói csak olvashatók maradnak, amíg a teljes modellkatalógus be nem töltődik. A szerkesztésükhöz koppintson fent az Újrapróbálkozás gombra.",
     "providersEmpty": "Nincs a keresésnek megfelelő szolgáltató.",
     "providersNone": "Ennél a szervezetnél nem érhetők el szolgáltatók.",
-    "providersUnavailable": "A szolgáltatók listája még nem töltődött be. Koppintson az Újrapróbálkozás gombra a betöltéshez.",
+    "providersUnavailable": "A szolgáltatók listáját nem sikerült betölteni.",
     "allowAllShown": "Az összes megjelenített engedélyezése",
     "denyAllShown": "Az összes megjelenített letiltása",
     "gatewaysDescription": "A Kilo a modellkéréseket a Vercel AI Gateway vagy az OpenRouter használatával irányítja. A letiltott átjáró sikertelenné teszi ezeket a kéréseket.",

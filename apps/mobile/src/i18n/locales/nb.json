@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
     "providersEmpty": "Ingen leverandører samsvarer med dette søket.",
     "providersNone": "Ingen leverandører er tilgjengelige for denne organisasjonen.",
-    "providersUnavailable": "Leverandørlisten er ikke lastet inn ennå. Prøv igjen for å laste den inn.",
+    "providersUnavailable": "Leverandørlisten kunne ikke lastes inn.",
     "allowAllShown": "Tillat alle viste",
     "denyAllShown": "Nekt alle viste",
     "gatewaysDescription": "Kilo ruter modellforespørsler gjennom Vercel AI Gateway eller OpenRouter. En deaktivert inngangsportal får disse forespørslene til å feile.",

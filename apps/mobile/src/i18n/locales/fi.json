@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "Palveluntarjoajien kytkimet ovat vain luku -tilassa, kunnes koko mallikatalogi on ladattu. Muokkaa niitä napauttamalla yllä Yritä uudelleen.",
     "providersEmpty": "Haulla ei löytynyt palveluntarjoajia.",
     "providersNone": "Tälle organisaatiolle ei ole saatavilla palveluntarjoajia.",
-    "providersUnavailable": "Palveluntarjoajien luetteloa ei ole vielä ladattu. Yritä uudelleen, niin se ladataan.",
+    "providersUnavailable": "Palveluntarjoajien luetteloa ei voitu ladata.",
     "allowAllShown": "Salli kaikki näytetyt",
     "denyAllShown": "Estä kaikki näytetyt",
     "gatewaysDescription": "Kilo reitittää mallipyynnöt Vercel AI Gatewayn tai OpenRouterin kautta. Jos yhdyskäytävä on poistettu käytöstä, sen kautta kulkevat pyynnöt epäonnistuvat.",

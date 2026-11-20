@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "Amaswishi abahlinzeki ahlala engokufunda kuphela kuze kulayishwe ikhathalogi ephelele yamamodeli. Thepha Zama futhi ngenhla ukuze uwahlele.",
     "providersEmpty": "Abekho abahlinzeki abahambisana nalokhu kusesha.",
     "providersNone": "Akukho bahlinzeki abatholakalayo kule nhlangano.",
-    "providersUnavailable": "Uhlu lwabahlinzeki alukalayishwanga okwamanje. Zama futhi ukuze lulayishwe.",
+    "providersUnavailable": "Uhlu lwabahlinzeki alukwazanga ukulayishwa.",
     "allowAllShown": "Vumela konke okubonisiwe",
     "denyAllShown": "Nqaba konke okubonisiwe",
     "gatewaysDescription": "I-Kilo idlulisela izicelo zamamodeli nge-Vercel AI Gateway noma nge-OpenRouter. Isango elikhutshaziwe lehluleka lezo zicelo.",

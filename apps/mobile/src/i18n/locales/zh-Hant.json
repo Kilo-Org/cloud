@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
     "providersEmpty": "沒有符合此搜尋的供應商。",
     "providersNone": "此組織沒有可用的供應商。",
-    "providersUnavailable": "供應商清單尚未載入完成。請再試一次以載入。",
+    "providersUnavailable": "無法載入供應商清單。",
     "allowAllShown": "允許所有顯示項目",
     "denyAllShown": "拒絕所有顯示項目",
     "gatewaysDescription": "Kilo 會透過 Vercel AI Gateway 或 OpenRouter 路由模型請求。停用的閘道會使這些請求失敗。",

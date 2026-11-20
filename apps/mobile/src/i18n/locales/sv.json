@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
     "providersEmpty": "Inga leverantörer matchar den här sökningen.",
     "providersNone": "Inga leverantörer är tillgängliga för den här organisationen.",
-    "providersUnavailable": "Leverantörslistan har inte lästs in än. Försök igen för att läsa in den.",
+    "providersUnavailable": "Leverantörslistan kunde inte läsas in.",
     "allowAllShown": "Tillåt alla som visas",
     "denyAllShown": "Neka alla som visas",
     "gatewaysDescription": "Kilo dirigerar modellbegäranden via Vercel AI Gateway eller OpenRouter. En inaktiverad nätbrygga gör att dessa begäranden misslyckas.",

@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
     "providersNone": "Tidak ada penyedia yang tersedia untuk organisasi ini.",
-    "providersUnavailable": "Daftar penyedia belum dimuat. Coba lagi untuk memuatnya.",
+    "providersUnavailable": "Daftar penyedia tidak dapat dimuat.",
     "allowAllShown": "Izinkan semua yang ditampilkan",
     "denyAllShown": "Tolak semua yang ditampilkan",
     "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",

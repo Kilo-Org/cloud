@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "Mgba ọkụ ndị na-enye ọrụ ga-anọgide naanị maka ịgụ ruo mgbe katalọgụ ụdị niile ebudatara. Nwaa ọzọ n'elu iji dezie ha.",
     "providersEmpty": "Ọnweghị onye na-enye ọrụ dabara na nchọta a.",
     "providersNone": "Ọnweghị onye na-enye ọrụ dị maka nzukọ a.",
-    "providersUnavailable": "Ndepụta ndị na-enye ọrụ ebudatabeghị. Nwaa ọzọ iji budata ya.",
+    "providersUnavailable": "Enweghị ike ibudata ndepụta ndị na-enye ọrụ.",
     "allowAllShown": "Kwe ka ihe niile egosiri",
     "denyAllShown": "Jụ ihe niile egosiri",
     "gatewaysDescription": "Kilo na-eziga arịrịọ ihe nlere site na Vercel AI Gateway ma ọ bụ OpenRouter. Ọnụ ụzọ agbanyụrụ na-eme ka arịrịọ ndị ahụ daa.",

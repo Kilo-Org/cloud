@@ -4992,7 +4992,7 @@
     "providersNeedCatalog": "Các công tắc nhà cung cấp sẽ ở chế độ chỉ đọc cho đến khi danh mục mô hình đầy đủ được tải. Nhấn Thử lại ở trên để chỉnh sửa.",
     "providersEmpty": "Không có nhà cung cấp nào khớp với tìm kiếm này.",
     "providersNone": "Không có nhà cung cấp nào khả dụng cho tổ chức này.",
-    "providersUnavailable": "Danh sách nhà cung cấp chưa tải xong. Hãy thử lại để tải danh sách.",
+    "providersUnavailable": "Không thể tải danh sách nhà cung cấp.",
     "allowAllShown": "Cho phép tất cả mục đang hiển thị",
     "denyAllShown": "Từ chối tất cả mục đang hiển thị",
     "gatewaysDescription": "Kilo định tuyến yêu cầu mô hình qua Vercel AI Gateway hoặc OpenRouter. Cổng kết nối bị tắt sẽ làm các yêu cầu đó thất bại.",

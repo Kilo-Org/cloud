@@ -5069,7 +5069,7 @@
     "providersNeedCatalog": "Comutatoarele furnizorilor rămân doar pentru citire până la încărcarea catalogului complet de modele. Atingeți Reîncearcă mai sus pentru a le edita.",
     "providersEmpty": "Niciun furnizor nu corespunde acestei căutări.",
     "providersNone": "Nu există furnizori disponibili pentru această organizație.",
-    "providersUnavailable": "Lista furnizorilor nu s-a încărcat încă. Atingeți Reîncearcă pentru a o încărca.",
+    "providersUnavailable": "Lista furnizorilor nu s-a putut încărca.",
     "allowAllShown": "Permite toate cele afișate",
     "denyAllShown": "Interzice toate cele afișate",
     "gatewaysDescription": "Kilo direcționează cererile către modele prin Vercel AI Gateway sau OpenRouter. O poartă de acces dezactivată face ca aceste cereri să eșueze.",

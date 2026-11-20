@@ -57,6 +57,7 @@
     "link": "saite",
     "takingLonger": "Tas aizņem vairāk laika, nekā gaidīts. Vari aizvērt šo ekrānu un pārbaudīt vēlreiz.",
     "model": "Modelis",
+    "notSelected": "Nav atlasīts",
     "accessDenied": "Piekļuve liegta",
     "allRepositories": "Visi repozitoriji",
     "personal": "Personīgais",
@@ -147,6 +148,7 @@
     "performance": "Veiktspēja",
     "preferences": "Lietotāja iestatījumi",
     "privacyPolicy": "Privātuma politika",
+    "termsOfService": "Lietošanas noteikumi",
     "profile": "Profils",
     "reactions": "Reakcijas",
     "recent": "Jaunākie",
@@ -170,6 +172,7 @@
     "generating": "Ģenerē…",
     "working": "Strādā",
     "yourOwnRepositories": "Tavi repozitoriji",
+    "organizationRepositories": "Organizācijas repozitoriji",
     "dismissed": "Noraidīts",
     "agent": "Aģents",
     "durationMinuteShort": "min",
@@ -216,8 +219,8 @@
     "verifyCode": "Pārbaudīt kodu",
     "resendCode": "Nosūtīt kodu vēlreiz",
     "termsPrefix": "Turpinot, tu piekrīti mūsu ",
+    "termsInSentence": "Pakalpojuma noteikumiem",
     "terms": "Noteikumiem",
-    "termsInSentence": "Noteikumiem",
     "termsConnector": " un ",
     "termsSuffix": ".",
     "moreSignInOptions": "Citas pierakstīšanās iespējas",
@@ -772,7 +775,6 @@
       "replyPlaceholder": "Atbilde…",
       "replyBody": "Atbildes teksts",
       "submitReply": "Nosūtīt atbildi",
-      "termsTitle": "Lietošanas noteikumi",
       "termsCopy": "Publicēt saturu drīkst no 13 gadu vecuma.",
       "termsAcceptRetry": "Neizdevās pieņemt noteikumus. Pārbaudi savienojumu un mēģini vēlreiz.",
       "viewTerms": "Skatīt noteikumus",
@@ -1047,7 +1049,11 @@
     "tabs": {
       "overview": "Pārskats",
       "files": "Faili",
-      "discussion": "Diskusija"
+      "discussion": "Diskusija",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentārs",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentāri",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentāri",
+      "discussionAccessibility_zero": "{{title}}: {{displayCount}} komentāru"
     },
     "fileStatus": {
       "modified": "Mainīts",
@@ -1154,16 +1160,16 @@
     },
     "category": {
       "agentAttentionTitle": "Aģents gaida tavu rīcību",
-      "agentAttentionSubtitle": "jautājumi, atļauju pieprasījumi un nepieciešamās atbildes",
+      "agentAttentionSubtitle": "Jautājumi, atļauju pieprasījumi un nepieciešamās atbildes",
       "agentUpdatesTitle": "Aģenta jaunumi",
-      "agentUpdatesSubtitle": "aģenta ziņojumi uzdevuma izpildes laikā",
+      "agentUpdatesSubtitle": "Aģenta ziņojumi uzdevuma izpildes laikā",
       "sessionStatusTitle": "Sesijas statuss",
-      "sessionStatusSubtitle": "sesija pabeigta / kļūda / gatava vadīšanai",
-      "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
+      "sessionStatusSubtitle": "Sesija pabeigta / kļūda / gatava vadīšanai",
+      "balanceAlertsSubtitle": "Brīdinājumi par mazu organizācijas kredītu atlikumu",
       "balanceAlertsUnavailable": "Pievienojieties organizācijai, lai saņemtu bilances brīdinājumus.",
-      "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi",
+      "securityFindingsSubtitle": "Jaunas konstatētās problēmas un SLA atgādinājumi",
       "securityFindingsUnavailable": "Iespējojiet Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus.",
-      "spendAlertsSubtitle": "sliekšņu pārsniegumi un stundas lēcieni",
+      "spendAlertsSubtitle": "Sliekšņu pārsniegumi un stundas lēcieni",
       "spendAlertsToggle": "Izdevumu brīdinājumu kategorija"
     },
     "history": {
@@ -1245,7 +1251,7 @@
     },
     "instructions": {
       "title": "Pielāgoti norādījumi",
-      "deprecation": "Pielāgoto norādījumu funkcijas atbalstu plānots pārtraukt. Tā vietā pārvieto šos norādījumus uz REVIEW.md failu savā repozitorijā.",
+      "deprecation": "Pielāgotie norādījumi tiks noņemti. Tā vietā pārvieto šos norādījumus uz REVIEW.md failu savā repozitorijā.",
       "placeholder": "piemēram, ievērot mūsu kļūdu apstrādes noteikumus…",
       "clearTitle": "Noņemt pielāgotos norādījumus?",
       "clearMessage": "Saglabājot tukšu lauku, tiks dzēsti šim recenzentam saglabātie pielāgotie norādījumi."
@@ -1409,8 +1415,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebTitle": "Pārvaldīts tīmeklī",
+      "managedOnWebShort": "Šis savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebRepositories": "Izvēlies repozitorijus priekš {{organization}} tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionReconnect": "Izveido jaunu darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
+      "descriptionOverview": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to nākamajā ekrānā.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
       "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
       "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
@@ -1431,6 +1441,7 @@
     "platformList": {
       "checking": "Pārbauda…",
       "statusUnavailable": "Statuss nav pieejams",
+      "needsAttention": "Nepieciešama rīcība",
       "platforms": "Platformas",
       "activity": "Darbības"
     },
@@ -3076,6 +3087,7 @@
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
     "signedIn": "Pierakstīšanās: {{signedIn}} · Pēdējā aktivitāte: {{lastSeen}}",
+    "signedInThisDevice": "Pierakstīšanās: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Šeit ir redzamas Kilo lietotnes, Kilo CLI un tīmekļa pārlūka sesijas. Redaktora sesijas nav iekļautas.",
     "thisDevice": "Šī ierīce",
     "viewProfile": "Skatīt profilu",
@@ -3239,6 +3251,8 @@
     "retryHint": "Atkārtoti ielādē Kilo Pass stāvokli.",
     "endedOn": "Beidzies {{date}}",
     "notAvailableInApp": "Kilo Pass lietotnē nav pieejams.",
+    "notAvailableTitle": "Kilo Pass lietotnē netiek piedāvāts",
+    "noPassDescription": "Šim kontam nav Kilo Pass.",
     "statusActive": "Aktīvs",
     "statusTrialing": "Izmēģinājuma periods",
     "statusPastDue": "Maksājums nokavēts",
@@ -3309,6 +3323,7 @@
     "revokeConsent": "Atsaukt piekrišanu",
     "revokeConsentTitle": "Atsaukt piekrišanu datu kopīgošanai?",
     "acceptAndContinue": "Pieņemt un turpināt",
+    "loadingConsentSettings": "Notiek tavu piekrišanas iestatījumu ielāde…",
     "decline": "Noraidīt",
     "declineAndSignOut": "Noraidīt un izrakstīties",
     "declineTitle": "Noraidīt datu kopīgošanu?",
@@ -3520,7 +3535,7 @@
       "retentionLimit": "Tiek rādīti jaunākie rēķini."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Iespējot brīdinājumu par mazu atlikumu",
+      "subtitle": "Sūti brīdinājumu pa e-pastu uz norādītajām adresēm, kad šīs organizācijas atlikums nokrītas zem iestatītās summas.",
       "notifyEmailsLabel": "Paziņojumu saņēmēju e-pasta adreses",
       "permissionDenied": "Tev nav atļaujas pārvaldīt norēķinu brīdinājumus.",
       "separateEmailsHint": "Atdali vairākas e-pasta adreses ar komatiem.",
@@ -3596,6 +3611,7 @@
       "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
       "emptyTitle": "Šajā stundā nav pieprasījumu",
       "emptyDescription": "Izmantojiet pogu „Iepriekšējā stunda”, lai apskatītu iepriekšējos pieprasījumus.",
+      "emptyBoundDescription": "Pieprasījumu žurnāli tālāk pagātnē nesniedzas.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
       "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
       "tokens": "{{input}} ievade · {{output}} izvade",
@@ -3667,8 +3683,7 @@
       "renameTitle": "Pārdēvēt organizāciju",
       "renamePlaceholder": "Organizācijas nosaukums",
       "balance": "Atlikums",
-      "organizationSeats": "Organizācijas vietas",
-      "plan": "Organizācijas plāns",
+      "plan": "Plāns",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Beidzies",
@@ -3703,7 +3718,8 @@
     "signupStepUp": "Lai pabeigtu konta izveidi, izvēlies “$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithGoogle)”.",
-    "invalidCode": "Kods nav pareizs. Mēģini vēlreiz.",
+    "signupStepUpBack": "Lai pabeigtu konta izveidi, atgriezies iepriekšējā ekrānā un izvēlies “$t(login.moreSignInOptions)”.",
+    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Mēģini vēlreiz vai izvēlies “$t(login.resendCode)”.",
     "codeInProgress": "Tavs kods tiek apstrādāts. Uzgaidi mirkli un mēģini vēlreiz.",
     "tooManyAttempts": "Pārāk daudz mēģinājumu. Pieprasi jaunu kodu.",
     "invalidToken": "Pierakstīšanās neizdevās. Lūdzu, mēģini vēlreiz.",
@@ -3832,6 +3848,7 @@
   },
   "modelChat": {
     "offlineFailure": "Šim modelim nepieciešams interneta savienojums. Izveido savienojumu un mēģini vēlreiz vai pārslēdzies uz modeli šajā ierīcē.",
+    "connectionLost": "Savienojums ar modeli tika pārtraukts. Pārbaudi savienojumu un mēģini vēlreiz.",
     "empty": {
       "title": "Sākt tērzēšanu",
       "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
@@ -3972,6 +3989,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) nosūta īsu secināšanas pieprasījumu šim galapunktam, izmantojot izvēlēto protokolu un modeli. Pakalpojuma sniedzējs par to var iekasēt maksu.",
       "connectionSucceeded": "Modelis izpildīja pieprasījumu, izmantojot šo protokolu.",
       "connectionFailed": "Modelis nevarēja izpildīt pieprasījumu. Pārbaudi API saknes adresi, protokolu, piekļuves datus un modeļa ID.",
+      "requestTimedOut": "Galapunkts neatbildēja laikā. Pārbaudi API sakni un savienojumu, tad mēģini vēlreiz.",
+      "requestUnauthorized": "Galapunkts noraidīja piekļuves datus. Pārbaudi API atslēgu un pielāgotās galvenes, tad mēģini vēlreiz.",
+      "requestNotFound": "Galapunkts vai modelis nav atrasts. Pārbaudi API sakni un modeļa ID.",
+      "requestRateLimited": "Galapunkts ierobežo pieprasījumus. Nogaidi brīdi un mēģini vēlreiz.",
+      "requestUnavailable": "Galapunkts šobrīd nav pieejams. Mēģini vēlreiz pēc brīža.",
+      "requestUnreachable": "Galapunkts nav sasniedzams. Pārbaudi API sakni un savienojumu.",
+      "requestInvalidResponse": "Galapunkts neatbildēja paredzētajā formātā. Pārbaudi, vai API sakne un protokols atbilst serverim, un mēģini vēlreiz.",
+      "discoveryNoModels": "Galapunkts neuzrādīja nevienu modeli. Ievadi modeļus manuāli.",
+      "connectionIncomplete": "Modelis atbildēja, bet nepabeidza pieprasījumu. Mēģini vēlreiz vai pārbaudi modeļa ID un protokolu.",
       "invalidInput": "Ievadi aizmugursistēmas nosaukumu, derīgas galvenes un vismaz vienu modeli ar unikālu ID un nosaukumu. Tokenu ierobežojumiem jābūt pozitīviem veseliem skaitļiem.",
       "invalidUrl": "Ievadi HTTP vai HTTPS API saknes adresi bez piekļuves datiem, vaicājuma vai fragmenta.",
       "publicHttp": "Publiski HTTP galapunkti nav atļauti. Izmanto HTTPS vai privātu lokālu galapunktu.",
@@ -4110,10 +4136,20 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     },
-    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu."
+    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu.",
+    "providerKeyRefused": "Pakalpojumu sniedzējs noraidīja piekļuves datus. Pārbaudi tā API atslēgu, tad nosūti vēlreiz.",
+    "providerModelMissing": "Šis aizmugurējais serviss vairs nenodrošina šo modeli. Izvēlies citu.",
+    "providerRateLimited": "Pakalpojumu sniedzējs ierobežo pieprasījumus. Nogaidi brīdi un nosūti vēlreiz.",
+    "providerUnavailable": "Pakalpojumu sniedzējs šobrīd nav pieejams. Nosūti vēlreiz pēc brīža."
   },
   "settingsTools": {
-    "confirmTitle": "Apstiprināt šo izmaiņu?"
+    "confirmTitle": "Apstiprināt šo izmaiņu?",
+    "guarded": {
+      "spendAlertsOff": "Vai izslēgt tēriņu brīdinājumus? Jūs vairs nesaņemsit paziņojumus par tēriņu sliekšņu pārsniegšanu un pēkšņiem tēriņu kāpumiem stundas laikā.",
+      "balanceAlertsOff": "Vai izslēgt atlikuma brīdinājumus? Jūs vairs nesaņemsit paziņojumus, kad jūsu kredītu atlikums kļūs zems.",
+      "securityFindingsOff": "Vai izslēgt drošības atklājumus? Jūs vairs nesaņemsit paziņojumus par jauniem drošības atklājumiem.",
+      "hideBalanceOn": "Vai paslēpt savus atlikumus? Kredītu atlikumi vairs neparādīsies profila ekrānos un organizācijas centrā."
+    }
   },
   "appActions": {
     "start": {
@@ -4491,6 +4527,7 @@
     "pickPackToBuyAgain": "Izvēlieties paketi augstāk, lai sāktu jaunu pirkumu.",
     "purchasePending": "Veikals joprojām apstrādā šo maksājumu. Kredītus saņemsiet, tiklīdz veikals apstiprinās darījumu.",
     "buyAgain": "Pirkt vēlreiz",
+    "checkPurchase": "Pārbaudīt pirkumu",
     "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
     "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."
   },
@@ -4588,7 +4625,9 @@
     },
     "saveSheet": {
       "title": "Saglabāt sarakstā",
-      "saved": "Saglabāts sarakstā {{list}}"
+      "saved": "Saglabāts sarakstā {{list}}",
+      "saveFailed": "Neizdevās saglabāt uzdevumu. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+      "saveRefused": "Neizdevās saglabāt uzdevumu šajā sarakstā. Izvēlieties citu sarakstu."
     }
   },
   "agentBriefing": {
@@ -4600,6 +4639,7 @@
     "empty": "Nav aktivitātes šajā atskaites periodā",
     "emptyHint": "Jūsu mākoņa un CLI kodēšanas sesijas parādīsies šeit, kad plānotajā atskaitē būs aktivitāte.",
     "loadError": "Neizdevās ielādēt atskaites",
+    "estimateLoadError": "Neizdevās ielādēt novērtējumu.",
     "view": "Lasīt atskaiti",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4702,7 +4742,7 @@
     "topFeatures": "Populārākās funkcijas",
     "emptyTitle": "Šajā periodā nav lietojuma",
     "unavailableTitle": "Lietojums nav pieejams",
-    "unavailableDescription": "Šī darbvieta neziņo par lietojumu. Atkārtots mēģinājums nepalīdzēs.",
+    "unavailableDescription": "Šai darbvietai lietojums nav iestatīts. Ja sagaidāt, ka šeit būs redzams lietojums, sazinieties ar atbalsta dienestu.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
     "viewDetails": "Skatīt lietojuma informāciju"
   },
@@ -4710,7 +4750,7 @@
     "title": "Integrācijas",
     "sectionTitle": "Pievienotie pakalpojumi",
     "entrySubtitle": "GitHub, Slack, Linear un citi",
-    "subtitle": "Savienojiet savus izstrādes rīkus un darbplūsmas ar Kilo",
+    "subtitle": "Savienojiet savus izstrādes rīkus un darbplūsmas ar Kilo.",
     "disconnect": "Atvienot",
     "disconnectTitle": "Vai atvienot {{provider}}?",
     "disconnectMessage": "Kilo vairs neatbildēs pakalpojumā {{provider}}. Savienojumu varat atjaunot jebkurā laikā.",
@@ -4782,7 +4822,6 @@
       "nameLocked": "Nosaukumu nevar mainīt pēc trigera izveides.",
       "repositoryLocked": "Repozitoriju nevar mainīt pēc trigera izveides.",
       "environmentAutomatic": "Automātiski pēc repozitorija",
-      "notSelected": "Nav atlasīts",
       "profileDefaults": "Izmantot noklusējumus",
       "profileHelp": "Profila iestatījumi tiek piemēroti, kad trigeris tiek palaists. Tad tiek atrisināti arī tā noslēpumi.",
       "customAgent": "Pielāgots aģents",
@@ -4872,7 +4911,7 @@
   },
   "organizationGuardrails": {
     "title": "MI aizsargbarjeras",
-    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori.",
+    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "MI aizsargbarjeras nav iespējotas",
     "unavailable": "Kilo pēc pieprasījuma iespējo MI aizsargbarjeras organizācijai. Sazinieties ar {{supportEmail}}, un Kilo komanda tās ieslēdz jūsu organizācijai.",
     "contactSupport": "Sazināties ar atbalsta dienestu",
@@ -5010,7 +5049,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Uzņēmuma funkcija",
-    "enterpriseOnly": "Šī funkcija ir pieejama tikai uzņēmuma līmenī.",
+    "enterpriseOnly": "Nodrošinātāji un modeļi ir pieejami Enterprise plānā.",
     "readOnly": "Šos iestatījumus var mainīt tikai organizācijas īpašnieki un administratori.",
     "loadError": "Neizdevās ielādēt nodrošinātājus un modeļus",
     "tabModels": "Modeļi",

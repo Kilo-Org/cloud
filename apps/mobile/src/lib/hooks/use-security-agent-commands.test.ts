@@ -167,7 +167,6 @@ describe('reconcileCommandStatuses (terminal + omission purge)', () => {
     const result = reconcileCommandStatuses({
       trackedIds: ['cmd-1'],
       batchIds: ['cmd-1'],
-      perCommandIds: [],
       batchCommands: [terminal],
       batchSettled: true,
       perCommandResults: [],
@@ -182,7 +181,6 @@ describe('reconcileCommandStatuses (terminal + omission purge)', () => {
     const result = reconcileCommandStatuses({
       trackedIds: ['cmd-1'],
       batchIds: ['cmd-1'],
-      perCommandIds: [],
       batchCommands: [makeCommand({ id: 'cmd-1', status: 'succeeded' })],
       batchSettled: true,
       perCommandResults: [],
@@ -197,7 +195,6 @@ describe('reconcileCommandStatuses (terminal + omission purge)', () => {
     const result = reconcileCommandStatuses({
       trackedIds: ['cmd-1'],
       batchIds: ['cmd-1'],
-      perCommandIds: [],
       batchCommands: [],
       batchSettled: true,
       perCommandResults: [],
@@ -212,7 +209,6 @@ describe('reconcileCommandStatuses (terminal + omission purge)', () => {
     const result = reconcileCommandStatuses({
       trackedIds: ['cmd-1', 'cmd-2'],
       batchIds: ['cmd-1', 'cmd-2'],
-      perCommandIds: [],
       batchCommands: [makeCommand({ id: 'cmd-1', status: 'accepted' })],
       batchSettled: true,
       perCommandResults: [],
@@ -227,7 +223,6 @@ describe('reconcileCommandStatuses (terminal + omission purge)', () => {
     const result = reconcileCommandStatuses({
       trackedIds: ['cmd-1'],
       batchIds: ['cmd-1'],
-      perCommandIds: [],
       batchCommands: undefined,
       batchSettled: false,
       perCommandResults: [],
@@ -241,10 +236,25 @@ describe('reconcileCommandStatuses (terminal + omission purge)', () => {
     const result = reconcileCommandStatuses({
       trackedIds: ['cmd-100', 'cmd-101'],
       batchIds: ['cmd-100'],
-      perCommandIds: ['cmd-101'],
       batchCommands: [makeCommand({ id: 'cmd-100', status: 'accepted' })],
       batchSettled: true,
-      perCommandResults: [{ error: { data: { code: 'NOT_FOUND' } } }],
+      perCommandResults: [{ id: 'cmd-101', result: { error: { data: { code: 'NOT_FOUND' } } } }],
+      processedTerminalIds: processed,
+    });
+
+    expect(result.unavailableIds).toEqual(['cmd-101']);
+  });
+
+  it('purges by id when the paired results arrive in another order', () => {
+    const result = reconcileCommandStatuses({
+      trackedIds: ['cmd-100', 'cmd-101'],
+      batchIds: ['cmd-100'],
+      batchCommands: [makeCommand({ id: 'cmd-100', status: 'accepted' })],
+      batchSettled: true,
+      perCommandResults: [
+        { id: 'cmd-102', result: {} },
+        { id: 'cmd-101', result: { error: { data: { code: 'NOT_FOUND' } } } },
+      ],
       processedTerminalIds: processed,
     });
 
@@ -256,10 +266,12 @@ describe('reconcileCommandStatuses (terminal + omission purge)', () => {
     const result = reconcileCommandStatuses({
       trackedIds: ['cmd-100', 'cmd-101', 'cmd-102'],
       batchIds: ['cmd-100'],
-      perCommandIds: ['cmd-101', 'cmd-102'],
       batchCommands: [makeCommand({ id: 'cmd-100', status: 'accepted' })],
       batchSettled: true,
-      perCommandResults: [{ data: terminal }, {}],
+      perCommandResults: [
+        { id: 'cmd-101', result: { data: terminal } },
+        { id: 'cmd-102', result: {} },
+      ],
       processedTerminalIds: processed,
     });
 

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the transcript element-tree suite asserts this component's unrendered tree, so splitting the failure footer behind a component boundary would hide every assertion's target */
 import { memo, useCallback, useMemo } from 'react';
-import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type Part, type PreparationAttempt, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +32,7 @@ import {
 import { partRendersContent, userBubbleRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
 import { firstHumanText, humanTextParts, isFilePart } from './part-types';
+import { PreparationGroup } from './preparation-group';
 import { groupMessageParts } from './session-tool-run';
 import { CondensedToolRunRow } from './tool-run-rows';
 import { useMessageCopy } from './use-message-copy';
@@ -87,13 +88,19 @@ type MessageBubbleProps = {
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
   /**
-   * Whether this turn's preparation group states its failure. The group names
-   * the stage that failed and the reason, so a generic response-failure
-   * statement here would state the same turn twice; the footer keeps its
-   * actions and drops that statement. A classified failure is still shown.
-   * Defaults to false.
+   * The words Copy to composer puts back when they are not this row's own: a
+   * chat states a question's failure under the words its answer had reached,
+   * an assistant row, and the words to edit and send again are the question's.
    */
-  failureStatedByPreparation?: boolean;
+  composerText?: string;
+  /**
+   * The failed preparation of this turn, drawn between the row and its failure
+   * footer: the group names the stage that failed and the reason, so it comes
+   * before the actions that recover from it. A generic response-failure
+   * statement would state the same turn twice, so the footer keeps its actions
+   * and drops that statement; a classified failure is still shown.
+   */
+  failedPreparation?: PreparationAttempt;
   /** Restores a canceled queued message's prompt back into the composer. */
   onRestoreQueued?: (message: StoredMessage) => void;
   /**
@@ -127,7 +134,8 @@ function MessageBubbleImpl({
   addCredits,
   retryAvailable,
   onCopyToComposer,
-  failureStatedByPreparation,
+  composerText,
+  failedPreparation,
   onRestoreQueued,
   noReplyRecorded,
   condenseToolCalls,
@@ -173,8 +181,11 @@ function MessageBubbleImpl({
   );
   // Copy-to-composer re-sends only the first human-authored text part, so a
   // synthesized attachment notice is not copied and a file-only row hides the
-  // button entirely.
-  const copyText = useMemo(() => (isUser ? firstHumanText(parts) : ''), [isUser, parts]);
+  // button entirely. A row that states another row's failure names its text.
+  const copyText = useMemo(
+    () => composerText ?? (isUser ? firstHumanText(parts) : ''),
+    [composerText, isUser, parts]
+  );
 
   // Keep actions on the separate host so interactive descendants remain reachable.
   // Accessible Copy retains the existing ActionSheet path; details matches long-press.
@@ -212,10 +223,10 @@ function MessageBubbleImpl({
   // A turn whose preparation failed states that failure in its preparation
   // group, with the stage and the reason. The generic response-failure
   // statement would state the same turn again, so only the statement goes: the
-  // actions stay here, because a collapsed group must not be able to hide the
-  // turn's recovery.
+  // actions stay, under the group, because a collapsed group must not be able
+  // to hide the turn's recovery.
   const statedByPreparation =
-    failureStatedByPreparation === true && failure !== null && isGenericResponseFailure(failure);
+    failedPreparation !== undefined && failure !== null && isGenericResponseFailure(failure);
   const relevantHandlerWired =
     retryAvailable === false ||
     (failure !== null &&
@@ -226,7 +237,7 @@ function MessageBubbleImpl({
         : onRetryMessage !== undefined || (failure.canAddCredits && addCredits !== undefined)));
   // The actions this row would draw, resolved once: the footer is skipped when
   // the preparation group states the failure and no action is left, so a blank
-  // padded block never sits above that group.
+  // padded block never sits under that group.
   const retryAction = failure?.canRetry === true ? onRetryMessage : undefined;
   const creditsAction = failure?.canAddCredits === true ? addCredits : undefined;
   const copyAction = failure?.canCopy === true && copyText !== '' ? onCopyToComposer : undefined;
@@ -244,7 +255,11 @@ function MessageBubbleImpl({
   // so the copy still ends on the trailing side in an RTL interface. The
   // assistant's column names no alignment: its title and detail keep the
   // interface's own start edge, as the assistant rows around them do.
-  const trailingFailure = failure?.side === 'user';
+  // Under a preparation group the actions follow the group's full-width card,
+  // so they keep its leading edge rather than the bubble's trailing one.
+  const trailingFailure = failure?.side === 'user' && !statedByPreparation;
+  const preparationGroup =
+    failedPreparation === undefined ? null : <PreparationGroup attempt={failedPreparation} />;
   const failureFooter =
     failure !== null && relevantHandlerWired && (!statedByPreparation || actionRenders) ? (
       /* The actions close the turn rather than opening the next one: the space
@@ -375,6 +390,7 @@ function MessageBubbleImpl({
           <Pressable
             onLongPress={handleLongPress}
             accessible={a11y.accessible}
+            focusable={a11y.focusable}
             className="px-4 py-1"
           >
             {a11y.accessibilityActions.length > 0 ? (
@@ -385,7 +401,7 @@ function MessageBubbleImpl({
                 accessibilityHint={a11y.accessibilityHint}
                 accessibilityActions={a11y.accessibilityActions}
                 onAccessibilityAction={handleAccessibilityAction}
-                className="absolute inset-0 opacity-0"
+                className="absolute inset-0"
                 pointerEvents="none"
               />
             ) : null}
@@ -447,6 +463,7 @@ function MessageBubbleImpl({
             </View>
           </Pressable>
         ) : null}
+        {preparationGroup}
         {failureFooter}
         {noReplyNote}
       </View>
@@ -476,7 +493,12 @@ function MessageBubbleImpl({
   return (
     <View>
       {visibleParts.length > 0 ? (
-        <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
+        <Pressable
+          className="px-4 py-1"
+          onLongPress={handleLongPress}
+          accessible={a11y.accessible}
+          focusable={a11y.focusable}
+        >
           {a11y.accessibilityActions.length > 0 ? (
             <View
               accessible
@@ -485,7 +507,7 @@ function MessageBubbleImpl({
               accessibilityHint={a11y.accessibilityHint}
               accessibilityActions={a11y.accessibilityActions}
               onAccessibilityAction={handleAccessibilityAction}
-              className="absolute inset-0 opacity-0"
+              className="absolute inset-0"
               pointerEvents="none"
             />
           ) : null}
@@ -508,6 +530,7 @@ function MessageBubbleImpl({
           </InMessageBubbleContext.Provider>
         </Pressable>
       ) : null}
+      {preparationGroup}
       {failureFooter}
     </View>
   );

@@ -7,6 +7,7 @@ import {
   mountScreen,
   pressDelete,
   pressSave,
+  rerenderScreen,
   resetOverviewState,
   testProfile,
   type TestProfileDetail,
@@ -251,6 +252,38 @@ describe('ProfileOverviewScreen unsaved metadata guard', () => {
     await waitFor(() => h.success.mock.calls.length > 0);
 
     expect(h.guard.enabled).toBe(false);
+  });
+
+  // A save already in flight owns the route: Back is dropped without a prompt,
+  // because Discard would pop a screen whose write still lands. This case fails
+  // on the code before the fix, where the pending update was invisible to the
+  // guard and the Back press raised the discard confirmation.
+  it('drops Back while a save is in flight, and asks again after it settles', async () => {
+    const { renderer, queryClient } = await mountScreen();
+
+    changeText(renderer.root, 'Profile description', 'Saving description');
+    h.mutations.update.isPending = true;
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(h.guard.enabled).toBe(true);
+
+    pressBack();
+
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.repeat).not.toHaveBeenCalled();
+    expect(h.guard.enabled).toBe(true);
+
+    h.mutations.update.isPending = false;
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    pressBack();
+
+    expect(h.confirm).toHaveBeenCalledOnce();
+    expect(h.repeat).not.toHaveBeenCalled();
   });
 
   // The delete dialog used to offer `common.delete` as its label, so the one

@@ -57,6 +57,7 @@
     "link": "tautan",
     "takingLonger": "Proses ini memakan waktu lebih lama dari perkiraan. Kamu dapat menutup layar ini dan memeriksa kembali.",
     "model": "Model AI",
+    "notSelected": "Belum dipilih",
     "accessDenied": "Akses ditolak.",
     "allRepositories": "Semua repositori",
     "personal": "Pribadi",
@@ -147,6 +148,7 @@
     "performance": "Kinerja",
     "preferences": "Preferensi",
     "privacyPolicy": "Kebijakan privasi",
+    "termsOfService": "Ketentuan layanan",
     "profile": "Profil",
     "reactions": "Reaksi",
     "recent": "Terbaru",
@@ -170,6 +172,7 @@
     "generating": "Membuat…",
     "working": "Bekerja",
     "yourOwnRepositories": "Repositori milikmu",
+    "organizationRepositories": "Repositori organisasi",
     "dismissed": "Diabaikan",
     "agent": "Agen",
     "durationMinuteShort": "min",
@@ -216,8 +219,8 @@
     "verifyCode": "Verifikasi kode",
     "resendCode": "Kirim ulang kode",
     "termsPrefix": "Dengan melanjutkan, kamu menyetujui ",
+    "termsInSentence": "Ketentuan layanan",
     "terms": "Ketentuan",
-    "termsInSentence": "Ketentuan",
     "termsConnector": " dan ",
     "termsSuffix": ".",
     "moreSignInOptions": "Opsi masuk lainnya",
@@ -576,16 +579,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agen membutuhkanmu",
-      "agentAttentionSubtitle": "pertanyaan, permintaan izin, atau masukan yang dibutuhkan",
+      "agentAttentionSubtitle": "Pertanyaan, permintaan izin, atau masukan yang dibutuhkan",
       "agentUpdatesTitle": "Pembaruan agen",
-      "agentUpdatesSubtitle": "pesan dari agen saat tugas berlangsung",
+      "agentUpdatesSubtitle": "Pesan dari agen saat tugas berlangsung",
       "sessionStatusTitle": "Status sesi",
-      "sessionStatusSubtitle": "selesai / gagal / siap dikendalikan",
-      "balanceAlertsSubtitle": "peringatan saat saldo organisasi rendah",
+      "sessionStatusSubtitle": "Selesai / gagal / siap dikendalikan",
+      "balanceAlertsSubtitle": "Peringatan saat saldo organisasi rendah",
       "balanceAlertsUnavailable": "Bergabunglah dengan organisasi untuk mendapatkan peringatan saldo.",
-      "securityFindingsSubtitle": "temuan baru dan pengingat SLA",
+      "securityFindingsSubtitle": "Temuan baru dan pengingat SLA",
       "securityFindingsUnavailable": "Aktifkan Agen keamanan Kilo pada cakupan untuk mendapatkan temuan keamanan.",
-      "spendAlertsSubtitle": "melewati ambang batas dan lonjakan per jam",
+      "spendAlertsSubtitle": "Melewati ambang batas dan lonjakan per jam",
       "spendAlertsToggle": "Kategori peringatan pengeluaran"
     },
     "history": {
@@ -667,7 +670,7 @@
     },
     "instructions": {
       "title": "Instruksi kustom",
-      "deprecation": "Fitur instruksi khusus akan dihentikan. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
+      "deprecation": "Fitur instruksi khusus akan dihapus. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
       "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…",
       "clearTitle": "Hapus instruksi kustom?",
       "clearMessage": "Menyimpan kolom yang kosong akan menghapus instruksi kustom yang tersimpan untuk peninjau ini."
@@ -696,8 +699,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
+      "managedOnWebTitle": "Dikelola di web",
+      "managedOnWebShort": "Koneksi ini dikelola di web melalui komputer.",
+      "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web dari komputer.",
       "description": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionReconnect": "Buat token akses ruang kerja baru untuk {{organization}}, lalu tempelkan di bawah.",
+      "descriptionOverview": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di layar berikutnya.",
       "scopes": "Akun: baca · Repositori: baca/tulis · PR: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja",
       "tokenRefused": "Bitbucket tidak menerima token akses ruang kerja ini. Periksa bahwa token tersebut memiliki cakupan izin di atas, lalu coba lagi."
@@ -733,6 +740,7 @@
     "platformList": {
       "activity": "Aktivitas",
       "checking": "Memeriksa…",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "statusUnavailable": "Status tidak tersedia"
     },
@@ -1737,7 +1745,7 @@
       "manageProfiles": "Kelola profil",
       "advancedConfig": "Konfigurasi Lanjutan",
       "advancedConfigDescription": "Berlaku untuk sesi ini. Menyimpannya sebagai profil akan menyimpannya untuk lain kali.",
-      "saveAsProfile": "Simpan sebagai Profil",
+      "saveAsProfile": "Simpan sebagai profil",
       "saveProfileDescription": "Simpan variabel lingkungan saat ini dan perintah pengaturan sebagai profil yang dapat digunakan kembali.",
       "profileSaved": "Profil \"{{name}}\" disimpan",
       "organizationProfiles": "Profil Organisasi",
@@ -2465,6 +2473,7 @@
     "noSessions": "Tidak ada sesi aktif",
     "noSessionsDescription": "Masuk ke aplikasi Kilo di perangkat lain agar perangkat tersebut muncul di sini.",
     "signedIn": "Masuk {{signedIn}} · Terakhir aktif {{lastSeen}}",
+    "signedInThisDevice": "Masuk {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Sesi masuk melalui aplikasi Kilo, Kilo CLI, dan peramban web muncul di sini. Sesi masuk melalui editor tidak ditampilkan.",
     "thisDevice": "Perangkat ini",
     "viewProfile": "Lihat profil",
@@ -2626,6 +2635,8 @@
     "retryHint": "Mencoba memuat ulang status Kilo Pass.",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia di aplikasi.",
+    "notAvailableTitle": "Kilo Pass tidak ada di aplikasi",
+    "noPassDescription": "Akun ini tidak memiliki Kilo Pass.",
     "statusActive": "Aktif",
     "statusTrialing": "Uji coba",
     "statusPastDue": "Pembayaran terlambat",
@@ -2696,6 +2707,7 @@
     "revokeConsent": "Cabut persetujuan",
     "revokeConsentTitle": "Cabut persetujuan berbagi data?",
     "acceptAndContinue": "Setujui dan lanjutkan",
+    "loadingConsentSettings": "Memuat pengaturan persetujuanmu…",
     "decline": "Tolak",
     "declineAndSignOut": "Tolak dan keluar",
     "declineTitle": "Tolak berbagi data?",
@@ -2881,7 +2893,6 @@
       "submitReply": "Kirim balasan",
       "termsAcceptRetry": "Tidak dapat menyimpan persetujuan atas ketentuan layanan. Periksa koneksimu dan coba lagi.",
       "termsCopy": "Kamu harus berusia minimal 13 tahun untuk mengirim komentar.",
-      "termsTitle": "Ketentuan layanan",
       "threadAccessibilityLabel": "Utas diskusi {{anchorLabel}}",
       "unavailable": "Diskusi tidak tersedia.",
       "unavailableMessage": "PR ini mungkin sudah dihapus.",
@@ -3235,6 +3246,9 @@
     },
     "tabs": {
       "discussion": "Diskusi",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility_one": "{{title}}: 1 komentar",
       "files": "Berkas",
       "overview": "Ringkasan"
     },
@@ -3423,8 +3437,7 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Di bawah {{amount}}",
-      "organizationSeats": "Lisensi pengguna organisasi",
-      "plan": "Paket organisasi",
+      "plan": "Paket",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Berakhir",
@@ -3467,7 +3480,7 @@
       "retentionLimit": "Menampilkan faktur terbaru."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktifkan peringatan saldo rendah",
+      "subtitle": "Kirim peringatan lewat email ke alamat yang kamu cantumkan saat saldo organisasi ini turun di bawah jumlah yang kamu tetapkan.",
       "notifyEmailsLabel": "Alamat email penerima",
       "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan penagihan.",
       "separateEmailsHint": "Pisahkan setiap alamat email dengan koma.",
@@ -3543,6 +3556,7 @@
       "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
       "emptyTitle": "Tidak ada permintaan di jam ini",
       "emptyDescription": "Gunakan Jam sebelumnya untuk melihat permintaan yang lebih awal.",
+      "emptyBoundDescription": "Log permintaan hanya tersedia sampai titik ini.",
       "loadError": "Tidak dapat memuat log permintaan.",
       "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
       "tokens": "{{input}} masuk · {{output}} keluar",
@@ -3643,7 +3657,8 @@
     "signupStepUp": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Kode tersebut salah. Coba lagi.",
+    "signupStepUpBack": "Untuk menyelesaikan pembuatan akunmu, kembali lalu gunakan '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Coba lagi atau gunakan '$t(login.resendCode)'.",
     "codeInProgress": "Kodemu sedang diproses. Tunggu sebentar dan coba lagi.",
     "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
     "invalidToken": "Gagal masuk. Coba lagi.",
@@ -3772,6 +3787,7 @@
   },
   "modelChat": {
     "offlineFailure": "Model ini memerlukan koneksi internet. Sambungkan dan coba lagi, atau beralih ke model di perangkat ini.",
+    "connectionLost": "Koneksi ke model terputus. Periksa koneksi Anda dan coba lagi.",
     "empty": {
       "title": "Mulai obrolan",
       "description": "Kirim pesan untuk berbicara dengan model."
@@ -3911,6 +3927,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) mengirim permintaan inferensi singkat ke titik akhir ini menggunakan protokol dan model yang dipilih. Penyedia mungkin mengenakan biaya untuk permintaan ini.",
       "connectionSucceeded": "Model berhasil menyelesaikan permintaan menggunakan protokol ini.",
       "connectionFailed": "Model tidak dapat menyelesaikan permintaan. Periksa URL dasar API, protokol, kredensial, dan ID model.",
+      "requestTimedOut": "Titik akhir tidak menjawab tepat waktu. Periksa URL dasar API dan koneksi Anda, lalu coba lagi.",
+      "requestUnauthorized": "Titik akhir menolak kredensial. Periksa kunci API dan tajuk kustom, lalu coba lagi.",
+      "requestNotFound": "Titik akhir atau model tidak ditemukan. Periksa URL dasar API dan ID model.",
+      "requestRateLimited": "Titik akhir membatasi permintaan. Tunggu sebentar dan coba lagi.",
+      "requestUnavailable": "Titik akhir tidak tersedia saat ini. Coba lagi sebentar lagi.",
+      "requestUnreachable": "Titik akhir tidak dapat dijangkau. Periksa URL dasar API dan koneksi Anda.",
+      "requestInvalidResponse": "Titik akhir tidak menjawab dalam format yang diharapkan. Periksa apakah URL dasar API dan protokol cocok dengan server, lalu coba lagi.",
+      "discoveryNoModels": "Titik akhir tidak mencantumkan model apa pun. Masukkan model secara manual.",
+      "connectionIncomplete": "Model menjawab tetapi tidak menyelesaikan permintaan. Coba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama layanan, tajuk yang valid, dan setidaknya satu model dengan ID dan nama yang unik. Batas token harus berupa bilangan bulat positif.",
       "invalidUrl": "Masukkan URL dasar API HTTP atau HTTPS tanpa kredensial, kueri, atau fragmen.",
       "publicHttp": "Titik akhir HTTP publik tidak diizinkan. Gunakan HTTPS atau titik akhir lokal privat.",
@@ -4049,10 +4074,20 @@
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
     },
-    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini."
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini.",
+    "providerKeyRefused": "Penyedia menolak kredensial. Periksa kunci API-nya, lalu kirim lagi.",
+    "providerModelMissing": "Layanan ini tidak lagi menyediakan model ini. Pilih yang lain.",
+    "providerRateLimited": "Penyedia membatasi permintaan. Tunggu sebentar dan kirim lagi.",
+    "providerUnavailable": "Penyedia tidak tersedia saat ini. Kirim lagi sebentar lagi."
   },
   "settingsTools": {
-    "confirmTitle": "Konfirmasi perubahan ini?"
+    "confirmTitle": "Konfirmasi perubahan ini?",
+    "guarded": {
+      "spendAlertsOff": "Matikan peringatan pengeluaran? Anda tidak akan lagi menerima notifikasi saat melewati ambang batas pengeluaran dan saat terjadi lonjakan per jam.",
+      "balanceAlertsOff": "Matikan peringatan saldo? Anda tidak akan lagi menerima notifikasi saat kredit Anda menipis.",
+      "securityFindingsOff": "Matikan temuan keamanan? Anda tidak akan lagi menerima notifikasi tentang temuan keamanan baru.",
+      "hideBalanceOn": "Sembunyikan saldo Anda? Saldo kredit tidak akan lagi muncul di layar profil dan hub organisasi."
+    }
   },
   "appActions": {
     "start": {
@@ -4424,6 +4459,7 @@
     "pickPackToBuyAgain": "Pilih paket di atas untuk memulai pembelian baru.",
     "purchasePending": "Toko masih memproses pembayaran ini. Kredit Anda akan masuk setelah toko menyetujui tagihannya.",
     "buyAgain": "Beli lagi",
+    "checkPurchase": "Periksa pembelian",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   },
@@ -4517,7 +4553,9 @@
     },
     "saveSheet": {
       "title": "Simpan ke daftar",
-      "saved": "Disimpan ke {{list}}"
+      "saved": "Disimpan ke {{list}}",
+      "saveFailed": "Tidak dapat menyimpan tugas. Periksa koneksi Anda dan coba lagi.",
+      "saveRefused": "Tidak dapat menyimpan tugas ke daftar ini. Pilih daftar lain."
     }
   },
   "agentBriefing": {
@@ -4529,6 +4567,7 @@
     "empty": "Tidak ada aktivitas dalam periode laporan ini",
     "emptyHint": "Sesi coding cloud dan CLI Anda muncul di sini saat laporan terjadwal memiliki aktivitas.",
     "loadError": "Tidak dapat memuat laporan",
+    "estimateLoadError": "Tidak dapat memuat estimasi.",
     "view": "Baca laporan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4627,7 +4666,7 @@
     "topFeatures": "Fitur teratas",
     "emptyTitle": "Tidak ada penggunaan pada periode ini",
     "unavailableTitle": "Penggunaan tidak tersedia",
-    "unavailableDescription": "Workspace ini tidak melaporkan penggunaan. Mencoba lagi tidak akan membantu.",
+    "unavailableDescription": "Penggunaan belum disiapkan untuk workspace ini. Hubungi dukungan jika Anda berharap melihat penggunaan di sini.",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
     "viewDetails": "Lihat detail penggunaan"
   },
@@ -4635,7 +4674,7 @@
     "title": "Integrasi",
     "sectionTitle": "Layanan terhubung",
     "entrySubtitle": "GitHub, Slack, Linear, dan lainnya",
-    "subtitle": "Hubungkan alat dan alur kerja pengembangan Anda ke Kilo",
+    "subtitle": "Hubungkan alat dan alur kerja pengembangan Anda ke Kilo.",
     "disconnect": "Putuskan",
     "disconnectTitle": "Putuskan {{provider}}?",
     "disconnectMessage": "Kilo tidak akan merespons lagi di {{provider}}. Anda dapat menghubungkannya kembali kapan saja.",
@@ -4707,7 +4746,6 @@
       "nameLocked": "Nama tidak dapat diubah setelah pemicu dibuat.",
       "repositoryLocked": "Repositori tidak dapat diubah setelah pemicu dibuat.",
       "environmentAutomatic": "Otomatis berdasarkan repositori",
-      "notSelected": "Belum dipilih",
       "profileDefaults": "Gunakan nilai bawaan",
       "profileHelp": "Setelan profil berlaku saat pemicu berjalan. Rahasianya akan diselesaikan pada saat itu.",
       "customAgent": "Agen khusus",
@@ -4797,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Pagar Pengaman Kecerdasan Artifisial",
-    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial.",
+    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Pagar Pengaman Kecerdasan Artifisial tidak diaktifkan",
     "unavailable": "Kilo mengaktifkan Pagar Pengaman Kecerdasan Artifisial untuk sebuah organisasi atas permintaan. Hubungi {{supportEmail}}, dan tim Kilo mengaktifkannya untuk organisasi Anda.",
     "contactSupport": "Hubungi tim dukungan",
@@ -4935,7 +4973,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fitur perusahaan",
-    "enterpriseOnly": "Ini adalah fitur khusus perusahaan.",
+    "enterpriseOnly": "Penyedia dan model tersedia di paket Enterprise.",
     "readOnly": "Hanya pemilik dan administrator organisasi yang dapat mengubah pengaturan ini.",
     "loadError": "Penyedia dan model tidak dapat dimuat",
     "tabModels": "Model",

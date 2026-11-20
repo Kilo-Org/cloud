@@ -54,7 +54,7 @@ function textActionBoxStyle() {
  */
 export type RowTrailingSpec =
   | Readonly<{ kind: 'chevron' }>
-  | Readonly<{ kind: 'check'; selected: boolean; disabled?: boolean }>
+  | Readonly<{ kind: 'check'; selected: boolean; disabled?: boolean; multi?: boolean }>
   | Readonly<{
       kind: 'switch';
       value: boolean;
@@ -75,6 +75,13 @@ export type RowTrailingSpec =
       label: string;
       onPress: () => void;
       disabled?: boolean;
+      /**
+       * The label's ink. `primary` (default) is the accent a screen's one text
+       * action carries; `neutral` is for a list that repeats the same action
+       * on every row, where a column of accent labels would be the strongest
+       * colour on the screen (DESIGN.md: keep the brand yellow scarce).
+       */
+      tone?: 'primary' | 'neutral';
       /**
        * Replaces the derived disabled-only state. An action whose work is in
        * flight passes its own, so the cell announces `busy` while it keeps the
@@ -103,7 +110,13 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
       return <RowChevron />;
     }
     case 'check': {
-      return <RowCheck selected={trailing.selected} disabled={trailing.disabled} />;
+      return (
+        <RowCheck
+          selected={trailing.selected}
+          disabled={trailing.disabled}
+          multi={trailing.multi}
+        />
+      );
     }
     case 'switch': {
       // The control's handlers reach the native switch as one props object;
@@ -176,7 +189,10 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
         >
           <Text
             variant="mono"
-            className={cn(trailing.disabled ? 'text-muted-foreground' : 'text-primary')}
+            className={cn(
+              trailing.disabled && 'text-muted-foreground',
+              !trailing.disabled && (trailing.tone === 'neutral' ? 'text-ink2' : 'text-primary')
+            )}
           >
             {trailing.label}
           </Text>

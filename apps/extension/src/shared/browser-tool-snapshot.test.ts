@@ -45,6 +45,7 @@ const createFakeSession = ({
 
   const session: BrowserToolPageSession = {
     attach: async () => undefined,
+    captureViewportImage: async () => undefined,
     consoleMessages: () => [],
     networkRequestsSinceLoad: () => [],
     registerRefs: (entries, options) => {
@@ -124,14 +125,71 @@ const SAMPLE_TREE: BrowserAriaNode[] = [
   axNode({ ignored: true, name: 'Hello', nodeId: '4', role: 'StaticText' }),
 ];
 
+/**
+ * A checkout form as Chrome's accessibility tree reports it: unnamed layout
+ * `generic` wrappers, an unnamed `LabelText` and an unnamed status paragraph
+ * between the named nodes.
+ */
+const CHECKOUT_FORM_TREE: BrowserAriaNode[] = [
+  axNode({
+    backendDOMNodeId: 1,
+    childIds: ['2', '9'],
+    name: 'Checkout',
+    nodeId: '1',
+    role: 'RootWebArea',
+  }),
+  axNode({ backendDOMNodeId: 2, childIds: ['3', '4'], nodeId: '2', role: 'generic' }),
+  axNode({
+    backendDOMNodeId: 3,
+    name: 'Contact',
+    nodeId: '3',
+    properties: [{ name: 'level', value: 2 }],
+    role: 'heading',
+  }),
+  axNode({ backendDOMNodeId: 4, childIds: ['5', '7'], nodeId: '4', role: 'generic' }),
+  axNode({ backendDOMNodeId: 5, childIds: ['6'], nodeId: '5', role: 'LabelText' }),
+  axNode({ name: 'Email', nodeId: '6', role: 'StaticText' }),
+  axNode({ backendDOMNodeId: 7, name: 'Email', nodeId: '7', role: 'textbox' }),
+  axNode({ backendDOMNodeId: 9, childIds: ['10', '11', '14'], nodeId: '9', role: 'generic' }),
+  axNode({ backendDOMNodeId: 10, name: 'Submit', nodeId: '10', role: 'button' }),
+  axNode({ backendDOMNodeId: 11, childIds: ['12'], nodeId: '11', role: 'generic' }),
+  axNode({ backendDOMNodeId: 12, childIds: ['13'], nodeId: '12', role: 'paragraph' }),
+  axNode({ name: 'idle', nodeId: '13', role: 'StaticText' }),
+  axNode({
+    backendDOMNodeId: 14,
+    childIds: ['15'],
+    name: 'Help',
+    nodeId: '14',
+    role: 'navigation',
+  }),
+  axNode({ backendDOMNodeId: 15, name: 'FAQ', nodeId: '15', role: 'link' }),
+];
+
 describe('buildBrowserAriaSnapshot', () => {
   it('renders indented lines and refs only the interactive nodes', () => {
     const snapshot = buildBrowserAriaSnapshot(SAMPLE_TREE);
 
     expect(renderBrowserAriaSnapshot(snapshot)).toBe(
-      ['  - heading "Welcome"', '  - button "Submit" [ref=e12]'].join('\n')
+      ['- heading "Welcome"', '- button "Submit" [ref=e12]'].join('\n')
     );
     expect(snapshot.refs).toStrictEqual([{ backendNodeId: 12, ref: 'e12' }]);
+  });
+
+  it('nests a line only under the printed lines above it, never under a node that printed nothing', () => {
+    const snapshot = buildBrowserAriaSnapshot(CHECKOUT_FORM_TREE);
+
+    expect(renderBrowserAriaSnapshot(snapshot)).toBe(
+      [
+        '- RootWebArea "Checkout"',
+        '  - heading "Contact"[level=2]',
+        '  - text: Email',
+        '  - textbox "Email" [ref=e7]',
+        '  - button "Submit" [ref=e10]',
+        '  - text: idle',
+        '  - navigation "Help"',
+        '    - link "FAQ" [ref=e15]',
+      ].join('\n')
+    );
   });
 
   it('renders text leaves and CDP state attributes', () => {
@@ -163,23 +221,20 @@ describe('buildBrowserAriaSnapshot', () => {
     );
   });
 
-  it('honours depth by pruning deeper levels', () => {
-    const snapshot = buildBrowserAriaSnapshot(
-      [
-        axNode({ childIds: ['2'], nodeId: '1', role: 'generic' }),
-        axNode({
-          backendDOMNodeId: 11,
-          childIds: ['3'],
-          name: 'Welcome',
-          nodeId: '2',
-          role: 'heading',
-        }),
-        axNode({ name: 'Deep', nodeId: '3', role: 'StaticText' }),
-      ],
-      { depth: 1 }
-    );
+  it('counts only printed levels against depth', () => {
+    const snapshot = buildBrowserAriaSnapshot(CHECKOUT_FORM_TREE, { depth: 1 });
 
-    expect(renderBrowserAriaSnapshot(snapshot)).toBe('  - heading "Welcome"');
+    expect(renderBrowserAriaSnapshot(snapshot)).toBe(
+      [
+        '- RootWebArea "Checkout"',
+        '  - heading "Contact"[level=2]',
+        '  - text: Email',
+        '  - textbox "Email" [ref=e7]',
+        '  - button "Submit" [ref=e10]',
+        '  - text: idle',
+        '  - navigation "Help"',
+      ].join('\n')
+    );
   });
 
   it('renders only the subtree for a target backend node id', () => {
@@ -271,6 +326,29 @@ describe('captureBrowserAriaSnapshot', () => {
     expect(capture.refs).toStrictEqual([{ ref: 'e1', selector: 'html > body > main > button' }]);
   });
 
+  it('nests the DOM fallback lines only under printed lines too', async () => {
+    document.body.innerHTML = [
+      '<main><div><h1>Hello</h1><div><label>Email <input aria-label="Email"></label></div></div>',
+      '<div><button>Go</button><div><p>idle</p></div></div>',
+      '<nav role="navigation" aria-label="Help"><div><a href="/faq">FAQ</a></div></nav></main>',
+    ].join('');
+
+    const { session } = createFakeSession({ axUnsupported: true });
+
+    const capture = await captureBrowserAriaSnapshot(session, {});
+
+    expect(capture.text).toBe(
+      [
+        '- heading "Hello"[level=1]',
+        '- textbox "Email" [ref=e1]',
+        '- button "Go" [ref=e2]',
+        '- paragraph "idle"',
+        '- navigation "Help"',
+        '  - link "FAQ" [ref=e3]',
+      ].join('\n')
+    );
+  });
+
   it('returns a placeholder instead of an empty result for an empty page', async () => {
     document.body.innerHTML = '';
     const { session } = createFakeSession({ axUnsupported: true });
@@ -283,6 +361,7 @@ describe('captureBrowserAriaSnapshot', () => {
   it('surfaces an uninspectable tab instead of an empty result', async () => {
     const session: BrowserToolPageSession = {
       attach: async () => undefined,
+      captureViewportImage: async () => undefined,
       consoleMessages: () => [],
       networkRequestsSinceLoad: () => [],
       registerRefs: () => undefined,

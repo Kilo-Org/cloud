@@ -67,7 +67,7 @@ function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
   const scopeTitle = useSecurityScopeTitle(scope);
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={scopeTitle} eyebrow={t('common.securityAgent')} />
+      <ScreenHeader title={t('common.securityAgent')} subtitle={scopeTitle} />
       <ScopeEntryBodySkeleton />
     </View>
   );
@@ -219,8 +219,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (view === 'denied') {
     return (
       <ScopeAccessDeniedScreen
-        title={scopeTitle}
-        eyebrow={t('common.securityAgent')}
+        title={t('common.securityAgent')}
+        subtitle={scopeTitle}
         kind={access === 'not-found' ? 'not-found' : 'denied'}
         onRetry={() => void recovery.retry()}
         isRetrying={recovery.isRetrying}
@@ -280,8 +280,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     });
     return (
       <PlatformErrorScreen
-        title={scopeTitle}
-        eyebrow={t('common.securityAgent')}
+        title={t('common.securityAgent')}
+        subtitle={scopeTitle}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
         variant={failure.variant}
         message={failure.descriptionKey ? t(failure.descriptionKey) : undefined}
@@ -308,8 +308,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            title={scopeTitle}
-            eyebrow={t('common.securityAgent')}
+            title={t('common.securityAgent')}
+            subtitle={scopeTitle}
             headerRight={auditAction}
           />
           {!connectUrl && isMinting ? (
@@ -348,8 +348,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            title={scopeTitle}
-            eyebrow={t('common.securityAgent')}
+            title={t('common.securityAgent')}
+            subtitle={scopeTitle}
             headerRight={auditAction}
           />
           {!reauthUrl && !connectUrl && isMinting ? (

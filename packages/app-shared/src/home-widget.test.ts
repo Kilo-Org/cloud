@@ -326,6 +326,60 @@ describe('Home-only widget policy', () => {
     });
   });
 
+  it('offers Approve only from a permission row and keeps the count key-independent', () => {
+    const questionKey = 'a'.repeat(64);
+    // Both rows need input, only the permission row can be approved. The
+    // question row carries the only key, so it ranks first and owns the title.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'question', title: 'Pick a branch', approvalKey: questionKey },
+        { status: 'permission', title: 'Approve deploy' },
+      ],
+    });
+    expect(data.snapshot.needsApproval).toBe(1);
+    expect(data.snapshot.needsInput).toBe(2);
+    expect(data.details.approvalKey).toBeNull();
+    const home = buildHomeWidgetPresentation(data, now);
+    expect(home.approvalKey).toBeNull();
+    expect(home.canApprove).toBe(false);
+    expect(home.waitingAgents).toEqual([
+      { title: 'Pick a branch', kind: 'question' },
+      { title: 'Approve deploy', kind: 'permission' },
+    ]);
+    expect(data.details.primaryTitle).toBe('Pick a branch');
+
+    // With a key on both rows the rank still answers only "carries a key", so
+    // the older question row leads while Approve takes the permission key.
+    const permissionKey = 'b'.repeat(64);
+    const bothKeyed = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        {
+          status: 'question',
+          title: 'Pick a branch',
+          approvalKey: questionKey,
+          statusUpdatedAt: '2026-10-09T09:00:00Z',
+        },
+        {
+          status: 'permission',
+          title: 'Approve deploy',
+          approvalKey: permissionKey,
+          statusUpdatedAt: '2026-10-09T09:30:00Z',
+        },
+      ],
+    });
+    expect(bothKeyed.details.approvalKey).toBe(permissionKey);
+    const bothKeyedHome = buildHomeWidgetPresentation(bothKeyed, now);
+    expect(bothKeyedHome.approvalKey).toBe(permissionKey);
+    expect(bothKeyedHome.canApprove).toBe(true);
+    expect(bothKeyedHome.waitingAgents).toEqual([
+      { title: 'Pick a branch', kind: 'question' },
+      { title: 'Approve deploy', kind: 'permission' },
+    ]);
+    expect(bothKeyed.details.primaryTitle).toBe('Pick a branch');
+  });
+
   it('hides a title whose kind no longer matches the presented kind', () => {
     const data = buildHomeWidgetData({
       ...scope,
@@ -491,6 +545,17 @@ describe('Home-only widget policy', () => {
       const data = buildHomeWidgetData({ ...scope, sessions: [], status });
       expect(homeWidgetRefreshAt(data, now)).toBe(now + 30 * 60 * 1000);
     }
+  });
+
+  it('keeps a terminal snapshot quiet and unstale even when its counts survive', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Private' }],
+    });
+    data.snapshot.status = 'signed_out';
+    expect(homeWidgetRefreshAt(data, now)).toBe(now + 2 * 60 * 60 * 1000);
+    expect(buildHomeWidgetPresentation(data, now).stale).toBe(false);
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([now]);
   });
 });
 

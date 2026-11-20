@@ -2,7 +2,8 @@ import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
-import { ArrowRight, Building2, Plus } from '@/components/ui/icons';
+import { DirectionalArrowRight } from '@/components/ui/directional-icons';
+import { Building2, Plus } from '@/components/ui/icons';
 import { isPersonal } from '@/lib/hooks/use-code-reviewer';
 import { type CouncilRefusalReason } from '@/lib/hooks/use-reviewer-council';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
@@ -77,7 +78,7 @@ export function CouncilRefusalScreen({
         personal ? (
           <StateAction
             label={t(actionKey)}
-            icon={hasMemberships ? ArrowRight : Plus}
+            icon={hasMemberships ? DirectionalArrowRight : Plus}
             onPress={() => {
               if (hasMemberships) {
                 // The reviewer scope list is the account switcher: every

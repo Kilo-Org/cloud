@@ -81,6 +81,8 @@ export type Screen = {
   annotated: string;
   dump: string;
   capture?: string;
+  /** The frame a held target's content landed on, when its hold was released. */
+  landing?: string;
   env: ProbeEnv;
 };
 
@@ -145,6 +147,31 @@ const SCREEN_QUIET_TIMEOUT_MS = 15_000;
 const RTL_LANGUAGE = 'ar';
 const LTR_FALLBACK_LANGUAGE = 'en';
 
+/**
+ * What releasing a held target established.
+ *
+ * A held target is measured twice: the loading frame the target names, then the
+ * screen its content lands on once the hold is released. `settled` above speaks
+ * for the loading frame only, so the landing needs its own evidence: a release
+ * the app never confirmed, or a placeholder that outlives the hold, leaves the
+ * second half of the capture unmeasured, and a row that reported neither would
+ * pass with no landing evidence at all.
+ */
+export type HoldRelease = {
+  /** The app reported delivering the release link it was sent. */
+  confirmed: boolean;
+  /** Why the app never confirmed the release link. */
+  failure?: string;
+  /** The placeholder the hold painted cleared once the release landed. */
+  cleared: boolean;
+  /** Milliseconds the placeholder took to clear, or its whole budget when it did not. */
+  clearMs: number;
+  /** The landed screen stopped changing within the settle budget. */
+  settled: boolean;
+  /** Milliseconds the landing took to stop changing, or how long it was still moving. */
+  landedMs: number;
+};
+
 export type Sampled = {
   dump: ProbeDump;
   timeline: ProbeDump[];
@@ -153,6 +180,8 @@ export type Sampled = {
   elapsedMs: number;
   /** Set when the measured screen still paints a loading placeholder. */
   blockedBy?: 'loading-placeholder';
+  /** Present on a held target that was released: what the landing established. */
+  release?: HoldRelease;
   /** Milliseconds this capture spent waiting for the placeholder to clear. */
   loadingWaitMs?: number;
   /**
@@ -391,13 +420,16 @@ export function screenFindings(args: {
   const image =
     alignment === undefined || alignment.status === 'bracketed' ? args.image : undefined;
   const findings: Finding[] = [];
-  if (args.sampled?.settled !== false) {
-    findings.push(...checkScreen(args.tree, image));
-    // A held target measures the loading frame, so the loading rules judge it:
-    // a screen that says nothing while it waits, and a wait a reader cannot name.
-    if (args.held === true) {
-      findings.push(...checkLoadingAffordance(args.tree), ...checkLoadingLabels(args.tree));
-    }
+  if (args.sampled?.settled !== false) findings.push(...checkScreen(args.tree, image));
+  // A held target measures the loading frame, so the loading rules judge it: a
+  // screen that says nothing while it waits, and a wait a reader cannot name.
+  // They run outside the settled gate: the frame a held target names is often
+  // still animating when it is read (a spinner, a repainting skeleton), and these
+  // rules read one node's own role and name without comparing two rects, so an
+  // unsettled loading frame is exactly the tree they can still measure. Gating
+  // them on `settled` would exempt the frames the hold exists to judge.
+  if (args.held === true) {
+    findings.push(...checkLoadingAffordance(args.tree), ...checkLoadingLabels(args.tree));
   }
   findings.push(...checkDevLogOverlay(args.dump));
   if (alignment !== undefined && alignment.status !== 'bracketed') {
@@ -452,6 +484,16 @@ export function screenFindings(args: {
         })
       );
     }
+    if (args.held === true && args.sampled.release !== undefined) {
+      findings.push(
+        ...releaseFindings({
+          cell: args.cell,
+          target: args.target,
+          dump: args.dump,
+          release: args.sampled.release,
+        })
+      );
+    }
   }
   return findings.map(finding => ({ ...finding, cell: args.cell, target: args.target }));
 }
@@ -486,6 +528,7 @@ export function captureFiles(out: string, cell: string, target: string) {
     screenshot: `${base}.png`,
     annotated: `${base}.annotated.png`,
     dump: `${base}.json`,
+    landing: `${base}.landing.json`,
     timeline: `${base}.timeline.json`,
     capture: `${base}.capture.json`,
     absolute: (relative: string) => path.join(out, relative),
@@ -630,10 +673,13 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   if (!opened(settled.dump)) {
     ctx.log(`design-gate: ${target.id} did not change the screen; opening the link again`);
     // The retry opens the same cold screen, so it gets the same wait, and the
-    // timeline is restarted after it for the same reason as above.
+    // timeline is restarted after it for the same reason as above. A held target
+    // is the exception for the same reason as the first open: its placeholder
+    // cannot clear while the data is held, so waiting on it would spend the whole
+    // bound and log a placeholder the target asked for.
     await ctx.probe.stopSampling();
     await ctx.probe.openLink(target.link);
-    await waitForPlaceholder();
+    if (target.hold !== true) await waitForPlaceholder();
     await startSampling(ctx, samplingMs);
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
@@ -738,6 +784,8 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // then the screen the content lands on once the hold is released. One timeline
   // is what lets the shift rule report the jump a person sees between the two,
   // instead of comparing two captures and guessing which rect answers for which.
+  let release: HoldRelease | undefined;
+  let landing: string | undefined;
   if (target.hold === true && target.after !== undefined) {
     ctx.log(`design-gate: ${target.id} releasing the loading hold`);
     await startSampling(ctx, samplingMs);
@@ -745,12 +793,39 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     if (releaseFailure !== undefined) {
       ctx.log(`design-gate: ${target.id} release link not confirmed: ${releaseFailure}`);
     }
-    await waitForLoadingPlaceholder(ctx.probe, ctx.clock);
+    // A release that never reaches the app leaves the hold on, so the placeholder
+    // it kept painting is not the placeholder this wait is about: the release's
+    // own confirmation is the finding, and waiting here would spend the bound on
+    // the state the target asked for.
+    const wait =
+      releaseFailure === undefined
+        ? await waitForLoadingPlaceholder(ctx.probe, ctx.clock)
+        : { cleared: false, observed: false, elapsedMs: 0 };
+    if (releaseFailure === undefined && !wait.cleared && wait.observed) {
+      ctx.log(
+        `design-gate: ${target.id} still paints its placeholder ${wait.elapsedMs}ms after release`
+      );
+    }
     const landed = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     const released = await ctx.probe.stopSampling();
     samples = joinPasses(samples, released.samples, spacingMs);
     truncated = truncated || released.truncated;
     reportTruncation();
+    // The landing is evidence in its own right: the loading frame is what the row
+    // names, and this is the screen it gave way to. Keep the frame, so a landing
+    // the rules never grade is still on disk to read.
+    landing = files.landing;
+    writeJson(files.absolute(landing), landed.dump);
+    release = {
+      confirmed: releaseFailure === undefined,
+      ...(releaseFailure === undefined ? {} : { failure: releaseFailure }),
+      // A wait that never saw a placeholder has nothing left to clear: the release
+      // landed on content directly.
+      cleared: wait.cleared || !wait.observed,
+      clearMs: wait.elapsedMs,
+      settled: landed.settled,
+      landedMs: landed.elapsedMs,
+    };
     ctx.log(
       `design-gate: ${target.id} released onto ${landed.dump.env.screen ?? landed.dump.env.route}` +
         `${landed.settled ? '' : ' (still moving)'}`
@@ -771,6 +846,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     settled: settled.settled && (!stillLoading || target.hold === true) && quiet,
     ...(stillLoading && target.hold !== true ? { blockedBy: 'loading-placeholder' as const } : {}),
     ...(placeholderWaitedMs > 0 ? { loadingWaitMs: placeholderWaitedMs } : {}),
+    ...(release === undefined ? {} : { release }),
   };
   writeJson(files.absolute(files.capture), alignment);
   const screen: Screen = {
@@ -780,6 +856,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     annotated: files.annotated,
     dump: files.dump,
     capture: files.capture,
+    ...(landing === undefined ? {} : { landing }),
     env: sampled.dump.env,
   };
   return { sampled, screen, unopened, image };
@@ -969,6 +1046,77 @@ export function unsettledFinding(args: {
       `The screen kept changing for ${args.elapsedMs} ms and its frames describe more than one ` +
       'layout; layout rules were skipped for this screen.',
   };
+}
+
+/**
+ * A held target whose landing was never measured.
+ *
+ * The release is the second half of a held capture: the screen the loading frame
+ * gives way to. An unconfirmed release, a placeholder that outlives the hold, or
+ * a landing that never stops moving leaves that half unmeasured, and the row says
+ * so instead of reporting the loading frame as the whole capture. Every arm is a
+ * warning: the loading frame itself was still measured, and what is missing is
+ * the evidence for the frame after it.
+ */
+export function releaseFindings(args: {
+  cell: string;
+  target: string;
+  dump: ProbeDump;
+  release: HoldRelease;
+}): Finding[] {
+  const { release } = args;
+  if (!release.confirmed) {
+    return [
+      {
+        rule: 'loading-release',
+        severity: 'warning',
+        cell: args.cell,
+        target: args.target,
+        element: rootRef(args.dump),
+        measured: 1,
+        expected: 'a release the app reports delivering',
+        unit: 'ratio',
+        message:
+          `The hold was not released (${release.failure ?? 'not confirmed'}), so the screen the ` +
+          'content lands on was never measured: this row judges the loading frame only.',
+      },
+    ];
+  }
+  if (!release.cleared) {
+    return [
+      {
+        rule: 'loading-release',
+        severity: 'warning',
+        cell: args.cell,
+        target: args.target,
+        element: rootRef(args.dump),
+        measured: release.clearMs,
+        expected: 'the content that replaces the loading placeholder',
+        unit: 'ms',
+        message:
+          `The loading placeholder was still painted ${release.clearMs} ms after the release, so ` +
+          'the frame the target lands on was never measured.',
+      },
+    ];
+  }
+  if (!release.settled) {
+    return [
+      {
+        rule: 'loading-release',
+        severity: 'warning',
+        cell: args.cell,
+        target: args.target,
+        element: rootRef(args.dump),
+        measured: release.landedMs,
+        expected: 'the released screen at rest',
+        unit: 'ms',
+        message:
+          `The released screen kept changing for ${release.landedMs} ms, so its landed frame ` +
+          'describes more than one layout.',
+      },
+    ];
+  }
+  return [];
 }
 
 function warningFinding(

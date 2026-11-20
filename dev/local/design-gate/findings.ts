@@ -19,6 +19,7 @@ export const RULE_IDS = [
   'unsettled',
   'loading-placeholder',
   'loading-unlabelled',
+  'loading-release',
   'capture-alignment',
   'blank-frame',
   'env-mismatch',

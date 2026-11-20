@@ -771,8 +771,49 @@ describe('verifyAdmissionAsync', () => {
       keyId: 'unknownKey',
     };
     const result = await verifyAdmissionAsync(admission);
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    // The only refusal that names a client-side recovery: this device asserted
+    // with a key id this database has never stored.
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+    });
     expect(mockCaptureMessage).toHaveBeenCalledWith('apple_assertion_unknown_key');
+  });
+
+  test('names no recovery for an invalid assertion against a stored key', async () => {
+    const existingKey = {
+      key_id: 'key1',
+      kilo_user_id: 'user1',
+      platform: 'ios',
+      public_key: 'base64pubkey',
+      sign_count: 0,
+      attested_at: '2026-01-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+      last_used_at: null,
+    };
+    jest.mocked(db.query.native_attested_keys.findFirst).mockResolvedValue(existingKey as any);
+    jest.mocked(db.update).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
+        }),
+      }),
+    } as any);
+    mockVerifyAppleAssertion.mockResolvedValue({ ok: false, error: 'INVALID_ASSERTION' });
+
+    const result = await verifyAdmissionAsync({
+      platform: 'ios',
+      kind: 'assertion',
+      challenge: 'ch123',
+      payload: 'base64assertion',
+      keyId: 'key1',
+    });
+
+    // A key this database knows, refused on its merits, gets no recovery: a
+    // new key would not repair an invalid assertion.
+    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(mockCaptureMessage).toHaveBeenCalledWith('apple_assertion_failed: INVALID_ASSERTION');
   });
 
   test('ios assertion fails when sign count is not increasing', async () => {

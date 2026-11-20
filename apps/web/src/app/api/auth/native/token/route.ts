@@ -265,7 +265,12 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   503 { error: 'NONCE_STORE_UNAVAILABLE' }
  *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? }
  *   403 { error: AuthErrorType }
- *   403 { error: 'ADMISSION_REQUIRED' }
+ *   403 { error: 'ADMISSION_REQUIRED', recovery?: 'IOS_ASSERTION_UNKNOWN_KEY' }
+ *       `recovery` appears only when the device's assertion named a key id this
+ *       database has never seen, and only before any provider call, OTP
+ *       reservation, ticket consumption, or settlement. The client may drop its
+ *       stored key id and retry once with a fresh proof; no other refusal
+ *       carries the field.
  *   400 invalid request body
  *   500 admission provider or identity provider infrastructure error
  */
@@ -298,12 +303,22 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   // ── Step 2: Verify the proof ─────────────────────────────────────────────
   // A refused verdict is a 403. A provider fault is retryable, so it must not
   // be reported as a refusal of the device.
+  // A refusal that names a recovery (`recovery`) is the one case the client may
+  // repair itself: it is answered before any provider call, OTP reservation,
+  // ticket consumption, or settlement, so a single retry with a fresh proof
+  // cannot double-spend anything. Every other refusal keeps its old body.
   let admissionVerification: VerifyAdmissionOk;
   try {
     const verified = await verifyAdmissionAsync(admissionPayload);
     if (!verified.ok) {
       countAdmissionCondition('native_admission_refused');
-      return NextResponse.json({ error: verified.errorCode }, { status: 403 });
+      return NextResponse.json(
+        {
+          error: verified.errorCode,
+          ...(verified.recovery ? { recovery: verified.recovery } : {}),
+        },
+        { status: 403 }
+      );
     }
     admissionVerification = verified;
   } catch {

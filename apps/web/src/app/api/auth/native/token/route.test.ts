@@ -1444,6 +1444,74 @@ describe('POST /api/auth/native/token', () => {
       }
     );
 
+    it('names the unknown-key recovery on the refusal and nothing else', async () => {
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: false,
+        errorCode: 'ADMISSION_REQUIRED',
+        recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          admission: { platform: 'ios' },
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'ADMISSION_REQUIRED',
+        recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+      });
+      // Answered before any side effect: the retry the hint invites can neither
+      // spend a provider call, an OTP reservation, nor settle an account.
+      expect(mockVerifyNativeAppleIdToken).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockReserveSignInCode).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('adds no recovery field when the proof is missing', async () => {
+      mockRequireAdmissionPayload.mockReturnValue(undefined);
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'new@example.com',
+          code: '123456',
+          admission: { platform: 'android' },
+        })
+      );
+
+      expect(response.status).toBe(403);
+      const body: unknown = await response.json();
+      // The old body, byte for byte: no extra key on any other refusal.
+      expect(body).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(Object.keys(body as Record<string, unknown>)).toEqual(['error']);
+    });
+
+    it.each(['ADMISSION_REQUIRED', 'INVALID_CODE'])(
+      'adds no recovery field for a %s refusal that names none',
+      async errorCode => {
+        mockVerifyAdmissionAsync.mockResolvedValue({ ok: false, errorCode });
+
+        const response = await POST(
+          createRequest({
+            provider: 'email',
+            email: 'new@example.com',
+            code: '123456',
+            admission: { platform: 'android' },
+          })
+        );
+
+        expect(response.status).toBe(403);
+        const body: unknown = await response.json();
+        expect(body).toEqual({ error: errorCode });
+        expect(Object.keys(body as Record<string, unknown>)).toEqual(['error']);
+      }
+    );
+
     it('runs admission verification before provider verification', async () => {
       mockVerifyNativeGoogleIdToken.mockResolvedValue({
         sub: 'google-sub-1',

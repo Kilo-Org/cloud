@@ -1,16 +1,29 @@
 import { z } from 'zod';
 
 import { API_BASE_URL } from '@/lib/config';
-import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
+import { clearAttestKeyOnRefusal, getAdmission } from '@/lib/auth/admission';
 import {
   type AuthTerminalRoute,
   classifyAuthResponse,
   reportAuthTerminalFailure,
 } from '@/lib/auth/auth-response-class';
-import { parseAuthError, type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
+import {
+  ADMISSION_RECOVERY_UNKNOWN_KEY,
+  type AdmissionRecoveryHint,
+  parseAuthError,
+  type PendingLinkOffer,
+} from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 
 const stringCodeErrorSchema = z.object({ code: z.string() });
+
+const retryableAssertionBodySchema = z.looseObject({
+  admission: z.object({
+    platform: z.literal('ios'),
+    kind: z.literal('assertion'),
+    keyId: z.string().min(1),
+  }),
+});
 
 /**
  * Upper bound on every auth POST. A hung request must reject so the caller's
@@ -35,27 +48,16 @@ export type PostAuthFailure = {
   retryAfterMs?: number;
 };
 
-/**
- * Minimal fetch helper for auth endpoints. Returns success with parsed body
- * or failure with an optional error code, SSO organization id, and the
- * classification of the refusal.
- *
- * Every native auth POST routes through here, so this is also where a refused
- * admission drops the stored App Attest key id. Putting it here rather than at
- * each caller means a new sign-in path cannot forget it. A terminal refusal
- * (a 401, or a 4xx with no retry guidance) is classified here and reported
- * once with a stable fingerprint, instead of once per retry. The stored
- * credential is cleared where a stored credential can exist and a 401 proves
- * it dead — the refresh rotation in `credentials.ts`.
- *
- * `extraHeaders` carries a caller's own auth header; the login routes take
- * none, and only the authenticated passkey registration route sets it.
- */
-export async function postAuth(
+/** One parsed answer, reported by the caller so a repaired refusal files nothing. */
+type AuthAttempt =
+  | { ok: true; data: unknown }
+  | { ok: false; failure: PostAuthFailure; unknownKeyHint: AdmissionRecoveryHint | undefined };
+
+async function sendAuthAttempt(
   path: AuthTerminalRoute,
   body: unknown,
-  extraHeaders?: Record<string, string>
-): Promise<{ ok: true; data: unknown } | PostAuthFailure> {
+  extraHeaders: Record<string, string> | undefined
+): Promise<AuthAttempt> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
@@ -93,18 +95,24 @@ export async function postAuth(
         status: response.status,
         retryAfterHeader: response.headers.get('retry-after'),
       });
-      if (classified.kind === 'terminal') {
-        reportAuthTerminalFailure(path, classified.status);
-      }
       return {
         ok: false,
-        errorCode: parsed?.code,
-        ssoOrganizationId: parsed?.ssoOrganizationId,
-        signupMethods: parsed?.signupMethods,
-        pendingLink: parsed?.pendingLink,
-        httpStatus: response.status,
-        terminal: classified.kind === 'terminal',
-        retryAfterMs: classified.kind === 'retry' ? classified.retryAfterMs : undefined,
+        failure: {
+          ok: false,
+          errorCode: parsed?.code,
+          ssoOrganizationId: parsed?.ssoOrganizationId,
+          signupMethods: parsed?.signupMethods,
+          pendingLink: parsed?.pendingLink,
+          httpStatus: response.status,
+          terminal: classified.kind === 'terminal',
+          retryAfterMs: classified.kind === 'retry' ? classified.retryAfterMs : undefined,
+        },
+        // Only the 403 the route writes for a refused device proof may name a
+        // recovery; any other status carrying the field is not repairable here.
+        unknownKeyHint:
+          response.status === 403 && parsed?.code === 'ADMISSION_REQUIRED'
+            ? parsed.recovery
+            : undefined,
       };
     }
 
@@ -115,15 +123,96 @@ export async function postAuth(
     // server refusal drops the attest key, so the abort path must not touch it.
     return {
       ok: false,
-      errorCode: controller.signal.aborted ? 'TIMEOUT' : undefined,
-      ssoOrganizationId: undefined,
-      httpStatus: undefined,
-      terminal: false,
-      retryAfterMs: undefined,
+      failure: {
+        ok: false,
+        errorCode: controller.signal.aborted ? 'TIMEOUT' : undefined,
+        ssoOrganizationId: undefined,
+        httpStatus: undefined,
+        terminal: false,
+        retryAfterMs: undefined,
+      },
+      unknownKeyHint: undefined,
     };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** File the one terminal event a refusal earns, when it earns one. */
+function reportIfTerminal(path: AuthTerminalRoute, failure: PostAuthFailure): void {
+  if (failure.terminal && failure.httpStatus !== undefined) {
+    reportAuthTerminalFailure(path, failure.httpStatus);
+  }
+}
+
+/**
+ * Minimal fetch helper for auth endpoints. Returns success with parsed body
+ * or failure with an optional error code, SSO organization id, and the
+ * classification of the refusal.
+ *
+ * Every native auth POST routes through here, so this is also where a refused
+ * admission drops the stored App Attest key id. Putting it here rather than at
+ * each caller means a new sign-in path cannot forget it. A terminal refusal
+ * (a 401, or a 4xx with no retry guidance) is classified here and reported
+ * once with a stable fingerprint, instead of once per retry. The stored
+ * credential is cleared where a stored credential can exist and a 401 proves
+ * it dead — the refresh rotation in `credentials.ts`.
+ *
+ * One refusal is repaired here: the token route's `IOS_ASSERTION_UNKNOWN_KEY`
+ * hint, sent only for an iOS assertion against a key id this database has never
+ * stored, and only before any provider call, OTP reservation, ticket
+ * consumption, or settlement. The request is repeated once with a new
+ * attestation, so the retry keeps the caller's provider proof. A retry is never
+ * sent without a fresh proof, never repeats the refused key, and never runs a
+ * second time.
+ *
+ * `extraHeaders` carries a caller's own auth header; the login routes take
+ * none, and only the authenticated passkey registration route sets it.
+ */
+export async function postAuth(
+  path: AuthTerminalRoute,
+  body: unknown,
+  extraHeaders?: Record<string, string>
+): Promise<{ ok: true; data: unknown } | PostAuthFailure> {
+  const attempt = await sendAuthAttempt(path, body, extraHeaders);
+  if (attempt.ok) {
+    return attempt;
+  }
+
+  const parsed =
+    path === '/api/auth/native/token' && attempt.unknownKeyHint === ADMISSION_RECOVERY_UNKNOWN_KEY
+      ? retryableAssertionBodySchema.safeParse(body)
+      : undefined;
+  if (!parsed?.success) {
+    reportIfTerminal(path, attempt.failure);
+    return attempt.failure;
+  }
+
+  // The refusal dropped the stored key id, so this is a new attestation against
+  // a fresh challenge. Failing to build one is a provider or transport fault,
+  // not a device refusal: it stays retryable and names no error code, so it
+  // never reads as the terminal browser-only admission message.
+  const fresh = await getAdmission().catch(() => undefined);
+  if (
+    fresh?.platform !== 'ios' ||
+    fresh.kind !== 'attestation' ||
+    !fresh.keyId ||
+    fresh.keyId === parsed.data.admission.keyId
+  ) {
+    return {
+      ok: false,
+      errorCode: undefined,
+      ssoOrganizationId: undefined,
+      terminal: false,
+    };
+  }
+
+  const retried = await sendAuthAttempt(path, { ...parsed.data, admission: fresh }, extraHeaders);
+  if (!retried.ok) {
+    reportIfTerminal(path, retried.failure);
+    return retried.failure;
+  }
+  return retried;
 }
 
 export function hasStringCode(error: unknown): error is { code: string } {

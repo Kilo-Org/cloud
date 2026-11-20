@@ -4,9 +4,25 @@ import { evaluateAlerts } from '../src/alerting/evaluate';
 import { NATIVE_CONTAINER_APP } from '../src/alerting/container-allocations';
 import { DEAD_LETTER_QUEUE_NAME } from '../src/alerting/dead-letter-queue';
 
+const USAGE_ID = 'a'.repeat(32);
+const USAGE_NAME = 'usage-ingest-processing-eu';
+
 const DLQ_ID = 'd'.repeat(32);
 
 function deadLetterQueueResponse(url: string, backlogCount: number): Response | undefined {
+  if (url.includes(`/queues?name=${USAGE_NAME}&page=1`)) {
+    return Response.json({
+      success: true,
+      result: [{ queue_name: USAGE_NAME, queue_id: USAGE_ID }],
+      result_info: { total_pages: 1 },
+    });
+  }
+  if (url.includes(`/queues/${USAGE_ID}/metrics`)) {
+    return Response.json({
+      success: true,
+      result: { backlog_count: 0, backlog_bytes: 0, oldest_message_timestamp_ms: 0 },
+    });
+  }
   if (url.includes(`/queues?name=${DEAD_LETTER_QUEUE_NAME}&page=1`)) {
     return Response.json({
       success: true,

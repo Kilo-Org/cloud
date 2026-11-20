@@ -19,6 +19,7 @@ export function ReviewerHeader({
   subtitle,
   reserveSubtitle = false,
   subtitlePlaceholder,
+  titleAccessory,
   backFallback = CODE_REVIEWER_HOME_PATH,
   onBack,
 }: Readonly<{
@@ -47,6 +48,12 @@ export function ReviewerHeader({
    * title.
    */
   subtitlePlaceholder?: ScreenHeaderSlot;
+  /**
+   * A badge on the title's own line, after the title. The detail screen states
+   * a settled review's outcome here, so the status carries the header's heading
+   * role instead of a hand-made label in the body.
+   */
+  titleAccessory?: ScreenHeaderSlot;
   /** Where Back lands when the screen has no history to pop. */
   backFallback?: Href;
   /** Run this instead of navigating, e.g. while a form confirms a discard. */
@@ -59,6 +66,7 @@ export function ReviewerHeader({
       subtitle={subtitle}
       reserveSubtitle={reserveSubtitle}
       subtitlePlaceholder={subtitlePlaceholder}
+      titleAccessory={titleAccessory}
       backFallback={backFallback}
       onBack={onBack}
     />

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isOrgModeFormDirty,
+  isOrgModeFormDraft,
   type OrgMode,
   orgModeConfigInput,
   orgModeFormSaveValues,
@@ -257,5 +258,21 @@ describe('orgModeConfigInput', () => {
     expect(
       orgModeConfigInput(values({ groups: [], editFileRegex: '\\.md$' }), 'create').groups
     ).toEqual([]);
+  });
+});
+
+describe('isOrgModeFormDraft', () => {
+  it('accepts the whole form, tool groups included', () => {
+    expect(isOrgModeFormDraft(values())).toBe(true);
+    expect(isOrgModeFormDraft(values({ groups: ['read', 'edit', 'mcp'] }))).toBe(true);
+  });
+
+  it('refuses another build’s value instead of coercing it', () => {
+    expect(isOrgModeFormDraft({ ...values(), name: 42 })).toBe(false);
+    expect(isOrgModeFormDraft({ ...values(), groups: ['read', 'deploy'] })).toBe(false);
+    // A key this build does not know is another build's draft, not this one's.
+    expect(isOrgModeFormDraft({ ...values(), extra: 'x' })).toBe(false);
+    expect(isOrgModeFormDraft({ ...values(), groups: undefined })).toBe(false);
+    expect(isOrgModeFormDraft(null)).toBe(false);
   });
 });

@@ -9,6 +9,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { i18n } from '@/i18n';
 import { BitbucketOverview } from './bitbucket-overview';
 
@@ -359,21 +360,58 @@ function connectActions(root: TestRenderer.ReactTestRenderer) {
   });
 }
 
+describe('BitbucketOverview OAuth connection card', () => {
+  /** The row title the card paints over the managed-on-web line. */
+  function cardTitle(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.className === 'text-sm font-medium')
+      .map(node => node.props.children);
+  }
+
+  // The granted-name case lives in `bitbucket-overview-connection.mounted.test.tsx`,
+  // which asserts the same row title from the full OAuth status shape; only the
+  // empty-name fallback is new.
+  it('reads Connected when the authorization names an empty workspace', async () => {
+    // The status read passes the server's `displayName` through, so an empty
+    // string reaches the card: a nullish fallback painted a blank title.
+    readiness.connected = false;
+    readiness.integrationId = null;
+    status.data = {
+      method: 'oauth',
+      status: 'connected',
+      workspace: { slug: 'acme', displayName: '' },
+    };
+
+    const renderer = await renderScreen();
+
+    expect(cardTitle(renderer)).toEqual([i18n.t('common.connected')]);
+  });
+});
+
 describe('BitbucketOverview not-connected state', () => {
-  it('names the organization and the next screen in the connect description', async () => {
+  it('states the next step without repeating the organization in the connect description', async () => {
     readiness.connected = false;
     readiness.integrationId = null;
 
     const root = await renderScreen();
     const text = JSON.stringify(root.toJSON());
+    const description = i18n.t('codeReviewer.bitbucketConnect.descriptionOverview');
 
     // The token field lives on the sheet the action opens, so the copy names
     // that step; "paste it below" pointed at a button with no field under it.
-    expect(text).toContain(
-      i18n.t('codeReviewer.bitbucketConnect.descriptionOverview', {
-        organization: 'Acme Robotics',
-      })
-    );
+    // The header subtitle above already names the organization, so the
+    // description leaves the name out instead of naming it a second time.
+    expect(text).toContain(description);
+    expect(description).not.toContain('{{organization}}');
+    expect(description).not.toContain('Acme Robotics');
+    // `ScreenHeader` is stubbed to null here, so the header's one mention is
+    // asserted through the subtitle it receives, and the painted body text stays
+    // free of the name.
+    expect(root.root.findAllByType(ReviewerHeader).map(header => header.props.subtitle)).toEqual([
+      'Acme Robotics',
+    ]);
+    expect(text).not.toContain('Acme Robotics');
     expect(text).not.toContain('{{');
     expect(connectActions(root)).toHaveLength(1);
     expect(orgBoundaryCalls.length).toBeGreaterThan(0);

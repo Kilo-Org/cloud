@@ -120,6 +120,9 @@ export const benchmarkRuns = sqliteTable(
     // Which registry queue this run drained: 'platform' (saved platform decider
     // list) or 'user' (owner pools). Classifier runs are always 'platform'.
     purpose: text('purpose').$type<BenchmarkRunPurpose>().notNull().default('platform'),
+    // ACTIVE_MEASUREMENT_REVISION the run started under: which cases it runs and how it grades them.
+    // Runs from before the column existed measured revision 2.
+    measurement_revision: integer('measurement_revision').notNull().default(2),
   },
   table => [
     uniqueIndex('UQ_benchmark_runs_one_running_per_router_kind_purpose')
@@ -201,11 +204,17 @@ export const caseResults = sqliteTable(
     output_prefix: text('output_prefix'),
     event_count: integer('event_count'),
     last_event_types: text('last_event_types'),
+    // Tool evidence of the measured turn (src/kilo-events.ts ToolEvidence); null before it was
+    // recorded. tool_names is a JSON array of distinct names in first-use order.
+    tool_calls: integer('tool_calls'),
+    tool_names: text('tool_names'),
+    step_count: integer('step_count'),
+    final_finish_reason: text('final_finish_reason'),
     // Repetition index (0-based); together with run_id/model/variant/case_id forms the PK.
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
-    // PROMPT_TRANSPORT_REVISION of the CLI call that produced this result.
+    // Measurement revision (src/measurement-revision.ts) of the call that produced this result.
     prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
@@ -461,6 +470,28 @@ export const benchmarkSubscriptions = sqliteTable(
   },
   table => [primaryKey({ columns: [table.router, table.owner_type, table.owner_id] })]
 );
+
+/**
+ * Progress of one day's alias sync, per router. The daily cron starts it and the minute
+ * cron resumes it while the row says work is left: whether the platform aliases were
+ * re-resolved, and a keyset cursor over owner subscriptions. `attempts` bounds how much
+ * the day may repeat after a failure.
+ */
+export const benchmarkDailyAliasSync = sqliteTable('benchmark_daily_alias_sync', {
+  router: text('router').$type<AutoRouter>().primaryKey(),
+  day: text('day').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  platform_status: text('platform_status')
+    .$type<'pending' | 'ok' | 'failed'>()
+    .notNull()
+    .default('pending'),
+  platform_error: text('platform_error'),
+  owner_cursor_type: text('owner_cursor_type').$type<'user' | 'org'>(),
+  owner_cursor_id: text('owner_cursor_id'),
+  owner_pages: integer('owner_pages').notNull().default(0),
+  owner_done: integer('owner_done').notNull().default(0),
+  updated_at: text('updated_at').notNull(),
+});
 
 /**
  * Ready registry rows queued to re-measure the cases the revision-1 prompt transport

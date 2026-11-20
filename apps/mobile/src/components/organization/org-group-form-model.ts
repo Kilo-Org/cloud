@@ -6,12 +6,38 @@
  */
 
 import { foldForSearch } from '@/i18n/fold-for-search';
+import * as z from 'zod';
 
 /** `OrganizationGroupMetadataSchema.name` bound, and the field's `maxLength`. */
 export const ORG_GROUP_NAME_MAX_LENGTH = 80;
 
 /** `OrganizationGroupMetadataSchema.description` bound, and the field's `maxLength`. */
 export const ORG_GROUP_DESCRIPTION_MAX_LENGTH = 500;
+
+/** A group form's durable draft: its two texts, its member selection and search. */
+export type OrgGroupFormDraft = {
+  name: string;
+  description: string;
+  memberIds: readonly string[];
+  memberQuery: string;
+};
+
+/**
+ * The draft's stored shape. Strict on purpose: a value that carries any other
+ * key was written by a build with a different form, so the caller reads it as no
+ * draft and leaves it stored rather than coercing a shape it does not know.
+ */
+const orgGroupFormDraftSchema = z.strictObject({
+  name: z.string(),
+  description: z.string(),
+  memberIds: z.array(z.string()),
+  memberQuery: z.string(),
+});
+
+/** Shape guard for a stored group form draft; another build's value is refused. */
+export function isOrgGroupFormDraft(value: unknown): value is OrgGroupFormDraft {
+  return orgGroupFormDraftSchema.safeParse(value).success;
+}
 
 export type OrgGroupNameError = 'required' | 'tooLong' | null;
 

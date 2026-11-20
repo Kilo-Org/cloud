@@ -208,6 +208,7 @@ describe('mapRunRow', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       engine_identity: 'v1:deadbeef',
+      measurement_revision: 2,
       purpose: 'platform' as const,
     };
     const result = mapRunRow(runRow);

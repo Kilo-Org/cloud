@@ -22,8 +22,14 @@ import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
+import { PROBE_CASES } from './datasets/probe-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity, publishPlatformRoutingTable } from './run';
+import {
+  ACTIVE_MEASUREMENT_REVISION,
+  deciderCasesForRouter,
+  MEASUREMENT_REVISION,
+} from './measurement-revision';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
@@ -356,6 +362,7 @@ beforeEach(() => {
           purpose: run.purpose ?? 'platform',
           accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
           frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
+          measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
           status: 'running',
           completed_at: null,
           error: null,
@@ -902,6 +909,7 @@ describe('GET /admin/runs', () => {
         router: 'efficient',
         repetitions: 2,
         engineIdentity: computeEngineIdentity('decider', 'efficient'),
+        measurementRevision: MEASUREMENT_REVISION,
         enqueuedModels: 3,
         completedCases: 40,
         failedCases: 3,
@@ -915,7 +923,7 @@ describe('GET /admin/runs', () => {
     expect(body.runs[0].progress).toEqual({
       completedCases: 40,
       failedCases: 3,
-      totalCases: 3 * DECIDER_CASES.length * 2,
+      totalCases: 3 * deciderCasesForRouter('efficient', MEASUREMENT_REVISION).length * 2,
     });
     expect(body.runs[1].progress).toBeUndefined();
     // Only runs that can still change are tallied.
@@ -1054,6 +1062,7 @@ describe('GET /admin/runs', () => {
         router: 'efficient',
         repetitions: 1,
         engineIdentity: computeEngineIdentity('decider', 'efficient'),
+        measurementRevision: MEASUREMENT_REVISION,
         enqueuedModels: 1,
         completedCases: 4,
         failedCases: 0,
@@ -1228,6 +1237,7 @@ describe('POST /admin/runs', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: 1000,
       engine_identity: 'v1:deadbeef',
+      measurement_revision: 2,
       purpose: 'platform',
     });
 
@@ -1348,6 +1358,25 @@ describe('POST /admin/runs', () => {
     });
     expect(scheduleRunChunks).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('starts a drained pair on the revision-2 cases while revision 3 is inactive', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(202);
+    const [, run] = vi.mocked(insertRun).mock.calls[0];
+    expect(run.measurement_revision).toBe(2);
+    // The dispatcher materializes chunks from the run's own revision, so a run started
+    // now never reaches the probe cases of the still-inactive revision 3.
+    const scheduled = deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION);
+    expect(scheduled).toEqual(DECIDER_CASES);
+    const scheduledIds = new Set(scheduled.map(benchCase => benchCase.id));
+    expect(PROBE_CASES.filter(benchCase => scheduledIds.has(benchCase.id))).toEqual([]);
   });
 
   it('starts one run per queue for queue=both', async () => {

@@ -243,7 +243,9 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   // the body offers no request to act on, and before the first read answers.
   const errorState = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
   const keepsCachedData =
-    errorState?.kind === 'retryable' || errorState?.kind === 'service-unavailable';
+    errorState?.kind === 'retryable' ||
+    errorState?.kind === 'service-unavailable' ||
+    errorState?.kind === 'offline';
   const loadFailed = errorState !== null && (pr.data === undefined || !keepsCachedData);
   const requestLoaded = !loadFailed && pr.data !== undefined;
   // Files and Discussion read from the request, so a failed load leaves them

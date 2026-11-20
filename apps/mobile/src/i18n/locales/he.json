@@ -141,6 +141,7 @@
     "keepRunning": "המשך הרצה",
     "newSession": "סשן חדש",
     "noModelsAvailable": "אין מודלים זמינים",
+    "modelRetires": "יוצא משימוש ב-{{date}}",
     "notFound": "לא נמצא.",
     "online": "מקוון",
     "open": "פתיחת {{name}}",
@@ -184,7 +185,8 @@
     "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
     "privateRepositoryA11y": "{{name}}, מאגר פרטי",
     "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד.",
-    "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב."
+    "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב.",
+    "viewOnGitHub": "הצגת ה-PR ב-GitHub"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -698,7 +700,8 @@
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו."
+      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
+      "notConnectedReadOnlyPlan": "תקופת הניסיון של הארגון הסתיימה, ולכן הבעלים חייבים לעדכן את החיוב ב-⁨kilo.ai⁩."
     },
     "bitbucketConnect": {
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
@@ -1235,7 +1238,7 @@
       "dueThisWeekDetail_two": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "dueThisWeekDetail_other": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "noDeadline": "אין מועד אחרון",
-      "reviewSlaAssignment": "בדיקת המועדים שנקבעו לפי SLA",
+      "reviewSlaAssignment": "בדיקת הקצאת ה-SLA",
       "allOpenFindingsTracked": "כל הממצאים הפתוחים במעקב"
     },
     "dismiss": {
@@ -2823,7 +2826,6 @@
       "skipped_other": "דילוג על {{displayCount}}",
       "skipped_two": "דילוג על {{displayCount}}",
       "title": "בדיקות",
-      "viewOnGitHub": "הצגת ה-PR ב-GitHub",
       "checkDetails": "פרטי בדיקה"
     },
     "composer": {
@@ -2852,9 +2854,9 @@
       "checkFailedTitleGitLab": "לא ניתן היה לבדוק את החיבור ל-GitLab.",
       "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
       "providerCheckFailedMessage": "לא ניתן היה להתחבר לספק. בדוק את החיבור ונסה שוב.",
-      "reconnectTitle": "חיבור מחדש ל-GitHub",
-      "reconnectTitleGitLab": "חיבור מחדש ל-GitLab",
-      "reconnectTitleBitbucket": "חיבור מחדש ל-Bitbucket",
+      "reconnectTitle": "חבר מחדש את GitHub",
+      "reconnectTitleGitLab": "חבר מחדש את GitLab",
+      "reconnectTitleBitbucket": "חבר מחדש את Bitbucket",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל.",
       "gitlabDescription": "סקירת בקשות מיזוג בנייד",
       "gitlabInstanceMismatchTitle": "חיבור GitLab מיועד למופע אחר",
@@ -2884,6 +2886,10 @@
       "commentActions": "פעולות בתגובה",
       "comment": "{{displayCount}} תגובות",
       "comment_other": "{{displayCount}} תגובות",
+      "conversationTruncated": "מוצגות רק {{displayCount}} התגובות הראשונות.",
+      "conversationTruncated_one": "מוצגות רק {{displayCount}} התגובות הראשונות.",
+      "conversationTruncated_two": "מוצגות רק {{displayCount}} התגובות הראשונות.",
+      "conversationTruncated_other": "מוצגות רק {{displayCount}} התגובות הראשונות.",
       "couldNotLoad": "לא ניתן היה לטעון את הדיון.",
       "couldNotLoadMore": "לא ניתן היה לטעון עוד תגובות.",
       "loadMoreComments": "טעינת תגובות נוספות",

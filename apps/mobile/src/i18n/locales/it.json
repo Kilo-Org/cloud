@@ -141,6 +141,7 @@
     "keepRunning": "Continua l'esecuzione",
     "newSession": "Nuova sessione",
     "noModelsAvailable": "Nessun modello disponibile",
+    "modelRetires": "Ritirato il {{date}}",
     "notFound": "Elemento non trovato.",
     "online": "In linea",
     "open": "Apri {{name}}",
@@ -184,7 +185,8 @@
     "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
     "privateRepositoryA11y": "{{name}}, repository privato",
     "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese.",
-    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova."
+    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova.",
+    "viewOnGitHub": "Visualizza la PR su GitHub"
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -508,7 +510,7 @@
     "changelogFixesPolish": "Correzioni e miglioramenti in tutta l'app.",
     "changelogAreas": {
       "signIn": "Accesso",
-      "profileOrganizations": "Profilo e organizzazioni"
+      "profileOrganizations": "Profilo & organizzazioni"
     }
   },
   "notifications": {
@@ -665,7 +667,8 @@
     },
     "autoReviews": "Revisioni automatiche",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo."
+      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
+      "notConnectedReadOnlyPlan": "Il periodo di prova dell'organizzazione è terminato, quindi il proprietario deve aggiornare la fatturazione su kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",
@@ -716,7 +719,7 @@
     },
     "providerConnect": {
       "description": "Connetti {{label}} di Kilo per revisionare automaticamente le pull request.",
-      "githubApp": "l'App GitHub",
+      "githubApp": "l'app GitHub",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
       "gitlabAccount": "l'account GitLab",
       "gitlabError": "Impossibile aprire la configurazione di GitLab. Riprova."
@@ -2823,7 +2826,6 @@
       "skipped_other": "{{displayCount}} saltati",
       "skipped_many": "{{displayCount}} saltati",
       "title": "Controlli",
-      "viewOnGitHub": "Visualizza la PR su GitHub",
       "checkDetails": "dettagli del controllo"
     },
     "composer": {
@@ -2884,6 +2886,10 @@
       "commentActions": "Azioni sul commento",
       "comment": "{{displayCount}} commenti",
       "comment_other": "{{displayCount}} commenti",
+      "conversationTruncated": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_one": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_many": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_other": "Sono visualizzati solo i primi {{displayCount}} commenti.",
       "couldNotLoad": "Impossibile caricare la discussione.",
       "couldNotLoadMore": "Impossibile caricare altri commenti.",
       "loadMoreComments": "Carica altri commenti",

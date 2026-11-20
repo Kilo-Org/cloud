@@ -140,10 +140,12 @@
     "keepRunning": "Çalıştırmaya devam et",
     "newSession": "Yeni oturum",
     "noModelsAvailable": "Kullanılabilir model yok",
+    "modelRetires": "Kullanımdan kalkıyor: {{date}}",
     "notFound": "Bulunamadı.",
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "viewOnGitHub": "PR'ı GitHub'da görüntüle",
     "completed": "Tamamlandı",
     "pending": "Bekliyor",
     "running": "Çalışıyor",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
       "signIn": "Oturum açma",
-      "profileOrganizations": "Profil ve kuruluşlar"
+      "profileOrganizations": "Profil & kuruluşlar"
     }
   },
   "preferences": {
@@ -697,7 +699,8 @@
     },
     "autoReviews": "Otomatik incelemeler",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
+      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
+      "notConnectedReadOnlyPlan": "Kuruluşun deneme süresi sona erdi, bu yüzden sahibin kilo.ai adresinden faturalandırmayı güncellemesi gerekiyor."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
@@ -2783,7 +2786,6 @@
       "skipped_one": "{{displayCount}} atlandı",
       "skipped_other": "{{displayCount}} atlandı",
       "title": "Kontroller",
-      "viewOnGitHub": "PR'ı GitHub'da görüntüle",
       "checkDetails": "kontrol ayrıntıları"
     },
     "composer": {
@@ -2847,6 +2849,9 @@
       "couldNotLoad": "Tartışma yüklenemedi.",
       "couldNotLoadMore": "Daha fazla yorum yüklenemedi.",
       "loadMoreComments": "Daha fazla yorum yükle",
+      "conversationTruncated": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_one": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_other": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
       "loading": "Tartışma yükleniyor",
       "moderation": {
         "block": {

@@ -140,6 +140,7 @@
     "keepRunning": "চালিয়ে রাখুন",
     "newSession": "নতুন সেশন",
     "noModelsAvailable": "কোনো মডেল পাওয়া যাচ্ছে না",
+    "modelRetires": "অবসর হবে {{date}}",
     "notFound": "পাওয়া যায়নি।",
     "online": "অনলাইন",
     "open": "{{name}} খুলুন",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থা মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
     "privateRepositoryA11y": "{{name}}, ব্যক্তিগত রিপোজিটরি",
     "legalDocumentEnglishOnly": "এই নথিটি কেবল ইংরেজিতে উপলব্ধ।",
-    "organizationTrialEndedBilling": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। আপনি বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।"
+    "organizationTrialEndedBilling": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। আপনি বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
+    "viewOnGitHub": "GitHub-এ PR দেখুন"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "আরও মন্তব্য লোড করা যায়নি।",
       "retryLoadingMore": "আরও মন্তব্য লোড করার চেষ্টা আবার করুন",
       "loadMoreComments": "আরও মন্তব্য লোড করুন",
+      "conversationTruncated": "শুধু প্রথম {{displayCount}}টি মন্তব্য দেখানো হচ্ছে।",
+      "conversationTruncated_one": "শুধু প্রথম {{displayCount}}টি মন্তব্য দেখানো হচ্ছে।",
+      "conversationTruncated_other": "শুধু প্রথম {{displayCount}}টি মন্তব্য দেখানো হচ্ছে।",
       "addReaction": "প্রতিক্রিয়া যোগ করুন",
       "reactionPill": "{{emoji}} প্রতিক্রিয়া, {{displayCount}} {{countLabel}}",
       "reaction_one": "প্রতিক্রিয়া",
@@ -881,7 +886,6 @@
       "noAccess": "এই রিপোজিটরির চেকগুলো দেখার অনুমতি আপনার নেই।",
       "couldNotLoad": "চেক লোড করা যায়নি।",
       "retryChecks": "চেক লোড করার চেষ্টা আবার করুন",
-      "viewOnGitHub": "GitHub-এ PR দেখুন",
       "noChecksReported": "কোনো চেকের তথ্য পাওয়া যায়নি",
       "passed": "{{displayCount}}টি পাস করেছে",
       "passed_one": "{{displayCount}}টি পাস করেছে",
@@ -936,9 +940,9 @@
       "checkFailedTitleGitLab": "GitLab সংযোগ পরীক্ষা করা যায়নি।",
       "checkFailedTitleBitbucket": "Bitbucket সংযোগ পরীক্ষা করা যায়নি।",
       "providerCheckFailedMessage": "প্রদানকারীতে পৌঁছানো যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
-      "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযোগ",
-      "reconnectTitleGitLab": "GitLab-এর সঙ্গে আবার সংযোগ",
-      "reconnectTitleBitbucket": "Bitbucket-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযুক্ত করুন",
+      "reconnectTitleGitLab": "GitLab-এর সঙ্গে আবার সংযুক্ত করুন",
+      "reconnectTitleBitbucket": "Bitbucket-এর সঙ্গে আবার সংযুক্ত করুন",
       "reconnectDescription": "আপনার GitHub সংযোগের অনুমতি বাতিল করা হয়েছে।",
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করুন",
       "gitlabInstanceMismatchTitle": "GitLab সংযোগটি অন্য একটি ইনস্ট্যান্সের জন্য",
@@ -1391,7 +1395,8 @@
     "followReviewMd": "REVIEW.md অনুসরণ করুন",
     "followReviewMdSubtitle": "প্রতিটি রিপোজিটরির REVIEW.md ফাইলের নির্দেশনা অনুসরণ করুন",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।"
+      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
+      "notConnectedReadOnlyPlan": "সংস্থার ট্রায়াল শেষ হয়েছে, তাই একজন মালিককে kilo.ai-এ বিলিং আপডেট করতে হবে।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-এর Bitbucket সংযোগ কম্পিউটার থেকে ওয়েবে পরিচালনা করা হয়।",
@@ -1724,7 +1729,7 @@
       "dueThisWeekDetail_one": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "dueThisWeekDetail_other": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "noDeadline": "কোনো সময়সীমা নেই",
-      "reviewSlaAssignment": "নির্ধারিত SLA পর্যালোচনা করুন",
+      "reviewSlaAssignment": "SLA নির্ধারণ পর্যালোচনা করুন",
       "allOpenFindingsTracked": "সব অমীমাংসিত ত্রুটি নজরদারিতে আছে"
     },
     "dismiss": {
@@ -1843,7 +1848,7 @@
       "couldNotLoadMore": "আরও ত্রুটি লোড করা যায়নি।",
       "noMatchesTitle": "ফিল্টারের সঙ্গে মেলে এমন কোনো ত্রুটি নেই",
       "noMatchesDescription": "নির্বাচিত ফিল্টারগুলো বদলে বা সরিয়ে দেখুন।",
-      "emptyTitle": "কোনো অমীমাংসিত ত্রুটি নেই",
+      "emptyTitle": "কোনো খোলা ত্রুটি নেই",
       "emptyDescription": "এখন নজর দেওয়ার মতো কোনো অমীমাংসিত ত্রুটি নেই।"
     },
     "findingRow": {
@@ -1985,7 +1990,7 @@
       "failedDescription": "নিরাপত্তা এজেন্ট বিশ্লেষণটি সম্পূর্ণ করতে পারেনি।",
       "extractionFailedDescription": "প্রযুক্তিগত রিপোর্টটিকে কাঠামোগত ফলাফলে রূপান্তর করা যায়নি।",
       "exploitableDescription": "অ্যাপ্লিকেশনের কোড থেকে ত্রুটিযুক্ত ফিচারটি ব্যবহার করা যায়।",
-      "notExploitable": "কোডে পৌঁছানোর পথ নেই",
+      "notExploitable": "প্রবেশযোগ্য কোডপথ নেই",
       "notExploitableDescription": "এই রিপোজিটরিতে ত্রুটিযুক্ত ফিচারটি ব্যবহারের কোনো কোডপথ পাওয়া যায়নি।",
       "unknown": "পর্যালোচনা প্রয়োজন",
       "unknownDescription": "নিরাপত্তা দুর্বলতাযুক্ত ফিচারটি কোড থেকে ব্যবহার করা যায় কি না, তা বিশ্লেষণে নিশ্চিত হওয়া যায়নি।",
@@ -2034,7 +2039,7 @@
     "remediationUnavailable": {
       "findingNotFound": "নিরাপত্তা ত্রুটির রেকর্ডটি আর নেই।",
       "approvalRequired": "স্বয়ংক্রিয় সমাধানের জন্য অনুমোদন প্রয়োজন। অনুমোদন দিতে নিজে সমাধানের কাজ শুরু করুন।",
-      "findingNotOpen": "ত্রুটিটি আর অমীমাংসিত অবস্থায় নেই।",
+      "findingNotOpen": "ত্রুটিটি আর খোলা নেই।",
       "repoNotInScope": "নিরাপত্তা এজেন্টের জন্য রিপোজিটরিটি নির্বাচিত নয়।",
       "analysisRequired": "সমাধান শুরু করার আগে কোডবেস বিশ্লেষণ চালান।",
       "staleAnalysis": "বিশ্লেষণের পরে ত্রুটিটি বদলেছে। সমাধান শুরু করার আগে আবার বিশ্লেষণ চালান।",

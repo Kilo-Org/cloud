@@ -140,6 +140,7 @@
     "keepRunning": "Lad køre",
     "newSession": "Ny session",
     "noModelsAvailable": "Ingen modeller tilgængelige",
+    "modelRetires": "Udfases {{date}}",
     "notFound": "Indholdet blev ikke fundet.",
     "online": "Forbundet",
     "open": "Åbn {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
-    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen."
+    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
+    "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
     "changelogAreas": {
       "signIn": "Log-ind",
-      "profileOrganizations": "Profil og organisationer"
+      "profileOrganizations": "Profil & organisationer"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Kunne ikke indlæse flere kommentarer.",
       "retryLoadingMore": "Prøv at indlæse flere kommentarer igen",
       "loadMoreComments": "Indlæs flere kommentarer",
+      "conversationTruncated": "Kun de første {{displayCount}} kommentarer vises.",
+      "conversationTruncated_one": "Kun de første {{displayCount}} kommentarer vises.",
+      "conversationTruncated_other": "Kun de første {{displayCount}} kommentarer vises.",
       "addReaction": "Tilføj reaktion",
       "reactionPill": "Reaktion: {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
@@ -881,7 +886,6 @@
       "noAccess": "Du har ikke adgang til kontroller for dette kodelager.",
       "couldNotLoad": "Kunne ikke indlæse kontroller.",
       "retryChecks": "Prøv at indlæse kontrollerne igen",
-      "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen kontroller rapporteret",
       "passed": "{{displayCount}} bestået",
       "passed_one": "{{displayCount}} bestået",
@@ -1391,7 +1395,8 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen."
+      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
+      "notConnectedReadOnlyPlan": "Organisationens prøveperiode er udløbet, så en ejer skal opdatere betalingen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",

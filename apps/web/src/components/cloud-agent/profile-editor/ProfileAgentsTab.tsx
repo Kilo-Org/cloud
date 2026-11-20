@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Plus, Bot, Pencil, ChevronDown, Info } from 'lucide-react';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -290,7 +291,7 @@ function AgentForm({
     () =>
       (modelsData?.data ?? []).map(m => ({
         id: m.id,
-        name: m.name,
+        name: modelNameWithRetirement(m),
         isFree: m.isFree,
         mayTrainOnYourPrompts: m.mayTrainOnYourPrompts,
         hasUserByokAvailable: m.hasUserByokAvailable,

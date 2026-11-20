@@ -94,6 +94,23 @@ describe('PrReviewDiscussionTab full-body states', () => {
     }
   });
 
+  // The offline kind must own the body like the other failure kinds: before
+  // this arm it fell through every branch to the list's empty state, so an
+  // offline reader was told there was no discussion at all.
+  it('names the connection when the first page never reached the server', () => {
+    discussionState.firstPageErrorState = { kind: 'offline' };
+    const renderer = mountTab();
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.placement).toBeUndefined();
+    expect(bottomPaddedViews(renderer)).toHaveLength(0);
+    expectCtaPresence(renderer, false);
+    act(() => {
+      (error.props.onRetry as () => void)();
+    });
+    expect(discussionState.query.refetch).toHaveBeenCalled();
+  });
+
   it('centers the reconnect notice', () => {
     discussionState.firstPageErrorState = { kind: 'reconnect' };
     const renderer = mountTab();

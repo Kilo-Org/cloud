@@ -151,7 +151,13 @@ export function classifyReadFailureKind({
   return 'retryable';
 }
 
-function servedAnswer(error: unknown): boolean {
+/**
+ * True when the failed read reached the server: a tRPC envelope carrying a
+ * code, or an HTTP status on the answer. A transport rejection carries
+ * neither — a `TRPCClientError` over a failed fetch has no `data.code` — so
+ * the connection owns that failure, not the backend.
+ */
+export function servedAnswer(error: unknown): boolean {
   // A bare top-level `code` is not a server answer on its own: transport and
   // abort errors carry one too (the Expo fetch cancellation names itself in
   // `code`). Only a real tRPC error envelope, or a status the answer carried,

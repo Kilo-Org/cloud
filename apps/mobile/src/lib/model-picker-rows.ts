@@ -1,5 +1,6 @@
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { i18n } from '@/i18n';
+import { foldForSearch } from '@/i18n/fold-for-search';
 import { autoModelLabel } from '@/lib/auto-model-name';
 
 export type ModelPickerRow =
@@ -96,7 +97,7 @@ export function buildModelPickerRows({
   search: string;
   favoriteIds: Set<string>;
 }): ModelPickerRow[] {
-  const query = search.toLowerCase().trim();
+  const query = foldForSearch(search).trim();
   const filtered = models.filter(model => !query || searchableText(model).includes(query));
 
   const favorites = filtered.filter(model => isFavoriteOption(model, favoriteIds));
@@ -149,7 +150,7 @@ export function buildModelPickerRows({
 }
 
 function searchableText(model: SessionModelOption): string {
-  return [
+  const joined = [
     model.name,
     // The row renders an auto model's catalog name (`Auto Efficiente` in
     // Italian), so that translated name must be searchable too; matching only
@@ -161,8 +162,11 @@ function searchableText(model: SessionModelOption): string {
     autoModelLabel(model.displayId, model.name),
   ]
     .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+    .join(' ');
+
+  // Fold case and diacritics so "mistral" still finds a provider named
+  // "Mistrál Labs".
+  return foldForSearch(joined);
 }
 
 function groupForModel(

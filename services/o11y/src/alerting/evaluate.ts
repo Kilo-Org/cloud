@@ -20,6 +20,7 @@ import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-
 import { evaluateContainerCapacity } from './container-capacity-evaluate';
 import { evaluateContainerAllocations } from './container-allocations';
 import { evaluateQueueBacklogAlert } from './queue-backlog-evaluate';
+import { queryUsageQueueBacklog } from './usage-queue-backlog-query';
 import { evaluateDeadLetterQueueAlert } from './dead-letter-queue-evaluate';
 
 /**
@@ -326,6 +327,12 @@ export async function evaluateAlerts(env: Env): Promise<void> {
     await evaluateQueueBacklogAlert(env);
   } catch (err) {
     errors.push(new Error('queue_backlog evaluation', { cause: err }));
+  }
+
+  try {
+    await evaluateQueueBacklogAlert(env, queryUsageQueueBacklog, undefined, 'once-until-resolved');
+  } catch (err) {
+    errors.push(new Error('usage_queue_backlog evaluation', { cause: err }));
   }
 
   try {

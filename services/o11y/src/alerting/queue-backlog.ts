@@ -10,6 +10,8 @@ export const QUEUE_BACKLOG_PAGE_INTERVAL = 100_000;
 
 export type QueueBacklogMetrics = {
   queueId: string;
+  queueName?: string;
+  runbookUrl?: string;
   backlogCount: number;
   backlogBytes: number;
   oldestMessageTimestamp?: Date;

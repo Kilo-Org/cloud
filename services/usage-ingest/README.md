@@ -626,6 +626,46 @@ For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
 timeout 0 and the pre-trial cap 200 for the same single queue. Preserve the current writer
 route, retry delay/budget and per-message dispositions.
 
+## Main queue backlog alert
+
+The o11y Worker's existing every-minute scheduled evaluator independently reads
+native backlog metrics for the exact production queue `usage-ingest-processing-eu`,
+without relying on consumer logs. It resolves the current queue ID by exact name
+on every run with a bounded paginated lookup. Lookup or metrics failures fail the
+run rather than reporting an empty queue; other infrastructure checks still run.
+
+The main usage queue raises a ticket at 25,000 pending messages and one page
+on the first observation at or above 50,000. The page threshold is always 50,000,
+even if the first observation is much higher. While that page is active, no
+higher count triggers another page. Three consecutive observed readings below
+50,000 re-arm paging; any reading at or above 50,000 resets that recovery streak.
+The next crossing can then page again. These metric observations only re-arm
+the alert detector; they do not resolve the actual on-call incident. On-call may
+fix the underlying issue before queue depth drops. The outgoing Slack webhook
+cannot read or follow manual incident state, so manually resolving an incident
+while the backlog stays high does not trigger more pages. There is no manual
+reset UI or incident-system integration. Tickets retain their existing
+25,000 threshold and three-below-threshold re-arm policy. State is isolated by
+queue ID, and failed notifications leave state unchanged so the next tick retries.
+The generic ingest-queue monitor retains its existing 100,000-message page
+escalations; this once-per-episode page policy applies only to the main usage queue.
+These are count thresholds, not a backlog growth-rate detector or accounting SLO.
+The existing ingest-queue monitor and usage DLQ alert remain separate.
+
+Tickets use `O11Y_SLACK_WEBHOOK_TICKET`; pages use `O11Y_SLACK_WEBHOOK_PAGE`.
+Activation occurs on the next normal o11y deployment after merge. The existing
+`O11Y_CF_CONTAINERS_API_TOKEN` must already have Queues Read access to this
+account, including queue listing and metrics. No new secret or configuration is
+needed. Deploying while the backlog exceeds a threshold may alert immediately;
+this documentation does not establish that any live alert has been sent.
+
+The alert includes queue name and ID, pending count, bytes, oldest-message
+timestamp when available, severity and threshold. When it fires, compare count
+and oldest-message age across observations, check consumer delivery/errors and
+writer admission/latency, then inspect the [dead-letter alert](#dead-letter-alert).
+Coordinate incident ownership before changing controls or replaying messages.
+A falling count alone does not establish accounting reconciliation.
+
 ## Dead-letter alert
 
 The alert covers every usage kind on the queue: LLM, Enkrypt and Exa.

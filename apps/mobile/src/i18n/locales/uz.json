@@ -965,6 +965,8 @@
       "pendingComment": "yuborilmagan izoh",
       "pendingComment_other": "yuborilmagan izoh",
       "submitCountOfTotal": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
       "submitReview": "Ko‘rib chiqish natijasini yuborish",
       "partialPostedFresh": "{{displayFreshCount}} ta izoh yuborildi. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ta izoh yuborildi. ",

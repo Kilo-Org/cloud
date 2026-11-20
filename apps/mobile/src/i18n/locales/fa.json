@@ -965,6 +965,8 @@
       "pendingComment": "نظر در انتظار ارسال",
       "pendingComment_other": "نظر در انتظار ارسال",
       "submitCountOfTotal": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
+      "submitCountOfTotal_one": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
+      "submitCountOfTotal_other": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
       "submitReview": "ارسال بازبینی",
       "partialPostedFresh": "{{displayFreshCount}} نظر ارسال شد. ",
       "partialPostedFresh_one": "{{displayFreshCount}} نظر ارسال شد. ",

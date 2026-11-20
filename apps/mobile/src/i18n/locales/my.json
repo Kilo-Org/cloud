@@ -965,6 +965,8 @@
       "pendingComment": "မတင်သွင်းရသေးသော မှတ်ချက်",
       "pendingComment_other": "မတင်သွင်းရသေးသော မှတ်ချက်",
       "submitCountOfTotal": "မှတ်ချက် {{displayTotalCount}} ခုအနက် {{displayFreshCount}} ခုကို တင်ပါ",
+      "submitCountOfTotal_one": "မှတ်ချက် {{displayTotalCount}} ခုအနက် {{displayFreshCount}} ခုကို တင်ပါ",
+      "submitCountOfTotal_other": "မှတ်ချက် {{displayTotalCount}} ခုအနက် {{displayFreshCount}} ခုကို တင်ပါ",
       "submitReview": "စစ်ဆေးမှုကို တင်သွင်းပါ",
       "partialPostedFresh": "မှတ်ချက် {{displayFreshCount}} ခု တင်ပြီးပါပြီ။ ",
       "partialPostedFresh_one": "မှတ်ချက် {{displayFreshCount}} ခု တင်ပြီးပါပြီ။ ",

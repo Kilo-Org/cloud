@@ -5,6 +5,8 @@
  * rules.
  */
 
+import { foldForSearch } from '@/i18n/fold-for-search';
+
 /** `OrganizationGroupMetadataSchema.name` bound, and the field's `maxLength`. */
 export const ORG_GROUP_NAME_MAX_LENGTH = 80;
 
@@ -155,4 +157,20 @@ export function orgGroupFormExit({
     }
   }
   return currentIndex <= 0 ? { kind: 'push-list' } : { kind: 'back' };
+}
+
+/**
+ * The members a group form's search keeps, in the server's order. Folds case
+ * and diacritics on both sides, so a query for "anais" keeps "Anaís" and a
+ * query for the email still matches.
+ */
+export function filterOrgGroupMembers<T extends Readonly<{ name: string; email: string }>>(
+  members: readonly T[],
+  query: string
+): readonly T[] {
+  const needle = foldForSearch(query.trim());
+  if (needle.length === 0) {
+    return members;
+  }
+  return members.filter(member => foldForSearch(`${member.name} ${member.email}`).includes(needle));
 }

@@ -11,6 +11,8 @@ import {
   DEFAULT_AUTO_ROUTER,
   DEFAULT_BENCHMARK_DECIDER_MODEL_IDS,
   BenchmarkConfigSchema,
+  BENCHMARK_CONTAINER_BUDGET,
+  BenchmarkSchedulerLimitSchema,
   BenchmarkSchedulerOverridesSchema,
   BenchmarkKindSchema,
   BenchmarkProfileStatusesRequestSchema,
@@ -33,6 +35,7 @@ import {
   type BenchmarkRunsResponse,
   type BenchmarkRunSummariesResponse,
   type BenchmarkSchedulerConfigResponse,
+  type BenchmarkSchedulerSetting,
   type BenchmarkRunProgress,
   type CustomRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
@@ -130,6 +133,35 @@ function withLegacyAdminConfigFields(
     classifierMaxP95LatencyMs: policy.classifierMaxP95LatencyMs,
   };
 }
+
+/**
+ * The previous web release requires the retired provider limits in this response
+ * and sends them on save (ADR 0003 invariant 7). Serve them as the container
+ * budget, which no longer binds anything beyond the slots, and accept and ignore
+ * them on PUT. Remove both once that release is promoted.
+ */
+const LEGACY_PROVIDER_LIMIT_SETTING = {
+  effective: BENCHMARK_CONTAINER_BUDGET,
+  source: 'default',
+  override: null,
+  fallback: BENCHMARK_CONTAINER_BUDGET,
+} satisfies BenchmarkSchedulerSetting;
+
+function withLegacySchedulerSettings(settings: BenchmarkSchedulerConfigResponse['settings']) {
+  return {
+    ...settings,
+    providerConcurrency: LEGACY_PROVIDER_LIMIT_SETTING,
+    unknownProviderConcurrency: LEGACY_PROVIDER_LIMIT_SETTING,
+  };
+}
+
+const SchedulerOverridesRequestSchema = z
+  .strictObject({
+    ...BenchmarkSchedulerOverridesSchema.shape,
+    providerConcurrency: BenchmarkSchedulerLimitSchema.nullable().optional(),
+    unknownProviderConcurrency: BenchmarkSchedulerLimitSchema.nullable().optional(),
+  })
+  .transform(({ slots, modelConcurrency }) => ({ slots, modelConcurrency }));
 
 /**
  * The previous web release parses the run list with a contract that still
@@ -260,15 +292,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
 
   app.get('/admin/scheduler-config', async c => {
     const { overrides, ...updated } = await getSchedulerOverrides(c.env.BENCH_DB);
+    const { settings } = resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides);
     return c.json({
-      settings: resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides).settings,
+      settings: withLegacySchedulerSettings(settings),
       ...updated,
     } satisfies BenchmarkSchedulerConfigResponse);
   });
 
   app.put(
     '/admin/scheduler-config',
-    zodJsonValidator(BenchmarkSchedulerOverridesSchema, {
+    zodJsonValidator(SchedulerOverridesRequestSchema, {
       errorMessage: 'Invalid scheduler config',
     }),
     async c => {
@@ -277,8 +310,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         c.req.valid('json'),
         c.req.header('x-updated-by') ?? null
       );
+      const { settings } = resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides);
       return c.json({
-        settings: resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides).settings,
+        settings: withLegacySchedulerSettings(settings),
         ...updated,
       } satisfies BenchmarkSchedulerConfigResponse);
     }

@@ -965,6 +965,8 @@
       "pendingComment": "maoni yanayosubiri kutumwa",
       "pendingComment_other": "maoni yanayosubiri kutumwa",
       "submitCountOfTotal": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
       "submitReview": "Wasilisha ukaguzi",
       "partialPostedFresh": "Maoni {{displayFreshCount}} yamechapishwa. ",
       "partialPostedFresh_one": "Maoni {{displayFreshCount}} yamechapishwa. ",

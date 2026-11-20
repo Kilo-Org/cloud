@@ -965,6 +965,8 @@
       "pendingComment": "na nakabinbing komento",
       "pendingComment_other": "na nakabinbing komento",
       "submitCountOfTotal": "Isumite ang {{displayFreshCount}} sa {{displayTotalCount}} na komento",
+      "submitCountOfTotal_one": "Isumite ang {{displayFreshCount}} sa {{displayTotalCount}} na komento",
+      "submitCountOfTotal_other": "Isumite ang {{displayFreshCount}} sa {{displayTotalCount}} na komento",
       "submitReview": "Isumite ang pagsusuri",
       "partialPostedFresh": "Na-post ang {{displayFreshCount}} na komento. ",
       "partialPostedFresh_one": "Na-post ang {{displayFreshCount}} na komento. ",

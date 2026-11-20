@@ -965,6 +965,8 @@
       "pendingComment": "okwu a na-ezigabeghị",
       "pendingComment_other": "okwu a na-ezigabeghị",
       "submitCountOfTotal": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",
       "submitReview": "Nyefee nyocha",
       "partialPostedFresh": "Ebipụtala okwu {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Ebipụtala okwu {{displayFreshCount}}. ",

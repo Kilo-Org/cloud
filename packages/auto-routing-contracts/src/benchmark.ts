@@ -277,6 +277,37 @@ export const BenchmarkModelSummarySchema = z.object({
 });
 export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 
+/**
+ * A pair's repetition plan within a run (src/adaptive-repetitions.ts): every pair
+ * starts at one repetition, and only a pair near a ranking boundary or one that
+ * would take a route lead is measured further.
+ *
+ * - `provisional`: repetitions started, nothing settled yet.
+ * - `escalated`: near a boundary or a would-be leader; the rest are scheduled.
+ * - `complete`: the measured repetitions settle it.
+ * - `stopped`: dominated on every route it competes on; no further repetition can
+ *   change a published leader.
+ */
+export const PairRepetitionStateSchema = z.enum([
+  'provisional',
+  'escalated',
+  'complete',
+  'stopped',
+]);
+export type PairRepetitionState = z.infer<typeof PairRepetitionStateSchema>;
+
+/** One run entry's repetition plan, as the admin console reports it. */
+export const BenchmarkPairRepetitionSchema = z.object({
+  model: z.string().trim().min(1),
+  variant: VariantSchema,
+  measuredReps: z.number().int().nonnegative(),
+  requiredReps: z.number().int().positive(),
+  state: PairRepetitionStateSchema.nullable(),
+  /** Routes the plan was decided on; empty until the pair has graded results. */
+  routes: z.array(z.string()),
+});
+export type BenchmarkPairRepetition = z.infer<typeof BenchmarkPairRepetitionSchema>;
+
 // Live case tally for a running run. `totalCases` is null when the expected
 // total cannot be derived exactly (the dataset changed after the run started),
 // so a reader shows counts without a completion estimate.

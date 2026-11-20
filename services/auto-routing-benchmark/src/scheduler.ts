@@ -232,10 +232,16 @@ export async function scheduleRunChunks(
   db: D1Database,
   run: {
     runId: string;
-    entries: readonly { model: string; variant: string | null }[];
+    entries: readonly { model: string; variant: string | null; requiredReps?: number }[];
     repetitions: number;
     caseIds: readonly string[];
     chunkSize: number;
+    /**
+     * Schedule lanes a later repetition decision added to an already-initialized
+     * run. Every existing lane resumes where it stopped, so only the new lanes
+     * write chunks; the marker row is already there.
+     */
+    extend?: boolean;
   }
 ): Promise<boolean> {
   const deadline = Date.now() + SCHEDULER_INIT_BUDGET_MS;
@@ -243,7 +249,7 @@ export async function scheduleRunChunks(
     .prepare('SELECT run_id FROM scheduler_runs WHERE run_id = ?')
     .bind(run.runId)
     .first();
-  if (initialized) return true;
+  if (initialized && !run.extend) return true;
   const lanes = await db
     .prepare(SCHEDULER_MATERIALIZED_LANES_SQL)
     .bind(run.runId)
@@ -279,7 +285,11 @@ export async function scheduleRunChunks(
   const chunks = Math.ceil(run.caseIds.length / run.chunkSize);
   for (const entry of run.entries) {
     const variant = entry.variant ?? '';
-    for (let rep = 0; rep < run.repetitions; rep++) {
+    // A pair owes the repetitions its plan raised it to (src/adaptive-repetitions.ts):
+    // one by default, the router's count near a boundary, and the lead minimum when
+    // it would head a route — which can exceed the router's own count on frontier.
+    const reps = Math.max(1, entry.requiredReps ?? run.repetitions);
+    for (let rep = 0; rep < reps; rep++) {
       const start = resumeAt.get(JSON.stringify([entry.model, variant, rep])) ?? 0;
       for (let chunk = start; chunk < chunks; chunk++) {
         const offset = chunk * run.chunkSize;

@@ -29,10 +29,15 @@ import caseComplexity from './datasets/case-complexity.json';
 import type { RunModelRow, RunRow } from './db';
 import {
   countCaseResultsByLane,
+  countMeasuredRepsByPair,
+  countRecordedRepsByRun,
   exactPairKey,
   existsNewerCompletedRun,
   getCaseResults,
   getExistingCaseResultIds,
+  listRunModelRepPlans,
+  listRunModelsNeedingReps,
+  setRunModelRepPlan,
   reuseDeciderCaseResults,
   getPendingDeciderOutput,
   savePendingDeciderOutput,
@@ -180,6 +185,13 @@ import {
   type MeasuredCase,
 } from './measurement-revision';
 import { isProbeCase } from './datasets/probe-cases';
+import {
+  pairKey,
+  MIN_LEAD_REPS,
+  enforceLeadProtection,
+  type PairRepetitionState,
+} from './adaptive-repetitions';
+import { pairsOwingRepetitions, planRunRepetitions } from './adaptive-repetitions-run';
 import { applyProbeActivations } from './probe-activation';
 import { BenchmarkProbeFamilyError, runProbeCaseViaGateway } from './probe/executor';
 import { agenticEligibilityView, pairsMissingProbeResults } from './probe/eligibility';
@@ -1338,6 +1350,70 @@ export async function drainQueue(
   }
 }
 
+/**
+ * Decide and store every enqueued pair's repetition plan from the rows the run
+ * already holds, then report which pairs still owe repetitions.
+ *
+ * The accuracy to beat per route is the route's accuracy in the live table; a
+ * route the table does not serve (or no table at all) falls back to the run's
+ * strongest other pair. A pair the decision raises is written with the
+ * repetitions it owes, and the scheduler materializes exactly those lanes.
+ */
+export async function applyRepetitionPlans(
+  env: Env,
+  runId: string,
+  run: {
+    router: AutoRouter;
+    repetitions: number;
+    minAccuracy: number;
+    measurementRevision: number;
+  }
+): Promise<Array<{ model: string; variant: string; requiredReps: number }>> {
+  const [rows, measuredReps, plans, previous] = await Promise.all([
+    getCaseResults(env.BENCH_DB, runId),
+    countMeasuredRepsByPair(env.BENCH_DB, runId),
+    listRunModelRepPlans(env.BENCH_DB, runId),
+    getLatestRoutingTable(env.BENCH_DB, run.router).catch(() => null),
+  ]);
+  const leaderAccuracy = new Map<string, number>();
+  for (const [routeKey, candidates] of Object.entries(previous?.table.routes ?? {})) {
+    const [leader] = candidates;
+    if (leader) leaderAccuracy.set(routeKey, leader.accuracy);
+  }
+  const next = planRunRepetitions({
+    rows,
+    enqueued: plans.map(plan => ({
+      model: plan.model,
+      variant: variantFromStorage(plan.variant),
+    })),
+    measuredReps,
+    context: {
+      router: run.router,
+      minAccuracy: run.minAccuracy,
+      accuracyNoiseBand: previous?.table.accuracyNoiseBand ?? 0.05,
+      boundaryTargetReps: run.repetitions,
+      routeKeys: deciderCasesForRouter(run.router, run.measurementRevision).map(benchCase =>
+        taxonomyRouteKey(benchCase)
+      ),
+      leaderAccuracy,
+    },
+    settled: new Set(plans.filter(plan => plan.state !== null).map(plan => pairKey(plan.model, plan.variant))),
+  });
+  await Promise.all(
+    next.map(plan =>
+      setRunModelRepPlan(env.BENCH_DB, {
+        runId,
+        model: plan.model,
+        variant: variantToStorage(plan.variant),
+        requiredReps: plan.requiredReps,
+        state: plan.state,
+        routes: plan.routes,
+      })
+    )
+  );
+  return pairsOwingRepetitions(next);
+}
+
 async function initializeScheduledRun(env: Env, runId: string): Promise<boolean> {
   const initialized = await env.BENCH_DB.prepare(
     'SELECT run_id FROM scheduler_runs WHERE run_id = ?'
@@ -1360,7 +1436,11 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   }
   const entries = models
     .filter(model => model.enqueued)
-    .map(model => ({ model: model.model, variant: variantFromStorage(model.variant) }));
+    .map(model => ({
+      model: model.model,
+      variant: variantFromStorage(model.variant),
+      requiredReps: model.required_reps,
+    }));
   // A run's first chunk is written only after every entry's reuse committed, so a run
   // without chunks is the only one whose reuse may be missing or partial. The copies
   // skip rows the run already holds, so repeating a failed pass is safe.
@@ -1383,10 +1463,19 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
       });
       throw error;
     }
+    // Reused rows are a pair's first repetition, so a plan decided from them can
+    // settle a pair at one repetition or raise it to the full three.
+    await applyRepetitionPlans(env, runId, run);
   }
   return scheduleRunChunks(env.BENCH_DB, {
     runId,
-    entries,
+    entries: (
+      await listRunModelsNeedingReps(env.BENCH_DB, runId)
+    ).map(row => ({
+      model: row.model,
+      variant: variantFromStorage(row.variant),
+      requiredReps: row.requiredReps,
+    })),
     repetitions: run.repetitions,
     caseIds: deciderCasesForRouter(run.router, run.measurement_revision).map(
       benchCase => benchCase.id
@@ -1927,6 +2016,52 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
   return true;
 }
 
+/**
+ * Raise a pair's repetitions once its first repetition is fully measured.
+ *
+ * Every pair is scheduled for one repetition. When the last chunk of a pair's
+ * first repetition settles, its plan is decided from the rows now in the run: a
+ * pair near a ranking boundary, or one that would take a route lead, is raised
+ * to the repetitions it owes and those lanes are materialized; a dominated pair
+ * is recorded as stopped and does no more work. Called per finished chunk, so it
+ * only reads and plans when this chunk closed its pair's repetition 0.
+ */
+async function escalateAfterFirstRepetition(
+  env: Env,
+  state: RunState,
+  claim: SchedulerClaim
+): Promise<void> {
+  if (state.repetitions <= 1 && state.repetitions < MIN_LEAD_REPS) return;
+  const laneCounts = await countCaseResultsByLane(env.BENCH_DB, claim.run_id);
+  const caseCount = expectedCaseCount('decider', state.router, state.measurementRevision);
+  const firstRep = laneCounts.filter(lane => lane.rep === 0);
+  if (!firstRep.every(lane => lane.n >= caseCount)) return;
+  const owing = await applyRepetitionPlans(env, claim.run_id, state);
+  if (owing.length === 0) return;
+  const entries = owing.map(row => ({
+    model: row.model,
+    variant: variantFromStorage(row.variant),
+    requiredReps: row.requiredReps,
+  }));
+  await scheduleRunChunks(env.BENCH_DB, {
+    runId: claim.run_id,
+    entries,
+    repetitions: state.repetitions,
+    caseIds: deciderCasesForRouter(state.router, state.measurementRevision).map(
+      benchCase => benchCase.id
+    ),
+    chunkSize: DECIDER_CHUNK_SIZE,
+    extend: true,
+  });
+  console.log(
+    JSON.stringify({
+      event: 'benchmark_repetition_plan_escalated',
+      runId: claim.run_id,
+      pairs: entries.map(entry => entry.model),
+    })
+  );
+}
+
 async function processScheduledChunk(env: Env, id: string, token: string): Promise<void> {
   const claim = await getChunk(env.BENCH_DB, id, token);
   if (!claim) return;
@@ -1949,6 +2084,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
       claim
     );
     await finishChunk(env.BENCH_DB, id, token);
+    await escalateAfterFirstRepetition(env, state, claim);
   } catch (error) {
     const outputDeadline =
       error instanceof AmbiguousBenchmarkExecutionError ? error.outputDeadline : null;
@@ -2857,10 +2993,12 @@ async function loadLaneAccounting(
     listLaneFailures(db, runId),
   ]);
   const countByLane = new Map(laneCounts.map(r => [laneKey(r.model, r.variant, r.rep), r.n]));
+  // A pair owes only the repetitions its plan raised it to (src/adaptive-repetitions.ts):
+  // a settled pair at one repetition is complete, not "missing" reps 1..target-1.
   const lanes: Lane[] = state.models
     .filter(m => m.enqueued)
     .flatMap(m =>
-      Array.from({ length: state.repetitions }, (_, rep) => ({
+      Array.from({ length: Math.max(1, m.required_reps) }, (_, rep) => ({
         model: m.model,
         variant: m.variant,
         rep,

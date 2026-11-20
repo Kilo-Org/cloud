@@ -260,6 +260,13 @@
       "when": 1795172697158,
       "tag": "0036_concurrent_decider_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1795177709546,
+      "tag": "0039_adaptive_repetitions",
+      "breakpoints": true
     }
   ]
 }

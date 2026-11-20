@@ -58,6 +58,7 @@ import {
   variantFromStorage,
   variantToStorage,
 } from './reasoning-effort';
+import type { PairRepetitionState } from './adaptive-repetitions';
 import type { OfflineSweep } from './scoreboard/schema';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
 import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
@@ -2519,4 +2520,154 @@ export async function getClassifierWinner(
     p95LatencyMs: winner.p95LatencyMs,
     generatedAt: runRow.completed_at ?? new Date().toISOString(),
   };
+}
+
+/**
+ * Repetitions each lane of a run holds rows for: the plan's `measuredReps`.
+ * One grouped read, so a decision pass costs one statement per run.
+ */
+export async function countMeasuredRepsByPair(
+  db: D1Database,
+  runId: string
+): Promise<Map<string, number>> {
+  const rows = await drizzle(db)
+    .select({
+      model: runModels.model,
+      variant: runModels.variant,
+      rep: caseResults.rep,
+    })
+    .from(caseResults)
+    .innerJoin(
+      runModels,
+      and(
+        eq(runModels.run_id, caseResults.run_id),
+        eq(runModels.model, caseResults.model),
+        eq(runModels.variant, caseResults.variant)
+      )
+    )
+    .where(eq(caseResults.run_id, runId))
+    .groupBy(caseResults.model, caseResults.variant, caseResults.rep);
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const key = JSON.stringify([row.model, row.variant]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** The rep plan's current decision, read back so a settled re-evaluation is a no-op. */
+export async function listRunModelRepPlans(
+  db: D1Database,
+  runId: string
+): Promise<
+  Array<{
+    model: string;
+    variant: string;
+    requiredReps: number;
+    state: PairRepetitionState | null;
+    routes: string[];
+  }>
+> {
+  const rows = await drizzle(db)
+    .select({
+      model: runModels.model,
+      variant: runModels.variant,
+      requiredReps: runModels.required_reps,
+      state: runModels.repetition_state,
+      routes: runModels.repetition_routes,
+    })
+    .from(runModels)
+    .where(and(eq(runModels.run_id, runId), eq(runModels.enqueued, true)));
+  return rows.map(row => ({
+    model: row.model,
+    variant: row.variant,
+    requiredReps: row.requiredReps,
+    state: row.state,
+    routes: parseRepetitionRoutes(row.routes),
+  }));
+}
+
+function parseRepetitionRoutes(raw: string | null): string[] {
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.every(entry => typeof entry === 'string') ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Write a pair's repetition plan. Only rows whose plan has not been written yet
+ * (`repetition_state IS NULL`) are raised to the target, so an escalation happens
+ * once per run and a stopped pair is never resurrected by a later pass.
+ */
+export async function setRunModelRepPlan(
+  db: D1Database,
+  plan: {
+    runId: string;
+    model: string;
+    variant: string;
+    requiredReps: number;
+    state: PairRepetitionState;
+    routes: readonly string[];
+  }
+): Promise<void> {
+  await drizzle(db)
+    .update(runModels)
+    .set({
+      required_reps: plan.requiredReps,
+      repetition_state: plan.state,
+      repetition_routes: JSON.stringify(plan.routes),
+    })
+    .where(
+      and(
+        eq(runModels.run_id, plan.runId),
+        eq(runModels.model, plan.model),
+        eq(runModels.variant, plan.variant),
+        isNull(runModels.repetition_state)
+      )
+    );
+}
+
+/** Pairs of a run that still owe repetitions: a plan, or the target, above what they hold. */
+export async function listRunModelsNeedingReps(
+  db: D1Database,
+  runId: string
+): Promise<Array<{ model: string; variant: string; requiredReps: number }>> {
+  const { results } = await db
+    .prepare(
+      `SELECT model, variant, required_reps AS requiredReps
+       FROM run_models AS m
+       WHERE m.run_id = ? AND m.enqueued = 1
+         AND (
+           SELECT COUNT(DISTINCT rep) FROM case_results AS r
+           WHERE r.run_id = m.run_id AND r.model = m.model AND r.variant = m.variant
+         ) < m.required_reps`
+    )
+    .bind(runId)
+    .all<{ model: string; variant: string; requiredReps: number }>();
+  return results;
+}
+
+/** Repetitions each pair's provenance run holds, for the published-leader guard at build. */
+export async function countRecordedRepsByRun(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<Map<string, number>> {
+  if (runIds.length === 0) return new Map();
+  const { results } = await db
+    .prepare(
+      `SELECT run_id AS runId, model, variant, COUNT(DISTINCT rep) AS reps
+       FROM case_results
+       WHERE run_id IN (SELECT value FROM json_each(?))
+       GROUP BY run_id, model, variant`
+    )
+    .bind(JSON.stringify([...runIds]))
+    .all<{ runId: string; model: string; variant: string; reps: number }>();
+  const counts = new Map<string, number>();
+  for (const row of results) {
+    counts.set(JSON.stringify([row.runId, row.model, row.variant]), row.reps);
+  }
+  return counts;
 }

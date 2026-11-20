@@ -23,6 +23,7 @@ import type {
   PolicySettingComputedMap,
   PolicySettingOverrides,
 } from '@kilocode/auto-routing-contracts';
+import type { PairRepetitionState } from './adaptive-repetitions';
 
 export type ClientProfileStatus = 'pending' | 'ready' | 'failed';
 
@@ -147,6 +148,16 @@ export const runModels = sqliteTable(
     enqueued: integer('enqueued', { mode: 'boolean' }).notNull(),
     // Legacy mirror of the platform effort key; kept for rollback/provenance.
     reasoning_effort: text('reasoning_effort'),
+    // Repetitions this pair owes in this run. Every pair starts at 1; the scheduler
+    // raises it to the run's target when the pair turns out to sit near a ranking
+    // boundary or would take a route lead (src/adaptive-repetitions.ts). The run's
+    // own `repetitions` stays the target, so reuse and engine identity are unchanged.
+    required_reps: integer('required_reps').notNull().default(1),
+    // Repetition plan after the measured repetitions, for the admin console:
+    // null until decided, then 'complete' | 'stopped' | 'escalated'.
+    repetition_state: text('repetition_state').$type<PairRepetitionState>(),
+    // Routes the decision was made on, as JSON; the console names them.
+    repetition_routes: text('repetition_routes'),
   },
   table => [primaryKey({ columns: [table.run_id, table.model, table.variant] })]
 );

@@ -963,6 +963,8 @@
       "pendingComment": "ያልተላኩ አስተያየቶች",
       "pendingComment_other": "ያልተላኩ አስተያየቶች",
       "submitCountOfTotal": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_one": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_other": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
       "submitReview": "ግምገማውን አስገባ",
       "partialPostedFresh": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
       "partialPostedFresh_one": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",

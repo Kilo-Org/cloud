@@ -963,6 +963,8 @@
       "pendingComment": "ความคิดเห็นที่รอส่ง",
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_one": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_other": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitReview": "ส่งรีวิว",
       "partialPostedFresh": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
       "partialPostedFresh_one": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",

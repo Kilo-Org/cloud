@@ -963,6 +963,8 @@
       "pendingComment": "મોકલવાની બાકી ટિપ્પણીઓ",
       "pendingComment_other": "મોકલવાની બાકી ટિપ્પણીઓ",
       "submitCountOfTotal": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
+      "submitCountOfTotal_one": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
+      "submitCountOfTotal_other": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
       "submitReview": "સમીક્ષા મોકલો",
       "partialPostedFresh": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",

@@ -963,6 +963,8 @@
       "pendingComment": "ਨਾ ਭੇਜੀਆਂ ਟਿੱਪਣੀਆਂ",
       "pendingComment_other": "ਨਾ ਭੇਜੀਆਂ ਟਿੱਪਣੀਆਂ",
       "submitCountOfTotal": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
       "submitReview": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰੋ",
       "partialPostedFresh": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
       "partialPostedFresh_one": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",

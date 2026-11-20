@@ -963,6 +963,8 @@
       "pendingComment": "fanehoan-kevitra miandry",
       "pendingComment_other": "fanehoan-kevitra miandry",
       "submitCountOfTotal": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
       "submitReview": "Alefaso ny fandinihana",
       "partialPostedFresh": "Hevitra {{displayFreshCount}} no navoaka. ",
       "partialPostedFresh_one": "Hevitra {{displayFreshCount}} no navoaka. ",

@@ -963,6 +963,8 @@
       "pendingComment": "යැවීමට ඇති අදහස්",
       "pendingComment_other": "යැවීමට ඇති අදහස්",
       "submitCountOfTotal": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ක් ඉදිරිපත් කරන්න",
+      "submitCountOfTotal_one": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ක් ඉදිරිපත් කරන්න",
+      "submitCountOfTotal_other": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ක් ඉදිරිපත් කරන්න",
       "submitReview": "සමාලෝචනය ඉදිරිපත් කරන්න",
       "partialPostedFresh": "අදහස් {{displayFreshCount}} ක් පළ කර ඇත. ",
       "partialPostedFresh_one": "අදහස් {{displayFreshCount}} ක් පළ කර ඇත. ",

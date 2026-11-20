@@ -963,6 +963,8 @@
       "pendingComment": "elküldésre váró hozzászólás",
       "pendingComment_other": "elküldésre váró hozzászólás",
       "submitCountOfTotal": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
+      "submitCountOfTotal_one": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
+      "submitCountOfTotal_other": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
       "submitReview": "Ellenőrzés elküldése",
       "partialPostedFresh": "{{displayFreshCount}} hozzászólás elküldve. ",
       "partialPostedFresh_one": "{{displayFreshCount}} hozzászólás elküldve. ",

@@ -3234,6 +3234,8 @@
       "partialPostedStale_one": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "partialPostedStale_other": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "submitCountOfTotal": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
+      "submitCountOfTotal_one": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
+      "submitCountOfTotal_other": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
       "submitReview": "Kirim tinjauan",
       "blockedRequestChanges": "Tambahkan ringkasan atau setidaknya satu komentar untuk meminta perubahan.",
       "blockedComment": "Tambahkan ringkasan atau setidaknya satu komentar untuk mengirim tinjauan berupa komentar."

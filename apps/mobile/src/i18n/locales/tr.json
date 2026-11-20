@@ -3234,6 +3234,8 @@
       "partialPostedStale_one": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "partialPostedStale_other": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_one": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_other": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
       "submitReview": "İncelemeyi gönder",
       "blockedRequestChanges": "Değişiklik istemek için bir özet veya en az bir yorum ekle.",
       "blockedComment": "İncelemeni yorum olarak göndermek için bir özet veya en az bir yorum ekle."

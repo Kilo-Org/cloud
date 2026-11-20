@@ -963,6 +963,8 @@
       "pendingComment": "amazwana angakathunyelwa",
       "pendingComment_other": "amazwana angakathunyelwa",
       "submitCountOfTotal": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
+      "submitCountOfTotal_one": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
+      "submitCountOfTotal_other": "Thumela amazwana angu-{{displayFreshCount}} kwangu-{{displayTotalCount}}",
       "submitReview": "Thumela umbiko wokuhlola",
       "partialPostedFresh": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",
       "partialPostedFresh_one": "Kuthunyelwe amazwana angu-{{displayFreshCount}}. ",

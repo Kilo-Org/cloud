@@ -3234,6 +3234,8 @@
       "partialPostedStale_one": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "partialPostedStale_other": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "submitCountOfTotal": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
+      "submitCountOfTotal_one": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
+      "submitCountOfTotal_other": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
       "submitReview": "Beoordeling verzenden",
       "blockedRequestChanges": "Voeg een samenvatting of minstens één opmerking toe om wijzigingen te vragen.",
       "blockedComment": "Voeg een samenvatting of minstens één opmerking toe om een beoordeling met opmerkingen te verzenden."

@@ -1055,6 +1055,8 @@
       "pendingComment": "pending comments",
       "pendingComment_other": "pending comments",
       "submitCountOfTotal": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
+      "submitCountOfTotal_one": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
+      "submitCountOfTotal_other": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
       "submitReview": "Submit review",
       "partialPostedFresh_one": "Posted {{displayFreshCount}} comment. ",
       "partialPostedFresh": "Posted {{displayFreshCount}} comments. ",

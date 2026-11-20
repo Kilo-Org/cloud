@@ -963,6 +963,8 @@
       "pendingComment": "չուղարկված մեկնաբանություն",
       "pendingComment_other": "չուղարկված մեկնաբանություն",
       "submitCountOfTotal": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
+      "submitCountOfTotal_one": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
+      "submitCountOfTotal_other": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
       "submitReview": "Ուղարկել վերանայումը",
       "partialPostedFresh": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
       "partialPostedFresh_one": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",

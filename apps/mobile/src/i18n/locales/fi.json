@@ -963,6 +963,8 @@
       "pendingComment": "lähettämätöntä kommenttia",
       "pendingComment_other": "lähettämätöntä kommenttia",
       "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
+      "submitCountOfTotal_one": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
+      "submitCountOfTotal_other": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
       "submitReview": "Lähetä katselmointi",
       "partialPostedFresh": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Julkaistuja kommentteja: {{displayFreshCount}}. ",

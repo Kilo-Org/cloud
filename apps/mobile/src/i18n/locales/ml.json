@@ -963,6 +963,8 @@
       "pendingComment": "സമർപ്പിക്കാത്ത അഭിപ്രായങ്ങൾ",
       "pendingComment_other": "സമർപ്പിക്കാത്ത അഭിപ്രായങ്ങൾ",
       "submitCountOfTotal": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
+      "submitCountOfTotal_one": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
+      "submitCountOfTotal_other": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
       "submitReview": "പരിശോധന സമർപ്പിക്കുക",
       "partialPostedFresh": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
       "partialPostedFresh_one": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",

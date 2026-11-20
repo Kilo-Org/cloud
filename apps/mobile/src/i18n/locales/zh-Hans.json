@@ -3234,6 +3234,8 @@
       "partialPostedStale_one": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
       "partialPostedStale_other": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
       "submitCountOfTotal": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
+      "submitCountOfTotal_one": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
+      "submitCountOfTotal_other": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
       "submitReview": "提交审查意见",
       "blockedRequestChanges": "请填写总结或添加至少一条评论，才能要求更改。",
       "blockedComment": "请填写总结或添加至少一条评论，才能提交评论类型的审查。"

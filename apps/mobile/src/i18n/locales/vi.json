@@ -3234,6 +3234,8 @@
       "partialPostedStale_one": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
       "partialPostedStale_other": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
       "submitCountOfTotal": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
+      "submitCountOfTotal_one": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
+      "submitCountOfTotal_other": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
       "submitReview": "Gửi kết quả rà soát",
       "blockedRequestChanges": "Thêm tóm tắt hoặc ít nhất một bình luận để yêu cầu thay đổi.",
       "blockedComment": "Thêm tóm tắt hoặc ít nhất một bình luận để gửi bản đánh giá dưới dạng bình luận."

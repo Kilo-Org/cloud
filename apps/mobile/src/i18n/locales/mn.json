@@ -963,6 +963,8 @@
       "pendingComment": "илгээгээгүй сэтгэгдэл",
       "pendingComment_other": "илгээгээгүй сэтгэгдэл",
       "submitCountOfTotal": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
+      "submitCountOfTotal_one": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
+      "submitCountOfTotal_other": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
       "submitReview": "Шалгалтын дүнг илгээх",
       "partialPostedFresh": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
       "partialPostedFresh_one": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",

@@ -963,6 +963,8 @@
       "pendingComment": "ósendar athugasemdir",
       "pendingComment_other": "ósendar athugasemdir",
       "submitCountOfTotal": "Senda {{displayFreshCount}} af {{displayTotalCount}} athugasemdum",
+      "submitCountOfTotal_one": "Senda {{displayFreshCount}} af {{displayTotalCount}} athugasemdum",
+      "submitCountOfTotal_other": "Senda {{displayFreshCount}} af {{displayTotalCount}} athugasemdum",
       "submitReview": "Senda rýni",
       "partialPostedFresh": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",

@@ -963,6 +963,8 @@
       "pendingComment": "komen belum dihantar",
       "pendingComment_other": "komen belum dihantar",
       "submitCountOfTotal": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
+      "submitCountOfTotal_one": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
+      "submitCountOfTotal_other": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
       "submitReview": "Hantar semakan",
       "partialPostedFresh": "{{displayFreshCount}} komen telah disiarkan. ",
       "partialPostedFresh_one": "{{displayFreshCount}} komen telah disiarkan. ",

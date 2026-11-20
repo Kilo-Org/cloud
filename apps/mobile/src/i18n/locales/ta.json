@@ -963,6 +963,8 @@
       "pendingComment": "நிலுவையிலுள்ள கருத்துகள்",
       "pendingComment_other": "நிலுவையிலுள்ள கருத்துகள்",
       "submitCountOfTotal": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
+      "submitCountOfTotal_one": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
+      "submitCountOfTotal_other": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
       "submitReview": "மதிப்பாய்வைச் சமர்ப்பிக்கவும்",
       "partialPostedFresh": "இடுகையிட்ட கருத்துகள்: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "இடுகையிட்ட கருத்துகள்: {{displayFreshCount}}. ",

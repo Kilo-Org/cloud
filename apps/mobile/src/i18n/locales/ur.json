@@ -963,6 +963,8 @@
       "pendingComment": "زیر التوا تبصرے",
       "pendingComment_other": "زیر التوا تبصرے",
       "submitCountOfTotal": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
+      "submitCountOfTotal_one": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
+      "submitCountOfTotal_other": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
       "submitReview": "جائزہ جمع کریں",
       "partialPostedFresh": "پوسٹ کیے گئے تبصروں کی تعداد: {{displayFreshCount}}۔ ",
       "partialPostedFresh_one": "پوسٹ کیے گئے تبصروں کی تعداد: {{displayFreshCount}}۔ ",

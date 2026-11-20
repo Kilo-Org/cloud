@@ -963,6 +963,8 @@
       "pendingComment": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "pendingComment_other": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "submitCountOfTotal": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
       "submitReview": "ସମୀକ୍ଷା ଦାଖଲ କରନ୍ତୁ",
       "partialPostedFresh": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
       "partialPostedFresh_one": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",

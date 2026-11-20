@@ -963,6 +963,8 @@
       "pendingComment": "kòmantè an atant",
       "pendingComment_other": "kòmantè an atant",
       "submitCountOfTotal": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
+      "submitCountOfTotal_one": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
+      "submitCountOfTotal_other": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
       "submitReview": "Soumèt revizyon an",
       "partialPostedFresh": "{{displayFreshCount}} kòmantè pibliye. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kòmantè pibliye. ",

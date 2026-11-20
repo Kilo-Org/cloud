@@ -696,7 +696,11 @@ describe('AdvancedConfigPanel', () => {
 
   it('a refused save leaves the draft intact and writes nothing else', async () => {
     const mocks = mutations();
-    mocks.create.mutateAsync.mockRejectedValue(new Error('Took too long'));
+    // The production shape of the client deadline: named like a tRPC client
+    // error but payload-less, so its text is engineering detail, not a refusal.
+    mocks.create.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Request timed out after 15000ms'), { name: 'TRPCClientError' })
+    );
     const onSelectProfile = vi.fn<(id: string | null) => void>();
     const renderer = mount({ mocks, onSelectProfile });
     fillManualConfig(renderer);
@@ -714,7 +718,29 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).toContain('API_KEY');
     expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
     // A transport failure is not a server answer, so the line stays neutral.
-    expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+    const message = saveSheetMessage(renderer);
+    expect(message).toBe(i18n.t('profiles.saveFailed'));
+    expect(message).not.toContain('Request timed out after 15000ms');
+  });
+
+  it('a lost connection reaches the person as the neutral line, not the transport text', async () => {
+    const mocks = mutations();
+    mocks.create.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('fetch failed: Unable to resolve host'), {
+        name: 'TRPCClientError',
+      })
+    );
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    expect(toast.success).not.toHaveBeenCalled();
+    const message = saveSheetMessage(renderer);
+    expect(message).toBe(i18n.t('profiles.saveFailed'));
+    expect(message).not.toContain('Unable to resolve host');
   });
 
   it('shows the server sentence when the save is refused with a tRPC conflict', async () => {

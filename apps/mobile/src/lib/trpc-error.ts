@@ -73,6 +73,24 @@ export function readTrpcErrorField(
   return undefined;
 }
 
+/**
+ * The sentence a tRPC SERVER answered with, or undefined when this error is not
+ * a server answer. Unlike `readTrpcErrorField` this never falls back to
+ * `Error.message`: the transport wrappers are named `TRPCClientError` too and
+ * carry no payload, so their text is engineering detail, not a refusal.
+ */
+export function readTrpcServerMessage(error: unknown): string | undefined {
+  const direct = DirectErrorSchema.safeParse(error);
+  if (direct.success) {
+    return direct.data.data.message;
+  }
+  const shaped = ShapedErrorSchema.safeParse(error);
+  if (shaped.success) {
+    return shaped.data.shape.data.message;
+  }
+  return undefined;
+}
+
 const TERMINAL_TRPC_CODES = [
   'BAD_REQUEST',
   'FORBIDDEN',

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isControlPlaneTimeout,
   isUsageSourceUnavailable,
+  readTrpcServerMessage,
   trpcErrorVariant,
 } from '@/lib/trpc-error';
 
@@ -92,6 +93,36 @@ describe('trpcErrorVariant', () => {
     expect(trpcErrorVariant(new Error('network down'))).toBe('server');
     expect(trpcErrorVariant(undefined)).toBe('server');
     expect(trpcErrorVariant(null)).toBe('server');
+  });
+});
+
+describe('readTrpcServerMessage', () => {
+  it('returns the message a server answer carries under data', () => {
+    expect(
+      readTrpcServerMessage({ data: { code: 'CONFLICT', message: 'Name already taken' } })
+    ).toBe('Name already taken');
+  });
+
+  it('returns the message of a shaped server answer', () => {
+    expect(
+      readTrpcServerMessage({
+        shape: { data: { code: 'CONFLICT', message: 'Name already taken' } },
+      })
+    ).toBe('Name already taken');
+  });
+
+  it('refuses the payload-less transport error named like a tRPC client error', () => {
+    expect(
+      readTrpcServerMessage(
+        Object.assign(new Error('Request timed out after 15000ms'), { name: 'TRPCClientError' })
+      )
+    ).toBeUndefined();
+  });
+
+  it('refuses a bare Error and a value that is no error at all', () => {
+    expect(readTrpcServerMessage(new Error('network down'))).toBeUndefined();
+    expect(readTrpcServerMessage(undefined)).toBeUndefined();
+    expect(readTrpcServerMessage(null)).toBeUndefined();
   });
 });
 

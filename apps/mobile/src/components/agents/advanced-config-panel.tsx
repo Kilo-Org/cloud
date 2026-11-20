@@ -27,7 +27,7 @@ import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAgentProfileList, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
-import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
+import { readTrpcServerMessage } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 /** Structural view of a list row, so both the personal and combined shapes fit. */
@@ -232,13 +232,11 @@ export function AdvancedConfigPanel({
       if (!(error instanceof Error) || error.message.trim().length === 0) {
         toast.error(t('profiles.saveFailed'));
       }
-      // Only a tRPC payload carries the server's sentence. A transport failure
-      // or timeout carries none, so the client cannot know whether the write
-      // landed: that is exactly what a null refusal reports.
-      const answered = isTrpcClientError(error)
-        ? (readTrpcErrorField(error, 'message') ?? '').trim()
-        : '';
-      return { saved: false, refusal: answered === '' ? null : answered };
+      // Only a server answer carries a sentence. The transport wrappers are named
+      // TRPCClientError too but carry no payload, so a timeout or a lost connection
+      // reaches the person as the neutral line rather than engineering text.
+      const refusal = readTrpcServerMessage(error)?.trim() ?? '';
+      return { saved: false, refusal: refusal === '' ? null : refusal };
     }
   };
 

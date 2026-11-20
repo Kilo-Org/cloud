@@ -45,10 +45,7 @@ import {
   readUnregisterAuthToken,
   unionTokens,
 } from './unregister-session';
-import {
-  canRegisterActivityTokenKind,
-  subscribePushToStartGate,
-} from './live-activity-switch';
+import { canRegisterActivityTokenKind, subscribePushToStartGate } from './live-activity-switch';
 import { type GlanceableDelivery, setGlanceableDelivery } from './sink-registry';
 
 let pushToStartToken: string | null = null;

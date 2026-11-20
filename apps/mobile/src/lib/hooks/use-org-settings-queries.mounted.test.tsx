@@ -30,7 +30,6 @@ vi.mock('sonner-native', () => ({ toast: { error: toastError, success: vi.fn() }
 // writes, so every refusal reaches a reader who can change the plan, and this
 // suite's subject is the toast copy that reader gets — the sentence that
 // names the destination, because the hooks render no billing step.
-vi.mock('@/lib/trial-refusal', () => ({ useCanManageBilling: () => true }));
 
 type MutationOptions = ReactQuery.MutationOptions<unknown, Error, unknown>;
 
@@ -135,7 +134,7 @@ describe("organization settings refusal toasts — the localization hook's contr
     rpc.guardrailsUpdate.mockRejectedValue(
       rejection('Organization trial has expired.', 'FORBIDDEN')
     );
-    const { renderer, unmount } = await mountWith(useSaveOrgGuardrails, {
+    const { renderer, unmount } = await mountWith(() => useSaveOrgGuardrails('org-1', true), {
       organizationId: 'org-1',
       enabled: false,
       detectors: {
@@ -164,7 +163,7 @@ describe("organization settings refusal toasts — the localization hook's contr
 
   it('model access toasts the generic line for an unrecognized refusal', async () => {
     rpc.updateAllowLists.mockRejectedValue(rejection('Failed to update guardrails', 'PATCH'));
-    const { renderer, unmount } = await mountWith(useSaveOrgModelAccess, {
+    const { renderer, unmount } = await mountWith(() => useSaveOrgModelAccess('org-1', true), {
       organizationId: 'org-1',
     });
     await pressFire(renderer);
@@ -177,7 +176,7 @@ describe("organization settings refusal toasts — the localization hook's contr
     rpc.updateGatewaySettings.mockRejectedValue(
       rejection('Failed to update gateway settings', 'PATCH')
     );
-    const { renderer, unmount } = await mountWith(useSaveOrgGatewaySettings, {
+    const { renderer, unmount } = await mountWith(() => useSaveOrgGatewaySettings('org-1', true), {
       organizationId: 'org-1',
     });
     await pressFire(renderer);

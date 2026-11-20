@@ -23,7 +23,6 @@ import {
 import { guardrailsIssues } from '@/lib/organization/guardrails-issues';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
-import { useCanManageBilling } from '@/lib/trial-refusal';
 
 /**
  * The guardrails form: the dirty draft, its save, and the keep-editing gate.
@@ -37,14 +36,20 @@ import { useCanManageBilling } from '@/lib/trial-refusal';
  */
 export function GuardrailsForm({
   organizationId,
+  canManageBilling = false,
   data,
-}: Readonly<{ organizationId: string; data: OrgGuardrails }>) {
+}: Readonly<{
+  organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
+  data: OrgGuardrails;
+}>) {
   const { t } = useTranslation();
-  const save = useSaveOrgGuardrails(organizationId);
-  // The refusal copy names this reader's destination: the form renders no
-  // billing step beside the failure line, so a money role reads the sentence
-  // that points at kilo.ai instead of one that claims an owner must act.
-  const canManageBilling = useCanManageBilling(organizationId);
+  // The screen resolves the reader's role once and hands it down: this form
+  // renders no billing step beside the failure line, so a money role reads the
+  // sentence that names the destination instead of one that claims an owner
+  // must act.
+  const save = useSaveOrgGuardrails(organizationId, canManageBilling);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
   const outputAvailable = data.output_available;
   const { groups } = data;

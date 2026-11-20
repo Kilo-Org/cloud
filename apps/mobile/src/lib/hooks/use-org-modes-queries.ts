@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type OrgModeConfigInput } from '@/components/organization/org-mode-form-model';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
-import { useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 /**
@@ -29,9 +28,8 @@ export function useOrgModes(organizationId: string | null) {
  * reads the refusal copy that names the destination instead of one that claims
  * an owner must act.
  */
-export function useOrgModeMutations(organizationId: string) {
+export function useOrgModeMutations(organizationId: string, canManageBilling = false) {
   const trpc = useTRPC();
-  const canManageBilling = useCanManageBilling(organizationId);
   const queryClient = useQueryClient();
   const modesFilter = trpc.organizations.modes.pathFilter();
   const scope = { id: `organization-modes:${organizationId}` };

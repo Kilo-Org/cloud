@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
-import { useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -57,9 +56,8 @@ export function useOrgGroups(organizationId: string | null, enabled: boolean) {
  * step of its own, so a money role reads the refusal copy that names the
  * destination instead of one that claims an owner must act.
  */
-export function useOrgGroupMutations(organizationId: string) {
+export function useOrgGroupMutations(organizationId: string, canManageBilling = false) {
   const trpc = useTRPC();
-  const canManageBilling = useCanManageBilling(organizationId);
   const queryClient = useQueryClient();
   const groupsFilter = trpc.organizations.groups.pathFilter();
   const scope = { id: `organization-groups:${organizationId}` };

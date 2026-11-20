@@ -3,7 +3,6 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { toast } from 'sonner-native';
 
 import { organizationErrorMessage } from '@/lib/server-error-copy';
-import { useCanManageBilling } from '@/lib/trial-refusal';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
@@ -33,9 +32,8 @@ export function useOrgGuardrails(organizationId: string | null, enabled: boolean
  * so the refusal copy itself names the destination to a money role instead of
  * claiming an owner must act.
  */
-export function useSaveOrgGuardrails(organizationId: string | null) {
+export function useSaveOrgGuardrails(organizationId: string | null, canManageBilling = false) {
   const trpc = useTRPC();
-  const canManageBilling = useCanManageBilling(organizationId);
   const queryClient = useQueryClient();
   return useMutation(
     trpc.organizations.guardrails.update.mutationOptions({
@@ -101,9 +99,8 @@ export type OrgGatewaySettings = RouterOutputs['organizations']['settings']['get
  * takes the provider allow list and the model deny list together so one write
  * cannot drop the organization's default model against the other list.
  */
-export function useSaveOrgModelAccess(organizationId: string | null) {
+export function useSaveOrgModelAccess(organizationId: string | null, canManageBilling = false) {
   const trpc = useTRPC();
-  const canManageBilling = useCanManageBilling(organizationId);
   const queryClient = useQueryClient();
   return useMutation(
     trpc.organizations.settings.updateAllowLists.mutationOptions({
@@ -133,9 +130,8 @@ export function useSaveOrgModelAccess(organizationId: string | null) {
   );
 }
 
-export function useSaveOrgGatewaySettings(organizationId: string | null) {
+export function useSaveOrgGatewaySettings(organizationId: string | null, canManageBilling = false) {
   const trpc = useTRPC();
-  const canManageBilling = useCanManageBilling(organizationId);
   const queryClient = useQueryClient();
   return useMutation(
     trpc.organizations.settings.updateGatewaySettings.mutationOptions({

@@ -53,6 +53,8 @@ type StackNavigation = {
 
 type GroupFormProps = Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   /** The group being edited, or undefined to create one. */
   group: OrgGroup | undefined;
 }>;
@@ -69,13 +71,13 @@ type GroupFormProps = Readonly<{
  * The route admits an owner or admin only — the mutations are
  * `organizationAdminMutationProcedure` — and hands this form the group it resolves.
  */
-export function GroupForm({ organizationId, group }: GroupFormProps) {
+export function GroupForm({ organizationId, canManageBilling = false, group }: GroupFormProps) {
   const router = useRouter();
   const navigation = useNavigation<StackNavigation>();
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
-  const mutations = useOrgGroupMutations(organizationId);
+  const mutations = useOrgGroupMutations(organizationId, canManageBilling);
   const orgWithMembers = useOrgWithMembers(organizationId);
   const nameRef = useRef(group?.name ?? '');
   const descriptionRef = useRef(group?.description ?? '');

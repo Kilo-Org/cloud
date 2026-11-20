@@ -32,7 +32,6 @@ vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
 // hooks reach expo-router and the organization query chain this harness does
 // not mount. The stub pins the money role: this suite's subject is the refusal
 // copy a billing role reads, and no billing step is rendered here.
-vi.mock('@/lib/trial-refusal', () => ({ useCanManageBilling: () => true }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -82,6 +81,7 @@ function element(
   return createElement(ModelAccessForm, {
     organizationId: 'org-1',
     canEdit: true,
+    canManageBilling: true,
     models: [],
     catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
     catalogUnavailable: overrides.catalogUnavailable === true,

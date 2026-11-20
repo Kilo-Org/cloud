@@ -389,6 +389,7 @@ export const organizationAdminRouter = createTRPCRouter({
                     anthropic_user_profile_id: parentAnthropicUserProfileId,
                     require_seats: false,
                     free_trial_end_at: null,
+                    trial_granted: false,
                     settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
                   }
                 : { parent_organization_id: null, anthropic_user_profile_id: null }

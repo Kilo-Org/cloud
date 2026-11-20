@@ -1565,6 +1565,10 @@ describe('organization admin router', () => {
       );
 
       try {
+        await db
+          .update(organizations)
+          .set({ trial_granted: true, require_seats: true })
+          .where(eq(organizations.id, childOrganization.id));
         const caller = await createCallerForUser(adminUser.id);
         await caller.organizations.admin.setParent({
           organizationId: childOrganization.id,
@@ -1578,6 +1582,7 @@ describe('organization admin router', () => {
           .select({
             require_seats: organizations.require_seats,
             free_trial_end_at: organizations.free_trial_end_at,
+            trial_granted: organizations.trial_granted,
             settings: organizations.settings,
           })
           .from(organizations)
@@ -1589,6 +1594,7 @@ describe('organization admin router', () => {
         });
         expect(updatedChildOrganization.require_seats).toBe(false);
         expect(updatedChildOrganization.free_trial_end_at).toBeNull();
+        expect(updatedChildOrganization.trial_granted).toBe(false);
         expect(updatedChildOrganization.settings.suppress_trial_messaging).toBe(true);
       } finally {
         await db

@@ -95,6 +95,11 @@ const RUN_MODEL_INSERT_BATCH_SIZE = 18;
 // ceiling — the same ceiling that once stranded every pending profile in prod.
 const PROFILE_ENTRY_FILTER_BATCH_SIZE = 30;
 
+// Statements that filter on a page of run ids bind one variable per id plus the
+// fixed clause. `GET /admin/runs` caps a page at 100 ids, so 90 leaves room for
+// that clause inside D1's 100-variable ceiling.
+const RUN_ID_FILTER_BATCH_SIZE = 90;
+
 /**
  * Rows per config INSERT. D1 allows 100 bound variables per statement and the
  * widest of these tables is 4 columns, so 20 rows always fits. The decider
@@ -1137,24 +1142,36 @@ export async function listRunTotals(
 }
 
 /**
- * Enqueued model ids per run for the runs among `runIds`, in one statement.
- * A skipped (not enqueued) model is absent: it was measured by an earlier run.
+ * Enqueued model ids per run for the runs among `runIds`, in one statement per
+ * batch of ids. A skipped (not enqueued) model is absent: it was measured by an
+ * earlier run. A model enqueued at two reasoning variants is one id, because the
+ * list answers "which models did this run measure", not "how many pairs".
  */
 export async function listRunModelIds(
   db: D1Database,
   runIds: readonly string[]
 ): Promise<Map<string, string[]>> {
   if (runIds.length === 0) return new Map();
-  const rows = await drizzle(db)
-    .select({ runId: runModels.run_id, model: runModels.model })
-    .from(runModels)
-    .where(and(inArray(runModels.run_id, [...runIds]), eq(runModels.enqueued, true)));
+  const orm = drizzle(db);
   const models = new Map<string, string[]>();
-  for (const row of rows) {
-    const list = models.get(row.runId);
-    if (list) list.push(row.model);
-    else models.set(row.runId, [row.model]);
+  for (let i = 0; i < runIds.length; i += RUN_ID_FILTER_BATCH_SIZE) {
+    const rows = await orm
+      .selectDistinct({ runId: runModels.run_id, model: runModels.model })
+      .from(runModels)
+      .where(
+        and(
+          inArray(runModels.run_id, runIds.slice(i, i + RUN_ID_FILTER_BATCH_SIZE)),
+          eq(runModels.enqueued, true)
+        )
+      );
+    for (const row of rows) {
+      const list = models.get(row.runId);
+      if (list) list.push(row.model);
+      else models.set(row.runId, [row.model]);
+    }
   }
+  // DISTINCT removes the duplicates of one run's variants; a run id belongs to
+  // exactly one batch, so no list is assembled twice.
   return models;
 }
 

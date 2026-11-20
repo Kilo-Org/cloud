@@ -17,6 +17,7 @@ import {
 } from './db';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { variantFromStorage } from './reasoning-effort';
+import { loadRunModelTotals } from './run-totals';
 
 let sqlite: DatabaseSync;
 let db: D1Database;
@@ -156,7 +157,7 @@ describe('admin run totals', () => {
     expect(models.has('run-b')).toBe(false);
   });
 
-  it('reports per-pair accuracy and cost means from real case rows', async () => {
+  it('sums the per-pair score, cost and route counts from real case rows', async () => {
     insertRun('run-a');
     insertCase('run-a', {
       model: 'vendor/alpha',
@@ -185,7 +186,7 @@ describe('admin run totals', () => {
 
     const totals = await listRunModelTotals(db, 'run-a');
 
-    // Ordered by case count then model here; the caller sorts for display.
+    // No ORDER BY at the SQL level: `loadRunModelTotals` is what sorts for display.
     const alpha = totals.find(t => t.model === 'vendor/alpha');
     expect(alpha).toMatchObject({
       variant: 'high',
@@ -197,5 +198,137 @@ describe('admin run totals', () => {
     expect(variantFromStorage(alpha?.variant ?? '')).toBe('high');
     const beta = totals.find(t => t.model === 'vendor/beta');
     expect(beta).toMatchObject({ costedCases: 0, costSum: null, cases: 1 });
+  });
+
+  it('lists one id for a model enqueued at two reasoning variants', async () => {
+    insertRun('run-a');
+    const insertModel = sqlite.prepare(
+      `INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, ?, 1)`
+    );
+    insertModel.run('run-a', 'vendor/alpha', '');
+    insertModel.run('run-a', 'vendor/alpha', 'high');
+    insertModel.run('run-a', 'vendor/beta', '');
+
+    const models = await listRunModelIds(db, ['run-a']);
+
+    // The list answers "which models did this run measure", so a pair measured
+    // at two variants is one id rather than the same id twice.
+    expect(models.get('run-a')).toEqual(['vendor/alpha', 'vendor/beta']);
+  });
+
+  it('lists a full page of 100 runs without exceeding D1’s variable ceiling', async () => {
+    const runIds = Array.from({ length: 100 }, (_, i) => `run-${String(i).padStart(3, '0')}`);
+    for (const id of runIds) insertRun(id);
+    const insertModel = sqlite.prepare(
+      `INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)`
+    );
+    insertModel.run(runIds[0], 'vendor/first');
+    insertModel.run(runIds[99], 'vendor/last');
+
+    const models = await listRunModelIds(db, runIds);
+
+    // A `?limit=100` page binds one variable per run id plus the enqueued flag.
+    // Unchunked that is 101 variables, which D1 rejects outright, so the whole
+    // page would silently lose its model lists.
+    expect(models.get(runIds[0])).toEqual(['vendor/first']);
+    expect(models.get(runIds[99])).toEqual(['vendor/last']);
+    expect(models.size).toBe(2);
+  });
+
+  it('rounds the means and orders the pairs as the console displays them', async () => {
+    insertRun('run-a');
+    // alpha: 2 of 3 cases correct, 2 of 3 costed, 1 error, 1 timeout, 1 of 2 routed.
+    insertCase('run-a', {
+      model: 'vendor/alpha',
+      variant: 'high',
+      caseId: 'a1',
+      score: 1,
+      cost: 0.02,
+      routeHit: 1,
+    });
+    insertCase('run-a', {
+      model: 'vendor/alpha',
+      variant: 'high',
+      caseId: 'a2',
+      score: 1,
+      cost: 0.04,
+      error: 'provider 503',
+      timedOut: 1,
+      routeHit: 0,
+    });
+    insertCase('run-a', {
+      model: 'vendor/alpha',
+      variant: 'high',
+      caseId: 'a3',
+      score: 0,
+      cost: null,
+    });
+    // beta is perfectly accurate, so it reads first whatever it costs.
+    insertCase('run-a', { model: 'vendor/beta', caseId: 'b1', score: 1, cost: 0.5 });
+    // delta and alpha tie on accuracy; delta is cheaper per case, so it wins.
+    insertCase('run-a', {
+      model: 'vendor/delta',
+      caseId: 'd1',
+      score: 1,
+      cost: 0.01,
+    });
+    insertCase('run-a', {
+      model: 'vendor/delta',
+      caseId: 'd2',
+      score: 1,
+      cost: 0.01,
+    });
+    insertCase('run-a', {
+      model: 'vendor/delta',
+      caseId: 'd3',
+      score: 0,
+      cost: 0.01,
+    });
+    // omega ties them on accuracy but reported no cost, so it reads last.
+    insertCase('run-a', {
+      model: 'vendor/omega',
+      caseId: 'o1',
+      score: 1,
+      cost: null,
+    });
+    insertCase('run-a', {
+      model: 'vendor/omega',
+      caseId: 'o2',
+      score: 1,
+      cost: null,
+    });
+    insertCase('run-a', {
+      model: 'vendor/omega',
+      caseId: 'o3',
+      score: 0,
+      cost: null,
+    });
+
+    const totals = await loadRunModelTotals(db, 'run-a');
+
+    expect(totals.map(t => t.model)).toEqual([
+      'vendor/beta',
+      'vendor/delta',
+      'vendor/alpha',
+      'vendor/omega',
+    ]);
+    const alpha = totals.find(t => t.model === 'vendor/alpha');
+    expect(alpha).toMatchObject({
+      // 2/3 to 4 dp, the same rounding the persisted route summaries carry.
+      accuracy: 0.6667,
+      variant: 'high',
+      // 0.06 over the two costed cases, rounded to 8 dp; the null-cost case is
+      // unknown, not free, so it is outside the mean.
+      costPerCaseUsd: 0.03,
+      totalCostUsd: 0.06,
+      cases: 3,
+      errors: 1,
+      timeouts: 1,
+      // One of the two cases that recorded a route hit.
+      routeAccuracy: 0.5,
+    });
+    const omega = totals.find(t => t.model === 'vendor/omega');
+    // A pair that reported no cost stays null rather than a made-up 0.
+    expect(omega).toMatchObject({ variant: null, costPerCaseUsd: null, totalCostUsd: null });
   });
 });

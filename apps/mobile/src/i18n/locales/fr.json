@@ -3498,7 +3498,7 @@
       "planStatusLapsed": " · Expiré",
       "planEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif.",
       "manageBilling": "Gérer la facturation",
-      "renamePlaceholder": "Nom de l'organisation",
+      "renamePlaceholder": "Saisissez un nom d'organisation",
       "renameTitle": "Renommer l'organisation"
     },
     "inviteMember": {

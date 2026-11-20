@@ -3617,7 +3617,7 @@
     },
     "hub": {
       "renameTitle": "Nimeä organisaatio uudelleen",
-      "renamePlaceholder": "Organisaation nimi",
+      "renamePlaceholder": "Anna organisaation nimi",
       "balance": "Saldo",
       "plan": "Paketti",
       "planTeams": "Teams",

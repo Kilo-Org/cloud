@@ -3617,7 +3617,7 @@
     },
     "hub": {
       "renameTitle": "Szervezet átnevezése",
-      "renamePlaceholder": "Szervezet neve",
+      "renamePlaceholder": "Add meg a szervezet nevét",
       "balance": "Egyenleg",
       "plan": "Csomag",
       "planTeams": "Teams",

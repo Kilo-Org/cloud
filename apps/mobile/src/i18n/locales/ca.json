@@ -3677,7 +3677,7 @@
     },
     "hub": {
       "renameTitle": "Reanomena l'organització",
-      "renamePlaceholder": "Nom de l'organització",
+      "renamePlaceholder": "Introdueix un nom per a l'organització",
       "balance": "Saldo",
       "plan": "Pla",
       "planTeams": "Teams",

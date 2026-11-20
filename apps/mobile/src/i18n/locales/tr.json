@@ -3439,7 +3439,7 @@
       "planStatusLapsed": " · Sona erdi",
       "planEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok.",
       "manageBilling": "Faturalandırmayı yönet",
-      "renamePlaceholder": "Kuruluş adı",
+      "renamePlaceholder": "Bir kuruluş adı girin",
       "renameTitle": "Kuruluşu yeniden adlandır"
     },
     "inviteMember": {

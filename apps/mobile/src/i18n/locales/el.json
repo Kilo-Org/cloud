@@ -3617,7 +3617,7 @@
     },
     "hub": {
       "renameTitle": "Μετονομασία οργανισμού",
-      "renamePlaceholder": "Όνομα οργανισμού",
+      "renamePlaceholder": "Εισαγάγετε όνομα οργανισμού",
       "balance": "Υπόλοιπο",
       "plan": "Πλάνο",
       "planTeams": "Teams",

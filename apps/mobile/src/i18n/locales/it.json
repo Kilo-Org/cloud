@@ -3498,7 +3498,7 @@
       "planStatusLapsed": " · Terminato",
       "planEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo.",
       "manageBilling": "Gestisci la fatturazione",
-      "renamePlaceholder": "Nome dell'organizzazione",
+      "renamePlaceholder": "Inserisci un nome per l'organizzazione",
       "renameTitle": "Rinomina l'organizzazione"
     },
     "inviteMember": {

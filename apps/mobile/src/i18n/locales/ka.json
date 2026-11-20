@@ -3617,7 +3617,7 @@
     },
     "hub": {
       "renameTitle": "ორგანიზაციის სახელის შეცვლა",
-      "renamePlaceholder": "ორგანიზაციის სახელი",
+      "renamePlaceholder": "შეიყვანეთ ორგანიზაციის სახელი",
       "balance": "ბალანსი",
       "plan": "გეგმა",
       "planTeams": "Teams",

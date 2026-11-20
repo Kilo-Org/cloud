@@ -3737,7 +3737,7 @@
     },
     "hub": {
       "renameTitle": "Pervadinti organizaciją",
-      "renamePlaceholder": "Organizacijos pavadinimas",
+      "renamePlaceholder": "Įveskite organizacijos pavadinimą",
       "balance": "Likutis",
       "plan": "Planas",
       "planTeams": "Teams",

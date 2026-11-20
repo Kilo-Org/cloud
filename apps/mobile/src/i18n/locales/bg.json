@@ -3617,7 +3617,7 @@
     },
     "hub": {
       "renameTitle": "Преименувай организацията",
-      "renamePlaceholder": "Име на организацията",
+      "renamePlaceholder": "Въведете име на организацията",
       "balance": "Наличност",
       "plan": "План",
       "planTeams": "Teams",

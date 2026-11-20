@@ -3737,7 +3737,7 @@
     },
     "hub": {
       "renameTitle": "Přejmenovat organizaci",
-      "renamePlaceholder": "Název organizace",
+      "renamePlaceholder": "Zadejte název organizace",
       "balance": "Zůstatek",
       "plan": "Plán",
       "planTeams": "Teams",

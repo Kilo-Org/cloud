@@ -3439,7 +3439,7 @@
       "planStatusLapsed": " · Beendet",
       "planEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan.",
       "manageBilling": "Abrechnung verwalten",
-      "renamePlaceholder": "Name der Organisation",
+      "renamePlaceholder": "Gib einen Namen für die Organisation ein",
       "renameTitle": "Organisation umbenennen"
     },
     "inviteMember": {

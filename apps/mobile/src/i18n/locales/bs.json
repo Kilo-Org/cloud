@@ -3677,7 +3677,7 @@
     },
     "hub": {
       "renameTitle": "Preimenuj organizaciju",
-      "renamePlaceholder": "Naziv organizacije",
+      "renamePlaceholder": "Unesite naziv organizacije",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

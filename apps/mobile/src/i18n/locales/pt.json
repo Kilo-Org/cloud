@@ -3737,7 +3737,7 @@
     },
     "hub": {
       "renameTitle": "Renomear organização",
-      "renamePlaceholder": "Nome da organização",
+      "renamePlaceholder": "Introduza um nome para a organização",
       "balance": "Saldo",
       "plan": "Plano",
       "planTeams": "Teams",

@@ -3465,6 +3465,8 @@ describe('agent browser calls', () => {
       readonly revokeAfterOpen?: boolean;
       /** The opened tab reports an empty url, as Chrome does without the `tabs` permission. */
       readonly unreadableTabUrl?: boolean;
+      /** No file is in the browser's download history, so the guard's search cannot claim one. */
+      readonly noSeededFile?: boolean;
     } = {}
   ) => {
     const downloads = createFakeDownloads();
@@ -3566,8 +3568,11 @@ describe('agent browser calls', () => {
       tabsApi,
     });
 
-    // The file the approved repeat keeps, as the browser reports it once it is written.
-    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+    // The file the approved repeat keeps, as the browser reports it once it is written. A case about the answer's
+    // Text rather than the download leaves the history empty, so the guard's search cannot claim a file.
+    if (options.noSeededFile !== true) {
+      downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+    }
 
     /**
      * A navigate the test answers by hand, so two calls can be interleaved on purpose. One waiter per navigate, in
@@ -4315,7 +4320,11 @@ describe('agent browser calls', () => {
   });
 
   it('falls back to the url the step opened when the tab reports an empty one under its dialog', async () => {
-    const fixture = await tabsNewFixture({ plain: true, unreadableTabUrl: true });
+    const fixture = await tabsNewFixture({
+      noSeededFile: true,
+      plain: true,
+      unreadableTabUrl: true,
+    });
 
     fixture.cdp.setHandlers({
       'Page.navigate': () => {
@@ -5871,6 +5880,8 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
         arguments: { target: '#save' },
         caller: panel(),
         tabId: TAB_ID,
+        // The agent session holds this tab, so the panel's call is a take-over first.
+        takeOver: true,
         toolName: 'kilo_browser_click',
       })
     ).resolves.toStrictEqual({

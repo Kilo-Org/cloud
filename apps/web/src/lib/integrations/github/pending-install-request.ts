@@ -96,9 +96,7 @@ export async function recordGitHubInstallRequest(params: {
   });
 
   const requests = await fetchGitHubInstallationRequests(githubAppType);
-  const requesterRequests = requests.filter(
-    request => request.requesterId === githubRequester.id
-  );
+  const requesterRequests = requests.filter(request => request.requesterId === githubRequester.id);
 
   const recordedRows = await db
     .select({ accountId: platform_integrations.platform_account_id })

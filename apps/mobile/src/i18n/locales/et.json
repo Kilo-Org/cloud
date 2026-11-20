@@ -19,7 +19,9 @@
     "presenceStatus": "Hostid: {{connection}}",
     "commandStatus": "Käsu edastamine: {{status}}",
     "delivered": "Edastatud",
-    "expired": "Aegunud"
+    "expired": "Aegunud",
+    "recoveryGaps_one": "{{displayCount}} osa sellest transkriptsioonist on puudu.",
+    "recoveryGaps_other": "{{displayCount}} osa sellest transkriptsioonist on puudu."
   },
   "common": {
     "manageOnWeb": "Halda veebis",
@@ -2788,6 +2790,8 @@
     "modelPicker": {
       "title": "Vali mudel",
       "noModelsDescription": "Valimiseks pole ühtegi mudelit saadaval.",
+      "allUnavailableTitle": "Ühtegi mudelit ei saa kasutada",
+      "allUnavailableDescription": "Lisa teenusepakkuja võti ja proovi seejärel uuesti.",
       "favorites": "Lemmikud"
     },
     "modelSelector": {
@@ -4987,6 +4991,7 @@
     "providersDescription": "Lülita teenusepakkuja välja, et Kilo ei suunaks selle organisatsiooni päringuid sellele.",
     "providersNeedCatalog": "Teenusepakkujate lülitid on kirjutuskaitstud, kuni kogu mudelikataloog on laaditud. Nende muutmiseks puuduta ülal nuppu Proovi uuesti.",
     "providersEmpty": "Sellele otsingule ei vasta ükski teenusepakkuja.",
+    "providersNone": "Sellele organisatsioonile ei ole ühtegi teenusepakkujat saadaval.",
     "allowAllShown": "Luba kõik kuvatud",
     "denyAllShown": "Keela kõik kuvatud",
     "gatewaysDescription": "Kilo suunab mudelipäringud läbi Vercel AI Gateway või OpenRouteri. Kui lüüs on välja lülitatud, need päringud nurjuvad.",

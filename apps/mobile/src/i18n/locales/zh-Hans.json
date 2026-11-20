@@ -19,7 +19,9 @@
     "presenceStatus": "主机：{{connection}}",
     "commandStatus": "命令送达状态：{{status}}",
     "delivered": "已送达",
-    "expired": "已过期"
+    "expired": "已过期",
+    "recoveryGaps_one": "此对话记录缺少 {{displayCount}} 个部分。",
+    "recoveryGaps_other": "此对话记录缺少 {{displayCount}} 个部分。"
   },
   "common": {
     "manageOnWeb": "在网页上管理",
@@ -2231,6 +2233,8 @@
     "modelPicker": {
       "title": "选择模型",
       "noModelsDescription": "没有可选择的模型。",
+      "allUnavailableTitle": "无法使用任何模型",
+      "allUnavailableDescription": "添加提供商密钥，然后重试。",
       "favorites": "收藏"
     },
     "modelSelector": {
@@ -4987,6 +4991,7 @@
     "providersDescription": "关闭某个提供商即可阻止 Kilo 为此组织路由到该提供商。",
     "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
     "providersEmpty": "没有匹配此搜索的提供商。",
+    "providersNone": "此组织没有可用的提供商。",
     "allowAllShown": "允许所有显示的项",
     "denyAllShown": "拒绝所有显示的项",
     "gatewaysDescription": "Kilo 通过 Vercel AI Gateway 或 OpenRouter 路由模型请求。已禁用的网关会使这些请求失败。",

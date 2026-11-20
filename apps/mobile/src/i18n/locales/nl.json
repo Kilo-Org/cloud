@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Opdrachtbezorging: {{status}}",
     "delivered": "Bezorgd",
-    "expired": "Verlopen"
+    "expired": "Verlopen",
+    "recoveryGaps_one": "{{displayCount}} deel van dit transcript ontbreekt.",
+    "recoveryGaps_other": "{{displayCount}} delen van dit transcript ontbreken."
   },
   "common": {
     "manageOnWeb": "Beheren op het web",
@@ -2231,7 +2233,9 @@
     "modelPicker": {
       "title": "Model selecteren",
       "favorites": "Favorieten",
-      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren."
+      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren.",
+      "allUnavailableTitle": "Geen enkel model kan worden gebruikt",
+      "allUnavailableDescription": "Voeg een providersleutel toe en probeer het opnieuw."
     },
     "modelSelector": {
       "provider": "Aanbieder {{id}}",
@@ -4987,6 +4991,7 @@
     "providersDescription": "Schakel een aanbieder uit om te voorkomen dat Kilo voor deze organisatie naar die aanbieder routeert.",
     "providersNeedCatalog": "De schakelaars voor aanbieders blijven alleen-lezen totdat de volledige modelcatalogus is geladen. Tik hierboven op Opnieuw proberen om ze te bewerken.",
     "providersEmpty": "Geen aanbieders komen overeen met deze zoekopdracht.",
+    "providersNone": "Er zijn geen aanbieders beschikbaar voor deze organisatie.",
     "allowAllShown": "Alle getoonde toestaan",
     "denyAllShown": "Alle getoonde weigeren",
     "gatewaysDescription": "Kilo routeert modelverzoeken via Vercel AI Gateway of OpenRouter. Een uitgeschakelde toegangspoort laat die verzoeken mislukken.",

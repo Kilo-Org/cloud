@@ -19,7 +19,10 @@
     "presenceStatus": "Hôtes : {{connection}}",
     "commandStatus": "Transmission de la commande : {{status}}",
     "delivered": "Transmise",
-    "expired": "Expirée"
+    "expired": "Expirée",
+    "recoveryGaps_one": "Il manque {{displayCount}} partie de cette transcription.",
+    "recoveryGaps_many": "Il manque {{displayCount}} parties de cette transcription.",
+    "recoveryGaps_other": "Il manque {{displayCount}} parties de cette transcription."
   },
   "common": {
     "manageOnWeb": "Gérer sur le web",
@@ -2153,6 +2156,8 @@
     "modelPicker": {
       "title": "Choix du modèle",
       "noModelsDescription": "Aucun modèle n'est disponible.",
+      "allUnavailableTitle": "Aucun modèle ne peut être utilisé",
+      "allUnavailableDescription": "Ajoutez une clé de fournisseur et réessayez.",
       "favorites": "Favoris"
     },
     "modelSelector": {
@@ -5063,6 +5068,7 @@
     "providersDescription": "Désactivez un fournisseur pour que Kilo cesse de lui acheminer les requêtes de cette organisation.",
     "providersNeedCatalog": "Les interrupteurs des fournisseurs restent en lecture seule tant que le catalogue complet des modèles n'est pas chargé. Appuyez sur Réessayer ci-dessus pour les modifier.",
     "providersEmpty": "Aucun fournisseur ne correspond à cette recherche.",
+    "providersNone": "Aucun fournisseur n'est disponible pour cette organisation.",
     "allowAllShown": "Autoriser tous ceux affichés",
     "denyAllShown": "Refuser tous ceux affichés",
     "gatewaysDescription": "Kilo achemine les requêtes de modèles via Vercel AI Gateway ou OpenRouter. Une passerelle désactivée fait échouer ces requêtes.",

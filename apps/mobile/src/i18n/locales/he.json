@@ -7,7 +7,7 @@
     "directory": "תיקיית עבודה",
     "createSession": "יצירת סשן בפרוטוקול נייטיב",
     "queueIfOffline": "הוספת הפרומפט לתור אם המארח לא מחובר",
-    "prompt": "פרומפט או /command",
+    "prompt": "פרומפט או \u2066/command\u2069",
     "localClear": "ניקוי התצוגה המקומית",
     "abort": "עצירת הסבב",
     "failed": "פעולת השליטה מרחוק בפרוטוקול נייטיב נכשלה",
@@ -19,7 +19,10 @@
     "presenceStatus": "מארחים: {{connection}}",
     "commandStatus": "מסירת הפקודה: {{status}}",
     "delivered": "נמסרה",
-    "expired": "פג התוקף"
+    "expired": "פג התוקף",
+    "recoveryGaps_one": "חסר חלק {{displayCount}} מתמלול זה.",
+    "recoveryGaps_two": "חסרים {{displayCount}} חלקים מתמלול זה.",
+    "recoveryGaps_other": "חסרים {{displayCount}} חלקים מתמלול זה."
   },
   "common": {
     "manageOnWeb": "ניהול באתר",
@@ -2257,6 +2260,8 @@
     "modelPicker": {
       "title": "בחירת מודל",
       "noModelsDescription": "אין מודלים זמינים לבחירה.",
+      "allUnavailableTitle": "לא ניתן להשתמש באף מודל",
+      "allUnavailableDescription": "הוסף מפתח ספק ונסה שוב.",
       "favorites": "מועדפים"
     },
     "modelSelector": {
@@ -5063,6 +5068,7 @@
     "providersDescription": "כבה ספק כדי למנוע מ-Kilo לנתב אליו בקשות עבור הארגון הזה.",
     "providersNeedCatalog": "מתגי הספקים יישארו לקריאה בלבד עד שקטלוג המודלים המלא ייטען. לחץ על ניסיון חוזר למעלה כדי לערוך אותם.",
     "providersEmpty": "אין ספקים שמתאימים לחיפוש הזה.",
+    "providersNone": "אין ספקים זמינים עבור הארגון הזה.",
     "allowAllShown": "אשר את כל המוצגים",
     "denyAllShown": "חסום את כל המוצגים",
     "gatewaysDescription": "Kilo מנתב בקשות מודל דרך Vercel AI Gateway או OpenRouter. שער מושבת מכשיל את הבקשות האלה.",

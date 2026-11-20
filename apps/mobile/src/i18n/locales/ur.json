@@ -7,7 +7,7 @@
     "directory": "ورکنگ ڈائریکٹری",
     "createSession": "نیٹو سیشن بنائیں",
     "queueIfOffline": "ہوسٹ آف لائن ہو تو پرامپٹ قطار میں رکھیں",
-    "prompt": "پرامپٹ یا /command",
+    "prompt": "پرامپٹ یا \u2066/command\u2069",
     "localClear": "مقامی منظر صاف کریں",
     "abort": "ٹرن منسوخ کریں",
     "failed": "نیٹو ریموٹ کارروائی ناکام ہو گئی",
@@ -19,7 +19,9 @@
     "presenceStatus": "ہوسٹس: {{connection}}",
     "commandStatus": "کمانڈ کی ترسیل: {{status}}",
     "delivered": "پہنچا دیا گیا",
-    "expired": "میعاد ختم ہو گئی"
+    "expired": "میعاد ختم ہو گئی",
+    "recoveryGaps_one": "اس ٹرانسکرپٹ کا {{displayCount}} حصہ غائب ہے۔",
+    "recoveryGaps_other": "اس ٹرانسکرپٹ کے {{displayCount}} حصے غائب ہیں۔"
   },
   "common": {
     "manageOnWeb": "ویب پر منظم کریں",
@@ -2788,6 +2790,8 @@
     "modelPicker": {
       "title": "ماڈل منتخب کریں",
       "noModelsDescription": "منتخب کرنے کے لیے کوئی ماڈل دستیاب نہیں ہے۔",
+      "allUnavailableTitle": "کوئی بھی ماڈل استعمال نہیں کیا جا سکتا",
+      "allUnavailableDescription": "فراہم کنندہ کی کلید شامل کریں اور دوبارہ کوشش کریں۔",
       "favorites": "پسندیدہ"
     },
     "modelSelector": {
@@ -4987,6 +4991,7 @@
     "providersDescription": "پرووائیڈر کو بند کریں تاکہ Kilo اس تنظیم کے لیے اس کی طرف روٹنگ بند کر دے۔",
     "providersNeedCatalog": "مکمل ماڈل کیٹلاگ لوڈ ہونے تک پرووائیڈر سوئچز صرف پڑھنے کے لیے رہیں گے۔ انہیں تبدیل کرنے کے لیے اوپر دوبارہ کوشش کریں پر ٹیپ کریں۔",
     "providersEmpty": "اس تلاش سے کوئی پرووائیڈر مطابقت نہیں رکھتا۔",
+    "providersNone": "اس تنظیم کے لیے کوئی پرووائیڈر دستیاب نہیں ہے۔",
     "allowAllShown": "دکھائے گئے سب کی اجازت دیں",
     "denyAllShown": "دکھائے گئے سب کو مسترد کریں",
     "gatewaysDescription": "Kilo ماڈل کی درخواستیں Vercel AI Gateway یا OpenRouter کے ذریعے روٹ کرتا ہے۔ غیر فعال گیٹ وے ان درخواستوں کو ناکام کر دیتا ہے۔",

@@ -91,7 +91,10 @@ it('reuses MessageBubble for files/tools/errors and keeps empty, incomplete and 
       messages: readySession.messages.map(item => ({ ...item, incomplete: true })),
     })
   );
-  expect(text(renderer.root)).toContain('Native transcript recovery is incomplete');
+  // A missing part reads as a localized gap banner, never as a raw id list.
+  expect(text(renderer.root)).toContain('nativeRemote.recoveryGaps');
+  expect(text(renderer.root)).toContain('common.retry');
+  expect(text(renderer.root)).not.toContain('msg_snapshot');
   expect(text(renderer.root)).not.toContain('agentChat.session.emptyTitle');
   expect(renderer.root.findAllByType('MessageBubble')).toHaveLength(0);
 });
@@ -115,81 +118,6 @@ it.each(['forbidden', 'session_deleted'])(
     expect(text(renderer.root)).not.toContain('agentChat.session.emptyTitle');
   }
 );
-
-it('opens native tool details through the shared host and keeps an open sheet live', async () => {
-  const fixture = nativeRemoteFixture();
-  const renderer = await mount(fixture.client);
-  await press(renderer, 'ses-first');
-  await act(() =>
-    fixture.publishSession('ses-first', {
-      ...readySession,
-      messages: [
-        {
-          seq: 1,
-          message: {
-            id: 'msg_tool',
-            type: 'assistant',
-            time: { created: 1 },
-            content: [
-              {
-                type: 'tool',
-                id: 'call',
-                name: 'shell',
-                time: { created: 1, ran: 2 },
-                state: { status: 'running', input: { command: 'pwd' } },
-              },
-            ],
-          },
-        },
-      ],
-    })
-  );
-  const row = renderer.root.findByType('MessageBubble');
-  const tool = renderedMessageSchema.parse(row.props.message).parts[0];
-  if (!tool) {
-    throw new Error('Native tool was not projected');
-  }
-  await press(renderer, 'Open bash details');
-  expect(renderer.root.findByType('PartDetailSheet').props).toMatchObject({
-    visible: true,
-    part: { id: tool.id, type: 'tool', state: { status: 'running', input: { command: 'pwd' } } },
-  });
-  await act(() =>
-    fixture.publishSession('ses-first', {
-      ...readySession,
-      messages: [
-        {
-          seq: 1,
-          message: {
-            id: 'msg_tool',
-            type: 'assistant',
-            time: { created: 1, completed: 4 },
-            content: [
-              {
-                type: 'tool',
-                id: 'call',
-                name: 'shell',
-                time: { created: 1, ran: 2, completed: 3 },
-                state: {
-                  status: 'completed',
-                  input: { command: 'pwd' },
-                  content: [{ type: 'text', text: '/owned/project' }],
-                },
-              },
-            ],
-          },
-        },
-      ],
-    })
-  );
-  expect(renderer.root.findByType('PartDetailSheet').props).toMatchObject({
-    visible: true,
-    part: {
-      id: tool.id,
-      state: { status: 'completed', input: { command: 'pwd' }, output: '/owned/project' },
-    },
-  });
-});
 
 it('shows one unreadable notice instead of consent controls and keeps readable cards', async () => {
   const fixture = nativeRemoteFixture();

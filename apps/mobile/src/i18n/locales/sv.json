@@ -19,7 +19,9 @@
     "presenceStatus": "Värdar: {{connection}}",
     "commandStatus": "Kommandoleverans: {{status}}",
     "delivered": "Levererat",
-    "expired": "Utgånget"
+    "expired": "Utgånget",
+    "recoveryGaps_one": "{{displayCount}} del av den här transkriptionen saknas.",
+    "recoveryGaps_other": "{{displayCount}} delar av den här transkriptionen saknas."
   },
   "common": {
     "manageOnWeb": "Hantera på webben",
@@ -2788,6 +2790,8 @@
     "modelPicker": {
       "title": "Välj modell",
       "noModelsDescription": "Det finns inga modeller att välja mellan.",
+      "allUnavailableTitle": "Inga modeller kan användas",
+      "allUnavailableDescription": "Lägg till en leverantörsnyckel och försök igen.",
       "favorites": "Favoriter"
     },
     "modelSelector": {
@@ -4987,6 +4991,7 @@
     "providersDescription": "Stäng av en leverantör för att stoppa Kilo från att dirigera till den för den här organisationen.",
     "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
     "providersEmpty": "Inga leverantörer matchar den här sökningen.",
+    "providersNone": "Inga leverantörer är tillgängliga för den här organisationen.",
     "allowAllShown": "Tillåt alla som visas",
     "denyAllShown": "Neka alla som visas",
     "gatewaysDescription": "Kilo dirigerar modellbegäranden via Vercel AI Gateway eller OpenRouter. En inaktiverad nätbrygga gör att dessa begäranden misslyckas.",

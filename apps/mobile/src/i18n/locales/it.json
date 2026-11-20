@@ -19,7 +19,10 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Consegna comando: {{status}}",
     "delivered": "Consegnato",
-    "expired": "Scaduto"
+    "expired": "Scaduto",
+    "recoveryGaps_one": "Manca {{displayCount}} parte di questa trascrizione.",
+    "recoveryGaps_many": "Mancano {{displayCount}} parti di questa trascrizione.",
+    "recoveryGaps_other": "Mancano {{displayCount}} parti di questa trascrizione."
   },
   "common": {
     "manageOnWeb": "Gestisci sul web",
@@ -2224,6 +2227,8 @@
     "modelPicker": {
       "title": "Modello",
       "noModelsDescription": "Non ci sono modelli da selezionare.",
+      "allUnavailableTitle": "Nessun modello può essere usato",
+      "allUnavailableDescription": "Aggiungi una chiave del fornitore, poi riprova.",
       "favorites": "Preferiti"
     },
     "modelSelector": {
@@ -5063,6 +5068,7 @@
     "providersDescription": "Disattiva un fornitore per impedire a Kilo di instradare verso di esso per questa organizzazione.",
     "providersNeedCatalog": "Gli interruttori dei fornitori restano in sola lettura finché non viene caricato il catalogo completo dei modelli. Tocca Riprova qui sopra per modificarli.",
     "providersEmpty": "Nessun fornitore corrisponde a questa ricerca.",
+    "providersNone": "Nessun fornitore è disponibile per questa organizzazione.",
     "allowAllShown": "Consenti tutti quelli mostrati",
     "denyAllShown": "Nega tutti quelli mostrati",
     "gatewaysDescription": "Kilo instrada le richieste dei modelli tramite Vercel AI Gateway o OpenRouter. Un canale di accesso disattivato fa fallire tali richieste.",

@@ -19,7 +19,11 @@
     "presenceStatus": "Hostitelé: {{connection}}",
     "commandStatus": "Doručení příkazu: {{status}}",
     "delivered": "Doručeno",
-    "expired": "Platnost vypršela"
+    "expired": "Platnost vypršela",
+    "recoveryGaps_one": "Chybí {{displayCount}} část tohoto přepisu.",
+    "recoveryGaps_few": "Chybí {{displayCount}} části tohoto přepisu.",
+    "recoveryGaps_many": "Chybí {{displayCount}} části tohoto přepisu.",
+    "recoveryGaps_other": "Chybí {{displayCount}} částí tohoto přepisu."
   },
   "common": {
     "manageOnWeb": "Spravovat na webu",
@@ -2888,7 +2892,9 @@
     "modelPicker": {
       "title": "Výběr modelu",
       "favorites": "Oblíbené",
-      "noModelsDescription": "K výběru nejsou k dispozici žádné modely."
+      "noModelsDescription": "K výběru nejsou k dispozici žádné modely.",
+      "allUnavailableTitle": "Žádný model nelze použít",
+      "allUnavailableDescription": "Přidejte klíč poskytovatele a poté to zkuste znovu."
     },
     "modelSelector": {
       "provider": "Poskytovatel {{id}}",
@@ -5139,6 +5145,7 @@
     "providersDescription": "Po vypnutí poskytovatele k němu Kilo pro tuto organizaci přestane směrovat požadavky.",
     "providersNeedCatalog": "Přepínače poskytovatelů zůstanou jen pro čtení, dokud se nenačte celý katalog modelů. Pokud je chcete upravit, klepněte výše na Zkusit znovu.",
     "providersEmpty": "Hledání neodpovídají žádní poskytovatelé.",
+    "providersNone": "Pro tuto organizaci nejsou k dispozici žádní poskytovatelé.",
     "allowAllShown": "Povolit vše zobrazené",
     "denyAllShown": "Zakázat vše zobrazené",
     "gatewaysDescription": "Kilo směruje požadavky na modely přes Vercel AI Gateway nebo OpenRouter. Pokud je brána vypnutá, tyto požadavky selžou.",

@@ -187,7 +187,7 @@ const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 // The English catalog sentence for a lapsed organization plan.
 const TRIAL_ENDED_COPY =
-  "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai.";
+  "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.";
 
 // The sentence a billing role gets instead: it offers the plan step rather than
 // naming the person who can take it.

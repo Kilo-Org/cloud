@@ -509,8 +509,9 @@ or authorize a production rollout, capacity increase, or replay.
 
 ### Writer admission protection
 
-The Frankfurt HTTP writer authenticates and validates the request before applying
-one admission guard to `queue` and `queue_vercel` callers. Both transports share a
+The Frankfurt LLM HTTP writer (`/api/internal/usage/record`) authenticates and
+validates the request before applying one admission guard to `queue` and
+`queue_vercel` callers. Both transports share a
 per-runtime active-call limit of `max(1, pool.options.max - 2)`, currently **8**
 with the unchanged pool maximum of 10. The writer returns HTTP **429** before usage
 database work as follows:
@@ -552,34 +553,48 @@ The two connections of nominal headroom are a starting local policy, **not
 reserved connections** or a measured global capacity bound. Other traffic can
 compete after the snapshot, a writer may perform several database operations,
 background work can outlive the awaited call, and each runtime instance has its
-own counter/pool. An admitted call can still wait. The pool maximum stays at 10,
-consumer concurrency at 225 in production (200 in staging), parallelism at 2, and
-batch size at 6 in production and 2 in staging; retry settings also stay unchanged.
-There is no new environment knob; merging this change activates queue rejection
-when the normal automatic deployment reaches the writer.
+own counter/pool. An admitted call can still wait. The LLM primary pool maximum
+stays at 10. Consumer concurrency, parallelism, batch size, retry settings and
+queue selection are unchanged by writer isolation. There is no new environment
+knob; the change reaches the writer through its normal deployment.
 
 Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) and the Exa
-writer (`/api/internal/exa-usage/record`) use the same guard and the same shared limit,
-as writer class `non_llm`; Enkrypt and Exa share that one class. That class has
-its own ceiling inside the shared limit: `max(1, min(2, limit - 1))`, currently
-**2 of 8**. A `non_llm` call over the ceiling gets the same HTTP 429 body with
-reason `queue_limit` and is not written. Its active plus queued calls never exceed
-the ceiling, so it cannot fill the FIFO either. LLM queue writes can still use all
-8 slots; the ceiling only stops non-LLM writes from taking more than 2. When the
-shared limit is 1 (pool maximum 3 or less), the ceiling is 1 and a non-LLM call
-can take the only slot. The total limit is unchanged. Like the shared limit, this
-is a per-runtime counter, not a connection reservation, and it makes no
-fleet-wide fairness claim.
+writer (`/api/internal/exa-usage/record`) instead use `taggedWriterAdmission`, an
+independent per-runtime gate, as writer class `non_llm`. The two routes share a
+**two-write** budget when co-located in one runtime. Their admitted transactions
+use `taggedWriterDb` and a dedicated primary pool with maximum **2** connections,
+not the LLM pool. All eight LLM admissions remain available while both tagged
+slots are held. An excess tagged call immediately receives the compatible HTTP
+429 body with reason `queue_limit`, without writing or entering the LLM FIFO.
 
-The writer marks a class-only rejection when shared slots remain and its pool
-snapshot shows zero waiters and fewer checked-out connections than the shared
-limit. Missing or inconsistent gauges leave the rejection unmarked. Roll out
-the writer first, then the consumer. Either order retains the existing overload
-behavior until both sides support the header. Older consumers ignore it and the
-429 body stays compatible. During an authorized rollout, compare backlog slope,
-native invocation exception ratio and concurrency with pool waiting and LLM 429s.
-Halt rollout if shared pressure rises or backlog growth and exceptions worsen.
-A lower exception ratio alone does not establish recovery.
+The tagged pool opens connections on demand, keeps the existing connection
+timeout and five-second idle timeout, and participates in Vercel suspension
+cleanup. In a co-located runtime the primary connection envelope is **12**
+(10 LLM/general plus 2 tagged), with replica pools additional and unchanged.
+Across N runtimes using the tagged pool, this can add up to **2N** connections.
+Separate function instances each have their own gate and pool: this is not a
+fleet-wide two-write limit. Deployed function mapping has not been verified;
+the regression proves independence even with co-location. This is not a measured
+production capacity increase. PostgreSQL row locks and server/pooler capacity
+remain shared. Direct and regional handoff writes retain the general primary
+pool; post-commit background work also retains its existing behavior.
+
+At the tagged ceiling, a consistent pool snapshot with zero waiting clients
+marks the rejection class-only (`x-usage-class-limit: non_llm`), including when
+both tagged connections are checked out. Missing or inconsistent gauges leave
+the rejection unmarked. Actual pool waiting/busy rejection remains distinct
+from this class ceiling. Older consumers ignore the header and the 429 body
+stays compatible. During an authorized rollout, compare backlog slope, native
+invocation exception ratio and concurrency with both pools' waiting and LLM
+429s. Halt rollout if shared database pressure rises or backlog growth and
+exceptions worsen. A lower exception ratio alone does not establish recovery.
+The Cloudflare consumer cap is a separate control; it does not reserve these
+writer slots or connections.
+
+The executable contract is the [co-location regression](../../apps/web/src/app/api/internal/usage/record/usage-writer-admission.test.ts),
+run with `pnpm --filter web test --runInBand usage-writer-admission`. It holds both
+tagged transactions, checks their actual connection application names, and
+verifies all eight LLM admissions and the tagged class-only rejection.
 
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,

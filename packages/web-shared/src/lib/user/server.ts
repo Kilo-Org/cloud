@@ -159,6 +159,14 @@ export async function getUserFromSession(): Promise<{ id: string } | null> {
 export type RequiredPermissions = {
   adminOnly: boolean;
   DANGEROUS_allowBlockedUsers?: boolean;
+  /**
+   * Admits an account the authorization refuses — the R0 domain blacklist or
+   * the R1 block — so it can end its own session. Only a request that does
+   * nothing but that cleanup may set it: the app's sign-out has to end the
+   * session server-side even while a refusal stands, or the app clears its
+   * credentials and leaves a usable session and refresh token behind.
+   */
+  allowRefusedAccountSelfCleanup?: boolean;
   expectedAudience?: string;
   // Derive from an actual Request URL or fixed route path, never a request header.
   requestPathname?: string;
@@ -833,14 +841,20 @@ async function validateUserAuthorization({
       cloudAgentAuthority,
     });
   } else if (await isUserBlacklistedByDomain(user, readDb)) {
-    return authError(403, 'Access denied (R0)', kiloUserId, {
-      authorizationRefused: true,
-      refusalReason: 'account_blocked',
-      internalApiUse,
-      tokenSource,
-      cloudAgentAuthority,
-    });
-  } else if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
+    if (!opts.allowRefusedAccountSelfCleanup) {
+      return authError(403, 'Access denied (R0)', kiloUserId, {
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
+    }
+  } else if (
+    !opts.DANGEROUS_allowBlockedUsers &&
+    !opts.allowRefusedAccountSelfCleanup &&
+    isBlockedAccount(user)
+  ) {
     return authError(403, 'Access denied (R1)', kiloUserId, {
       authorizationRefused: true,
       refusalReason: 'account_blocked',

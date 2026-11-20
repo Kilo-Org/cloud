@@ -204,7 +204,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
         // A refused account still owns the session it is signing out of. The
         // admission covers exactly one procedure (see admitsRefusedAccount), so
         // every other call keeps the block refusal below.
-        DANGEROUS_allowBlockedUsers: admitsRefusedAccount(opts?.info),
+        allowRefusedAccountSelfCleanup: admitsRefusedAccount(opts?.info),
       }),
     startedAt,
     surface: 'context',

@@ -706,6 +706,36 @@ describe('getUserFromAuth', () => {
     }
   });
 
+  test('admits a refused email domain only for its own session cleanup', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `cleanup-domain@mail.${blockedDomain}`,
+      api_token_pepper: 'cleanup-domain-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      const refused = await getUserFromAuth({ adminOnly: false });
+      expect(refused.user).toBeNull();
+      expect(refused.refusalReason).toBe('account_blocked');
+
+      const admitted = await getUserFromAuth({
+        adminOnly: false,
+        allowRefusedAccountSelfCleanup: true,
+      });
+
+      // The account is admitted so the revoke can end its own session; nothing
+      // about the refusal itself changes for any other call.
+      expect(admitted.authFailedResponse).toBeNull();
+      expect(admitted.user?.id).toBe(user.id);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
   test('authorizes a user whose email domain only shares a raw suffix with a refused domain', async () => {
     const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
     const user = await insertTestUser({

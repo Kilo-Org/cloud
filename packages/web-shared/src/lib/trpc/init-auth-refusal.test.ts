@@ -122,7 +122,7 @@ describe('createTRPCContext revoked-account admission', () => {
     // The auth read is asked to admit the block, which is what lets the revoke
     // reach the procedure instead of dying at the context gate.
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
-      expect.objectContaining({ DANGEROUS_allowBlockedUsers: true })
+      expect.objectContaining({ allowRefusedAccountSelfCleanup: true })
     );
     expect(context.user).toEqual({ id: 'user-1' });
     expect(context.deviceSessionId).toBe('device-1');
@@ -148,7 +148,7 @@ describe('createTRPCContext revoked-account admission', () => {
     expect(error).toBeInstanceOf(TRPCError);
     expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
-      expect.objectContaining({ DANGEROUS_allowBlockedUsers: false })
+      expect.objectContaining({ allowRefusedAccountSelfCleanup: false })
     );
   });
 
@@ -165,7 +165,7 @@ describe('createTRPCContext revoked-account admission', () => {
     expect(error).toBeInstanceOf(TRPCError);
     expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
-      expect.objectContaining({ DANGEROUS_allowBlockedUsers: false })
+      expect.objectContaining({ allowRefusedAccountSelfCleanup: false })
     );
   });
 });

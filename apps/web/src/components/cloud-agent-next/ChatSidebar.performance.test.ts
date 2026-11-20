@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ChatSidebar } from './ChatSidebar';
 import { useStackedWorkspaceSource } from './hooks/useStackedWorkspaceSource';
 import type { StoredSession } from './types';
+import { groupSidebarWorkspaces } from './hooks/sidebar-workspace-model';
+import { workspaceSummaryFixture } from './hooks/workspace-summary-test-fixtures';
 
 Object.assign(globalThis, { React });
 
@@ -30,6 +32,16 @@ it('does not mount hidden workspace menu queries for every sidebar row', () => {
   const html = renderToStaticMarkup(
     createElement(ChatSidebar, {
       sessions,
+      workspaceGroups: groupSidebarWorkspaces(
+        [],
+        {},
+        sessions.map(session =>
+          workspaceSummaryFixture({
+            worktreeId: session.worktreeId ?? '',
+            latestOpenSessionId: session.sessionId,
+          })
+        )
+      ),
       onCreateWorktreeChat: jest.fn(),
       onRenameWorktree: jest.fn(),
       onDeleteWorktree: jest.fn(),

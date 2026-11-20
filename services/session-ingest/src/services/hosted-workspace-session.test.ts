@@ -23,6 +23,7 @@ function selectBuilder(value: unknown[]) {
     from: vi.fn(() => ({
       where: vi.fn(() => ({
         limit: vi.fn(() => Promise.resolve(value)),
+        then: (resolve: (rows: unknown[]) => unknown) => resolve(value),
       })),
     })),
   };
@@ -65,6 +66,7 @@ function createDb(options: { deleteRows: boolean }) {
     selectBuilder([
       {
         session_id: kiloSessionId,
+        cloud_agent_worktree_id: workspaceId,
         parent_session_id: null,
         organization_id: null,
         git_url: null,
@@ -78,6 +80,9 @@ function createDb(options: { deleteRows: boolean }) {
     select: vi.fn(() => builders[selectIndex++]),
     execute: vi.fn(() => Promise.resolve({ rows: [{ session_id: kiloSessionId, depth: 0 }] })),
     delete: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) })),
+    })),
   };
   const db = {
     transaction: vi.fn(async callback => callback(tx)),

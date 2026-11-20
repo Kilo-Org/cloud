@@ -1,12 +1,28 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { useChatStackInfo } from './useChatStackInfo';
+import { workspaceSummaryFixture } from './hooks/workspace-summary-test-fixtures';
 
 const currentWorktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
 const parentWorktreeId = 'worktree_12345678-1234-4234-9234-123456789abd';
 let mockParentWorktreeId: string | null = null;
 const mockUseQuery = jest.fn<{ data: undefined }, [unknown]>(() => ({ data: undefined }));
 const mockQueryOptions = (input: unknown) => ({ queryKey: ['options', input] });
+
+jest.mock('./hooks/useWorkspaceSummaries', () => ({
+  useWorkspaceSummaryLookup: () => ({
+    workspaces: [
+      workspaceSummaryFixture({
+        worktreeId: currentWorktreeId,
+        parentWorktreeId: mockParentWorktreeId,
+        branch: 'feature',
+      }),
+      ...(mockParentWorktreeId
+        ? [workspaceSummaryFixture({ worktreeId: parentWorktreeId, branch: 'main' })]
+        : []),
+    ],
+  }),
+}));
 
 jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),

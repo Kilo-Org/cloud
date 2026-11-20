@@ -100,6 +100,8 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
       void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.listWorkspaces.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceSummaries.pathFilter());
     },
     onError: error => {
       toast.error(error?.message ?? 'Failed to refresh pull request status');

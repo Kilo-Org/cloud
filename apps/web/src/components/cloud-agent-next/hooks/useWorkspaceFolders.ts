@@ -15,6 +15,7 @@ import {
 } from '../workspace-folders';
 import { positionBetween } from '@/lib/todos/position';
 import { workspaceFoldersQueryKey } from './sidebar-queries';
+import { sidebarQueryInput } from './sidebar-query-scope';
 import type { useSidebarPreferences } from './useSidebarPreferences';
 
 type CollapsedFolders = Pick<
@@ -37,7 +38,7 @@ export function useWorkspaceFolders(
     () => workspaceFoldersQueryKey(queryOptions.queryKey, currentUserId),
     [currentUserId, queryOptions.queryKey]
   );
-  const foldersQuery = useQuery({ ...queryOptions, queryKey, staleTime: 15_000 });
+  const foldersQuery = useQuery({ ...queryOptions, queryKey, staleTime: 60_000 });
   const { mutateAsync: createFolder } = useMutation(trpc.workspaceFolders.create.mutationOptions());
   const { mutateAsync: updateFolder } = useMutation(trpc.workspaceFolders.update.mutationOptions());
   const { mutateAsync: removeFolder } = useMutation(trpc.workspaceFolders.delete.mutationOptions());
@@ -88,10 +89,18 @@ export function useWorkspaceFolders(
   const refresh = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey }),
-      queryClient.invalidateQueries(trpc.cliSessionsV2.listWorkspaces.pathFilter()),
-      queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
+      queryClient.invalidateQueries({
+        ...trpc.cliSessionsV2.listWorkspaces.pathFilter(),
+        predicate: query =>
+          sidebarQueryInput(query.queryKey)?.organizationId === (organizationId ?? null),
+      }),
+      queryClient.invalidateQueries({
+        ...trpc.cliSessionsV2.workspaceSummaries.pathFilter(),
+        predicate: query =>
+          sidebarQueryInput(query.queryKey)?.organizationId === (organizationId ?? null),
+      }),
     ]);
-  }, [queryClient, queryKey, trpc]);
+  }, [organizationId, queryClient, queryKey, trpc]);
 
   const run = useCallback(
     async (mutation: () => Promise<unknown>, successMessage: string): Promise<boolean> => {
@@ -175,11 +184,9 @@ export function useWorkspaceFolders(
         folderId ? 'Session moved to folder' : 'Session moved to Ungrouped'
       );
       if (moved) {
-        // The destination folder changes how the sidebar groups the session,
-        // so the sessions and worktree-details queries must refetch too.
         void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
         void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
-        void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceSummaries.pathFilter());
         if (folderId) setCollapsedFolderIds(ids => ids.filter(id => id !== folderId));
       }
       return moved;
@@ -225,7 +232,8 @@ export function useWorkspaceFolders(
    */
   const initializeWorktreePositions = useCallback(
     async (orderedWorktreeIds: readonly string[], folderId: string | null): Promise<boolean> => {
-      if (savingRef.current || orderedWorktreeIds.length > 200) return false;
+      if (savingRef.current || orderedWorktreeIds.length > SMART_FOLDER_WORKTREE_ORDER_LIMIT)
+        return false;
       savingRef.current = true;
       setIsSaving(true);
       try {

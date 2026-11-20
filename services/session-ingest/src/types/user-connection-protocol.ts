@@ -1,5 +1,6 @@
 import { MAX_GIT_BRANCH_LENGTH, gitBranchValueSchema } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 
 // Use z.string() for session IDs (not the strict sessionIdSchema from ws-protocol)
 // because the CLI's remote-protocol.ts uses z.string() — the strict ses_ format
@@ -307,6 +308,7 @@ export const SessionStatusUpdatedPayloadSchema = z.union([
 export const SessionDeletedPayloadSchema = z.object({
   source: z.literal('v2'),
   sessionId: z.string(),
+  worktreeId: z.string().nullable().optional(),
   parentSessionId: z.string().nullable(),
   organizationId: z.string().nullable(),
   gitUrl: z.string().nullable(),
@@ -315,11 +317,17 @@ export const SessionDeletedPayloadSchema = z.object({
   deletedAt: z.string(),
 });
 
+export const WorkspaceUpdateIdsSchema = z
+  .array(cloudAgentWorktreeIdSchema)
+  .max(200)
+  .refine(ids => new Set(ids).size === ids.length, 'worktreeIds must be unique');
+
 export const SessionEventPayloadSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.created'), data: SessionRowEventPayloadSchema }),
   z.object({ type: z.literal('session.updated'), data: SessionRowEventPayloadSchema }),
   z.object({ type: z.literal('session.status.updated'), data: SessionStatusUpdatedPayloadSchema }),
   z.object({ type: z.literal('session.deleted'), data: SessionDeletedPayloadSchema }),
+  z.object({ type: z.literal('workspace.updated'), data: z.object({ worktreeId: z.string() }) }),
 ]);
 
 // -- DO → Web UI (WebInbound) -------------------------------------------------

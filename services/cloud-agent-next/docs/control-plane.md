@@ -791,7 +791,9 @@ keep environment snapshots and existing history/worktree recovery.
   Existing native sessions are reused when their record names this workspace directory; a record
   that names another directory takes history-only recovery, as Kilo v2 already requires.
   Missing native sessions use history-only recovery.
-  A re-pointed record keeps the fields it already carries. The native import cannot carry a
+  A re-pointed record keeps the fields it already carries, including the wider shapes a record may
+  hold: the import accepts a summary that carries file diffs and a revert that carries a patch diff,
+  and serves both back with the record. The native import cannot carry a
   session permission ruleset, so the ruleset is applied right after it and, when that could not
   complete, remembered beside the wrapper's durable state. A create path that finds the obligation
   already remembered does not rewrite it. Every prepare settles a remembered ruleset before the
@@ -810,6 +812,11 @@ keep environment snapshots and existing history/worktree recovery.
   A record whose own permission is present but not a ruleset fails the create path the same way,
   before the import, and the record is left unchanged: no rules are applied, so a later prepare in
   the same allocation reads that record again and fails the same way until the record is replaced.
+  The settle path refuses a record that names the route directory and carries such a permission in
+  exactly the same way: it sends no update, keeps the remembered ruleset because the record is left
+  unchanged, and fails the prepare. A record under another directory is still treated as absent, so
+  the marker simply waits for the import to re-point it. Both entry points therefore refuse, rather
+  than prepare a route whose record lacks the rules it owes.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

@@ -301,11 +301,13 @@ export async function hasOutstandingRuleset(sessionId: string): Promise<boolean>
   return (await readOutstandingRuleset(sessionId)) !== undefined;
 }
 
-/** The parts of a session read that decide whether an apply is still owed. */
-const storedSessionSchema = z.object({
-  directory: z.string(),
-  permission: z.array(permissionRuleSchema).optional(),
-});
+/**
+ * The parts of a session read that decide which record the read describes.
+ * `permission` is parsed separately, because a record that carries permission
+ * data which is not a ruleset is still this route's record: failing the whole
+ * parse would read it as absent and the caller would prepare without the rules.
+ */
+const storedSessionSchema = z.object({ directory: z.string() }).passthrough();
 
 /** True when every rule of `permission` is already present in `stored`. */
 function rulesetCovers(
@@ -325,9 +327,23 @@ function rulesetCovers(
 /**
  * What a session read says about a ruleset the caller wants to apply. The
  * record's directory is part of the answer: an update scoped to this route's
- * directory does not reach a record stored under another one.
+ * directory does not reach a record stored under another one. `invalid` is a
+ * record this route owns whose `permission` is present but is not a ruleset:
+ * the rules can be neither compared nor applied, so the caller must fail.
  */
-type StoredRuleset = 'absent' | 'holds' | 'missing';
+type StoredRuleset = 'absent' | 'holds' | 'invalid' | 'missing';
+
+/**
+ * A record that names the route directory but carries a permission that is not
+ * a ruleset cannot have its rules applied, so every path that would prepare
+ * from it fails instead of preparing without the rules.
+ */
+function invalidRecordRuleset(sessionId: string): SessionRulesetNotAppliedError {
+  return new SessionRulesetNotAppliedError(
+    sessionId,
+    new Error(`Session record for ${sessionId} carries a permission that is not a ruleset`)
+  );
+}
 
 /**
  * A record that does not exist, and a read that cannot answer, leave the caller
@@ -353,7 +369,12 @@ async function storedRulesetFor(
     }
     const stored = record.data.permission;
     if (stored === undefined) return 'missing';
-    return rulesetCovers(stored, permission) ? 'holds' : 'missing';
+    // The record names this directory, so a permission that is not a ruleset is
+    // a record the caller cannot settle: neither "absent" nor "missing" may be
+    // reported, because both would let the route prepare without the rules.
+    const ruleset = parseRuleset(stored);
+    if (ruleset === undefined) return 'invalid';
+    return rulesetCovers(ruleset, permission) ? 'holds' : 'missing';
   } catch {
     return 'missing';
   }
@@ -830,10 +851,15 @@ export function createWrapperKiloClient(
             permission
           );
         };
-        if ((await settled()) === 'holds') {
+        const state = await settled();
+        if (state === 'holds') {
           await clearMarker();
           return;
         }
+        // A record this route owns whose permission is not a ruleset cannot have
+        // the rules compared or applied, so the route fails instead of updating
+        // it and leaving the marker cleared.
+        if (state === 'invalid') throw invalidRecordRuleset(sessionId);
         let lastError: unknown;
         for (let attempt = 1; attempt <= 3; attempt += 1) {
           try {
@@ -845,10 +871,15 @@ export function createWrapperKiloClient(
             if (signal?.aborted) break;
             // A failed attempt may still have applied the update, so check the
             // record before repeating it and never store the ruleset twice.
-            if ((await settled()) === 'holds') {
+            const recheck = await settled();
+            if (recheck === 'holds') {
               await clearMarker();
               return;
             }
+            // A record that now reads as carrying a permission which is not a
+            // ruleset must not be updated again: the marker stays and the route
+            // fails the same way the create path does.
+            if (recheck === 'invalid') throw invalidRecordRuleset(sessionId);
             if (attempt < 3) {
               const { promise, resolve } = Promise.withResolvers<void>();
               setTimeout(resolve, 50 * attempt);
@@ -905,10 +936,7 @@ export function createWrapperKiloClient(
       // A record that carries permission data which is not a ruleset cannot have
       // its rules applied, so the route fails instead of preparing without them.
       if (record?.permission !== undefined && recordRuleset === undefined) {
-        throw new SessionRulesetNotAppliedError(
-          sessionId,
-          new Error(`Session record for ${sessionId} carries a permission that is not a ruleset`)
-        );
+        throw invalidRecordRuleset(sessionId);
       }
       // The obligation is already durable when the marker covers what the record
       // carries, so it is not rewritten: a directory that refuses the write must
@@ -977,6 +1005,11 @@ export function createWrapperKiloClient(
       // import re-points it, and an absent record has nothing to apply to, so
       // the marker stays for the create path in both cases.
       if (stored === 'absent') return;
+      // A record that names this directory but carries a permission which is not
+      // a ruleset cannot have the rules applied, so the route fails the way the
+      // create path does. The record is left unchanged, so the marker stays and
+      // the next prepare fails the same way instead of preparing without them.
+      if (stored === 'invalid') throw invalidRecordRuleset(sessionId);
       // A record that already holds the rules is not updated again, because the
       // update appends them; the marker is cleared instead. A marker that cannot
       // be cleared is retried by the next prepare, which then finds the stored

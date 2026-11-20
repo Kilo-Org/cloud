@@ -899,7 +899,12 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       workspaceID?: string;
       parentID?: string;
       share?: { url: string };
-      summary?: { additions: number; deletions: number; files: number };
+      summary?: {
+        additions: number;
+        deletions: number;
+        files: number;
+        diffs?: Array<Record<string, unknown>>;
+      };
       revert?: { messageID: string; partID?: string; snapshot?: string; diff?: string };
       permission?: unknown;
       time?: { created: number; updated: number; compacting?: number; archived?: number };
@@ -1027,7 +1032,21 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       const directory = temporaryDirectory('kilo-api-rebind-target-');
       const otherDirectory = temporaryDirectory('kilo-api-rebind-other-');
       const created = 1_700_000_000_000;
-      const revert = { messageID: 'msg_revert', partID: 'prt_revert', snapshot: 'snap_revert' };
+      // The native record carries the wider shapes too: its summary may hold
+      // file diffs and its revert a patch diff. The import stores and serves
+      // both, so a re-point passes them through rather than dropping them.
+      const summary = {
+        additions: 7,
+        deletions: 2,
+        files: 3,
+        diffs: [{ file: 'a.txt', additions: 7, deletions: 2, status: 'modified' }],
+      };
+      const revert = {
+        messageID: 'msg_revert',
+        partID: 'prt_revert',
+        snapshot: 'snap_revert',
+        diff: 'diff --git a/a.txt b/a.txt',
+      };
       const permission = [{ permission: 'bash', pattern: 'git push*', action: 'allow' }];
       const stub = startEnsureSessionStub(sessionId, {
         id: sessionId,
@@ -1036,7 +1055,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         workspaceID: 'wrk_carried',
         parentID: 'ses_carried_parent',
         share: { url: 'https://share.example/ses_carried' },
-        summary: { additions: 7, deletions: 2, files: 3 },
+        summary,
         revert,
         permission,
         time: { created, updated: created + 1, compacting: created + 2, archived: created + 3 },
@@ -1057,7 +1076,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         workspaceID: 'wrk_carried',
         parentID: 'ses_carried_parent',
         shareURL: 'https://share.example/ses_carried',
-        summary: { additions: 7, deletions: 2, files: 3 },
+        summary,
         revert,
         timeCreated: created,
         timeUpdated: created + 1,
@@ -1270,6 +1289,57 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
         expect(stub.updates).toHaveLength(0);
         expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
+      } finally {
+        await forgetOutstandingRuleset(sessionId);
+      }
+    });
+
+    it('fails the settle when the route record permission is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_settle_invalid';
+      const directory = temporaryDirectory('kilo-api-permission-settle-invalid-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberOutstandingRuleset(sessionId, permission);
+      try {
+        // The record names this directory, so it is this route's session; its
+        // permission cannot be compared, so no update may be sent against it.
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+          permission: { edit: 'allow' },
+        });
+
+        const error = await createClient(stub.url)
+          .settleOutstandingRuleset(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect(stub.updates).toHaveLength(0);
+        // The record is left unchanged, so the obligation is still owed.
+        expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
+      } finally {
+        await forgetOutstandingRuleset(sessionId);
+      }
+    });
+
+    it('fails instead of updating a route record whose permission is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_apply_invalid';
+      const directory = temporaryDirectory('kilo-api-permission-apply-invalid-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberOutstandingRuleset(sessionId, permission);
+      try {
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory,
+          permission: { edit: 'allow' },
+        });
+
+        const error = await createClient(stub.url)
+          .ensureSession(sessionId, directory)
+          .catch((error: unknown) => error);
+
+        expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect(stub.updates).toHaveLength(0);
+        expect(stub.imports).toHaveLength(0);
       } finally {
         await forgetOutstandingRuleset(sessionId);
       }

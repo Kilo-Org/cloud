@@ -33,13 +33,18 @@ import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
-  requireAdmissionPayload,
+  classifyAdmissionPayload,
   countAdmissionCondition,
+  requireAdmissionPayload,
   verifyAdmissionAsync,
   persistAttestedKey,
   KeyCollisionError,
   type VerifyAdmissionOk,
 } from '@/lib/auth/native-admission';
+import {
+  startNativeTokenTelemetry,
+  type NativeTokenTelemetry,
+} from '@/lib/auth/native-admission-telemetry';
 import {
   createDeviceSession,
   issueSessionCredentials,
@@ -275,10 +280,36 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   500 admission provider or identity provider infrastructure error
  */
 export const POST = withRestTiming('/api/auth/native/token', async (request: Request) => {
-  const body = await request.json().catch(() => undefined);
+  // One record per request for the allowlisted mobile cohort. Created before
+  // any branch so an early refusal is counted too; every call is a no-op for
+  // other clients. A thrown request is still recorded, as the 500 it surfaces.
+  const telemetry = startNativeTokenTelemetry(request);
+  try {
+    const response = await runNativeTokenExchange(request, telemetry);
+    telemetry.emit(response.status);
+    return response;
+  } catch (error) {
+    telemetry.emit(500);
+    throw error;
+  }
+});
+
+async function runNativeTokenExchange(
+  request: Request,
+  telemetry: NativeTokenTelemetry
+): Promise<Response> {
+  // A body that did not parse is a transport error; a body that parsed but did
+  // not match the schema is a request error. They stay separate so neither is
+  // reported as an admission stage.
+  let parsed = true;
+  const body = await request.json().catch(() => {
+    parsed = false;
+    return undefined;
+  });
   const validation = requestSchema.safeParse(body);
 
   if (!validation.success) {
+    telemetry.requestRejected(parsed ? 'invalid_request' : 'invalid_json');
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
 
@@ -290,6 +321,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   // answered may let the exchange through: a rule that is not configured
   // refuses here, before any of that work, and is reported.
   if (await isNativeTokenAddressRateLimited(request)) {
+    telemetry.addressRateLimited();
     return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
   }
 
@@ -297,6 +329,14 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   const admissionPayload = requireAdmissionPayload(body);
   if (!admissionPayload) {
     countAdmissionCondition('native_admission_missing');
+    // Only a refused request pays for this second classification: it names the
+    // shape rule that refused, so a record separates an absent field from a
+    // malformed one. The gate above decided; nothing here changes the response.
+    const refusal = classifyAdmissionPayload(body['admission']);
+    // A gate that refused without a matching shape rule cannot happen in
+    // production (both call the same classifier); leaving the branch
+    // unrecorded surfaces it as `incomplete` instead of inventing a reason.
+    if (!refusal.ok) telemetry.admissionMissing(refusal.reason);
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
@@ -312,6 +352,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     const verified = await verifyAdmissionAsync(admissionPayload);
     if (!verified.ok) {
       countAdmissionCondition('native_admission_refused');
+      telemetry.admissionRefused(verified.detail);
       return NextResponse.json(
         {
           error: verified.errorCode,
@@ -321,8 +362,10 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       );
     }
     admissionVerification = verified;
+    telemetry.admissionPassed(verified.platform);
   } catch {
     captureMessage('native_admission_unavailable');
+    telemetry.admissionProviderFault();
     return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
   }
 
@@ -823,4 +866,4 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     await revokeAbandonedSession(sessionId);
     throw error;
   }
-});
+}

@@ -403,6 +403,38 @@ describe('isolated frame list', () => {
       ok: false,
     });
   });
+
+  it('judges a frame element the browser cannot name by the document that holds it', async () => {
+    // A Firefox without runtime.getFrameId cannot name the hosted frame: the element is still the shop document’s.
+    const probe = fakeProbe({
+      0: {
+        frame: {
+          origin: 'https://shop.example.com',
+          parentFrameId: null,
+          url: 'https://shop.example.com/',
+        },
+        hosted: { frameId: null },
+      },
+    });
+
+    await expect(
+      preflightAgentCall({
+        args: { target: '#pay' },
+        authorized: [{ class: 'read', origin: 'https://shop.example.com' }],
+        consumeStepToken: () => false,
+        session: { ...sessionWith(probe), takeDownloads: () => [] },
+        sessionHandle: 'session-1',
+        stepTokens: [],
+        tabId: 7,
+        toolName: 'browser_snapshot',
+      })
+    ).resolves.toStrictEqual({
+      class: 'read',
+      ok: true,
+      origin: 'https://shop.example.com',
+      targetOriginFrame: false,
+    });
+  });
 });
 
 describe('isolated sensitive classification', () => {

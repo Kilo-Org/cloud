@@ -283,6 +283,8 @@ const targetFrameOf = async (
       resolved.selector,
       resolved.frameId
     );
+    const frame =
+      hosted === undefined ? undefined : frames.find(candidate => candidate.id === hosted.frameId);
 
     // The document holding the element: the tab's own, or the spliced child frame a ref came from.
     const holder =
@@ -294,15 +296,9 @@ const targetFrameOf = async (
         ? { frame: true, origin: OPAQUE_ORIGIN }
         : { frame: resolved.frameId !== undefined, frameId: holder.id, origin: holder.origin };
 
-    if (hosted !== undefined) {
-      const frame = frames.find(candidate => candidate.id === hosted.frameId);
-
-      return {
-        frame: true,
-        ...(frame === undefined ? {} : { frameId: frame.id }),
-        origin: frame?.origin ?? OPAQUE_ORIGIN,
-        owner: holderFrame,
-      };
+    // A browser that cannot name the hosted frame leaves the element judged by the document that holds it, below.
+    if (frame !== undefined) {
+      return { frame: true, frameId: frame.id, origin: frame.origin, owner: holderFrame };
     }
 
     // A ref from a spliced child frame acts in that frame's document, so it needs that frame's grant.

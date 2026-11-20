@@ -3465,6 +3465,10 @@ export const organizations = pgTable(
       .where(
         sql`(${table.settings}->>'is_sales_demo')::boolean = true AND ${table.deleted_at} IS NULL`
       ),
+    // Creator-scoped organization lookups.
+    index('IDX_organizations_created_by_kilo_user_id')
+      .on(table.created_by_kilo_user_id)
+      .concurrently(),
     // Directory Sync lookups resolve an organization from a webhook payload, so each
     // binding column is probed by value. The predicates keep these indexes to the few
     // directory-synced rows; `deleted_at IS NULL` lets a soft-deleted organization

@@ -111,7 +111,9 @@ export function AdvancedConfigPanel({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const list = useAgentProfileList(organizationId);
-  const { create } = useAgentProfileMutations(organizationId);
+  // The save's refusal is stated by the open sheet, so the create must not also
+  // toast it: one failure surface, one sentence.
+  const { create } = useAgentProfileMutations(organizationId, { quietCreateErrorToast: true });
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<ProfileSelectorProfile | null>(null);
@@ -227,11 +229,11 @@ export function AdvancedConfigPanel({
       toast.success(t('agentChat.newSession.profileSaved', { name: submission.name }));
       return { saved: true };
     } catch (error) {
-      // The mutation hook already toasts a readable server message; only fill
-      // in the fallback when the server sent nothing.
-      if (!(error instanceof Error) || error.message.trim().length === 0) {
-        toast.error(t('profiles.saveFailed'));
-      }
+      // The open sheet is this flow's only failure surface, so the hook's error
+      // toast is off and nothing is toasted here: the sheet states the server's
+      // sentence when the server wrote one, and its own neutral line when the
+      // envelope carries none.
+      //
       // Only a server answer carries a sentence. The transport wrappers are named
       // TRPCClientError too but carry no payload, so a timeout or a lost connection
       // reaches the person as the neutral line rather than engineering text.

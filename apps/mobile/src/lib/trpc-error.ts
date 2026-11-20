@@ -78,20 +78,44 @@ export function readTrpcErrorField(
 }
 
 /**
+ * The tRPC codes whose envelope carries a sentence the application wrote for a
+ * person. Everything else the wire can name is a framework or transport code —
+ * `PARSE_ERROR`, `METHOD_NOT_SUPPORTED`, `NOT_IMPLEMENTED`,
+ * `CLIENT_CLOSED_REQUEST`, `PAYLOAD_TOO_LARGE`, `TIMEOUT`,
+ * `UNPROCESSABLE_CONTENT`, `INTERNAL_SERVER_ERROR`, and any code added upstream
+ * — whose text nobody authored for a person. The check is an allowlist so a new
+ * framework code reaches the screen as the caller's neutral line, not as
+ * engineering text.
+ */
+const AUTHORED_REFUSAL_CODES = [
+  'BAD_REQUEST',
+  'CONFLICT',
+  'PRECONDITION_FAILED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'TOO_MANY_REQUESTS',
+  'UNAUTHORIZED',
+] as const;
+
+type AuthoredRefusalCode = (typeof AUTHORED_REFUSAL_CODES)[number];
+
+/**
  * Whether this envelope carries a refusal the application wrote, so its
  * sentence may be shown to a person.
  *
  * Wire shape of a mobile call: the client rejects with a `TRPCClientError`
  * whose `message` is the server's message, and whose `data` holds the code,
- * status, path and stack. The code decides which sentences the application
- * wrote for a person:
+ * status, path and stack. Only an allowlisted application code speaks for the
+ * person, and only when the envelope is not one of the two shapes that carry
+ * no authored sentence:
  *
- * - An authored refusal, such as a duplicate name, carries a sentence written
- *   for the person, so the caller shows it.
- * - `INTERNAL_SERVER_ERROR` carries diagnostic text, so the caller states its
- *   own neutral line and gives the next step instead.
- * - A context auth failure carries the session's diagnostic text and signs the
- *   person out, so it yields no sentence either.
+ * - An authored refusal, such as a duplicate name (`CONFLICT`), carries a
+ *   sentence written for the person, so the caller shows it.
+ * - `INTERNAL_SERVER_ERROR`, and every other code outside the allowlist,
+ *   carries diagnostic text, so the caller states its own neutral line.
+ * - A context auth failure is `UNAUTHORIZED` with `authRequired: true`; it
+ *   carries the session's diagnostic text and signs the person out, so it
+ *   yields no sentence either.
  * - A non-null `zodError` names an input contract failure, which has no
  *   reading for the person, so the caller states the neutral line too.
  *
@@ -102,10 +126,13 @@ function isAuthoredRefusal(
   zodError: unknown,
   authRequired: boolean | undefined
 ): boolean {
-  if (code === undefined || code === 'INTERNAL_SERVER_ERROR' || authRequired === true) {
+  if (code === undefined || !AUTHORED_REFUSAL_CODES.includes(code as AuthoredRefusalCode)) {
     return false;
   }
-  return zodError === undefined || zodError === null;
+  if (zodError !== undefined && zodError !== null) {
+    return false;
+  }
+  return !(code === 'UNAUTHORIZED' && authRequired === true);
 }
 
 /**

@@ -692,6 +692,48 @@ describe('AdvancedConfigPanel', () => {
     // A bare `Error` carries no tRPC payload, so the panel cannot know whether
     // the write landed and the sheet states the neutral line, not a server one.
     expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+    // The sheet is this flow's only failure surface: no toast repeats the line.
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('asks the mutation hook for a quiet create, so the sheet alone states a refusal', () => {
+    const renderer = mount({ organizationId: 'org-1' });
+    expect(listMock.useAgentProfileMutations).toHaveBeenLastCalledWith('org-1', {
+      quietCreateErrorToast: true,
+    });
+    renderer.unmount();
+  });
+
+  it('a rejection that carries no Error and no server sentence states the sheet line only', async () => {
+    const mocks = mutations();
+    // The fallback the panel used to toast fired on a rejection that is not an
+    // Error, so this case fails if the panel takes a failure surface of its own.
+    mocks.create.mutateAsync.mockRejectedValue('nope');
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+  });
+
+  it('a refusal with only a whitespace message states the sheet line only', async () => {
+    const mocks = mutations();
+    // The panel's old fallback fired on a message that trims to nothing, so this
+    // case fails if the panel takes a failure surface of its own.
+    mocks.create.mutateAsync.mockRejectedValue(new Error('   '));
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
   });
 
   it('a refused save leaves the draft intact and writes nothing else', async () => {

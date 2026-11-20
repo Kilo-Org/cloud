@@ -165,6 +165,53 @@ describe('readTrpcServerMessage', () => {
     expect(readTrpcServerMessage(invalid)).toBeUndefined();
   });
 
+  it('yields no sentence for a framework code, whatever human-looking text it carries', () => {
+    // The allowlist decides, not the presence of text: a framework code is not
+    // a refusal the application wrote for a person.
+    for (const code of [
+      'PARSE_ERROR',
+      'METHOD_NOT_SUPPORTED',
+      'NOT_IMPLEMENTED',
+      'CLIENT_CLOSED_REQUEST',
+      'PAYLOAD_TOO_LARGE',
+      'TIMEOUT',
+      'UNPROCESSABLE_CONTENT',
+    ]) {
+      const framework = Object.assign(new Error('Something went wrong. Please try again.'), {
+        name: 'TRPCClientError',
+        data: { code, httpStatus: 400, path: 'agentProfiles.create' },
+      });
+      expect(readTrpcServerMessage(framework), code).toBeUndefined();
+      expect(readTrpcServerMessage({ data: { code } }), code).toBeUndefined();
+      expect(
+        readTrpcServerMessage({ shape: { data: { code, message: 'Please try again.' } } }),
+        code
+      ).toBeUndefined();
+    }
+  });
+
+  it('returns the sentence of an allowlisted application refusal', () => {
+    const cases: [string, string][] = [
+      ['BAD_REQUEST', 'The name is too long.'],
+      ['PRECONDITION_FAILED', 'Add a variable before saving.'],
+      ['NOT_FOUND', 'That profile no longer exists.'],
+      ['TOO_MANY_REQUESTS', 'Too many attempts. Wait a moment.'],
+      ['FORBIDDEN', 'You cannot change this profile.'],
+      ['CONFLICT', 'A profile with this name already exists'],
+      ['UNAUTHORIZED', 'Sign in again to continue.'],
+    ];
+    for (const [code, sentence] of cases) {
+      const answered = Object.assign(new Error(sentence), {
+        name: 'TRPCClientError',
+        data: { code, httpStatus: 400, path: 'agentProfiles.create', zodError: null },
+      });
+      expect(readTrpcServerMessage(answered), code).toBe(sentence);
+      expect(readTrpcServerMessage({ shape: { data: { code, message: sentence } } }), code).toBe(
+        sentence
+      );
+    }
+  });
+
   it('returns a message carried under a shaped answer', () => {
     expect(
       readTrpcServerMessage({

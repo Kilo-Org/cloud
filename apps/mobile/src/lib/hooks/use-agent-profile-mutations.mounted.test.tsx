@@ -129,6 +129,46 @@ function mountCreateProbe(holder: { current: CreateProfile | null }) {
   });
 }
 
+/** The Advanced Configuration panel's Save as profile path: it states the refusal itself. */
+function QuietCreateProfileProbe({ holder }: { holder: { current: CreateProfile | null } }) {
+  holder.current = useAgentProfileMutations('org-1', {
+    quietCreateErrorToast: true,
+  }).create.mutateAsync;
+  return null;
+}
+
+type UpdateProfile = (input: { profileId: string; name?: string }) => Promise<unknown>;
+
+/** The Overview screen's rename path, which keeps the hook's toast. */
+function UpdateProfileProbe({ holder }: { holder: { current: UpdateProfile | null } }) {
+  holder.current = useAgentProfileMutations('org-1').update.mutateAsync;
+  return null;
+}
+
+function mountQuietCreateProbe(holder: { current: CreateProfile | null }) {
+  const queryClient = createTestQueryClient();
+  return renderWithProviders(<QuietCreateProfileProbe holder={holder} />, {
+    queryClient,
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+        {children}
+      </TRPCProvider>
+    ),
+  });
+}
+
+function mountUpdateProbe(holder: { current: UpdateProfile | null }) {
+  const queryClient = createTestQueryClient();
+  return renderWithProviders(<UpdateProfileProbe holder={holder} />, {
+    queryClient,
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+        {children}
+      </TRPCProvider>
+    ),
+  });
+}
+
 describe('useAgentProfileMutations toast copy', () => {
   beforeEach(() => {
     vi.mocked(toast.error).mockReset();
@@ -169,6 +209,41 @@ describe('useAgentProfileMutations toast copy', () => {
     const { unmount } = await mountCreateProbe(holder);
     await act(async () => {
       await holder.current?.({ name: 'Team setup' }).catch(() => undefined);
+    });
+
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith('Organization not found');
+    unmount();
+  });
+
+  it('stays silent for a refused quiet create, whose caller states the refusal itself', async () => {
+    transport.mockImplementation(async () => {
+      await Promise.resolve();
+      return deniedResponse();
+    });
+
+    const holder: { current: CreateProfile | null } = { current: null };
+    const { unmount } = await mountQuietCreateProbe(holder);
+    await act(async () => {
+      await holder.current?.({ name: 'Team setup' }).catch(() => undefined);
+    });
+
+    expect(callsTo('agentProfiles.create')).toBe(1);
+    expect(toast.error).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('keeps the toast for every other mutation when the quiet create is asked for', async () => {
+    transport.mockImplementation(async () => {
+      await Promise.resolve();
+      return deniedResponse('Organization not found');
+    });
+
+    const holder: { current: UpdateProfile | null } = { current: null };
+    const { unmount } = await mountUpdateProbe(holder);
+    await act(async () => {
+      await holder
+        .current?.({ profileId: '11111111-1111-4111-8111-111111111111', name: 'Renamed' })
+        .catch(() => undefined);
     });
 
     expect(toast.error).toHaveBeenCalledExactlyOnceWith('Organization not found');

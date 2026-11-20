@@ -9,7 +9,12 @@ import {
   targetOf,
   TRIPWIRE_MS,
 } from './browser-download-hold';
-import type { ApprovalNeed, DownloadHoldItem, DownloadStep } from './browser-download-hold';
+import type {
+  ApprovalNeed,
+  DownloadHoldItem,
+  DownloadSign,
+  DownloadStep,
+} from './browser-download-hold';
 import { DOWNLOAD_HOLD_STATE_KEY, startDownloadHold } from './browser-download-hold-host';
 import { installDownloadHoldOnGrant } from './browser-download-hold-listener';
 
@@ -706,7 +711,7 @@ describe('the recorded state', () => {
 
 describe('a sign-gated settle', () => {
   const attachment = 'https://app.example/reports/q4.pdf';
-  const sign = (signed: () => boolean) => signed;
+  const sign = (signed: () => DownloadSign) => signed;
 
   it('waits for the item a sign announced, and the call decides the file it names', async () => {
     const downloads = makeDownloads();
@@ -717,7 +722,7 @@ describe('a sign-gated settle', () => {
 
     const settled = hold.settle('session-1', {
       graceMs: 40,
-      sign: sign(() => signed),
+      sign: sign(() => (signed ? 'download' : 'none')),
       since: Date.now(),
       timeoutMs: 1500,
     });
@@ -746,7 +751,7 @@ describe('a sign-gated settle', () => {
 
     const settled = hold.settle('session-1', {
       graceMs: 40,
-      sign: sign(() => false),
+      sign: sign(() => 'none'),
       since: Date.now(),
       timeoutMs: 1500,
     });
@@ -764,7 +769,7 @@ describe('a sign-gated settle', () => {
 
     const settled = hold.settle('session-1', {
       graceMs: 40,
-      sign: sign(() => true),
+      sign: sign(() => 'download'),
       since: Date.now(),
       timeoutMs: 1500,
     });
@@ -774,6 +779,39 @@ describe('a sign-gated settle', () => {
     // Nothing was decided, and the hold invented no report: the caller decides what the file may have become.
     await expect(settled).resolves.toBe('waiting_for_item');
     expect(reports).toStrictEqual([]);
+  });
+
+  /**
+   * The hold-tier form of the same race: a click's attachment response is a Document of the call's that the browser
+   * has not answered, so the call may not answer "nothing happened" while it is outstanding. Only once that Document
+   * is answered with no download does the call answer `no_sign`.
+   */
+  it('waits out a Document of its own that is still unanswered before answering no_sign', async () => {
+    const downloads = makeDownloads();
+    const { hold } = makeHold(downloads);
+    let sign: DownloadSign = 'pending';
+
+    hold.tab(agentTab());
+
+    const settled = hold.settle('session-1', {
+      graceMs: 40,
+      sign: () => sign,
+      since: Date.now(),
+      timeoutMs: 1500,
+    });
+
+    // The grace is long spent, and the call still has a Document in flight: it is not "no download".
+    let outcome: string | undefined;
+    void settled.then(value => {
+      outcome = value;
+    });
+    await vi.advanceTimersByTimeAsync(400);
+    expect(outcome).toBeUndefined();
+
+    sign = 'none';
+    await vi.advanceTimersByTimeAsync(60);
+
+    await expect(settled).resolves.toBe('no_sign');
   });
 
   it('hears the announcement that lands after the tool answered, on that same call', async () => {
@@ -791,7 +829,7 @@ describe('a sign-gated settle', () => {
 
     const settled = hold.settle('session-1', {
       graceMs: 40,
-      sign: sign(() => signed),
+      sign: sign(() => (signed ? 'download' : 'none')),
       since: callStartedAt,
       timeoutMs: 1500,
     });

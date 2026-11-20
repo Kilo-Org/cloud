@@ -28,7 +28,12 @@ import type {
 import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
 import type { BrowserSensitiveStep } from './browser-agent-gate';
 import { ATTRIBUTION_WAIT_MS, targetOf } from './browser-download-hold';
-import type { DownloadHold, DownloadSettle, DownloadStep } from './browser-download-hold';
+import type {
+  DownloadHold,
+  DownloadSettle,
+  DownloadSign,
+  DownloadStep,
+} from './browser-download-hold';
 import {
   DOWNLOAD_FAIL_REASON,
   DOWNLOAD_RESPONSE_PATTERNS,
@@ -3654,7 +3659,26 @@ export const createBrowserRuntime = ({
             settleState =
               (await downloadHold?.settle(sessionKey, {
                 graceMs: DOWNLOAD_START_GRACE_MS,
-                sign: () => signedDownload() !== null || navigatedToFile,
+                sign: (): DownloadSign => {
+                  if (signedDownload() !== null || navigatedToFile) {
+                    return 'download';
+                  }
+
+                  // A Document this call started that the browser has not answered can still become a file: the
+                  // Item it would produce arrives after the announcement, so the call may not answer "nothing" yet.
+                  const unanswered = runSession
+                    .networkRequests()
+                    .some(
+                      request =>
+                        !requestsBefore.has(request.requestId) &&
+                        request.resourceType === 'Document' &&
+                        request.status === undefined &&
+                        request.finishedAt === undefined &&
+                        request.failure === undefined
+                    );
+
+                  return unanswered ? 'pending' : 'none';
+                },
                 since: callStartedAt,
                 timeoutMs: DOWNLOAD_ITEM_WAIT_MS,
               })) ?? null;

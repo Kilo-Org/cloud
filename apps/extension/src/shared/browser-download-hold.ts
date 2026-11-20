@@ -189,31 +189,35 @@ export interface DownloadHoldTab {
   readonly tabId: number;
 }
 
-/** How long one call waits for its own download's decision after the tool answered. */
-export interface SettleWindow {
-  /** The call's own start: a decision older than this belongs to a call already answered. */
-  readonly since: number;
-  /**
-   * How long to wait for an item when nothing suggests a download started, measured from the call's own start.
-   * The settle adds {@link DOWNLOAD_SIGN_GRACE_MS} to this, measured from itself: the tab's announcement can
-   * land after the tool answered, and a grace spent before the settle began would miss it.
-   */
-  readonly graceMs: number;
-  /**
-   * Whether something the call saw says a download started: the tab's own announcement, or a page load the
-   * browser answered as a file. Only a signed call waits the whole {@link timeoutMs} for its item.
-   */
-  readonly sign: () => boolean;
-  readonly timeoutMs: number;
-}
+/**
+ * What a call has seen of a download, as one state rather than a pair of flags.
+ * - `download`: something the call can name said a file started — the tab's announcement, or a load the browser
+ *   answered as a file.
+ * - `pending`: a Document the call started has no answer from the browser yet. It may become a file, so a call may
+ *   not answer `no_sign` while one is outstanding: a click's attachment response arrives a few milliseconds after the
+ *   click returned, and a settle that gave up before then answered "nothing happened" for a file it had just saved.
+ * - `none`: nothing of the call's can still become a file.
+ */
+export type DownloadSign = 'download' | 'none' | 'pending';
 
 /**
- * How a call's settle ended, as one state rather than a pair of flags:
+ * How a call's settle ends, as one state rather than a pair of flags:
  * - `no_sign`: nothing suggested a download, so the call answered after the short grace.
  * - `waiting_for_item`: a download started and no item was decided inside the bound; the file may exist.
  * - `decided`: the hold decided the item, and its report is what the call answers with.
  */
 export type DownloadSettle = 'decided' | 'no_sign' | 'waiting_for_item';
+
+/** How long one call waits for its own download's decision after the tool answered. */
+export interface SettleWindow {
+  /** The call's own start: a decision older than this belongs to a call already answered. */
+  readonly since: number;
+  /** How long to wait for a sign at all, measured from the settle: only a call with nothing pending pays it. */
+  readonly graceMs: number;
+  /** What the call has seen so far: the sign, a Document of its own still outstanding, or nothing. */
+  readonly sign: () => DownloadSign;
+  readonly timeoutMs: number;
+}
 
 export interface DownloadHold {
   /** The browser announced a download on an agent tab, before its item existed. */
@@ -986,9 +990,9 @@ export const createDownloadHold = ({
     needOf,
     settle: async (session, window) => {
       const until = window.since + window.timeoutMs;
-      // The announcement can arrive after the tool answered, so the grace is measured from this settle as well:
-      // a grace measured from the call alone is already spent when the settle begins, and the sign never lands.
-      const graceUntil = Math.max(window.since + window.graceMs, now() + DOWNLOAD_SIGN_GRACE_MS);
+      // The grace is measured from this settle: the tab's announcement lands after the tool answered, and a grace
+      // Spent before the settle began would miss it. Nothing is released early while the call still has a Document.
+      const graceUntil = now() + window.graceMs;
       let state: DownloadSettle = 'no_sign';
 
       for (;;) {
@@ -1000,15 +1004,26 @@ export const createDownloadHold = ({
           return 'decided';
         }
 
+        const sign = window.sign();
+
         // A download started: the browser creates the item a moment after it announces the file, so the call
         // Waits for that item instead of answering before it exists.
-        if (state === 'no_sign' && window.sign()) {
+        if (state === 'no_sign' && sign === 'download') {
           state = 'waiting_for_item';
         }
 
         if (state === 'waiting_for_item' && now() >= until) {
           // Signed, and nothing was decided inside the bound: the caller reports the file as possibly saved.
           return state;
+        }
+
+        // A Document the call started has no answer yet: it can still become the file, so the call waits for it
+        // Rather than answering "nothing happened" over a download it has already saved. The item bound still caps it.
+        if (state === 'no_sign' && sign === 'pending' && now() < until) {
+          // eslint-disable-next-line no-await-in-loop -- one bounded poll for the response this call is owed
+          await waitFor(HOLD_POLL_MS);
+
+          continue;
         }
 
         if (state === 'no_sign' && now() >= graceUntil) {

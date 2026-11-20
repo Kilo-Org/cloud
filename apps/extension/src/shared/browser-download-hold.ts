@@ -217,12 +217,13 @@ export type DownloadSettle = 'decided' | 'no_sign' | 'waiting_for_item';
 
 /** How long one call waits for its own download's decision after the tool answered. */
 export interface SettleWindow {
-  /** The call's own start: a decision older than this belongs to a call already answered. */
+  /** The call's own start: a decision older than this belongs to a call already answered. Only the filter. */
   readonly since: number;
   /** How long to wait for a sign at all, measured from the settle: only a call with nothing pending pays it. */
   readonly graceMs: number;
   /** What the call has seen so far: the sign, a Document of its own still outstanding, or nothing. */
   readonly sign: () => DownloadSign;
+  /** How long to wait for the call's decision, measured from the settle's own entry: never `since + timeoutMs`. */
   readonly timeoutMs: number;
 }
 
@@ -295,6 +296,29 @@ const pageOf = (url: string | undefined): string | undefined => {
     return `${parsed.origin}${parsed.pathname}`;
   } catch {
     return undefined;
+  }
+};
+
+/** The origin a url names: what an origin-only referrer can still be compared by. */
+const originOf = (url: string | undefined): string | undefined => {
+  try {
+    return new URL(url ?? '').origin;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Whether a url carries nothing but its origin. A cross-origin attachment's referrer is origin-only under Chrome's
+ * default `strict-origin-when-cross-origin` policy: the path was withheld from the request, not never there.
+ */
+const isOriginOnly = (url: string | undefined): boolean => {
+  try {
+    const parsed = new URL(url ?? '');
+
+    return parsed.pathname === '/' && parsed.search === '' && parsed.hash === '';
+  } catch {
+    return false;
   }
 };
 
@@ -426,12 +450,15 @@ export const createDownloadHold = ({
   cancel,
   now = Date.now,
   onReport,
+  onSpent,
   search,
 }: {
   readonly cancel: (itemId: number) => Promise<void>;
   readonly now?: () => number;
   /** Called once per report as it is queued, so a worker that sleeps before the next call does not lose it. */
   readonly onReport?: ((report: DownloadHoldReport, session: string) => void) | undefined;
+  /** Called the moment an armed approval is spent, so a record keeps the one file it bought spent across a restart. */
+  readonly onSpent?: ((need: ApprovalNeed) => void) | undefined;
   readonly search?: ((itemId: number) => Promise<readonly DownloadHoldItem[]>) | undefined;
 }): DownloadHold => {
   const needs = new Map<string, ApprovalNeed>();
@@ -573,6 +600,22 @@ export const createDownloadHold = ({
       }
     }
 
+    // An origin-only referrer names no page: a cross-origin attachment's document (and a same-origin one, which the
+    // Browser also reduces) reports `origin/`, so the page it came from was withheld, not absent. The origin is then
+    // The strongest tie there is — and it is enough to fail closed, because the file is attributed to whichever agent
+    // Tab shares it rather than saved unanswered.
+    const origin = isOriginOnly(referrer) ? originOf(referrer) : undefined;
+
+    if (origin === undefined) {
+      return undefined;
+    }
+
+    for (const [tabId, tab] of tabs) {
+      if (originOf(tab.page) === origin) {
+        return tabId;
+      }
+    }
+
     return undefined;
   };
 
@@ -606,6 +649,22 @@ export const createDownloadHold = ({
     return pageOf(item.referrer) === undefined ? newest?.[0] : undefined;
   };
 
+  /** The agent tab an unclaimed announcement already named: the strongest attribution there is. */
+  const tabByAnnouncement = (item: DownloadHoldItem): number | undefined => {
+    const url = item.url === undefined || item.url === '' ? undefined : item.url;
+
+    for (const [tabId, list] of announcements) {
+      if (
+        tabs.has(tabId) &&
+        list.some(entry => !entry.claimed && announcementMatches(entry, url))
+      ) {
+        return tabId;
+      }
+    }
+
+    return undefined;
+  };
+
   const classify = (item: DownloadHoldItem): Attribution => {
     if (item.byExtensionId !== undefined) {
       return { kind: 'foreign' };
@@ -614,6 +673,14 @@ export const createDownloadHold = ({
     // No agent tab is registered: no click of the agent's can be the cause.
     if (tabs.size === 0) {
       return { kind: 'foreign' };
+    }
+
+    // The browser named this file on an agent tab a moment before the item: owned whichever way the referrer points,
+    // Which is what an origin-only or withheld referrer leaves to read.
+    const announced = tabByAnnouncement(item);
+
+    if (announced !== undefined) {
+      return { kind: 'owned', tabId: announced };
     }
 
     if (pageOf(item.referrer) === undefined) {
@@ -665,6 +732,9 @@ export const createDownloadHold = ({
     };
 
     needs.set(need.session, spent);
+    // The one file the approval bought is spent: a record that keeps the armed need would let a restarted worker
+    // Arm the same approval again, and a second file would land without a new human answer.
+    onSpent?.(spent);
 
     return spent;
   };
@@ -1049,7 +1119,9 @@ export const createDownloadHold = ({
     },
     needOf,
     settle: async (session, window) => {
-      const until = window.since + window.timeoutMs;
+      // The wait is measured from this settle, never from the call's start: a tool slower than the bound would
+      // Otherwise reach its own settle with the deadline already past, and answer over an item still in flight.
+      const until = now() + window.timeoutMs;
       // The grace is measured from this settle: the tab's announcement lands after the tool answered, and a grace
       // Spent before the settle began would miss it. Nothing is released early while the call still has a Document.
       const graceUntil = now() + window.graceMs;

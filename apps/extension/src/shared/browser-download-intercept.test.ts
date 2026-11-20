@@ -61,6 +61,56 @@ describe('the response pause', () => {
     expect(isDownloadResponse(page)).toBe(false);
     expect(DOWNLOAD_FAIL_REASON).toBe('Aborted');
   });
+
+  /**
+   * The defect this covers: the check searched the whole header for the word, so `inline; filename="attachment-1.pdf"`
+   * matched and an ordinary page load was failed as a download.
+   */
+  it('reads the disposition type, never a file name that happens to contain it', () => {
+    const inline = pausedOf({
+      documentURL: 'https://app.example/reports/attachment-1234.pdf',
+      requestId: 'r3',
+      responseHeaders: [
+        { name: 'Content-Disposition', value: 'inline; filename="attachment-1234.pdf"' },
+        { name: 'Content-Type', value: 'application/pdf' },
+      ],
+    });
+
+    expect(isDownloadResponse(inline)).toBe(false);
+
+    // The type alone decides; its case does not.
+    const attachment = pausedOf({
+      documentURL: 'https://app.example/reports/q4.pdf',
+      requestId: 'r4',
+      responseHeaders: [{ name: 'Content-Disposition', value: 'ATTACHMENT; filename="q4.pdf"' }],
+    });
+
+    expect(isDownloadResponse(attachment)).toBe(true);
+  });
+
+  /**
+   * The defect this covers: a missing `Content-Type` was read as a file, so a server that sends none had every
+   * navigation failed — and an HTML body Chrome would have rendered was reported as a stopped download.
+   */
+  it('continues a Document without a Content-Type, because Chrome sniffs and renders it', () => {
+    const sniffed = pausedOf({
+      documentURL: 'https://app.example/no-header',
+      requestId: 'r5',
+      responseHeaders: [],
+    });
+
+    expect(sniffed.mediaType).toBeUndefined();
+    expect(isDownloadResponse(sniffed)).toBe(false);
+
+    // A media type no browser renders is still the file it always was, with or without a matching disposition.
+    const binary = pausedOf({
+      documentURL: 'https://app.example/report.bin',
+      requestId: 'r6',
+      responseHeaders: [{ name: 'Content-Type', value: 'application/octet-stream' }],
+    });
+
+    expect(isDownloadResponse(binary)).toBe(true);
+  });
 });
 
 describe('the settle that keeps the pause armed', () => {

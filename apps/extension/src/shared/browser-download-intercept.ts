@@ -170,17 +170,27 @@ export const downloadResponsePause = (
   };
 };
 
+/** The disposition's own type: the token before the first `;`, lower-cased. `filename="attachment.pdf"` is not it. */
+const dispositionOf = (disposition: string | undefined): string | undefined => {
+  const [type] = (disposition ?? '').split(';');
+  const trimmed = type?.trim().toLowerCase() ?? '';
+
+  return trimmed === '' ? undefined : trimmed;
+};
+
 /** Whether Chrome would save this document response as a file rather than show it. */
 export const isDownloadResponse = (pause: DownloadResponsePause): boolean => {
   const { disposition, mediaType } = pause;
 
-  if (disposition?.toLowerCase().includes('attachment') === true) {
+  // Only the disposition's type decides: `inline; filename="attachment-1234.pdf"` is a rendered page.
+  if (dispositionOf(disposition) === 'attachment') {
     return true;
   }
 
-  // No media type at all: Chrome has no renderer to pick, so the body is a file.
+  // No media type at all: Chrome sniffs the body, and an HTML one is a page, never a file. A missing header is not
+  // A download signal, so the response is continued and the browser renders what it finds.
   if (mediaType === undefined) {
-    return true;
+    return false;
   }
 
   return (

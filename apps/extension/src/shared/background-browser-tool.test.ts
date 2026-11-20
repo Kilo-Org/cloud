@@ -1,6 +1,10 @@
 /* eslint-disable max-lines, require-await, typescript-eslint/require-await, unicorn/no-useless-undefined -- Fake extension runtime returns verbatim responses for assertions. */
 import { describe, expect, it, vi } from 'vitest';
-import { BROWSER_TOOL_MESSAGE, TAB_NOT_INSPECTABLE_ERROR } from '@/src/shared/tab-debugger';
+import {
+  BROWSER_TOOL_MESSAGE,
+  DISPOSE_BROWSER_CALLER_MESSAGE,
+  TAB_NOT_INSPECTABLE_ERROR,
+} from '@/src/shared/tab-debugger';
 import type {
   BrowserTabInfo,
   BrowserTabsApi,
@@ -297,6 +301,61 @@ describe('background browser tool branch', () => {
     });
     // No page command may run for an invalid call.
     expect(state.commands).toStrictEqual([]);
+  });
+});
+
+describe('the cached browser runtime', () => {
+  /**
+   * The defect this covers: the panel path built the runtime without the hold, and the runtime cache is keyed by the
+   * tabs API alone. The agent bridge then reused that runtime for the rest of the worker's life, with no hold: every
+   * agent download fell back to the cancel-after-start guard.
+   */
+  it('keeps the hold when a panel message created the runtime first', async () => {
+    const { api: debuggerApi } = createFakeDebuggerApi();
+    const tabs = new Map([[60, { id: 60, title: 'Example', url: 'https://example.com/' }]]);
+    const { api: tabsApi } = createFakeTabsApi(tabs);
+    const closed: string[] = [];
+    const hold = {
+      announce: () => undefined,
+      arm: () => undefined,
+      closeSession: (session: string) => {
+        closed.push(session);
+      },
+      drain: () => [],
+      escape: () => undefined,
+      handle: () => false,
+      navigate: () => undefined,
+      needOf: () => undefined,
+      settle: async () => 'no_sign' as const,
+      tab: () => undefined,
+      tracked: () => undefined,
+    };
+    const agentCaller = {
+      controllerId: 'controller-1',
+      kind: 'agent',
+      sessionHandle: 'session-1',
+    } as const;
+
+    // The panel's message is the first one this worker sees: it creates the one runtime for this tabs API.
+    await handleTabDebuggerRequest({
+      debuggerApi,
+      downloadHold: hold,
+      request: browserToolRequest(60, 'kilo_browser_navigate', { url: 'https://example.com/' }),
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    // The agent's session ends through the same cached runtime: the hold is part of it, so the session closes there.
+    const response = await handleTabDebuggerRequest({
+      debuggerApi,
+      downloadHold: hold,
+      request: { caller: agentCaller, type: DISPOSE_BROWSER_CALLER_MESSAGE },
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    expect(response).toMatchObject({ ok: true, type: DISPOSE_BROWSER_CALLER_MESSAGE });
+    expect(closed).toStrictEqual(['session-1']);
   });
 });
 

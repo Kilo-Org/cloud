@@ -3,6 +3,7 @@
 /* eslint-disable jest/no-hooks, vitest/no-hooks, vitest/require-top-level-describe -- fake timers must be installed per case and restored after it. */
 /* eslint-disable vitest/prefer-strict-equal -- the fake's ordering strings are primitives; deep equality says what `toStrictEqual` would say for a `string[]`. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import {
   ATTRIBUTION_WAIT_MS,
   createDownloadHold,
@@ -12,6 +13,7 @@ import {
 } from './browser-download-hold';
 import type {
   ApprovalNeed,
+  DownloadHold,
   DownloadHoldItem,
   DownloadSettle,
   DownloadSign,
@@ -52,6 +54,7 @@ interface FakeDownloads {
   };
   readonly globals: {
     readonly downloads: () => FakeDownloads['api'];
+    readonly extensionOrigin: () => string;
     readonly permissions: () => {
       readonly onAdded: {
         readonly addListener: (
@@ -120,6 +123,7 @@ const makeDownloads = (): FakeDownloads => {
     /** The `DownloadHoldGlobals` a host reads, over this fake. */
     globals: {
       downloads: () => api,
+      extensionOrigin: () => 'chrome-extension://kilo-test-extension-id/',
       permissions: () => ({
         onAdded: {
           addListener: (listener: (added: { readonly permissions?: string[] }) => void): void => {
@@ -171,6 +175,8 @@ const makeDownloads = (): FakeDownloads => {
 interface FakeStorage {
   readonly getItem: (key: string) => Promise<unknown>;
   readonly keys: string[];
+  /** The session names the last written record holds: what a restart would restore. */
+  readonly recordKeys: () => string[];
   readonly release: () => void;
   readonly setItem: (key: string, value: unknown) => Promise<void>;
   readonly store: () => unknown;
@@ -203,6 +209,15 @@ const makeStorage = ({
       return values.get(key);
     },
     keys,
+    recordKeys: (): string[] => {
+      const value = values.get(DOWNLOAD_HOLD_STATE_KEY);
+      const parsed = z
+        .object({})
+        .catchall(z.unknown())
+        .safeParse(value ?? {});
+
+      return parsed.success ? Object.keys(parsed.data) : [];
+    },
     release: (): void => {
       resolve();
     },
@@ -436,6 +451,79 @@ describe('foreign downloads', () => {
     ).toBe(false);
     expect(downloads.order).toEqual(['suggest']);
     expect(hold.tracked(2)).toBeUndefined();
+  });
+
+  /**
+   * The defect this covers: a cross-origin attachment's referrer is origin-only, so the exact page comparison never
+   * matched the agent tab and `classify` called it foreign — the file was saved with no approval and no report.
+   */
+  it('owns a cross-origin attachment whose referrer carries only the origin', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    // Chrome's default policy reduces a cross-origin referrer to `origin/`: the path was withheld, not absent.
+    expect(
+      hold.handle(
+        { id: 4, referrer: 'https://app.example/', url: 'https://files.example/q4.pdf' },
+        () => {
+          downloads.order.push('suggest');
+        }
+      )
+    ).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(downloads.order.indexOf('cancel')).toBeLessThan(downloads.order.indexOf('suggest'));
+    expect(reports).toStrictEqual(['stopped:q4.pdf']);
+  });
+
+  it('leaves an origin-only referrer naming no agent tab’s origin to the user', () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    expect(
+      hold.handle(
+        { id: 5, referrer: 'https://other.example/', url: 'https://files.example/q4.pdf' },
+        () => {
+          downloads.order.push('suggest');
+        }
+      )
+    ).toBe(false);
+    expect(downloads.order).toEqual(['suggest']);
+    expect(reports).toStrictEqual([]);
+  });
+
+  /**
+   * The module header promises an announcement is the strongest attribution, ahead of the referrer. An announcement
+   * that names the file on an agent tab therefore decides the download even when its referrer points elsewhere.
+   */
+  it('owns a file its own announcement claimed, whatever the referrer says', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+    hold.announce({
+      suggestedFilename: 'q4.pdf',
+      tabId: 7,
+      url: 'https://files.example/q4.pdf',
+    });
+
+    // A referrer that names no agent tab at all: without the announcement this would pass as another page's file.
+    expect(
+      hold.handle(
+        { id: 6, referrer: 'https://other.example/page', url: 'https://files.example/q4.pdf' },
+        () => {
+          downloads.order.push('suggest');
+        }
+      )
+    ).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(downloads.order.indexOf('cancel')).toBeLessThan(downloads.order.indexOf('suggest'));
+    expect(reports).toStrictEqual(['stopped:q4.pdf']);
   });
 });
 
@@ -729,17 +817,61 @@ describe('a download announced after its own item', () => {
 });
 
 describe('the recorded state', () => {
-  const startHost = (downloads: FakeDownloads, storage: FakeStorage) =>
-    startDownloadHold({
+  const chromeOrigin = () => 'chrome-extension://kilo-test-extension-id/';
+  const startChrome = (downloads: FakeDownloads, storage: FakeStorage): DownloadHold => {
+    const hold = startDownloadHold({
       downloads: downloads.globals.downloads,
+      extensionOrigin: chromeOrigin,
       permissions: downloads.globals.permissions,
       sessionStorage: () => storage,
     });
 
+    if (hold === undefined) {
+      throw new Error('expected Chrome to have a download hold');
+    }
+
+    return hold;
+  };
+
+  /**
+   * The defect this covers: the host always returned a hold, so Firefox — which has no `onDeterminingFilename` at all —
+   * was given one, the runtime picked the hold tier, and nothing was listening: the file was saved unreported.
+   */
+  it('returns no hold at all in a browser that cannot raise the event', () => {
+    const firefox = makeDownloads();
+
+    expect(
+      startDownloadHold({
+        downloads: firefox.globals.downloads,
+        extensionOrigin: () => 'moz-extension://kilo-test-extension-id/',
+        permissions: firefox.globals.permissions,
+        sessionStorage: () => makeStorage({}),
+      })
+    ).toBeUndefined();
+
+    // Chrome keeps its hold before the grant, because the grant is what makes the event exist there.
+    expect(startChrome(makeDownloads(), makeStorage({}))).toBeDefined();
+  });
+
+  it('returns no hold when the browser will not name its own origin', () => {
+    const downloads = makeDownloads();
+    // `chrome.runtime.getURL` absent is what background.ts reads as no origin at all.
+    const origin: string | undefined = undefined;
+
+    expect(
+      startDownloadHold({
+        downloads: downloads.globals.downloads,
+        extensionOrigin: () => origin,
+        permissions: downloads.globals.permissions,
+        sessionStorage: () => makeStorage({}),
+      })
+    ).toBeUndefined();
+  });
+
   it('rehydrates needs and reports from storage.session after a worker restart', async () => {
     const storage = makeStorage({});
     const first = makeDownloads();
-    const firstHold = startHost(first, storage);
+    const firstHold = startChrome(first, storage);
 
     firstHold.tab(agentTab());
     firstHold.arm(armedNeed({ url: 'https://app.example/reports/q4.pdf' }));
@@ -757,7 +889,7 @@ describe('the recorded state', () => {
     expect(storage.store()).toBeDefined();
 
     const second = makeDownloads();
-    const secondHold = startHost(second, storage);
+    const secondHold = startChrome(second, storage);
 
     await vi.advanceTimersByTimeAsync(0);
 
@@ -779,7 +911,7 @@ describe('the recorded state', () => {
       initial: { 'session-1': { owed: [], tabs: [] } },
     });
     const downloads = makeDownloads();
-    const hold = startHost(downloads, storage);
+    const hold = startChrome(downloads, storage);
 
     hold.tab(agentTab());
     hold.arm(armedNeed({ url: 'https://app.example/reports/q4.pdf' }));
@@ -793,6 +925,147 @@ describe('the recorded state', () => {
       downloads.order.push('suggest');
     });
     expect(downloads.order).toContain('suggest');
+  });
+
+  /**
+   * The defect this covers: the armed need is the only thing the record kept, so a worker restarted inside the
+   * token's lifetime re-armed an approval the first file had already spent, and a second file landed unanswered.
+   */
+  it('keeps a spent approval spent across a restart, so it is never armed twice', async () => {
+    const storage = makeStorage({});
+    const first = makeDownloads();
+    const firstHold = startChrome(first, storage);
+    const attachment = 'https://app.example/reports/q4.pdf';
+
+    firstHold.tab(agentTab());
+    firstHold.arm(armedNeed({ url: attachment }));
+    // The record is read before the first decision: a waking download waits for it, and so does this test.
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The approved file lands: the one file the approval bought is spent.
+    expect(
+      firstHold.handle({ id: 1, referrer: page, url: attachment }, () => {
+        first.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(firstHold.needOf('session-1')?.kind).toBe('spent');
+
+    const second = makeDownloads();
+    const secondHold = startChrome(second, storage);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The restarted worker restored the spent need, not an armed one: a second file is refused, never let through.
+    expect(secondHold.needOf('session-1')?.kind).toBe('spent');
+
+    const download = secondHold.handle({ id: 2, referrer: page, url: attachment }, () => {
+      second.order.push('suggest');
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(download).toBe(true);
+    expect(second.order).toContain('cancel');
+    expect(
+      secondHold.drain('session-1').map(report => `${String(report.kept)}:${report.filename}`)
+    ).toEqual(['false:q4.pdf']);
+  });
+
+  /**
+   * The defect this covers: the record was restored in the background, so a download whose event woke the worker was
+   * classified against an empty hold — no agent tab, no approval — and its file was passed through as the user's.
+   */
+  it('decides a waking download only after the record is restored', async () => {
+    const attachment = 'https://app.example/reports/q4.pdf';
+    const record = {
+      'session-1': {
+        owed: [],
+        tabs: [{ page, session: 'session-1', step, tabId: 7 }],
+      },
+    };
+    const storage = makeStorage({ deferred: true, initial: record });
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    const emission = hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+      downloads.order.push('suggest');
+    });
+
+    // The record has not landed: nothing may be answered yet, and the answer is owed to Chrome.
+    expect(emission).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(downloads.order).toEqual([]);
+
+    storage.release();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The restored agent tab makes this the agent's file: cancelled before `suggest`, and reported.
+    expect(downloads.order.indexOf('cancel')).toBeLessThan(downloads.order.indexOf('suggest'));
+    expect(
+      hold.drain('session-1').map(report => `${String(report.kept)}:${report.filename}`)
+    ).toEqual(['false:q4.pdf']);
+  });
+
+  /**
+   * The defect this covers: closing a session did not touch it, so a record read still in flight restored the closed
+   * session's tabs — and a user's download on that page was attributed, cancelled and reported to nobody.
+   */
+  it('never resurrects a session closed before the record was read', async () => {
+    const attachment = 'https://app.example/reports/q4.pdf';
+    const record = {
+      'session-1': {
+        need: armedNeed({ url: attachment }),
+        owed: [],
+        tabs: [{ page, session: 'session-1', step, tabId: 7 }],
+      },
+    };
+    const storage = makeStorage({ deferred: true, initial: record });
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    hold.closeSession('session-1');
+    storage.release();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The closed session is gone from the record, and its tab is not registered: the file is the user's.
+    expect(hold.needOf('session-1')).toBeUndefined();
+    expect(storage.recordKeys()).toStrictEqual([]);
+    expect(
+      hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(downloads.order).toEqual(['suggest']);
+    expect(hold.drain('session-1')).toEqual([]);
+  });
+
+  /**
+   * The defect this covers: a detached tab was edited out of the record only while it existed, so a tab read that was
+   * still in flight re-registered a closed tab and its downloads were attributed to a session that left the page.
+   */
+  it('never re-registers a tab detached before the record was read', async () => {
+    const attachment = 'https://app.example/reports/q4.pdf';
+    const record = {
+      'session-1': {
+        owed: [],
+        tabs: [{ page, session: 'session-1', step, tabId: 7 }],
+      },
+    };
+    const storage = makeStorage({ deferred: true, initial: record });
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    hold.tab({ detach: 7 });
+    storage.release();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(
+      hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(downloads.order).toEqual(['suggest']);
+    expect(hold.drain('session-1')).toEqual([]);
   });
 });
 
@@ -923,14 +1196,53 @@ describe('a sign-gated settle', () => {
       timeoutMs: 1500,
     });
 
-    // The tab announces the file at +130, twenty milliseconds into the settle: inside the sign grace.
-    await vi.advanceTimersByTimeAsync(20);
+    // The tab announces the file at +110, at the tool's own answer: inside the sign grace.
+    await vi.advanceTimersByTimeAsync(0);
     sign = 'download';
-    await vi.advanceTimersByTimeAsync(1400);
+    // The bound is the settle's own 1500 ms, not the call's: measured from the call start it would already be spent.
+    await vi.advanceTimersByTimeAsync(1560);
 
     // A signed call that decided nothing inside the bound: the call answers the refusal itself, not the next one.
     await expect(settled).resolves.toBe('waiting_for_item');
     expect(hold.drain('session-1')).toStrictEqual([]);
+  });
+
+  /**
+   * The defect this covers: the bound was `since + timeoutMs`, so a tool slower than the bound reached its own settle
+   * with the deadline already past and answered over an item that was still in flight.
+   */
+  it('waits its full bound when the tool outlasted it, so a late item is still decided', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    // The tool took 2500 ms — longer than the settle's 1500 — so a bound measured from the call start is long spent.
+    const callStartedAt = Date.now();
+
+    await vi.advanceTimersByTimeAsync(2500);
+
+    const settled = hold.settle('session-1', {
+      graceMs: 40,
+      sign: () => 'download',
+      since: callStartedAt,
+      timeoutMs: 1500,
+    });
+    let outcome: DownloadSettle | 'pending' = 'pending';
+    const consuming = (async (): Promise<void> => {
+      outcome = await settled;
+    })();
+
+    // The item arrives 300 ms into the settle: it is the call's own download, and it is decided before the bound.
+    await vi.advanceTimersByTimeAsync(300);
+    hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(SETTLE_QUIET_MS + 20);
+    await consuming;
+
+    expect(outcome).toBe('decided');
+    expect(reports).toStrictEqual(['stopped:q4.pdf']);
   });
 
   /**

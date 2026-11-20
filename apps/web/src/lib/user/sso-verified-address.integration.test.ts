@@ -31,6 +31,21 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   deleteStripeCustomer: jest.fn().mockResolvedValue(undefined),
 }));
 
+// WorkOS is unreachable in tests too (`.env.test` carries an invalid key).
+jest.mock('@/lib/scim/directory-verified-domains', () => {
+  class VerifiedDomainLookupError extends Error {}
+  class VerifiedDomainOwnerMissingError extends Error {}
+  return {
+    VerifiedDomainLookupError,
+    VerifiedDomainOwnerMissingError,
+    listDnsVerifiedDomains: jest.fn(),
+  };
+});
+
+const verifiedDomains = jest.requireMock<{ listDnsVerifiedDomains: jest.Mock }>(
+  '@/lib/scim/directory-verified-domains'
+);
+
 let suffix: string;
 let domain: string;
 let email: string;
@@ -42,6 +57,10 @@ beforeEach(() => {
   suffix = randomUUID();
   domain = `sso-${suffix}.test`;
   email = `person@${domain}`;
+  verifiedDomains.listDnsVerifiedDomains.mockReset();
+  verifiedDomains.listDnsVerifiedDomains.mockImplementation(async (workOSOrganizationId: string) =>
+    workOSOrganizationId === `org_${suffix}` ? [domain] : []
+  );
 });
 
 afterEach(async () => {
@@ -64,12 +83,16 @@ afterEach(async () => {
   }
 });
 
-async function seedOrganization(ssoDomain: string | null): Promise<string> {
+/** `workOSOrganizationId` defaults to the one whose DNS-verified domains include `domain`. */
+async function seedOrganization(
+  ssoDomain: string | null,
+  workOSOrganizationId = `org_${suffix}`
+): Promise<string> {
   const organization = await createOrganization(`SSO Org ${randomUUID()}`, null, false);
   createdOrganizationIds.push(organization.id);
   await db
     .update(organizations)
-    .set({ sso_domain: ssoDomain })
+    .set({ sso_domain: ssoDomain, external_org_id: workOSOrganizationId })
     .where(eq(organizations.id, organization.id));
   return organization.id;
 }
@@ -149,6 +172,20 @@ describe('hasSsoVerifiedPrimaryAddress', () => {
     expect(await ssoVerified(provisioned.id)).toBe(true);
   });
 
+  test("does not count an SSO sign-in when the authority's WorkOS organization has not verified the domain through DNS", async () => {
+    const authorityId = await seedOrganization(domain, `org_unverified_${suffix}`);
+    const user = await seedAccount();
+    await addUserToOrganization(authorityId, user.id, 'member');
+
+    await signInThroughSso();
+
+    expect(await getUserAuthProviders(user.id)).toEqual([
+      expect.objectContaining({ provider: 'workos', email, hosted_domain: domain }),
+    ]);
+    expect(await ssoVerified(user.id)).toBe(false);
+    expect(verifiedDomains.listDnsVerifiedDomains).toHaveBeenCalledWith(`org_unverified_${suffix}`);
+  });
+
   test('does not count an SSO sign-in once the domain no longer requires SSO', async () => {
     const authorityId = await seedOrganization(domain);
     const user = await seedAccount();
@@ -165,7 +202,7 @@ describe('hasSsoVerifiedPrimaryAddress', () => {
 
   test('does not count an SSO sign-in when the account is outside the authority organization', async () => {
     const authorityId = await seedOrganization(domain);
-    const otherId = await seedOrganization(null);
+    const otherId = await seedOrganization(null, `org_other_${suffix}`);
     const user = await seedAccount();
     await addUserToOrganization(otherId, user.id, 'member');
     await signInThroughSso();

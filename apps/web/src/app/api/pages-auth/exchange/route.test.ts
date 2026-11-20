@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import {
+  getOrganizationById,
   getProfileOrganizations,
   getUserOrgMemberships,
 } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -10,6 +11,11 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { createPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
+import {
+  listDnsVerifiedDomains,
+  VerifiedDomainLookupError,
+  VerifiedDomainOwnerMissingError,
+} from '@/lib/scim/directory-verified-domains';
 import { getUserAuthProviders } from '@/lib/user';
 import { POST } from './route';
 
@@ -29,6 +35,7 @@ jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
+  getOrganizationById: jest.fn(),
   getProfileOrganizations: jest.fn(),
   getUserOrgMemberships: jest.fn(),
 }));
@@ -36,6 +43,16 @@ jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
   resolveSsoAuthorityForDomain: jest.fn(),
 }));
+
+jest.mock('@/lib/scim/directory-verified-domains', () => {
+  class VerifiedDomainLookupError extends Error {}
+  class VerifiedDomainOwnerMissingError extends Error {}
+  return {
+    VerifiedDomainLookupError,
+    VerifiedDomainOwnerMissingError,
+    listDnsVerifiedDomains: jest.fn(),
+  };
+});
 
 jest.mock('@/lib/user', () => ({
   getUserAuthProviders: jest.fn(),
@@ -47,6 +64,8 @@ const mockedIsUserBlacklistedByDomain = jest.mocked(isUserBlacklistedByDomain);
 const mockedGetProfileOrganizations = jest.mocked(getProfileOrganizations);
 const mockedGetUserOrgMemberships = jest.mocked(getUserOrgMemberships);
 const mockedResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
+const mockedGetOrganizationById = jest.mocked(getOrganizationById);
+const mockedListDnsVerifiedDomains = jest.mocked(listDnsVerifiedDomains);
 
 const NEXTAUTH_TEST_SECRET = 'synthetic-pages-auth-exchange-secret';
 const NOW = new Date('2026-03-01T12:00:00.000Z');
@@ -137,6 +156,11 @@ describe('POST /api/pages-auth/exchange', () => {
       sourceOrganizationId: 'org-sso',
     });
     mockedGetUserOrgMemberships.mockResolvedValue([{ orgId: 'org-sso', role: 'member' }]);
+    mockedGetOrganizationById.mockResolvedValue({
+      id: 'org-sso',
+      external_org_id: 'org_workos_sso',
+    } as never);
+    mockedListDnsVerifiedDomains.mockResolvedValue(['kilo.test']);
   });
 
   afterEach(() => {
@@ -225,7 +249,7 @@ describe('POST /api/pages-auth/exchange', () => {
         return (await response.json()).user;
       }
 
-      test('carries the primary address when the domain requires SSO through an organization the account belongs to', async () => {
+      test("carries the primary address when the domain requires SSO through an organization the account belongs to, and that organization's WorkOS organization verified the domain through DNS", async () => {
         mockedGetUserAuthProviders.mockResolvedValueOnce(
           providerRows(['workos', 'ada@kilo.test', 'kilo.test'])
         );
@@ -237,6 +261,50 @@ describe('POST /api/pages-auth/exchange', () => {
         });
         expect(mockedResolveSsoAuthorityForDomain).toHaveBeenCalledWith('kilo.test');
         expect(mockedGetUserOrgMemberships).toHaveBeenCalledWith('user-1');
+        expect(mockedGetOrganizationById).toHaveBeenCalledWith('org-sso');
+        expect(mockedListDnsVerifiedDomains).toHaveBeenCalledWith('org_workos_sso');
+      });
+
+      test('leaves the key out when the domain is attached to the WorkOS organization but not verified through DNS', async () => {
+        mockedGetUserAuthProviders.mockResolvedValueOnce(
+          providerRows(['workos', 'ada@kilo.test', 'kilo.test'])
+        );
+        mockedListDnsVerifiedDomains.mockResolvedValueOnce(['other.test']);
+
+        expect(await sentUser()).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+      });
+
+      test('leaves the key out when the authority organization has no WorkOS organization', async () => {
+        mockedGetUserAuthProviders.mockResolvedValueOnce(
+          providerRows(['workos', 'ada@kilo.test', 'kilo.test'])
+        );
+        mockedGetOrganizationById.mockResolvedValueOnce({
+          id: 'org-sso',
+          external_org_id: null,
+        } as never);
+
+        expect(await sentUser()).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+        expect(mockedListDnsVerifiedDomains).not.toHaveBeenCalled();
+      });
+
+      test.each([
+        ['WorkOS cannot be reached', () => new VerifiedDomainLookupError('WorkOS unavailable')],
+        [
+          'the WorkOS organization no longer exists',
+          () => new VerifiedDomainOwnerMissingError('WorkOS organization gone'),
+        ],
+        ['the lookup throws anything else', () => new TypeError('unexpected')],
+      ])('still answers, without the key, when %s', async (_name, failure) => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        mockedGetUserAuthProviders.mockResolvedValueOnce(
+          providerRows(['workos', 'ada@kilo.test', 'kilo.test'])
+        );
+        mockedListDnsVerifiedDomains.mockRejectedValueOnce(failure());
+
+        expect(await sentUser()).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(JSON.stringify(warn.mock.calls)).not.toContain('ada@kilo.test');
+        warn.mockRestore();
       });
 
       test('ignores case in the row address and domain', async () => {
@@ -264,6 +332,7 @@ describe('POST /api/pages-auth/exchange', () => {
         mockedResolveSsoAuthorityForDomain.mockResolvedValueOnce(authority);
 
         expect(await sentUser()).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+        expect(mockedListDnsVerifiedDomains).not.toHaveBeenCalled();
       });
 
       test('leaves the key out when the account is not a member of the authority organization', async () => {
@@ -273,6 +342,7 @@ describe('POST /api/pages-auth/exchange', () => {
         mockedGetUserOrgMemberships.mockResolvedValueOnce([{ orgId: 'org-1', role: 'member' }]);
 
         expect(await sentUser()).toEqual({ id: 'user-1', name: 'Ada Lovelace' });
+        expect(mockedListDnsVerifiedDomains).not.toHaveBeenCalled();
       });
 
       test.each([

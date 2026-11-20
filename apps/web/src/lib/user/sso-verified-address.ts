@@ -4,7 +4,11 @@ import {
   getLowerDomainFromEmail,
 } from '@kilocode/web-shared/lib/email-address';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import { getUserOrgMemberships } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  getOrganizationById,
+  getUserOrgMemberships,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { listDnsVerifiedDomains } from '@/lib/scim/directory-verified-domains';
 
 /**
  * Whether a company SSO sign-in proved the account's primary address.
@@ -15,16 +19,24 @@ import { getUserOrgMemberships } from '@kilocode/web-shared/lib/organizations/or
  *   to exactly one WorkOS organization, that organization is linked to a Kilo
  *   organization, and that Kilo organization is the domain's SSO authority.
  * - Directory sync (`upsertDirectoryUser`) writes the directory user id with a
- *   null `hosted_domain`. Its domain check accepts any domain the WorkOS
- *   organization marks verified, which a dashboard tick can satisfy, so its
- *   rows prove nothing on their own.
+ *   null `hosted_domain`. Its address is the identity provider's assertion,
+ *   not a sign-in, so its rows prove nothing on their own.
  *
  * So the proof is a `workos` row for the primary address whose `hosted_domain`
  * is the primary address's domain, with the sign-in's authority still in force
- * now: the domain requires SSO, and the account is a member of the
- * organization that is its authority. A domain whose SSO was turned off, moved
- * to another organization, or left misconfigured proves nothing, and neither
- * does an account that has left the authority organization.
+ * now: the domain requires SSO, the account is a member of the organization
+ * that is its authority, and that organization's WorkOS organization has
+ * verified the domain through DNS. A domain whose SSO was turned off, moved to
+ * another organization, or left misconfigured proves nothing, and neither does
+ * an account that has left the authority organization.
+ *
+ * DNS verification is required because neither the authority nor the sign-in
+ * shows the organization controls the domain: an owner can set any unclaimed
+ * domain as `sso_domain`, and WorkOS lists a domain attached to an
+ * organization before it is verified. `listDnsVerifiedDomains` is the
+ * repository's bar for domain control. A lookup that fails for any reason
+ * answers false, so the exchange succeeds without the address and the next
+ * exchange asks again.
  *
  * Directory sync can move an SSO row's address within the same domain
  * (`applyDirectoryUserChanges`), keeping its profile id and `hosted_domain`.
@@ -33,7 +45,8 @@ import { getUserOrgMemberships } from '@kilocode/web-shared/lib/organizations/or
  * different domain leaves `hosted_domain` on the old one, so it does not count.
  *
  * The address comparison ignores case only, as `hasVerifiedPrimaryAddress`
- * does. The database is read only when a matching row exists.
+ * does. The database is read only when a matching row exists, and WorkOS only
+ * when every other condition holds.
  */
 export async function hasSsoVerifiedPrimaryAddress(
   user: Pick<User, 'id' | 'google_user_email'>,
@@ -58,5 +71,26 @@ export async function hasSsoVerifiedPrimaryAddress(
   if (authority.status !== 'required') return false;
 
   const memberships = await getUserOrgMemberships(user.id);
-  return memberships.some(m => m.orgId === authority.sourceOrganizationId);
+  if (!memberships.some(m => m.orgId === authority.sourceOrganizationId)) return false;
+
+  return await authorityDnsVerifiedDomain(authority.sourceOrganizationId, domain);
+}
+
+async function authorityDnsVerifiedDomain(
+  organizationId: string,
+  domain: string
+): Promise<boolean> {
+  const organization = await getOrganizationById(organizationId);
+  if (!organization?.external_org_id) return false;
+
+  try {
+    const verified = await listDnsVerifiedDomains(organization.external_org_id);
+    return verified.includes(domain);
+  } catch (error) {
+    console.warn('[pages-auth] Could not read the SSO authority verified domains', {
+      organizationId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
 }

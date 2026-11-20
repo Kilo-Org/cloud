@@ -1277,7 +1277,7 @@
       "dueThisWeekDetail_many": "منها {{exploitable}} مؤكدة القابلية للاستغلال",
       "dueThisWeekDetail_other": "منها {{exploitable}} مؤكدة القابلية للاستغلال",
       "noDeadline": "لا يوجد موعد نهائي",
-      "reviewSlaAssignment": "مراجعة المواعيد المحددة حسب SLA",
+      "reviewSlaAssignment": "مراجعة تعيين الـSLA",
       "allOpenFindingsTracked": "تُتابَع جميع النتائج المفتوحة"
     },
     "dismiss": {

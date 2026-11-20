@@ -1720,7 +1720,7 @@
       "dueThisWeekDetail_one": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "dueThisWeekDetail_other": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "noDeadline": "بدون مهلت",
-      "reviewSlaAssignment": "بررسی مهلت‌های تعیین‌شده در SLA",
+      "reviewSlaAssignment": "بررسی تخصیص SLA",
       "allOpenFindingsTracked": "همه یافته‌های باز ردیابی می‌شوند"
     },
     "dismiss": {

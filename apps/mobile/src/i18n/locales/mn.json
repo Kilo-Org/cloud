@@ -1720,7 +1720,7 @@
       "dueThisWeekDetail_one": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "dueThisWeekDetail_other": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "noDeadline": "Хугацаагүй",
-      "reviewSlaAssignment": "Тогтоосон SLA хугацааг шалгах",
+      "reviewSlaAssignment": "SLA оноолтыг шалгах",
       "allOpenFindingsTracked": "Бүх шийдээгүй асуудлыг хянаж байна"
     },
     "dismiss": {

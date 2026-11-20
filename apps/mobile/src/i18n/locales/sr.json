@@ -1757,7 +1757,7 @@
       "dueThisWeekDetail_few": "{{exploitable}} od njih potvrđeno iskoristivi",
       "dueThisWeekDetail_other": "{{exploitable}} od njih potvrđeno iskoristivi",
       "noDeadline": "Bez roka",
-      "reviewSlaAssignment": "Proveri dodeljene rokove prema SLA",
+      "reviewSlaAssignment": "Proveri dodelu rokova prema SLA",
       "allOpenFindingsTracked": "Prate se svi otvoreni nalazi"
     },
     "dismiss": {

@@ -509,6 +509,13 @@ export type GetProviderInput = {
   organizationId: string | undefined;
   /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
   botId?: string | undefined;
+  /**
+   * Serve only the route Kilo pays for: no stored key, no ChatGPT connection, no Claude
+   * billing connection, no partner route. A measurement run needs one identical transport for
+   * every payer, and a payer's own key would both change what is measured and bill a
+   * different account. Organization model and provider policy still apply.
+   */
+  managedRoutesOnly?: boolean;
   /** The provider routing settings, from the organization or group policy and otherwise the
    * request's own `provider`. Decides whether the Vercel AI Gateway key serves and which gateway
    * Kilo's route uses. Direct BYOK and custom LLM routes do not use it. */
@@ -531,13 +538,6 @@ export type GetProviderInput = {
   isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
-  /**
-   * Serve only the route Kilo pays for: no stored key, no ChatGPT connection, no Claude
-   * billing connection, no partner route. A measurement run needs one identical transport for
-   * every payer, and a payer's own key would both change what is measured and bill a
-   * different account. Organization model and provider policy still apply.
-   */
-  managedRoutesOnly?: boolean;
   /** Receives the steps and BYOK candidates behind the result, when the call returns. */
   onDecision?: (decision: ProviderRoutingDecision) => void;
 };

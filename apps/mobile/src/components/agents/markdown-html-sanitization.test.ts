@@ -20,6 +20,11 @@ function nestedEmptyContainers(depth: number): string {
  * this separates a scan that re-reads the tail per tag from one that reads each
  * region once; the call count alone cannot, because either version makes about
  * one call per tag.
+ *
+ * A whole-value regex replace is invisible to that model: the engine scans
+ * inside `RegExp.prototype[Symbol.replace]`, so a `[^>]*` rescan reads no
+ * countable characters. {@link countScans} counts those replaces separately, so
+ * a pipeline that rebuilds the whole value per pass cannot look like a scan.
  */
 // The natives, captured before the spies replace them. `Reflect.get` reads the
 // function value without forming an unbound method reference.
@@ -32,10 +37,19 @@ const nativeExec = Reflect.get(RegExp.prototype, 'exec') as (
   this: RegExp,
   value: string
 ) => RegExpExecArray | null;
+const nativeReplace = Reflect.get(RegExp.prototype, Symbol.replace) as (
+  this: RegExp,
+  value: string,
+  replaceValue: unknown
+) => string;
 
-/** Runs `run` with both scans counted, returning the characters they read. */
-function countReads(run: () => void): number {
+/** What one cold scan of a value costs, under the spy model above. */
+type ScanCost = { readonly reads: number; readonly wholeValueReplaces: number };
+
+/** Runs `run` with both scans and whole-value regex replaces counted. */
+function countScans(run: () => void): ScanCost {
   let read = 0;
+  let wholeValueReplaces = 0;
   const indexSpy = vi.spyOn(String.prototype, 'indexOf');
   indexSpy.mockImplementation(function countScan(this: string, search: string, from = 0): number {
     const found = nativeIndexOf.call(this, search, from);
@@ -55,28 +69,46 @@ function countReads(run: () => void): number {
     }
     return match;
   } as never);
+  // `String.prototype.replace` and `replaceAll` dispatch here with a regex
+  // pattern, so this sees every whole-value rebuild, including the inner
+  // rescan of a `[^>]*` that the character model cannot.
+  const replaceSpy = vi.spyOn(RegExp.prototype, Symbol.replace);
+  replaceSpy.mockImplementation(function countReplace(
+    this: RegExp,
+    value: string,
+    replaceValue: unknown
+  ) {
+    wholeValueReplaces += 1;
+    return nativeReplace.call(this, value, replaceValue);
+  } as never);
   try {
     run();
   } finally {
     indexSpy.mockRestore();
     execSpy.mockRestore();
+    replaceSpy.mockRestore();
   }
-  return read;
+  return { reads: read, wholeValueReplaces };
 }
 
-/** The characters one cold scan of `value` reads. */
-function charactersRead(value: string): number {
-  return countReads(() => {
+/** What one cold scan of `value` costs. */
+function scanCost(value: string): ScanCost {
+  return countScans(() => {
     clearHtmlEmptinessCacheForTests();
     htmlSanitizesToEmpty(value);
   });
 }
 
+/** The characters one cold scan of `value` reads. */
+function charactersRead(value: string): number {
+  return scanCost(value).reads;
+}
+
 /** The characters a warm ask about `value` reads: zero once it is memoized. */
 function readsOnWarmCache(value: string): number {
-  return countReads(() => {
+  return countScans(() => {
     htmlSanitizesToEmpty(value);
-  });
+  }).reads;
 }
 
 beforeEach(() => {
@@ -183,24 +215,51 @@ describe('htmlSanitizesToEmpty', () => {
   });
 
   it('scans a value with many void removed tags in linear time', () => {
-    // Regression: the container pattern paired `<input>` and `<source>` with a
-    // closer that a void element cannot have, so every occurrence walked the
-    // rest of the value on every streamed publish. Measured on the Android
-    // emulator with the app's own bundle: 20,000 such tags took 14.2 s before
-    // and 35 ms after.
+    // Regression: the removal pipeline rebuilt the whole value once per pattern,
+    // per pass, and the container pattern paired `<input>` and `<source>` with a
+    // closer a void element cannot have, so every occurrence walked the rest of
+    // the value; 20,000 such tags took 14.2 s on the Android emulator with the
+    // app's own bundle, and 35 ms with the linear scans.
+    // Two properties are asserted because no single metric sees both:
+    //  - no whole-value regex replace happens. A pattern's own `[^>]*` rescan
+    //    runs inside `RegExp.prototype[Symbol.replace]`, so the characters-read
+    //    model counts nothing for it, and a pipeline of whole-value replaces
+    //    scores exactly like one linear scan (measured: ratio 4.00 on the old
+    //    pipeline, which is why this test passed on it). Zero replaces is the
+    //    property a rewrite must keep.
+    //  - the characters read through `indexOf`/`exec` grow with the value, not
+    //    per tag: a scan that re-reads the tail per tag reads occurrences ×
+    //    length, while one that reads each region once reads the value about
+    //    twice. A wall-clock sample on a shared runner cannot tell those apart.
     // The corpus is the four void removed elements repeated, then visible text,
-    // so no tag can ever close. Characters read through `String.prototype.indexOf`
-    // is the quantity that separates the shapes: a scan that re-reads the tail
-    // per tag reads occurrences × length, while one that reads each region once
-    // reads the value about twice. A wall-clock sample on a shared runner cannot
-    // tell those apart reliably.
-    const readsOf = (tags: number): number =>
-      charactersRead(`${'<input><source><link><meta>'.repeat(tags / 4)}visible`);
-    const small = readsOf(5_000);
-    const large = readsOf(20_000);
+    // so no tag can ever close.
+    const costOf = (tags: number) =>
+      scanCost(`${'<input><source><link><meta>'.repeat(tags / 4)}visible`);
+    const small = costOf(5_000);
+    const large = costOf(20_000);
+    expect(small.wholeValueReplaces).toBe(0);
+    expect(large.wholeValueReplaces).toBe(0);
     // Four times the input: the linear scan reads about 4×, the per-tag tail
     // walk about 16×.
-    expect(large).toBeLessThan(small * 5);
+    expect(large.reads).toBeLessThan(small.reads * 5);
+  });
+
+  it('reads a whitespace tail after a start tag once, not once per candidate', () => {
+    // The shape a streamed frame produces mid-tag: many start tags, then the
+    // only `>`, then a whitespace run. Every candidate `<` before that `>` looks
+    // for its closer after the same `>`, so a scan that re-searches the `\s*`
+    // tail per candidate reads candidates × tail. At 8,000 candidates and 14,000
+    // more tail characters the head revision read 112,070,000 extra characters
+    // (16,138,005 at m=2,000 against 128,208,005 at m=16,000); a scan that
+    // answers the tail once per `>` read 84,000 (132,005 and 216,005).
+    const readsOf = (tail: number): number =>
+      charactersRead(`${'<a'.repeat(8_000)}>${' '.repeat(tail)}`);
+    const small = readsOf(2_000);
+    const large = readsOf(16_000);
+    // At the measured 6 reads per tail character, 14,000 more characters cost
+    // 84,000. The bound allows 20 per character, 3× the measurement and still
+    // 400× below the per-candidate product.
+    expect(large - small).toBeLessThan(14_000 * 20);
   });
 
   it('scans a value whose start tags never complete in one pass', () => {
@@ -312,6 +371,18 @@ describe('htmlSanitizesToEmpty', () => {
       '</div>',
       '<span>',
       '</span>',
+      // Hyphenated and word-boundary names: the container name run continues
+      // past a `-`, while the old pattern's `\b` let the name group backtrack to
+      // a shorter prefix that still ends at a word boundary. `</a>` closing
+      // `<a->` is the case only that backtracking matches.
+      '<div-x>',
+      '</div-x>',
+      '<a-b>',
+      '</a-b>',
+      '<ab>',
+      '</ab>',
+      '<a->',
+      '</a>',
       '<b>',
       '</b>',
       '<input',

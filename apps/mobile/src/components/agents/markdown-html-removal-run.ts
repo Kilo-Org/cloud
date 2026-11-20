@@ -1,5 +1,7 @@
 import {
   CONTAINER_NAME_RUN_RE,
+  type EmptyContainerCloser,
+  emptyContainerCloserAt,
   emptyContainerEnd,
   endTagAtOrAfter,
   endTagTailAt,
@@ -153,15 +155,19 @@ function removeHtmlComments(value: string): string {
  * optional `/`, a removed name (case-insensitive) terminated by a `\b`, any run
  * of non-`>` characters, then a `>`.
  *
- * One forward scan with a monotonic `>` cursor replaces the pattern's
- * backtracking over `[^>]*`: when no `>` follows a candidate's name, no later
- * candidate can complete either, so the scan ends and the rest is kept
- * verbatim. That is the shape a streamed frame produces mid-tag.
+ * One forward scan replaces the pattern's backtracking over `[^>]*`: when no
+ * `>` follows a candidate's name, no later candidate can complete either, so
+ * the scan ends and the rest is kept verbatim. That is the shape a streamed
+ * frame produces mid-tag. No `>` offset is cached: every match consumes through
+ * its own `>`, so the next candidate's name end is always past it and a fresh
+ * search is the only one that can answer. Each target `>` is found from the
+ * match before it, so the regions the searches read do not overlap and the scan
+ * stays linear; the `break` is what keeps a `>`-free tail from being walked per
+ * candidate.
  */
 function removeRemovedTags(value: string): string {
   let kept = 0;
   let result = '';
-  let tagEndCursor = -1;
   let at = 0;
   while (at < value.length) {
     const start = value.indexOf('<', at);
@@ -174,16 +180,14 @@ function removeRemovedTags(value: string): string {
       at = start + 1;
     } else {
       const nameEnd = start + name.length + (isEndTag ? 2 : 1);
-      if (tagEndCursor < nameEnd) {
-        tagEndCursor = value.indexOf('>', nameEnd);
-      }
-      if (tagEndCursor === -1) {
+      const tagEnd = value.indexOf('>', nameEnd);
+      if (tagEnd === -1) {
         // No `>` at or after this point means no later candidate completes
         // either; the rest of the value stays as it is.
         break;
       }
       result += value.slice(kept, start);
-      kept = tagEndCursor + 1;
+      kept = tagEnd + 1;
       at = kept;
     }
   }
@@ -199,15 +203,24 @@ function removeRemovedTags(value: string): string {
  * case, `\s*`, `>`.
  *
  * The name group of that pattern backtracks: at a start whose full run does not
- * equal the closer's name, a shorter prefix that still ends at a `\b` may. Both
- * `>` searches run on one monotonic cursor, so a value with no `>` costs one
- * walk to its end rather than one per candidate `<`.
+ * equal the closer's name, a shorter prefix that still ends at a `\b` may. Every
+ * candidate that ends at the same open tag `>` also shares the same closer: the
+ * whitespace run, `</` and closer name after that `>` do not depend on the open
+ * tag's name, which is the only thing that varies between those candidates. So
+ * {@link emptyContainerCloserAt} runs once per `>` and each candidate pays only
+ * its own name-length prefix compare. The `>` search itself runs on one
+ * monotonic cursor, so a value with no `>` costs one walk to its end rather than
+ * one per candidate `<`.
  */
 function removeEmptyContainers(value: string): string {
   let kept = 0;
   let result = '';
+  // The `>` that ends the current open tag, and the closer scan after it; both
+  // are unset until the first candidate searches. The cursor only moves forward,
+  // so an offset still at or after a later candidate's name end is reused with
+  // its scan, and each region of the value is read once.
   let openEndCursor = -1;
-  let noOpenEnd = false;
+  let closer: EmptyContainerCloser | undefined = undefined;
   let at = 0;
   while (at < value.length) {
     const start = value.indexOf('<', at);
@@ -221,14 +234,15 @@ function removeEmptyContainers(value: string): string {
     if (run !== null) {
       if (openEndCursor < nameAt) {
         openEndCursor = value.indexOf('>', nameAt);
-        noOpenEnd = openEndCursor === -1;
+        closer =
+          openEndCursor === -1 ? undefined : emptyContainerCloserAt(value, openEndCursor + 1);
       }
-      if (noOpenEnd) {
+      if (openEndCursor === -1) {
         // No `>` at or after this name: no open tag later in the value can
         // complete either, so the rest stays as it is.
         break;
       }
-      closerEnd = emptyContainerEnd(value, nameAt, openEndCursor + 1);
+      closerEnd = emptyContainerEnd(value, nameAt, closer);
     }
     if (closerEnd === -1) {
       at = start + 1;

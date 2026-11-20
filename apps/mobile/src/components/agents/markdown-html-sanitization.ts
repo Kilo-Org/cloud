@@ -146,45 +146,86 @@ export function endTagAtOrAfter(offsets: readonly number[], from: number): numbe
 }
 
 /**
- * The end of a `</name\s*>` closer for the open tag whose name run starts at
- * `nameAt`, or `-1`. `tailAt` is just past the open tag's `>`. The pattern's
- * name group backtracks, so a prefix of the run that ends at a `\b` matches too.
+ * The closer that follows one open tag: the whitespace run after its `>`, then
+ * `</`, that closer's name run, and the `\s*>` tail after it. Every field
+ * depends only on the open tag's `>`, never on the open tag's name.
  */
-export function emptyContainerEnd(value: string, nameAt: number, tailAt: number): number {
-  CONTAINER_NAME_RUN_RE.lastIndex = nameAt;
-  const run = CONTAINER_NAME_RUN_RE.exec(value);
-  if (run === null) {
-    return -1;
-  }
-  const runLength = run[0].length;
+export type EmptyContainerCloser = {
+  /** Where the closer's name run starts, just past its `</`. */
+  readonly nameAt: number;
+  /** The length of the closer's name run. */
+  readonly runLength: number;
+  /** The end of the `\s*>` tail after that whole run, or `-1` for none. */
+  readonly tailEnd: number;
+};
+
+/**
+ * The closer at or after `tailAt`, which is just past an open tag's `>`, or
+ * `undefined` when no `</name …>` follows it. One call answers every candidate
+ * start tag that ends at that `>`.
+ */
+export function emptyContainerCloserAt(
+  value: string,
+  tailAt: number
+): EmptyContainerCloser | undefined {
   WHITESPACE_RUN_RE.lastIndex = tailAt;
   WHITESPACE_RUN_RE.exec(value);
   const closerAt = WHITESPACE_RUN_RE.lastIndex;
   if (!value.startsWith('</', closerAt)) {
+    return undefined;
+  }
+  const nameAt = closerAt + 2;
+  CONTAINER_NAME_RUN_RE.lastIndex = nameAt;
+  const run = CONTAINER_NAME_RUN_RE.exec(value);
+  if (run === null) {
+    return undefined;
+  }
+  const runLength = run[0].length;
+  return { nameAt, runLength, tailEnd: endTagTailAt(value, nameAt + runLength) };
+}
+
+/**
+ * The end of a `</name\s*>` closer for the open tag whose name run starts at
+ * `nameAt`, or `-1`. `closer` is the scan of the text after that open tag's `>`,
+ * which no candidate can change.
+ *
+ * The pattern's name group backtracks, so a prefix of the run that ends at a
+ * `\b` matches too. Such a prefix can only reach the closer's own name run when
+ * it is that whole run: a shorter prefix stops inside the run, at a name
+ * character `\s*>` cannot match, so the tail is only reachable there and the
+ * cached `tailEnd` answers every prefix length.
+ */
+export function emptyContainerEnd(
+  value: string,
+  nameAt: number,
+  closer: EmptyContainerCloser | undefined
+): number {
+  if (closer === undefined) {
     return -1;
   }
-  const closerNameAt = closerAt + 2;
+  CONTAINER_NAME_RUN_RE.lastIndex = nameAt;
+  const openRun = CONTAINER_NAME_RUN_RE.exec(value);
+  if (openRun === null) {
+    return -1;
+  }
   // The longest name the backreference can satisfy is the common prefix of the
-  // run and the closer's text; the search walks down from there to the shortest
-  // prefix that still ends at a `\b`.
+  // run and the closer's text. The open run bounds it: past that run the open
+  // tag's own `>` cannot equal a name character.
+  const openRunLength = openRun[0].length;
   let prefix = 0;
   while (
-    prefix < runLength &&
-    value.codePointAt(nameAt + prefix) === value.codePointAt(closerNameAt + prefix)
+    prefix < openRunLength &&
+    value.codePointAt(nameAt + prefix) === value.codePointAt(closer.nameAt + prefix)
   ) {
     prefix += 1;
   }
-  for (let length = prefix; length >= 1; length -= 1) {
-    const before = isWordCode(value.codePointAt(nameAt + length - 1));
-    const after = isWordCode(value.codePointAt(nameAt + length));
-    if (before !== after) {
-      const closerEnd = endTagTailAt(value, closerNameAt + length);
-      if (closerEnd !== -1) {
-        return closerEnd;
-      }
-    }
+  if (prefix < closer.runLength) {
+    return -1;
   }
-  return -1;
+  const length = closer.runLength;
+  const before = isWordCode(value.codePointAt(nameAt + length - 1));
+  const after = isWordCode(value.codePointAt(nameAt + length));
+  return before === after ? -1 : closer.tailEnd;
 }
 
 /** True for the ASCII characters a `\b` treats as word characters. */

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { type BannerState } from '@/lib/offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 
 export type LiveSessions = ReturnType<typeof useLiveAgentSessions>;
@@ -36,14 +37,39 @@ export function useLiveSessionContext() {
     isReady,
     isResolving,
     isError,
+    // A resolving context is only a wait while one of its reads is in flight;
+    // offline, a read that never started is the pause the surfaces name.
+    isFetching: boundary.isFetching,
     label,
     refetch: boundary.refetch,
   };
 }
 
-export function liveSessionContent(context: LiveSessionContext, sessions: LiveSessions) {
+/** What a live surface is showing; `offline` is a state, not a load in flight. */
+export type LiveSessionContent = 'pending' | 'offline' | 'rows' | 'empty' | 'error';
+
+/**
+ * The one classification both live surfaces (Home's card and the Agents list)
+ * read.
+ *
+ * `connectivity` is the committed connectivity the app-wide offline banner
+ * paints. Offline is not loading: a paused first read never settles, so
+ * naming it `offline` is what lets a surface draw the offline state with Retry
+ * instead of the "Loading…" card and skeletons it cannot settle out of. The
+ * paused read still resumes by itself when the connection returns, so the
+ * state clears without the person pressing anything. Rows and a confirmed empty
+ * list stay as they are: they are real answers from before the connection went
+ * away, and the banner already speaks for the connection.
+ */
+export function liveSessionContent(
+  context: LiveSessionContext,
+  sessions: LiveSessions,
+  connectivity: BannerState
+): LiveSessionContent {
+  const offlineWaiting =
+    connectivity === 'offline' && !sessions.isFetching && !context.isFetching;
   if (context.isResolving) {
-    return 'pending';
+    return offlineWaiting ? 'offline' : 'pending';
   }
   if (!context.isReady || sessions.terminalError?.kind === 'non-retryable') {
     return 'error';
@@ -54,5 +80,8 @@ export function liveSessionContent(context: LiveSessionContext, sessions: LiveSe
   if (sessions.terminalError) {
     return 'error';
   }
-  return sessions.hasAcceptedSuccess ? 'empty' : 'pending';
+  if (sessions.hasAcceptedSuccess) {
+    return 'empty';
+  }
+  return offlineWaiting ? 'offline' : 'pending';
 }

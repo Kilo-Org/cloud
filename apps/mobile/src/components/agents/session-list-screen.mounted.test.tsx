@@ -857,6 +857,44 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(state.announcements).toEqual(['Loading…']);
   });
 
+  it('names the offline state instead of a load that cannot start', async () => {
+    // A confirmed-offline device pauses the first read: pending never settles,
+    // so the screen owes the person the offline state with its own Retry, not a
+    // "Loading…" line and eight skeletons that would never land.
+    state.internet = 'offline';
+    state.connection.isConnected = false;
+    state.live.hasAcceptedSuccess = false;
+    state.live.isPaused = true;
+    await renderScreen();
+    expect(listSkeletons()).toHaveLength(0);
+    expect(text()).not.toContain('Loading…');
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    // One statement: the card already names the connection, so the inline line
+    // does not repeat it.
+    expect(text()).not.toContain('No internet connection');
+    expect(text()).not.toContain('Nothing running right now');
+
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    // The offline card stands for every read the surface waits on, so its Retry
+    // asks both the context and the sessions list.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
+    expect(state.refetch).toHaveBeenCalledTimes(1);
+
+    // The connection returns: the paused read resumes by itself and the card
+    // gives way to the confirmed list.
+    state.internet = 'online';
+    state.connection.isConnected = true;
+    state.live.isPaused = false;
+    state.live.hasAcceptedSuccess = true;
+    await renderScreen();
+    expect(text()).not.toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain('Nothing running right now');
+  });
+
   it('keeps list identity, row identity, navigation, run state, and scroll policy through reconnect and refresh failure', async () => {
     state.live.activeSessions = [row];
     await renderScreen();

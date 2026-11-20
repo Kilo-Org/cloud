@@ -43,7 +43,7 @@ export function useLiveSessionHeaderNotice(
   const connection = useUserWebConnection();
   const retryLock = useMemo(createSubmitLock, []);
   const [retrying, setRetrying] = useState(false);
-  const content = liveSessionContent(context, sessions);
+  const content = liveSessionContent(context, sessions, internet);
 
   const loadFailed = content === 'rows' && context.isReady && Boolean(sessions.terminalError);
   const connectionLost =
@@ -51,7 +51,10 @@ export function useLiveSessionHeaderNotice(
   let message: string | null = null;
   if (loadFailed) {
     message = failureLabel;
-  } else if (internet === 'offline') {
+  } else if (internet === 'offline' && content !== 'offline') {
+    // The offline card owns its own statement when the surface has nothing to
+    // show; the notice speaks only for rows and confirmed-empty content, which
+    // stay on screen through the outage.
     message = t('offline.noInternet');
   } else if (connectionLost) {
     message = t('agentChat.sessionConnection.connectionLost');

@@ -27,6 +27,7 @@ const readyContext: LiveSessionContext = {
   isReady: true,
   isResolving: false,
   isError: false,
+  isFetching: false,
   label: undefined,
   // The context is only read by `liveSessionContent`; the refetch is never
   // invoked here, so a no-op stub is enough to satisfy the exact query type.
@@ -184,7 +185,7 @@ describe('live Agents list across a transient socket empty', () => {
     expect(ids()).toEqual(['a1']);
     // The screen's admission decision must keep the list, not paint the empty
     // state, for the reconnect window.
-    expect(liveSessionContent(readyContext, live())).toBe('rows');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('rows');
   });
 
   it('keeps the rows when a socket reconnect delivers an empty snapshot', async () => {
@@ -200,7 +201,7 @@ describe('live Agents list across a transient socket empty', () => {
     });
     expect(client.getQueryData(QUERY_KEY)).toEqual({ sessions: [] });
     expect(ids()).toEqual(['a1']);
-    expect(liveSessionContent(readyContext, live())).toBe('rows');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('rows');
   });
 
   it('still settles on the empty state when the live set was never populated', async () => {
@@ -208,7 +209,7 @@ describe('live Agents list across a transient socket empty', () => {
     await render();
     expect(ids()).toEqual([]);
     expect(live().hasAcceptedSuccess).toBe(true);
-    expect(liveSessionContent(readyContext, live())).toBe('empty');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('empty');
   });
 
   it('keeps the confirmed rows when a manual write empties the cache', async () => {
@@ -229,7 +230,7 @@ describe('live Agents list across a transient socket empty', () => {
     // The cache really is empty while the server's last answer listed the row.
     expect(client.getQueryData(QUERY_KEY)).toEqual({ sessions: [] });
     expect(ids()).toEqual(['a1']);
-    expect(liveSessionContent(readyContext, live())).toBe('rows');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('rows');
     expect(live().isFetching).toBe(true);
 
     // The confirmation fetch settles with the row and the surface keeps it.
@@ -242,7 +243,7 @@ describe('live Agents list across a transient socket empty', () => {
     // this cannot pass before the answer lands.
     await waitFor(() => live().hasAcceptedSuccess);
     expect(ids()).toEqual(['a1']);
-    expect(liveSessionContent(readyContext, live())).toBe('rows');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('rows');
   });
 
   it('keeps the confirmed rows when the confirmation answer fails', async () => {
@@ -267,7 +268,7 @@ describe('live Agents list across a transient socket empty', () => {
     // zero state.
     expect(ids()).toEqual(['a1']);
     expect(live().terminalError?.kind).toBe('retryable');
-    expect(liveSessionContent(readyContext, live())).toBe('rows');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('rows');
   });
 
   it('accepts the emptiness once an accepted answer confirms it', async () => {
@@ -284,7 +285,7 @@ describe('live Agents list across a transient socket empty', () => {
     // Still held: the emptiness is unconfirmed.
     expect(ids()).toEqual(['a1']);
     expect(live().hasAcceptedSuccess).toBe(false);
-    expect(liveSessionContent(readyContext, live())).toBe('rows');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('rows');
 
     await act(async () => {
       confirmation.resolve({ sessions: [] });
@@ -322,7 +323,7 @@ describe('live Agents list across a transient socket empty', () => {
     // The fresh instance starts from the completed answer's ids: unresolved,
     // never the zero state.
     expect(live().hasAcceptedSuccess).toBe(false);
-    expect(liveSessionContent(readyContext, live())).toBe('pending');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('pending');
 
     // Its answer lists the row again, so the card returns.
     await act(async () => {
@@ -334,6 +335,6 @@ describe('live Agents list across a transient socket empty', () => {
     // this cannot pass before the answer lands.
     await waitFor(() => live().hasAcceptedSuccess);
     expect(ids()).toEqual(['a1']);
-    expect(liveSessionContent(readyContext, live())).toBe('rows');
+    expect(liveSessionContent(readyContext, live(), 'online')).toBe('rows');
   });
 });

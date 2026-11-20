@@ -40,6 +40,7 @@ import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
 import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
@@ -73,8 +74,15 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
   const sessions = useLiveAgentSessions({ organizationId, enabled: context.isReady });
   const { activeSessions, refetch } = sessions;
-  const content = liveSessionContent(context, sessions);
+  const connectivity = useCommittedConnectivityStatus();
+  const content = liveSessionContent(context, sessions, connectivity);
   const hasLiveRows = content === 'rows';
+  // The offline state owns the whole surface: the feedback band centers its
+  // card, and the body (skeletons or rows) stands down for it.
+  const offlineSurface = content === 'offline';
+  // A failure or the offline state owns the whole surface: its centered card
+  // takes the space the body would have used.
+  const centeredSurface = offlineSurface || (query.hasLoaded && content === 'error');
   // A status link from the Home `Live now` card narrows the live list to one
   // state. The parameter is transient: it is not stored, so it cannot silently
   // narrow a later visit. The active filter is drawn by
@@ -373,7 +381,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   );
 
   let body: ReactNode = null;
-  if (!query.hasLoaded || content === 'pending') {
+  // Offline is not a load: the paused first read cannot land, so the centered
+  // feedback band draws the offline card (with Retry) and no body follows it —
+  // skeletons would keep promising a load that cannot start.
+  if (!offlineSurface && (!query.hasLoaded || content === 'pending')) {
     body = <SessionListSkeletonRows insets={{ left, right }} />;
   } else if (hasLiveRows && visibleSessions.length === 0) {
     // The reserved band is mounted here too (the sessions exist behind the
@@ -442,15 +453,15 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const region = (
     <>
       <View
-        className={query.hasLoaded && content === 'error' ? 'flex-1' : 'min-h-5'}
-        style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
+        className={centeredSurface ? 'flex-1' : 'min-h-5'}
+        style={centeredSurface ? undefined : sidePadding}
       >
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
           failureLabel={t('agents.sessionList.couldNotLoadActive')}
           compact
-          centered={query.hasLoaded && content === 'error'}
+          centered={centeredSurface}
           refresh={{
             busy: pull.refreshing || pull.busy,
             failed: pull.failed || retryableRowsFailure,

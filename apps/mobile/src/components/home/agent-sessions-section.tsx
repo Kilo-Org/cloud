@@ -79,6 +79,7 @@ export function LiveSessionFeedback({
   }, [isConnected]);
   const retryLock = useMemo(createSubmitLock, []);
   const [retrying, setRetrying] = useState(false);
+  const content = liveSessionContent(context, sessions, internet);
   const handleRefreshRetry = () => {
     refresh?.onRetry();
   };
@@ -89,14 +90,24 @@ export function LiveSessionFeedback({
     setRetrying(true);
     void (async () => {
       try {
-        await (context.isError ? context.refetch() : sessions.refetch());
+        // A context failure is the boundary's own read. The offline card stands
+        // for everything the surface is still waiting on, so its Retry asks the
+        // boundary as well: a context read that never started is what keeps the
+        // surface unresolved there. A still-offline device re-pauses the read,
+        // and the card stays put with `isRetrying` reporting the attempt.
+        if (context.isError) {
+          await context.refetch();
+        } else if (content === 'offline') {
+          await Promise.all([context.refetch(), sessions.refetch()]);
+        } else {
+          await sessions.refetch();
+        }
       } finally {
         retryLock.release();
         setRetrying(false);
       }
     })();
   };
-  const content = liveSessionContent(context, sessions);
   // One message speaks while the refresh-status line owns the rows-state
   // failure: the line announces its own copy instead of a second label.
   const statusLineOwnsFailure = content === 'rows' && refresh && (refresh.busy || refresh.failed);
@@ -195,6 +206,22 @@ export function LiveSessionFeedback({
     if (rowsFailureInNotice) {
       failure = null;
     }
+  } else if (content === 'offline') {
+    // Offline is not a load: nothing settles until the connection returns, so
+    // the surface names the connection instead of showing a wait it cannot end.
+    // Retry asks the paused reads for an answer now, and React Query's own
+    // reconnect refetch clears the state if the person does nothing.
+    failureOwnsRetry = true;
+    failure = (
+      <QueryError
+        placement="top"
+        compact={centered ? undefined : true}
+        className={centered ? 'pt-0' : undefined}
+        variant="offline"
+        onRetry={handleRetry}
+        isRetrying={retrying}
+      />
+    );
   }
   let connectionLabel: string | null = null;
   if (context.isReady && !isConnected && internet !== 'offline') {
@@ -215,8 +242,10 @@ export function LiveSessionFeedback({
   // Agents live tab): the offline line, the visible connection status, or the
   // retry that backs it. Elsewhere — Home puts the same facts in its section
   // header notice — the row was an empty child of the Home column's `gap-2`, so
-  // an invisible box still held the card 7 dp below the section label.
-  const offlineLine = inlineNotices && internet === 'offline';
+  // an invisible box still held the card 7 dp below the section label. While
+  // the offline card owns the surface it already names the connection, so the
+  // line yields: one state, one statement.
+  const offlineLine = inlineNotices && internet === 'offline' && content !== 'offline';
   const connectionStatus = inlineNotices && reconnectExhausted && connectionLabel !== null;
   const connectionRetry =
     inlineNotices && context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry;

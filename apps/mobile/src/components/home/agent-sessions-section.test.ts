@@ -160,6 +160,7 @@ const context: Props['context'] = {
   isReady: true,
   isResolving: false,
   isError: false,
+  isFetching: false,
   label: 'Engineering',
   refetch: vi.fn(),
 };
@@ -347,6 +348,95 @@ describe('Home live section', () => {
     await render({ ...settled, activeSessions: [session('a1')] });
     expect(nodes('Skeleton')).toHaveLength(0);
     expect(text()).toContain('a1');
+  });
+
+  it('draws the offline card instead of a load that cannot start', async () => {
+    // Confirmed offline, first read paused: pending never settles, so the card
+    // must name the connection with its own Retry instead of leaving the
+    // skeleton under a "No internet connection" notice.
+    connectivity.offline = true;
+    connectivity.connected = false;
+    await render({ ...settled, hasAcceptedSuccess: false, isPaused: true }, context);
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(nodes('QueryError')).toHaveLength(1);
+    expect(node('QueryError').props.variant).toBe('offline');
+    expect(typeof node('QueryError').props.onRetry).toBe('function');
+    // The card speaks for the connection; the header notice does not repeat it.
+    expect(text()).not.toContain('No internet connection');
+    expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
+
+    // A read that is still in flight keeps the wait: it can still land.
+    await render(
+      { ...settled, hasAcceptedSuccess: false, isPaused: true, isFetching: true },
+      context
+    );
+    expect(nodes('Skeleton').length).toBeGreaterThan(0);
+    expect(nodes('QueryError')).toHaveLength(0);
+  });
+
+  it('draws the offline card while the context read is still unresolved', async () => {
+    connectivity.offline = true;
+    connectivity.connected = false;
+    await render(
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isReady: false, isResolving: true }
+    );
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(node('QueryError').props.variant).toBe('offline');
+
+    // A context whose own read is in flight is resolving, not stalled.
+    await render(
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isReady: false, isResolving: true, isFetching: true }
+    );
+    expect(nodes('Skeleton').length).toBeGreaterThan(0);
+  });
+
+  it('keeps rows and confirmed-empty content through an outage', async () => {
+    connectivity.offline = true;
+    connectivity.connected = false;
+    await render({
+      ...settled,
+      activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+    });
+    expect(nodes('QueryError')).toHaveLength(0);
+    expect(text()).toContain('a1');
+    expect(text()).toContain('No internet connection');
+
+    await render(settled);
+    expect(nodes('QueryError')).toHaveLength(0);
+    expect(text()).toContain(i18n.t('home.noLiveSessions'));
+    expect(text()).toContain('No internet connection');
+  });
+
+  it('retries both reads from the offline card', async () => {
+    connectivity.offline = true;
+    connectivity.connected = false;
+    const contextRefetch = vi.fn().mockResolvedValue(undefined);
+    const sessionsRefetch = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(LiveSessionFeedback, {
+          context: { ...context, isResolving: true, isReady: false, refetch: contextRefetch },
+          sessions: { ...settled, hasAcceptedSuccess: false, isPaused: true, refetch: sessionsRefetch },
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+      await Promise.resolve();
+    });
+    const card = nodes('QueryError')[0];
+    if (!card) {
+      throw new Error('Missing offline card');
+    }
+    expect(card.props.variant).toBe('offline');
+    await act(async () => {
+      (card.props.onRetry as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(contextRefetch).toHaveBeenCalledTimes(1);
+    expect(sessionsRefetch).toHaveBeenCalledTimes(1);
   });
 
   it('draws the zero state as its one message, without four zero counts', async () => {

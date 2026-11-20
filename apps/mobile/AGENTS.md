@@ -299,7 +299,8 @@ outside the three screens that own a title line; **L11** a `Sheet` without a `Sh
 padding or margin wider than the 14pt gutter (`px-`/`ps-`/`pe-`/`pl-`/`pr-`/`mx-`/`ms-`/`me-` at 5 and up); **L13** a
 `Button` inside an `EmptyState`/`QueryError` `action` slot instead of `StateAction`. A
 violation the migration has not reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call
-site and lower its line, never regenerate the baseline over a new violation.
+site and lower its line, never regenerate the baseline over a new violation, and the
+rewrite refuses while the theme or any walked file could not be read or parsed.
 
 After you change anything in `components/ui`, run the design gate on
 `kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.

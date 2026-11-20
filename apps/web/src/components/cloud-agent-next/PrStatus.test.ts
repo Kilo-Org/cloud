@@ -27,6 +27,8 @@ jest.mock('@/lib/trpc/utils', () => ({
       list: { pathFilter: () => ({ queryKey: ['list'] }) },
       search: { pathFilter: () => ({ queryKey: ['search'] }) },
       worktreeDetails: { pathFilter: () => ({ queryKey: ['worktreeDetails'] }) },
+      listWorkspaces: { pathFilter: () => ({ queryKey: ['listWorkspaces'] }) },
+      workspaceSummaries: { pathFilter: () => ({ queryKey: ['workspaceSummaries'] }) },
     },
   }),
 }));
@@ -337,15 +339,17 @@ describe('refresh action', () => {
     expect(html).toContain('Pull request status has not synced yet.');
   });
 
-  it('only invalidates the session queries after a successful refresh', () => {
+  it('only invalidates session and workspace queries after a successful refresh', () => {
     hoverCard();
     const options = mutationOptions();
     expect(options.onSettled).toBeUndefined();
     options.onSuccess();
-    expect(mockInvalidateQueries).toHaveBeenCalledTimes(3);
+    expect(mockInvalidateQueries).toHaveBeenCalledTimes(5);
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['list'] });
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['search'] });
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['worktreeDetails'] });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['listWorkspaces'] });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspaceSummaries'] });
   });
 
   it('disables refresh and spins while the mutation is pending', () => {

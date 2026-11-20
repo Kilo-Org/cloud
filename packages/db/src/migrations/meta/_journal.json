@@ -2612,6 +2612,13 @@
       "when": 1795114240575,
       "tag": "0372_webhook_events_partitioned",
       "breakpoints": true
+    },
+    {
+      "idx": 373,
+      "version": "7",
+      "when": 1795172011357,
+      "tag": "0373_workspace_read_model",
+      "breakpoints": true
     }
   ]
 }

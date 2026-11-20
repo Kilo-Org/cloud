@@ -122,6 +122,7 @@ jest.mock('@/lib/integrations/platforms/github/batch-review-decisions', () => ({
 
 jest.mock('@/lib/cloud-agent/session-events', () => ({
   notifyCliSessionRenamed: jest.fn(),
+  queueWorkspaceUpdates: jest.fn(),
 }));
 
 jest.mock('next/server', () => ({

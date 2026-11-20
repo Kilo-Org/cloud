@@ -12,7 +12,6 @@ import {
   type WorkspaceTabsState,
 } from '../workspace-tabs';
 import type { usePersistedWorkspaceTabs } from './usePersistedWorkspaceTabs';
-import type { useClosedWorktreeChatTabs } from './useClosedWorktreeChatTabs';
 
 Object.assign(globalThis, { React });
 
@@ -81,7 +80,6 @@ function installDom() {
 
 describe('usePersistedWorkspaceTabs', () => {
   let usePersistedWorkspaceTabsHook: typeof usePersistedWorkspaceTabs;
-  let useClosedWorktreeChatTabsHook: typeof useClosedWorktreeChatTabs;
   let dom: ReturnType<typeof installDom>;
   let root: Root;
   let probe: ProbeState | null;
@@ -90,8 +88,6 @@ describe('usePersistedWorkspaceTabs', () => {
     dom = installDom();
     ({ usePersistedWorkspaceTabs: usePersistedWorkspaceTabsHook } =
       await import('./usePersistedWorkspaceTabs'));
-    ({ useClosedWorktreeChatTabs: useClosedWorktreeChatTabsHook } =
-      await import('./useClosedWorktreeChatTabs'));
   });
 
   afterAll(() => {
@@ -253,96 +249,5 @@ describe('usePersistedWorkspaceTabs', () => {
     act(() => setScopeA?.(state => addTerminalTab(state, 'tty-a', 'ses-a')));
     expect(stored()?.terminals.map(tab => tab.id)).toEqual(['tty-a']);
     expect(probe?.tabs).toEqual(createWorkspaceTabsState());
-  });
-
-  describe('useClosedWorktreeChatTabs', () => {
-    let chatProbe: ReturnType<typeof useClosedWorktreeChatTabs> | null;
-
-    function ChatProbe({ storageKey }: { storageKey: string | null }) {
-      chatProbe = useClosedWorktreeChatTabsHook(storageKey);
-      return null;
-    }
-
-    function renderChats(storageKey: string | null = STORAGE_KEY) {
-      act(() => root.render(createElement(ChatProbe, { storageKey })));
-    }
-
-    it('preserves external closures during a local update without a storage event', () => {
-      renderChats();
-      dom.storage.set(
-        STORAGE_KEY,
-        JSON.stringify({
-          closedSessionIds: ['ses-external'],
-          sessionOrderByWorktree: { 'wt-a': ['ses-1'] },
-        })
-      );
-      act(() => chatProbe?.closeChatTab('ses-local'));
-      expect(chatProbe?.closedSessionIds).toEqual(['ses-external', 'ses-local']);
-      expect(JSON.parse(dom.storage.get(STORAGE_KEY) ?? '{}')).toEqual({
-        closedSessionIds: ['ses-external', 'ses-local'],
-        sessionOrderByWorktree: { 'wt-a': ['ses-1'] },
-      });
-    });
-
-    it('syncs storage changes and clears while ignoring unrelated keys', () => {
-      renderChats();
-      dom.storage.set(
-        STORAGE_KEY,
-        JSON.stringify({
-          closedSessionIds: ['ses-external'],
-          sessionOrderByWorktree: { 'wt-a': ['ses-1'] },
-        })
-      );
-      dispatchStorage('unrelated');
-      expect(chatProbe?.closedSessionIds).toEqual([]);
-      dispatchStorage();
-      expect(chatProbe?.closedSessionIds).toEqual(['ses-external']);
-      expect(chatProbe?.sessionOrderByWorktree).toEqual({ 'wt-a': ['ses-1'] });
-      dom.storage.delete(STORAGE_KEY);
-      dispatchStorage();
-      expect(chatProbe?.closedSessionIds).toEqual([]);
-      act(() => chatProbe?.closeChatTab('ses-local'));
-      dom.storage.clear();
-      dispatchStorage(null);
-      expect(chatProbe?.closedSessionIds).toEqual([]);
-    });
-
-    it('resyncs a page restored from the back-forward cache', () => {
-      renderChats();
-      dom.storage.set(
-        STORAGE_KEY,
-        JSON.stringify({ closedSessionIds: ['ses-external'], sessionOrderByWorktree: {} })
-      );
-      const dispatchPageShow = (persisted: boolean) => {
-        const event = new window.Event('pageshow');
-        Object.assign(event, { persisted });
-        act(() => {
-          window.dispatchEvent(event);
-        });
-      };
-
-      dispatchPageShow(false);
-      expect(chatProbe?.closedSessionIds).toEqual([]);
-      dispatchPageShow(true);
-      expect(chatProbe?.closedSessionIds).toEqual(['ses-external']);
-    });
-
-    it.each(['getItem', 'setItem'] as const)('keeps updates in memory when %s throws', method => {
-      jest.spyOn(window.localStorage, method).mockImplementation(() => {
-        throw new Error('unavailable');
-      });
-      renderChats();
-      act(() => chatProbe?.closeChatTab('ses-1'));
-      act(() => chatProbe?.closeChatTab('ses-2'));
-      expect(chatProbe?.closedSessionIds).toEqual(['ses-1', 'ses-2']);
-    });
-
-    it('keeps updates in memory without a storage key', () => {
-      renderChats(null);
-      act(() => chatProbe?.closeChatTab('ses-1'));
-      act(() => chatProbe?.closeChatTab('ses-2'));
-      expect(chatProbe?.closedSessionIds).toEqual(['ses-1', 'ses-2']);
-      expect(dom.storage.size).toBe(0);
-    });
   });
 });

@@ -194,8 +194,8 @@ export async function createSalesDemoOrganization(args: {
       created_by_kilo_user_id: targetUser.id,
       free_trial_end_at: oneYearFromNow.toISOString(),
       // The demo grants the target user a trial window, so it consumes their
-      // one-trial eligibility and a later organization they create starts
-      // without a trial.
+      // one-trial eligibility. The target's user row holds that record, stamped
+      // below; a later organization they create starts without a trial.
       trial_granted: true,
       settings: demoOrganizationSettings(now),
     })
@@ -221,6 +221,19 @@ export async function createSalesDemoOrganization(args: {
     role: 'owner',
     invited_by: adminUser.id,
   });
+
+  // The demo grants the target user a trial window, so their user row records
+  // that the offer is spent; a later organization they create starts without a
+  // trial. `isNull` keeps the first consumption timestamp.
+  await txn
+    .update(kilocode_users)
+    .set({ organization_trial_consumed_at: now.toISOString() })
+    .where(
+      and(
+        eq(kilocode_users.id, targetUser.id),
+        isNull(kilocode_users.organization_trial_consumed_at)
+      )
+    );
 
   const demoIds = await ensureSalesDemoUsers(txn);
   for (const demoId of demoIds) {

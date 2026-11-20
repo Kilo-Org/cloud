@@ -68,6 +68,7 @@ const mockUser: User = {
   customer_source: null,
   signup_ip: null,
   account_deletion_requested_at: null,
+  organization_trial_consumed_at: null,
   normalized_email: null,
   email_domain: null,
   external_id: null,

@@ -163,6 +163,12 @@ describe('sales demo router', () => {
     expect(org.settings.suppress_trial_messaging).toBe(true);
     expect(org.settings.enable_usage_limits).toBe(true);
     expect(org.created_by_kilo_user_id).toBe(target.id);
+    const [stampedTarget] = await db
+      .select({ organization_trial_consumed_at: kilocode_users.organization_trial_consumed_at })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, target.id))
+      .limit(1);
+    expect(stampedTarget.organization_trial_consumed_at).not.toBeNull();
     expect(Number(org.total_microdollars_acquired) - Number(org.microdollars_used)).toBe(
       25_030_000
     );

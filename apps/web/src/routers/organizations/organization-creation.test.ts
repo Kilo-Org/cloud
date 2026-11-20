@@ -1,5 +1,6 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  kilocode_users,
   organization_audit_logs,
   organization_memberships,
   organization_seats_purchases,
@@ -454,11 +455,81 @@ describe('organization trial eligibility', () => {
       trial_granted: true,
       settings: { is_sales_demo: true, suppress_trial_messaging: true },
     });
+    // `createSalesDemoOrganization` stamps the target user's row. The direct
+    // insert above bypasses it, so stamp the same record here.
+    await db
+      .update(kilocode_users)
+      .set({ organization_trial_consumed_at: new Date().toISOString() })
+      .where(eq(kilocode_users.id, user.id));
 
     const later = await createOrganization('After Demo', user.id);
 
     expect(later.trial_granted).toBe(false);
     expect(later.free_trial_end_at).toBeNull();
+  });
+
+  test('keeps a trial window on a creation with no creator', async () => {
+    const organization = await createOrganization('Admin Organization');
+
+    expect(organization.trial_granted).toBe(true);
+    expect(organization.free_trial_end_at).not.toBeNull();
+    expect(organization.created_by_kilo_user_id).toBeNull();
+    expect(new Date(organization.free_trial_end_at ?? 0).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test('records trial consumption on the creator, so an assigned organization does not consume their offer', async () => {
+    const userA = await insertTestUser();
+    const userB = await insertTestUser();
+
+    const organization = await createOrganization('Assigned Organization', userA.id);
+    expect(organization.trial_granted).toBe(true);
+
+    await db
+      .update(organizations)
+      .set({ created_by_kilo_user_id: userB.id })
+      .where(eq(organizations.id, organization.id));
+
+    const second = await createOrganization('Second Organization', userB.id);
+
+    expect(second.trial_granted).toBe(true);
+    expect(second.free_trial_end_at).not.toBeNull();
+  });
+
+  test('keeps the offer consumed after the creator is cleared', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Cleared Organization', user.id);
+    expect(organization.trial_granted).toBe(true);
+
+    await db
+      .update(organizations)
+      .set({ created_by_kilo_user_id: null })
+      .where(eq(organizations.id, organization.id));
+
+    const second = await createOrganization('Second Organization', user.id);
+
+    expect(second.trial_granted).toBe(false);
+    expect(second.free_trial_end_at).toBeNull();
+  });
+
+  test('records the consumption timestamp once', async () => {
+    const user = await insertTestUser();
+    await createOrganization('First Organization', user.id);
+
+    const [firstRead] = await db
+      .select({ organization_trial_consumed_at: kilocode_users.organization_trial_consumed_at })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(firstRead.organization_trial_consumed_at).not.toBeNull();
+
+    await createOrganization('Second Organization', user.id);
+
+    const [secondRead] = await db
+      .select({ organization_trial_consumed_at: kilocode_users.organization_trial_consumed_at })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(secondRead.organization_trial_consumed_at).toBe(
+      firstRead.organization_trial_consumed_at
+    );
   });
 });
 

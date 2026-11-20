@@ -307,28 +307,28 @@ export async function createOrganization(
 ): Promise<Organization> {
   const organization = await db.transaction(async tx => {
     const creationLimit = userId ? await enforceOrganizationCreationLimit(tx, userId) : null;
-    // Only the first organization a user creates receives a trial window. The
-    // lookup intentionally ignores soft deletion: removing an organization
-    // must not restore the offer. Internal staff accounts keep a trial on every
-    // organization they create.
-    const hasPriorTrialOrganization =
-      creationLimit?.internalAccount !== true &&
-      userId != null &&
-      (
-        await tx
-          .select({ id: organizations.id })
-          .from(organizations)
-          .where(
-            and(
-              eq(organizations.created_by_kilo_user_id, userId),
-              eq(organizations.trial_granted, true)
-            )
-          )
-          .limit(1)
-      ).length > 0;
-    const grantsTrial = creationLimit?.internalAccount === true || !hasPriorTrialOrganization;
+    // `trial_granted` records whether this organization received a trial window.
+    // The user's `organization_trial_consumed_at` column records that the
+    // creator used the offer. The creator's user row decides, so reassigning an
+    // organization's creator cannot move eligibility. Internal staff accounts
+    // keep a trial on every organization they create.
+    // A creation with no creator (admin, SCIM, helper) has no consumption record
+    // to read, so it keeps a trial window as before.
+    const grantsTrial =
+      creationLimit == null || creationLimit.internalAccount || !creationLimit.trialConsumed;
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
+
+    if (grantsTrial && userId != null) {
+      // `isNull` keeps the first consumption timestamp when two organizations
+      // are created at once.
+      await tx
+        .update(kilocode_users)
+        .set({ organization_trial_consumed_at: now.toISOString() })
+        .where(
+          and(eq(kilocode_users.id, userId), isNull(kilocode_users.organization_trial_consumed_at))
+        );
+    }
 
     const [org] = await tx
       .insert(organizations)

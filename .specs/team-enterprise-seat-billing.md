@@ -20,6 +20,7 @@ Active.
 - Updated 2026-03-28/29 with spec audit fixes, definitions, and billing compliance implementation.
 - Updated 2026-05-18 to define organization KiloClaw hard-expiry lifecycle coupling.
 - Updated 2026-05-28 to classify organization-owned Stripe EFWs as review-only.
+- Updated 2026-11-20 to define the conditional organization trial grant: one trial per creator, with the staff exemption and the sales-demo consumption rule.
 
 ## Conventions
 
@@ -139,8 +140,9 @@ their members access to the platform. Two plan tiers exist -- Teams
 and Enterprise -- each with distinct per-seat pricing. Both monthly
 and annual billing cycles are available for each tier, with annual
 billing discounted to 10 months' worth of the monthly rate (12 months
-for the price of 10). Self-service creation of top-level organizations
-starts them on the Enterprise plan with a 14-day free trial; users
+for the price of 10). Self-service creation of a top-level organization
+starts it on the Enterprise plan, and creation grants a 14-day free
+trial only when the creator has not already used their one trial; users
 choose their plan tier (Teams or Enterprise) and billing cycle (monthly
 or annual) when converting to a paid subscription. New child
 organizations start on their parent's plan at creation, whether Teams or
@@ -165,8 +167,11 @@ consuming a seat.
    top-level organizations explicitly provides Enterprise; see rule 3.
    Child creation explicitly provides the parent's plan; see rule 10.)
 3. The self-service creation flow MUST create new top-level
-   organizations on the Enterprise plan with a 14-day free trial.
-   Child organizations follow rule 10 instead.
+   organizations on the Enterprise plan. Creation MUST grant a
+   14-day free trial only when the creating user has not already
+   consumed their trial eligibility. Later organizations from the
+   same creator MUST be created with no trial window. Child
+   organizations follow rule 10 instead and never carry a trial.
 4. The user MUST NOT be offered a choice of plan or billing cycle
    during trial creation; plan tier and billing cycle selection
    occurs only when converting to a paid subscription.
@@ -474,9 +479,10 @@ consuming a seat.
 
 1. Organizations without an active subscription purchase and subject
    to trial enforcement MUST operate under a free trial period.
-2. The system MUST compute trial expiration from an explicit end
-   date when set, or fall back to the organization creation date
-   plus a configurable number of days (default: 14).
+2. The system MUST compute the trial expiration of an organization
+   that carries a trial window from an explicit end date when set,
+   or fall back to the organization creation date plus a
+   configurable number of days (default: 14).
 3. The system MUST compute days remaining by flooring the
    fractional difference between the expiration timestamp and the
    current time (i.e., rounding toward negative infinity, using
@@ -529,6 +535,21 @@ consuming a seat.
 15. These KiloClaw-specific lifecycle rules do not change the general
     organization UI and mutation behavior for active, soft-expired, or
     hard-expired trial stages defined above.
+16. An organization created without a trial grant stores no trial end
+    date and MUST be classified as trial hard-expired from creation,
+    so seat-subscription enforcement applies immediately. An
+    explicitly stored trial end date MUST still be measured and
+    honored under rules 2 and 3.
+17. A user's trial eligibility MUST be consumed by the creation that
+    first grants them a trial window, and MUST be recorded per user
+    so it survives deletion of the organization, reassignment of the
+    organization's creator, and clearing of the creator.
+18. Organizations created for internal staff accounts at the
+    `kilocode.ai` domain MUST each receive a trial window, matching
+    the exemption the per-user organization creation limit already
+    applies.
+19. A sales-demo organization created for a user MUST consume that
+    user's trial eligibility.
 
 ### Payment Processor Customer Management
 

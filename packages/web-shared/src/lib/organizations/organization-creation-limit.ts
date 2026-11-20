@@ -21,13 +21,25 @@ export function isInternalAccountEmail(email: string | null | undefined): boolea
   return getLowerDomainFromEmail(email) === INTERNAL_ACCOUNT_DOMAIN;
 }
 
+export type OrganizationCreationLimit = {
+  /** Staff at an internal domain: exempt from the cap and keep a trial on every organization. */
+  internalAccount: boolean;
+  /** Whether this user already spent their one organization free trial. */
+  trialConsumed: boolean;
+};
+
 export async function enforceOrganizationCreationLimit(
   tx: DrizzleTransaction,
   userId: User['id']
-): Promise<{ internalAccount: boolean }> {
+): Promise<OrganizationCreationLimit> {
   // Both creation paths must acquire this lock before counting organizations.
+  // Reading the trial consumption in this same locked row lets the creation
+  // transaction decide and stamp it under one lock.
   const [user] = await tx
-    .select({ email: kilocode_users.google_user_email })
+    .select({
+      email: kilocode_users.google_user_email,
+      organizationTrialConsumedAt: kilocode_users.organization_trial_consumed_at,
+    })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, userId))
     .for('update');
@@ -35,8 +47,9 @@ export async function enforceOrganizationCreationLimit(
   if (!user) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
   }
+  const trialConsumed = user.organizationTrialConsumedAt != null;
   if (isInternalAccountEmail(user.email)) {
-    return { internalAccount: true };
+    return { internalAccount: true, trialConsumed };
   }
 
   const directOrganizations = tx
@@ -78,5 +91,5 @@ export async function enforceOrganizationCreationLimit(
     });
   }
 
-  return { internalAccount: false };
+  return { internalAccount: false, trialConsumed };
 }

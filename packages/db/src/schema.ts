@@ -542,6 +542,11 @@ export const kilocode_users = pgTable(
     customer_source: text(),
     signup_ip: text(),
     account_deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
+    // When this user's one organization free trial was consumed. Set once, when an
+    // organization creation grants them a trial window. Eligibility reads this
+    // column, not the creator column of past organizations, so reassigning an
+    // organization's creator never moves the offer.
+    organization_trial_consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     normalized_email: text(),
     email_domain: text(),

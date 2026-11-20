@@ -299,10 +299,20 @@ measurements are included in routing-table version hashes.
 - An unchanged target with current measurements needs no benchmark.
 - A changed target reuses current cached measurements or enters the normal benchmark queue.
 - The previous serving target remains active until every replacement variant is ready.
-- Resolution failures, unavailable replacements, and failed measurements retain the previous serving target.
+- Resolution failures, unavailable replacements, and failed measurements retain the previous serving target. A target that is still saved but has no ready measurement keeps serving instead of dropping out of the routing table, and the hold is logged as `benchmark_alias_serving_held`.
 - Removing an alias stops its subscription from following later updates.
 - Daily target changes do not consume the owner's request quota.
 - An unchanged concrete ID has no automatic measurement expiry. Use targeted refresh after a confirmed provider change.
+
+The 05:00 run covers platform aliases and every owner subscription on both routers, in bounded
+work units it can resume: the platform aliases are re-resolved once, then owners are reconciled a
+keyset page at a time (`benchmark_daily_alias_sync`, one row per router). The one-minute tick
+continues an unfinished day, and a failed catalog resolution is retried on later ticks the same
+day until 30 attempts are spent. Each step of the daily branch — stale sweep, alias sync,
+registry sync, policy recomputation, drain, publish — runs in its own isolation, so one failure
+does not skip the others, and one `benchmark_daily_sync_summary` event per router carries every
+step's outcome. Per-owner failures are logged as `benchmark_subscription_daily_failed` and do not
+stop the pass.
 
 Existing benchmark subscriptions retain their persisted alias targets. Backfill known owners
 with the full model list before relying on daily coverage for historical pools.

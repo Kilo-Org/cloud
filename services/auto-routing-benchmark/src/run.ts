@@ -539,9 +539,10 @@ export async function publishPlatformRoutingTable(
   // `desired` is the serving set, which `servingSubscriptionSnapshot` already restricts
   // to ready rows, so it cannot show that a live pair is about to disappear. The live
   // table can: a pair it serves, that is still a target, and that has no ready row under
-  // this engine would drop out of the new build. That is a re-measurement in flight or an
-  // engine bump, and either way the existing table stays. A settled `failed` pair is
-  // allowed to drop out, as it was when the gate counted only pending and running rows.
+  // this engine would drop out of the new build. That is a re-measurement in flight, an
+  // engine bump, or a failed replacement whose previous target is still serving, and
+  // either way the existing table stays. Only a pair that left the target set may drop,
+  // and that happens once its alias promoted a ready replacement.
   const previous = await getLatestRoutingTable(env.BENCH_DB, router).catch(() => null);
   const readyPairs = new Set(
     readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant))
@@ -562,7 +563,7 @@ export async function publishPlatformRoutingTable(
   }
   const dropped = [...livePairs.values()].find(pair => {
     const key = exactPairKey(pair.model, pair.variant);
-    return !readyPairs.has(key) && targets.has(key) && statusByPair.get(key) !== 'failed';
+    return !readyPairs.has(key) && targets.has(key);
   });
   if (dropped) {
     console.log(

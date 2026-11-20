@@ -969,7 +969,7 @@ describe('decider run completion', () => {
     expect(saveRoutingTable).not.toHaveBeenCalled();
   });
 
-  it('publishes without a live pair whose re-measurement failed', async () => {
+  it('keeps the published table while a live target lost its measurement', async () => {
     vi.mocked(getLatestRoutingTable).mockResolvedValue(
       liveRoutingTable([
         { model: 'platform/a', variant: null },
@@ -1005,13 +1005,9 @@ describe('decider run completion', () => {
       }))
     );
 
-    await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
+    await expect(publishPlatformRoutingTable(env, fetch)).resolves.toBeNull();
 
-    expect(saveRoutingTable).toHaveBeenCalledOnce();
-    const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
-    expect(
-      table.routes['implementation/code_generation'].map(candidate => candidate.model)
-    ).toEqual(['platform/a']);
+    expect(saveRoutingTable).not.toHaveBeenCalled();
   });
 
   it('does not publish a thin table as an engine bump re-measures the live pairs', async () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
+import { TAXONOMY_ROUTE_KEYS, benchmarkPairKey } from '@kilocode/auto-routing-contracts';
 import type * as CliRunnerModule from './cli-runner';
 import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
@@ -9,8 +9,15 @@ import type * as ConfigModule from './config';
 import type * as SchedulerModule from './scheduler';
 import type * as SubscriptionsModule from './subscriptions';
 
-vi.mock('./subscriptions', async importOriginal => ({
-  ...(await importOriginal<typeof SubscriptionsModule>()),
+vi.mock('./subscriptions', () => ({
+  PLATFORM_SUBSCRIPTION_OWNER: { ownerType: 'platform', ownerId: '' },
+  snapshotPairs: (snapshot: SubscriptionsModule.SubscriptionSnapshot, serving = false) => [
+    ...new Map(
+      snapshot
+        .flatMap(entry => (serving ? entry.servingPairs : entry.pairs))
+        .map(pair => [benchmarkPairKey(pair), pair])
+    ).values(),
+  ],
   syncSubscriptionSnapshot: vi.fn(),
   servingSubscriptionSnapshot: vi.fn(),
 }));
@@ -144,6 +151,7 @@ import {
   processJob,
   acceptContainerCaseResult,
   computeEngineIdentity,
+  publishPlatformRoutingTable,
   PAID_OUTPUT_WAIT_MS,
 } from './run';
 import { createDeciderJudge } from './decider-judge';
@@ -1873,6 +1881,84 @@ describe('processJob — canonical registry publication', () => {
       cases: 5,
       meetsThreshold: true,
     });
+  });
+});
+
+describe('publishPlatformRoutingTable — serving pair retention', () => {
+  const aliasA = '~vendor/a-latest';
+  const aliasB = '~vendor/b-latest';
+  const aliasC = '~vendor/c-latest';
+  const unready = 'vendor/unready';
+  const retired = 'vendor/retired';
+  const steady = 'vendor/steady';
+
+  async function blockedPublish(status: 'failed' | 'pending') {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            { id: aliasA, alias_target: unready },
+            { id: unready },
+            { id: aliasB, alias_target: retired },
+            { id: retired },
+            { id: aliasC, alias_target: steady },
+            { id: steady },
+          ],
+        })
+      )
+    );
+    const baseConfig = await getBenchmarkConfig(env.BENCH_DB, 'efficient');
+    if (!baseConfig) throw new Error('config missing');
+    vi.mocked(getBenchmarkConfig).mockResolvedValue({
+      ...baseConfig,
+      deciderModels: [{ id: aliasA }, { id: aliasB }, { id: aliasC }],
+    });
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: aliasA,
+        pairs: [{ model: unready, variant: null }],
+        servingPairs: [],
+        resolutionError: null,
+      },
+      {
+        model: aliasB,
+        pairs: [{ model: retired, variant: null }],
+        servingPairs: [],
+        resolutionError: null,
+      },
+      {
+        model: aliasC,
+        pairs: [{ model: steady, variant: null }],
+        servingPairs: [{ model: steady, variant: null }],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: steady, variant: '', run_id: 'run-steady' },
+    ]);
+    vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
+      { model: unready, variant: '', status },
+      { model: retired, variant: '', status: 'failed' },
+      { model: steady, variant: '', status: 'ready' },
+    ]);
+    vi.mocked(getLatestRoutingTable).mockResolvedValue({
+      table: {
+        version: 'previous',
+        routes: { 'implementation/code_generation': [{ model: steady }, { model: retired }] },
+      },
+    } as never);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const published = await publishPlatformRoutingTable(env, fetch, 'efficient');
+    log.mockRestore();
+    return published;
+  }
+
+  it('keeps the live table when a target whose replacement failed or is still pending lost its result', async () => {
+    for (const status of ['failed', 'pending'] as const) {
+      expect(await blockedPublish(status)).toBeNull();
+      expect(vi.mocked(saveRoutingTable)).not.toHaveBeenCalled();
+    }
   });
 });
 

@@ -225,6 +225,13 @@
       "when": 1793979873424,
       "tag": "0031_routing_selection_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1795141640560,
+      "tag": "0032_magical_black_bolt",
+      "breakpoints": true
     }
   ]
 }

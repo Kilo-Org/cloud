@@ -488,6 +488,12 @@ export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner
  * The immutable pool a benchmark request measures. Paid benchmarks derive it from the saved row,
  * so a request can never benchmark a pool an editor has not persisted, and the Worker needs no
  * PostgreSQL access of its own.
+ *
+ * It is the full saved pool, including a gateway entry's `servingPin`: the routing table and the
+ * per-entry status must keep serving the pinned target. Pin publication therefore changes this
+ * context, so the Worker's start-time comparison is over the pool *identity* (base router, default
+ * entry, entry models/links), not this object's text. `customRouterPoolVersion` is that identity,
+ * and `customRouterBenchmarkIdentity` projects it for callers that compare a context directly.
  */
 export function customRouterBenchmarkContext(
   router: CustomRouterDefinition
@@ -502,35 +508,48 @@ export function customRouterBenchmarkContext(
 }
 
 /**
- * Names one saved pool state. A quote is bound to it, and a start carries the version of the
- * authorized row it read, so a quote issued for an older pool can never be spent after an edit,
- * a default change, a link change, or an entry being removed and restored.
+ * The measurement identity of a saved pool: which cases run, never how they are served. A
+ * `servingPin` is routing state, so publishing one must neither invalidate a valid quote nor reset
+ * a settlement's version, while a concrete model, link, default, or base-router change must.
+ * Entry keys are sorted, so entry order is not identity.
  *
- * `revision` is the row's `updated_at`, which every definition edit advances and a pin-only write
- * leaves alone: a serving pin never invalidates a quote, but an editor's remove/restore round trip
- * does. The hash covers the fields that decide which cases run; re-registering an entry (which
- * refreshes its pricing) is not a pool edit.
+ * This is the only value a paid quote needs: the Worker compares `pool_version`, never the context
+ * text, because a context has no default entry key and would gain/lose a pin over time.
  */
-export function customRouterPoolVersion(router: CustomRouterDefinition, revision: string): string {
+function customRouterPoolIdentity(router: CustomRouterDefinition): string {
   const entries = router.entries
     .map(entry => ({
       key: customRouterEntryKey(entry),
       entry:
         entry.kind === 'gateway'
           ? { kind: 'gateway' as const, model: entry.model, measuredAs: entry.measuredAs ?? null }
-          : { kind: 'client' as const, provider: entry.provider, model: entry.model },
+          : {
+              kind: 'client' as const,
+              provider: entry.provider,
+              model: entry.model,
+              variants: entry.variants,
+            },
     }))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-  return createHash('sha256')
-    .update(
-      JSON.stringify({
-        revision,
-        baseRouter: router.baseRouter,
-        defaultEntryKey: router.defaultEntryKey,
-        entries,
-      })
-    )
-    .digest('hex');
+  return JSON.stringify({
+    baseRouter: router.baseRouter,
+    defaultEntryKey: router.defaultEntryKey,
+    entries,
+  });
+}
+
+/**
+ * Names one saved pool state. A quote is bound to it, and a start carries the version of the
+ * authorized row it read, so a quote issued for an older pool can never be spent after the pool
+ * changes in a way that decides which cases run.
+ *
+ * The version is the measurement identity only — base router, default entry, and each entry's
+ * model/`measuredAs` (client entries also keep their variant list). It deliberately excludes
+ * `updated_at`, serving pins, pricing, and capabilities: a no-op client re-registration or a pin
+ * publication must not invalidate an outstanding quote, nor reset a settlement's version.
+ */
+export function customRouterPoolVersion(router: CustomRouterDefinition): string {
+  return createHash('sha256').update(customRouterPoolIdentity(router)).digest('hex');
 }
 
 export type CustomRouterBenchmarkSubject = {
@@ -558,7 +577,7 @@ function benchmarkSubjectFromRow(row: AutoRoutingCustomRouter): CustomRouterBenc
   return {
     router,
     context: customRouterBenchmarkContext(router),
-    poolVersion: customRouterPoolVersion(router, row.updated_at),
+    poolVersion: customRouterPoolVersion(router),
   };
 }
 

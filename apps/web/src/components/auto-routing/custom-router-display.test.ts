@@ -144,16 +144,27 @@ describe('entryRoutingStatus', () => {
     expect(status.rebenchmarkNeeded).toBe(true);
   });
 
-  it('shows a permanent failure with the reason and keeps last measurement serving', () => {
+  it('shows a permanent failure from a real status row and keeps last measurement serving', () => {
     const status = entryRoutingStatus(
       entry({
-        blocker: {
-          kind: 'permanent',
-          model: 'vendor/a',
-          variant: null,
-          failureClass: 'model_not_found',
-          reason: 'the provider removed this model',
-        },
+        variants: [
+          {
+            variant: null,
+            status: 'ready',
+            failureReason: null,
+            linked: false,
+            availability: 'permanent_failure',
+            failure: {
+              kind: 'permanent',
+              failureClass: 'model_not_found',
+              reason: 'the provider removed this model',
+              attempts: 6,
+              firstFailedAt: '2026-11-18T00:00:00.000Z',
+              lastFailedAt: '2026-11-20T00:00:00.000Z',
+              cause: 'terminal_class',
+            },
+          },
+        ],
       })
     );
     expect(status.kind).toBe('permanently-failed');
@@ -161,6 +172,26 @@ describe('entryRoutingStatus', () => {
     expect(status.detail).toContain('the provider removed this model');
     expect(status.detail).toContain('last usable measurement');
     expect(status.active).toBe(true);
+  });
+
+  it('shows a permanent failure on a row with no measurement as unable to serve', () => {
+    const status = entryRoutingStatus(
+      entry({
+        variants: [
+          {
+            variant: null,
+            status: 'failed',
+            failureReason: 'not in the catalog',
+            linked: false,
+            availability: 'permanent_failure',
+          },
+        ],
+      })
+    );
+    expect(status.kind).toBe('permanently-failed');
+    expect(status.detail).toContain('not in the catalog');
+    expect(status.detail).toContain('replace it or choose another model');
+    expect(status.active).toBe(false);
   });
 
   it('separates serving on an old pinned alias from being unavailable', () => {
@@ -186,14 +217,14 @@ describe('entryRoutingStatus', () => {
     expect(pinned.detail).toContain('vendor/model-3');
   });
 
-  it('shows a pinned target that is gone as unavailable', () => {
+  it('shows a pinned target that is gone with an unmeasured fallback as unavailable', () => {
     const status = entryRoutingStatus(
       aliasEntry({
         servingPin: { model: 'vendor/model-2', pinnedAt: '2026-11-19T00:00:00.000Z' },
         variants: [
           {
             variant: null,
-            status: 'stale',
+            status: 'missing',
             failureReason: null,
             linked: false,
             servingFallback: true,
@@ -204,10 +235,37 @@ describe('entryRoutingStatus', () => {
       { aliasTargets: new Map([['~vendor/model-latest', 'vendor/model-3']]) }
     );
     expect(status.kind).toBe('unavailable');
+    expect(status.label).toBe('Benchmarked target no longer served');
     expect(status.active).toBe(false);
     expect(status.rebenchmarkNeeded).toBe(true);
-    expect(status.detail).toContain('no longer served');
-    expect(status.detail).toContain('vendor/model-3');
+    expect(status.detail).toContain('vendor/model-2 is no longer served');
+    expect(status.detail).toContain(
+      'Requests go to vendor/model-3, which has no measurement in this pool.'
+    );
+  });
+
+  it('shows a dead pin whose live target is measured as still serving', () => {
+    const status = entryRoutingStatus(
+      aliasEntry({
+        servingPin: { model: 'vendor/model-2', pinnedAt: '2026-11-19T00:00:00.000Z' },
+        variants: [
+          {
+            variant: null,
+            status: 'ready',
+            failureReason: null,
+            linked: false,
+            servingFallback: true,
+            servingModel: 'vendor/model-3',
+          },
+        ],
+      }),
+      { aliasTargets: new Map([['~vendor/model-latest', 'vendor/model-3']]) }
+    );
+    expect(status.kind).toBe('unavailable');
+    expect(status.label).toBe('Serving new alias target');
+    expect(status.active).toBe(true);
+    expect(status.rebenchmarkNeeded).toBe(true);
+    expect(status.detail).toContain('which is measured in this pool');
   });
 
   it('marks an older measurement active with a re-benchmark hint', () => {

@@ -76,7 +76,7 @@ describe('poolBenchmarkWarnings', () => {
     expect(warnings[0]?.message).toContain('provider returned 404');
   });
 
-  it('reports a permanent failure with its cause and blocks the remedy', () => {
+  it('reports a permanent failure from the status row the API actually sends', () => {
     const warnings = poolBenchmarkWarnings(
       summary({
         entries: [
@@ -90,15 +90,19 @@ describe('poolBenchmarkWarnings', () => {
                 status: 'failed',
                 failureReason: 'not in the catalog',
                 linked: false,
+                resolvedModel: 'vendor/a',
+                availability: 'permanent_failure',
+                failure: {
+                  kind: 'permanent',
+                  failureClass: 'model_not_found',
+                  reason: 'not in the catalog',
+                  attempts: 6,
+                  firstFailedAt: '2026-11-18T00:00:00.000Z',
+                  lastFailedAt: '2026-11-20T00:00:00.000Z',
+                  cause: 'terminal_class',
+                },
               },
             ],
-            blocker: {
-              kind: 'permanent',
-              model: 'vendor/a',
-              variant: null,
-              failureClass: 'model_not_found',
-              reason: 'not in the catalog',
-            },
           },
         ],
       })
@@ -108,6 +112,31 @@ describe('poolBenchmarkWarnings', () => {
     expect(warnings[0]?.message).toContain('Benchmark permanently failed for vendor/a');
     expect(warnings[0]?.message).toContain('not in the catalog');
     expect(warnings[0]?.message).toContain('cannot be added to a pool');
+  });
+
+  it('treats a permanent availability row without a failure object as permanent', () => {
+    const warnings = poolBenchmarkWarnings(
+      summary({
+        entries: [
+          {
+            key: 'gateway:vendor/a',
+            entry: { kind: 'gateway', model: 'vendor/a' },
+            needsClientEval: false,
+            variants: [
+              {
+                variant: null,
+                status: 'failed',
+                failureReason: 'the provider removed this model',
+                linked: false,
+                availability: 'permanent_failure',
+              },
+            ],
+          },
+        ],
+      })
+    );
+    expect(warnings[0]?.tone).toBe('destructive');
+    expect(warnings[0]?.message).toContain('the provider removed this model');
   });
 
   it('reports a fallback when the pinned target is gone', () => {
@@ -125,7 +154,40 @@ describe('poolBenchmarkWarnings', () => {
             variants: [
               {
                 variant: null,
-                status: 'stale',
+                status: 'ready',
+                failureReason: null,
+                linked: false,
+                servingFallback: true,
+                servingModel: 'vendor/model-3',
+              },
+            ],
+          },
+        ],
+      }),
+      new Map([['~vendor/model-latest', 'vendor/model-3']])
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.tone).toBe('warning');
+    expect(warnings[0]?.message).toContain('vendor/model-2 is no longer served');
+    expect(warnings[0]?.message).toContain('go to vendor/model-3, which is measured in this pool');
+  });
+
+  it('reports a fallback target with no measurement as unmeasured', () => {
+    const warnings = poolBenchmarkWarnings(
+      summary({
+        entries: [
+          {
+            key: 'gateway:~vendor/model-latest',
+            entry: {
+              kind: 'gateway',
+              model: '~vendor/model-latest',
+              servingPin: { model: 'vendor/model-2', pinnedAt: '2026-11-19T00:00:00.000Z' },
+            },
+            needsClientEval: false,
+            variants: [
+              {
+                variant: null,
+                status: 'missing',
                 failureReason: null,
                 linked: false,
                 servingFallback: true,
@@ -136,10 +198,8 @@ describe('poolBenchmarkWarnings', () => {
       }),
       new Map([['~vendor/model-latest', 'vendor/model-3']])
     );
-    expect(warnings).toHaveLength(1);
     expect(warnings[0]?.tone).toBe('destructive');
-    expect(warnings[0]?.message).toContain('vendor/model-2 is no longer served');
-    expect(warnings[0]?.message).toContain('fall back to vendor/model-3');
+    expect(warnings[0]?.message).toContain('go to vendor/model-3, which has no measurement');
   });
 
   it('reports a moved alias while the pinned target still serves', () => {

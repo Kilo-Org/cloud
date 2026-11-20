@@ -55,6 +55,38 @@ describe('decideServingPins', () => {
     });
   });
 
+  test('advances confirmedAt on an unchanged target so a delayed older pin cannot overwrite it', () => {
+    // A newer confirmation re-pins the same target (e.g. a re-run while the alias already points
+    // there). It must advance the ordering stamp even though the target is unchanged.
+    const advanced = decideServingPins({
+      entries: [gateway(ALIAS, pin(NEW_TARGET, CONFIRMED_EARLY, 'req-early'))],
+      aliases: [{ model: ALIAS, target: NEW_TARGET }],
+      poolUnchanged: true,
+      requestId: 'req-late',
+      confirmedAt: CONFIRMED_LATE,
+      pinnedAt: PINNED_AT,
+    });
+    expect(advanced.applied).toEqual([{ model: ALIAS, target: NEW_TARGET, pinnedAt: PINNED_AT }]);
+    expect(servingPinOf(advanced.entries[0])).toMatchObject({
+      model: NEW_TARGET,
+      confirmedAt: CONFIRMED_LATE,
+      requestId: 'req-late',
+    });
+
+    // The delayed callback of the older, differing confirmation now arrives and must be refused.
+    const delayed = decideServingPins({
+      entries: advanced.entries,
+      aliases: [{ model: ALIAS, target: OLD_TARGET }],
+      poolUnchanged: true,
+      requestId: 'req-early',
+      confirmedAt: CONFIRMED_EARLY,
+      pinnedAt: PINNED_AT,
+    });
+    expect(delayed.applied).toEqual([]);
+    expect(delayed.skipped).toEqual([{ model: ALIAS, reason: 'superseded' }]);
+    expect(servingPinOf(delayed.entries[0])?.model).toBe(NEW_TARGET);
+  });
+
   test('never lets a late callback from an older confirmation overwrite a newer pin', () => {
     const outcome = decide({
       pool: [gateway(ALIAS, pin(NEW_TARGET, CONFIRMED_LATE, 'req-new'))],
@@ -99,6 +131,7 @@ describe('decideServingPins', () => {
     });
     expect(replay.applied).toEqual([]);
     expect(replay.skipped).toEqual([{ model: ALIAS, reason: 'unchanged' }]);
+    expect(servingPinOf(replay.entries[0])?.confirmedAt).toBe(CONFIRMED_LATE);
 
     const linked = decide({
       pool: [{ kind: 'gateway', model: ALIAS, measuredAs: 'vendor/old' }],

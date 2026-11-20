@@ -14,19 +14,25 @@ export type PoolBenchmarkWarning = {
 
 function failedBenchmarkWarnings(entry: CustomRouterListEntry): PoolBenchmarkWarning[] {
   const label = entryLabel(entry.entry);
-  const blocker = entry.blocker ?? null;
-
-  // The blocker names the exact resolved pair that permanently failed, which is
-  // not always the entry's own model: an alias reports its target.
-  if (blocker !== null) {
-    const variant = blocker.variant === null ? '' : ` (${blocker.variant})`;
+  // A permanent verdict only exists on a status row's `failure`/`availability`.
+  // The list has no separate `blocker` field, so a permanent failure would
+  // otherwise never warn.
+  const permanent = entry.variants.find(
+    variant => variant.failure?.kind === 'permanent' || variant.availability === 'permanent_failure'
+  );
+  if (permanent !== undefined) {
+    const failedModel = permanent.resolvedModel ?? label;
+    const variant = permanent.variant === null ? '' : ` (${permanent.variant})`;
+    const reason =
+      permanent.failure?.reason ??
+      permanent.failureReason ??
+      permanent.failure?.failureClass ??
+      'the benchmark permanently failed';
     return [
       {
         key: `${entry.key}:failed`,
         tone: 'destructive',
-        message: `Benchmark permanently failed for ${blocker.model}${variant}: ${
-          blocker.reason ?? blocker.failureClass
-        }. This model cannot be added to a pool; remove ${label} or choose another model.`,
+        message: `Benchmark permanently failed for ${failedModel}${variant}: ${reason}. This model cannot be added to a pool; remove ${label} or choose another model.`,
       },
     ];
   }
@@ -64,13 +70,22 @@ function aliasWarnings(
   const fallback = entry.variants.find(variant => variant.servingFallback === true);
 
   if (fallback !== undefined) {
+    const servedTarget = aliasTarget ?? fallback.servingModel ?? null;
+    const target = servedTarget ?? 'the current alias target';
+    const measured = entry.variants.some(
+      variant => variant.status === 'ready' || variant.status === 'stale'
+    );
     return [
       {
         key: `${entry.key}:alias`,
-        tone: 'destructive',
-        message: `The benchmarked model ${pin?.model ?? 'for this alias'} is no longer served. Requests for ${label} fall back to ${
-          aliasTarget ?? fallback.servingModel ?? 'the current alias target'
-        } without a benchmark measurement. Benchmark the pool again to update routing.`,
+        tone: measured ? 'warning' : 'destructive',
+        message: [
+          `The benchmarked model ${pin?.model ?? 'for this alias'} is no longer served.`,
+          measured
+            ? `Requests for ${label} go to ${target}, which is measured in this pool.`
+            : `Requests for ${label} go to ${target}, which has no measurement in this pool.`,
+          'Benchmark the pool again to pin the current target.',
+        ].join(' '),
       },
     ];
   }

@@ -21,7 +21,7 @@ import {
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createCallerFactory, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
@@ -35,6 +35,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-clie
   getPlatformMeasurements: jest.fn(),
   lookupCustomRouterBlockedModels: jest.fn(),
   pausePaidBenchmark: jest.fn(),
+  pausePoolBenchmark: jest.fn(),
   requestPaidBenchmarkQuote: jest.fn(),
   startPaidBenchmark: jest.fn(),
 }));
@@ -223,6 +224,92 @@ describe('customRouterBenchmarks', () => {
         clientEvalEntryKeys: [],
       },
     });
+  });
+
+  test('serves the saved pin to table and status while the pool identity stays stable', async () => {
+    await createRouter({ userId: user.id });
+    const caller = await createCallerForUser(user.id);
+    const pin = {
+      model: SONNET,
+      pinnedAt: '2026-11-20T12:00:00.000Z',
+      confirmedAt: '2026-11-20T11:00:00.000Z',
+    };
+    const pinned: CustomRouterEntry[] = [{ kind: 'gateway', model: SONNET, servingPin: pin }];
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ entries: pinned })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+
+    // The routing table and the per-entry status keep the pinned target: both read the full saved
+    // pool, so dropping the pin from the benchmark context would silently stop alias continuity.
+    await caller.customRouterBenchmarks.table({ slug: 'coding' });
+    expect(mockedTable).toHaveBeenLastCalledWith(expect.objectContaining({ entries: pinned }));
+
+    // A quote issued now is bound to the pin-free identity, so a later pin-only write cannot
+    // invalidate it, while the concrete model still moves the identity.
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    const before = mockedQuote.mock.calls[0]?.[0];
+    if (!before) throw new Error('expected a quote request');
+    expect(before.context.entries).toEqual(pinned);
+
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    expect(mockedQuote.mock.calls[1]?.[0]?.poolVersion).toBe(before.poolVersion);
+
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ entries: [{ kind: 'gateway', model: 'anthropic/claude-sonnet-4-5' }] })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    expect(mockedQuote.mock.calls[2]?.[0]?.poolVersion).not.toBe(before.poolVersion);
+  });
+
+  test('keeps one quote identity across a pin publication and a no-op re-registration', async () => {
+    await createRouter({ userId: user.id });
+    const caller = await createCallerForUser(user.id);
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    const before = mockedQuote.mock.calls[0]?.[0];
+    if (!before) throw new Error('expected a quote request');
+
+    // A settlement publishes a serving pin onto the saved row.
+    const pinned: CustomRouterEntry[] = [
+      {
+        kind: 'gateway',
+        model: SONNET,
+        servingPin: {
+          model: SONNET,
+          pinnedAt: '2026-11-20T12:00:00.000Z',
+          confirmedAt: '2026-11-20T11:00:00.000Z',
+        },
+      },
+    ];
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ entries: pinned })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    const afterPin = mockedQuote.mock.calls[1]?.[0];
+    // The pool identity a quote is bound to is unchanged; only the served context gained the pin.
+    expect(afterPin?.poolVersion).toBe(before.poolVersion);
+
+    // The CLI re-registers the same gateway entry with refreshed pricing.
+    await db
+      .update(auto_routing_custom_routers)
+      .set({
+        entries: [{ kind: 'gateway', model: SONNET }],
+      })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    const afterReRegister = mockedQuote.mock.calls[2]?.[0];
+    expect(afterReRegister?.poolVersion).toBe(before.poolVersion);
+
+    // A genuine concrete target change is a different measurement identity.
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ entries: [{ kind: 'gateway', model: 'anthropic/claude-sonnet-4-5' }] })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    const afterModelChange = mockedQuote.mock.calls[3]?.[0];
+    expect(afterModelChange?.poolVersion).not.toBe(before.poolVersion);
   });
 
   test('does not read another user’s pool', async () => {

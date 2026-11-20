@@ -244,6 +244,8 @@ export async function handleLlmProxyRequest(
           ...inputGuardrail,
           sessionId: headers.sessionId,
           microdollarUsageId: usageId,
+          // From the verified assignment only: no header can claim benchmark provenance.
+          benchmarkCase: Boolean(benchmark),
           apiKind: requestBodyParsed.kind,
           clientRequestId: headers.clientRequestId,
           parts: extractRequestParts(requestBodyParsed),
@@ -604,6 +606,7 @@ export async function handleLlmProxyRequest(
             {
               sessionId: usageContext.session_id,
               microdollarUsageId: usageId,
+              benchmarkCase: Boolean(benchmark),
               organizationId,
               kiloUserId: user.id,
               apiKind: requestBodyParsed.kind,

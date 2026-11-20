@@ -68,8 +68,19 @@ export function decideServingPins(input: {
       continue;
     }
     if (entry.servingPin?.model === alias.target) {
-      // The same target is already pinned, including a replay of this very request.
-      skipped.push({ model: alias.model, reason: 'unchanged' });
+      // The same target is already pinned. A newer confirmation must still advance `confirmedAt`:
+      // otherwise a delayed callback from an older, differing confirmation would look newer than
+      // the pin and overwrite it. A replay of this very request advances nothing.
+      const existing = entry.servingPin;
+      if (confirmedAtOf(existing) >= Date.parse(confirmedAt)) {
+        skipped.push({ model: alias.model, reason: 'unchanged' });
+        continue;
+      }
+      entries[index] = {
+        ...entry,
+        servingPin: { ...existing, requestId, confirmedAt, pinnedAt },
+      };
+      applied.push({ model: alias.model, target: alias.target, pinnedAt });
       continue;
     }
     if (confirmedAtOf(entry.servingPin) > Date.parse(confirmedAt)) {

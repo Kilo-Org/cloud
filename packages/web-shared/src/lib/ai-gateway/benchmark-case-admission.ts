@@ -41,13 +41,30 @@ export function benchmarkRefusalResponse(
   retryable: boolean
 ): NextResponse {
   const status =
-    reason === 'payment_refused' || reason === 'payer_unavailable' || reason === 'no_funded_payer'
-      ? 402
-      : reason === 'admission_unavailable'
-        ? 503
-        : 409;
+    // A bad envelope is a credential error, not a payment one: 401 so the Worker cannot read it
+    // as an account that failed to pay.
+    reason === 'assignment_invalid'
+      ? 401
+      : reason === 'payment_refused' ||
+          reason === 'payer_unavailable' ||
+          reason === 'no_funded_payer'
+        ? 402
+        : reason === 'admission_unavailable'
+          ? 503
+          : 409;
   return NextResponse.json(
-    { error: { code: 'benchmark_payer_refused', reason, retryable } },
+    {
+      error: {
+        // Only an account that failed to fund this call is a payer refusal; a bad credential is
+        // reported as itself so a Worker cannot detach a payer for a problem with its envelope.
+        code:
+          reason === 'assignment_invalid'
+            ? 'benchmark_assignment_invalid'
+            : 'benchmark_payer_refused',
+        reason,
+        retryable,
+      },
+    },
     {
       status,
       headers: {
@@ -68,9 +85,11 @@ export async function verifyBenchmarkAssignment(
   secret: string | undefined,
   now = Date.now()
 ): Promise<BenchmarkAssignmentVerification> {
+  // An unverifiable envelope proves nothing about the payer: nothing was dispatched, so the
+  // account is never detached or charged for it.
   const invalid = (): BenchmarkAssignmentVerification => ({
     ok: false,
-    response: benchmarkRefusalResponse('payer_unavailable', false),
+    response: benchmarkRefusalResponse('assignment_invalid', false),
   });
   const encoded = headers.get(BENCHMARK_ASSIGNMENT_HEADER);
   const authorization = headers.get('authorization');

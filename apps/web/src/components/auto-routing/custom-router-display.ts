@@ -162,6 +162,10 @@ function servesNow(entry: CustomRouterListEntry): boolean {
  * pinned target that needs another benchmark, serve older measurements, be
  * measuring, be paused, be permanently failed, or not be benchmarked at all.
  * A model nobody asked to measure is never presented as benchmarking or paused.
+ *
+ * Every state here is derived from rows the status API really sends: a permanent
+ * failure is `variant.failure.kind === 'permanent'` or `availability:
+ * 'permanent_failure'`, never a list-level `blocker` field no producer fills.
  */
 export function entryRoutingStatus(
   entry: CustomRouterListEntry,
@@ -177,13 +181,20 @@ export function entryRoutingStatus(
   const running = variants.some(
     variant => variant.status === 'pending' || variant.status === 'running'
   );
-  const blocker = entry.blocker ?? null;
 
-  if (blocker !== null) {
+  const permanent = variants.find(
+    variant => variant.failure?.kind === 'permanent' || variant.availability === 'permanent_failure'
+  );
+  if (permanent !== undefined) {
+    const reason =
+      permanent.failure?.reason ??
+      permanent.failureReason ??
+      permanent.failure?.failureClass ??
+      'The benchmark permanently failed';
     return {
       kind: 'permanently-failed',
       label: 'Permanently failed',
-      detail: `${blocker.reason ?? blocker.failureClass}.${
+      detail: `${reason}.${
         serving
           ? ' Routing still uses its last usable measurement.'
           : ' It cannot serve this pool; replace it or choose another model.'
@@ -191,6 +202,36 @@ export function entryRoutingStatus(
       active: serving,
       rebenchmarkNeeded: false,
       tone: 'destructive',
+    };
+  }
+
+  // The saved pin's target is gone from the catalog, so the live alias target
+  // serves instead. This must come before the plain "not benchmarked" fallback:
+  // a dead pin on an unmeasured target is exactly the case the owner must see.
+  const fallbackVariant = variants.find(variant => variant.servingFallback === true);
+  if (fallbackVariant !== undefined) {
+    const benchmarked = pin?.model ?? null;
+    const servedTarget =
+      fallbackVariant.servingModel ?? inputs.aliasTargets?.get(entry.entry.model) ?? null;
+    const target = servedTarget ?? "the alias's current target";
+    const targetState = serving
+      ? `Routing uses ${target}, which is measured in this pool.`
+      : running
+        ? `Requests go to ${target}; it is being measured now.`
+        : `Requests go to ${target}, which has no measurement in this pool.`;
+    return {
+      kind: 'unavailable',
+      label: serving ? 'Serving new alias target' : 'Benchmarked target no longer served',
+      detail: [
+        benchmarked !== null
+          ? `The benchmarked target ${benchmarked} is no longer served.`
+          : 'The benchmarked target for this alias is no longer served.',
+        targetState,
+        'Benchmark this pool again to pin the current target.',
+      ].join(' '),
+      active: serving,
+      rebenchmarkNeeded: true,
+      tone: serving ? 'warning' : 'destructive',
     };
   }
 
@@ -275,22 +316,6 @@ export function entryRoutingStatus(
       active: false,
       rebenchmarkNeeded: false,
       tone: 'muted',
-    };
-  }
-
-  const fallback = variants.find(variant => variant.servingFallback === true);
-  if (fallback !== undefined) {
-    const servingModel =
-      fallback.servingModel ?? inputs.aliasTargets?.get(entry.entry.model) ?? null;
-    return {
-      kind: 'unavailable',
-      label: 'Unavailable on benchmarked model',
-      detail: `${pin?.model ?? 'The benchmarked model'} is no longer served.${
-        servingModel !== null ? ` Requests fall back to ${servingModel} without a measurement.` : ''
-      } Benchmark this pool again to update routing.`,
-      active: false,
-      rebenchmarkNeeded: true,
-      tone: 'destructive',
     };
   }
 

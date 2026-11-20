@@ -28,8 +28,9 @@ export class PoolPinsRouterNotFoundError extends Error {
  * Applies the benchmark worker's settlement callback to one saved pool. The decision is pure
  * (`decideServingPins`); this only reads the locked row and writes the result.
  *
- * Writing a pin leaves `updated_at` untouched, because `customRouterPoolVersion` includes it: a
- * pin-only write must not invalidate an outstanding quote.
+ * Writing a pin leaves `updated_at` untouched. `customRouterPoolVersion` no longer hashes it — the
+ * version is measurement identity, so pins and no-op re-registrations cannot invalidate a quote —
+ * but keeping the row's edit stamp stable keeps audit ordering honest for a routing-only write.
  */
 export async function applyServingPins(
   input: CustomRouterPoolPinsRequest
@@ -50,7 +51,7 @@ export async function applyServingPins(
     if (!row) throw new PoolPinsRouterNotFoundError();
 
     const router = toCustomRouterDefinition(row);
-    const poolUnchanged = customRouterPoolVersion(router, row.updated_at) === request.poolVersion;
+    const poolUnchanged = customRouterPoolVersion(router) === request.poolVersion;
     const { entries, applied, skipped } = decideServingPins({
       entries: router.entries,
       aliases: request.aliases,

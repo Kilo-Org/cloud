@@ -205,6 +205,13 @@ export const BenchmarkAdmissionRefusalReasonSchema = z.enum([
   'permanently_failed',
   /** The admission callback could not be reached: outcome uncertain, never reassign. */
   'admission_unavailable',
+  /**
+   * The assignment envelope itself is not authentic: missing, unsigned, malformed or expired.
+   * Nothing was dispatched and this is not a statement about the payer's ability to pay, so the
+   * Worker must never detach or charge the account — it stops the call and reports a bad
+   * credential instead.
+   */
+  'assignment_invalid',
 ]);
 export type BenchmarkAdmissionRefusalReason = z.infer<typeof BenchmarkAdmissionRefusalReasonSchema>;
 

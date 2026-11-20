@@ -86,7 +86,23 @@ describe('verifyBenchmarkAssignment', () => {
     );
     const result = await verifyBenchmarkAssignment(headers, SECRET);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.response.status).toBe(402);
+    // A tampered envelope is a credential failure, never a payer refusal.
+    if (!result.ok) expect(result.response.status).toBe(401);
+  });
+
+  it('reports a bad envelope as a credential error, not a payer refusal', async () => {
+    // An unauthenticated or expired envelope proves nothing about the account, so the Worker
+    // must not detach or charge it for this.
+    const result = await verifyBenchmarkAssignment(new Headers(), SECRET);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.response.status).toBe(401);
+      const body = (await result.response.clone().json()) as {
+        error: { code: string; reason: string };
+      };
+      expect(body.error.code).toBe('benchmark_assignment_invalid');
+      expect(body.error.reason).toBe('assignment_invalid');
+    }
   });
 
   it('rejects a wrong secret, a stale token, and a missing header', async () => {

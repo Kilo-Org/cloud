@@ -638,6 +638,32 @@ export async function getRoutingCaseResultsForEntries(
   return [...pairs.values()];
 }
 
+export type ProbeCaseCount = { model: string; variant: string; run_id: string; probes: number };
+
+/**
+ * Probe results each pair's provenance run holds at `revision` or newer. A pair counts as
+ * probe-complete only when `probes` reaches the number of probe cases (src/probe/eligibility.ts);
+ * run completion already guarantees every repetition produced a row.
+ */
+export async function countProbeCaseResults(
+  db: D1Database,
+  params: { runIds: readonly string[]; caseIds: readonly string[]; revision: number }
+): Promise<ProbeCaseCount[]> {
+  if (params.runIds.length === 0 || params.caseIds.length === 0) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT run_id, model, variant, COUNT(DISTINCT case_id) AS probes
+       FROM case_results
+       WHERE run_id IN (SELECT value FROM json_each(?))
+         AND case_id IN (SELECT value FROM json_each(?))
+         AND prompt_revision >= ?
+       GROUP BY run_id, model, variant`
+    )
+    .bind(JSON.stringify(params.runIds), JSON.stringify(params.caseIds), params.revision)
+    .all<ProbeCaseCount>();
+  return results;
+}
+
 export async function getExistingCaseResultIds(
   db: D1Database,
   params: {

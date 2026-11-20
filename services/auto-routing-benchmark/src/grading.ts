@@ -43,6 +43,14 @@ export type DeciderCheck =
 
 export type MechanicalDeciderCheck = Exclude<DeciderCheck, { kind: 'judged' }>;
 
+/**
+ * The correct final answer of a probe case: a mechanical check that carries one answer
+ * (`exact` or `json_equal`), never a rubric and never narration.
+ */
+export type ProbeAnswerCheck =
+  | Extract<DeciderCheck, { kind: 'exact' }>
+  | Extract<DeciderCheck, { kind: 'json_equal' }>;
+
 export type DeciderJudge = (input: {
   userPrompt: string;
   output: string;
@@ -67,6 +75,19 @@ export function lacksRequiredToolCalls(
   toolCalls: number | null
 ): boolean {
   return (toolCalls ?? 0) < (requiredToolCalls ?? 0);
+}
+
+/**
+ * Grades the reply to a probe: a tool call continues the task in progress and scores 1,
+ * and so does a reply whose text is the task's correct final answer. A narration stop, a
+ * wrong answer, or an empty reply scores 0.
+ */
+export function gradeProbeOutput(
+  check: ProbeAnswerCheck,
+  reply: { text: string; toolCalls: number }
+): 0 | 1 {
+  if (reply.toolCalls > 0) return 1;
+  return runDeciderCheck(check, reply.text) ? 1 : 0;
 }
 
 export async function gradeDeciderOutput(

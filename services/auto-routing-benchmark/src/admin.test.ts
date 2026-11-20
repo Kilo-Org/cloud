@@ -16,7 +16,7 @@ import type * as ProfilesModule from './profiles';
 import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
-import { CONTINUATION_CASES } from './datasets/continuation-cases';
+import { isProbeCase, PROBE_CASES } from './datasets/probe-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
 import {
@@ -989,9 +989,9 @@ describe('POST /admin/runs', () => {
     const [[, schedule]] = vi.mocked(scheduleRunChunks).mock.calls;
     expect(schedule.caseIds).toEqual(DECIDER_CASES.map(benchCase => benchCase.id));
     const scheduled = new Set(schedule.caseIds);
-    expect(CONTINUATION_CASES.filter(benchCase => scheduled.has(benchCase.id))).toEqual([]);
+    expect(PROBE_CASES.filter(benchCase => scheduled.has(benchCase.id))).toEqual([]);
     const graded = deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION);
-    expect(graded.filter(benchCase => benchCase.requiredToolCalls !== undefined)).toEqual([]);
+    expect(graded.filter(benchCase => isProbeCase(benchCase))).toEqual([]);
   });
 
   it('starts one run per queue for queue=both', async () => {

@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { AutoRouter } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { deciderCliPrompt } from './cli-runner';
-import { CONTINUATION_CASES } from './datasets/continuation-cases';
 import { DECIDER_CASES, FRONTIER_CASES, type DeciderCase } from './datasets/decider-cases';
+import { PROBE_CASES } from './datasets/probe-cases';
 import {
   copyRemeasureBaselines,
   countCurrentProfilesByStatus,
@@ -248,7 +248,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect(report).toMatchObject({
       pairs: 1,
       affectedResults: affected.length,
-      unmeasuredResults: CONTINUATION_CASES.length,
+      unmeasuredResults: PROBE_CASES.length,
       unknownCostResults: 0,
       changed: 0,
       pairDetails: [{ model: MODEL, queues: ['platform'], state: null }],
@@ -356,9 +356,12 @@ describe('prompt transport re-measure (real SQLite)', () => {
       .prepare("SELECT case_ids FROM scheduler_chunks WHERE run_id = ? AND status = 'pending'")
       .all('next')
       .flatMap(row => JSON.parse(String(row.case_ids)) as string[]);
-    const agenticIds = DECIDER_CASES.filter(c => c.taskType === 'agentic_execution').map(c => c.id);
-    expect(scheduled.sort()).toEqual([...agenticIds, ...CONTINUATION_CASES.map(c => c.id)].sort());
-    expect(agenticIds).toHaveLength(90);
+    // Revision 3 re-measures only the probe cases plus the single re-answered terminal case;
+    // the 90 agentic base cases keep their revision-2 results (tool evidence is recorded free).
+    expect(scheduled.sort()).toEqual(
+      [...PROBE_CASES.map(c => c.id), 'supp-agent-term-pwd-base'].sort()
+    );
+    expect(DECIDER_CASES.filter(c => c.taskType === 'agentic_execution')).toHaveLength(90);
     expect(scheduled.length).toBeLessThan(DECIDER_CASES.length / 5);
   });
 
@@ -385,8 +388,8 @@ describe('prompt transport re-measure (real SQLite)', () => {
       projectedCostUsd: 0,
       changed: 0,
     });
-    const continuationIds = new Set(CONTINUATION_CASES.map(c => c.id));
-    expect(report.affectedCaseIds.filter(id => continuationIds.has(id))).toEqual([]);
+    const probeIds = new Set(PROBE_CASES.map(c => c.id));
+    expect(report.affectedCaseIds.filter(id => probeIds.has(id))).toEqual([]);
     expect(tableDump()).toEqual(before);
   });
 

@@ -57,6 +57,8 @@ import { gradeDeciderOutput, type DeciderJudge } from './grading';
 import type { HonoEnv } from './hono-env';
 import { createSystemOneClient } from './openrouter';
 import { currentProfileContextFromConfig } from './profiles';
+import type { DeciderCase } from './datasets/decider-cases';
+import { isProbeCase } from './datasets/probe-cases';
 import { CLIENT_EVAL_REVISION, deciderCasesForRouter } from './measurement-revision';
 
 export class ClientEvalError extends Error {
@@ -76,8 +78,16 @@ export type ClientEvalDeps = {
   now?: () => Date;
 };
 
+// Client eval runs the CLI with the case's prompt, so it covers the prompt cases only; a
+// probe case is a cut of a recorded history, sent through the gateway by the worker.
+function clientEvalCases(router: AutoRouter): DeciderCase[] {
+  return deciderCasesForRouter(router, CLIENT_EVAL_REVISION).filter(
+    (benchCase): benchCase is DeciderCase => !isProbeCase(benchCase)
+  );
+}
+
 function findCase(router: AutoRouter, caseId: string) {
-  const benchCase = deciderCasesForRouter(router, CLIENT_EVAL_REVISION).find(c => c.id === caseId);
+  const benchCase = clientEvalCases(router).find(c => c.id === caseId);
   if (!benchCase) {
     throw new ClientEvalError('invalid_request', `Unknown ${router} case: ${caseId}`);
   }
@@ -119,7 +129,7 @@ export async function planClientEval(
     })
   );
   const uploaded = await listClientCaseKeys(db, [...currentProfileIds.values()]);
-  const cases = deciderCasesForRouter(request.baseRouter, CLIENT_EVAL_REVISION);
+  const cases = clientEvalCases(request.baseRouter);
   const items: ClientEvalPlanItem[] = [];
   const staleEntries: ClientEvalPair[] = [];
   for (const { entry, variant, rows } of pairs) {
@@ -225,8 +235,7 @@ export async function gradeClientEvalResult(
     nowIso
   );
   const caseKey = { profileId: profile.id, caseId: request.caseId, rep: request.rep };
-  const plannedResults =
-    deciderCasesForRouter(request.baseRouter, CLIENT_EVAL_REVISION).length * current.repetitions;
+  const plannedResults = clientEvalCases(request.baseRouter).length * current.repetitions;
   const stored = await getClientCase(db, caseKey);
   if (stored?.ran) {
     return settleStoredClientCase(db, profile, caseKey, stored, plannedResults, nowIso, deps);

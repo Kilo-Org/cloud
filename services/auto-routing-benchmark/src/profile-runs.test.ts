@@ -1122,7 +1122,7 @@ describe('decider run completion', () => {
     ).toEqual(['platform/a', 'platform/b']);
   });
 
-  it('serves the live table until every pair is graded under the new revision', async () => {
+  it('publishes every route while the probe revision is not active', async () => {
     vi.mocked(getLatestRoutingTable).mockResolvedValue(
       liveRoutingTable([
         { model: 'platform/a', variant: null },
@@ -1179,25 +1179,15 @@ describe('decider run completion', () => {
     const revisions: Record<string, number> = {
       'revision-3-a': 3,
       'revision-2-b': 2,
-      'revision-3-b': 3,
     };
     vi.mocked(getRunMeasurementRevisions).mockImplementation(async (_db, runIds) =>
       runIds.map(runId => ({ runId, measurementRevision: revisions[runId] }))
     );
 
-    await expect(publishPlatformRoutingTable(env, fetch)).resolves.toBeNull();
-    expect(saveRoutingTable).not.toHaveBeenCalled();
-
-    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
-      { model: 'platform/a', variant: '', run_id: 'revision-3-a' },
-      { model: 'platform/b', variant: 'high', run_id: 'revision-3-b' },
-    ]);
-    vi.mocked(getSummariesForRuns).mockResolvedValue([
-      ...summariesFor('platform/a', null, 'revision-3-a'),
-      ...summariesFor('platform/b', 'high', 'revision-3-b'),
-    ]);
-
     await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
+
+    // `ACTIVE_MEASUREMENT_REVISION` is below the probe revision, so mixed gradings neither
+    // hold the table nor narrow a route: probe route eligibility starts with activation.
     const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
     expect(table.routes['agentic_execution/tool_usage'].map(candidate => candidate.model)).toEqual([
       'platform/a',

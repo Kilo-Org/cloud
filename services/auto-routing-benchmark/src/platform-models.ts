@@ -20,6 +20,7 @@ export const BenchmarkModelCatalogSchema = z.object({
     z.object({
       id: z.string().trim().min(1),
       alias_target: z.string().trim().min(1).optional(),
+      description: z.string().optional(),
       inference_provider_ids: z.array(z.string()).optional(),
       supported_parameters: z.array(z.string()).optional(),
       context_length: z.number().nullable().catch(null).optional(),
@@ -29,7 +30,14 @@ export const BenchmarkModelCatalogSchema = z.object({
         .nullable()
         .catch(null)
         .optional(),
-      opencode: z.object({ variants: BenchmarkCatalogVariantsSchema.optional() }).optional(),
+      opencode: z
+        .object({
+          variants: BenchmarkCatalogVariantsSchema.optional(),
+          // The CLI's prompt and SDK choices for this model (see probe/family.ts).
+          prompt: z.string().nullish(),
+          ai_sdk_provider: z.string().nullish(),
+        })
+        .optional(),
       pricing: z
         .object({
           prompt: CatalogTokenPriceSchema.optional(),
@@ -43,7 +51,7 @@ export const BenchmarkModelCatalogSchema = z.object({
   ),
 });
 
-type CatalogModel = z.infer<typeof BenchmarkModelCatalogSchema>['data'][number];
+export type CatalogModel = z.infer<typeof BenchmarkModelCatalogSchema>['data'][number];
 
 export function catalogModelSupportsTools(model: CatalogModel): boolean {
   return model.supported_parameters?.includes('tools') ?? true;
@@ -176,6 +184,31 @@ export function catalogCandidatePrices(
           : null,
       ];
     })
+  );
+}
+
+/**
+ * What a reply's tokens cost at the catalog's prices, for a reply that arrives without the
+ * gateway's billed cost. Cached input is a subset of the reported input; usage the catalog
+ * cannot price returns null instead of a made-up zero.
+ */
+export function catalogUsageCostUsd(
+  model: CatalogModel,
+  usage: {
+    inputTokens: number | null;
+    cachedInputTokens: number | null;
+    outputTokens: number | null;
+  }
+): number | null {
+  const pricing = model.pricing;
+  if (pricing?.prompt == null || pricing.completion == null) return null;
+  if (usage.inputTokens == null && usage.outputTokens == null) return null;
+  const input = usage.inputTokens ?? 0;
+  const cached = Math.min(usage.cachedInputTokens ?? 0, input);
+  return (
+    (input - cached) * pricing.prompt +
+    cached * (pricing.input_cache_read ?? pricing.prompt) +
+    (usage.outputTokens ?? 0) * pricing.completion
   );
 }
 

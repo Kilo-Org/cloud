@@ -1,8 +1,13 @@
 import type { AutoRouter, CandidatePricing } from '@kilocode/auto-routing-contracts';
 import type { DeciderCase } from './datasets/decider-cases';
-import { deciderCasesForRouter, minimumCaseRevisions } from './measurement-revision';
+import { isProbeCase } from './datasets/probe-cases';
+import {
+  deciderCasesForRouter,
+  minimumCaseRevisions,
+  type MeasuredCase,
+} from './measurement-revision';
 import { REMEASURE_FRONTIER_INNER_QUOTE_CASES, snapshotPromptTokens } from './prompt-transport';
-import { variantFromStorage } from './reasoning-effort';
+import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
 export type RemeasureAction = 'dry-run' | 'request' | 'cancel';
 
@@ -80,6 +85,8 @@ export async function planPromptTransportRemeasure(
     action: RemeasureAction;
     prices: ReadonlyMap<string, CandidatePricing | null>;
     frontierInnerQuotes?: boolean;
+    /** Restrict the plan to these exact pairs; absent means every ready pair. */
+    pairs?: readonly { model: string; variant: string | null }[];
     nowIso?: string;
   }
 ): Promise<RemeasureRouterReport> {
@@ -89,14 +96,31 @@ export async function planPromptTransportRemeasure(
   });
   const cases = deciderCasesForRouter(params.router, params.revision);
   const affected = cases.filter(benchCase => benchCase.id in minimums);
-  const casesById = new Map<string, DeciderCase>(affected.map(c => [c.id, c]));
-  // Materializing a snapshot builds a few hundred KB, so price each case once.
+  const casesById = new Map<string, MeasuredCase>(affected.map(c => [c.id, c]));
+  // Materializing a snapshot builds a few hundred KB, so price each case once. A probe case
+  // has no prompt to materialize: it replays a recorded history.
   const snapshotTokensByCase = new Map(
     affected
+      .filter((benchCase): benchCase is DeciderCase => !isProbeCase(benchCase))
       .filter(benchCase => benchCase.longContext)
       .map(benchCase => [benchCase.id, snapshotPromptTokens(benchCase)])
   );
   const pairBindings = [params.router, params.engineIdentity, params.repetitions];
+  // An explicit pair list measures exactly those pairs, so the operator can request the
+  // probe measurement of a chosen set instead of the whole pool.
+  const pairFilter =
+    params.pairs && params.pairs.length > 0
+      ? `AND (SELECT 1 FROM json_each(?) AS wanted
+           WHERE wanted.value = json_array(p.model, p.variant))`
+      : '';
+  const pairFilterBindings =
+    params.pairs && params.pairs.length > 0
+      ? [
+          JSON.stringify(
+            params.pairs.map(pair => JSON.stringify([pair.model, variantToStorage(pair.variant)]))
+          ),
+        ]
+      : [];
   const [{ results }, { results: measured }] = await Promise.all([
     db
       .prepare(`
@@ -106,11 +130,12 @@ export async function planPromptTransportRemeasure(
           AND source.model = p.model AND source.variant = p.variant
         ${REMEASURE_JOIN}
         WHERE ${READY_PAIR_FILTER}
+          ${pairFilter}
           AND EXISTS (SELECT 1 FROM json_each(?) AS minimum
             WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
         ORDER BY p.model, p.variant
       `)
-      .bind(...pairBindings, JSON.stringify(minimums))
+      .bind(...pairBindings, ...pairFilterBindings, JSON.stringify(minimums))
       .all<AffectedRow>(),
     db
       .prepare(`
@@ -122,9 +147,14 @@ export async function planPromptTransportRemeasure(
         FROM benchmark_profiles AS p
         ${REMEASURE_JOIN}
         WHERE ${READY_PAIR_FILTER}
+          ${pairFilter}
         ORDER BY p.model, p.variant
       `)
-      .bind(JSON.stringify(cases.map(benchCase => benchCase.id)), ...pairBindings)
+      .bind(
+        JSON.stringify(cases.map(benchCase => benchCase.id)),
+        ...pairBindings,
+        ...pairFilterBindings
+      )
       .all<MeasuredRow>(),
   ]);
 

@@ -1424,9 +1424,11 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       const stub = startEnsureSessionStub(sessionId);
       try {
         mkdirSync(rulesets, { recursive: true });
+        // A list whose elements are not rules: the shape a bare array check
+        // accepts, and the one that would otherwise be applied as grants.
         writeFileSync(
           join(rulesets, `${encodeURIComponent(sessionId)}.json`),
-          '{"permission":"edit"}'
+          '[{"permission":"edit"}]'
         );
 
         // Present but not a ruleset is still owed: reading it as nothing owed
@@ -1439,6 +1441,25 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
           .catch((error: unknown) => error);
         expect(settleError).toBeInstanceOf(SessionRulesetNotAppliedError);
         expect(stub.updates).toHaveLength(0);
+      } finally {
+        await forgetOutstandingRuleset(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('fails the route when a marker is not JSON at all', async () => {
+      const sessionId = 'ses_record_permission_marker_not_json';
+      const home = temporaryDirectory('kilo-api-permission-not-json-home-');
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        mkdirSync(rulesets, { recursive: true });
+        writeFileSync(join(rulesets, `${encodeURIComponent(sessionId)}.json`), 'not json');
+
+        const error = await readOutstandingRuleset(sessionId).catch((error: unknown) => error);
+        expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
       } finally {
         await forgetOutstandingRuleset(sessionId).catch(() => undefined);
         if (originalHome === undefined) delete process.env.HOME;

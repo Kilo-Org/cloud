@@ -306,9 +306,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // button resolves (re-mints) the URL on press. An error-only page here
       // made the landing permanently unusable on a transient backend failure.
       //
-      // The audit action resolves after the capability read, so its column is
-      // reserved and the icon cannot push the subtitle and the body down when
-      // it lands.
+      // The audit action resolves after the capability read, so the band is
+      // reserved at its height from the first frame: the icon cannot grow the
+      // header when it lands.
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader

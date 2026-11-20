@@ -70,11 +70,12 @@ const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
 const HEADER_CONTENT_GUTTER = 44;
 
 /**
- * The `ms-3` gap the trailing cluster keeps from the heading, in dp. The
- * cluster and the heading are separate flex children, so the title loses this
- * as well whenever the row holds both.
+ * The `ms-3` start margin the trailing cluster keeps from the heading, in dp:
+ * 10.5dp at NativeWind's 14dp rem. The cluster is its own flex child, so the
+ * title loses this margin as well whenever the row holds one, and the stacking
+ * decision reserves the same gap the band lays out instead of a wider one.
  */
-const HEADER_ACTIONS_GAP = 12;
+const HEADER_ACTIONS_GAP = 10.5;
 
 /**
  * The centered row's leading extent (dp): the width of the 48dp icon target
@@ -339,13 +340,15 @@ type ScreenHeaderProps = {
    */
   headerRightWidth?: number;
   /**
-   * Reserve the trailing action's column while that action is not mounted yet,
-   * for a header whose `headerRight` is resolved by a read after the first
-   * frame. The late control neither grows the title band nor narrows the
-   * eyebrow and the subtitle lines: the column is held from the first frame on
-   * and the lines end where the arriving control puts its edge. It pairs with
-   * `headerRightWidth`, which is the width of the control being reserved; a
-   * cluster that reflowed to its own row reserves nothing.
+   * Keep the title band at the trailing action's height while that action is
+   * not mounted yet, for a header whose `headerRight` is resolved by a read
+   * after the first frame: the band is at least the action's own height from
+   * the first frame on, so a late control cannot grow the header when it lands.
+   * It holds no column, so the eyebrow and subtitle lines end at the action's
+   * leading edge once it is mounted — a late action narrows those lines in
+   * place rather than moving them. It pairs with `headerRightWidth`, which is
+   * the width of the control being reserved; a cluster that reflowed to its own
+   * row reserves nothing.
    */
   reserveHeaderRightSpace?: boolean;
   /**
@@ -694,15 +697,17 @@ export function ScreenHeader({
   // font scale. Nothing hangs outside the row, so the header's top gap stays
   // the plain `HEADER_TOP_GAP` below the surface's own clearance.
   // A caller whose trailing action arrives after the first frame reserves the
-  // band it lands in, so the icon neither grows the header nor pushes the
-  // subtitle down when the read answers.
+  // band it lands in, so the icon cannot grow the header when the read answers.
   const reserveActionBand = reserveHeaderRightSpace && !stackActions;
   const titleBandClass = cn(
     'flex-row items-center',
-    (canGoBack || reserveActionBand) && 'min-h-[48px]',
-    canGoBack && 'gap-1'
+    (canGoBack || reserveActionBand) && 'min-h-[48px]'
   );
-  const lineRowClass = cn('flex-row items-center', canGoBack && 'gap-1');
+  // No row gap: the band's children are the back control, the title and the
+  // trailing slots, and each slot already pays its own `ms-3` margin. A `gap-*`
+  // charged the title a second gap in front of the cluster and shaved the same
+  // 3.5dp off every eyebrow and subtitle line beside an action.
+  const lineRowClass = 'flex-row items-center';
 
   // A surface that reaches the window top (a full-window modal) needs the
   // status bar and corner pad added on top of the header's gap; one that
@@ -1088,19 +1093,18 @@ export function ScreenHeader({
   const inRowSlotCount = Number(inRowHeaderRight != null) + Number(inRowInlineActions != null);
   const trailingExtent =
     inRowSlotCount * HEADER_ACTIONS_GAP + headerRightExtent + inlineActionsExtent;
-  // The eyebrow and subtitle lines end where they end today: the trailing
-  // controls now sit on the title line, so each of those lines keeps their
-  // extent as a spacer. A caller that reserves an action arriving after the
-  // first frame reserves the declared column from that frame on.
-  const reservedTrailingExtent = reserveActionBand
-    ? (headerRightWidth ?? 0) + HEADER_ACTIONS_GAP
-    : 0;
-  const trailingColumnWidth = Math.max(trailingExtent, reservedTrailingExtent);
+  // The eyebrow and subtitle lines end where the trailing controls end: the
+  // controls sit on the title line now, so each of those lines keeps their
+  // extent — the slots' own `ms-3` margins included — as a spacer, and stops
+  // exactly at the action's leading edge. The band reserves height, not a
+  // column (see `reserveHeaderRightSpace`), so an action still arriving holds
+  // nothing here: when it lands it narrows these lines in place instead of
+  // moving them.
   const trailingLineSpacer =
-    trailingColumnWidth > 0 ? (
+    trailingExtent > 0 ? (
       <View
         className="shrink-0"
-        style={{ width: Math.round(trailingColumnWidth) }}
+        style={{ width: Math.round(trailingExtent) }}
         aria-hidden
         pointerEvents="none"
       />
@@ -1175,11 +1179,11 @@ export function ScreenHeader({
       <View className="mt-2 min-w-0">{inlineActions}</View>
     ) : null;
   // The heading is one block on the 14dp page gutter. Inside it every line
-  // starts on the title's column — 34dp of the 48dp target plus the row gap —
-  // which the `gutter` rule reads as the header's own column rather than a page
-  // column, so the block needs no surface of its own. The eyebrow and subtitle
-  // rows keep the control's column as a spacer without the band's height, so
-  // the band's extra space stays on the title's line alone.
+  // starts on the title's column — 34dp of the 48dp target plus the 3.5dp
+  // `ms-1` gap — which the `gutter` rule reads as the header's own column
+  // rather than a page column, so the block needs no surface of its own. The
+  // eyebrow and subtitle rows keep the control's column as a spacer without the
+  // band's height, so the band's extra space stays on the title's line alone.
   const headingBlockClassName = pinnedInlineActions
     ? 'min-w-0 grow shrink justify-center'
     : 'min-w-0 flex-1 justify-center';
@@ -1189,19 +1193,32 @@ export function ScreenHeader({
   // title is the start-most content of its column. When the row holds the
   // control it is the 48dp band, so the target is whole inside its parent and
   // the title centres on the control rather than the control overflowing the
-  // title's line.
+  // title's line. The title box then pays the band's 3.5dp `ms-1` itself: the
+  // row lays out no gap, so the eyebrow and subtitle lines carry the same
+  // margin in front of their own slots and all four lines start on one column.
   //
   // The trailing slots are this row's own siblings, so a header with a
   // subtitle keeps its actions on the title's line: as siblings of the whole
   // block they centred between the title and the subtitle, and a 48dp icon
   // landed 9.3dp below the title's centre (measured on the Security Agent
   // finding-details header: icon centre 93.3 in a 67.4dp block whose title
-  // centred at 84.0). The heading keeps its width: the band is what is left
-  // beside the slots, exactly as the block was.
+  // centred at 84.0). The band now owns the row's full width, so the title box
+  // is what takes the free space, exactly as the heading block did before the
+  // slots moved: a pinned cluster stays at the trailing edge instead of packing
+  // up against the title, while a short row still shrinks that cluster first
+  // against the title's own `shrink`.
   const titleRow = (
     <View className={titleBandClass}>
       {backControl}
-      <View className={cn('min-w-0', pinnedInlineActions ? 'shrink' : 'flex-1')}>{titleNode}</View>
+      <View
+        className={cn(
+          'min-w-0',
+          canGoBack && 'ms-1',
+          pinnedInlineActions ? 'grow shrink' : 'flex-1'
+        )}
+      >
+        {titleNode}
+      </View>
       {inRowHeaderRight ? (
         <View className={headerRightSlotClassName} onLayout={onHeaderRightLayout}>
           {inRowHeaderRight}
@@ -1215,7 +1232,7 @@ export function ScreenHeader({
       {eyebrowSlot ? (
         <View className={lineRowClass}>
           {backControlSpacer}
-          <View className="min-w-0 flex-1">{eyebrowSlot}</View>
+          <View className={cn('min-w-0 flex-1', canGoBack && 'ms-1')}>{eyebrowSlot}</View>
           {trailingLineSpacer}
         </View>
       ) : null}
@@ -1223,7 +1240,7 @@ export function ScreenHeader({
       {subtitleSlot ? (
         <View className={lineRowClass}>
           {backControlSpacer}
-          <View className="min-w-0 flex-1">{subtitleSlot}</View>
+          <View className={cn('min-w-0 flex-1', canGoBack && 'ms-1')}>{subtitleSlot}</View>
           {trailingLineSpacer}
         </View>
       ) : null}

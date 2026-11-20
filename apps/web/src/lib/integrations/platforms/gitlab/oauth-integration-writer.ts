@@ -186,8 +186,12 @@ export async function storeGitLabOAuthIntegration(
         !changedInstance &&
         previousAccountId !== null &&
         previousAccountId !== input.providerUser.id;
-      if (changedInstance !== instanceChangeRequested) {
-        throw new Error('GitLab integration changed while reconnecting');
+      if (!instanceChangeRequested && changedInstance) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'GitLab integration changed while connecting. Reload the integration and try again.',
+        });
       }
       if (changedInstance) {
         const remaining = await listProjectIdsWithStoredTokens({

@@ -184,22 +184,36 @@ export function resolveModelPickerSelection(
   };
 }
 
-export function commitModelPickerSelection(
-  bridge: Pick<ModelPickerBridge, 'options' | 'selectionScope' | 'isSelectionCurrent' | 'onSelect'>,
-  value: string,
-  variant: string
+/**
+ * Commits a pick the caller already resolved. The picker resolves a row press
+ * once, against the catalog it drew, so the commit does not look the model up
+ * again in a bridge whose catalog may have changed under the open sheet. Only
+ * the scope is checked again: a scope that moved on makes the answer belong to
+ * a conversation this pick was not made for.
+ */
+export function commitResolvedModelPickerSelection(
+  bridge: Pick<ModelPickerBridge, 'selectionScope' | 'isSelectionCurrent' | 'onSelect'>,
+  selection: ModelPickerSelection
 ): boolean {
   if (!bridge.isSelectionCurrent(bridge.selectionScope)) {
     return false;
   }
 
+  bridge.onSelect(selection);
+  return true;
+}
+
+export function commitModelPickerSelection(
+  bridge: Pick<ModelPickerBridge, 'options' | 'selectionScope' | 'isSelectionCurrent' | 'onSelect'>,
+  value: string,
+  variant: string
+): boolean {
   const selection = resolveModelPickerSelection(bridge, value, variant);
   if (!selection) {
     return false;
   }
 
-  bridge.onSelect(selection);
-  return true;
+  return commitResolvedModelPickerSelection(bridge, selection);
 }
 
 export function setLanguagePickerBridge(bridge: LanguagePickerBridge) {

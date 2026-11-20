@@ -12,7 +12,7 @@ import { ReasoningEffortSchema, refineVariantExclusivity, VariantSchema } from '
 import { addDuplicateKeyIssues } from './duplicate-keys';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
-import { OwnerIdentityShape } from './owner';
+import { OwnerIdentityShape, OwnerTypeSchema } from './owner';
 import {
   POLICY_SETTING_VALUE_DEFAULTS,
   POLICY_SETTING_VALUE_SCHEMAS,
@@ -87,21 +87,162 @@ export const BenchmarkSchedulerSettingSchema = z.object({
 });
 export type BenchmarkSchedulerSetting = z.infer<typeof BenchmarkSchedulerSettingSchema>;
 
+/** USD spend caps an admin can override at runtime, without a deploy. */
+export const BENCHMARK_SPEND_CAP_KEYS = ['perRunUsd', 'perDayUsd', 'perOwnerDayUsd'] as const;
+export type BenchmarkSpendCapKey = (typeof BENCHMARK_SPEND_CAP_KEYS)[number];
+
+/** A cap that leaves room for a real batch but bounds one runaway activation. */
+export const BENCHMARK_SPEND_CAP_USD_MAX = 100_000;
+
+/**
+ * A USD cap is always a positive, finite amount. There is deliberately no way to
+ * express "unlimited": `0`, a negative value and a missing value are all rejected,
+ * and a null override only means "fall back to the environment or the default",
+ * never "spend without a bound".
+ */
+export const BenchmarkSpendCapUsdSchema = z
+  .number()
+  .finite()
+  .positive()
+  .max(BENCHMARK_SPEND_CAP_USD_MAX);
+
+/**
+ * Caps applied when nothing is saved — neither an admin override nor
+ * `BENCHMARK_SCHEDULER_CONFIG`. They are conservative on purpose: a 32-pair run of
+ * a long-context frontier model costs far more than a forecast of a short batch, and
+ * refusing a legitimate run is recoverable while an overspend is not.
+ */
+export const DEFAULT_BENCHMARK_SPEND_CAPS: Readonly<Record<BenchmarkSpendCapKey, number>> = {
+  perRunUsd: 50,
+  perDayUsd: 150,
+  perOwnerDayUsd: 25,
+};
+
+/** One spend cap with its resolved value and where it came from. */
+export const BenchmarkSpendCapSettingSchema = z.object({
+  effective: BenchmarkSpendCapUsdSchema,
+  source: BenchmarkSchedulerSettingSourceSchema,
+  override: BenchmarkSpendCapUsdSchema.nullable(),
+  fallback: BenchmarkSpendCapUsdSchema,
+});
+export type BenchmarkSpendCapSetting = z.infer<typeof BenchmarkSpendCapSettingSchema>;
+
+export const BenchmarkSpendCapsResponseSchema = z.object({
+  perRunUsd: BenchmarkSpendCapSettingSchema,
+  perDayUsd: BenchmarkSpendCapSettingSchema,
+  perOwnerDayUsd: BenchmarkSpendCapSettingSchema,
+});
+export type BenchmarkSpendCapsResponse = z.infer<typeof BenchmarkSpendCapsResponseSchema>;
+
 /**
  * Unknown setting keys are stripped, so a client parses a worker that still serves
- * a retired setting.
+ * a retired setting. `spendCaps` is optional because a worker that predates it does
+ * not serve it; the console shows that as an unavailable state rather than a cap of
+ * zero, which would read as "no budget left".
  */
 export const BenchmarkSchedulerConfigResponseSchema = z.object({
   settings: z.object({
     slots: BenchmarkSchedulerSettingSchema,
     modelConcurrency: BenchmarkSchedulerSettingSchema,
   } satisfies Record<BenchmarkSchedulerSettingKey, typeof BenchmarkSchedulerSettingSchema>),
+  spendCaps: BenchmarkSpendCapsResponseSchema.optional(),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
 export type BenchmarkSchedulerConfigResponse = z.infer<
   typeof BenchmarkSchedulerConfigResponseSchema
 >;
+
+/**
+ * A config save replaces the whole set: a null cap falls back to the environment or
+ * the default, exactly like the integer limits. A cap is never cleared into
+ * "unlimited" — only raised.
+ */
+export const BenchmarkSchedulerConfigUpdateSchema = z.strictObject({
+  ...BenchmarkSchedulerOverridesSchema.shape,
+  perRunUsd: BenchmarkSpendCapUsdSchema.nullable().default(null),
+  perDayUsd: BenchmarkSpendCapUsdSchema.nullable().default(null),
+  perOwnerDayUsd: BenchmarkSpendCapUsdSchema.nullable().default(null),
+});
+export type BenchmarkSchedulerConfigUpdate = z.infer<typeof BenchmarkSchedulerConfigUpdateSchema>;
+
+/** Which cap refused or paused work; `unknown_cost` is a fail-closed pricing refusal. */
+export const BenchmarkSpendCapScopeSchema = z.enum([
+  'run',
+  'day',
+  'owner_day',
+  'unknown_cost',
+]);
+export type BenchmarkSpendCapScope = z.infer<typeof BenchmarkSpendCapScopeSchema>;
+
+/**
+ * One pair's pre-run spend estimate for a run the benchmark would start now: the
+ * cases its own selection rules pick for this pair, and what that pair's measured
+ * per-case cost says they cost.
+ */
+export const BenchmarkSpendForecastPairSchema = z.object({
+  entry: BenchmarkPairSchema,
+  /** Cases per repetition this pair would execute (copy/reuse and revision rules applied). */
+  casesPerRepetition: z.number().int().nonnegative(),
+  repetitions: z.number().int().nonnegative(),
+  estimateUsd: z.number().nonnegative(),
+  /** `measured` from this pair's own graded rows, `pricing` from catalog price x tokens,
+   *  `unknown` when neither exists — the pair is refused, never priced at zero. */
+  basis: z.enum(['measured', 'pricing', 'unknown']),
+  measuredCases: z.number().int().nonnegative(),
+});
+export type BenchmarkSpendForecastPair = z.infer<typeof BenchmarkSpendForecastPairSchema>;
+
+export const BenchmarkSpendForecastSchema = z.object({
+  totalUsd: z.number().nonnegative(),
+  pairs: z.array(BenchmarkSpendForecastPairSchema),
+  /** What the estimate refuses against: the run cap, the day remainder, the owner remainder. */
+  perRunUsd: z.number().nonnegative(),
+  daySpendUsd: z.number().nonnegative(),
+  perDayUsd: z.number().nonnegative(),
+  perOwnerDayUsd: z.number().nonnegative().nullable(),
+  ownerDaySpendUsd: z.number().nonnegative().nullable(),
+});
+export type BenchmarkSpendForecast = z.infer<typeof BenchmarkSpendForecastSchema>;
+
+/**
+ * Why work that was refused admission is still waiting. The pairs stay `pending` in
+ * the registry — refusing a run never drops work — and this is what an admin reads
+ * to see which cap held it, what it was expected to cost, and what was left.
+ */
+export const BenchmarkBudgetHoldSchema = z.object({
+  entry: BenchmarkPairSchema,
+  scope: BenchmarkSpendCapScopeSchema,
+  estimateUsd: z.number().nonnegative(),
+  remainingUsd: z.number().nonnegative(),
+  /** Null for a platform pair: only a user-owned subscription has an owner budget. */
+  ownerType: OwnerTypeSchema.nullable(),
+  ownerId: z.string().nullable(),
+  heldAt: z.string(),
+});
+export type BenchmarkBudgetHold = z.infer<typeof BenchmarkBudgetHoldSchema>;
+
+/** Today's spend against the day cap, served with the scheduler config. */
+export const BenchmarkSpendTodaySchema = z.object({
+  day: z.string(),
+  spentUsd: z.number().nonnegative(),
+  perDayUsd: z.number().nonnegative(),
+});
+export type BenchmarkSpendToday = z.infer<typeof BenchmarkSpendTodaySchema>;
+
+/**
+ * Pre-run estimate for the queue as it stands now. Served by its own route so the
+ * console can show the number before the admin presses Run, and returned again in a
+ * refusal so the message names the same figure.
+ */
+export const BenchmarkRunForecastResponseSchema = z.object({
+  queue: BenchmarkRunPurposeSchema,
+  // Null when nothing is pending: there is nothing to estimate.
+  forecast: BenchmarkSpendForecastSchema.nullable(),
+  /** Pairs the queue would claim, in admission order. Empty when nothing is pending. */
+  entries: z.number().int().nonnegative(),
+});
+export type BenchmarkRunForecastResponse = z.infer<typeof BenchmarkRunForecastResponseSchema>;
 
 /** Exact model/effort identity in persisted benchmark run snapshots. */
 export const BenchmarkDeciderModelSchema = z
@@ -169,6 +310,14 @@ export const BenchmarkConfigSchema = z
     // written through this schema.
     policyOverrides: PolicySettingOverridesSchema.nullable().optional(),
     policyComputed: PolicySettingComputedMapSchema.nullable().optional(),
+    // Operator switch for the owner (user) queue: no user run is admitted and no
+    // owner admission queues rows while it is set. Subscriptions are still recorded,
+    // so a pool saved during a pause is admitted when it lifts.
+    //
+    // Deliberately optional with no default: a web release that predates the field
+    // sends a config without it, and defaulting to `false` would silently unpause the
+    // queue on an ordinary model edit. Absent means "leave the stored flag alone".
+    userQueuePaused: z.boolean().optional(),
     updatedAt: z.string().nullable(),
     updatedBy: z.string().nullable(),
   })
@@ -287,6 +436,25 @@ export const BenchmarkRunProgressSchema = z.object({
 });
 export type BenchmarkRunProgress = z.infer<typeof BenchmarkRunProgressSchema>;
 
+/**
+ * A run's own spend accounting: whether it is within its caps, or paused at one, with
+ * the estimate admission recorded for it.
+ */
+export const BenchmarkRunBudgetSchema = z.discriminatedUnion('state', [
+  z.object({
+    state: z.literal('within'),
+    capUsd: z.number().nonnegative(),
+    forecastUsd: z.number().nonnegative().nullable(),
+  }),
+  z.object({
+    state: z.literal('paused'),
+    capUsd: z.number().nonnegative(),
+    scope: BenchmarkSpendCapScopeSchema,
+    forecastUsd: z.number().nonnegative().nullable(),
+  }),
+]);
+export type BenchmarkRunBudget = z.infer<typeof BenchmarkRunBudgetSchema>;
+
 export const BenchmarkRunSchema = z.object({
   id: z.string(),
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
@@ -300,6 +468,9 @@ export const BenchmarkRunSchema = z.object({
   // Optional so run payloads persisted before the field existed still parse.
   // Omitted for terminal runs, whose counts are already final in their summaries.
   progress: BenchmarkRunProgressSchema.optional(),
+  // Optional so a run payload from a worker that predates spend caps still parses;
+  // absent then means "this worker does not account for spend".
+  budget: BenchmarkRunBudgetSchema.optional(),
 });
 export type BenchmarkRun = z.infer<typeof BenchmarkRunSchema>;
 
@@ -495,8 +666,20 @@ export const BenchmarkRegistryResponseSchema = z.object({
     .optional(),
   /** Failed rows of the live identity that a queue still wants, retryable and permanent. */
   failedEntries: z.array(BenchmarkRegistryFailedEntrySchema).optional(),
+  /**
+   * Pairs that are pending because a spend cap refused their run, with the cap,
+   * estimate and remaining budget. Optional so a worker that predates spend caps
+   * still parses.
+   */
+  budgetHolds: z.array(BenchmarkBudgetHoldSchema).optional(),
 });
 export type BenchmarkRegistryResponse = z.infer<typeof BenchmarkRegistryResponseSchema>;
+
+/** Manual resume of a run paused at a spend cap; dispatch continues if the cap allows. */
+export const ResumeBenchmarkRunRequestSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
+  runId: z.string().trim().min(1),
+});
 
 export const RequeueBenchmarkRegistryRequestSchema = z.object({
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),

@@ -1,11 +1,17 @@
 import {
   BENCHMARK_CONTAINER_BUDGET,
   BenchmarkSchedulerLimitSchema,
+  BenchmarkSpendCapUsdSchema,
+  DEFAULT_BENCHMARK_SPEND_CAPS,
   type BenchmarkProfileFailureClass,
   type BenchmarkSchedulerConfigResponse,
+  type BenchmarkSchedulerConfigUpdate,
   type BenchmarkSchedulerOverrides,
   type BenchmarkSchedulerSetting,
   type BenchmarkSchedulerSettingKey,
+  type BenchmarkSpendCapKey,
+  type BenchmarkSpendCapSetting,
+  type BenchmarkSpendCapsResponse,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 
@@ -37,6 +43,11 @@ const SchedulerConfigSchema = z.object({
       'efficient/user': 1,
       'frontier/user': 1,
     }),
+  // Spend caps share the scheduler config because they are enforced by the same
+  // dispatch pass, but they are never unlimited: see BenchmarkSpendCapUsdSchema.
+  perRunUsd: BenchmarkSpendCapUsdSchema.default(DEFAULT_BENCHMARK_SPEND_CAPS.perRunUsd),
+  perDayUsd: BenchmarkSpendCapUsdSchema.default(DEFAULT_BENCHMARK_SPEND_CAPS.perDayUsd),
+  perOwnerDayUsd: BenchmarkSpendCapUsdSchema.default(DEFAULT_BENCHMARK_SPEND_CAPS.perOwnerDayUsd),
 });
 
 export type SchedulerConfig = z.infer<typeof SchedulerConfigSchema>;
@@ -44,15 +55,31 @@ export function schedulerConfig(raw?: string): SchedulerConfig {
   return SchedulerConfigSchema.parse(raw ? JSON.parse(raw) : {});
 }
 
+/** The three USD caps, resolved. Admission and the in-flight guard both read this. */
+export type SpendCaps = {
+  perRunUsd: number;
+  perDayUsd: number;
+  perOwnerDayUsd: number;
+};
+
+export function spendCapsOf(config: SchedulerConfig): SpendCaps {
+  return {
+    perRunUsd: config.perRunUsd,
+    perDayUsd: config.perDayUsd,
+    perOwnerDayUsd: config.perOwnerDayUsd,
+  };
+}
+
 type ResolvedSchedulerConfig = {
   config: SchedulerConfig;
   settings: BenchmarkSchedulerConfigResponse['settings'];
+  spendCaps: BenchmarkSpendCapsResponse;
 };
 
 /** Each overridable limit resolves admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then default. */
 export function resolveSchedulerConfig(
   envConfig: string | undefined,
-  overrides: BenchmarkSchedulerOverrides
+  overrides: BenchmarkSchedulerConfigUpdate
 ): ResolvedSchedulerConfig {
   const env = z.record(z.string(), z.unknown()).parse(envConfig ? JSON.parse(envConfig) : {});
   const fallback = SchedulerConfigSchema.parse(env);
@@ -69,18 +96,36 @@ export function resolveSchedulerConfig(
     slots: setting('slots'),
     modelConcurrency: setting('modelConcurrency'),
   };
+  const spendCap = (key: BenchmarkSpendCapKey): BenchmarkSpendCapSetting => {
+    const override = overrides[key];
+    return {
+      effective: override ?? fallback[key],
+      source: override !== null ? 'admin' : key in env ? 'env' : 'default',
+      override,
+      fallback: fallback[key],
+    };
+  };
+  const spendCaps = {
+    perRunUsd: spendCap('perRunUsd'),
+    perDayUsd: spendCap('perDayUsd'),
+    perOwnerDayUsd: spendCap('perOwnerDayUsd'),
+  };
   return {
     config: {
       ...fallback,
       slots: settings.slots.effective,
       modelConcurrency: settings.modelConcurrency.effective,
+      perRunUsd: spendCaps.perRunUsd.effective,
+      perDayUsd: spendCaps.perDayUsd.effective,
+      perOwnerDayUsd: spendCaps.perOwnerDayUsd.effective,
     },
     settings,
+    spendCaps,
   };
 }
 
 type StoredSchedulerOverrides = {
-  overrides: BenchmarkSchedulerOverrides;
+  overrides: BenchmarkSchedulerConfigUpdate;
   updatedAt: string | null;
   updatedBy: string | null;
 };
@@ -88,6 +133,9 @@ type StoredSchedulerOverrides = {
 type SchedulerSettingsRow = {
   slots: unknown;
   model_concurrency: unknown;
+  per_run_usd: unknown;
+  per_day_usd: unknown;
+  per_owner_day_usd: unknown;
   updated_at: string;
   updated_by: string | null;
 };
@@ -98,10 +146,20 @@ function storedLimit(value: unknown): number | null {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * A stored cap that no longer validates (zero, negative, non-finite) is ignored so
+ * the resolved default applies: an unreadable cap must never mean "no cap".
+ */
+function storedSpendCap(value: unknown): number | null {
+  const parsed = BenchmarkSpendCapUsdSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 export async function getSchedulerOverrides(db: D1Database): Promise<StoredSchedulerOverrides> {
   const row = await db
     .prepare(`
-    SELECT slots, model_concurrency, updated_at, updated_by
+    SELECT slots, model_concurrency, per_run_usd, per_day_usd, per_owner_day_usd,
+      updated_at, updated_by
     FROM scheduler_settings WHERE id = 1
   `)
     .first<SchedulerSettingsRow>();
@@ -109,6 +167,9 @@ export async function getSchedulerOverrides(db: D1Database): Promise<StoredSched
     overrides: {
       slots: storedLimit(row?.slots),
       modelConcurrency: storedLimit(row?.model_concurrency),
+      perRunUsd: storedSpendCap(row?.per_run_usd),
+      perDayUsd: storedSpendCap(row?.per_day_usd),
+      perOwnerDayUsd: storedSpendCap(row?.per_owner_day_usd),
     },
     updatedAt: row?.updated_at ?? null,
     updatedBy: row?.updated_by ?? null,
@@ -117,18 +178,27 @@ export async function getSchedulerOverrides(db: D1Database): Promise<StoredSched
 
 export async function saveSchedulerOverrides(
   db: D1Database,
-  overrides: BenchmarkSchedulerOverrides,
+  overrides: BenchmarkSchedulerConfigUpdate,
   updatedBy: string | null
 ): Promise<StoredSchedulerOverrides> {
   const updatedAt = new Date().toISOString();
   await db
     .prepare(`
-    INSERT INTO scheduler_settings (id, slots, model_concurrency, updated_at, updated_by)
-    VALUES (1, ?1, ?2, ?3, ?4)
-    ON CONFLICT (id) DO UPDATE SET slots = ?1, model_concurrency = ?2, updated_at = ?3,
-      updated_by = ?4
+    INSERT INTO scheduler_settings (id, slots, model_concurrency, per_run_usd, per_day_usd,
+      per_owner_day_usd, updated_at, updated_by)
+    VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7)
+    ON CONFLICT (id) DO UPDATE SET slots = ?1, model_concurrency = ?2, per_run_usd = ?3,
+      per_day_usd = ?4, per_owner_day_usd = ?5, updated_at = ?6, updated_by = ?7
   `)
-    .bind(overrides.slots, overrides.modelConcurrency, updatedAt, updatedBy)
+    .bind(
+      overrides.slots,
+      overrides.modelConcurrency,
+      overrides.perRunUsd,
+      overrides.perDayUsd,
+      overrides.perOwnerDayUsd,
+      updatedAt,
+      updatedBy
+    )
     .run();
   return { overrides, updatedAt, updatedBy };
 }
@@ -355,6 +425,13 @@ export const SCHEDULER_LANE_HEADS_SQL = `
   FROM lane JOIN benchmark_runs AS run ON run.id = lane.run_id
   WHERE run.status = 'running'
     AND EXISTS (SELECT 1 FROM scheduler_runs WHERE scheduler_runs.run_id = run.id)
+    -- In-flight spend guard, per run from its own recorded total. A run paused at a
+    -- cap claims nothing further, and one whose recorded fresh spend already reached
+    -- its cap stops here too, so dispatch never spends past the cap even in the pass
+    -- before it writes the pause row. The day and owner guards run before this query
+    -- and pause their runs, which this predicate then excludes.
+    AND run.spend_pause_scope IS NULL
+    AND run.spent_usd < ?1
     AND NOT EXISTS (
       SELECT 1 FROM run_lane_failures AS failure
       WHERE failure.run_id = lane.run_id AND failure.model = lane.model
@@ -525,7 +602,7 @@ export async function claimScheduledChunks(
       const free = config.slots - live.results.length;
       if (free <= 0) break;
       const [heads, cooldowns] = await Promise.all([
-        db.prepare(SCHEDULER_LANE_HEADS_SQL).all<SchedulerLaneHead>(),
+        db.prepare(SCHEDULER_LANE_HEADS_SQL).bind(config.perRunUsd).all<SchedulerLaneHead>(),
         db
           .prepare(
             "SELECT scope, key FROM scheduler_cooldowns WHERE scope IN ('model', 'catalog') AND until > ?"

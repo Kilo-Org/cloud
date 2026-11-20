@@ -12,14 +12,15 @@ import type {
   AutoRouter,
   BenchmarkKind,
   BenchmarkModelSummary,
+  BenchmarkProfileStatus,
+  BenchmarkRunPurpose,
+  BenchmarkRunStatus,
+  BenchmarkSpendCapScope,
   CandidatePricing,
   CustomRouterEntryRef,
   OwnerType,
   ProductionTokenProfile,
   EffortByComplexity,
-  BenchmarkProfileStatus,
-  BenchmarkRunPurpose,
-  BenchmarkRunStatus,
   PolicySettingComputedMap,
   PolicySettingOverrides,
 } from '@kilocode/auto-routing-contracts';
@@ -66,6 +67,10 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   policy_overrides: text('policy_overrides', { mode: 'json' }).$type<PolicySettingOverrides>(),
   // Daily system-optimal computation, keyed by policy setting. Server-owned.
   policy_computed: text('policy_computed', { mode: 'json' }).$type<PolicySettingComputedMap>(),
+  // Operator switch for the owner (user) queue: while set, the drain starts no user
+  // run and owner admissions queue no rows. Subscriptions are still recorded, so
+  // saving a pool during a pause loses nothing. The platform queue is unaffected.
+  user_queue_paused: integer('user_queue_paused', { mode: 'boolean' }).notNull().default(false),
   updated_at: text('updated_at').notNull(),
   updated_by: text('updated_by'),
 });
@@ -123,6 +128,21 @@ export const benchmarkRuns = sqliteTable(
     // ACTIVE_MEASUREMENT_REVISION the run started under: which cases it runs and how it grades them.
     // Runs from before the column existed measured revision 2.
     measurement_revision: integer('measurement_revision').notNull().default(2),
+    // The reuse-aware pre-run estimate admission compared against the caps, so a
+    // paused run can show what it was expected to cost. Null on runs admitted
+    // before spend caps existed.
+    spend_estimate_usd: real('spend_estimate_usd'),
+    // The subscription owner whose per-owner daily budget admitted a user-queue
+    // run; null for platform runs and for runs admitted before the cap existed.
+    spend_owner_type: text('spend_owner_type').$type<'user' | 'org'>(),
+    spend_owner_id: text('spend_owner_id'),
+    // Set while the run is paused at a spend cap. Dispatch skips a paused run's
+    // chunks; the status stays `running` so its measurements are kept, and a raised
+    // cap (or the UTC day rolling) resumes it.
+    spend_pause_scope: text('spend_pause_scope').$type<BenchmarkSpendCapScope>(),
+    // This run's fresh execution cost, maintained as its results are written, so the
+    // per-run guard and the console read one row instead of aggregating results.
+    spent_usd: real('spent_usd').notNull().default(0),
   },
   table => [
     // Decider queues run several runs at once; a classifier run derives one winner.
@@ -724,6 +744,59 @@ export const runLaneFailures = sqliteTable(
   table => [
     primaryKey({
       columns: [table.run_id, table.model, table.variant, table.rep, table.chunk, table.shard],
+    }),
+  ]
+);
+
+/**
+ * Running spend total per UTC day and owner, maintained as fresh results are
+ * persisted. Admission and the in-flight guard read it with one indexed range read
+ * instead of aggregating `case_results` — that table is millions of rows and D1 is
+ * overload-sensitive. The platform row uses `''`/`''` for the owner, because a NULL
+ * would make every upsert insert a new row instead of incrementing.
+ */
+export const benchmarkSpendLedger = sqliteTable(
+  'benchmark_spend_ledger',
+  {
+    day: text('day').notNull(),
+    owner_type: text('owner_type').notNull(),
+    owner_id: text('owner_id').notNull(),
+    spent_usd: real('spent_usd').notNull().default(0),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [primaryKey({ columns: [table.day, table.owner_type, table.owner_id] })]
+);
+
+/**
+ * Why a pending registry row is waiting: a spend cap refused the run that would
+ * have claimed it. Advisory only — the row stays `pending`, and the next drain that
+ * fits the caps admits it and drops the hold.
+ */
+export const benchmarkBudgetHolds = sqliteTable(
+  'benchmark_budget_holds',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    // '' for the platform queue, which has no owner budget.
+    owner_type: text('owner_type').notNull().default(''),
+    owner_id: text('owner_id').notNull().default(''),
+    scope: text('scope').$type<BenchmarkSpendCapScope>().notNull(),
+    estimate_usd: real('estimate_usd').notNull(),
+    remaining_usd: real('remaining_usd').notNull(),
+    held_at: text('held_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.router,
+        table.model,
+        table.variant,
+        table.engine_identity,
+        table.repetitions,
+      ],
     }),
   ]
 );

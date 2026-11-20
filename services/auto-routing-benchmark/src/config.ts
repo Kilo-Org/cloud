@@ -37,6 +37,9 @@ export function mapConfigRows(
     // Stored JSON; entries that fail their key's schema are ignored on read.
     policy_overrides?: unknown;
     policy_computed?: unknown;
+    // Absent on a row read by a worker that predates the operator switch, and on
+    // fixtures; both read as "not paused".
+    user_queue_paused?: boolean | null;
     updated_at: string;
     updated_by: string | null;
   } | null,
@@ -62,6 +65,7 @@ export function mapConfigRows(
     benchmarkOrgId: configRow.benchmark_org_id,
     policyOverrides: parseStoredPolicyOverrides(configRow.policy_overrides),
     policyComputed: parseStoredPolicyComputed(configRow.policy_computed),
+    userQueuePaused: configRow.user_queue_paused ?? false,
     updatedAt: configRow.updated_at,
     updatedBy: configRow.updated_by,
   };

@@ -13,7 +13,7 @@ import {
   BenchmarkConfigSchema,
   BENCHMARK_CONTAINER_BUDGET,
   BenchmarkSchedulerLimitSchema,
-  BenchmarkSchedulerOverridesSchema,
+  BenchmarkSchedulerConfigUpdateSchema,
   BenchmarkKindSchema,
   BenchmarkProfileStatusesRequestSchema,
   BenchmarkRunPurposeSchema,
@@ -170,11 +170,17 @@ function withLegacySchedulerSettings(settings: BenchmarkSchedulerConfigResponse[
 
 const SchedulerOverridesRequestSchema = z
   .strictObject({
-    ...BenchmarkSchedulerOverridesSchema.shape,
+    ...BenchmarkSchedulerConfigUpdateSchema.shape,
     providerConcurrency: BenchmarkSchedulerLimitSchema.nullable().optional(),
     unknownProviderConcurrency: BenchmarkSchedulerLimitSchema.nullable().optional(),
   })
-  .transform(({ slots, modelConcurrency }) => ({ slots, modelConcurrency }));
+  .transform(({ slots, modelConcurrency, perRunUsd, perDayUsd, perOwnerDayUsd }) => ({
+    slots,
+    modelConcurrency,
+    perRunUsd,
+    perDayUsd,
+    perOwnerDayUsd,
+  }));
 
 /**
  * The previous web release parses the run list with a contract that still
@@ -408,9 +414,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
 
   app.get('/admin/scheduler-config', async c => {
     const { overrides, ...updated } = await getSchedulerOverrides(c.env.BENCH_DB);
-    const { settings } = resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides);
+    const { settings, spendCaps } = resolveSchedulerConfig(
+      c.env.BENCHMARK_SCHEDULER_CONFIG,
+      overrides
+    );
     return c.json({
       settings: withLegacySchedulerSettings(settings),
+      spendCaps,
       ...updated,
     } satisfies BenchmarkSchedulerConfigResponse);
   });
@@ -426,9 +436,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         c.req.valid('json'),
         c.req.header('x-updated-by') ?? null
       );
-      const { settings } = resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides);
+      const { settings, spendCaps } = resolveSchedulerConfig(
+        c.env.BENCHMARK_SCHEDULER_CONFIG,
+        overrides
+      );
       return c.json({
         settings: withLegacySchedulerSettings(settings),
+        spendCaps,
         ...updated,
       } satisfies BenchmarkSchedulerConfigResponse);
     }

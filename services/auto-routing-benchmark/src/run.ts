@@ -180,6 +180,17 @@ import {
   type MeasuredCase,
 } from './measurement-revision';
 import { isProbeCase } from './datasets/probe-cases';
+import {
+  admitAgainstSpendCaps,
+  batchOwnerFor,
+  evaluateRunClaim,
+  pauseRunsAtDailyCaps,
+  resolveSpendCaps,
+  resumeRunFromSpendCap,
+  utcDayOf,
+  type AdmissionSkipReason,
+  type SpendOwner,
+} from './spend';
 import { applyProbeActivations } from './probe-activation';
 import { BenchmarkProbeFamilyError, runProbeCaseViaGateway } from './probe/executor';
 import { agenticEligibilityView, pairsMissingProbeResults } from './probe/eligibility';
@@ -937,6 +948,15 @@ export type StartRunOptions = {
    * config list. Ignored for classifier runs.
    */
   entries?: readonly RunModelEntry[];
+  /**
+   * Admission's spend snapshot, recorded on the run so its in-flight guard and the
+   * console read the same numbers. The owner is whose daily budget the run draws on;
+   * null for the platform queue.
+   */
+  spend?: {
+    estimateUsd: number;
+    owner: { ownerType: 'user' | 'org'; ownerId: string } | null;
+  };
 };
 
 export async function startRun(
@@ -1095,6 +1115,8 @@ export async function startRun(
         engine_identity: engineIdentity,
         measurement_revision: ACTIVE_MEASUREMENT_REVISION,
         purpose,
+        spend_estimate_usd: options.spend?.estimateUsd ?? null,
+        spend_owner: options.spend?.owner ?? null,
       },
       runModelRows,
       carriedSummaries
@@ -1157,6 +1179,7 @@ export async function startRun(
       purpose,
       engineIdentity,
       measurementRevision: ACTIVE_MEASUREMENT_REVISION,
+      spendOwner: null,
     });
     return { runId, enqueuedModels: 0, skippedModels };
   }
@@ -1215,9 +1238,16 @@ function logQueueDrainSkipped(
 /**
  * Why a queue drain started no run. `active_run` means the queue's slot is
  * taken and the new work waits for it; `nothing_pending` means the queue holds
- * nothing to claim, so it waits for a registration, not for a run to end.
+ * nothing to claim, so it waits for a registration, not for a run to end;
+ * `paused` means the operator paused the user queue; the `spend_cap_*` members
+ * mean admission refused the batch because its reuse-aware estimate exceeds a cap
+ * or could not be priced.
  */
-export type DrainSkipReason = 'active_run' | 'nothing_pending';
+export type DrainSkipReason =
+  | 'active_run'
+  | 'nothing_pending'
+  | 'paused'
+  | AdmissionSkipReason;
 
 export async function drainQueue(
   env: Env,
@@ -1243,6 +1273,15 @@ export async function drainQueue(
   if (!config) {
     // No saved config means no registry rows to claim: nothing is pending.
     options.skipped?.push('nothing_pending');
+    return null;
+  }
+
+  // Operator switch. Checked before either listing so a paused user queue does no
+  // registry work at all; the platform queue is unaffected. Nothing is dropped: the
+  // pending rows stay pending and the next unpaused drain claims them.
+  if (queue === 'user' && config.userQueuePaused) {
+    options.skipped?.push('paused');
+    console.log(JSON.stringify({ event: 'benchmark_queue_drain_paused', queue, router }));
     return null;
   }
 
@@ -1306,8 +1345,45 @@ export async function drainQueue(
     variant: variantFromStorage(row.variant),
   }));
 
+  // Fail-closed admission. The estimate runs this run's own case selection, so it
+  // counts the cases a revision rule makes a pair re-measure, not a generic average.
+  // A refusal leaves every pair pending, records why, and starts nothing.
+  const admission = await admitAgainstSpendCaps(env, {
+    queue,
+    router,
+    revision: ACTIVE_MEASUREMENT_REVISION,
+    engineIdentity,
+    repetitions,
+    entries,
+    owner: await batchOwnerFor(env.BENCH_DB, router, queue, entries),
+    caps: await resolveSpendCaps(env.BENCH_DB, env.BENCHMARK_SCHEDULER_CONFIG),
+    prices: catalogCandidatePrices(catalog),
+  });
+  if (!admission.admitted) {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_queue_drain_spend_capped',
+        queue,
+        router,
+        scope: admission.refusal.refusal.scope,
+        forecastUsd: Number(admission.refusal.forecast.totalUsd.toFixed(4)),
+        entryCount: entries.length,
+      })
+    );
+    options.skipped?.push(admission.refusal.skipReason);
+    return null;
+  }
+
   try {
-    const result = await startRun(env, 'decider', { router, purpose: queue, entries });
+    const result = await startRun(env, 'decider', {
+      router,
+      purpose: queue,
+      entries,
+      spend: {
+        estimateUsd: admission.forecast.totalUsd,
+        owner: admission.owner,
+      },
+    });
     console.log(
       JSON.stringify({
         event: 'benchmark_queue_drain_started',
@@ -1460,6 +1536,21 @@ export async function dispatchScheduler(env: Env): Promise<void> {
     env.BENCHMARK_SCHEDULER_CONFIG,
     (await getSchedulerOverrides(env.BENCH_DB)).overrides
   );
+  // Cross-run half of the in-flight guard. A day or owner cap belongs to the whole
+  // fleet, so it is evaluated once here, before any claim; paused runs then claim
+  // nothing because the lane-head query excludes them.
+  const paused = await pauseRunsAtDailyCaps(env.BENCH_DB, {
+    perDayUsd: config.perDayUsd,
+    perOwnerDayUsd: config.perOwnerDayUsd,
+  });
+  if (paused.length > 0) {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_runs_paused_at_spend_cap',
+        runs: paused,
+      })
+    );
+  }
   const failed = await recoverChunks(env.BENCH_DB, Date.now());
   for (const claim of failed) {
     await recordLaneFailure(env.BENCH_DB, {
@@ -2322,6 +2413,8 @@ type RunState = {
   purpose: BenchmarkRunPurpose;
   engineIdentity: string;
   measurementRevision: number;
+  /** Owner whose daily budget this run draws on; null for the platform queue. */
+  spendOwner: SpendOwner | null;
 };
 
 async function getRunState(env: Env, runId: string): Promise<RunState> {
@@ -2344,6 +2437,10 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     purpose: run.purpose === 'user' ? 'user' : 'platform',
     engineIdentity: run.engine_identity,
     measurementRevision: run.measurement_revision,
+    spendOwner:
+      (run.spend_owner_type === 'user' || run.spend_owner_type === 'org') && run.spend_owner_id
+        ? { ownerType: run.spend_owner_type, ownerId: run.spend_owner_id }
+        : null,
   };
 }
 

@@ -68,6 +68,7 @@ import {
   wireProfileFailure,
   type ProfileFailure,
 } from './profile-failure';
+import { freshResultSpendStatements, type SpendOwner } from './spend';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -214,6 +215,9 @@ export async function replaceConfig(
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
     policy_overrides?: PolicySettingOverrides | null;
+    // Absent leaves the stored operator switch alone, so an old web release's save
+    // cannot unpause the owner queue.
+    user_queue_paused?: boolean;
     updated_at: string;
     updated_by: string | null;
   },
@@ -304,15 +308,18 @@ const QUEUE_RUN_OCCUPANCY_SQL = `
 /**
  * Inserts a decider run only while its (router ?2, queue ?15) has no starting run
  * and fewer than ?17 active runs, so the check and the insert are one statement.
- * The run records the measurement revision it was started under (?16).
+ * The run records the measurement revision it was started under (?16), and the
+ * spend snapshot admission used: its forecast (?18) and the owner whose daily
+ * budget admitted it (?19, ?20, '' for the platform queue).
  */
 const ADMIT_DECIDER_RUN_SQL = `
   INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
     kind, status, started_at, min_accuracy, switch_cost_factor, best_accuracy_switch_threshold,
     max_concurrency, benchmark_user_id, benchmark_org_id, repetitions,
-    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision)
+    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision,
+    spend_estimate_usd, spend_owner_type, spend_owner_id)
   SELECT ?1, ?2, ?3, ?4, 'decider', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-    ?16
+    ?16, ?18, ?19, ?20
   WHERE NOT EXISTS (
     SELECT 1 FROM benchmark_runs AS active
     WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
@@ -361,6 +368,10 @@ export async function insertRun(
     engine_identity: string;
     measurement_revision?: number;
     purpose?: BenchmarkRunPurpose;
+    /** Reuse-aware pre-run estimate admission compared against the caps. */
+    spend_estimate_usd?: number | null;
+    /** The owner whose daily budget admitted a user-queue run. */
+    spend_owner?: { ownerType: 'user' | 'org'; ownerId: string } | null;
   },
   models: RunModelRow[],
   carriedSummaries: BenchmarkModelSummary[]
@@ -385,6 +396,9 @@ export async function insertRun(
     engine_identity: run.engine_identity,
     measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
     purpose: run.purpose ?? 'platform',
+    spend_estimate_usd: run.spend_estimate_usd ?? null,
+    spend_owner_type: run.spend_owner?.ownerType ?? null,
+    spend_owner_id: run.spend_owner?.ownerId ?? null,
   } satisfies typeof benchmarkRuns.$inferInsert;
 
   const dependents = [];
@@ -447,7 +461,10 @@ export async function insertRun(
         row.engine_identity,
         row.purpose,
         row.measurement_revision,
-        MAX_RUNNING_RUNS_PER_QUEUE
+        MAX_RUNNING_RUNS_PER_QUEUE,
+        row.spend_estimate_usd,
+        row.spend_owner_type,
+        row.spend_owner_id
       ),
     db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(row.router, row.purpose),
     ...dependents.map(query => {
@@ -485,7 +502,20 @@ export async function getRunWithModels(
   return { run, models };
 }
 
-export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Promise<void> {
+/**
+ * Writes one graded result and, for a fresh execution, its cost into the spend
+ * ledger in the same batch — so the day's total and the run's own total always agree
+ * with what is in `case_results`, with no separate pass to drift.
+ *
+ * `spend` is the owner whose daily budget this run draws on, or null for the platform
+ * queue. Absent means the caller is not a benchmark execution (a test fixture, a
+ * reused copy) and no ledger is written.
+ */
+export async function upsertCaseResult(
+  db: D1Database,
+  row: CaseResultRow,
+  spend?: { owner: SpendOwner | null } | null
+): Promise<void> {
   const orm = drizzle(db);
   const upsert = orm
     .insert(caseResults)
@@ -524,9 +554,21 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         prompt_revision: row.prompt_revision,
       },
     });
-  await orm.batch([
-    upsert,
-    orm.delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(row)),
+  const ledger =
+    spend === undefined || spend === null
+      ? []
+      : freshResultSpendStatements(db, {
+          runId: row.run_id,
+          costUsd: row.cost_usd,
+          owner: spend.owner,
+        });
+  const built = [
+    upsert.toSQL(),
+    orm.delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(row)).toSQL(),
+  ];
+  await db.batch([
+    ...built.map(query => db.prepare(query.sql).bind(...query.params)),
+    ...ledger,
   ]);
 }
 

@@ -1329,8 +1329,9 @@ in `skipped`.
 
 - **No wait on the admin path.** A save that adds a model drains the platform queue in the
   same request, so the run exists by the time the save answers — no **Run platform queue**
-  click and no cron wait. The drain is bounded at 5 s; if it is slow, or the queue's slot is
-  taken, the save still answers 200 with the saved config and reports why in `drain`:
+  click and no cron wait. The drain is bounded at 5 s; if it is slow, or the queue is
+  already starting a run or holds `MAX_RUNNING_RUNS_PER_QUEUE` active runs, the save still
+  answers 200 with the saved config and reports why in `drain`:
   `skipped: 'timeout' | 'failed' | 'active_run' | 'nothing_pending'`. A drain that outlives
   the deadline is not abandoned: the save hands its promise to the request's
   `ctx.waitUntil`, so a claim that already started a run still records it, and the
@@ -1339,9 +1340,12 @@ in `skipped`.
   `POST /admin/profiles/register`, which is not a benchmark config save and does not drain;
   the cron tick starts it. It stays because owner registrations arrive at arbitrary times
   and a drain is the only thing that can start their run.
-- **The queue's active run must finish.** One active run per `(router, queue)`. A new model
-  waits behind the pair batch already in flight. More runs per queue is proposed separately
-  and is what removes this wait.
+- **The queue's earlier runs.** A queue holds up to 4 active runs and starts one at a
+  time, so a new model gets its own run on the next drain instead of waiting behind the
+  pair batch already in flight; see "The two registry queues". Runs of one
+  `(router, queue)` share its execution share, and inside it the scheduler prefers the
+  model with the fewest live chunks, so the new run's first cases start as soon as its
+  models hold fewer slots than the earlier runs' models.
 - **Initialization at 20 s per pass.** A D1 write budget, not a policy choice: one pass
   writes 50 chunks per batch so a big run never holds a single transaction open. A run
   needing more passes just takes longer before its first case.

@@ -163,6 +163,7 @@ exports[`privileged inventory covers discovered tRPC procedures the guarded proc
   "admin.emailTesting.getPreview query [admin] -> trpc.admin.emailTesting",
   "admin.emailTesting.getTemplates query [admin] -> trpc.admin.emailTesting",
   "admin.emailTesting.sendTest mutation [admin] -> trpc.admin.emailTesting",
+  "admin.enkryptCalls.perMinute query [admin] -> trpc.admin.enkryptCalls",
   "admin.enrichmentData.upsert mutation [admin] -> trpc.admin.enrichmentData",
   "admin.extendClawTrial.extendTrials mutation [admin] -> trpc.admin.extendClawTrial",
   "admin.extendClawTrial.matchUsers query [admin] -> trpc.admin.extendClawTrial",

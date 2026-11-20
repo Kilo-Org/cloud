@@ -140,6 +140,8 @@ import { clearSessionLocalState } from './services/session-local-state';
 import { setCloudAgentSessionVersion } from './services/cloud-agent-session-version';
 import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
 import { applyMetadataChanges } from './ingest/metadata';
+import { laterLastActivityAt } from './ingest/last-activity';
+import { higherTotalCostMicrodollars } from './ingest/total-cost';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -618,25 +620,44 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       ]),
       this.ctx,
       input.cloudAgentSessionId,
-      input.rename
+      { rename: input.rename, liveSummary: input.liveSummary }
     );
-    if (input.lastActivityAt === undefined) return;
     // The Session DO's clock can run ahead of the database, and the active-session list treats a
     // future last_activity_at as live; no writer would lower it, so the report is clamped.
-    const activity = sql`LEAST(${input.lastActivityAt}::timestamptz, now())`;
-    // The predicate makes the write forward-only by itself, so a repeat that does not advance
-    // the stored value matches no row and writes no row version.
+    const activity =
+      input.lastActivityAt === undefined
+        ? undefined
+        : sql`LEAST(${input.lastActivityAt}::timestamptz, now())`;
+    const cost = input.totalCostMicrodollars;
+    if (activity === undefined && cost === undefined) return;
+    // Both columns only move forward, so a late publication cannot lower them. The predicate
+    // matches only when one of them advances, so a repeat writes no row version.
     await getWorkerDb(this.env.HYPERDRIVE.connectionString)
       .update(cli_sessions_v2)
-      .set({ last_activity_at: activity })
+      .set({
+        ...(activity === undefined ? {} : { last_activity_at: laterLastActivityAt(activity) }),
+        ...(cost === undefined
+          ? {}
+          : { total_cost_microdollars: higherTotalCostMicrodollars(cost) }),
+      })
       .where(
         and(
           eq(cli_sessions_v2.session_id, input.sessionId),
           eq(cli_sessions_v2.kilo_user_id, input.kiloUserId),
           eq(cli_sessions_v2.cloud_agent_session_id, input.cloudAgentSessionId),
           or(
-            isNull(cli_sessions_v2.last_activity_at),
-            lt(cli_sessions_v2.last_activity_at, activity)
+            activity === undefined
+              ? undefined
+              : or(
+                  isNull(cli_sessions_v2.last_activity_at),
+                  lt(cli_sessions_v2.last_activity_at, activity)
+                ),
+            cost === undefined
+              ? undefined
+              : or(
+                  isNull(cli_sessions_v2.total_cost_microdollars),
+                  lt(cli_sessions_v2.total_cost_microdollars, cost)
+                )
           )
         )
       );

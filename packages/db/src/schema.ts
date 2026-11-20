@@ -5354,6 +5354,72 @@ export const webhook_events = pgTable(
   ]
 );
 
+// Replaces `webhook_events`, which keeps serving reads until its rows age out.
+// Partitioned daily on created_at in the migration; Drizzle cannot express it.
+// `apps/web/src/lib/integrations/db/webhook-event-partitions.ts` creates future
+// partitions and drops ones past retention.
+//
+// No foreign keys to kilocode_users or organizations: creating, detaching or
+// dropping a partition of a table with those keys locks both referenced tables,
+// and the drop takes ACCESS EXCLUSIVE on them. User deletion removes these rows
+// explicitly, and retention bounds anything else.
+//
+// Deduplication lives in `webhook_event_signatures`: a unique key on a
+// partitioned table must include created_at, which a redelivery does not share.
+export const webhook_events_v2 = pgTable(
+  'webhook_events_v2',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    owned_by_organization_id: uuid(),
+    owned_by_user_id: text(),
+    platform: text().notNull(),
+    event_type: text().notNull(),
+    event_action: text(),
+    payload: jsonb().notNull(),
+    headers: jsonb().notNull(),
+    processed: boolean().notNull().default(false),
+    processed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    handlers_triggered: text().array().default([]).notNull(),
+    errors: jsonb(),
+    event_signature: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('IDX_webhook_events_v2_owned_by_org_id_created_at').on(
+      table.owned_by_organization_id,
+      table.created_at
+    ),
+    index('IDX_webhook_events_v2_owned_by_user_id_created_at').on(
+      table.owned_by_user_id,
+      table.created_at
+    ),
+    check(
+      'webhook_events_v2_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+// One row per accepted webhook delivery. Claiming the signature in the same
+// transaction as the event insert is how redeliveries are rejected. No foreign
+// key to webhook_events_v2, so its partitions can be dropped freely.
+export const webhook_event_signatures = pgTable(
+  'webhook_event_signatures',
+  {
+    event_signature: text().notNull().primaryKey(),
+    webhook_event_id: uuid().notNull(),
+    webhook_event_created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [index('IDX_webhook_event_signatures_created_at').on(table.created_at)]
+);
+
 // ============ WEBHOOK TRIGGERS ============
 // Registry for webhook triggers - PostgreSQL is listing/ownership index only
 // Authoritative config data lives in the worker's TriggerDO
@@ -5683,6 +5749,7 @@ export type SessionStepUpProof = typeof session_step_up_proofs.$inferSelect;
 export type NewSessionStepUpProof = typeof session_step_up_proofs.$inferInsert;
 
 export type WebhookEvent = typeof webhook_events.$inferSelect;
+export type WebhookEventV2 = typeof webhook_events_v2.$inferSelect;
 
 // ============ MODEL STATS ============
 // Cached model data from OpenRouter and external benchmarks

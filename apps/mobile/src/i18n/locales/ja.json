@@ -172,6 +172,7 @@
     "generating": "生成中…",
     "working": "作業中",
     "yourOwnRepositories": "自分のリポジトリ",
+    "organizationRepositories": "組織のリポジトリ",
     "dismissed": "却下済み",
     "agent": "エージェント",
     "durationMinuteShort": "min",
@@ -669,7 +670,7 @@
     },
     "instructions": {
       "title": "カスタム指示",
-      "deprecation": "カスタム指示は廃止予定です。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
+      "deprecation": "カスタム指示は削除されます。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
       "placeholder": "例：エラー処理の規則に従っているか確認…",
       "clearTitle": "カスタム指示を削除しますか？",
       "clearMessage": "空のフィールドを保存すると、このレビュアーに保存されているカスタム指示が削除されます。"
@@ -698,8 +699,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
+      "managedOnWebTitle": "Webで管理されています",
+      "managedOnWebShort": "この接続は、パソコンからWebで管理されています。",
+      "managedOnWebRepositories": "{{organization}}のリポジトリを、パソコンからWebで選択してください。",
       "description": "{{organization}}用のワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "descriptionReconnect": "{{organization}}用の新しいワークスペースアクセストークンを作成し、下に貼り付けてください。",
+      "descriptionOverview": "{{organization}}用のワークスペースアクセストークンを作成し、次の画面で貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
       "tokenPlaceholder": "ワークスペースアクセストークン",
       "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
@@ -735,6 +740,7 @@
     "platformList": {
       "activity": "アクティビティ",
       "checking": "確認中…",
+      "needsAttention": "要対応",
       "platforms": "プラットフォーム",
       "statusUnavailable": "状態を確認できません"
     },
@@ -2629,6 +2635,8 @@
     "retryHint": "Kilo Passの状態の取得を再試行します。",
     "endedOn": "{{date}}に終了しました",
     "notAvailableInApp": "Kilo Passはアプリでは利用できません。",
+    "notAvailableTitle": "Kilo Passはアプリでは提供されていません",
+    "noPassDescription": "このアカウントにはKilo Passがありません。",
     "statusActive": "有効",
     "statusTrialing": "トライアル中",
     "statusPastDue": "支払い延滞",
@@ -3238,6 +3246,9 @@
     },
     "tabs": {
       "discussion": "ディスカッション",
+      "discussionAccessibility": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_one": "{{title}}：1件のコメント",
       "files": "ファイル",
       "overview": "概要"
     },
@@ -3426,8 +3437,7 @@
     "hub": {
       "balance": "残高",
       "lowBalanceBelow": "{{amount}}未満",
-      "organizationSeats": "組織のシート数",
-      "plan": "組織のプラン",
+      "plan": "プラン",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 終了",
@@ -3470,7 +3480,7 @@
       "retentionLimit": "最新の請求書を表示しています。"
     },
     "lowBalanceAlert": {
-      "enableA11y": "残高アラートを有効にする",
+      "subtitle": "この組織の残高が設定した金額を下回ったときに、指定したメールアドレスにアラートを送信します。",
       "notifyEmailsLabel": "通知先メールアドレス",
       "permissionDenied": "請求アラートを管理する権限がありません。",
       "separateEmailsHint": "複数のメールアドレスはカンマで区切ってください。",
@@ -3647,7 +3657,8 @@
     "signupStepUp": "アカウントの作成を完了するには、「$t(login.moreSignInOptions)」を選択してください。",
     "signupStepUpApple": "アカウントの作成を完了するには、「$t(login.signInWithApple)」を選択してください。",
     "signupStepUpGoogle": "アカウントの作成を完了するには、「$t(login.signInWithGoogle)」を選択してください。",
-    "invalidCode": "そのコードは正しくありません。もう一度お試しください。",
+    "signupStepUpBack": "アカウントの作成を完了するには、前の画面に戻って「$t(login.moreSignInOptions)」を選択してください。",
+    "invalidCode": "そのコードは正しくないか、有効期限が切れています。もう一度お試しいただくか、「$t(login.resendCode)」を選択してください。",
     "codeInProgress": "コードを処理中です。しばらく待ってからもう一度お試しください。",
     "tooManyAttempts": "試行回数が多すぎます。新しいコードをリクエストしてください。",
     "invalidToken": "サインインに失敗しました。もう一度お試しください。",
@@ -3916,6 +3927,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection)では、選択したプロトコルとモデルを使用して、このエンドポイントに短い推論リクエストを送信します。プロバイダーから料金が請求される場合があります。",
       "connectionSucceeded": "モデルはこのプロトコルでリクエストを完了しました。",
       "connectionFailed": "モデルはリクエストを完了できませんでした。APIルートURL、プロトコル、認証情報、モデルIDを確認してください。",
+      "requestTimedOut": "エンドポイントが時間内に応答しませんでした。APIルートURLと接続を確認して、もう一度お試しください。",
+      "requestUnauthorized": "エンドポイントが認証情報を拒否しました。APIキーとカスタムヘッダーを確認して、もう一度お試しください。",
+      "requestNotFound": "エンドポイントまたはモデルが見つかりませんでした。APIルートURLとモデルIDを確認してください。",
+      "requestRateLimited": "エンドポイントがリクエストを制限しています。しばらく待ってからもう一度お試しください。",
+      "requestUnavailable": "エンドポイントは現在利用できません。しばらくしてからもう一度お試しください。",
+      "requestUnreachable": "エンドポイントに到達できませんでした。APIルートURLと接続を確認してください。",
+      "requestInvalidResponse": "エンドポイントから期待される形式ではない応答が返されました。APIルートURLとプロトコルがサーバーと一致しているか確認し、もう一度お試しください。",
+      "discoveryNoModels": "エンドポイントにモデルが一覧にありませんでした。モデルを手動で入力してください。",
+      "connectionIncomplete": "モデルは応答しましたが、完了しませんでした。もう一度お試しいただくか、モデルIDとプロトコルを確認してください。",
       "invalidInput": "バックエンド名、有効なヘッダー、および一意のIDと名前を持つモデルを少なくとも1つ入力してください。トークン数の上限には正の整数を指定してください。",
       "invalidUrl": "認証情報、クエリ、フラグメントを含まないHTTPまたはHTTPSのAPIルートURLを入力してください。",
       "publicHttp": "公開HTTPエンドポイントは許可されません。HTTPSまたは非公開のローカルエンドポイントを使用してください。",
@@ -4054,7 +4074,11 @@
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
     },
-    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。"
+    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。",
+    "providerKeyRefused": "プロバイダーが認証情報を拒否しました。そのAPIキーを確認して、再送信してください。",
+    "providerModelMissing": "このバックエンドではこのモデルを提供していません。別のものを選択してください。",
+    "providerRateLimited": "プロバイダーがリクエストを制限しています。しばらく待ってから再送信してください。",
+    "providerUnavailable": "プロバイダーは現在利用できません。しばらくしてから再送信してください。"
   },
   "settingsTools": {
     "confirmTitle": "この変更を確認しますか？"
@@ -4429,6 +4453,7 @@
     "pickPackToBuyAgain": "新しい購入を開始するには、上のパックを選択してください。",
     "purchasePending": "ストアでこのお支払いを処理中です。請求が承認されると、クレジットが付与されます。",
     "buyAgain": "もう一度購入",
+    "checkPurchase": "購入を確認",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   },
@@ -4522,7 +4547,9 @@
     },
     "saveSheet": {
       "title": "リストに保存",
-      "saved": "{{list}}に保存しました"
+      "saved": "{{list}}に保存しました",
+      "saveFailed": "タスクを保存できませんでした。接続を確認して、もう一度お試しください。",
+      "saveRefused": "このリストにタスクを保存できませんでした。別のリストを選択してください。"
     }
   },
   "agentBriefing": {
@@ -4534,6 +4561,7 @@
     "empty": "このブリーフ期間中のアクティビティはありません",
     "emptyHint": "スケジュールされたブリーフにアクティビティがあると、クラウドとCLIのコーディングセッションがここに表示されます。",
     "loadError": "ブリーフィングを読み込めませんでした",
+    "estimateLoadError": "推定を読み込めませんでした。",
     "view": "ブリーフィングを読む",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}、$t(agentBriefing.snapshotPullRequests) {{pullRequests}}、$t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4801,7 +4829,7 @@
   },
   "organizationGuardrails": {
     "title": "AIガードレール",
-    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。",
+    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AIガードレールは有効になっていません",
     "unavailable": "Kiloは、リクエストに応じて組織のAIガードレールを有効にします。{{supportEmail}} までお問い合わせください。Kiloチームがお使いの組織に対して有効にします。",
     "contactSupport": "サポートに連絡",
@@ -4939,7 +4967,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "エンタープライズ機能",
-    "enterpriseOnly": "これはエンタープライズ限定の機能です。",
+    "enterpriseOnly": "プロバイダーとモデルは Enterprise プランで利用できます。",
     "readOnly": "これらの設定を変更できるのは組織の所有者と管理者のみです。",
     "loadError": "プロバイダーとモデルを読み込めませんでした",
     "tabModels": "モデル",

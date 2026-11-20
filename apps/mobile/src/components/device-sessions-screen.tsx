@@ -13,6 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowIconAction } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
@@ -27,6 +28,7 @@ import {
   sortDeviceSessions,
 } from '@/lib/device-sessions';
 import { formatDate } from '@/lib/format';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
@@ -130,6 +132,9 @@ export function DeviceSessionsScreen() {
     data,
   });
   const sessions = sortDeviceSessions(data ?? []);
+  // A session revoked elsewhere leaves this list stale until it refetches, so
+  // a pull asks the server again.
+  const [refreshing, onRefresh] = useManualRefresh(refetch, t('common.couldNotRefresh'));
 
   const revokeSession = useMutation(
     trpc.user.revokeDeviceSessionById.mutationOptions({
@@ -204,6 +209,7 @@ export function DeviceSessionsScreen() {
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {state === 'loading' ? (
           <RowGroup leadingTile>

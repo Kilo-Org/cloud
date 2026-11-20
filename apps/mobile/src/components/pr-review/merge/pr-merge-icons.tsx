@@ -37,7 +37,7 @@ export function mergeBlockedReasonIcon(kind: MergeBlockedReasonId): LucideIcon {
 
 export type MergeMethodOption = {
   value: AllowedMergeMethod;
-  /** The chip's own copy: the method name alone. */
+  /** The segment's own copy: the method name alone. */
   label: string;
   /** The spoken label: the full sentence the provider words the method with. */
   accessibilityLabel: string;

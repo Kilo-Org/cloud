@@ -116,7 +116,10 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: 'ContextControl',
+}));
 vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/agents/session-preview-overlay', () => ({
   SessionPreviewOverlay: () => null,

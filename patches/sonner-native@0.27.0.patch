@@ -1,0 +1,25 @@
+diff --git a/lib/module/toast-button.js b/lib/module/toast-button.js
+index 96acc9ca862176bb6b811fa0d9722d8eed5d5444..fd7785eac737abe74634d5c926f491f8cbd74e56 100644
+--- a/lib/module/toast-button.js
++++ b/lib/module/toast-button.js
+@@ -13,6 +13,7 @@ export const ToastButton = ({
+   textStyle
+ }) => {
+   return /*#__PURE__*/_jsx(Pressable, {
++    accessibilityRole: "button",
+     onPress: onPress,
+     style: style,
+     children: /*#__PURE__*/_jsx(Text, {
+diff --git a/src/toast-button.tsx b/src/toast-button.tsx
+index 4f10c1799b6b5db973e658c81f062305f30fbb5c..84831312a36a661398fd8afbfa702a02f5d74fc7 100644
+--- a/src/toast-button.tsx
++++ b/src/toast-button.tsx
+@@ -20,7 +20,7 @@ export const ToastButton: React.FC<{
+   textStyle,
+ }) => {
+   return (
+-    <Pressable onPress={onPress} style={style}>
++    <Pressable accessibilityRole="button" onPress={onPress} style={style}>
+       <Text
+         numberOfLines={1}
+         allowFontScaling={allowFontScaling}

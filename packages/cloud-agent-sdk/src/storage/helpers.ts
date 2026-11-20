@@ -33,7 +33,7 @@ function insertSortedBy<T>(arr: readonly T[], item: T, key: (value: T) => string
 /**
  * Ordering evidence of the last accepted update for a stored part: the event
  * time it was accepted on (or the settle time that ordered it), keyed by the
- * part's message and id.
+ * message id the backend buckets the part under and the part id.
  *
  * The backend owns this store next to its parts. Keeping the evidence off the
  * part matters: a part is plain data the UI renders and `structuredClone`
@@ -65,30 +65,48 @@ function createPartViewCache(): PartViewCache {
   return new Map<string, Map<string, { source: Part; view: ReadonlyPart }>>();
 }
 
-function partOrderingKey(messageID: string, partId: string): string {
-  return `${messageID}\u0000${partId}`;
+/**
+ * Key of one part's ordering evidence. The message id is the one the storage
+ * keeps the parts under, not the label the part object carries, so the insert,
+ * the stale check and `forgetPartUpdateTime` all address the same entry.
+ */
+function partOrderingKey(messageId: string, partId: string): string {
+  return `${messageId}\u0000${partId}`;
 }
 
+/**
+ * Record the event time of an accepted update under the bucket the part is
+ * stored in.
+ */
 function rememberPartUpdateTime(
   evidence: PartOrderingEvidence,
-  part: Part,
+  messageId: string,
+  partId: string,
   eventTime: number | undefined
 ): void {
   if (eventTime === undefined) return;
-  evidence.set(partOrderingKey(part.messageID, part.id), eventTime);
+  evidence.set(partOrderingKey(messageId, partId), eventTime);
 }
 
-function storedPartUpdateTime(evidence: PartOrderingEvidence, part: Part): number | undefined {
-  return evidence.get(partOrderingKey(part.messageID, part.id));
+function storedPartUpdateTime(
+  evidence: PartOrderingEvidence,
+  messageId: string,
+  partId: string
+): number | undefined {
+  return evidence.get(partOrderingKey(messageId, partId));
 }
 
-/** Drop the ordering evidence of a part the backend no longer keeps. */
+/**
+ * Drop the ordering evidence of a part the backend no longer keeps. It takes
+ * the same message id the upsert keyed the evidence with, so the delete always
+ * finds the entry.
+ */
 function forgetPartUpdateTime(
   evidence: PartOrderingEvidence,
-  messageID: string,
+  messageId: string,
   partId: string
 ): void {
-  evidence.delete(partOrderingKey(messageID, partId));
+  evidence.delete(partOrderingKey(messageId, partId));
 }
 
 function toolLifecycleRank(part: Part): number | null {
@@ -230,6 +248,7 @@ function isStaleToolLifecycleUpdate(
 }
 
 function upsertPartDroppingStaleSyntheticParts(
+  messageId: string,
   arr: Part[],
   part: Part,
   eventTime: number | undefined,
@@ -246,7 +265,7 @@ function upsertPartDroppingStaleSyntheticParts(
     ? arr.filter(
         existing =>
           existing.id === part.id ||
-          existing.messageID !== part.messageID ||
+          existing.messageID !== messageId ||
           existing.type !== part.type ||
           Reflect.get(existing, 'synthetic') !== true
       )
@@ -256,7 +275,7 @@ function upsertPartDroppingStaleSyntheticParts(
   if (idx >= 0) {
     const existing = filtered[idx];
     const storedEventTime =
-      existing === undefined ? undefined : storedPartUpdateTime(evidence, existing);
+      existing === undefined ? undefined : storedPartUpdateTime(evidence, messageId, existing.id);
     if (
       existing !== undefined &&
       !authoritative &&
@@ -278,14 +297,15 @@ function upsertPartDroppingStaleSyntheticParts(
     // terminal whose event time falls between the two win.
     rememberPartUpdateTime(
       evidence,
-      nextPart,
+      messageId,
+      nextPart.id,
       eventTime ?? partSettledAt(nextPart) ?? storedEventTime
     );
     return nextArr;
   }
 
   const nextPart = clonePart(part);
-  rememberPartUpdateTime(evidence, nextPart, eventTime);
+  rememberPartUpdateTime(evidence, messageId, nextPart.id, eventTime);
   return insertSortedBy(filtered, nextPart, partIdKey);
 }
 

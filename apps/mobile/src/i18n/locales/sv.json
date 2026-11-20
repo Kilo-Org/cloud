@@ -172,6 +172,7 @@
     "generating": "Genererar…",
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
+    "organizationRepositories": "Organisationens kodarkiv",
     "dismissed": "Avfärdad",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "Översikt",
       "files": "Filer",
-      "discussion": "Diskussion"
+      "discussion": "Diskussion",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentarer",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentarer"
     },
     "fileStatus": {
       "modified": "Ändrad",
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "Anpassade instruktioner",
-      "deprecation": "Funktionen för anpassade instruktioner ska fasas ut. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
+      "deprecation": "Funktionen för anpassade instruktioner kommer att tas bort. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
       "placeholder": "t.ex. följ våra regler för felhantering…",
       "clearTitle": "Ta bort anpassade instruktioner?",
       "clearMessage": "Om du sparar ett tomt fält tas de anpassade instruktioner som sparats för den här granskaren bort."
@@ -1387,8 +1391,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
+      "managedOnWebTitle": "Hanteras på webben",
+      "managedOnWebShort": "Den här anslutningen hanteras på webben från en dator.",
+      "managedOnWebRepositories": "Välj repositorier för {{organization}} på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
+      "descriptionOverview": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den på nästa skärm.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
       "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
@@ -1409,6 +1417,7 @@
     "platformList": {
       "checking": "Kontrollerar…",
       "statusUnavailable": "Status inte tillgänglig",
+      "needsAttention": "Kräver åtgärd",
       "platforms": "Plattformar",
       "activity": "Aktivitet"
     },
@@ -1920,7 +1929,7 @@
       "githubAppSettings": "Inställningarna för GitHub-appen",
       "manageAccess": "Hantera GitHub-appens åtkomst",
       "noRepositories": "Inga kodarkiv",
-      "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv",
+      "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv.",
       "selectAtLeastOne": "Välj minst ett kodarkiv."
     },
     "scopeEntry": {
@@ -3183,6 +3192,8 @@
     "retryHint": "Försöker läsa in Kilo Pass-status igen.",
     "endedOn": "Avslutad {{date}}",
     "notAvailableInApp": "Kilo Pass är inte tillgängligt i appen.",
+    "notAvailableTitle": "Kilo Pass finns inte i appen",
+    "noPassDescription": "Det här kontot har inget Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Provperiod",
     "statusPastDue": "Betalning förfallen",
@@ -3465,7 +3476,7 @@
       "retentionLimit": "Visar de senaste fakturorna."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktivera varning för lågt saldo",
+      "subtitle": "Skicka en varning via e-post till de adresser du anger när organisationens saldo understiger det belopp du ställer in.",
       "notifyEmailsLabel": "E-postadresser för varningar",
       "permissionDenied": "Du har inte behörighet att hantera faktureringsvarningar.",
       "separateEmailsHint": "Separera flera e-postadresser med kommatecken.",
@@ -3612,8 +3623,7 @@
       "renameTitle": "Byt namn på organisation",
       "renamePlaceholder": "Organisationens namn",
       "balance": "Saldo",
-      "organizationSeats": "Platser i organisationen",
-      "plan": "Organisationsplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Har löpt ut",
@@ -3647,7 +3657,8 @@
     "signupStepUp": "Välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
     "signupStepUpApple": "Välj ”$t(login.signInWithApple)” för att slutföra skapandet av ditt konto.",
     "signupStepUpGoogle": "Välj ”$t(login.signInWithGoogle)” för att slutföra skapandet av ditt konto.",
-    "invalidCode": "Koden är felaktig. Försök igen.",
+    "signupStepUpBack": "Gå tillbaka och välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
+    "invalidCode": "Koden är felaktig eller har gått ut. Försök igen eller välj ”$t(login.resendCode)”.",
     "codeInProgress": "Din kod behandlas. Vänta en stund och försök igen.",
     "tooManyAttempts": "För många försök. Begär en ny kod.",
     "invalidToken": "Inloggningen misslyckades. Försök igen.",
@@ -3916,6 +3927,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) skickar en kort inferensbegäran till den här slutpunkten med valt protokoll och vald modell. Leverantören kan ta betalt för den.",
       "connectionSucceeded": "Modellen slutförde en begäran med det här protokollet.",
       "connectionFailed": "Modellen kunde inte slutföra en begäran. Kontrollera API-roten, protokollet, inloggningsuppgifterna och modell-ID:t.",
+      "requestTimedOut": "Slutpunkten svarade inte i tid. Kontrollera API-roten och din anslutning och försök igen.",
+      "requestUnauthorized": "Slutpunkten nekade inloggningsuppgifterna. Kontrollera API-nyckeln och de anpassade rubrikerna och försök igen.",
+      "requestNotFound": "Slutpunkten eller modellen hittades inte. Kontrollera API-roten och modell-ID:t.",
+      "requestRateLimited": "Slutpunkten begränsar antalet förfrågningar. Vänta ett ögonblick och försök igen.",
+      "requestUnavailable": "Slutpunkten är inte tillgänglig just nu. Försök igen om en stund.",
+      "requestUnreachable": "Det gick inte att nå slutpunkten. Kontrollera API-roten och din anslutning.",
+      "requestInvalidResponse": "Slutpunkten svarade inte i det förväntade formatet. Kontrollera att API-roten och protokollet matchar servern och försök igen.",
+      "discoveryNoModels": "Slutpunkten listade inga modeller. Ange modeller manuellt.",
+      "connectionIncomplete": "Modellen svarade men slutförde inte. Försök igen eller kontrollera modell-ID:t och protokollet.",
       "invalidInput": "Ange ett backendnamn, giltiga headers och minst en modell med unikt ID och namn. Tokengränser måste vara positiva heltal.",
       "invalidUrl": "Ange en HTTP- eller HTTPS-API-rot utan inloggningsuppgifter, frågesträng eller fragment.",
       "publicHttp": "Publika HTTP-slutpunkter är inte tillåtna. Använd HTTPS eller en privat lokal slutpunkt.",
@@ -4054,7 +4074,11 @@
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
     },
-    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet."
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet.",
+    "providerKeyRefused": "Leverantören nekade inloggningsuppgifterna. Kontrollera dess API-nyckel och skicka igen.",
+    "providerModelMissing": "Den här backenden tillhandahåller inte längre den här modellen. Välj en annan.",
+    "providerRateLimited": "Leverantören begränsar antalet förfrågningar. Vänta ett ögonblick och skicka igen.",
+    "providerUnavailable": "Leverantören är inte tillgänglig just nu. Skicka igen om en stund."
   },
   "settingsTools": {
     "confirmTitle": "Bekräfta denna ändring?"
@@ -4429,6 +4453,7 @@
     "pickPackToBuyAgain": "Välj ett paket ovan för att starta ett nytt köp.",
     "purchasePending": "Butiken behandlar fortfarande betalningen. Dina krediter kommer så snart den godkänner debiteringen.",
     "buyAgain": "Köp igen",
+    "checkPurchase": "Kontrollera köpet",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
   },
@@ -4522,7 +4547,9 @@
     },
     "saveSheet": {
       "title": "Spara i lista",
-      "saved": "Sparat i {{list}}"
+      "saved": "Sparat i {{list}}",
+      "saveFailed": "Det gick inte att spara uppgiften. Kontrollera din anslutning och försök igen.",
+      "saveRefused": "Det gick inte att spara uppgiften i den här listan. Välj en annan lista."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4561,7 @@
     "empty": "Ingen aktivitet under den här rapportperioden",
     "emptyHint": "Dina kodningssessioner i molnet och CLI visas här när en schemalagd rapport har aktivitet.",
     "loadError": "Det gick inte att läsa in rapporter",
+    "estimateLoadError": "Det gick inte att läsa in uppskattningen.",
     "view": "Läs rapport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4801,7 +4829,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-skyddsräcken",
-    "permissionDenied": "Endast organisationsägare och administratörer kan hantera AI-skyddsräcken.",
+    "permissionDenied": "Endast organisationsägare och administratörer kan hantera AI-skyddsräcken. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI-skyddsräcken är inte aktiverade",
     "unavailable": "Kilo aktiverar AI-skyddsräcken för en organisation på begäran. Kontakta {{supportEmail}}, och Kilo-teamet slår på dem för din organisation.",
     "contactSupport": "Kontakta supporten",
@@ -4939,7 +4967,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Företagsfunktion",
-    "enterpriseOnly": "Det här är en funktion som endast är tillgänglig för företag.",
+    "enterpriseOnly": "Leverantörer och modeller är tillgängliga på Enterprise-planen.",
     "readOnly": "Endast organisationsägare och administratörer kan ändra dessa inställningar.",
     "loadError": "Leverantörer och modeller kunde inte läsas in",
     "tabModels": "Modeller",

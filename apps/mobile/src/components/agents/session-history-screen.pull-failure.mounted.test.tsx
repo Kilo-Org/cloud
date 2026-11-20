@@ -186,7 +186,10 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: vi.fn(),
 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 60 }));
-vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: 'ContextControl',
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-filter-button', () => ({

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   SessionComposerSkeleton,
   SessionReadOnlyFooterPlaceholder,
+  SessionSkeletonMessages,
 } from './session-detail-skeleton';
 
 const platform = vi.hoisted(() => ({ os: 'android', fontScale: 1 }));
@@ -186,5 +187,22 @@ describe('SessionComposerSkeleton', () => {
       paddingLeft: 47,
       paddingRight: 59,
     });
+  });
+});
+
+// The transcript pads its rows by the landscape side insets; the placeholder
+// that stands in for it must clear the same insets, outside its bubble gutter.
+describe('SessionSkeletonMessages', () => {
+  it('clears the landscape side insets the transcript clears', () => {
+    sideInsets.style = { paddingLeft: 47, paddingRight: 59 };
+    // eslint-disable-next-line new-cap
+    const root = SessionSkeletonMessages({ sessionId: 'session-1' }) as React.ReactElement;
+    sideInsets.style = undefined;
+    expect((root.props as { style?: unknown }).style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
+    const gutter = (root.props as { children: React.ReactElement }).children;
+    expect(classNameOf(gutter).split(/\s+/)).toContain('px-4');
   });
 });

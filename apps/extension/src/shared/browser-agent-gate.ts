@@ -278,9 +278,7 @@ const targetFrameOf = async (
   if (session.isolatedProbe !== undefined && resolved.kind === 'selector') {
     const hosted = await readIsolatedHostedFrame(session.isolatedProbe, resolved.selector);
     const frame =
-      hosted === undefined
-        ? undefined
-        : frames.find(candidate => candidate.id === hosted.frameId);
+      hosted === undefined ? undefined : frames.find(candidate => candidate.id === hosted.frameId);
 
     // A browser that cannot name the hosted frame leaves the element judged by the document that holds it, below.
     if (frame !== undefined) {

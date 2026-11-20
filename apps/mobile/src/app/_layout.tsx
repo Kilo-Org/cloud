@@ -20,6 +20,7 @@ import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 // font bytes. The per-weight subpaths pull only the two used `.ttf` files.
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
+import { type StartupOutcome } from '@kilocode/app-shared/analytics';
 import * as Sentry from '@sentry/react-native';
 import { reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
@@ -554,15 +555,27 @@ function RootLayoutNav({
   );
 
   useEffect(() => {
+    // Every settled tag ends startup the same way: record the outcome once and
+    // hand the splash over to the reveal.
+    const settle = (reason: StartupOutcome) => {
+      markStartupComplete(reason);
+      setStartupFinished(true);
+    };
+    // Every redirecting tag navigates only once the root navigator accepts it.
+    const redirect = (href: Href) => {
+      if (!navigationReady) {
+        return;
+      }
+      router.replace(href);
+    };
+
     switch (decision.tag) {
       case 'settle-language-error': {
-        markStartupComplete('language-error');
-        setStartupFinished(true);
+        settle('language-error');
         return;
       }
       case 'settle-restore-error': {
-        markStartupComplete('restore-error');
-        setStartupFinished(true);
+        settle('restore-error');
         return;
       }
       case 'wait-loading':
@@ -570,63 +583,43 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-force-update': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/force-update');
+        redirect('/force-update');
         return;
       }
       case 'settle-force-update': {
-        markStartupComplete('force-update');
-        setStartupFinished(true);
+        settle('force-update');
         return;
       }
       case 'exit-force-update': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/(app)');
+        redirect('/(app)');
         return;
       }
       case 'settle-login': {
-        markStartupComplete('login');
-        setStartupFinished(true);
+        settle('login');
         return;
       }
       case 'redirect-login': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/(auth)/login');
+        redirect('/(auth)/login');
         return;
       }
       case 'settle-user-error': {
-        markStartupComplete('user-error');
-        setStartupFinished(true);
+        settle('user-error');
         return;
       }
       case 'settle-consent-error': {
-        markStartupComplete('consent-error');
-        setStartupFinished(true);
+        settle('consent-error');
         return;
       }
       case 'settle-consent': {
-        markStartupComplete('consent');
-        setStartupFinished(true);
+        settle('consent');
         return;
       }
       case 'redirect-consent': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/(app)/consent' as Href);
+        redirect('/(app)/consent' as Href);
         return;
       }
       case 'redirect-app': {
-        if (!navigationReady) {
-          return;
-        }
-        router.replace('/(app)');
+        redirect('/(app)');
         return;
       }
       case 'settle-app': {
@@ -637,8 +630,7 @@ function RootLayoutNav({
         if (!navigationReady || !isLastRouteHydrated()) {
           return;
         }
-        markStartupComplete('app');
-        setStartupFinished(true);
+        settle('app');
         // Deep-link navigation is owned by the pendingDeepLink effect below.
         // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
         break;

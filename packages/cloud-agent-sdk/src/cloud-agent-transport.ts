@@ -502,7 +502,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
      * Seed the connection state every snapshot page contributes, whichever path
      * fetched it: the v2 background flag, the workspace update cursor or the
      * event-log watermark, and — for the first page of a connect — the manager's
-     * record of it with its queued and failed turns.
+     * record of it with its completed, pending and failed turns.
      */
     function seedPageState(page: SessionSnapshotPage): void {
       if (page.sourceVersion === 'v2') enableBackgroundActivity();

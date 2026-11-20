@@ -12,7 +12,7 @@ import { createServiceState } from './service-state';
 import { createMemoryStorage } from './storage/memory';
 import { createChatProcessor } from './chat-processor';
 import type { SessionSnapshot, SessionSnapshotPageOutcome } from './types';
-import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage } from './test-helpers';
+import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage, deferred } from './test-helpers';
 
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
@@ -50,18 +50,6 @@ afterEach(() => {
 /** Flush microtask queue so Promise.all + .then in connect() settles. */
 async function flushPromises(): Promise<void> {
   await new Promise(r => setTimeout(r, 0));
-}
-
-/** ES2022-safe deferred: this package's `lib` target predates `Promise.withResolvers`. */
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (value: T | PromiseLike<T>) => void;
-} {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>(res => {
-    resolve = res;
-  });
-  return { promise, resolve };
 }
 
 const emptySnapshot = makeSnapshot({ id: 'ses-1' });

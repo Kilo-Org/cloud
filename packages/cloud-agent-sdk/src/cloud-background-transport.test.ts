@@ -1,6 +1,6 @@
 import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createConnection, type ConnectionConfig } from './cloud-agent-connection';
-import { cloudAgentId, kiloId } from './test-helpers';
+import { cloudAgentId, deferred, kiloId } from './test-helpers';
 import type { ServiceEvent } from './normalizer';
 
 jest.mock('./cloud-agent-connection', () => ({ createConnection: jest.fn() }));
@@ -37,18 +37,6 @@ function pageFor(version: 'v1' | 'v2') {
     omittedItemCount: 0,
     updateCursor: 0,
   };
-}
-
-/** ES2022-safe deferred: this package's `lib` target predates `Promise.withResolvers`. */
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (value: T | PromiseLike<T>) => void;
-} {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>(res => {
-    resolve = res;
-  });
-  return { promise, resolve };
 }
 
 function setup(

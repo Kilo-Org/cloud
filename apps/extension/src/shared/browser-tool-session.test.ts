@@ -1458,6 +1458,59 @@ describe('browser tool session scripting backend', () => {
     }
   });
 
+  it('keeps the quiet grace when only the title of the page changes', async () => {
+    vi.useFakeTimers();
+
+    try {
+      type Updated = (tabId: number, changeInfo: Record<string, unknown>) => void;
+      const listeners: Updated[] = [];
+      const shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+      const tabsApi: BrowserTabsApi = {
+        get: tabId => ({ id: tabId, ...shown }),
+        onUpdated: {
+          addListener: listener => {
+            listeners.push(listener);
+          },
+          removeListener: () => {
+            listeners.length = 0;
+          },
+        },
+        query: () => [],
+        update: tabId => ({ id: tabId }),
+      };
+      const session = createBrowserToolSession({
+        scriptingApi: createScriptingApi().api,
+        tabId: 7,
+        tabsApi,
+      });
+      let settled = false;
+      const navigated = (async () => {
+        const result = await session.callTool('browser_navigate_back', {});
+
+        settled = true;
+
+        return result;
+      })();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The browser also reports title and favicon changes; neither is a navigation this action started.
+      for (const listener of listeners) {
+        listener(7, { favIconUrl: 'https://example.com/favicon.ico' });
+        listener(7, { title: 'Renamed' });
+      }
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(settled).toBe(true);
+      await vi.advanceTimersByTimeAsync(15_000);
+      await expect(navigated).resolves.toStrictEqual({
+        error: 'The page has no history entry to go back to.',
+        ok: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('waits for the load of a navigation the browser already reported', async () => {
     vi.useFakeTimers();
 

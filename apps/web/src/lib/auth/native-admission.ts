@@ -247,6 +247,30 @@ function isDevSentinel(admission: AdmissionPayload): boolean {
 // ── Async attestation / assertion verification ─────────────────────────────
 
 /**
+ * The one recovery a refused admission names, when the client can repair the
+ * refusal itself. Only an iOS assertion whose key id this database has never
+ * seen qualifies: the device holds a stored key id that was never persisted
+ * here, so dropping it and attesting a new key is the fix.
+ *
+ * Nothing else gets a hint. A malformed or invalid attestation, an invalid or
+ * replayed assertion, a stale sign count, a negative Play Integrity verdict, a
+ * missing proof, and a key already bound to another account are all refusals
+ * the client must not paper over with a new key.
+ */
+export type AdmissionRecoveryHint = 'IOS_ASSERTION_UNKNOWN_KEY';
+
+/**
+ * A refused admission proof. `recovery` is set only for the unknown-key case
+ * above; every other refusal leaves it undefined so the wire response stays
+ * exactly what it was.
+ */
+export type AdmissionRefusal = {
+  ok: false;
+  errorCode: string;
+  recovery?: AdmissionRecoveryHint;
+};
+
+/**
  * Perform full async admission verification BEFORE user settlement.
  *
  * Must be called before createOrUpdateUser in the token route so that:
@@ -254,10 +278,12 @@ function isDevSentinel(admission: AdmissionPayload): boolean {
  * - Keys are written after the user id exists (via the token route after
  *   successful settlement).
  *
- * Atomically consumes the challenge. On provider infrastructure errors,
- * throws so the caller can surface a 5xx.
+ * Atomically consumes the challenge, so a caller that retries a refusal must
+ * fetch a fresh challenge. On provider infrastructure errors, throws so the
+ * caller can surface a 5xx.
  *
- * Returns the key data to persist after settlement, or an error.
+ * Returns the key data to persist after settlement, or a refusal carrying the
+ * recovery hint when the client may produce a new proof.
  */
 export type VerifyAdmissionOk = {
   ok: true;
@@ -281,7 +307,7 @@ export type VerifyAdmissionOk = {
 
 export async function verifyAdmissionAsync(
   admission: AdmissionPayload
-): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
+): Promise<VerifyAdmissionOk | AdmissionRefusal> {
   // Atomically consume the challenge
   const now = new Date().toISOString();
   const [consumed] = await db
@@ -341,7 +367,7 @@ function findAttestedKey(
 
 async function verifyAppleAdmission(
   admission: AdmissionPayload
-): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
+): Promise<VerifyAdmissionOk | AdmissionRefusal> {
   const { kind, challenge, payload, keyId } = admission;
 
   if (!keyId) {
@@ -375,8 +401,17 @@ async function verifyAppleAdmission(
   const existingKey = await findAttestedKey(db, keyId, 'ios');
 
   if (!existingKey) {
+    // The device holds a key id this database has never seen — the usual shape
+    // of an attestation that never reached the server. Name the recovery so the
+    // client can drop that id and attest a new key once. No other refusal gets
+    // this hint, and the assertion itself was never verified, so nothing here
+    // is weakened by telling the client to re-attest.
     captureMessage('apple_assertion_unknown_key');
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return {
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+    };
   }
 
   // Cross-user key collision: the caller must check ownership after settlement
@@ -435,7 +470,7 @@ async function verifyAppleAdmission(
 
 async function verifyAndroidAdmission(
   admission: AdmissionPayload
-): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
+): Promise<VerifyAdmissionOk | AdmissionRefusal> {
   const { kind, challenge, payload } = admission;
 
   // Android sends Play Integrity tokens with kind 'assertion' per the plan.

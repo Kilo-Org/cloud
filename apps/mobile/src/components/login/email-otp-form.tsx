@@ -55,6 +55,8 @@ export function EmailOtpForm({
   onCodeChange,
   onResend,
   onBack,
+  onBrowserSignIn,
+  browserSignInStarting = false,
   onBelowFieldHeightChange,
 }: Readonly<{
   email: string;
@@ -71,6 +73,13 @@ export function EmailOtpForm({
    */
   onResend: () => Promise<boolean>;
   onBack: () => void;
+  /**
+   * Presents the browser sign-in the `ADMISSION_REQUIRED` copy names; only that
+   * terminal refusal sets it.
+   */
+  onBrowserSignIn?: () => void;
+  /** A browser sign-in already started, so every action stays disabled. */
+  browserSignInStarting?: boolean;
   /**
    * Reports the height of everything below the code field, so the login shell
    * can keep that much of the form clear of the keyboard. A refusal can wrap,
@@ -89,7 +98,7 @@ export function EmailOtpForm({
    * field: a code typed while the request was in flight is not thrown away.
    */
   const resendAttemptRef = useRef(0);
-  const authBusy = busy !== undefined;
+  const authBusy = busy !== undefined || browserSignInStarting;
   const destination = formatCodeDestination(
     t('login.enterCodeSentTo', { email: ADDRESS_SLOT }),
     email
@@ -155,6 +164,22 @@ export function EmailOtpForm({
           >
             {error}
           </Text>
+        ) : null}
+        {onBrowserSignIn ? (
+          // The terminal refusal's copy names this control, so it sits with the
+          // message: a full-size action, one line like the others.
+          <Button
+            variant="outline"
+            size="lg"
+            disabled={authBusy}
+            loading={browserSignInStarting}
+            onPress={onBrowserSignIn}
+            accessibilityLabel={t('login.moreSignInOptions')}
+          >
+            <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+              {t('login.moreSignInOptions')}
+            </Text>
+          </Button>
         ) : null}
         <Button
           size="lg"

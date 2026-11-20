@@ -13,6 +13,15 @@ type AuthErrorsSection = (typeof en)['authErrors'];
 export type AuthErrorMessageKey = `authErrors.${keyof AuthErrorsSection & string}`;
 
 /**
+ * Client-side code for an unknown-key refusal whose fresh proof could not be
+ * built. Retrying rebuilds the attestation, so it reads as the retryable
+ * admission message rather than the browser-only one a server
+ * `ADMISSION_REQUIRED` shows — and carrying a code keeps `passkey-client.ts`
+ * from reporting the failed proof as a cancelled ceremony.
+ */
+export const ADMISSION_RECOVERY_FAILED = 'ADMISSION_RECOVERY_FAILED';
+
+/**
  * Server error code to catalog key. The map holds keys, never English: a code
  * that reaches the user must read in the user's language, and the copy lives
  * in one place with every other string.
@@ -39,6 +48,8 @@ const AUTH_ERROR_KEYS = {
   TIMEOUT: 'authErrors.signInTimedOut',
   // Admission: server refuses the device under enforce mode — non-retryable.
   ADMISSION_REQUIRED: 'authErrors.admissionRequired',
+  // Client-side: the unknown-key refusal's fresh proof could not be built.
+  ADMISSION_RECOVERY_FAILED: 'authErrors.retryableAdmission',
 } satisfies Record<string, AuthErrorMessageKey>;
 
 /** The message shown when no code matched, in the active language. */

@@ -273,6 +273,7 @@ describe('getProvider with a partner', () => {
       isFree: false,
       bypassAccessCheck: false,
       customLlmPricing: pricing,
+      customLlmPublicId: MODEL,
     });
     expect(partnerRoute.skipBalanceCheck).toBeUndefined();
     const kiloRoute = await result.routes[1]();
@@ -283,6 +284,7 @@ describe('getProvider with a partner', () => {
       bypassAccessCheck: false,
     });
     expect(kiloRoute.customLlmPricing).toBeUndefined();
+    expect(kiloRoute.customLlmPublicId).toBeUndefined();
     expect(decision.steps).toEqual([
       NO_CUSTOM_LLM,
       NO_DIRECT_BYOK_MODEL,

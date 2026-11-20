@@ -1,7 +1,10 @@
 import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import type { ByokFailoverAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
+import type {
+  ByokFailoverAttempt,
+  FailoverErrorSummary,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   sendUpstreamAttempt,
   type SendUpstreamAttemptInput,
@@ -13,6 +16,10 @@ const MIN_FAILOVER_BUDGET_MS = 30_000;
 const ERROR_BODY_READ_TIMEOUT_MS = 1_000;
 const MAX_ERROR_BODY_CHARS = 16 * 1024;
 const ERROR_CODE_PATTERN = /^[\w.:-]{1,64}$/;
+const MAX_SUMMARY_ISSUES = 5;
+const MAX_SUMMARY_FIELD_CHARS = 200;
+const SUMMARY_TYPE_PATTERN = /^[\w.:-]+$/;
+const SUMMARY_LOC_PATTERN = /^[\w.:[\]-]+$/;
 
 type ByokFailoverResult = {
   attempt: SendUpstreamAttemptResult;
@@ -67,19 +74,78 @@ function codeOf(value: unknown): string | undefined {
   return typeof value === 'string' && ERROR_CODE_PATTERN.test(value) ? value : undefined;
 }
 
+function boundedField(value: unknown, pattern: RegExp): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const bounded = value.slice(0, MAX_SUMMARY_FIELD_CHARS);
+  return pattern.test(bounded) ? bounded : undefined;
+}
+
+function summaryCode(value: unknown): string | undefined {
+  return codeOf(typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : value);
+}
+
+function locOf(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const segments = value.slice(0, 32).filter(s => typeof s === 'string' || typeof s === 'number');
+  return boundedField(segments.join('.'), SUMMARY_LOC_PATTERN);
+}
+
+/** The validation error list of a strict upstream: Mistral nests it in `message.detail`, FastAPI
+ * style upstreams put `detail` at the top level. */
+function validationIssuesOf(body: Record<string, unknown>, error: Record<string, unknown>) {
+  const message = isRecord(body.message) ? body.message : {};
+  const list = [body.detail, message.detail, error.detail].find(Array.isArray);
+  const issues: NonNullable<FailoverErrorSummary['issues']> = [];
+  for (const entry of list ?? []) {
+    if (issues.length >= MAX_SUMMARY_ISSUES) break;
+    if (!isRecord(entry)) continue;
+    const type = boundedField(entry.type, SUMMARY_TYPE_PATTERN);
+    const loc = locOf(entry.loc);
+    if (type || loc) issues.push({ ...(type ? { type } : {}), ...(loc ? { loc } : {}) });
+  }
+  return issues;
+}
+
+/**
+ * Only error type strings, field paths, and identifier-shaped codes. The `msg`, `input`, and free
+ * text `message` of an error echo request content, so they are never read.
+ */
+function summarizeError(body: unknown): FailoverErrorSummary | undefined {
+  if (!isRecord(body)) return undefined;
+  const error = isRecord(body.error) ? body.error : {};
+  const code = summaryCode(error.code) ?? summaryCode(body.code);
+  const type = boundedField(error.type ?? body.type, SUMMARY_TYPE_PATTERN);
+  const issues = validationIssuesOf(body, error);
+  if (!code && !type && issues.length === 0) return undefined;
+  return {
+    ...(code ? { code } : {}),
+    ...(type ? { type } : {}),
+    ...(issues.length > 0 ? { issues } : {}),
+  };
+}
+
+type ErrorDetails = { errorCode?: string; errorSummary?: FailoverErrorSummary };
+
 /**
  * The gateway's own `error_type`, or the provider's error code or type, such as OpenAI's
  * `insufficient_quota` or Anthropic's `rate_limit_error`. Messages can echo request content, so
- * only identifier-shaped codes are kept.
+ * only identifier-shaped codes are kept. A route that reports a summary also gets the allowlisted
+ * summary of its 4xx failure.
  */
-async function readErrorCode(response: Response): Promise<string | undefined> {
+async function readErrorDetails(response: Response, withSummary: boolean): Promise<ErrorDetails> {
   try {
     const body = await readErrorBody(response);
-    if (!isRecord(body)) return undefined;
+    if (!isRecord(body)) return {};
     const error = isRecord(body.error) ? body.error : {};
-    return codeOf(body.error_type) ?? codeOf(error.code) ?? codeOf(error.type) ?? codeOf(body.code);
+    const errorCode =
+      codeOf(body.error_type) ?? codeOf(error.code) ?? codeOf(error.type) ?? codeOf(body.code);
+    const errorSummary =
+      withSummary && response.status >= 400 && response.status < 500
+        ? summarizeError(body)
+        : undefined;
+    return { errorCode, errorSummary };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -100,9 +166,31 @@ function remainingBudgetMs(startedAt: number): number {
   return Math.floor(UPSTREAM_DURATION_BUDGET_MS - (performance.now() - startedAt));
 }
 
-type PendingAttempt = Omit<ByokFailoverAttempt, 'error_code'> & {
-  errorCode: Promise<string | undefined>;
+type PendingAttempt = Omit<ByokFailoverAttempt, 'error_code' | 'error_summary'> & {
+  details: Promise<ErrorDetails>;
 };
+
+function customLlmFields(route: ProviderRoute) {
+  return route.customLlmPublicId ? { custom_llm_public_id: route.customLlmPublicId } : {};
+}
+
+/** Reads the failure off the request path. A custom LLM route's summary is also logged, once read,
+ * because the failover warning cannot wait for the body. */
+function readFailureDetails(route: ProviderRoute, failed: Response): Promise<ErrorDetails> {
+  const isCustomLlm = !!route.customLlmPublicId;
+  const details = readErrorDetails(failed, isCustomLlm);
+  if (isCustomLlm) {
+    void details.then(({ errorSummary }) => {
+      if (!errorSummary) return;
+      console.warn('[byok-failover] Custom LLM upstream rejected the request', {
+        customLlmPublicId: route.customLlmPublicId,
+        status: failed.status,
+        errorSummary,
+      });
+    });
+  }
+  return details;
+}
 
 /**
  * Sends the request through its first route and, while a route's upstream fails with an
@@ -176,12 +264,16 @@ export async function sendUpstreamAttemptWithByokFailover(
       status: failed.status,
       failedProviderIds: byokProviderIds(providerContext),
       nextProviderIds: byokProviderIds(next),
+      ...(providerContext.customLlmPublicId
+        ? { failedCustomLlmPublicId: providerContext.customLlmPublicId }
+        : {}),
     });
     pending.push({
       provider_type: providerContext.provider.type,
       byok_provider_ids: byokProviderIds(providerContext),
+      ...customLlmFields(providerContext),
       status: failed.status,
-      errorCode: readErrorCode(failed),
+      details: readFailureDetails(providerContext, failed),
       duration_ms: attemptDurationMs,
       outcome: 'failed-over',
     });
@@ -204,18 +296,23 @@ export async function sendUpstreamAttemptWithByokFailover(
   pending.push({
     provider_type: providerContext.provider.type,
     byok_provider_ids: byokProviderIds(providerContext),
+    ...customLlmFields(providerContext),
     status: attemptStatus(attempt),
-    // The client still reads the failure, so the code comes from a copy.
-    errorCode: failed ? readErrorCode(failed.clone()) : Promise.resolve(undefined),
+    // The client still reads the failure, so the details come from a copy.
+    details: failed ? readFailureDetails(providerContext, failed.clone()) : Promise.resolve({}),
     duration_ms: attemptDurationMs,
     ...(failed || attempt.type === 'unknown-gateway-model'
       ? { outcome: 'failed' as const, stop_reason: stopReason ?? 'no-keys-left' }
       : { outcome: 'served' as const }),
   });
   const failoverAttempts = Promise.all(
-    pending.map(async ({ errorCode, ...rest }) => {
-      const error_code = await errorCode;
-      return error_code ? { ...rest, error_code } : rest;
+    pending.map(async ({ details, ...rest }) => {
+      const { errorCode, errorSummary } = await details;
+      return {
+        ...rest,
+        ...(errorCode ? { error_code: errorCode } : {}),
+        ...(errorSummary ? { error_summary: errorSummary } : {}),
+      };
     })
   );
   return { attempt, providerContext, request, failoverAttempts };

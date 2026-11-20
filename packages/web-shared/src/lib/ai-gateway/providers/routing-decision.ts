@@ -229,12 +229,28 @@ const ProviderRoutingDecisionSchema = z.object({
 
 export type ProviderRoutingDecision = z.infer<typeof ProviderRoutingDecisionSchema>;
 
+/**
+ * What a custom LLM upstream's 4xx error body reports, allowlisted so it cannot echo request
+ * content: identifier-shaped codes and types, and the field paths of validation errors.
+ */
+const FailoverErrorSummarySchema = z.object({
+  code: z.string().optional(),
+  type: z.string().optional(),
+  issues: z.array(z.object({ type: z.string().optional(), loc: z.string().optional() })).optional(),
+});
+
+export type FailoverErrorSummary = z.infer<typeof FailoverErrorSummarySchema>;
+
 const ByokFailoverAttemptSchema = z.object({
   provider_type: ProviderTypeSchema,
   byok_provider_ids: z.array(UserByokProviderIdSchema),
+  /** The `public_id` of the custom LLM, set on a partner attempt. */
+  custom_llm_public_id: z.string().optional(),
   status: z.number().int(),
   /** A machine-readable code from the error body, such as `rate_limit_error`; never its message. */
   error_code: z.string().optional(),
+  /** Set on a custom LLM attempt that failed with a 4xx status and a recognizable error body. */
+  error_summary: FailoverErrorSummarySchema.optional(),
   /** Until the upstream answered with response headers, or failed without them. */
   duration_ms: z.number().int().nonnegative(),
   /** `failed-over`: the next BYOK key took the request. The last attempt is `served` or `failed`. */

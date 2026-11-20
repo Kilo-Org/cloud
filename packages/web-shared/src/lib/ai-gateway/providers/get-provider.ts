@@ -132,6 +132,8 @@ export type ProviderRoute = {
   skipBalanceCheck?: boolean;
   /** What Kilo bills for the route instead of the model's own pricing. Set on partner routes. */
   customLlmPricing?: CustomPricingTiers;
+  /** The `public_id` of the partner custom LLM serving the route, for failover diagnostics. */
+  customLlmPublicId?: string;
   /** The provider the organization policy checks when a direct BYOK key serves the request (see
    *  `getDirectByokPolicyProviderId`). */
   directByokPolicyProviderId?: string;
@@ -481,6 +483,7 @@ async function resolvePartnerRoute(
     isFree: isFreeModel(input.requestedModel),
     bypassAccessCheck: false,
     customLlmPricing: definition.pricing,
+    customLlmPublicId: partner.public_id,
   };
 }
 

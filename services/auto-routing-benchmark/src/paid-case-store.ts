@@ -2145,60 +2145,70 @@ export function failPaidBenchmarkRequestStatements(
 }
 
 /**
+ * A request-facing reason for a case that finished without a usable result, when its own
+ * canonical run recorded no controlled reason. Deliberately fixed copy: the raw scored error
+ * of a shared execution can carry another payer's or provider's details, and the display row
+ * is user-facing, so it never copies it.
+ */
+export const PAID_CASE_UNUSABLE_REASON = 'The measurement finished without a usable result.';
+
+/**
  * Bring one request's **display** rows in line with the canonical case runs.
  *
  * `paid_benchmark_request_cases` is the console and aggregation view; `benchmark_case_runs`
  * is the measurement. A case that has conclusively finished unusable — `settled` with
- * `result_usable = 0`, or `failed` — must not leave its display row `queued`, or the
- * request waits forever on work nobody can measure any more. This is the only reconciliation
- * that turns a measured slot into `done`.
+ * `result_usable = 0`, or `failed` — must not leave its display row `queued`, or the request
+ * waits forever on work nobody can measure any more. This is the only reconciliation that
+ * turns a measured slot into `done`.
  *
  * Only a terminal canonical state can move a row: `queued`, `running`, `paused` and
- * `cancelled` are never read here, so a transient stop is never reported as terminal.
- * Terminal means:
- * - `settled` + `result_usable = 1`  → `done`, reason cleared;
- * - `settled` + `result_usable = 0`  → `failed`, with the run's own reason, else the scored
- *   error of that exact execution, else a generic unusable-result reason;
- * - `failed`                          → `failed`, with the reason its own writer recorded.
+ * `cancelled` runs are never read here, so a transient stop is never reported as terminal.
  *
- * The update is idempotent and also promotes an already `failed` row when its run later
- * proves usable: a shared result that lands after the slot was written stays reusable, so
- * `result_usable = 1` always wins. `reused` and `paused` rows are never touched, so a
- * historical reuse and a payment pause keep their own meaning. Nothing here charges, and no
- * statement creates work: it only re-labels rows whose canonical run is already terminal.
+ * The two statements split by what the row is now, so repeated passes do no work:
+ * - `[0]` promotes an already `failed` row to `done` only when its run later proves usable —
+ *   a shared result that lands after the slot was written stays reusable;
+ * - `[1]` moves a `queued`/`running` row to its terminal display state, and never re-rewrites
+ *   a row it already settled.
+ *
+ * The reason comes from the run's own controlled `failure_reason`, else
+ * {@link PAID_CASE_UNUSABLE_REASON}. Raw scored errors stay in `case_results` as diagnostics
+ * and are never copied to this user-facing row. No statement charges or creates work.
  */
 export function syncPaidRequestCaseDisplayStatements(
   db: D1Database,
   input: { requestId: string; now?: number }
 ): D1PreparedStatement[] {
   const at = iso(input.now ?? Date.now());
+  const caseKeyJoin = `run.engine_identity = rc.engine_identity
+    AND run.model = rc.model AND run.variant = rc.variant
+    AND run.rep = rc.rep AND run.case_id = rc.case_id`;
   return [
+    // A terminal row whose measurement later proves usable. Only `failed` is a candidate, and
+    // only a usable run matches, so a settled row is never touched again.
+    db
+      .prepare(
+        `UPDATE paid_benchmark_request_cases AS rc
+        SET status = 'done', reason = NULL, updated_at = ?
+        FROM benchmark_case_runs AS run
+        WHERE ${caseKeyJoin}
+          AND rc.request_id = ? AND rc.status = 'failed'
+          AND run.status IN ('settled', 'failed') AND run.result_usable = 1`
+      )
+      .bind(at, input.requestId),
+    // A live display row whose canonical run is already terminal.
     db
       .prepare(
         `UPDATE paid_benchmark_request_cases AS rc
         SET status = CASE WHEN run.result_usable = 1 THEN 'done' ELSE 'failed' END,
           reason = CASE WHEN run.result_usable = 1 THEN NULL
-            ELSE COALESCE(
-              run.failure_reason,
-              (SELECT result.error FROM case_results AS result
-                WHERE result.run_id = run.executor_run_id
-                  AND result.model = run.model AND result.variant = run.variant
-                  AND result.case_id = run.case_id AND result.rep = run.rep
-                LIMIT 1),
-              'No usable result.'
-            )
-          END,
+            ELSE COALESCE(run.failure_reason, ?) END,
           updated_at = ?
         FROM benchmark_case_runs AS run
-        WHERE run.engine_identity = rc.engine_identity
-          AND run.model = rc.model AND run.variant = rc.variant
-          AND run.rep = rc.rep AND run.case_id = rc.case_id
-          AND rc.request_id = ?
-          -- 'failed' is included so a late usable result can promote it to 'done'.
-          AND rc.status IN ('queued', 'running', 'failed')
+        WHERE ${caseKeyJoin}
+          AND rc.request_id = ? AND rc.status IN ('queued', 'running')
           AND run.status IN ('settled', 'failed')`
       )
-      .bind(at, input.requestId),
+      .bind(PAID_CASE_UNUSABLE_REASON, at, input.requestId),
   ];
 }
 

@@ -4,6 +4,8 @@ import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/rend
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatListScreen } from '@/components/chat/chat-list-screen';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
 import { backendTargetId } from '@/lib/chat/backend-target';
@@ -193,7 +195,8 @@ describe('the list body names what it knows', () => {
     const waiting = await mount();
     expect(bodyNodes(waiting, 'EmptyState')).toHaveLength(0);
     expect(bodyNodes(waiting, 'QueryError')).toHaveLength(0);
-    expect(bodyNodes(waiting, 'RowSkeleton').length).toBeGreaterThan(0);
+    // The skeleton is a component, not a string host: count it by type.
+    expect(waiting.root.findAllByType(RowSkeleton).length).toBeGreaterThan(0);
 
     view?.unmount();
     state.listAnswered = true;
@@ -227,8 +230,13 @@ describe('the list body names what it knows', () => {
 
   it('keeps the empty state for a list that answered with no chats', async () => {
     const tree = await mount();
+    const [empty] = bodyNodes(tree, 'EmptyState');
     expect(bodyNodes(tree, 'EmptyState')).toHaveLength(1);
     expect(bodyNodes(tree, 'QueryError')).toHaveLength(0);
+    // The one true empty state still invites the person to start a chat, with
+    // an action that can run: an answered list and an answered catalog.
+    expect(empty?.props.title).toBe(i18n.t('modelChat.empty.title'));
+    expect(empty?.props.action).toBeDefined();
   });
 
   it('names a failed list with Retry', async () => {

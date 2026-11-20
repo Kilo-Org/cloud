@@ -34,9 +34,10 @@ describe('selectChatListSurface', () => {
   });
 
   it('names the offline catalog rather than an empty list', () => {
-    expect(
-      selectChatListSurface({ ...answered, catalogAnswered: false, offline: true })
-    ).toEqual({ kind: 'catalog-error', offline: true });
+    expect(selectChatListSurface({ ...answered, catalogAnswered: false, offline: true })).toEqual({
+      kind: 'catalog-error',
+      offline: true,
+    });
   });
 
   it('names a catalog failure that is not offline', () => {

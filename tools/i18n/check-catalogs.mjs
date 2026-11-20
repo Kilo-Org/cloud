@@ -1580,7 +1580,7 @@ function wording(value, language = 'en') {
     .trim()
     .toLocaleUpperCase(language)
     .toLocaleLowerCase(language)
-    .replace(/[.!:。！：]+$/u, '');
+    .replace(/[.!:。！：।॥]+$/u, '');
 }
 
 function pluralBaseKey(key) {

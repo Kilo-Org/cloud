@@ -1062,13 +1062,13 @@ export async function listRuns(
   return runRows.map(mapRunRow);
 }
 
-export async function existsRunningRun(db: D1Database, router: AutoRouter): Promise<boolean> {
-  const run = await drizzle(db)
+export async function listRunningRunIds(db: D1Database, router: AutoRouter): Promise<string[]> {
+  const runs = await drizzle(db)
     .select({ id: benchmarkRuns.id })
     .from(benchmarkRuns)
     .where(and(eq(benchmarkRuns.router, router), eq(benchmarkRuns.status, 'running')))
-    .get();
-  return run !== undefined;
+    .orderBy(asc(benchmarkRuns.started_at), asc(benchmarkRuns.id));
+  return runs.map(run => run.id);
 }
 
 export type RunProgressCountRow = {

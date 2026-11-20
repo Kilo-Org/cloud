@@ -100,7 +100,7 @@ vi.mock('./db', async importOriginal => {
     getConfigRows: vi.fn(),
     replaceConfig: vi.fn(),
     listRuns: vi.fn(),
-    existsRunningRun: vi.fn(),
+    listRunningRunIds: vi.fn(),
     listRunProgressCounts: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     getClassifierWinner: vi.fn(),
@@ -163,7 +163,7 @@ import {
   listCurrentPlatformProfileStatuses,
   countCurrentProfilesByStatus,
   listRuns,
-  existsRunningRun,
+  listRunningRunIds,
   listRunProgressCounts,
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
@@ -322,7 +322,7 @@ beforeEach(() => {
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
-  vi.mocked(existsRunningRun).mockResolvedValue(false);
+  vi.mocked(listRunningRunIds).mockResolvedValue([]);
   vi.mocked(listRunProgressCounts).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
@@ -841,7 +841,7 @@ describe('GET /admin/runs', () => {
   it('returns an empty runs array when the table is empty', async () => {
     const res = await authedGet('/admin/runs');
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ runs: [], hasRunningRun: false });
+    await expect(res.json()).resolves.toEqual({ runs: [], runningRunIds: [] });
   });
 
   it('sweeps stale runs before listing so a wedged run is recovered', async () => {
@@ -991,7 +991,7 @@ describe('run list and per-run summaries against D1', () => {
   beforeEach(async () => {
     const actual = await vi.importActual<typeof DbModule>('./db');
     vi.mocked(listRuns).mockImplementation(actual.listRuns);
-    vi.mocked(existsRunningRun).mockImplementation(actual.existsRunningRun);
+    vi.mocked(listRunningRunIds).mockImplementation(actual.listRunningRunIds);
     sqlite.close();
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
@@ -1029,21 +1029,28 @@ describe('run list and per-run summaries against D1', () => {
     const res = await authedGet('/admin/runs');
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { runs: Record<string, unknown>[]; hasRunningRun: boolean };
+    const body = (await res.json()) as { runs: Record<string, unknown>[]; runningRunIds: string[] };
     expect(body.runs.map(run => run.id)).toEqual(['decider-efficient', 'classifier-shared']);
     // Empty for the previous web release; the summaries route serves the rows.
     for (const run of body.runs) expect(run.summaries).toEqual([]);
     // Only the frontier router has a running run.
-    expect(body.hasRunningRun).toBe(false);
+    expect(body.runningRunIds).toEqual([]);
   });
 
-  it('reports a running run of the router even when the filter hides it', async () => {
+  it('reports every running run of the router even when the filter hides them', async () => {
+    seedRun({
+      id: 'decider-frontier-user',
+      router: 'frontier',
+      kind: 'decider',
+      status: 'running',
+      startedAt: '2026-06-04T00:00:00.000Z',
+    });
     const res = await authedGet('/admin/runs?router=frontier&kind=classifier');
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { runs: { id: string }[]; hasRunningRun: boolean };
+    const body = (await res.json()) as { runs: { id: string }[]; runningRunIds: string[] };
     expect(body.runs.map(run => run.id)).toEqual(['classifier-shared']);
-    expect(body.hasRunningRun).toBe(true);
+    expect(body.runningRunIds).toEqual(['decider-frontier', 'decider-frontier-user']);
   });
 
   it('returns one run’s summaries', async () => {

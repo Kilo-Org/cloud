@@ -47,7 +47,7 @@ const runsResponse = {
       error: null,
     },
   ],
-  hasRunningRun: false,
+  runningRunIds: [],
 };
 
 describe('auto routing benchmark admin client', () => {

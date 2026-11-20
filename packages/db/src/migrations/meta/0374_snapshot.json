@@ -1,6 +1,6 @@
 {
-  "id": "a629edbb-b51c-4f45-9dbf-65d7376bc841",
-  "prevId": "f7b16a7b-c563-4ada-8f31-01cff921da78",
+  "id": "f7b16a7b-c563-4ada-8f31-01cff921da78",
+  "prevId": "0f39c3d4-247e-4a46-84c2-278a79f1796c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1765,6 +1765,25 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "delivery": {
+          "name": "delivery",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'env'"
+        },
+        "allowed_hosts": {
+          "name": "allowed_hosts",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "injection_locations": {
+          "name": "injection_locations",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -6710,6 +6729,25 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "delivery": {
+          "name": "delivery",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'env'"
+        },
+        "allowed_hosts": {
+          "name": "allowed_hosts",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "injection_locations": {
+          "name": "injection_locations",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -28654,22 +28692,6 @@
           "isUnique": true,
           "where": "(\"organizations\".\"settings\"->>'is_sales_demo')::boolean = true AND \"organizations\".\"deleted_at\" IS NULL",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organizations_created_by_kilo_user_id": {
-          "name": "IDX_organizations_created_by_kilo_user_id",
-          "columns": [
-            {
-              "expression": "created_by_kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"organizations\".\"created_by_kilo_user_id\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

@@ -19,7 +19,9 @@
     "presenceStatus": "Värdar: {{connection}}",
     "commandStatus": "Kommandoleverans: {{status}}",
     "delivered": "Levererat",
-    "expired": "Utgånget"
+    "expired": "Utgånget",
+    "recoveryGaps_one": "{{displayCount}} del av den här transkriptionen saknas.",
+    "recoveryGaps_other": "{{displayCount}} delar av den här transkriptionen saknas."
   },
   "common": {
     "manageOnWeb": "Hantera på webben",
@@ -138,10 +140,12 @@
     "keepRunning": "Fortsätt köra",
     "newSession": "Ny session",
     "noModelsAvailable": "Inga modeller tillgängliga",
+    "modelRetires": "Utgår {{date}}",
     "notFound": "Hittades inte",
     "online": "Uppkopplad",
     "open": "Öppna {{name}}",
     "openPullRequest": "Öppna PR",
+    "viewOnGitHub": "Visa PR på GitHub",
     "completed": "Slutförd",
     "pending": "Väntar",
     "running": "Körs",
@@ -181,7 +185,8 @@
     "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
     "privateRepositoryA11y": "{{name}}, privat kodarkiv",
     "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska.",
-    "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen."
+    "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen på kilo.ai och sedan försöka igen."
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -275,6 +280,9 @@
     "credits": "Krediter",
     "failedToLoadBalance": "Kunde inte läsa in saldot. Tryck för att försöka igen.",
     "balanceLoadFailed": "Kunde inte läsa in saldot",
+    "balanceUnreachable": "Kunde inte nå servern. Försök igen.",
+    "balanceAccessDenied": "Du har inte behörighet att se detta saldo.",
+    "balanceUnavailable": "Saldot kunde inte laddas.",
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
@@ -505,7 +513,7 @@
     "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
     "changelogAreas": {
       "signIn": "Inloggning",
-      "profileOrganizations": "Profil och organisationer"
+      "profileOrganizations": "Profil & organisationer"
     }
   },
   "preferences": {
@@ -750,6 +758,9 @@
       "couldNotLoadMore": "Kunde inte läsa in fler kommentarer.",
       "retryLoadingMore": "Försök läsa in fler kommentarer igen",
       "loadMoreComments": "Läs in fler kommentarer",
+      "conversationTruncated": "Visar bara de första {{displayCount}} kommentarerna.",
+      "conversationTruncated_one": "Visar bara de första {{displayCount}} kommentarerna.",
+      "conversationTruncated_other": "Visar bara de första {{displayCount}} kommentarerna.",
       "addReaction": "Lägg till en reaktion",
       "reactionPill": "{{emoji}}-reaktion, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
@@ -879,7 +890,6 @@
       "noAccess": "Du har inte åtkomst till kontrollerna för det här kodarkivet.",
       "couldNotLoad": "Kunde inte läsa in kontrollerna.",
       "retryChecks": "Försök läsa in kontrollerna igen",
-      "viewOnGitHub": "Visa PR på GitHub",
       "noChecksReported": "Inga kontroller rapporterade",
       "passed": "Godkänt: {{displayCount}}",
       "passed_one": "Godkänt: {{displayCount}}",
@@ -963,6 +973,8 @@
       "pendingComment": "oskickade kommentarer",
       "pendingComment_other": "oskickade kommentarer",
       "submitCountOfTotal": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Skicka granskning",
       "partialPostedFresh": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
@@ -1387,7 +1399,7 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen."
+      "notConnectedReadOnlyPlan": "Organisationens provperiod har löpt ut, så en ägare måste uppdatera faktureringen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
@@ -1396,7 +1408,7 @@
       "managedOnWebRepositories": "Välj repositorier för {{organization}} på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
-      "descriptionOverview": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den på nästa skärm.",
+      "descriptionOverview": "Skapa en åtkomsttoken för arbetsytan och klistra in den på nästa skärm.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
       "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
@@ -2788,6 +2800,8 @@
     "modelPicker": {
       "title": "Välj modell",
       "noModelsDescription": "Det finns inga modeller att välja mellan.",
+      "allUnavailableTitle": "Inga modeller kan användas",
+      "allUnavailableDescription": "Lägg till en leverantörsnyckel och försök igen.",
       "favorites": "Favoriter"
     },
     "modelSelector": {
@@ -3621,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "Byt namn på organisation",
-      "renamePlaceholder": "Organisationens namn",
+      "renamePlaceholder": "Ange ett namn på organisationen",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4847,12 +4861,15 @@
     "inputDescription": "Skannar varje indata med Enkrypt AI, inklusive verktygsresultat. När Enkrypt AI inte är tillgängligt skickas begäranden utan skanning i stället för att avvisas.",
     "outputTitle": "Skyddsräcken för utdata",
     "outputDescription": "Skannar svar med Enkrypt AI innan medlemmar får dem. Avstängt om du inte aktiverar det.",
+    "outputUnavailable": "Kilo har inte slagit på skanning av utdata för den här organisationen, så svar kontrolleras inte och det finns inget att ställa in här. Kontakta {{supportEmail}} för att begära det.",
     "detectorsHint": "Blockera avvisar en flaggad begäran. Endast logga registrerar den utan att fördröja begäran.",
     "detectorsHintOutput": "Blockera underkänner ett flaggat svar. Endast logga registrerar det utan att fördröja svaret.",
     "choiceLog": "Endast logga",
     "applyTo": "Tillämpa på",
     "applyToAllMembers": "Alla medlemmar",
     "applyKiloDefault": "Tillämpa Kilo-standard",
+    "applyKiloDefaultEnglishNote": "Texten i Kilos standardpolicy är på engelska, eftersom Kilo Gateway tillämpar den exakt som den är skriven.",
+    "applyKiloDefaultReplaceMessage": "Kilos standardpolicy är skriven på engelska och ersätter det du har angett under Policyöverträdelse. Texten du skrev i fältet för policytext kan inte återställas.",
     "invalidSavedTitle": "Sparade inställningar för indatadetektorer kan inte läsas",
     "invalidSavedBody": "Begäranden blockeras tills indatadetektorerna har sparats igen. Detektorerna nedan utgår från Kilo-standard.",
     "invalidSavedOutputTitle": "Sparade inställningar för utdatadetektorer kan inte läsas",
@@ -4987,6 +5004,8 @@
     "providersDescription": "Stäng av en leverantör för att stoppa Kilo från att dirigera till den för den här organisationen.",
     "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
     "providersEmpty": "Inga leverantörer matchar den här sökningen.",
+    "providersNone": "Inga leverantörer är tillgängliga för den här organisationen.",
+    "providersUnavailable": "Leverantörslistan kunde inte läsas in.",
     "allowAllShown": "Tillåt alla som visas",
     "denyAllShown": "Neka alla som visas",
     "gatewaysDescription": "Kilo dirigerar modellbegäranden via Vercel AI Gateway eller OpenRouter. En inaktiverad nätbrygga gör att dessa begäranden misslyckas.",

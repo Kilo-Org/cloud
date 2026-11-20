@@ -77,9 +77,12 @@ const mockSelectV2Sessions = jest.fn<() => Promise<Array<Record<string, unknown>
 const mockSelectChat = jest.fn<() => Promise<Array<Record<string, unknown>>>>();
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => {
-  const { cliSessions, cli_sessions_v2 } = jest.requireActual('@kilocode/db/schema') as {
+  const { cliSessions, cli_sessions_v2, cloud_agent_environment_vars } = jest.requireActual(
+    '@kilocode/db/schema'
+  ) as {
     cliSessions: unknown;
     cli_sessions_v2: unknown;
+    cloud_agent_environment_vars: unknown;
   };
   return {
     db: {
@@ -91,6 +94,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => {
             let result: Promise<Array<Record<string, unknown>>>;
             if (table === cliSessions) result = mockSelectV1Sessions();
             else if (table === cli_sessions_v2) result = mockSelectV2Sessions();
+            else if (table === cloud_agent_environment_vars) result = Promise.resolve([]);
             else result = mockSelectWhere(condition);
             return {
               limit: () => result,

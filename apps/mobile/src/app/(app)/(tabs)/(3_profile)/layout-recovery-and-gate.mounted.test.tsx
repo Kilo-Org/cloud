@@ -59,7 +59,11 @@ vi.mock('expo-router', () => ({
       createElement(
         'TabStack',
         null,
-        screenLayout({ navigation: scene.navigation, children: createElement('SceneBody') })
+        screenLayout({
+          navigation: scene.navigation,
+          options: {},
+          children: createElement('SceneBody'),
+        })
       ),
     { Screen: ({ name }: { name: string }) => createElement('RegisteredScreen', { name }) }
   ),

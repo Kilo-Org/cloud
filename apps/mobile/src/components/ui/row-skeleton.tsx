@@ -9,6 +9,16 @@ import { cn } from '@/lib/utils';
 const STRIP_CLASS = 'w-[3px] self-stretch rounded-[2px] bg-muted-soft';
 /** The bars hold the height of the lines they stand in for (`text-sm` 17.5pt, `text-xs` 14pt), so the swap to real rows never shifts the screen. */
 const TITLE_BAR_CLASS = 'h-5 w-40 max-w-full rounded bg-muted-soft';
+/**
+ * The distance between a title and the subtitle it becomes under a `RowFrame`
+ * row: that subtitle carries its own `mt-0.5` (1.75 dp), so a `gap-1` column
+ * stacks the bars 1.75 dp further apart than the loaded row. Only a caller that
+ * passes `rowFrame` — one whose loaded row is a `RowFrame` and was measured —
+ * gets it; every other placeholder keeps the one-step gap main draws.
+ */
+const ROW_FRAME_LINE_GAP_CLASS = 'gap-0.5';
+/** The one-step gap main draws between a placeholder's two lines. */
+const LINE_STEP_GAP_CLASS = 'gap-1';
 const SUBTITLE_BAR_CLASS = 'h-4 w-56 max-w-full rounded bg-muted-soft';
 const SECOND_SUBTITLE_BAR_CLASS = 'h-4 w-32 max-w-full rounded bg-muted-soft';
 const EYEBROW_BAR_CLASS = 'h-2 w-24 max-w-full rounded bg-muted-soft';
@@ -70,6 +80,14 @@ type RowSkeletonProps = {
   variant?: 'row' | 'session';
   /** The last flat-list row draws no divider under it. */
   last?: boolean;
+  /**
+   * The placeholder stands in for a `RowFrame` row, whose subtitle carries its
+   * own `mt-0.5` (1.75 dp) instead of the one-step `gap-1` this primitive draws
+   * by default. Ask for it only where that row's spacing was measured: the
+   * placeholder then reserves the height the loaded `RowFrame` row takes. Every
+   * other caller keeps main's geometry.
+   */
+  rowFrame?: boolean;
   className?: string;
 };
 
@@ -94,9 +112,11 @@ export function RowSkeleton({
   stack = false,
   variant = 'row',
   last = false,
+  rowFrame = false,
   className,
 }: Readonly<RowSkeletonProps>) {
   const lineCount = lines ?? (subtitle ? 2 : 1);
+  const lineGapClass = rowFrame ? ROW_FRAME_LINE_GAP_CLASS : LINE_STEP_GAP_CLASS;
 
   if (variant === 'session') {
     return (
@@ -132,7 +152,7 @@ export function RowSkeleton({
             <Skeleton className={cn(COMPACT_CONTROL_BOX_CLASS, TRAILING_CONTROL_CLASS)} />
           ) : null}
         </View>
-        <View className="min-w-0 w-full gap-1">
+        <View className={cn('min-w-0 w-full', lineGapClass)}>
           <Skeleton className={TITLE_BAR_CLASS} />
           {lineCount > 1 ? <Skeleton className={SUBTITLE_BAR_CLASS} /> : null}
           {lineCount > 2 ? <Skeleton className={SECOND_SUBTITLE_BAR_CLASS} /> : null}
@@ -144,7 +164,7 @@ export function RowSkeleton({
   return (
     <View className={cn(ROW_FRAME_CLASS, className)}>
       {tile ? <Skeleton className={cn(ROW_TILE_CLASS, 'bg-muted-soft')} /> : null}
-      <View className="min-w-0 flex-1 gap-1">
+      <View className={cn('min-w-0 flex-1', lineGapClass)}>
         <Skeleton className={TITLE_BAR_CLASS} />
         {lineCount > 1 ? <Skeleton className={SUBTITLE_BAR_CLASS} /> : null}
         {lineCount > 2 ? <Skeleton className={SECOND_SUBTITLE_BAR_CLASS} /> : null}

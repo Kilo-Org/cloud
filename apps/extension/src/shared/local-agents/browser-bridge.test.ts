@@ -4,12 +4,14 @@ import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
   SENSITIVE_REASON,
+  UNSERVED_BROWSER_TOOL_NAMES,
   createStepTokenStore,
   hashBrowserToolArguments,
 } from '../browser-agent-checks';
 import type { StepTokenIssue, StepTokenStore } from '../browser-agent-checks';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
 import type { BrowserCaller } from '../browser-caller';
+import { BROWSER_TOOL_CONTRACT } from '../browser-tool-contract';
 import type { BrowserToolRunInput, BrowserToolRunOutcome } from '../browser-runtime';
 import type { BrowserShareTabResult, BrowserTabGroupSessionSummary } from '../browser-tab-groups';
 import { BROWSER_TOOL_CONTRACT_SHA } from './envelope';
@@ -748,6 +750,43 @@ describe('local agent browser bridge', () => {
     });
   });
 
+  it('maps a take-over thrown by the tab session before the tool ran onto tab_taken', async () => {
+    const fake = createFakeRuntime({
+      outcome: () => {
+        throw new Error(TAB_TAKEN_ERROR);
+      },
+    });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.tabTaken,
+      message: TAB_TAKEN_ERROR,
+    });
+    expect(fake.releasedTabs).toHaveLength(1);
+  });
+
+  it('answers Playwright code with unsupported_in_browser before the gate runs', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    const refusal = await rejectionOf(
+      bridge.callTool(CONTROLLER, {
+        arguments: { code: 'async (page) => page.title()' },
+        authorized: [],
+        name: 'browser_run_code_unsafe',
+        sessionHandle: HANDLE,
+      })
+    );
+
+    expect(refusal?.code).toBe(LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser);
+    expect(refusal?.message).toContain('browser_evaluate');
+    expect(fake.run).toStrictEqual([]);
+  });
+
   it('returns an ordinary tool failure as an error result, not a protocol error', async () => {
     const fake = createFakeRuntime({
       outcome: () => ({ kind: 'result', result: { error: 'No element matches e99.', ok: false } }),
@@ -759,6 +798,22 @@ describe('local agent browser bridge', () => {
     await expect(bridge.callTool(CONTROLLER, snapshotParams())).resolves.toStrictEqual({
       content: [{ text: 'No element matches e99.', type: 'text' }],
       isError: true,
+    });
+  });
+
+  it('maps a tool this browser cannot run onto unsupported_in_browser', async () => {
+    const error =
+      'browser_drag is not available in Firefox: this browser exposes no debugger protocol.';
+    const fake = createFakeRuntime({
+      outcome: () => ({ kind: 'unsupported', result: { error, ok: false } }),
+    });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+      message: error,
     });
   });
 
@@ -934,6 +989,22 @@ describe('local agent browser bridge', () => {
     expect(list['tools']).toContainEqual(
       expect.objectContaining({ name: 'browser_snapshot', readOnly: true })
     );
+  });
+
+  it('does not offer the one pinned tool no backend here can run', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+    const listed = await bridge.listTools();
+    const { tools } = z.object({ tools: z.array(z.object({ name: z.string() })) }).parse(listed);
+    const names = tools.map(tool => tool.name);
+
+    // The contract stays verbatim, so the handshake SHA still matches; only the offer is narrowed.
+    // A caller that still sends the name is answered `unsupported_in_browser` (its own test).
+    expect(names).not.toContain('browser_run_code_unsafe');
+    expect(names).toHaveLength(BROWSER_TOOL_CONTRACT.length - 1);
+    for (const name of UNSERVED_BROWSER_TOOL_NAMES) {
+      expect(names).not.toContain(name);
+    }
   });
 
   it('refuses a share when the browser has no active tab', async () => {

@@ -114,12 +114,7 @@ export async function verifyAppleAttestation(
   | { ok: true; credentialId: Buffer; publicKeySpkiBase64: string }
   | { ok: false; error: AppleAttestError }
 > {
-  let buf: Buffer;
-  try {
-    buf = Buffer.from(attestationBase64, 'base64');
-  } catch {
-    return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
-  }
+  const buf = Buffer.from(attestationBase64, 'base64');
 
   const attestMap = decodeCborMap(buf);
   if (!attestMap) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
@@ -345,12 +340,7 @@ export async function verifyAppleAssertion(
   assertionBase64: string,
   publicKeySpkiBase64: string
 ): Promise<{ ok: true; signCount: number } | { ok: false; error: AppleAssertionError }> {
-  let assertionBuf: Buffer;
-  try {
-    assertionBuf = Buffer.from(assertionBase64, 'base64');
-  } catch {
-    return { ok: false, error: 'INVALID_ASSERTION' };
-  }
+  const assertionBuf = Buffer.from(assertionBase64, 'base64');
 
   const assertionMap = decodeCborMap(assertionBuf);
   if (!assertionMap) return { ok: false, error: 'INVALID_ASSERTION' };

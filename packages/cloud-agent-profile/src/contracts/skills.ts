@@ -44,6 +44,7 @@ export const skillFilesSchema = z.record(z.string(), z.string()).superRefine((fi
       pathInvalidCharacters: path => `Skill file path contains invalid characters: ${path}`,
       pathRejected: path => `Skill file path rejected: ${path}`,
       manifestInFiles: 'SKILL.md must be supplied as rawMarkdown, not in files',
+      duplicatePath: path => `Skill file path duplicates another companion file: ${path}`,
       fileTooLarge: path =>
         overLimitMessage(`Skill companion file ${path}`, MAX_SKILL_COMPANION_FILE_SIZE),
       totalTooLarge: total =>

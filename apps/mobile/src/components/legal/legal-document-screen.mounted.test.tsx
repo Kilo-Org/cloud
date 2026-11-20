@@ -126,6 +126,19 @@ afterEach(async () => {
   await i18n.changeLanguage('en');
 });
 
+describe('LegalDocumentScreen body selection', () => {
+  it('renders the body as plain text, not as a focusable selection block', async () => {
+    await i18n.changeLanguage('en');
+    const renderer = mountScreen();
+
+    const bodies = renderer.root.findAll(isBody);
+    expect(bodies).toHaveLength(1);
+    // A selectable body becomes one focusable selection block per paragraph
+    // group, so a screen reader meets prose as controls.
+    expect(bodies[0]?.props.selectable).toBe(false);
+  });
+});
+
 describe('LegalDocumentScreen English-only notice', () => {
   it('shows the Arabic notice above the document body', async () => {
     await i18n.changeLanguage('ar');

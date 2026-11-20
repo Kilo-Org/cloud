@@ -21,6 +21,7 @@ type Confirmation = {
 };
 
 const state = vi.hoisted(() => ({
+  insets: { left: 0, right: 0 },
   identity: { userId: 'u1' as string | undefined, isLoading: false },
   merge: {
     mutateAsync: vi.fn<(input: MergeVars) => Promise<MergeResult>>(),
@@ -42,7 +43,7 @@ export { state };
 vi.mock('react-native', () => ({
   // The commit fields render the shared Input, whose alignment helper reads
   // `I18nManager.isRTL` on every render.
-  I18nManager: { isRTL: false },
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   ScrollView: 'ScrollView',
   View: 'View',
   TextInput: 'TextInput',
@@ -58,6 +59,16 @@ vi.mock('react-native', () => ({
     },
   },
   useWindowDimensions: () => ({ height: 800, width: 400 }),
+}));
+// The merge body clears the window's side insets itself; a sheet on Android
+// reports none, and the suite asserts the landscape padding from this state.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: state.insets.left,
+    right: state.insets.right,
+  }),
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),

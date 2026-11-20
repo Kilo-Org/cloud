@@ -2616,15 +2616,22 @@
     {
       "idx": 373,
       "version": "7",
-      "when": 1795136436477,
-      "tag": "0373_trial_granted",
+      "when": 1795171985676,
+      "tag": "0373_cloud_agent_network_secrets",
       "breakpoints": true
     },
     {
       "idx": 374,
       "version": "7",
-      "when": 1795137411141,
-      "tag": "0374_organizations_creator_index",
+      "when": 1795171985678,
+      "tag": "0374_trial_granted",
+      "breakpoints": true
+    },
+    {
+      "idx": 375,
+      "version": "7",
+      "when": 1795171985679,
+      "tag": "0375_organizations_creator_index",
       "breakpoints": true
     }
   ]

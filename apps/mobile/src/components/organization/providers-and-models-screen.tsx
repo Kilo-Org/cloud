@@ -18,7 +18,11 @@ import {
   useOrgGatewaySettings,
   useOrgModelCatalog,
 } from '@/lib/hooks/use-org-settings-queries';
-import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import {
+  isMoneyRole,
+  useOrgBoundary,
+  useOrgWithMembers,
+} from '@/lib/hooks/use-organization-queries';
 
 const TITLE_KEY = 'organization.settingsOnWeb.providersAndModels';
 
@@ -135,6 +139,7 @@ export function OrganizationProvidersAndModelsScreen() {
       <ModelAccessForm
         organizationId={organizationId}
         canEdit={canManageOrganization(role)}
+        canManageBilling={isMoneyRole(role)}
         models={models.data.data}
         catalog={catalog.data ?? []}
         catalogUnavailable={catalog.data == null && catalog.isError}

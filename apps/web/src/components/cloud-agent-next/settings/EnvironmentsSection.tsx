@@ -268,7 +268,7 @@ export function EnvironmentsSection({
             </p>
             <p className="text-muted-foreground max-w-sm text-xs">
               {environments.length === 0
-                ? 'Add one to give a repository setup commands, variables, secrets, a sandbox size, and network access.'
+                ? 'Add one to give a repository setup commands, environment variables, network secrets, a sandbox size, and network access.'
                 : 'Choose an environment from the list to view or edit it.'}
             </p>
           </div>

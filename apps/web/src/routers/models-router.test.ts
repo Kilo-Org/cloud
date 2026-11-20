@@ -94,9 +94,10 @@ describe('modelsRouter.list', () => {
           opencode: { variants: {} },
         },
         {
-          id: 'provider/no-settings',
+          id: 'provider/retiring',
           name: 'No settings',
           architecture: { input_modalities: ['text'] },
+          retires_on: '2026-08-01',
         },
       ],
     });
@@ -123,12 +124,13 @@ describe('modelsRouter.list', () => {
         inference_provider_ids: [],
       },
       {
-        id: 'provider/no-settings',
+        id: 'provider/retiring',
         name: 'No settings',
         supportsVision: false,
         isPreferred: false,
         variants: [],
         inference_provider_ids: [],
+        retires_on: '2026-08-01',
       },
     ]);
   });

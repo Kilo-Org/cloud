@@ -1,7 +1,7 @@
 import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
-  RuntimeSkillsSchema,
+  PersistedRuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
   RuntimeModelContextLimitsSchema,
@@ -11,6 +11,7 @@ import {
 export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
 import { webSearchProviderSchema } from '../shared/web-search-provider.js';
+import { networkSecretsSchema } from '@kilocode/worker-utils/network-secrets';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { AgentVariantSchema, Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
@@ -252,7 +253,12 @@ const SharedSessionProfileFields = {
   encryptedSecrets: EncryptedSecretsSchema.optional(),
   setupCommands: setupCommandsSchema.optional(),
   mcpServers: mcpServersRecordSchema(MCPServerConfigSchema).optional(),
-  runtimeSkills: RuntimeSkillsSchema.optional(),
+  /**
+   * Stored bundles are read with the path rule's tolerance: a companion file
+   * written under an earlier rule is dropped instead of failing the whole
+   * payload. A caller's own skills are validated with `RuntimeSkillsSchema`.
+   */
+  runtimeSkills: PersistedRuntimeSkillsSchema,
   runtimeAgents: RuntimeAgentsSchema.optional(),
   builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
   modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
@@ -262,6 +268,7 @@ const SharedSessionProfileFields = {
 
 export const SessionProfileBundleSchema = z.object({
   ...SharedSessionProfileFields,
+  networkSecrets: networkSecretsSchema.optional(),
   /**
    * The environment's start commands. They run after setup in every prepared
    * workspace, including one whose environment snapshot already ran setup.

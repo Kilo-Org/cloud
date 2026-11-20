@@ -8,7 +8,7 @@ import {
   runDeciderCaseViaCli,
   warmUpCliContainer,
 } from './cli-runner';
-import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
+import { DECIDER_CASES, FRONTIER_CASES, type DeciderCase } from './datasets/decider-cases';
 import { materializeLongContext } from './datasets/long-context';
 
 const benchCase = {
@@ -100,6 +100,46 @@ describe('runDeciderCaseViaCli prompt', () => {
     );
     expect(prompt).toContain('BEGIN WORKSPACE SNAPSHOT');
     expect(prompt.length).toBeGreaterThan(longCase.userPrompt.length * 10);
+  });
+});
+
+describe('runDeciderCaseViaCli isolated body', () => {
+  async function sentBody(benchCase: DeciderCase) {
+    const fetch = vi.fn(async (_request: Request) =>
+      Response.json({ exitCode: 0, durationMs: 1, stdoutLines: [], stderrTail: '' })
+    );
+    const { env } = createEnv(fetch);
+    await runDeciderCaseViaCli(env, {
+      instanceName: 'run:model:0',
+      model: 'vendor/model',
+      benchCase,
+      kiloToken: 'kilo-user-token',
+      kiloApiUrl: 'http://host.docker.internal:3000',
+      variant: 'high',
+    });
+    const request = fetch.mock.calls[0]?.[0];
+    if (!request) throw new Error('no container request');
+    return readJsonBody(request);
+  }
+
+  it('isolates a tool-required case without a session', async () => {
+    const body = await sentBody({ ...benchCase, requiredToolCalls: 1 });
+    expect(body.isolated).toBe(true);
+    expect(body).not.toHaveProperty('seed');
+  });
+
+  it('keeps the measured body of an ordinary case', async () => {
+    const body = await sentBody(benchCase);
+    expect(Object.keys(body)).toEqual([
+      'model',
+      'prompt',
+      'kiloToken',
+      'kiloApiUrl',
+      'orgId',
+      'timeoutMs',
+      'variant',
+      'resultCallback',
+    ]);
   });
 });
 describe('runDeciderCaseViaCli', () => {

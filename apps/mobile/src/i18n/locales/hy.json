@@ -19,7 +19,9 @@
     "presenceStatus": "Հոսթեր՝ {{connection}}",
     "commandStatus": "Հրամանի առաքում՝ {{status}}",
     "delivered": "Առաքված",
-    "expired": "Ժամկետանց"
+    "expired": "Ժամկետանց",
+    "recoveryGaps_one": "Այս տեքստագրության {{displayCount}} մասը բացակայում է։",
+    "recoveryGaps_other": "Այս տեքստագրության {{displayCount}} մասը բացակայում է։"
   },
   "common": {
     "manageOnWeb": "Կառավարել վեբում",
@@ -138,6 +140,7 @@
     "keepRunning": "Շարունակել կատարումը",
     "newSession": "Նոր նստաշրջան",
     "noModelsAvailable": "Հասանելի մոդելներ չկան",
+    "modelRetires": "Դադարեցվում է {{date}}-ին",
     "notFound": "Չի գտնվել",
     "online": "Առցանց",
     "open": "Բացել {{name}}-ը",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Կազմակերպության սեփականատերը կարող է թարմացնել վճարումները kilo.ai-ում, ապա կրկին փորձել։",
     "privateRepositoryA11y": "{{name}}, մասնավոր պահեստ",
     "legalDocumentEnglishOnly": "Այս փաստաթուղթը հասանելի է միայն անգլերեն։",
-    "organizationTrialEndedBilling": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Դուք կարող եք թարմացնել վճարումները, ապա կրկին փորձել։"
+    "organizationTrialEndedBilling": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Դուք կարող եք թարմացնել վճարումները, ապա կրկին փորձել։",
+    "organizationTrialEndedBillingAtKiloAi": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Դուք կարող եք թարմացնել վճարումները kilo.ai-ում, ապա կրկին փորձել։",
+    "viewOnGitHub": "Դիտել PR-ը GitHub-ում"
   },
   "language": {
     "restarting": "Վերագործարկվում է՝ լեզվի փոփոխությունը կիրառելու համար",
@@ -275,6 +280,9 @@
     "credits": "Կրեդիտներ",
     "failedToLoadBalance": "Չհաջողվեց բեռնել մնացորդը։ Հպեք՝ կրկին փորձելու համար։",
     "balanceLoadFailed": "Չհաջողվեց բեռնել մնացորդը",
+    "balanceUnreachable": "Չհաջողվեց հասնել սերվերին։ Փորձեք կրկին։",
+    "balanceAccessDenied": "Այս մնացորդը դիտելու թույլտվություն չունես։",
+    "balanceUnavailable": "Մնացորդը չհաջողվեց բեռնել։",
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",
@@ -505,7 +513,7 @@
     "changelogFixesPolish": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
     "changelogAreas": {
       "signIn": "Մուտք",
-      "profileOrganizations": "Պրոֆիլ և կազմակերպություններ"
+      "profileOrganizations": "Պրոֆիլ ու կազմակերպություններ"
     }
   },
   "preferences": {
@@ -746,6 +754,9 @@
       "comment_one": "1 մեկնաբանություն",
       "comment": "{{displayCount}} մեկնաբանություն",
       "comment_other": "{{displayCount}} մեկնաբանություն",
+      "conversationTruncated": "Ցուցադրվում են միայն առաջին {{displayCount}} մեկնաբանությունները։",
+      "conversationTruncated_one": "Ցուցադրվում են միայն առաջին {{displayCount}} մեկնաբանությունները։",
+      "conversationTruncated_other": "Ցուցադրվում են միայն առաջին {{displayCount}} մեկնաբանությունները։",
       "startedRelative": " · սկսվել է {{relative}}",
       "couldNotLoadMore": "Չհաջողվեց բեռնել հավելյալ մեկնաբանությունները։",
       "retryLoadingMore": "Կրկին փորձել բեռնել հավելյալ մեկնաբանությունները",
@@ -879,7 +890,6 @@
       "noAccess": "Այս պահոցի ստուգումները դիտելու թույլտվություն չունես։",
       "couldNotLoad": "Չհաջողվեց բեռնել ստուգումները։",
       "retryChecks": "Կրկին փորձել բեռնել ստուգումները",
-      "viewOnGitHub": "Դիտել PR-ը GitHub-ում",
       "noChecksReported": "Ստուգումների մասին տվյալներ չկան",
       "passed": "{{displayCount}} հաջողված",
       "passed_one": "{{displayCount}} հաջողված",
@@ -934,9 +944,9 @@
       "checkFailedTitleGitLab": "Չհաջողվեց ստուգել GitLab-ի հետ կապը",
       "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը",
       "providerCheckFailedMessage": "Չհաջողվեց հասնել մատակարարին։ Ստուգիր կապդ և կրկին փորձիր։",
-      "reconnectTitle": "Կրկին միացում GitHub-ին",
-      "reconnectTitleGitLab": "Կրկին միացում GitLab-ին",
-      "reconnectTitleBitbucket": "Կրկին միացում Bitbucket-ին",
+      "reconnectTitle": "Կրկին միացնել GitHub-ը",
+      "reconnectTitleGitLab": "Կրկին միացնել GitLab-ը",
+      "reconnectTitleBitbucket": "Կրկին միացնել Bitbucket-ը",
       "reconnectDescription": "GitHub-ի հետ կապիդ թույլտվությունը չեղարկվել է։",
       "gitlabDescription": "Վերանայել միաձուլման հարցումները բջջային սարքում",
       "gitlabInstanceMismatchTitle": "GitLab-ի միացումը այլ ինստանսի համար է",
@@ -963,6 +973,8 @@
       "pendingComment": "չուղարկված մեկնաբանություն",
       "pendingComment_other": "չուղարկված մեկնաբանություն",
       "submitCountOfTotal": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
+      "submitCountOfTotal_one": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
+      "submitCountOfTotal_other": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
       "submitReview": "Ուղարկել վերանայումը",
       "partialPostedFresh": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
       "partialPostedFresh_one": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
@@ -1387,7 +1399,7 @@
     "followReviewMd": "Հետևել REVIEW.md-ին",
     "followReviewMdSubtitle": "Հետևել յուրաքանչյուր պահոցի REVIEW.md ֆայլի հրահանգներին",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։"
+      "notConnectedReadOnlyPlan": "Կազմակերպության փորձաշրջանն ավարտվել է, ուստի սեփականատերը պետք է թարմացնի վճարումները kilo.ai-ում։"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ի Bitbucket միացումը կառավարվում է վեբում՝ համակարգչից։",
@@ -1396,7 +1408,7 @@
       "managedOnWebRepositories": "Ընտրիր {{organization}}-ի ռեպոզիտորիաները վեբում՝ համակարգչից։",
       "description": "Ստեղծիր աշխատանքային տարածքի հասանելիության տոկեն {{organization}}-ի համար և տեղադրիր այն ստորև։",
       "descriptionReconnect": "Ստեղծիր նոր աշխատանքային տարածքի հասանելիության տոկեն {{organization}}-ի համար և տեղադրիր այն ստորև։",
-      "descriptionOverview": "Ստեղծիր աշխատանքային տարածքի հասանելիության տոկեն {{organization}}-ի համար և տեղադրիր այն հաջորդ էկրանին։",
+      "descriptionOverview": "Ստեղծիր աշխատանքային տարածքի հասանելիության տոկեն և տեղադրիր այն հաջորդ էկրանին։",
       "scopes": "Հաշիվ՝ կարդալ · Պահոցներ՝ կարդալ/գրել · Pull request-ներ՝ կարդալ · Վեբհուկեր՝ կարդալ/գրել",
       "tokenPlaceholder": "Աշխատանքային տարածքի հասանելիության տոկեն",
       "tokenRefused": "Bitbucket-ը չընդունեց այս աշխատանքային տարածքի տոկենը։ Ստուգիր, որ այն ունի վերևում նշված թույլտվությունները, ապա փորձիր կրկին։"
@@ -2788,6 +2800,8 @@
     "modelPicker": {
       "title": "Մոդելի ընտրություն",
       "noModelsDescription": "Ընտրելու համար հասանելի մոդելներ չկան։",
+      "allUnavailableTitle": "Ոչ մի մոդել չի կարող օգտագործվել",
+      "allUnavailableDescription": "Ավելացրեք մատակարարի բանալի և կրկին փորձեք։",
       "favorites": "Նախընտրածներ"
     },
     "modelSelector": {
@@ -3621,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "Վերանվանել կազմակերպությունը",
-      "renamePlaceholder": "Կազմակերպության անունը",
+      "renamePlaceholder": "Մուտքագրեք կազմակերպության անունը",
       "balance": "Մնացորդ",
       "plan": "Պլան",
       "planTeams": "Teams",
@@ -4847,12 +4861,15 @@
     "inputDescription": "Սկանավորում է յուրաքանչյուր մուտք Enkrypt AI-ով, ներառյալ գործիքների արդյունքները։ Երբ Enkrypt-ը հասանելի չէ, հարցումները մերժվելու փոխարեն ուղարկվում են առանց սկանավորման։",
     "outputTitle": "Ելքի պաշտպանիչներ",
     "outputDescription": "Սկանավորում է պատասխանները Enkrypt AI-ով, նախքան անդամները կստանան դրանք։ Անջատված է, եթե դուք չմիացնեք այն։",
+    "outputUnavailable": "Kilo-ն այս կազմակերպության համար չի միացրել ելքի սկանավորումը, ուստի պատասխանները չեն ստուգվում և այստեղ սահմանելու բան չկա։ Այն հայտարարելու համար կապվեք {{supportEmail}}-ի հետ։",
     "detectorsHint": "«Արգելափակել»-ը մերժում է նշված հարցումը։ «Միայն գրանցել»-ը գրանցում է այն՝ առանց հարցումը ուշացնելու։",
     "detectorsHintOutput": "«Արգելափակել»-ը ձախողում է նշված պատասխանը։ «Միայն գրանցել»-ը գրանցում է այն՝ առանց պատասխանը ուշացնելու։",
     "choiceLog": "Միայն գրանցել",
     "applyTo": "Կիրառել",
     "applyToAllMembers": "Բոլոր անդամները",
     "applyKiloDefault": "Կիրառել Kilo-ի լռելյայն կարգավորումները",
+    "applyKiloDefaultEnglishNote": "Kilo-ի լռելյայն քաղաքականության տեքստը անգլերեն է, որովհետև Kilo Gateway-ն այն կիրառում է ճիշտ այնպես, ինչպես գրված է։",
+    "applyKiloDefaultReplaceMessage": "Kilo-ի լռելյայն քաղաքականությունը գրված է անգլերեն և փոխարինում է Քաղաքականության խախտումում ձեր սահմանածը։ Քաղաքականության տեքստի դաշտում ձեր մուտքագրած տեքստը հնարավոր չէ վերականգնել։",
     "invalidSavedTitle": "Չհաջողվեց կարդալ պահպանված մուտքային դետեկտորների կարգավորումները",
     "invalidSavedBody": "Հարցումները արգելափակված են, քանի դեռ մուտքային դետեկտորները նորից չեն պահպանվել։ Ստորև բերված դետեկտորները սկսում են Kilo լռելյայնից։",
     "invalidSavedOutputTitle": "Չհաջողվեց կարդալ պահպանված ելքային դետեկտորների կարգավորումները",
@@ -4987,6 +5004,8 @@
     "providersDescription": "Անջատեք մատակարարին, որպեսզի Kilo-ն այս կազմակերպության համար չուղղորդի հարցումները դեպի նա։",
     "providersNeedCatalog": "Մատակարարների փոխանջատիչները մնում են միայն ընթերցման համար, քանի դեռ մոդելների ամբողջական կատալոգը չի բեռնվել։ Դրանք խմբագրելու համար սեղմեք վերևի Կրկին փորձել կոճակը։",
     "providersEmpty": "Ոչ մի մատակարար չի համապատասխանում այս որոնմանը։",
+    "providersNone": "Այս կազմակերպության համար հասանելի մատակարարներ չկան։",
+    "providersUnavailable": "Մատակարարների ցանկը չհաջողվեց բեռնել։",
     "allowAllShown": "Թույլատրել բոլոր ցուցադրվածները",
     "denyAllShown": "Արգելել բոլոր ցուցադրվածները",
     "gatewaysDescription": "Kilo-ն մոդելի հարցումները ուղղորդում է Vercel AI Gateway-ի կամ OpenRouter-ի միջոցով։ Անջատված դարպասը ձախողում է այդ հարցումները։",

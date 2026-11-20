@@ -86,6 +86,31 @@ function recordTtlSeconds(exp: number | undefined, capSeconds: number): number {
   return Math.max(1, Math.min(remaining, capSeconds));
 }
 
+/**
+ * Consume one single-use record so its token is accepted exactly once. A store
+ * write that cannot complete refuses the request with the retryable error, so
+ * the acceptance rule never depends on the store being reachable.
+ */
+async function recordSingleUseToken(params: {
+  recordKey: string;
+  ttlSeconds: number;
+  storeUnavailableMessage: string;
+  alreadyUsedMessage: string;
+}): Promise<void> {
+  let recorded: string | null = null;
+  try {
+    recorded = await redisClient.set(params.recordKey, '1', {
+      nx: true,
+      ex: params.ttlSeconds,
+    });
+  } catch {
+    throw new NonceStoreUnavailableError(params.storeUnavailableMessage);
+  }
+  if (recorded !== 'OK') {
+    throw new NativeIdTokenError(params.alreadyUsedMessage);
+  }
+}
+
 /** The claims every native Apple path requires from a verified identity token. */
 function appleIdentityFromPayload(payload: jwt.JwtPayload): VerifiedAppleIdToken {
   if (typeof payload.email !== 'string' || !payload.email) {
@@ -112,18 +137,12 @@ function appleTokenRecordKey(idToken: string): string {
  * never depends on the store being reachable.
  */
 async function recordSingleUseAppleToken(idToken: string, exp: number | undefined): Promise<void> {
-  let recorded: string | null = null;
-  try {
-    recorded = await redisClient.set(appleTokenRecordKey(idToken), '1', {
-      nx: true,
-      ex: recordTtlSeconds(exp, NONCE_TTL_CAP_SECONDS),
-    });
-  } catch {
-    throw new NonceStoreUnavailableError('Apple token record unavailable');
-  }
-  if (recorded !== 'OK') {
-    throw new NativeIdTokenError('Apple ID token already used');
-  }
+  await recordSingleUseToken({
+    recordKey: appleTokenRecordKey(idToken),
+    ttlSeconds: recordTtlSeconds(exp, NONCE_TTL_CAP_SECONDS),
+    storeUnavailableMessage: 'Apple token record unavailable',
+    alreadyUsedMessage: 'Apple ID token already used',
+  });
 }
 
 /**
@@ -229,20 +248,12 @@ async function recordSingleUseGoogleToken(
   idToken: string,
   expiresAt: number | undefined
 ): Promise<void> {
-  const digest = createHash('sha256').update(idToken).digest('hex');
-  const ttlSeconds = recordTtlSeconds(expiresAt, GOOGLE_TOKEN_TTL_CAP_SECONDS);
-  let recorded: string | null = null;
-  try {
-    recorded = await redisClient.set(`auth:google-signin-token:${digest}`, '1', {
-      nx: true,
-      ex: ttlSeconds,
-    });
-  } catch {
-    throw new NonceStoreUnavailableError('Google token record unavailable');
-  }
-  if (recorded !== 'OK') {
-    throw new NativeIdTokenError('Google ID token already used');
-  }
+  await recordSingleUseToken({
+    recordKey: `auth:google-signin-token:${createHash('sha256').update(idToken).digest('hex')}`,
+    ttlSeconds: recordTtlSeconds(expiresAt, GOOGLE_TOKEN_TTL_CAP_SECONDS),
+    storeUnavailableMessage: 'Google token record unavailable',
+    alreadyUsedMessage: 'Google ID token already used',
+  });
 }
 
 type GoogleVerificationMessages = {

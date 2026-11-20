@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   serverOptions: undefined as undefined | ServerOptions,
   spawn: vi.fn(),
   mkdtemp: vi.fn(),
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
   rm: vi.fn(),
   close: vi.fn(),
   exit: vi.fn<typeof process.exit>(),
@@ -36,6 +38,8 @@ vi.mock('node:http', () => ({
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
 vi.mock('node:fs/promises', () => ({
   mkdtemp: mocks.mkdtemp,
+  mkdir: mocks.mkdir,
+  writeFile: mocks.writeFile,
   rm: mocks.rm,
 }));
 
@@ -145,6 +149,8 @@ beforeEach(() => {
   mocks.children = [];
   mocks.spawn.mockReset().mockImplementation(createChild);
   mocks.mkdtemp.mockReset().mockResolvedValue('/tmp/benchmark-auth-test');
+  mocks.mkdir.mockReset().mockResolvedValue(undefined);
+  mocks.writeFile.mockReset().mockResolvedValue(undefined);
   mocks.rm.mockReset().mockResolvedValue(undefined);
   mocks.close.mockReset();
   mocks.exit.mockReset();
@@ -201,6 +207,30 @@ it('/run sends the prompt on stdin and disables automatic ingest while preservin
   });
   mocks.children[0].emit('close', 0);
   expect((await pending.done).status).toBe(200);
+});
+
+it.each([
+  ['an ordinary case keeps the inherited working directory', {}, '/app'],
+  ['an isolated case runs in its own workspace', { isolated: true }, '/tmp/benchmark-auth-test'],
+])('/run: %s', async (_kind, isolation, pwd) => {
+  vi.stubEnv('PWD', '/app');
+  await loadServer();
+  const pending = request('/run', { ...runBody, ...isolation });
+  await flushServer();
+  const options = mocks.spawn.mock.calls[0][2];
+  expect(options.cwd).toBe('/tmp/benchmark-auth-test');
+  expect(options.env.PWD).toBe(pwd);
+  mocks.children[0].emit('close', 0);
+  expect((await pending.done).status).toBe(200);
+});
+
+it('/run rejects a non-boolean isolation flag', async () => {
+  await loadServer();
+  expect(await request('/run', { ...runBody, isolated: 'yes' }).done).toEqual({
+    status: 400,
+    body: { error: 'isolated must be a boolean when provided' },
+  });
+  expect(mocks.spawn).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -616,7 +646,7 @@ it('bounds response completion after persisting output without blocking shutdown
 });
 
 it.each(['http_error', 'network_error', 'timeout'] as const)(
-  'retries a transient callback %s before answering without rerunning the CLI',
+  'answers after a transient callback %s and keeps delivering without rerunning the CLI',
   async category => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const fetch = vi
@@ -635,7 +665,7 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
     mocks.children[0].emit('close', 0);
     await flushServer();
     expect(fetch).toHaveBeenCalledOnce();
-    expect(pending.res.end).not.toHaveBeenCalled();
+    expect((await pending.done).status).toBe(200);
     expect(console.log).toHaveBeenCalledWith(
       JSON.stringify({
         event: 'benchmark_container_result_delivery_failed',
@@ -645,8 +675,9 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
         category,
       })
     );
+    stopServer();
+    expect(mocks.exit).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1_000);
-    expect((await pending.done).status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch.mock.calls[1][1].body).toBe(fetch.mock.calls[0][1].body);
     expect(console.log).toHaveBeenCalledWith(
@@ -668,13 +699,12 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
       })
     );
     expect(mocks.spawn).toHaveBeenCalledOnce();
-    stopServer();
     expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
   }
 );
 
 it.each(['http_error', 'network_error', 'timeout'] as const)(
-  'bounds callback %s retries and logs safe execution correlation before shutdown',
+  'retries callback %s delivery for about five minutes and logs safe execution correlation',
   async category => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -704,18 +734,16 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
     await flushServer();
     stopServer();
     expect(fetch).toHaveBeenCalledOnce();
-    expect(mocks.exit).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(999);
-    expect(fetch).toHaveBeenCalledOnce();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(mocks.exit).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1_999);
-    expect(fetch).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(fetch).toHaveBeenCalledTimes(3);
     expect((await pending.done).status).toBe(200);
-    expect(timeout).toHaveBeenCalledTimes(3);
+    const retryDelaysMs = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 45_000, 60_000, 60_000];
+    for (const [index, delayMs] of retryDelaysMs.entries()) {
+      expect(mocks.exit).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(delayMs - 1);
+      expect(fetch).toHaveBeenCalledTimes(index + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetch).toHaveBeenCalledTimes(index + 2);
+    }
+    expect(timeout).toHaveBeenCalledTimes(10);
     expect(timeout).toHaveBeenCalledWith(10_000);
     expect(error).toHaveBeenCalledExactlyOnceWith(
       JSON.stringify({
@@ -723,15 +751,15 @@ it.each(['http_error', 'network_error', 'timeout'] as const)(
         ...caseContext,
         category,
         outcome: 'completed',
-        attempt: 3,
-        attempts: 3,
+        attempt: 10,
+        attempts: 10,
       })
     );
     const logged = [...vi.mocked(console.log).mock.calls, ...error.mock.calls].flat().join('\n');
     for (const value of privateValues) expect(logged).not.toContain(value);
     expect(mocks.exit).toHaveBeenCalledExactlyOnceWith(0);
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(fetch).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(fetch).toHaveBeenCalledTimes(10);
     expect(mocks.spawn).toHaveBeenCalledOnce();
   }
 );

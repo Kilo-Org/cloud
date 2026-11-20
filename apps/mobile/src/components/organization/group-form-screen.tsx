@@ -13,7 +13,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgGroup } from '@/lib/hooks/use-org-groups-queries';
-import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { isMoneyRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups';
 /**
@@ -111,7 +111,14 @@ export function OrganizationGroupFormScreen() {
     return <GroupNotFound />;
   }
 
-  return <GroupForm key={group?.id ?? 'new'} organizationId={organizationId} group={group} />;
+  return (
+    <GroupForm
+      key={group?.id ?? 'new'}
+      organizationId={organizationId}
+      canManageBilling={isMoneyRole(role)}
+      group={group}
+    />
+  );
 }
 
 /**

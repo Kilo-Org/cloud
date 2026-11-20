@@ -35,6 +35,12 @@ export function ActivityIndicator({
     return (
       <NativeActivityIndicator
         {...props}
+        // The platform control animates, so it carries no role of its own: a
+        // reader announces an unnamed progress bar, and Android's indicator has
+        // no label at all. Both branches therefore speak the same wait.
+        accessibilityRole={props.accessibilityRole ?? 'progressbar'}
+        accessibilityLabel={props.accessibilityLabel ?? t('common.loading')}
+        accessibilityState={{ ...props.accessibilityState, busy: animating }}
         animating={animating}
         color={color}
         hidesWhenStopped={hidesWhenStopped}

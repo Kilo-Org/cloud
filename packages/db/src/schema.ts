@@ -9017,6 +9017,11 @@ export const agent_environment_profile_vars = pgTable(
     key: text().notNull(),
     value: text().notNull(), // Plaintext if is_secret=false, encrypted if is_secret=true
     is_secret: boolean().notNull().default(false),
+    delivery: text({ enum: ['env', 'network'] })
+      .notNull()
+      .default('env'),
+    allowed_hosts: text().array(),
+    injection_locations: text().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -9220,6 +9225,11 @@ export const cloud_agent_environment_vars = pgTable(
     key: text().notNull(),
     value: text().notNull(), // Plaintext if is_secret=false, RSA+AES envelope JSON if is_secret=true
     is_secret: boolean().notNull().default(false),
+    delivery: text({ enum: ['env', 'network'] })
+      .notNull()
+      .default('env'),
+    allowed_hosts: text().array(),
+    injection_locations: text().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

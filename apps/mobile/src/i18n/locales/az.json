@@ -19,7 +19,9 @@
     "presenceStatus": "Hostlar: {{connection}}",
     "commandStatus": "Əmrin çatdırılması: {{status}}",
     "delivered": "Çatdırılıb",
-    "expired": "Müddəti bitib"
+    "expired": "Müddəti bitib",
+    "recoveryGaps_one": "Bu transkriptin {{displayCount}} hissəsi itib.",
+    "recoveryGaps_other": "Bu transkriptin {{displayCount}} hissəsi itib."
   },
   "common": {
     "manageOnWeb": "Vebdə idarə et",
@@ -138,6 +140,7 @@
     "keepRunning": "İcranı davam etdir",
     "newSession": "Yeni sessiya",
     "noModelsAvailable": "Mövcud model yoxdur",
+    "modelRetires": "{{date}} tarixində dayandırılır",
     "notFound": "Tapılmadı.",
     "online": "Onlayn",
     "open": "{{name}} aç",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
     "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya",
     "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur.",
-    "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz."
+    "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
+    "organizationTrialEndedBillingAtKiloAi": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi kilo.ai ünvanında yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
+    "viewOnGitHub": "GitHub-da PR-ə bax"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -275,6 +280,9 @@
     "credits": "Kreditlər",
     "failedToLoadBalance": "Balansı yükləmək mümkün olmadı. Yenidən cəhd etmək üçün toxun.",
     "balanceLoadFailed": "Balansı yükləmək mümkün olmadı",
+    "balanceUnreachable": "Serverə çatmaq mümkün olmadı. Yenidən cəhd edin.",
+    "balanceAccessDenied": "Bu balansa baxmaq üçün icazəniz yoxdur.",
+    "balanceUnavailable": "Balans yüklənə bilmədi.",
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
@@ -505,7 +513,7 @@
     "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
     "changelogAreas": {
       "signIn": "Giriş",
-      "profileOrganizations": "Profil və təşkilatlar"
+      "profileOrganizations": "Profil ilə təşkilatlar"
     }
   },
   "preferences": {
@@ -750,6 +758,9 @@
       "couldNotLoadMore": "Daha çox şərh yüklənə bilmədi.",
       "retryLoadingMore": "Əlavə şərhləri yükləməyə yenidən cəhd et",
       "loadMoreComments": "Daha çox şərh yüklə",
+      "conversationTruncated": "Yalnız ilk {{displayCount}} şərh göstərilir.",
+      "conversationTruncated_one": "Yalnız ilk {{displayCount}} şərh göstərilir.",
+      "conversationTruncated_other": "Yalnız ilk {{displayCount}} şərh göstərilir.",
       "addReaction": "Reaksiya əlavə et",
       "reactionPill": "{{emoji}} reaksiyası, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
@@ -879,7 +890,6 @@
       "noAccess": "Bu repozitoriyanın yoxlamalarına girişin yoxdur.",
       "couldNotLoad": "Yoxlamalar yüklənə bilmədi.",
       "retryChecks": "Yoxlamaları yükləməyə yenidən cəhd et",
-      "viewOnGitHub": "GitHub-da PR-ə bax",
       "noChecksReported": "Yoxlama bildirilməyib",
       "passed": "{{displayCount}} uğurlu",
       "passed_one": "{{displayCount}} uğurlu",
@@ -963,6 +973,8 @@
       "pendingComment": "göndərilməmiş şərh",
       "pendingComment_other": "göndərilməmiş şərh",
       "submitCountOfTotal": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
       "submitReview": "Yoxlamanı göndər",
       "partialPostedFresh": "{{displayFreshCount}} şərh göndərildi. ",
       "partialPostedFresh_one": "{{displayFreshCount}} şərh göndərildi. ",
@@ -1387,7 +1399,7 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər."
+      "notConnectedReadOnlyPlan": "Təşkilatın sınaq müddəti başa çıxıb, ona görə də sahib kilo.ai ünvanında billinqi yeniləməlidir."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
@@ -1396,7 +1408,7 @@
       "managedOnWebRepositories": "{{organization}} üçün repozitoriyaları kompüterdən vebdə seçin.",
       "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
-      "descriptionOverview": "{{organization}} üçün iş sahəsi giriş tokeni yarat və növbəti ekranda yapışdır.",
+      "descriptionOverview": "İş sahəsi giriş tokeni yarat və növbəti ekranda yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
       "tokenPlaceholder": "İş sahəsinin giriş tokeni",
       "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."
@@ -2788,7 +2800,9 @@
     "modelPicker": {
       "title": "Model seç",
       "favorites": "Sevimlilər",
-      "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil."
+      "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil.",
+      "allUnavailableTitle": "Heç bir model istifadə edilə bilməz",
+      "allUnavailableDescription": "Provayder açarı əlavə et, sonra yenidən cəhd et."
     },
     "modelSelector": {
       "provider": "Təminatçı {{id}}",
@@ -3621,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "Təşkilatın adını dəyiş",
-      "renamePlaceholder": "Təşkilatın adı",
+      "renamePlaceholder": "Təşkilatın adını daxil edin",
       "balance": "Balans",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4847,12 +4861,15 @@
     "inputDescription": "Alət nəticələri daxil olmaqla hər girişi Enkrypt AI ilə yoxlayır. Enkrypt əlçatan olmadıqda sorğular rədd edilmək əvəzinə yoxlanılmadan göndərilir.",
     "outputTitle": "Çıxış üçün qoruyucu qaydalar",
     "outputDescription": "Cavabları üzvlərə çatmazdan əvvəl Enkrypt AI ilə yoxlayır. Siz aktivləşdirməyincə söndürülüdür.",
+    "outputUnavailable": "Kilo bu təşkilat üçün çıxış yoxlamasını aktivləşdirməyib, ona görə cavablar yoxlanmır və burada qurulacaq heç nə yoxdur. Bunu istəmək üçün {{supportEmail}} ilə əlaqə saxlayın.",
     "detectorsHint": "\"Blokla\" işarələnmiş sorğunu rədd edir. \"Yalnız qeydə al\" sorğunu ləngitmədən onu sadəcə qeydə alır.",
     "detectorsHintOutput": "\"Blokla\" işarələnmiş cavabı uğursuz edir. \"Yalnız qeydə al\" cavabı ləngitmədən onu sadəcə qeydə alır.",
     "choiceLog": "Yalnız qeydə al",
     "applyTo": "Kimlərə tətbiq olunur",
     "applyToAllMembers": "Bütün üzvlər",
     "applyKiloDefault": "Kilo standartını tətbiq et",
+    "applyKiloDefaultEnglishNote": "Kilo standart siyasət mətni ingilis dilindədir, çünki Kilo Gateway onu yazıldığı kimi tətbiq edir.",
+    "applyKiloDefaultReplaceMessage": "Kilo standart siyasəti ingilis dilində yazılıb və Siyasət pozuntusunda təyin etdiyinizi əvəz edir. Siyasət mətni sahəsinə daxil etdiyiniz mətn bərpa edilə bilməz.",
     "invalidSavedTitle": "Giriş detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
     "invalidSavedBody": "Giriş detektorları yenidən yadda saxlanılana qədər sorğular bloklanır. Aşağıdakı detektorlar Kilo standartı ilə başlayır.",
     "invalidSavedOutputTitle": "Çıxış detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
@@ -4987,6 +5004,8 @@
     "providersDescription": "Kilo-nun bu təşkilat üçün sorğuları provayderə yönləndirməsini dayandırmaq üçün onu söndürün.",
     "providersNeedCatalog": "Provayder açarları tam model kataloqu yüklənənə qədər yalnız oxunuş rejimində qalır. Onları redaktə etmək üçün yuxarıdakı Yenidən cəhd et düyməsinə toxunun.",
     "providersEmpty": "Bu axtarışa uyğun provayder yoxdur.",
+    "providersNone": "Bu təşkilat üçün heç bir provayder mövcud deyil.",
+    "providersUnavailable": "Provayder siyahısı yüklənmədi.",
     "allowAllShown": "Göstərilənlərin hamısına icazə ver",
     "denyAllShown": "Göstərilənlərin hamısını qadağan et",
     "gatewaysDescription": "Kilo model sorğularını Vercel AI Gateway və ya OpenRouter vasitəsilə yönləndirir. Şlüz deaktiv edilərsə, həmin sorğular uğursuz olur.",

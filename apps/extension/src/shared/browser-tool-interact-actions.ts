@@ -1,7 +1,12 @@
 /* eslint-disable id-length, max-lines -- CDP mouse commands name their coordinates `x` and `y`; one module owns the eight interaction tools and the shared CDP and page-helper plumbing keeps their shapes consistent. */
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
-import { ambiguousSelectorError } from './browser-agent-checks';
+import {
+  ambiguousSelectorError,
+  FRESH_SNAPSHOT_HINT,
+  looksLikeBrowserRef,
+  STALE_REF_ERROR,
+} from './browser-agent-checks';
 import { RETARGET_TO_CONTROL_FUNCTION } from './browser-agent-probes';
 import type { BrowserToolResolvedTarget, BrowserToolUniqueTarget } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
@@ -48,11 +53,6 @@ const toUpstreamToolName = (name: string): string =>
 export const isInteractBrowserToolName = (name: string): boolean =>
   INTERACT_BROWSER_TOOL_NAME_SET.has(toUpstreamToolName(name));
 
-const STALE_REF_ERROR_PREFIX = 'The element reference is stale or unknown.';
-const FRESH_SNAPSHOT_HINT =
-  'Take a fresh kilo_browser_snapshot and use a ref from that snapshot, or pass a unique CSS selector.';
-const STALE_REF_ERROR = `${STALE_REF_ERROR_PREFIX} ${FRESH_SNAPSHOT_HINT}`;
-
 const ok = (message: string): EvalTabResult => ({ ok: true, value: message });
 const fail = (error: string): EvalTabResult => ({ error, ok: false });
 
@@ -63,9 +63,6 @@ const okValue = (value: PageHelperValue): EvalTabResult => ({ ok: true, value })
 
 const invalidArguments = (tool: string, error: string): EvalTabResult =>
   fail(`${tool}: invalid arguments. ${error}`);
-
-const refPattern = /^(?:ref=)?(?:f\d+)?e\d+$/u;
-const looksLikeRef = (target: string): boolean => refPattern.test(target.trim());
 
 type TargetResolution =
   | { readonly ok: true; readonly target: BrowserToolUniqueTarget }
@@ -85,12 +82,12 @@ const resolveTargetOrError = async (
     return { ok: true, target: resolved };
   }
 
-  if (looksLikeRef(target)) {
+  if (looksLikeBrowserRef(target)) {
     return { error: STALE_REF_ERROR, ok: false };
   }
 
   return {
-    error: `No element matches the selector "${target}". Check the selector, or take a fresh kilo_browser_snapshot and use a ref.`,
+    error: `No element matches the selector "${target}". Check the selector, or take a new page snapshot and use a ref from it.`,
     ok: false,
   };
 };
@@ -399,10 +396,9 @@ const dispatchKeyStroke = async (
 /**
  * Dispatches a key chord with the metadata the browser needs to type a
  * printable character (`code`, `key`, `windowsVirtualKeyCode`, `text`), holding
- * the chord's modifiers around the final key. Shared with the run-code
- * `page.press` facade, which needs the same metadata.
+ * the chord's modifiers around the final key.
  */
-export const pressKeyChord = async (
+const pressKeyChord = async (
   session: BrowserToolInteractSession,
   chord: string
 ): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }> => {
@@ -457,7 +453,6 @@ type PageHelperTargetResult =
   | { readonly ok: true; readonly target: PageHelperTarget }
   | { readonly ok: false; readonly error: string };
 
-const nodeIdsResponseSchema = z.object({ nodeIds: z.array(z.number()) });
 const nodeObjectSchema = z.object({ object: z.object({ objectId: z.string().optional() }) });
 const callFunctionResponseSchema = z.object({
   result: z.object({ value: z.unknown().optional() }),
@@ -475,36 +470,34 @@ const releaseRemoteObject = async (
 };
 
 /**
- * Proves the frontend node is still attached to the document. A node removed
- * without a navigation keeps its backend id, still resolves to a remote object
- * and still accepts `DOM.setAttributeValue`, so tagging alone cannot tell a live
- * ref from a stale one and the page helper would wait for a selector it can
- * never find. Only the node's own `isConnected` distinguishes them.
+ * Tags the node only while it is still attached to the document. A node removed
+ * without a navigation keeps its backend id and still resolves to a remote
+ * object, so only the node's own `isConnected` tells a live ref from a stale one;
+ * tagging a detached node would leave the page helper waiting for a selector it
+ * can never find. A node inside a shadow root (the month, day and year parts of
+ * a date input are one) is out of reach of the page helper's document query, so
+ * it is reported instead of tagged.
+ *
+ * The tag is read back: a page that overrides `Element.prototype.setAttribute`
+ * to throw, or to do nothing, would otherwise leave a live ref reported as stale.
  */
-const nodeIsConnected = async (
-  session: BrowserToolInteractSession,
-  nodeId: number
-): Promise<boolean> => {
-  const resolved = await sendOrUndefined(session, 'DOM.resolveNode', { nodeId });
-  const object = nodeObjectSchema.safeParse(resolved);
-  const objectId = object.success ? object.data.object.objectId : undefined;
+const TAG_CONNECTED_NODE_FUNCTION =
+  "function (name, value) { try { if (this.isConnected !== true) { return 'detached'; } if (this.getRootNode() instanceof ShadowRoot) { return 'shadow'; } this.setAttribute(name, value); return this.getAttribute(name) === value ? 'tagged' : 'threw'; } catch (error) { return 'threw'; } }";
+const UNTAG_NODE_FUNCTION =
+  "function (name) { try { this.removeAttribute(name); } catch (error) { return 'threw'; } return 'untagged'; }";
+const SHADOW_PART_ERROR =
+  'This ref points inside a control’s built-in parts (such as the month, day and year of a date input), which this tool cannot fill one by one. Target the control itself with a CSS selector; a date input takes one YYYY-MM-DD value.';
+const TAGGING_UNAVAILABLE_ERROR =
+  'The page would not let this tool mark the element, so nothing was run. Target the element with a unique CSS selector instead.';
 
-  if (objectId === undefined) {
-    return false;
+/** What a failed tag outcome means to the caller; `detached` and no value at all are a ref this session cannot see. */
+const tagRefusalError = (outcome: unknown): string => {
+  if (outcome === 'shadow') {
+    return SHADOW_PART_ERROR;
   }
 
-  try {
-    const called = await sendOrUndefined(session, 'Runtime.callFunctionOn', {
-      functionDeclaration: 'function () { return this.isConnected === true; }',
-      objectId,
-      returnByValue: true,
-    });
-    const connected = callFunctionResponseSchema.safeParse(called);
-
-    return connected.success && connected.data.result.value === true;
-  } finally {
-    await releaseRemoteObject(session, objectId);
-  }
+  // A page that overrode the setter, or dropped the tag, is a live ref this tool cannot mark.
+  return outcome === 'threw' ? TAGGING_UNAVAILABLE_ERROR : STALE_REF_ERROR;
 };
 
 /**
@@ -512,6 +505,10 @@ const nodeIsConnected = async (
  * targets are used as-is. Either way the DOM-side lookup and the mutation are
  * performed by the page-helper layer (`page.waitFor`/`page.__q`/`page.fill`),
  * not by a second resolver in this module.
+ *
+ * A ref reaches its node through its backend id and a remote object, never a
+ * frontend node id: `DOM.pushNodesByBackendIdsToFrontend` refuses until the
+ * session has requested the document, which a snapshot never does.
  */
 const toPageHelperTarget = async (
   session: BrowserToolInteractSession,
@@ -521,42 +518,47 @@ const toPageHelperTarget = async (
     return { ok: true, target: { selector: target.selector } };
   }
 
-  const response = await sendOrUndefined(session, 'DOM.pushNodesByBackendIdsToFrontend', {
-    backendNodeIds: [target.backendNodeId],
-  });
-  const parsed = nodeIdsResponseSchema.safeParse(response);
-  const nodeId = parsed.success ? parsed.data.nodeIds[0] : undefined;
+  const resolved = nodeObjectSchema.safeParse(
+    await sendOrUndefined(session, 'DOM.resolveNode', { backendNodeId: target.backendNodeId })
+  );
+  const objectId = resolved.success ? resolved.data.object.objectId : undefined;
 
-  if (nodeId === undefined || nodeId === 0) {
-    return { error: STALE_REF_ERROR, ok: false };
-  }
-
-  if (!(await nodeIsConnected(session, nodeId))) {
+  if (objectId === undefined) {
     return { error: STALE_REF_ERROR, ok: false };
   }
 
   targetTagCounter += 1;
   const value = `kilo-${String(targetTagCounter)}`;
+  const tagged = callFunctionResponseSchema.safeParse(
+    await sendOrUndefined(session, 'Runtime.callFunctionOn', {
+      arguments: [{ value: TARGET_ATTRIBUTE }, { value }],
+      functionDeclaration: TAG_CONNECTED_NODE_FUNCTION,
+      objectId,
+      returnByValue: true,
+    })
+  );
 
-  const tagged = await sendOrUndefined(session, 'DOM.setAttributeValue', {
-    name: TARGET_ATTRIBUTE,
-    nodeId,
-    value,
-  });
+  const outcome = tagged.success ? tagged.data.result.value : undefined;
 
-  if (tagged === undefined) {
-    return { error: STALE_REF_ERROR, ok: false };
+  if (outcome !== 'tagged') {
+    await releaseRemoteObject(session, objectId);
+
+    // `detached` and no value at all mean the ref is gone; a page that refused the tag is a different failure,
+    // And telling the caller its live ref is stale would send it looking for a snapshot that changes nothing.
+    return { error: tagRefusalError(outcome), ok: false };
   }
 
   return {
     ok: true,
     target: {
       cleanup: async () => {
-        try {
-          await session.send('DOM.removeAttribute', { name: TARGET_ATTRIBUTE, nodeId });
-        } catch {
-          // The node may be gone after a navigation; the stale attribute is harmless.
-        }
+        // The node may be gone after a navigation; a stale attribute is harmless.
+        await sendOrUndefined(session, 'Runtime.callFunctionOn', {
+          arguments: [{ value: TARGET_ATTRIBUTE }],
+          functionDeclaration: UNTAG_NODE_FUNCTION,
+          objectId,
+        });
+        await releaseRemoteObject(session, objectId);
       },
       selector: `[${TARGET_ATTRIBUTE}="${value}"]`,
     },

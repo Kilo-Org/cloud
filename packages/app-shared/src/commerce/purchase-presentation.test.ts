@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { mapKiloPassStatusToClass, resolvePurchasePresentation } from './purchase-presentation';
+import {
+  mapKiloPassStatusToClass,
+  resolvePurchasePresentation,
+  type PurchasePresentationCta,
+} from './purchase-presentation';
 
 describe('resolvePurchasePresentation', () => {
   it('marks iOS credits unavailable with no CTA', () => {
@@ -110,6 +114,16 @@ describe('resolvePurchasePresentation', () => {
     });
 
     expect(result.program).toBeNull();
+  });
+
+  it('types a CTA as the readonly pairings the resolver produces', () => {
+    expectTypeOf<PurchasePresentationCta>().toEqualTypeOf<
+      | { readonly action: 'none'; readonly webPath: null }
+      | { readonly action: 'open_web'; readonly webPath: string }
+    >();
+    // The two pairings the doc rules out must stay unassignable.
+    expectTypeOf<{ action: 'none'; webPath: '/credits' }>().not.toExtend<PurchasePresentationCta>();
+    expectTypeOf<{ action: 'open_web'; webPath: null }>().not.toExtend<PurchasePresentationCta>();
   });
 });
 

@@ -1,5 +1,5 @@
 {
-  "id": "f7b16a7b-c563-4ada-8f31-01cff921da78",
+  "id": "0f39c3d4-247e-4a46-84c2-278a79f1796c",
   "prevId": "94d4960b-0408-4b0c-97bb-f56ae7534e12",
   "version": "7",
   "dialect": "postgresql",
@@ -1765,6 +1765,25 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "delivery": {
+          "name": "delivery",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'env'"
+        },
+        "allowed_hosts": {
+          "name": "allowed_hosts",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "injection_locations": {
+          "name": "injection_locations",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -6710,6 +6729,25 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "delivery": {
+          "name": "delivery",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'env'"
+        },
+        "allowed_hosts": {
+          "name": "allowed_hosts",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "injection_locations": {
+          "name": "injection_locations",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -28533,13 +28571,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "trial_granted": {
-          "name": "trial_granted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "company_domain": {
           "name": "company_domain",

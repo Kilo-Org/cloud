@@ -69,8 +69,8 @@ describe('SectionHeader mounted layout', () => {
       node => Object.is(node.type, 'Text') && node.children.includes('Live now')
     );
 
-    // The Latin display treatment is LTR-only (home-ar-loading) and is
-    // asserted per direction by the letterspacing test below.
+    // The display treatment follows the copy's script (home-ar-loading) and is
+    // asserted by the letterspacing test below.
     expect((label.props.className as string).split(' ')).toEqual(
       expect.arrayContaining([
         'grow',
@@ -211,40 +211,48 @@ describe('SectionHeader mounted layout', () => {
     }
   );
 
-  // Finding home-ar-loading: the Arabic section labels carried the Latin
-  // uppercase letter-spacing, whose glyph gaps break a cursive script's joins
-  // ('ال جلسا ت'). The display treatment is LTR-only.
+  // The display treatment belongs to the copy's script, not to the interface
+  // direction: Latin copy keeps the capitals and tracking in either direction,
+  // while right-to-left script copy drops them inside an RTL interface. The
+  // header's label and its action take the same rule (`keepsLatinDisplay`), so
+  // the two labels of one row cannot drift apart (home-ar-loading; design gate,
+  // section header actions in the rtl cell).
   it.each([
-    { isRTL: false, tracked: true },
-    { isRTL: true, tracked: false },
-  ])('letterspaces the section labels only outside RTL (RTL=$isRTL)', ({ isRTL, tracked }) => {
-    i18nManager.isRTL = isRTL;
-    const root = mount(
-      createElement(SectionHeader, {
-        label: 'الجلسات الجارية الآن',
-        actionLabel: 'عرض الكل',
-        onActionPress: () => undefined,
-      })
-    );
-    const action = root.findByProps({ accessibilityRole: 'button' });
-    const text = action.find(node => Object.is(node.type, 'Text'));
-    const label = root.find(
-      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
-    );
+    { isRTL: false, label: 'Sessions running now', action: 'See all', tracked: true },
+    { isRTL: true, label: 'Sessions running now', action: 'See all', tracked: true },
+    { isRTL: false, label: 'الجلسات الجارية الآن', action: 'عرض الكل', tracked: true },
+    { isRTL: true, label: 'الجلسات الجارية الآن', action: 'عرض الكل', tracked: false },
+  ])(
+    'letterspaces copy by script, never by direction alone (RTL=$isRTL)',
+    ({ isRTL, label, action, tracked }) => {
+      i18nManager.isRTL = isRTL;
+      const root = mount(
+        createElement(SectionHeader, {
+          label,
+          actionLabel: action,
+          onActionPress: () => undefined,
+        })
+      );
+      const actionButton = root.findByProps({ accessibilityRole: 'button' });
+      const actionText = actionButton.find(node => Object.is(node.type, 'Text'));
+      const labelText = root.find(
+        node => Object.is(node.type, 'Text') && node.children.includes(label)
+      );
 
-    for (const node of [label, text]) {
-      const classes = (node.props.className as string).split(' ');
-      if (tracked) {
-        expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
-      } else {
-        expect(classes).not.toContain('uppercase');
-        expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+      for (const node of [labelText, actionText]) {
+        const classes = (node.props.className as string).split(' ');
+        if (tracked) {
+          expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+        } else {
+          expect(classes).not.toContain('uppercase');
+          expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+        }
       }
     }
-  });
+  );
 
-  // The action's display treatment intentionally branches on direction (the
-  // LTR-only letterspacing); the layout must not.
+  // The action's display treatment follows the copy's script, not the direction
+  // (see the letterspacing test above); the layout must not branch at all.
   it('does not branch the action layout on direction', () => {
     function actionLayout(isRTL: boolean) {
       i18nManager.isRTL = isRTL;

@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
@@ -102,6 +103,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   } = props;
   const pending = usePendingReview();
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   const { confirm, dialog } = useConfirmDialog();
   const createComment = useCreateReviewCommentMutation(prRef ?? { owner, repo, number });
   const isEdit = mode.kind === 'edit';
@@ -447,38 +449,40 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className={SCREEN_BODY_CLASS}>
-          <ContextPreview
-            selection={selection}
-            fallbackPath={path}
-            fallbackLineLabel={lineRangeLabel}
-            preferFallback={isEdit}
-          />
-          <View className="gap-1">
-            <Text className="text-sm font-medium text-foreground">
-              {t('prReview.composer.commentBody')}
-            </Text>
-            {isEdit || draft.settled ? (
-              <CommentBodyField
-                inputRef={bodyInputRef}
-                isDisabled={isSubmitting}
-                defaultValue={bodyRef.current}
-                onChangeText={handleBodyChange}
-              />
-            ) : (
-              // Reserve the field's own box while the durable draft loads, so
-              // the footer below does not jump when the field mounts.
-              <View
-                className={
-                  keyboardVisible
-                    ? 'min-h-12 rounded-md border border-transparent'
-                    : 'min-h-14 rounded-md border border-transparent'
-                }
-              />
-            )}
-            {suggestionControl}
+        <View style={sideInsetStyle}>
+          <View className={SCREEN_BODY_CLASS}>
+            <ContextPreview
+              selection={selection}
+              fallbackPath={path}
+              fallbackLineLabel={lineRangeLabel}
+              preferFallback={isEdit}
+            />
+            <View className="gap-1">
+              <Text className="text-sm font-medium text-foreground">
+                {t('prReview.composer.commentBody')}
+              </Text>
+              {isEdit || draft.settled ? (
+                <CommentBodyField
+                  inputRef={bodyInputRef}
+                  isDisabled={isSubmitting}
+                  defaultValue={bodyRef.current}
+                  onChangeText={handleBodyChange}
+                />
+              ) : (
+                // Reserve the field's own box while the durable draft loads, so
+                // the footer below does not jump when the field mounts.
+                <View
+                  className={
+                    keyboardVisible
+                      ? 'min-h-12 rounded-md border border-transparent'
+                      : 'min-h-14 rounded-md border border-transparent'
+                  }
+                />
+              )}
+              {suggestionControl}
+            </View>
+            <ComposerInlineError feedback={feedback} />
           </View>
-          <ComposerInlineError feedback={feedback} />
         </View>
 
         <ComposerFooter

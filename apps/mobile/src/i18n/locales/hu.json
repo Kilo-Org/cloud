@@ -19,7 +19,9 @@
     "presenceStatus": "Gazdagépek: {{connection}}",
     "commandStatus": "Parancs kézbesítése: {{status}}",
     "delivered": "Kézbesítve",
-    "expired": "Lejárt"
+    "expired": "Lejárt",
+    "recoveryGaps_one": "{{displayCount}} rész hiányzik ebből az átiratból.",
+    "recoveryGaps_other": "{{displayCount}} rész hiányzik ebből az átiratból."
   },
   "common": {
     "manageOnWeb": "Kezelés a weben",
@@ -138,6 +140,7 @@
     "keepRunning": "Futtatás folytatása",
     "newSession": "Új munkamenet",
     "noModelsAvailable": "Nem érhetők el modellek",
+    "modelRetires": "Kivezetés: {{date}}",
     "notFound": "Nem található",
     "online": "Elérhető",
     "open": "{{name}} megnyitása",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
     "privateRepositoryA11y": "{{name}}, magán adattár",
     "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el.",
-    "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra."
+    "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra.",
+    "organizationTrialEndedBillingAtKiloAi": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
+    "viewOnGitHub": "PR megtekintése a GitHubon"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -275,6 +280,9 @@
     "credits": "Kreditek",
     "failedToLoadBalance": "Nem sikerült betölteni az egyenleget. Az újrapróbáláshoz koppints.",
     "balanceLoadFailed": "Nem tölthető be az egyenleg",
+    "balanceUnreachable": "A kiszolgáló nem érhető el. Próbáld újra.",
+    "balanceAccessDenied": "Nincs jogosultságod megtekinteni ezt az egyenleget.",
+    "balanceUnavailable": "Az egyenleg betöltése nem sikerült.",
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
@@ -505,7 +513,7 @@
     "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
       "signIn": "Bejelentkezés",
-      "profileOrganizations": "Profil és szervezetek"
+      "profileOrganizations": "Profil & szervezetek"
     }
   },
   "preferences": {
@@ -746,6 +754,9 @@
       "comment_one": "1 hozzászólás",
       "comment": "{{displayCount}} hozzászólás",
       "comment_other": "{{displayCount}} hozzászólás",
+      "conversationTruncated": "Csak az első {{displayCount}} hozzászólás látható.",
+      "conversationTruncated_one": "Csak az első {{displayCount}} hozzászólás látható.",
+      "conversationTruncated_other": "Csak az első {{displayCount}} hozzászólás látható.",
       "startedRelative": " · kezdődött: {{relative}}",
       "couldNotLoadMore": "Nem sikerült betölteni a további hozzászólásokat.",
       "retryLoadingMore": "További hozzászólások betöltésének megismétlése",
@@ -879,7 +890,6 @@
       "noAccess": "Nincs hozzáférésed a tároló ellenőrzéseihez.",
       "couldNotLoad": "Nem sikerült betölteni az ellenőrzéseket.",
       "retryChecks": "Ellenőrzések betöltésének megismétlése",
-      "viewOnGitHub": "PR megtekintése a GitHubon",
       "noChecksReported": "Még nincs ellenőrzési eredmény",
       "passed": "{{displayCount}} sikeres",
       "passed_one": "{{displayCount}} sikeres",
@@ -934,9 +944,9 @@
       "checkFailedTitleGitLab": "Nem sikerült ellenőrizni a GitLab-kapcsolatot",
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
       "providerCheckFailedMessage": "Nem sikerült elérni a szolgáltatót. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
-      "reconnectTitle": "Újracsatlakozás a GitHubhoz",
-      "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
-      "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
+      "reconnectTitle": "Csatlakoztasd újra a GitHubot",
+      "reconnectTitleGitLab": "Csatlakoztasd újra a GitLabot",
+      "reconnectTitleBitbucket": "Csatlakoztasd újra a Bitbucketet",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
       "gitlabDescription": "Módosítási kérelmek ellenőrzése mobilon",
       "gitlabInstanceMismatchTitle": "A GitLab-kapcsolat egy másik példányhoz tartozik",
@@ -963,6 +973,8 @@
       "pendingComment": "elküldésre váró hozzászólás",
       "pendingComment_other": "elküldésre váró hozzászólás",
       "submitCountOfTotal": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
+      "submitCountOfTotal_one": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
+      "submitCountOfTotal_other": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
       "submitReview": "Ellenőrzés elküldése",
       "partialPostedFresh": "{{displayFreshCount}} hozzászólás elküldve. ",
       "partialPostedFresh_one": "{{displayFreshCount}} hozzászólás elküldve. ",
@@ -1387,7 +1399,7 @@
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "Az adattárankénti REVIEW.md utasításfájlok követése",
     "bitbucket": {
-      "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják."
+      "notConnectedReadOnlyPlan": "A szervezet próbaidőszaka lejárt, ezért a tulajdonosnak frissítenie kell a számlázást a kilo.ai oldalon."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
@@ -1396,7 +1408,7 @@
       "managedOnWebRepositories": "Válassza ki {{organization}} tárolóit a weben, számítógépről.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
-      "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, majd illeszd be a következő képernyőn.",
+      "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez, majd illeszd be a következő képernyőn.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
       "tokenPlaceholder": "Munkaterület-hozzáférési token",
       "tokenRefused": "A Bitbucket nem fogadta el ezt a munkaterület-hozzáférési tokent. Ellenőrizd, hogy rendelkezik-e a fenti jogosultságokkal, majd próbáld újra."
@@ -2788,6 +2800,8 @@
     "modelPicker": {
       "title": "Modell kiválasztása",
       "noModelsDescription": "Nincs kiválasztható modell.",
+      "allUnavailableTitle": "Egyetlen modell sem használható",
+      "allUnavailableDescription": "Adj hozzá egy szolgáltatói kulcsot, majd próbáld újra.",
       "favorites": "Kedvencek"
     },
     "modelSelector": {
@@ -3621,7 +3635,7 @@
     },
     "hub": {
       "renameTitle": "Szervezet átnevezése",
-      "renamePlaceholder": "Szervezet neve",
+      "renamePlaceholder": "Add meg a szervezet nevét",
       "balance": "Egyenleg",
       "plan": "Csomag",
       "planTeams": "Teams",
@@ -4847,12 +4861,15 @@
     "inputDescription": "Minden bemenetet átvizsgál az Enkrypt AI segítségével, beleértve az eszközök eredményeit is. Ha az Enkrypt nem érhető el, a kéréseket a rendszer elutasítás helyett átvizsgálás nélkül elküldi.",
     "outputTitle": "Kimeneti őrkorlátok",
     "outputDescription": "Az Enkrypt AI segítségével átvizsgálja a válaszokat, mielőtt a tagok megkapnák azokat. Kikapcsolva marad, hacsak be nem kapcsolja.",
+    "outputUnavailable": "A Kilo nem kapcsolta be a kimenet vizsgálatát ehhez a szervezethez, ezért a válaszokat nem ellenőrzi, és itt nincs mit beállítani. A kéréshez írjon a {{supportEmail}} címre.",
     "detectorsHint": "A Blokkolás elutasítja a megjelölt kérést. A Csak naplózás rögzíti, anélkül hogy késleltetné a kérést.",
     "detectorsHintOutput": "A Blokkolás meghiúsítja a megjelölt választ. A Csak naplózás rögzíti, anélkül hogy késleltetné a választ.",
     "choiceLog": "Csak naplózás",
     "applyTo": "Alkalmazás erre",
     "applyToAllMembers": "Minden tag",
     "applyKiloDefault": "A Kilo alapértelmezés alkalmazása",
+    "applyKiloDefaultEnglishNote": "A Kilo alapértelmezett szabályzatának szövege angolul van, mert a Kilo Gateway pontosan úgy alkalmazza, ahogy le van írva.",
+    "applyKiloDefaultReplaceMessage": "A Kilo alapértelmezett szabályzata angolul íródott, és lecseréli azt, amit a Szabályzatsértés alatt beállított. A szabályzat szövegmezőjébe beírt szöveg nem állítható vissza.",
     "invalidSavedTitle": "A mentett bemeneti detektorbeállítások nem olvashatók",
     "invalidSavedBody": "A kérések blokkolva vannak, amíg a bemeneti detektorokat újra nem menti. Az alábbi detektorok a Kilo alapértelmezésből indulnak.",
     "invalidSavedOutputTitle": "A mentett kimeneti detektorbeállítások nem olvashatók",
@@ -4987,6 +5004,8 @@
     "providersDescription": "Kapcsoljon ki egy szolgáltatót, hogy a Kilo ne irányítson hozzá kéréseket ennél a szervezetnél.",
     "providersNeedCatalog": "A szolgáltatók kapcsolói csak olvashatók maradnak, amíg a teljes modellkatalógus be nem töltődik. A szerkesztésükhöz koppintson fent az Újrapróbálkozás gombra.",
     "providersEmpty": "Nincs a keresésnek megfelelő szolgáltató.",
+    "providersNone": "Ennél a szervezetnél nem érhetők el szolgáltatók.",
+    "providersUnavailable": "A szolgáltatók listáját nem sikerült betölteni.",
     "allowAllShown": "Az összes megjelenített engedélyezése",
     "denyAllShown": "Az összes megjelenített letiltása",
     "gatewaysDescription": "A Kilo a modellkéréseket a Vercel AI Gateway vagy az OpenRouter használatával irányítja. A letiltott átjáró sikertelenné teszi ezeket a kéréseket.",

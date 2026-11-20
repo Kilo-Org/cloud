@@ -36,6 +36,11 @@ import {
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { isSecurityFindingAnalyzable, type SecurityFinding } from '@/lib/security-agent';
@@ -123,7 +128,8 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   // Only a delivered page may claim there are no open findings: a read that is
   // paused, never started, or whose pages were cleared has not answered. An
   // unsettled connectivity keeps the skeleton instead of naming the connection.
-  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const connectivity = useCommittedConnectivityStatus();
+  const connectivityKnown = connectivity !== 'unknown';
   const body = classifyListBody({
     rowCount: items.length,
     hasDeliveredData: (findings.data?.pages.length ?? 0) > 0,
@@ -133,6 +139,42 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     fetchStatus: findings.fetchStatus,
     connectivityKnown,
   });
+  // This screen reads through two calls (the repositories list and the rows),
+  // and either one failing leaves the reader with nothing to act on. One kind
+  // over BOTH failures names the surface once: the old shape drew a card per
+  // read, so a permission refusal showed two "Something went wrong" cards with
+  // a Retry that could only be refused again.
+  const failureErrors = [findings.error, repositories.error].filter(
+    (error): error is Error => error != null
+  );
+  const failureKind = classifyReadFailureKind({
+    errors: failureErrors,
+    isPaused: findings.fetchStatus === 'paused' && connectivityKnown,
+    connectivity,
+  });
+  const failureRetryable = readFailureKindIsRetryable(failureKind);
+  const failureVariant = readFailureKindVariant(failureKind);
+  // Which read left the screen with nothing: the rows own the body, the
+  // repositories only decorate the list. A repositories failure with rows or a
+  // settled empty list is a notice above them; either failure with nothing
+  // delivered owns the surface.
+  const findingsFailed = body.status === 'error';
+  const failureOwnsBody = findingsFailed;
+  const failureVisible = findingsFailed || repositories.isError;
+  // A retryable failure keeps the screen's own sentence, naming the read that
+  // failed. The other three take their copy from the variant alone, which names
+  // the refusal, the missing item, or the connection instead of blaming the
+  // server for all of them. `offline` is retryable but still takes the
+  // variant's copy: its description is the connection's own sentence, and
+  // overriding it would describe a missing network as a failed read.
+  const failureMessage =
+    failureKind === 'retryable'
+      ? t(
+          findingsFailed
+            ? 'securityAgent.findingList.couldNotLoad'
+            : 'common.couldNotLoadRepositories'
+        )
+      : undefined;
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
   // `renderItem` and `extraData` by identity before re-rendering a row.
@@ -200,15 +242,30 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         }
       />
 
-      {repositories.isError ? (
+      {/* ONE error surface for the screen. Both reads feed the same kind, so a
+          permission refusal never describes itself as a server fault and a
+          terminal failure offers no Retry. A failure with rows to show is a
+          notice above them; a failure with nothing to show owns the body. */}
+      {failureVisible && (
         <QueryError
-          placement="top"
-          inset="gutter"
-          message={t('common.couldNotLoadRepositories')}
-          onRetry={() => void repositories.refetch()}
-          isRetrying={repositories.isFetching}
+          variant={failureVariant}
+          placement={failureOwnsBody ? 'center' : 'top'}
+          inset={failureOwnsBody ? undefined : 'gutter'}
+          message={failureMessage}
+          onRetry={
+            failureRetryable
+              ? () => {
+                  void findings.refetch();
+                  if (repositories.isError) {
+                    void repositories.refetch();
+                  }
+                }
+              : undefined
+          }
+          isRetrying={findings.isFetching || repositories.isFetching}
+          refreshControl={failureOwnsBody ? refreshControl : undefined}
         />
-      ) : null}
+      )}
 
       {body.status === 'loading' && (
         <View style={[listStyle, sideInsetMarginStyle]}>
@@ -219,16 +276,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             <FindingListSkeletonRows />
           </View>
         </View>
-      )}
-
-      {body.status === 'error' && (
-        <QueryError
-          variant={body.cause === 'offline' ? 'offline' : 'neutral'}
-          message={t('securityAgent.findingList.couldNotLoad')}
-          onRetry={() => void findings.refetch()}
-          isRetrying={body.isRetrying}
-          refreshControl={refreshControl}
-        />
       )}
 
       {body.status === 'empty' && (

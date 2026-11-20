@@ -19,7 +19,11 @@
     "presenceStatus": "Vykdymo procesai: {{connection}}",
     "commandStatus": "Komandos pristatymas: {{status}}",
     "delivered": "Pristatyta",
-    "expired": "Galiojimas baigėsi"
+    "expired": "Galiojimas baigėsi",
+    "recoveryGaps_one": "Trūksta {{displayCount}} šio įrašo dalies.",
+    "recoveryGaps_few": "Trūksta {{displayCount}} šio įrašo dalių.",
+    "recoveryGaps_many": "Trūksta {{displayCount}} šio įrašo dalies.",
+    "recoveryGaps_other": "Trūksta {{displayCount}} šio įrašo dalių."
   },
   "common": {
     "manageOnWeb": "Tvarkyti žiniatinklyje",
@@ -138,6 +142,7 @@
     "keepRunning": "Tęsti vykdymą",
     "newSession": "Nauja sesija",
     "noModelsAvailable": "Nėra modelių",
+    "modelRetires": "Išimamas {{date}}",
     "notFound": "Nerasta",
     "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",
@@ -181,7 +186,9 @@
     "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
     "privateRepositoryA11y": "{{name}}, privati saugykla",
     "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba.",
-    "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą."
+    "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą.",
+    "organizationTrialEndedBillingAtKiloAi": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
+    "viewOnGitHub": "Peržiūrėti PR GitHub platformoje"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -275,6 +282,9 @@
     "credits": "Kreditai",
     "failedToLoadBalance": "Nepavyko įkelti likučio. Bakstelėkite, kad bandytumėte dar kartą.",
     "balanceLoadFailed": "Nepavyko įkelti likučio",
+    "balanceUnreachable": "Nepavyko prisijungti prie serverio. Bandykite dar kartą.",
+    "balanceAccessDenied": "Neturite teisės matyti šio likučio.",
+    "balanceUnavailable": "Likučio įkelti nepavyko.",
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
@@ -505,7 +515,7 @@
     "changelogFixesPolish": "Pataisymai ir patobulinimai visoje programėlėje.",
     "changelogAreas": {
       "signIn": "Prisijungimas",
-      "profileOrganizations": "Profilis ir organizacijos"
+      "profileOrganizations": "Profilis bei organizacijos"
     }
   },
   "preferences": {
@@ -770,6 +780,11 @@
       "couldNotLoadMore": "Nepavyko įkelti daugiau komentarų.",
       "retryLoadingMore": "Bandyti įkelti daugiau komentarų dar kartą",
       "loadMoreComments": "Įkelti daugiau komentarų",
+      "conversationTruncated": "Rodomi tik pirmieji {{displayCount}} komentarai.",
+      "conversationTruncated_one": "Rodomi tik pirmieji {{displayCount}} komentarai.",
+      "conversationTruncated_few": "Rodomi tik pirmieji {{displayCount}} komentarai.",
+      "conversationTruncated_many": "Rodomi tik pirmieji {{displayCount}} komentarai.",
+      "conversationTruncated_other": "Rodomi tik pirmieji {{displayCount}} komentarai.",
       "addReaction": "Pridėti reakciją",
       "reactionPill": "{{emoji}} reakcija, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
@@ -905,7 +920,6 @@
       "noAccess": "Neturi prieigos prie šios saugyklos patikrinimų.",
       "couldNotLoad": "Nepavyko įkelti patikrinimų.",
       "retryChecks": "Pakartoti patikrinimus",
-      "viewOnGitHub": "Peržiūrėti PR GitHub platformoje",
       "noChecksReported": "Patikrinimų duomenų nėra",
       "passed": "sėkminga: {{displayCount}}",
       "passed_one": "sėkminga: {{displayCount}}",
@@ -997,6 +1011,10 @@
       "pendingComment": "nepateiktų komentarų",
       "pendingComment_other": "nepateiktų komentarų",
       "submitCountOfTotal": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
+      "submitCountOfTotal_one": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
+      "submitCountOfTotal_few": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
+      "submitCountOfTotal_many": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
+      "submitCountOfTotal_other": "Pateikti {{displayFreshCount}} iš {{displayTotalCount}} komentarų",
       "submitReview": "Pateikti peržiūrą",
       "partialPostedFresh": "Paskelbtų komentarų: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Paskelbtų komentarų: {{displayFreshCount}}. ",
@@ -1435,7 +1453,7 @@
     "followReviewMd": "Laikytis REVIEW.md instrukcijų",
     "followReviewMdSubtitle": "Laikytis kiekvienos saugyklos REVIEW.md faile pateiktų instrukcijų",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai."
+      "notConnectedReadOnlyPlan": "Organizacijos bandomasis laikotarpis baigėsi, todėl savininkas turi atnaujinti atsiskaitymą adresu kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
@@ -1444,7 +1462,7 @@
       "managedOnWebRepositories": "Pasirinkite {{organization}} saugyklas žiniatinklyje naudodami kompiuterį.",
       "description": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "descriptionReconnect": "Sukurk naują {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
-      "descriptionOverview": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį kitame ekrane.",
+      "descriptionOverview": "Sukurk darbo srities prieigos raktą ir įklijuok jį kitame ekrane.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
       "tokenPlaceholder": "Darbo srities prieigos raktas",
       "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
@@ -2888,6 +2906,8 @@
     "modelPicker": {
       "title": "Modelio pasirinkimas",
       "noModelsDescription": "Nėra modelių, kuriuos galėtumėte pasirinkti.",
+      "allUnavailableTitle": "Nė vieno modelio negalima naudoti",
+      "allUnavailableDescription": "Pridėkite teikėjo raktą ir bandykite dar kartą.",
       "favorites": "Mėgstamiausi"
     },
     "modelSelector": {
@@ -3741,7 +3761,7 @@
     },
     "hub": {
       "renameTitle": "Pervadinti organizaciją",
-      "renamePlaceholder": "Organizacijos pavadinimas",
+      "renamePlaceholder": "Įveskite organizacijos pavadinimą",
       "balance": "Likutis",
       "plan": "Planas",
       "planTeams": "Teams",
@@ -4999,12 +5019,15 @@
     "inputDescription": "Kiekviena įvestis nuskaitoma naudojant Enkrypt AI, įskaitant įrankių rezultatus. Kai Enkrypt nepasiekiamas, užklausos siunčiamos nenuskaitytos, užuot buvusios atmestos.",
     "outputTitle": "Išvesties apsaugos priemonės",
     "outputDescription": "Atsakymai nuskaitomi naudojant Enkrypt AI, kol nariai jų negauna. Išjungta, nebent įjungsite.",
+    "outputUnavailable": "„Kilo“ šiai organizacijai neįjungė išvesties nuskaitymo, todėl atsakymai netikrinami ir čia nėra ko nustatyti. Kad to paprašytumėte, susisiekite su {{supportEmail}}.",
     "detectorsHint": "Parinktis „Blokuoti“ atmeta pažymėtą užklausą. Parinktis „Tik registruoti“ ją įrašo nevilkdama užklausos.",
     "detectorsHintOutput": "Parinktis „Blokuoti“ blokuoja pažymėtą atsakymą. Parinktis „Tik registruoti“ jį įrašo nevilkdama atsakymo.",
     "choiceLog": "Tik registruoti",
     "applyTo": "Taikyti",
     "applyToAllMembers": "Visiems nariams",
     "applyKiloDefault": "Taikyti „Kilo“ numatytąjį",
+    "applyKiloDefaultEnglishNote": "„Kilo“ numatytosios politikos tekstas yra anglų kalba, nes „Kilo Gateway“ ją taiko tiksliai taip, kaip parašyta.",
+    "applyKiloDefaultReplaceMessage": "„Kilo“ numatytoji politika parašyta anglų kalba ir pakeičia tai, ką nustatėte skiltyje Politikos pažeidimas. Politikos teksto lauke įvesto teksto atkurti negalima.",
     "invalidSavedTitle": "Nepavyksta nuskaityti išsaugotų įvesties detektorių nustatymų",
     "invalidSavedBody": "Užklausos blokuojamos, kol įvesties detektoriai vėl bus išsaugoti. Toliau nurodyti detektoriai pradedami nuo „Kilo“ numatytųjų nustatymų.",
     "invalidSavedOutputTitle": "Nepavyksta nuskaityti išsaugotų išvesties detektorių nustatymų",
@@ -5139,6 +5162,8 @@
     "providersDescription": "Išjunkite teikėją, kad Kilo nebesiųstų jam užklausų šioje organizacijoje.",
     "providersNeedCatalog": "Teikėjų jungikliai lieka tik skaitomi, kol neįkeliamas visas modelių katalogas. Norėdami juos redaguoti, viršuje bakstelėkite Bandyti dar kartą.",
     "providersEmpty": "Nė vienas teikėjas neatitinka šios paieškos.",
+    "providersNone": "Šioje organizacijoje nėra prieinamų teikėjų.",
+    "providersUnavailable": "Nepavyko įkelti teikėjų sąrašo.",
     "allowAllShown": "Leisti visus rodomus",
     "denyAllShown": "Drausti visus rodomus",
     "gatewaysDescription": "Kilo nukreipia modelių užklausas per Vercel AI Gateway arba OpenRouter. Kai vartai išjungti, tos užklausos nepavyksta.",

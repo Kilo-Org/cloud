@@ -28,18 +28,22 @@
  * can no longer desynchronise a rule or hide the call sites after it.
  *
  * The mobile layout contract's rules are the table below: `LAYOUT_RULES` holds
- * each rule's id (the id a diagnostic and the baseline key carry), what it
- * bans, and the primitive that replaces it; `LAYOUT_ALLOWLIST` names the
- * modules that own the scale and may write those values. Those two constants
- * are the only description of the layout rules — retarget, rename or relax a
- * rule there, not in the checks that read it.
+ * each rule's id (the id a diagnostic and the baseline key carry), the detector
+ * that finds it, and the primitive that replaces it; `LAYOUT_ALLOWLIST` names
+ * the modules that own the scale and may write those values. Those two
+ * constants are the only description of the layout rules: `checkLayout`
+ * dispatches over the table and builds each diagnostic from the entry it
+ * dispatched from, so a rule's id is written once, in the table. Retarget,
+ * rename or relax a rule there, not in the checks that read it.
  *
  * A violation that already existed when the rules landed stays admitted by
  * `tools/nativewind/layout-baseline.json` (file path → count per rule). A file
  * may never exceed its baseline count, and an entry the file is now below is
  * reported with the line to lower or delete, so the baseline only shrinks and
  * at the end of the migration it is empty. Regenerate it with
- * `--write-layout-baseline` only after the violations themselves are gone.
+ * `--write-layout-baseline` only after the violations themselves are gone, and
+ * the rewrite refuses a run that could not read the theme or could not read or
+ * parse a walked file: those counts are short by what the run never saw.
  *
  * Usage: node tools/nativewind/check-classes.mjs [--write-layout-baseline]
  */
@@ -85,13 +89,25 @@ const LAYOUT_ALLOWLIST = [
 const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
 
 /**
- * The layout contract's rules. `patterns` read one class string (a `className`,
- * a `cn()` argument, a `*_CLASS` constant) and carry the offending class in the
- * diagnostic; a rule without `patterns` reads markup and names what it found.
- * `advice` is the primitive the contract names for the concern, so every
- * diagnostic points at the replacement instead of restating the ban.
+ * The layout contract's rules. Each entry states one rule once: `id` (the id a
+ * diagnostic and the baseline key carry) and `advice` (the primitive the
+ * contract names for the concern, so every diagnostic points at the replacement
+ * instead of restating the ban), plus exactly one detector:
+ *
+ * - `patterns` read one class string (a `className`, a `cn()` argument, a
+ *   `*_CLASS` constant) and carry the offending class in the diagnostic.
+ * - `detectSurface` reads one laid-out class surface: it receives the `group`
+ *   holding that surface's chunks and names what it found.
+ * - `detect` reads the whole file, for a rule whose ban is a shape rather than
+ *   a class string, and names what it found.
+ *
+ * `checkLayout` calls the detector each entry carries, so the dispatch below
+ * needs no rule-specific code and a rule's id exists only in the table.
+ *
+ * Exported for the structural test that keeps this promise: an entry without a
+ * detector, a duplicated id, or a second detector on one entry fails there.
  */
-const LAYOUT_RULES = [
+export const LAYOUT_RULES = [
   {
     id: 'L1',
     patterns: [
@@ -112,6 +128,7 @@ const LAYOUT_RULES = [
     id: 'L2',
     advice:
       'use SCREEN_BODY_CLASS from @/lib/layout (gutter px-4) for the scroll body, and leave ScreenHeader/SheetHeader their own gutter',
+    detect: detectScrollGutters,
   },
   {
     id: 'L3',
@@ -120,6 +137,7 @@ const LAYOUT_RULES = [
   },
   {
     id: 'L4',
+    detectSurface: detectCardSurface,
     advice: 'use Card, RowGroup or a row primitive for the surface',
   },
   {
@@ -129,10 +147,12 @@ const LAYOUT_RULES = [
   },
   {
     id: 'L6',
+    detect: detectInlineStyles,
     advice: 'use the layout classes or the constants in @/lib/layout',
   },
   {
     id: 'L7',
+    detect: detectRowChevrons,
     advice: 'use RowChevron or a row primitive',
   },
   {
@@ -151,14 +171,17 @@ const LAYOUT_RULES = [
     id: 'L9',
     advice:
       'a row divider is border-hair-soft at 0.5pt; use RowGroup/RowGroupItem/RowFrame, or border-hair-soft directly',
+    detectSurface: detectDivider,
   },
   {
     id: 'L10',
     advice:
       'use title with titleAccessory; titleContent replaces the title node and re-spells its typography',
+    detect: detectTitleContent,
   },
   {
     id: 'L11',
+    detect: detectSheetHeader,
     advice: 'render SheetHeader as the first child of every Sheet, so the sheet has its title row',
   },
   {
@@ -176,23 +199,15 @@ const LAYOUT_RULES = [
   },
   {
     id: 'L13',
+    detect: detectStateActionButtons,
     advice:
       'fill a state\u2019s action slot with StateAction from @/components/empty-state; a Button there re-decides the state action\u2019s frame, icon spacing and 48pt floor',
   },
 ];
 
-/** One rule from the table above, by id. */
-function layoutRule(id) {
-  const rule = LAYOUT_RULES.find(candidate => candidate.id === id);
-  if (rule === undefined) {
-    throw new Error(`check-classes: layout rule ${id} is missing from LAYOUT_RULES`);
-  }
-  return rule;
-}
-
 /** One diagnostic for one rule, naming the class or prop it read. */
-function layoutProblem(relative, line, id, offending) {
-  return `${relative}:${line}: [${id}] "${offending}": ${layoutRule(id).advice}`;
+function layoutProblem(relative, line, rule, offending) {
+  return `${relative}:${line}: [${rule.id}] "${offending}": ${rule.advice}`;
 }
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */
@@ -353,8 +368,6 @@ function isScrollContainer(name) {
   return SCROLL_CONTAINERS.has(name.replace(/^Animated\./, ''));
 }
 
-const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
-
 /**
  * Every string chunk one syntax tree holds, with where each chunk starts in
  * the source text and the two readings of its content. These are the only
@@ -472,9 +485,7 @@ export function checkScrollPadding(relative, elements, chunks, text, lineOf) {
     if (!isScrollContainer(name)) {
       continue;
     }
-    const { tokens: padding } = classTokens(chunks, node, 'className', classes =>
-      HORIZONTAL_PADDING.test(classes)
-    );
+    const { tokens: padding } = classTokens(chunks, node, 'className', anyPadding);
     if (padding.length > 0) {
       const line = lineOf(node.start);
       problems.push(
@@ -705,10 +716,14 @@ const CENTERED_BODIES = new Set(['CenteredState']);
 const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
 
 /**
- * The utility part of one class token, with any variant prefix removed. A
- * variant (`md:`, `landscape:`, `ios:`) selects when the utility applies, not
- * what it does, so the inset rules read the same padding a bare token writes —
+ * The utility part of one class token, with any variant prefix and the token's
+ * leading `!` removed. A variant (`md:`, `landscape:`, `ios:`) selects when the
+ * utility applies and `!` only raises its specificity, so neither changes what
+ * the utility does: the inset rules read the same padding a bare token writes —
  * the same way L12's lookbehind sees a variant-prefixed `px-6`.
+ * `checkScrollPadding` reads `anyPadding` here for the same reason the L2
+ * gutter rule does: a prefixed `ios:px-4` insets the content exactly as a bare
+ * `px-4` does.
  */
 function utilityOf(token) {
   const segments = token.split(':');
@@ -737,7 +752,7 @@ function anyPadding(token) {
  * contract fixed, and the header's own gutter is what the next screen lines up
  * against.
  */
-function checkScrollGutters(relative, program, chunks, text, lineOf) {
+function detectScrollGutters({ program, chunks, text, lineOf }) {
   const problems = [];
   walk(program, node => {
     if (node.type !== 'JSXOpeningElement') {
@@ -759,14 +774,10 @@ function checkScrollGutters(relative, program, chunks, text, lineOf) {
       gutter === 'className' ? anyPadding(classes) : wrongGutter(classes)
     );
     for (const token of tokens) {
-      problems.push(
-        layoutProblem(
-          relative,
-          lineOf(attribute.start),
-          'L2',
-          `${token} on <${tagName(node, text)}> ${gutter}`
-        )
-      );
+      problems.push({
+        line: lineOf(attribute.start),
+        offending: `${token} on <${tagName(node, text)}> ${gutter}`,
+      });
     }
   });
   return problems;
@@ -781,14 +792,14 @@ function checkScrollGutters(relative, program, chunks, text, lineOf) {
 const CARD_SURFACE = /(?<![\w-])bg-(?:secondary|card)(?![\w-])/;
 const CARD_RADIUS = /(?<![\w-])rounded-(?:(?:t|b|l|r|tl|tr|bl|br)-)?(?:md|lg|xl|2xl|3xl)(?![\w-])/;
 
-function cardSurfaceProblem(relative, group, lineOf) {
+function detectCardSurface({ lineOf, group }) {
   const classes = group.chunks.map(chunk => chunk.value).join(' ');
   const surface = CARD_SURFACE.exec(classes);
   const radius = CARD_RADIUS.exec(classes);
   if (surface === null || radius === null) {
-    return null;
+    return [];
   }
-  return layoutProblem(relative, lineOf(group.start), 'L4', `${surface[0]} ${radius[0]}`);
+  return [{ line: lineOf(group.start), offending: `${surface[0]} ${radius[0]}` }];
 }
 
 /**
@@ -799,13 +810,13 @@ function cardSurfaceProblem(relative, group, lineOf) {
 const DIVIDER_SIDE = /(?<![\w-])border-(?:b|t)(?:-(?:\d+|\[[^\]\s]+\]))?(?![\w-])/;
 const DIVIDER_COLOUR = /(?<![\w-])border-border(?![\w-])/;
 
-function dividerProblem(relative, group, lineOf) {
+function detectDivider({ lineOf, group }) {
   const classes = group.chunks.map(chunk => chunk.value).join(' ');
   const side = DIVIDER_SIDE.exec(classes);
   if (side === null || !DIVIDER_COLOUR.test(classes)) {
-    return null;
+    return [];
   }
-  return layoutProblem(relative, lineOf(group.start), 'L9', `${side[0]} border-border`);
+  return [{ line: lineOf(group.start), offending: `${side[0]} border-border` }];
 }
 
 /**
@@ -850,7 +861,7 @@ function styleObjects(value) {
     .filter(element => element.type === 'ObjectExpression');
 }
 
-function checkInlineStyles(relative, program, text, lineOf) {
+function detectInlineStyles({ program, text, lineOf }) {
   const problems = [];
   walk(program, node => {
     if (node.type !== 'JSXOpeningElement') {
@@ -881,7 +892,7 @@ function checkInlineStyles(relative, program, text, lineOf) {
             continue;
           }
           const written = text.slice(property.key.start, property.value.end).replace(/\s+/g, ' ');
-          problems.push(layoutProblem(relative, lineOf(property.start), 'L6', written));
+          problems.push({ line: lineOf(property.start), offending: written });
         }
       }
     }
@@ -897,7 +908,7 @@ function checkInlineStyles(relative, program, text, lineOf) {
 const ROW_CHEVRON_MODULES = new Set(['@/components/ui/directional-icons', '@/components/ui/icons']);
 const ROW_CHEVRON_NAMES = new Set(['ChevronRight', 'DirectionalChevronRight']);
 
-function checkRowChevrons(relative, program, lineOf) {
+function detectRowChevrons({ program, lineOf }) {
   const problems = [];
   walk(program, node => {
     if (node.type !== 'ImportDeclaration' || node.importKind === 'type') {
@@ -912,7 +923,7 @@ function checkRowChevrons(relative, program, lineOf) {
       }
       const name = importedName(specifier.imported);
       if (ROW_CHEVRON_NAMES.has(name)) {
-        problems.push(layoutProblem(relative, lineOf(specifier.start), 'L7', name));
+        problems.push({ line: lineOf(specifier.start), offending: name });
       }
     }
   });
@@ -931,7 +942,7 @@ const TITLE_CONTENT_ALLOWLIST = new Set([
   'apps/mobile/src/components/profiles/profile-overview-screen.tsx',
 ]);
 
-function checkTitleContent(relative, program, lineOf) {
+function detectTitleContent({ relative, program, lineOf }) {
   if (TITLE_CONTENT_ALLOWLIST.has(relative)) {
     return [];
   }
@@ -942,7 +953,7 @@ function checkTitleContent(relative, program, lineOf) {
       node.name.type === 'JSXIdentifier' &&
       node.name.name === 'titleContent'
     ) {
-      problems.push(layoutProblem(relative, lineOf(node.start), 'L10', 'titleContent'));
+      problems.push({ line: lineOf(node.start), offending: 'titleContent' });
     }
   });
   return problems;
@@ -1014,7 +1025,7 @@ function localComponentDrawsHeader(name, text, components, visited) {
   );
 }
 
-function checkSheetHeader(relative, program, text, lineOf) {
+function detectSheetHeader({ relative, program, text, lineOf }) {
   if (SHEET_ALLOWLIST.has(relative)) {
     return [];
   }
@@ -1049,12 +1060,12 @@ function checkSheetHeader(relative, program, text, lineOf) {
     if (!sheetNames.has(name)) {
       return;
     }
-    // The header belongs to this sheet's own subtree. A file-level flag would
-    // let a second, headerless sheet pass on the first one's header; a nested
-    // sheet's header must not count for the sheet that contains it either.
+    // The header belongs to this sheet's own subtree: a header inside a nested
+    // sheet is that sheet's, not this one's, and the same nesting rule serves
+    // both a literal SheetHeader and a local component that draws one.
     const headers = [];
-    const nested = [];
     const candidates = [];
+    const nested = [];
     walk(node, descendant => {
       if (descendant === node) {
         return;
@@ -1069,19 +1080,22 @@ function checkSheetHeader(relative, program, text, lineOf) {
         if (tag === 'SheetHeader') {
           headers.push(descendant.start);
         } else if (components.has(tag)) {
-          candidates.push(tag);
+          candidates.push({ tag, start: descendant.start });
         }
       }
     });
+    const outsideNested = start => !nested.some(child => start > child.start && start < child.end);
     const header =
-      headers.some(start => !nested.some(child => start > child.start && start < child.end)) ||
+      headers.some(outsideNested) ||
       // A sheet whose body is a local component (`<SessionFilterContent />`)
       // can draw its header there; follow the component it renders.
-      candidates.some(candidate =>
-        localComponentDrawsHeader(candidate, text, components, new Set())
+      candidates.some(
+        candidate =>
+          outsideNested(candidate.start) &&
+          localComponentDrawsHeader(candidate.tag, text, components, new Set())
       );
     if (!header) {
-      problems.push(layoutProblem(relative, lineOf(node.start), 'L11', `<${name}>`));
+      problems.push({ line: lineOf(node.start), offending: `<${name}>` });
     }
   });
   return problems;
@@ -1109,7 +1123,7 @@ function stateActionButton(expression, text) {
   return found;
 }
 
-function checkStateActionButtons(relative, program, text, lineOf) {
+function detectStateActionButtons({ program, text, lineOf }) {
   const problems = [];
   walk(program, node => {
     if (node.type !== 'JSXOpeningElement' || !STATE_ACTION_TAGS.has(tagName(node, text))) {
@@ -1128,7 +1142,7 @@ function checkStateActionButtons(relative, program, text, lineOf) {
       }
       const button = stateActionButton(attribute.value.expression, text);
       if (button !== null) {
-        problems.push(layoutProblem(relative, lineOf(button.start), 'L13', '<Button>'));
+        problems.push({ line: lineOf(button.start), offending: '<Button>' });
       }
     }
   });
@@ -1156,36 +1170,36 @@ export function checkLayout(relative, program, chunks, text, lineOf) {
     return [];
   }
   const problems = [];
+  const format = (rule, findings) =>
+    findings.map(finding => layoutProblem(relative, finding.line, rule, finding.offending));
   // Each chunk belongs to exactly one group: `layoutGroups` filters every
-  // candidate through its `covered` set and records what it hands out, so a
-  // second guard here would only restate that invariant in another place.
+  // candidate through its `covered` set and records what it hands out, so this
+  // dispatch reads each chunk once without a second guard of its own.
   for (const group of layoutGroups(program, text)) {
     for (const chunk of group.chunks) {
       for (const rule of LAYOUT_RULES) {
         for (const pattern of rule.patterns ?? []) {
           for (const match of chunk.value.matchAll(pattern)) {
             problems.push(
-              layoutProblem(relative, lineOf(chunk.start + match.index), rule.id, match[0])
+              layoutProblem(relative, lineOf(chunk.start + match.index), rule, match[0])
             );
           }
         }
       }
     }
-    const surface = cardSurfaceProblem(relative, group, lineOf);
-    if (surface !== null) {
-      problems.push(surface);
-    }
-    const divider = dividerProblem(relative, group, lineOf);
-    if (divider !== null) {
-      problems.push(divider);
+    for (const rule of LAYOUT_RULES) {
+      if (rule.detectSurface === undefined) {
+        continue;
+      }
+      problems.push(...format(rule, rule.detectSurface({ relative, text, lineOf, group })));
     }
   }
-  problems.push(...checkScrollGutters(relative, program, chunks, text, lineOf));
-  problems.push(...checkInlineStyles(relative, program, text, lineOf));
-  problems.push(...checkRowChevrons(relative, program, lineOf));
-  problems.push(...checkTitleContent(relative, program, lineOf));
-  problems.push(...checkSheetHeader(relative, program, text, lineOf));
-  problems.push(...checkStateActionButtons(relative, program, text, lineOf));
+  for (const rule of LAYOUT_RULES) {
+    if (rule.detect === undefined) {
+      continue;
+    }
+    problems.push(...format(rule, rule.detect({ relative, program, chunks, text, lineOf })));
+  }
   return problems;
 }
 
@@ -1546,23 +1560,45 @@ function compareLayoutBaseline(findings, baseline) {
   return [...reported, ...overCount, ...stale];
 }
 
-/** The whole audit: every source file, then the compiler pins, then the report. */
-function run() {
+/**
+ * The whole audit: every source file, then the compiler pins, then the report.
+ *
+ * `read` and `writeBaseline` exist so a test can drive one run without the
+ * process's own arguments: `read` is handed to the walk in place of the
+ * filesystem, and `writeBaseline` stands in for `--write-layout-baseline`.
+ */
+export function run({
+  read = readFileSync,
+  writeBaseline = process.argv.includes('--write-layout-baseline'),
+} = {}) {
   const problems = [];
+  // The walk's own per-file lines — a refused read, a parse error — kept apart
+  // from the rules' findings: no rule can report what it never read, so a run
+  // holding one of these has not audited the tree it walked.
+  const unaudited = [];
   const { failure: themeFailure } = themeTokens();
   for (const dir of SOURCE_DIRS) {
-    for (const entry of parseSourceTree(dir, ROOT, isTestArtifact)) {
+    for (const entry of parseSourceTree(dir, ROOT, isTestArtifact, read)) {
+      unaudited.push(...entry.problems);
       problems.push(...checkParsedFile(entry));
     }
   }
   const findings = layoutFindings(problems);
 
-  if (process.argv.includes('--write-layout-baseline')) {
-    // A run that could not read the theme must not rewrite the baseline as if
-    // it had audited the tree.
-    if (themeFailure !== null) {
-      console.error(themeFailure);
-      console.error('\ncheck-classes: 1 problem(s)');
+  if (writeBaseline) {
+    // A run that could not read the theme, or a walked file it could not read
+    // or parse, has not audited the tree: rewriting the baseline from it would
+    // record counts short by every file the run never saw, and the migration's
+    // floor would rise instead of shrink.
+    if (themeFailure !== null || unaudited.length > 0) {
+      if (themeFailure !== null) {
+        console.error(themeFailure);
+      }
+      for (const problem of unaudited) {
+        console.error(problem);
+      }
+      const count = unaudited.length + (themeFailure === null ? 0 : 1);
+      console.error(`\ncheck-classes: ${count} problem(s)`);
       process.exitCode = 1;
       return;
     }

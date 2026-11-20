@@ -188,7 +188,7 @@ describe('mapSummaryRow', () => {
 });
 
 describe('mapRunRow', () => {
-  it('maps a RunRow and attaches its summaries', () => {
+  it('maps a RunRow to the admin run shape', () => {
     const runRow = {
       id: 'run-abc',
       router: 'efficient' as const,
@@ -208,63 +208,20 @@ describe('mapRunRow', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       engine_identity: 'v1:deadbeef',
+      measurement_revision: 2,
       purpose: 'platform' as const,
     };
-    const summaries: BenchmarkModelSummary[] = [
-      {
-        model: 'openai/gpt-4o-mini',
-        routeKey: '*',
-        accuracy: 0.78,
-        avgCostUsd: 0.0002,
-        avgInputTokens: null,
-        avgCachedInputTokens: null,
-        avgOutputTokens: null,
-        avgReasoningTokens: null,
-        avgLatencyMs: 120,
-        p50LatencyMs: 110,
-        p95LatencyMs: null,
-        cases: 100,
-        errors: 5,
-        timeouts: 0,
-        routeAccuracy: null,
-      },
-    ];
-    const result = mapRunRow(runRow, summaries);
-    expect(result.id).toBe('run-abc');
-    expect(result.kind).toBe('classifier');
-    expect(result.status).toBe('completed');
-    expect(result.startedAt).toBe('2026-06-10T04:10:00.000Z');
-    expect(result.completedAt).toBe('2026-06-10T04:25:00.000Z');
-    expect(result.error).toBeNull();
-    expect(result.summaries).toHaveLength(1);
-    expect(result.summaries[0].model).toBe('openai/gpt-4o-mini');
-  });
-
-  it('attaches an empty summaries array when none are provided', () => {
-    const runRow = {
-      id: 'run-xyz',
-      router: 'efficient' as const,
-      accuracy_noise_band: 0.05,
-      frontier_min_accuracy_delta: 0,
-      kind: 'decider' as const,
-      status: 'running' as const,
-      started_at: '2026-06-11T05:10:00.000Z',
-      completed_at: null,
+    const result = mapRunRow(runRow);
+    expect(result).toEqual({
+      id: 'run-abc',
+      router: 'efficient',
+      kind: 'classifier',
+      purpose: 'platform',
+      status: 'completed',
+      startedAt: '2026-06-10T04:10:00.000Z',
+      completedAt: '2026-06-10T04:25:00.000Z',
       error: null,
-      min_accuracy: 0.7,
-      switch_cost_factor: 3,
-      best_accuracy_switch_threshold: 0.05,
-      max_concurrency: 4,
-      benchmark_user_id: null,
-      benchmark_org_id: null,
-      repetitions: 1,
-      classifier_max_p95_latency_ms: null,
-      engine_identity: 'v1:deadbeef',
-      purpose: 'platform' as const,
-    };
-    const result = mapRunRow(runRow, []);
-    expect(result.summaries).toEqual([]);
-    expect(result.completedAt).toBeNull();
+    });
   });
 });
 

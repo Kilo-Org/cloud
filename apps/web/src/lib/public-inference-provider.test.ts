@@ -103,6 +103,7 @@ describe('normalizePublicInferenceProvider', () => {
     ['openaichatgpt', 'OpenAI (ChatGPT)'],
     ['opencodego', 'OpenCode Go'],
     ['openinference', 'OpenInference'],
+    ['openrouter', 'OpenRouter'],
     ['orcarouter', 'OrcaRouter'],
     ['particle', 'Particle AI'],
     ['primeintellect', 'Prime Intellect'],

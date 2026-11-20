@@ -11,10 +11,9 @@ import {
   type ParseError,
 } from 'jsonc-parser';
 
-type AgentPolicy = Extract<OrganizationPermissionPolicy, { type: 'agent_permissions' }>;
-type ToolRule = NonNullable<AgentPolicy['data']['tools']>[string];
+type ToolRule = NonNullable<OrganizationPermissionPolicy['data']['tools']>[string];
 type PermissionRule = NonNullable<
-  NonNullable<AgentPolicy['data']['shell']>['bash']
+  NonNullable<OrganizationPermissionPolicy['data']['shell']>['bash']
 >['rules'][number];
 type ShellChoice = { kind: 'bash' | 'powershell'; fallback: 'ask' | 'deny' };
 
@@ -117,10 +116,6 @@ const policyFields = new Set([
   'pattern',
   'action',
   'fallback',
-  'mode',
-  'clients',
-  'feature',
-  'min_version',
 ]);
 
 function policyPath(path: PropertyKey[]): string {
@@ -136,25 +131,21 @@ function policyPath(path: PropertyKey[]): string {
 
 const safeSchemaMessages = new Set([
   'Control characters are not allowed',
-  'Duplicate client feature',
-  'Expected a SemVer version',
   'Invalid tool key',
   'Policy too large',
   'Too many tool permissions',
   'Use shell profiles for Bash command rules',
-  'Version must not contain surrounding whitespace',
 ]);
 
-function validatePolicy(
-  value: unknown,
-  policyType: OrganizationPermissionPolicy['type'],
-  warnings: string[] = []
-): Invalid | Valid {
+function validatePolicy(value: unknown, warnings: string[] = []): Invalid | Valid {
   const parsed = OrganizationPermissionPolicySchema.safeParse(value);
   if (!parsed.success) {
     const errors = parsed.error.issues.map(issue => {
       const location = policyPath(issue.path);
       if (safeSchemaMessages.has(issue.message)) return `${location}: ${issue.message}.`;
+      if (issue.code === 'invalid_value' && location === 'type') {
+        return 'type: Expected an agent_permissions policy document.';
+      }
       switch (issue.code) {
         case 'unrecognized_keys':
           return `${location}: Contains unsupported fields.`;
@@ -172,24 +163,20 @@ function validatePolicy(
     });
     return { status: 'invalid', errors: [...new Set(errors)] };
   }
-  if (parsed.data.type !== policyType) return invalid(`Expected a ${policyType} policy document.`);
   return { status: 'valid', policy: parsed.data, warnings };
 }
 
-function validateVersionedDocument(root: Node, policyType: OrganizationPermissionPolicy['type']) {
+function validateVersionedDocument(root: Node): Invalid | Valid {
   if (findNodeAtLocation(root, ['data', 'tools', '__proto__'])) {
     return invalid('data.tools: Contains an unsupported tool key.');
   }
-  return validatePolicy(getNodeValue(root), policyType);
+  return validatePolicy(getNodeValue(root));
 }
 
-export function parsePermissionPolicyDocument(
-  text: string,
-  policyType: OrganizationPermissionPolicy['type']
-): PermissionPolicyImportResult {
+export function parsePermissionPolicyDocument(text: string): Invalid | Valid {
   const document = parseDocument(text);
   if (document.status === 'invalid') return document;
-  return validateVersionedDocument(document.root, policyType);
+  return validateVersionedDocument(document.root);
 }
 
 function isAction(value: unknown): value is PermissionRule['action'] {
@@ -198,7 +185,6 @@ function isAction(value: unknown): value is PermissionRule['action'] {
 
 export function reviewPermissionPolicyImport(
   text: string,
-  policyType: OrganizationPermissionPolicy['type'],
   shell?: ShellChoice
 ): PermissionPolicyImportResult {
   const document = parseDocument(text);
@@ -206,10 +192,7 @@ export function reviewPermissionPolicyImport(
   const { root } = document;
   const config = new Map(objectEntries(root));
   if (config.has('type') || config.has('data') || config.has('schema_version')) {
-    return validateVersionedDocument(root, policyType);
-  }
-  if (policyType === 'client_access') {
-    return invalid('Client access can only be imported from a versioned policy document.');
+    return validateVersionedDocument(root);
   }
 
   const permission = config.get('permission');
@@ -276,11 +259,11 @@ export function reviewPermissionPolicyImport(
       'A wildcard stays in the ordered shell rules. It does not set the unmatched-command action.'
     );
   }
-  const policy: AgentPolicy = {
+  const policy: OrganizationPermissionPolicy = {
     type: 'agent_permissions',
     data: { schema_version: 1, ...(tools.length > 0 && { tools: Object.fromEntries(tools) }) },
   };
-  if (!shellRules) return validatePolicy(policy, policyType, warnings);
+  if (!shellRules) return validatePolicy(policy, warnings);
   if (
     shell &&
     ((shell.kind !== 'bash' && shell.kind !== 'powershell') ||
@@ -296,7 +279,6 @@ export function reviewPermissionPolicyImport(
       ...policy,
       data: { ...policy.data, shell: { [kind]: { fallback, rules: shellRules } } },
     },
-    policyType,
     warnings
   );
   if (shell) return resolved;
@@ -308,7 +290,7 @@ export function reviewPermissionPolicyImport(
       ),
     };
   }
-  const base = validatePolicy(policy, policyType, warnings);
+  const base = validatePolicy(policy, warnings);
   if (base.status === 'invalid') return base;
   return { status: 'needs-shell', policy: base.policy, rules: shellRules, warnings };
 }

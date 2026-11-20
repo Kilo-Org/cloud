@@ -9,13 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PolicyEditorFooter } from '../PolicyEditorFooter';
 import { AgentPermissionFields } from './AgentPermissionFields';
-import { ClientAccessFields } from './ClientAccessFields';
 import {
   parsePermissionPolicyDocument,
   reviewPermissionPolicyImport,
 } from './permission-policy-import';
 import {
-  permissionPolicyLabels,
   policyJson,
   PolicySelect,
   shellOptions,
@@ -37,22 +35,28 @@ export function PermissionPolicyEditor({
   onRemove,
   onClose,
 }: {
-  initial: PolicyDraft;
+  initial: OrganizationPermissionPolicy;
   inherited?: OrganizationPermissionPolicy;
   canEdit: boolean;
   lockReason: string;
   isSaving: boolean;
   isRemoving: boolean;
-  onSave: (policy: OrganizationPermissionPolicy) => void;
-  onRemove?: () => Promise<void>;
+  onSave: (policy: OrganizationPermissionPolicy) => Promise<boolean>;
+  onRemove?: () => Promise<boolean>;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState(initial);
+  const [edited, setEdited] = useState<PolicyDraft | null>(null);
+  const draft = edited ?? initial;
   const [jsonEditor, setJsonEditor] = useState<JsonEditor | null>(null);
   const validated = OrganizationPermissionPolicySchema.safeParse(draft);
   const busy = isSaving || isRemoving;
-  const hasChanges = policyJson(draft) !== policyJson(initial);
-  const canSave = canEdit && validated.success && !jsonEditor && !busy && hasChanges;
+  const canSave =
+    canEdit &&
+    !jsonEditor &&
+    !busy &&
+    edited !== null &&
+    validated.success &&
+    policyJson(validated.data) !== policyJson(initial);
 
   function exportPolicy() {
     if (!validated.success) return;
@@ -108,27 +112,19 @@ export function PermissionPolicyEditor({
           <PolicyJsonEditor
             key={jsonEditor.mode}
             editor={jsonEditor}
-            policyType={draft.type}
             onClose={() => setJsonEditor(null)}
             onApply={policy => {
-              setDraft(policy);
+              setEdited(policy);
               setJsonEditor(null);
               toast.success('Draft updated. Save policy to apply it.');
             }}
           />
-        ) : draft.type === 'agent_permissions' ? (
+        ) : (
           <AgentPermissionFields
             draft={draft.data}
-            inherited={inherited?.type === 'agent_permissions' ? inherited.data : undefined}
+            inherited={inherited?.data}
             disabled={!canEdit || busy}
-            onChange={data => setDraft({ type: 'agent_permissions', data })}
-          />
-        ) : (
-          <ClientAccessFields
-            draft={draft.data}
-            inherited={inherited?.type === 'client_access' ? inherited.data : undefined}
-            disabled={!canEdit || busy}
-            onChange={data => setDraft({ type: 'client_access', data })}
+            onChange={data => setEdited({ type: 'agent_permissions', data })}
           />
         )}
         {!jsonEditor && canEdit && !validated.success && (
@@ -138,9 +134,7 @@ export function PermissionPolicyEditor({
               const message =
                 issue.path.at(-1) === 'fallback'
                   ? 'Choose an explicit fallback for unlisted shell commands.'
-                  : issue.path.at(-1) === 'mode'
-                    ? 'Choose a client access mode.'
-                    : issue.message;
+                  : issue.message;
               return (
                 <p key={index}>
                   {path}: {message}
@@ -156,9 +150,15 @@ export function PermissionPolicyEditor({
           isDeleting={isRemoving}
           canSave={canSave}
           onCancel={onClose}
-          onDelete={jsonEditor || isSaving ? undefined : onRemove}
-          onSave={() => {
-            if (canSave && validated.success) onSave(validated.data);
+          onDelete={
+            jsonEditor || isSaving || !onRemove
+              ? undefined
+              : async () => {
+                  if (await onRemove()) setEdited(null);
+                }
+          }
+          onSave={async () => {
+            if (canSave && validated.success && (await onSave(validated.data))) setEdited(null);
           }}
         />
       ) : (
@@ -174,12 +174,10 @@ export function PermissionPolicyEditor({
 
 function PolicyJsonEditor({
   editor,
-  policyType,
   onApply,
   onClose,
 }: {
   editor: JsonEditor;
-  policyType: PolicyDraft['type'];
   onApply: (policy: OrganizationPermissionPolicy) => void;
   onClose: () => void;
 }) {
@@ -191,12 +189,12 @@ function PolicyJsonEditor({
   const isImport = editor.mode === 'import';
   const preview = reviewed
     ? isImport
-      ? reviewPermissionPolicyImport(text, policyType)
-      : parsePermissionPolicyDocument(text, policyType)
+      ? reviewPermissionPolicyImport(text)
+      : parsePermissionPolicyDocument(text)
     : null;
   const interpreted =
     preview?.status === 'needs-shell' && shell && fallback
-      ? reviewPermissionPolicyImport(text, policyType, { kind: shell, fallback })
+      ? reviewPermissionPolicyImport(text, { kind: shell, fallback })
       : preview;
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg border p-4">
@@ -216,9 +214,9 @@ function PolicyJsonEditor({
           }}
         />
         <p className="type-label text-muted-foreground">
-          {isImport && policyType === 'agent_permissions'
+          {isImport
             ? 'Paste a versioned policy or the contents of kilo.json or kilo.jsonc. Only supported permission settings are imported. Do not paste credentials.'
-            : `Paste the versioned ${permissionPolicyLabels[policyType].toLowerCase()} document. Reviewing JSON does not save it.`}
+            : 'Edit the versioned agent permissions document. Reviewing JSON does not save it.'}
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

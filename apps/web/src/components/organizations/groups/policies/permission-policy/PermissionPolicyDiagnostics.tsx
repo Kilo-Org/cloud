@@ -3,13 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { Badge } from '@/components/ui/badge';
 import { useTRPC } from '@/lib/trpc/utils';
-import {
-  permissionPolicyLabels,
-  policyJson,
-  PolicySelect,
-  policySummary,
-  type StoredPermissionPolicy,
-} from './permission-policy-ui';
+import type { OrganizationPermissionPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import { policyJson, PolicySelect, policySummary } from './permission-policy-ui';
 
 export function PermissionPolicyDiagnostics({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
@@ -91,8 +86,7 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
               <Badge variant="outline">Revision {inspection.response.revision}</Badge>
             </div>
             <p className="type-label text-muted-foreground">
-              The strictest applicable tool or shell decision wins. A client must pass every client
-              access policy.
+              The strictest applicable tool or shell decision wins.
             </p>
             <PolicySource
               name="Organization default"
@@ -123,7 +117,13 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
   );
 }
 
-function PolicySource({ name, policies }: { name: string; policies: StoredPermissionPolicy[] }) {
+function PolicySource({
+  name,
+  policies,
+}: {
+  name: string;
+  policies: OrganizationPermissionPolicy[];
+}) {
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border p-3">
       <h4 className="type-body font-medium break-words">{name}</h4>
@@ -131,7 +131,7 @@ function PolicySource({ name, policies }: { name: string; policies: StoredPermis
         policies.map(policy => (
           <details key={policy.type} className="type-label rounded border px-3 py-2">
             <summary className="cursor-pointer">
-              <span className="font-medium">{permissionPolicyLabels[policy.type]}</span>
+              <span className="font-medium">Agent permissions</span>
               <span className="text-muted-foreground"> · {policySummary(policy)}</span>
             </summary>
             <pre className="bg-background mt-2 max-h-56 overflow-auto rounded border p-2">

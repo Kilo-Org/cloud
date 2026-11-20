@@ -1,35 +1,24 @@
 import { useId } from 'react';
 import { Label } from '@/components/ui/label';
-import type { OrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import type { OrganizationPermissionPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
 
-export type AgentPolicy = Extract<OrganizationPermissionPolicy, { type: 'agent_permissions' }>;
-export type ClientPolicy = Extract<OrganizationPermissionPolicy, { type: 'client_access' }>;
-export type PolicyType = OrganizationPermissionPolicy['type'];
-export type StoredPermissionPolicy = Extract<OrganizationGroupPolicy, { type: PolicyType }>;
-export type ShellKind = keyof NonNullable<AgentPolicy['data']['shell']>;
-export type ShellProfile = NonNullable<NonNullable<AgentPolicy['data']['shell']>[ShellKind]>;
+export type AgentPermissions = OrganizationPermissionPolicy['data'];
+export type ShellKind = keyof NonNullable<AgentPermissions['shell']>;
+export type ShellProfile = NonNullable<NonNullable<AgentPermissions['shell']>[ShellKind]>;
 export type PolicyRule = ShellProfile['rules'][number];
 export type PolicyAction = PolicyRule['action'];
-export type ToolDecision = NonNullable<AgentPolicy['data']['tools']>[string];
-export type AgentDraft = Omit<AgentPolicy['data'], 'shell'> & {
+export type ToolDecision = NonNullable<AgentPermissions['tools']>[string];
+export type AgentDraft = Omit<AgentPermissions, 'shell'> & {
   shell?: Partial<
     Record<ShellKind, Omit<ShellProfile, 'fallback'> & { fallback?: ShellProfile['fallback'] }>
   >;
 };
-export type ClientDraft = {
-  schema_version: 1;
-  mode?: ClientPolicy['data']['mode'];
-  clients: Partial<Extract<ClientPolicy['data'], { mode: 'allowlist' }>['clients'][number]>[];
-};
-export type PolicyDraft =
-  | { type: 'agent_permissions'; data: AgentDraft }
-  | { type: 'client_access'; data: ClientDraft };
+export type PolicyDraft = { type: OrganizationPermissionPolicy['type']; data: AgentDraft };
 
-export const permissionPolicyLabels = {
-  agent_permissions: 'Agent permissions',
-  client_access: 'Client access',
-} satisfies Record<PolicyType, string>;
+export const emptyAgentPolicy = {
+  type: 'agent_permissions',
+  data: { schema_version: 1 },
+} satisfies OrganizationPermissionPolicy;
 
 export const actionLabels = {
   allow: 'Allow',
@@ -46,15 +35,11 @@ export const shellKinds = ['bash', 'powershell'] as const;
 export const shellLabels = { bash: 'Bash', powershell: 'PowerShell' };
 export const shellOptions = [actionOptions[1], actionOptions[2]] as const;
 
-export function policyJson(policy: PolicyDraft | StoredPermissionPolicy) {
+export function policyJson(policy: PolicyDraft) {
   return JSON.stringify(policy, null, 2);
 }
 
-export function policySummary(policy: StoredPermissionPolicy) {
-  if (policy.type === 'client_access') {
-    const { mode, clients } = policy.data;
-    return `${mode === 'allowlist' ? 'Allowlist' : 'Blocklist'} · ${clients.length} listed ${clients.length === 1 ? 'client' : 'clients'}`;
-  }
+export function policySummary(policy: OrganizationPermissionPolicy) {
   const { tools, shell, unrestricted_mode } = policy.data;
   const toolCount = Object.keys(tools ?? {}).length;
   return [
@@ -94,7 +79,7 @@ export function PolicySelect<T extends string>({
         disabled={disabled}
         onChange={event => {
           const option = options.find(option => option.value === event.target.value);
-          if (option) onChange(option.value);
+          if (option && !option.disabled) onChange(option.value);
         }}
         className="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 text-sm focus-visible:ring-[3px] disabled:opacity-50 pointer-coarse:h-11"
       >

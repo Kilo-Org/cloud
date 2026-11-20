@@ -7,33 +7,31 @@ import {
 const agentType = 'agent_permissions';
 const agentDocument = (data: object) =>
   JSON.stringify({ type: agentType, data: { schema_version: 1, ...data } });
+const retiredPolicy = {
+  type: 'client_access',
+  data: { schema_version: 1, mode: 'allowlist', clients: [{ feature: 'cli' }] },
+};
 
 describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p', parse => {
-  test.each([
-    ['agent_permissions', fixtures.layered.policy.agent_permissions.layers[0]],
-    ['agent_permissions', fixtures.layered.policy.agent_permissions.layers[1]],
-    ['agent_permissions', fixtures.layered.policy.agent_permissions.layers[2]],
-    ['client_access', fixtures.layered.policy.client_access.layers[0]],
-    ['client_access', fixtures.layered.policy.client_access.layers[1]],
-  ] as const)(
-    'round trips a %s producer fixture without altering its policy data',
-    (type, data) => {
-      const policy = { type, data };
+  test.each(fixtures.layered.policy.agent_permissions.layers)(
+    'round trips agent permissions producer fixture %# without altering its policy data',
+    data => {
+      const policy = { type: agentType, data };
       const text = `{
       // Comments, braces [{, and trailing commas are supported.
-      "type": "${type}",
+      "type": "${agentType}",
       "data": ${JSON.stringify(data)},
     }`;
-      expect(parse(text, type)).toStrictEqual({ status: 'valid', policy, warnings: [] });
+      expect(parse(text)).toStrictEqual({ status: 'valid', policy, warnings: [] });
     }
   );
 
   test.each(['{}', '{"type":"agent_permissions","data":', '{"bad":"\\q"}', '[]', 'null'])(
     'rejects non-policy or malformed input: %s',
     text => {
-      expect(parse(text, agentType)).toMatchObject({
+      expect(parse(text)).toMatchObject({
         status: 'invalid',
-        errors: [expect.any(String)],
+        errors: expect.arrayContaining([expect.any(String)]),
       });
     }
   );
@@ -43,18 +41,18 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
       "type": "agent_permissions",
       "data": {"schema_version": 1, "secret-name": 0, "secret-\\u006eame": 1}
     }`;
-    expect(parse(text, agentType)).toEqual({
+    expect(parse(text)).toEqual({
       status: 'invalid',
       errors: [expect.stringMatching(/^Duplicate property at line 3, column \d+\.$/)],
     });
   });
 
   test('rejects excessive raw UTF-8 bytes and nesting even in ignored sections', () => {
-    expect(parse(`/* ${'\u00e9'.repeat(70_000)} */ {}`, agentType)).toEqual({
+    expect(parse(`/* ${'\u00e9'.repeat(70_000)} */ {}`)).toEqual({
       status: 'invalid',
       errors: [expect.stringContaining('128 KiB')],
     });
-    expect(parse(`{"ignored":${'['.repeat(1_000)}0${']'.repeat(1_000)}}`, agentType)).toEqual({
+    expect(parse(`{"ignored":${'['.repeat(1_000)}0${']'.repeat(1_000)}}`)).toEqual({
       status: 'invalid',
       errors: [expect.stringContaining('nested too deeply')],
     });
@@ -65,21 +63,19 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
       pattern: `${index}${'x'.repeat(499)}`,
       action: 'allow',
     }));
-    expect(
-      parse(agentDocument({ shell: { bash: { fallback: 'ask', rules } } }), agentType)
-    ).toEqual({
+    expect(parse(agentDocument({ shell: { bash: { fallback: 'ask', rules } } }))).toEqual({
       status: 'invalid',
       errors: ['data: Policy too large.'],
     });
   });
 
   test('keeps an omitted shell map distinct from an explicit empty shell map', () => {
-    expect(parse(agentDocument({}), agentType)).toStrictEqual({
+    expect(parse(agentDocument({}))).toStrictEqual({
       status: 'valid',
       policy: { type: agentType, data: { schema_version: 1 } },
       warnings: [],
     });
-    expect(parse(agentDocument({ shell: {} }), agentType)).toStrictEqual({
+    expect(parse(agentDocument({ shell: {} }))).toStrictEqual({
       status: 'valid',
       policy: { type: agentType, data: { schema_version: 1, shell: {} } },
       warnings: [],
@@ -92,34 +88,19 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
     { cmd: { fallback: 'deny', rules: [] } },
     { bash: { fallback: 'deny', rules: [], extra: 'secret-value' } },
   ])('rejects invalid native shell profiles: %j', shell => {
-    expect(parse(agentDocument({ shell }), agentType)).toMatchObject({ status: 'invalid' });
+    expect(parse(agentDocument({ shell }))).toMatchObject({ status: 'invalid' });
   });
 
-  test('rejects the wrong policy type and a member envelope', () => {
-    expect(parse(agentDocument({}), 'client_access')).toEqual({
+  test('rejects a well-formed retired client access policy', () => {
+    expect(parse(JSON.stringify(retiredPolicy))).toMatchObject({
       status: 'invalid',
-      errors: ['Expected a client_access policy document.'],
+      errors: expect.arrayContaining(['type: Expected an agent_permissions policy document.']),
     });
-    expect(parse(JSON.stringify(fixtures.layered), agentType)).toMatchObject({ status: 'invalid' });
   });
 
-  test('rejects a future policy version and strict client access violations', () => {
-    expect(parse(agentDocument({ schema_version: 2 }), agentType)).toMatchObject({
-      status: 'invalid',
-    });
-    for (const data of [
-      { mode: 'allowlist', clients: [], unknown_clients: 'allow' },
-      { mode: 'allowlist', clients: [{ feature: 'cli', min_version: '1.2' }] },
-      { mode: 'allowlist', clients: [{ feature: 'cli' }, { feature: 'cli' }] },
-      { mode: 'blocklist', clients: [{ feature: 'cli', min_version: '1.2.3' }] },
-    ]) {
-      expect(
-        parse(
-          JSON.stringify({ type: 'client_access', data: { schema_version: 1, ...data } }),
-          'client_access'
-        )
-      ).toMatchObject({ status: 'invalid' });
-    }
+  test('rejects a member envelope and a future policy version', () => {
+    expect(parse(JSON.stringify(fixtures.layered))).toMatchObject({ status: 'invalid' });
+    expect(parse(agentDocument({ schema_version: 2 }))).toMatchObject({ status: 'invalid' });
   });
 
   test('formats validation issues without displaying supplied keys, patterns, or values', () => {
@@ -127,7 +108,7 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
       'secret-field': 'secret-value',
       tools: { 'secret-tool': { rules: [{ pattern: 'secret-pattern', action: 'secret-action' }] } },
     });
-    const result = parse(text, agentType);
+    const result = parse(text);
     expect(result).toMatchObject({ status: 'invalid' });
     expect(JSON.stringify(result)).not.toContain('secret-');
     expect(JSON.stringify(result)).toContain('data.tools[tool]');
@@ -136,7 +117,7 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
   test('rejects a tool key the shared schema would silently remove', () => {
     const text =
       '{"type":"agent_permissions","data":{"schema_version":1,"tools":{"__proto__":"deny"}}}';
-    expect(parse(text, agentType)).toEqual({
+    expect(parse(text)).toEqual({
       status: 'invalid',
       errors: ['data.tools: Contains an unsupported tool key.'],
     });
@@ -181,7 +162,7 @@ describe('legacy Kilo configuration', () => {
   ];
 
   test('previews only supported settings, keeping wildcard and integer-like rules in source order', () => {
-    const result = reviewPermissionPolicyImport(text, agentType);
+    const result = reviewPermissionPolicyImport(text);
     expect(result).toStrictEqual({
       status: 'needs-shell',
       policy: base,
@@ -193,7 +174,7 @@ describe('legacy Kilo configuration', () => {
       ],
     });
     expect(JSON.stringify(result)).not.toContain('secret-');
-    expect(parsePermissionPolicyDocument(JSON.stringify(base), agentType)).toStrictEqual({
+    expect(parsePermissionPolicyDocument(JSON.stringify(base))).toStrictEqual({
       status: 'valid',
       policy: base,
       warnings: [],
@@ -204,7 +185,7 @@ describe('legacy Kilo configuration', () => {
     { kind: 'bash', fallback: 'deny' },
     { kind: 'powershell', fallback: 'ask' },
   ] as const)('uses only the explicitly selected $kind profile and $fallback fallback', shell => {
-    const result = reviewPermissionPolicyImport(text, agentType, shell);
+    const result = reviewPermissionPolicyImport(text, shell);
     expect(result).toStrictEqual({
       status: 'valid',
       policy: {
@@ -224,8 +205,7 @@ describe('legacy Kilo configuration', () => {
     expect(
       reviewPermissionPolicyImport(
         text,
-        agentType,
-        choice as Parameters<typeof reviewPermissionPolicyImport>[2]
+        choice as Parameters<typeof reviewPermissionPolicyImport>[1]
       )
     ).toEqual({
       status: 'invalid',
@@ -234,21 +214,19 @@ describe('legacy Kilo configuration', () => {
   });
 
   test('does not infer a shell or a fallback from an empty map or a wildcard', () => {
-    expect(reviewPermissionPolicyImport('{"permission":{"bash":{}}}', agentType)).toMatchObject({
+    expect(reviewPermissionPolicyImport('{"permission":{"bash":{}}}')).toMatchObject({
       status: 'needs-shell',
       rules: [],
       policy: { data: { schema_version: 1 } },
     });
-    expect(
-      reviewPermissionPolicyImport('{"permission":{"bash":{"*":"deny"}}}', agentType)
-    ).toMatchObject({
+    expect(reviewPermissionPolicyImport('{"permission":{"bash":{"*":"deny"}}}')).toMatchObject({
       status: 'needs-shell',
       rules: [{ pattern: '*', action: 'deny' }],
     });
   });
 
   test('does not infer a shell profile from a scalar Bash tool permission', () => {
-    expect(reviewPermissionPolicyImport('{"permission":{"bash":"ask"}}', agentType)).toStrictEqual({
+    expect(reviewPermissionPolicyImport('{"permission":{"bash":"ask"}}')).toStrictEqual({
       status: 'valid',
       policy: { type: agentType, data: { schema_version: 1, tools: { bash: 'ask' } } },
       warnings: [],
@@ -257,9 +235,9 @@ describe('legacy Kilo configuration', () => {
 
   test('does not use legacy choices to repair a versioned shell profile', () => {
     const text = agentDocument({ shell: { bash: { rules: [] } } });
-    expect(
-      reviewPermissionPolicyImport(text, agentType, { kind: 'bash', fallback: 'deny' })
-    ).toMatchObject({ status: 'invalid' });
+    expect(reviewPermissionPolicyImport(text, { kind: 'bash', fallback: 'deny' })).toMatchObject({
+      status: 'invalid',
+    });
   });
 
   test.each([
@@ -275,7 +253,7 @@ describe('legacy Kilo configuration', () => {
     '{"permission":{"bash":{"git status *":"approve"}}}',
     '{"permission":{"edit":"deny"},"provider":[{"duplicate":1,"duplicate":2}]}',
   ])('rejects local input it cannot safely interpret: %s', text => {
-    expect(reviewPermissionPolicyImport(text, agentType)).toMatchObject({ status: 'invalid' });
+    expect(reviewPermissionPolicyImport(text)).toMatchObject({ status: 'invalid' });
   });
 
   test('validates unresolved shell rules through the shared schema', () => {
@@ -283,19 +261,22 @@ describe('legacy Kilo configuration', () => {
       Array.from({ length: 101 }, (_, i) => [`command ${i}`, 'allow'])
     );
     for (const bash of [tooManyRules, { ['x'.repeat(513)]: 'allow' }]) {
-      expect(
-        reviewPermissionPolicyImport(JSON.stringify({ permission: { bash } }), agentType)
-      ).toMatchObject({
+      expect(reviewPermissionPolicyImport(JSON.stringify({ permission: { bash } }))).toMatchObject({
         status: 'invalid',
         errors: [expect.stringMatching(/^permission\.bash\.rules/)],
       });
     }
   });
 
-  test('requires the matching import mode instead of silently converting client or advanced policy', () => {
-    expect(reviewPermissionPolicyImport(text, 'client_access')).toMatchObject({
+  test('does not fall back to legacy permissions when the document has a retired policy type', () => {
+    const text = JSON.stringify({ ...retiredPolicy, permission: { edit: 'allow' } });
+    expect(reviewPermissionPolicyImport(text)).toMatchObject({
       status: 'invalid',
+      errors: expect.arrayContaining(['type: Expected an agent_permissions policy document.']),
     });
-    expect(parsePermissionPolicyDocument(text, agentType)).toMatchObject({ status: 'invalid' });
+  });
+
+  test('does not parse a legacy config as a versioned policy document', () => {
+    expect(parsePermissionPolicyDocument(text)).toMatchObject({ status: 'invalid' });
   });
 });

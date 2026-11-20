@@ -12,7 +12,7 @@ import {
   shellLabels,
   shellOptions,
   type AgentDraft,
-  type AgentPolicy,
+  type AgentPermissions,
   type PolicyRule,
   type ToolDecision,
 } from './permission-policy-ui';
@@ -33,10 +33,11 @@ export function AgentPermissionFields({
   onChange,
 }: {
   draft: AgentDraft;
-  inherited?: AgentPolicy['data'];
+  inherited?: AgentPermissions;
   disabled: boolean;
   onChange: (draft: AgentDraft) => void;
 }) {
+  const unrestrictedBlocked = inherited?.unrestricted_mode === 'deny';
   return (
     <Tabs defaultValue="tools">
       <TabsList aria-label="Agent permission sections">
@@ -49,12 +50,12 @@ export function AgentPermissionFields({
           value={draft.unrestricted_mode ?? 'inherit'}
           options={[
             { value: 'inherit', label: 'Use inherited policy' },
-            actionOptions[0],
-            actionOptions[2],
+            { ...actionOptions[0], disabled: unrestrictedBlocked },
+            { ...actionOptions[2], disabled: unrestrictedBlocked },
           ]}
-          disabled={disabled || inherited?.unrestricted_mode === 'deny'}
+          disabled={disabled || (unrestrictedBlocked && draft.unrestricted_mode === undefined)}
           description={
-            inherited?.unrestricted_mode === 'deny'
+            unrestrictedBlocked
               ? 'Blocked by the organization default. A group cannot change this restriction.'
               : inherited?.unrestricted_mode === 'allow'
                 ? 'The organization default does not block unrestricted mode.'
@@ -104,11 +105,7 @@ export function AgentPermissionFields({
             const profile = draft.shell?.[kind];
             const blockedByDefault = inherited?.shell !== undefined && !inherited.shell[kind];
             return (
-              <fieldset
-                key={kind}
-                className="grid min-w-0 gap-3 border-t pt-3"
-                disabled={disabled || blockedByDefault}
-              >
+              <fieldset key={kind} className="grid min-w-0 gap-3 border-t pt-3" disabled={disabled}>
                 <legend className="type-body font-medium pr-2">{shellLabels[kind]}</legend>
                 {blockedByDefault && (
                   <p className="type-label text-muted-foreground">
@@ -120,6 +117,7 @@ export function AgentPermissionFields({
                     variant="outline"
                     size="sm"
                     className="w-fit"
+                    disabled={blockedByDefault}
                     onClick={() =>
                       onChange({ ...draft, shell: { ...draft.shell, [kind]: { rules: [] } } })
                     }
@@ -128,31 +126,33 @@ export function AgentPermissionFields({
                   </Button>
                 ) : (
                   <>
-                    <PolicySelect
-                      label="Unlisted commands"
-                      value={profile.fallback ?? ''}
-                      options={[
-                        { value: '', label: 'Choose a fallback', disabled: true },
-                        ...shellOptions,
-                      ]}
-                      onChange={fallback => {
-                        if (fallback)
+                    <fieldset disabled={blockedByDefault} className="grid min-w-0 gap-3">
+                      <PolicySelect
+                        label="Unlisted commands"
+                        value={profile.fallback ?? ''}
+                        options={[
+                          { value: '', label: 'Choose a fallback', disabled: true },
+                          ...shellOptions,
+                        ]}
+                        onChange={fallback => {
+                          if (fallback)
+                            onChange({
+                              ...draft,
+                              shell: { ...draft.shell, [kind]: { ...profile, fallback } },
+                            });
+                        }}
+                      />
+                      <RuleList
+                        rules={profile.rules}
+                        patternLabel="Command pattern"
+                        onChange={rules =>
                           onChange({
                             ...draft,
-                            shell: { ...draft.shell, [kind]: { ...profile, fallback } },
-                          });
-                      }}
-                    />
-                    <RuleList
-                      rules={profile.rules}
-                      patternLabel="Command pattern"
-                      onChange={rules =>
-                        onChange({
-                          ...draft,
-                          shell: { ...draft.shell, [kind]: { ...profile, rules } },
-                        })
-                      }
-                    />
+                            shell: { ...draft.shell, [kind]: { ...profile, rules } },
+                          })
+                        }
+                      />
+                    </fieldset>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -182,7 +182,7 @@ function ToolPermissions({
   onChange,
 }: {
   draft: AgentDraft;
-  inherited?: AgentPolicy['data'];
+  inherited?: AgentPermissions;
   disabled: boolean;
   onChange: (draft: AgentDraft) => void;
 }) {
@@ -212,11 +212,13 @@ function ToolPermissions({
     : 'No decision from the organization default for unmatched calls.';
 
   function updateTool(value?: ToolDecision) {
-    const next = { ...tools };
-    if (value === undefined) delete next[tool];
-    else onChange({ ...draft, tools: { ...next, [tool]: value } });
-    if (value === undefined)
+    if (value !== undefined) {
+      onChange({ ...draft, tools: { ...tools, [tool]: value } });
+    } else {
+      const next = { ...tools };
+      delete next[tool];
       onChange({ ...draft, tools: Object.keys(next).length ? next : undefined });
+    }
   }
 
   return (
@@ -236,11 +238,7 @@ function ToolPermissions({
         }))}
         onChange={setTool}
       />
-      <fieldset
-        aria-label={tool}
-        className="grid min-w-0 gap-3"
-        disabled={disabled || blockedByDefault}
-      >
+      <fieldset aria-label={tool} className="grid min-w-0 gap-3" disabled={disabled}>
         {inherited && (
           <p className="type-label text-muted-foreground">
             {inheritedText}
@@ -252,10 +250,13 @@ function ToolPermissions({
         <PolicySelect
           label="Tool decision"
           value={typeof decision === 'object' ? 'rules' : (decision ?? 'inherit')}
+          disabled={blockedByDefault && decision === undefined}
           options={[
             { value: 'inherit', label: 'Use inherited policy' },
-            ...actionOptions,
-            ...(tool === 'bash' ? [] : [{ value: 'rules', label: 'Resource rules' } as const]),
+            ...actionOptions.map(option => ({ ...option, disabled: blockedByDefault })),
+            ...(tool === 'bash'
+              ? []
+              : [{ value: 'rules', label: 'Resource rules', disabled: blockedByDefault } as const]),
           ]}
           onChange={value => {
             if (value === 'rules')
@@ -267,7 +268,7 @@ function ToolPermissions({
           }}
         />
         {typeof decision === 'object' && (
-          <>
+          <fieldset disabled={blockedByDefault} className="grid min-w-0 gap-3">
             <PolicySelect
               label="Unmatched calls"
               value={decision.fallback ?? 'inherit'}
@@ -281,7 +282,7 @@ function ToolPermissions({
               patternLabel="Resource pattern"
               onChange={rules => updateTool({ ...decision, rules })}
             />
-          </>
+          </fieldset>
         )}
       </fieldset>
       {!disabled && (
@@ -302,7 +303,7 @@ function ToolPermissions({
               disabled={!customTool.trim()}
               onClick={() => {
                 const key = customTool.trim();
-                if (!/^[A-Za-z0-9_.*:-]+$/.test(key)) {
+                if (key === '__proto__' || !/^[A-Za-z0-9_.*:-]+$/.test(key)) {
                   setCustomToolError('Enter a valid tool key.');
                   return;
                 }

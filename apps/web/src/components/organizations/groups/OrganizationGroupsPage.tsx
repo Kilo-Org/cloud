@@ -127,9 +127,10 @@ function GroupsPageContent({
             {showPermissionPolicies && (
               <div className="grid gap-3 border-t pt-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
                 <div>
-                  <p className="type-body font-medium">Permission policies</p>
+                  <p className="type-body font-medium">Agent permissions</p>
                   <p className="type-label text-muted-foreground">
-                    Set the organization baseline for agent permissions and client access.
+                    Set the organization baseline for agent permissions. Groups can add
+                    restrictions.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -137,7 +138,7 @@ function GroupsPageContent({
                     variant="outline"
                     onClick={() =>
                       drawer.open({
-                        type: 'permission-policies',
+                        type: 'permission-policy-editor',
                         target: { kind: 'default' },
                         appliesTo: 'Organization default',
                         canEdit: canManage,
@@ -254,7 +255,7 @@ function GroupsPageContent({
                       aria-label={`Permissions for ${group.name}`}
                       onClick={() =>
                         drawer.open({
-                          type: 'permission-policies',
+                          type: 'permission-policy-editor',
                           target: { kind: 'group', groupId: group.id },
                           appliesTo: group.name,
                           canEdit: canManage,

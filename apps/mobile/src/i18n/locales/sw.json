@@ -140,10 +140,12 @@
     "keepRunning": "Acha iendelee",
     "newSession": "Kikao kipya",
     "noModelsAvailable": "Hakuna modeli zinazopatikana",
+    "modelRetires": "Itastaafu {{date}}",
     "notFound": "Haikupatikana.",
     "online": "Mtandaoni",
     "open": "Fungua {{name}}",
     "openPullRequest": "Fungua ombi la kuunganisha",
+    "viewOnGitHub": "Angalia PR kwenye GitHub",
     "completed": "Imekamilika",
     "pending": "Inasubiri",
     "running": "Inaendelea",
@@ -183,7 +185,8 @@
     "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
     "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
     "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
-    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena."
+    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena.",
+    "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
     "changelogAreas": {
       "signIn": "Kuingia",
-      "profileOrganizations": "Wasifu na mashirika"
+      "profileOrganizations": "Wasifu & mashirika"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "Imeshindikana kupakia maoni zaidi.",
       "retryLoadingMore": "Jaribu tena kupakia maoni zaidi",
       "loadMoreComments": "Pakia maoni zaidi",
+      "conversationTruncated": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
+      "conversationTruncated_one": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
+      "conversationTruncated_other": "Inaonyesha maoni {{displayCount}} ya kwanza pekee.",
       "addReaction": "Ongeza mwitikio",
       "reactionPill": "mwitikio wa {{emoji}}, {{countLabel}} {{displayCount}}",
       "reaction_one": "mwitikio",
@@ -881,7 +887,6 @@
       "noAccess": "Huna ruhusa ya kuona vipimo vya hazina hii ya msimbo.",
       "couldNotLoad": "Imeshindikana kupakia vipimo.",
       "retryChecks": "Jaribu vipimo tena",
-      "viewOnGitHub": "Angalia PR kwenye GitHub",
       "noChecksReported": "Hakuna vipimo vilivyoripotiwa",
       "passed": "{{displayCount}} vimefaulu",
       "passed_one": "{{displayCount}} vimefaulu",
@@ -1391,7 +1396,6 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "notConnectedReadOnlyPlan": "Kipindi cha majaribio cha shirika kimeisha, kwa hivyo mmiliki anapaswa kusasisha malipo kwenye kilo.ai."
     },
     "bitbucketConnect": {
@@ -1427,9 +1431,9 @@
       "activity": "Shughuli"
     },
     "providerConnect": {
-      "githubApp": "Programu ya GitHub",
+      "githubApp": "programu ya GitHub",
       "githubError": "Imeshindikana kufungua usanidi wa GitHub. Tafadhali jaribu tena.",
-      "gitlabAccount": "Akaunti ya GitLab",
+      "gitlabAccount": "akaunti ya GitLab",
       "gitlabError": "Imeshindikana kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
       "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki."
     },

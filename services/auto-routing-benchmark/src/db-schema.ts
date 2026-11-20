@@ -26,6 +26,9 @@ import type {
 
 export type ClientProfileStatus = 'pending' | 'ready' | 'failed';
 
+/** Storage status: `failed` is retryable, `unavailable` is permanently failed. */
+export type BenchmarkProfileRowStatus = BenchmarkProfileStatus | 'unavailable';
+
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
 // via wrangler d1 migrations apply.
 
@@ -258,6 +261,7 @@ export const schedulerChunks = sqliteTable(
     available_at: integer('available_at').notNull().default(0),
     attempts: integer('attempts').notNull().default(0),
     throttle_deferrals: integer('throttle_deferrals').notNull().default(0),
+    catalog_deferrals: integer('catalog_deferrals').notNull().default(0),
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
@@ -314,7 +318,9 @@ export const schedulerExecutions = sqliteTable(
  * it reads live occupancy and claims; another dispatcher that finds the lease held
  * returns immediately and the next completion or cron wake retries. Model and slot
  * caps are only exact if one pass at a time reads occupancy.
- * Row 2, created on first use, serializes run initialization passes.
+ * Row 2, created on first use, serializes run initialization passes. Row 3 is a
+ * production deploy's intent: while its lease is unexpired, no new dispatch pass takes
+ * row 1, so the deploy takes row 1 when the current pass ends.
  */
 export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
   id: integer('id').primaryKey(),
@@ -330,7 +336,7 @@ export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
 export const schedulerCooldowns = sqliteTable(
   'scheduler_cooldowns',
   {
-    scope: text('scope').$type<'model' | 'provider'>().notNull(),
+    scope: text('scope').$type<'model' | 'provider' | 'catalog'>().notNull(),
     key: text('key').notNull(),
     until: integer('until').notNull(),
   },
@@ -412,10 +418,17 @@ export const benchmarkProfiles = sqliteTable(
     variant: text('variant').notNull().default(''),
     engine_identity: text('engine_identity').notNull(),
     repetitions: integer('repetitions').notNull(),
-    status: text('status').$type<BenchmarkProfileStatus>().notNull(),
+    status: text('status').$type<BenchmarkProfileRowStatus>().notNull(),
     // Provenance of the run that measured / is measuring this profile.
     run_id: text('run_id'),
     failure_reason: text('failure_reason'),
+    // Failure history since the last ready measurement, kept through requeue and re-run
+    // so the retry budgets count consecutive failed runs. Read through parseProfileState.
+    failure_class: text('failure_class'),
+    failure_attempts: integer('failure_attempts').notNull().default(0),
+    model_failure_attempts: integer('model_failure_attempts').notNull().default(0),
+    first_failed_at: text('first_failed_at'),
+    retry_after: text('retry_after'),
     invalidated_at: text('invalidated_at'),
     requested_at: text('requested_at').notNull(),
     updated_at: text('updated_at').notNull(),
@@ -647,6 +660,8 @@ export const runLaneFailures = sqliteTable(
     chunk: integer('chunk').notNull().default(0),
     shard: integer('shard').notNull().default(0),
     failed_at: text('failed_at').notNull(),
+    // Null on rows written before lane causes were recorded.
+    failure_class: text('failure_class'),
   },
   table => [
     primaryKey({

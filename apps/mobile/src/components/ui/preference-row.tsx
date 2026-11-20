@@ -5,6 +5,8 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { type LucideProps } from '@/components/ui/icons';
 import { RowFrame } from '@/components/ui/row-frame';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { selectionHaptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -15,6 +17,12 @@ type PreferenceRowProps = Readonly<{
   title: string;
   /** The line under the title. Omit it for a one-line switch row. */
   subtitle?: string;
+  /**
+   * A second muted line under the subtitle (a model's retirement date, say).
+   * It renders only when a caller passes it and joins the switch's spoken
+   * name through the shared list formatter, so the row keeps one name.
+   */
+  note?: string;
   value: boolean;
   disabled: boolean;
   busy?: boolean;
@@ -47,6 +55,7 @@ export function PreferenceRow({
   icon,
   title,
   subtitle,
+  note,
   value,
   disabled,
   busy = false,
@@ -90,6 +99,20 @@ export function PreferenceRow({
     selectionHaptic();
     flip();
   };
+  // The note is a second muted line, never the title, but the switch keeps one
+  // spoken name: the note joins the title through the shared list formatter
+  // ("openrouter and Retires Nov 22"), alongside the caller's own override.
+  const spokenName = accessibilityLabel ?? title;
+  const spokenLabel =
+    note === undefined ? spokenName : formatList([spokenName, note], i18n.language);
+  // Renders only when the caller passes a note, so a row gains its one extra
+  // muted line just then.
+  const noteNode =
+    note === undefined ? null : (
+      <Text variant="muted" className="mt-0.5 text-xs">
+        {note}
+      </Text>
+    );
   // The label column keeps 7 dp from the switch, not 10.5. The longest row
   // title ("Keep screen on while on session page") lands within a few pixels
   // of the column width at 360 dp: Android then measures the title against
@@ -153,7 +176,7 @@ export function PreferenceRow({
         disabled,
         thumbColor: switchColors?.thumbColor,
         trackColor: switchColors?.trackColor,
-        accessibilityLabel: accessibilityLabel ?? title,
+        accessibilityLabel: spokenLabel,
         accessibilityHint: subtitle,
         accessibilityState: { disabled, busy, checked: value },
       }}
@@ -166,6 +189,7 @@ export function PreferenceRow({
         {title}
       </Text>
       {subtitleNode}
+      {noteNode}
     </RowFrame>
   );
 }

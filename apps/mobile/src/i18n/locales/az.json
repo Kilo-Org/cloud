@@ -140,6 +140,7 @@
     "keepRunning": "İcranı davam etdir",
     "newSession": "Yeni sessiya",
     "noModelsAvailable": "Mövcud model yoxdur",
+    "modelRetires": "{{date}} tarixində dayandırılır",
     "notFound": "Tapılmadı.",
     "online": "Onlayn",
     "open": "{{name}} aç",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
     "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya",
     "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur.",
-    "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz."
+    "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
+    "organizationTrialEndedBillingAtKiloAi": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi kilo.ai ünvanında yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
+    "viewOnGitHub": "GitHub-da PR-ə bax"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
     "changelogAreas": {
       "signIn": "Giriş",
-      "profileOrganizations": "Profil və təşkilatlar"
+      "profileOrganizations": "Profil ilə təşkilatlar"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "Daha çox şərh yüklənə bilmədi.",
       "retryLoadingMore": "Əlavə şərhləri yükləməyə yenidən cəhd et",
       "loadMoreComments": "Daha çox şərh yüklə",
+      "conversationTruncated": "Yalnız ilk {{displayCount}} şərh göstərilir.",
+      "conversationTruncated_one": "Yalnız ilk {{displayCount}} şərh göstərilir.",
+      "conversationTruncated_other": "Yalnız ilk {{displayCount}} şərh göstərilir.",
       "addReaction": "Reaksiya əlavə et",
       "reactionPill": "{{emoji}} reaksiyası, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
@@ -881,7 +887,6 @@
       "noAccess": "Bu repozitoriyanın yoxlamalarına girişin yoxdur.",
       "couldNotLoad": "Yoxlamalar yüklənə bilmədi.",
       "retryChecks": "Yoxlamaları yükləməyə yenidən cəhd et",
-      "viewOnGitHub": "GitHub-da PR-ə bax",
       "noChecksReported": "Yoxlama bildirilməyib",
       "passed": "{{displayCount}} uğurlu",
       "passed_one": "{{displayCount}} uğurlu",
@@ -1391,7 +1396,6 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "notConnectedReadOnlyPlan": "Təşkilatın sınaq müddəti başa çıxıb, ona görə də sahib kilo.ai ünvanında billinqi yeniləməlidir."
     },
     "bitbucketConnect": {

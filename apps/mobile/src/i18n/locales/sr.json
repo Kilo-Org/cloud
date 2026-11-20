@@ -141,10 +141,12 @@
     "keepRunning": "Nastavi izvršavanje",
     "newSession": "Nova sesija",
     "noModelsAvailable": "Nema dostupnih modela",
+    "modelRetires": "Povlači se {{date}}",
     "notFound": "Nije pronađeno.",
     "online": "Na mreži",
     "open": "Otvori {{name}}",
     "openPullRequest": "Otvori PR",
+    "viewOnGitHub": "Pogledaj PR na GitHub-u",
     "completed": "Završeno",
     "pending": "Na čekanju",
     "running": "U toku",
@@ -184,7 +186,8 @@
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
     "privateRepositoryA11y": "{{name}}, privatno spremište",
     "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku.",
-    "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu, a zatim pokušajte ponovo."
+    "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu, a zatim pokušajte ponovo.",
+    "organizationTrialEndedBillingAtKiloAi": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu na kilo.ai, a zatim pokušajte ponovo."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",
@@ -508,7 +511,7 @@
     "changelogFixesPolish": "Ispravke i poboljšanja u celoj aplikaciji.",
     "changelogAreas": {
       "signIn": "Prijavljivanje",
-      "profileOrganizations": "Profil i organizacije"
+      "profileOrganizations": "Profil te organizacije"
     }
   },
   "preferences": {
@@ -763,6 +766,10 @@
       "couldNotLoadMore": "Nije moguće učitati još komentara.",
       "retryLoadingMore": "Ponovo pokušaj da učitaš još komentara",
       "loadMoreComments": "Učitaj još komentara",
+      "conversationTruncated": "Prikazano je samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_one": "Prikazano je samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_other": "Prikazano je samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_few": "Prikazano je samo prvih {{displayCount}} komentara.",
       "addReaction": "Dodaj reakciju",
       "reactionPill": "reakcija {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
@@ -895,7 +902,6 @@
       "noAccess": "Nemaš pristup proverama za ovaj repozitorijum.",
       "couldNotLoad": "Nije moguće učitati provere.",
       "retryChecks": "Ponovo pokušaj da učitaš provere",
-      "viewOnGitHub": "Pogledaj PR na GitHub-u",
       "noChecksReported": "Nema prijavljenih provera",
       "passed": "uspešno: {{displayCount}}",
       "passed_one": "uspešno: {{displayCount}}",
@@ -1417,7 +1423,6 @@
     "followReviewMd": "Sledi uputstva iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj uputstva iz datoteke REVIEW.md u svakom repozitorijumu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
       "notConnectedReadOnlyPlan": "Probni period organizacije je završen, pa vlasnik mora da ažurira naplatu na kilo.ai."
     },
     "bitbucketConnect": {

@@ -9,7 +9,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgModes } from '@/lib/hooks/use-org-modes-queries';
-import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { isMoneyRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 const MODES_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/modes';
 
@@ -22,7 +22,7 @@ const MODES_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/modes';
 export function OrganizationModeFormScreen() {
   const { modeId } = useLocalSearchParams<{ modeId?: string }>();
   const { t } = useTranslation();
-  const { organizationId, org, isResolving } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const modesQuery = useOrgModes(organizationId);
 
   if (isResolving || organizationId == null || org == null) {
@@ -66,6 +66,7 @@ export function OrganizationModeFormScreen() {
     <ModeForm
       key={mode?.id ?? 'new'}
       organizationId={organizationId}
+      canManageBilling={isMoneyRole(role)}
       mode={mode}
       existingModes={modesQuery.data?.modes ?? []}
     />

@@ -147,15 +147,17 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   });
 
   if (config.isError && !config.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <PlatformErrorScreen
         title={t('securityAgent.analysisSettings.title')}
+        errorTitle={t('securityAgent.analysisSettings.couldNotLoad')}
         variant={classifyReadFailureVariant({
           errors: [config.error],
           isPaused: config.fetchStatus === 'paused',
           connectivity,
         })}
-        message={t('securityAgent.analysisSettings.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );

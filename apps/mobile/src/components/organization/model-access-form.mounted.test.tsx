@@ -28,6 +28,9 @@ const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
 }));
+// The screen hands the form the reader's role; this harness passes the money
+// role, because this suite's subject is the refusal copy a billing role reads
+// and no billing step is rendered here.
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -53,6 +56,16 @@ vi.mock('@/components/organization/model-access-lists', () => ({
 vi.mock('@/components/organization/providers-gateways-section', () => ({
   GatewaySettingsSection: 'GatewaySettingsSection',
 }));
+// The form's leave guard needs a navigator; this suite asserts the save
+// contract, the refusal copy and the draft rules, so it stubs the guard and
+// ignores the `isDirty` derivation the stub takes no part in.
+vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
+  useMetadataLeaveGuard: () => ({
+    handleDirtyChange: vi.fn(),
+    leaveWithoutAsking: vi.fn(),
+    dialog: null,
+  }),
+}));
 
 function model(id: string, providers: readonly string[]): CatalogModel {
   return { id, name: id, inference_provider_ids: [...providers] } satisfies CatalogModel;
@@ -77,6 +90,7 @@ function element(
   return createElement(ModelAccessForm, {
     organizationId: 'org-1',
     canEdit: true,
+    canManageBilling: true,
     models: [],
     catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
     catalogUnavailable: overrides.catalogUnavailable === true,
@@ -381,7 +395,12 @@ describe('ModelAccessForm save copy', () => {
     changeDraft(root, setModelsAllowed(draft, ['anthropic/claude'], true));
     await pressSave(root);
 
-    expect(String(statusMessage(root))).toBe(i18n.t('common.organizationTrialEnded'));
+    // The form renders no billing step beside the failure line, so even the
+    // role that can change the plan reads the sentence that names the
+    // destination instead of one that claims an owner must act.
+    expect(String(statusMessage(root))).toBe(
+      i18n.t('common.organizationTrialEndedBillingAtKiloAi')
+    );
   });
 
   it('falls back to the status-failed line for an unrecognized refusal', async () => {

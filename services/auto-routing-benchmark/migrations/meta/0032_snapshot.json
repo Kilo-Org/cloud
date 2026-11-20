@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2c21836c-c394-4915-b5ab-b016563cf326",
+  "id": "9c189e91-325e-4615-adca-62ef01f224c2",
   "prevId": "1b919c36-b70c-4eb2-93c5-b5847452cd08",
   "tables": {
     "benchmark_config": {
@@ -176,90 +176,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "benchmark_daily_alias_sync": {
-      "name": "benchmark_daily_alias_sync",
-      "columns": {
-        "router": {
-          "name": "router",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "day": {
-          "name": "day",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "platform_status": {
-          "name": "platform_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'pending'"
-        },
-        "platform_error": {
-          "name": "platform_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "owner_cursor_type": {
-          "name": "owner_cursor_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "owner_cursor_id": {
-          "name": "owner_cursor_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "owner_pages": {
-          "name": "owner_pages",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "owner_done": {
-          "name": "owner_done",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "benchmark_profiles": {
       "name": "benchmark_profiles",
       "columns": {
@@ -316,6 +232,43 @@
         },
         "failure_reason": {
           "name": "failure_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "failure_class": {
+          "name": "failure_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "failure_attempts": {
+          "name": "failure_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "model_failure_attempts": {
+          "name": "model_failure_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "first_failed_at": {
+          "name": "first_failed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "retry_after": {
+          "name": "retry_after",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1970,6 +1923,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "failure_class": {
+          "name": "failure_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -2152,6 +2112,14 @@
         },
         "throttle_deferrals": {
           "name": "throttle_deferrals",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "catalog_deferrals": {
+          "name": "catalog_deferrals",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

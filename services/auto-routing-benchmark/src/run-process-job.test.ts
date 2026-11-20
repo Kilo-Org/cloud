@@ -30,7 +30,9 @@ vi.mock('./scheduler', async importOriginal => {
     getPaidCasePromptRevision: vi.fn(),
     claimScheduledChunks: vi.fn(),
     clearUnbilledCase: vi.fn(),
+    cooldownCatalog: vi.fn(),
     cooldownModel: vi.fn(),
+    deferCatalogChunk: vi.fn(),
     deferChunk: vi.fn(),
     deferThrottledChunk: vi.fn(),
     failChunk: vi.fn(),
@@ -57,6 +59,8 @@ vi.mock('./db', async importOriginal => {
   return {
     ...actual,
     countCaseResultsByLane: vi.fn(),
+    copyRemeasureBaselines: vi.fn(),
+    reuseDeciderCaseResults: vi.fn(),
     listLaneFailures: vi.fn(),
     recordLaneFailure: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
@@ -162,7 +166,9 @@ import {
   getPaidCasePromptRevision,
   claimScheduledChunks,
   clearUnbilledCase,
+  cooldownCatalog,
   cooldownModel,
+  deferCatalogChunk,
   deferChunk,
   deferThrottledChunk,
   failChunk,
@@ -176,6 +182,7 @@ import {
   scheduleRunChunks,
   startChunk,
   SCHEDULER_MAX_ATTEMPTS,
+  SCHEDULER_MAX_CATALOG_DEFERRALS,
   SCHEDULER_MAX_THROTTLE_DEFERRALS,
   type SchedulerClaim,
 } from './scheduler';
@@ -223,7 +230,7 @@ const env = {
   BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,
   BENCH_QUEUE: { send: queueSend, sendBatch: queueSendBatch },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
-  AUTO_ROUTING_CONFIG: { delete: kvDelete },
+  AUTO_ROUTING_CONFIG: { delete: kvDelete, put: vi.fn() },
 } as unknown as Env;
 
 function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {
@@ -239,6 +246,7 @@ function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {
     slot: 7,
     attempts: 1,
     throttle_deferrals: 0,
+    catalog_deferrals: 0,
     ...overrides,
   };
   vi.mocked(getChunk).mockResolvedValue(claim);
@@ -762,7 +770,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     { persisted: true, costUsd: null },
     { persisted: true, costUsd: 0 },
   ])(
-    'defers an unbilled catalog network failure and removes only its transient execution: %j',
+    'refunds an unbilled catalog network failure, cools dispatch and removes only its transient execution: %j',
     async ({ persisted, costUsd }) => {
       const claim = mockClaim({ variant: 'high', rep: 1 });
       mockRunSnapshot([
@@ -824,18 +832,50 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       expect(recordLaneFailure).not.toHaveBeenCalled();
       expect(cooldownModel).not.toHaveBeenCalled();
       expect(finishChunk).not.toHaveBeenCalled();
-      expect(deferChunk).toHaveBeenCalledWith(
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(deferCatalogChunk).toHaveBeenCalledWith(
         env.BENCH_DB,
         claim.id,
         claim.token,
         expect.any(Number)
       );
+      expect(cooldownCatalog).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
       expect(queueSend).toHaveBeenCalledWith(
         { runId, kind: 'decider', model, schedulerWake: true },
         { delaySeconds: 15 }
       );
     }
   );
+
+  it('fails the lane as catalog_load once the catalog deferral budget and attempts are spent', async () => {
+    const catalogFailure = {
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0,
+      stderrTail: 'Failed to load Kilo model catalog: fetch failed',
+    };
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce(catalogFailure)
+      .mockResolvedValueOnce(catalogFailure);
+    mockClaim({ attempts: SCHEDULER_MAX_ATTEMPTS });
+    await processJob(env, deciderMessage());
+    expect(deferCatalogChunk).toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+
+    vi.mocked(deferCatalogChunk).mockClear();
+    mockClaim({
+      attempts: SCHEDULER_MAX_ATTEMPTS,
+      catalog_deferrals: SCHEDULER_MAX_CATALOG_DEFERRALS,
+    });
+    await processJob(env, deciderMessage());
+    expect(deferCatalogChunk).not.toHaveBeenCalled();
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ model, failureClass: 'catalog_load' })
+    );
+  });
 
   it('defers an unbilled gateway model rejection instead of scoring it', async () => {
     const claim = mockClaim({ variant: 'high', rep: 0 });
@@ -938,9 +978,12 @@ describe('processJob — scheduler waits and paid-call safety', () => {
         env.BENCH_DB,
         runId,
         [{ model, variant: 'high' }],
-        expect.stringContaining('unavailable')
+        {
+          failureClass: 'model_not_found',
+          reason: expect.stringContaining('unavailable'),
+        }
       );
-      expect(failScheduledEntry).toHaveBeenCalledWith(env.BENCH_DB, claim);
+      expect(failScheduledEntry).toHaveBeenCalledWith(env.BENCH_DB, claim, 'model_not_found');
       expect(markRunCompleted).not.toHaveBeenCalled();
       expect(deferChunk).not.toHaveBeenCalled();
       expect(queueSend).not.toHaveBeenCalled();
@@ -1380,7 +1423,10 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     await processJob(env, deciderMessage());
     expect(deferThrottledChunk).not.toHaveBeenCalled();
     expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
-    expect(recordLaneFailure).toHaveBeenCalled();
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ model, failureClass: 'provider_unavailable' })
+    );
   });
 
   it.each([
@@ -1435,6 +1481,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       rep: 0,
       chunk: 0,
       shard: 0,
+      failureClass: 'ambiguous_execution',
     });
     expect(deferChunk).not.toHaveBeenCalled();
     expect(finishChunk).not.toHaveBeenCalled();

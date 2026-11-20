@@ -142,10 +142,12 @@
     "keepRunning": "Продолжить выполнение",
     "newSession": "Новый сеанс",
     "noModelsAvailable": "Нет доступных моделей",
+    "modelRetires": "Снимается {{date}}",
     "notFound": "Не найдено.",
     "online": "В сети",
     "open": "Открыть {{name}}",
     "openPullRequest": "Открыть pull request",
+    "viewOnGitHub": "Открыть PR на GitHub",
     "completed": "Завершено",
     "pending": "Ожидание",
     "running": "В работе",
@@ -185,7 +187,8 @@
     "organizationTrialEnded": "Пробный период организации закончился, и у неё нет активного плана. Владелец организации может обновить данные об оплате на kilo.ai, после чего повторите попытку.",
     "privateRepositoryA11y": "{{name}}, частный репозиторий",
     "legalDocumentEnglishOnly": "Этот документ доступен только на английском языке.",
-    "organizationTrialEndedBilling": "Пробный период организации закончился, и у неё нет активного плана. Вы можете обновить данные об оплате, после чего повторите попытку."
+    "organizationTrialEndedBilling": "Пробный период организации закончился, и у неё нет активного плана. Вы можете обновить данные об оплате, после чего повторите попытку.",
+    "organizationTrialEndedBillingAtKiloAi": "Пробный период организации закончился, и у неё нет активного плана. Вы можете обновить данные об оплате на kilo.ai, после чего повторите попытку."
   },
   "language": {
     "restarting": "Перезапуск для смены языка",
@@ -509,7 +512,7 @@
     "changelogFixesPolish": "Исправления и улучшения во всём приложении.",
     "changelogAreas": {
       "signIn": "Вход",
-      "profileOrganizations": "Профиль и организации"
+      "profileOrganizations": "Профиль & организации"
     }
   },
   "preferences": {
@@ -699,7 +702,6 @@
     },
     "autoReviews": "Автоматические проверки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не подключён. Подключить его могут только владельцы организации, администраторы и ответственные за оплату.",
       "notConnectedReadOnlyPlan": "Пробный период организации закончился, поэтому владелец должен обновить данные об оплате на kilo.ai."
     },
     "bitbucketConnect": {
@@ -751,9 +753,9 @@
     },
     "providerConnect": {
       "description": "Настройте подключение Kilo — {{label}} — для автоматической проверки пул-реквестов.",
-      "githubApp": "Приложение GitHub",
+      "githubApp": "приложение GitHub",
       "githubError": "Не удалось открыть настройку GitHub. Попробуйте снова.",
-      "gitlabAccount": "Аккаунт GitLab",
+      "gitlabAccount": "аккаунт GitLab",
       "gitlabError": "Не удалось открыть настройку GitLab. Попробуйте снова."
     },
     "reviewDetail": {
@@ -2864,7 +2866,6 @@
       "skipped_few": "пропущено: {{displayCount}}",
       "skipped_many": "пропущено: {{displayCount}}",
       "title": "Проверки",
-      "viewOnGitHub": "Открыть PR на GitHub",
       "checkDetails": "сведения о проверке"
     },
     "composer": {
@@ -2928,6 +2929,11 @@
       "couldNotLoad": "Не удалось загрузить обсуждение.",
       "couldNotLoadMore": "Не удалось загрузить остальные комментарии.",
       "loadMoreComments": "Загрузить ещё комментарии",
+      "conversationTruncated": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_one": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_other": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_few": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_many": "Показаны только первые {{displayCount}} комментариев.",
       "loading": "Загрузка обсуждения",
       "moderation": {
         "block": {

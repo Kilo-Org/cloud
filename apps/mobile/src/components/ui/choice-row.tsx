@@ -2,9 +2,8 @@ import { type ReactNode } from 'react';
 
 import { RowFrame } from '@/components/ui/row-frame';
 import { Text } from '@/components/ui/text';
-import { i18n } from '@/i18n';
+import { joinAccessibleName } from '@/lib/a11y/accessible-name';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
-import { formatList } from '@/lib/format';
 import { selectionHaptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
@@ -89,7 +88,7 @@ export function ChoiceRow({
       })}
       accessibilityLabel={
         accessibleName ??
-        (namedParts.length > 0 ? formatList(namedParts, i18n.language) : undefined)
+        (namedParts.length > 0 ? joinAccessibleName(namedParts) : undefined)
       }
     >
       {children ?? (

@@ -33,7 +33,6 @@ import {
   type PolicySettingValue,
   resolvePolicySettings,
   type BenchmarkRunProgress,
-  type RankedCandidate,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

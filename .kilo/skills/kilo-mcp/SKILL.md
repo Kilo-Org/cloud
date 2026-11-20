@@ -25,7 +25,7 @@ See `services/kilo-mcp/CHANGELOG.md`.
 1. **Search first.** `kilo_search` finds catalog endpoints. Never call a path from memory, and never guess one from this skill.
 2. **Call one path.** `kilo_call` takes a `path` from the catalog and an `input` that satisfies that row's `inputSchema`. A path outside the catalog and an input that violates the schema are rejected before any request is made.
 3. **Check the kind.** Every row carries a `kind`: `"query"` reads data, `"mutation"` changes it. Call a mutation path only when the user asked for that change.
-4. **Retry with care.** On a mutation, an ambiguous transport error — a timeout, a dropped connection, an unknown outcome — leaves the result unknown. Check the current state before a retry. A query carries no such ambiguity and can be retried.
+4. **Retry with care.** If a mutation times out or loses its connection, check the current state before trying again. Queries can be retried.
 
 A catalog row carries `path` (the `kilo_call` argument), `kind`, `summary`,
 `inputSchema`, `tags`, and `searchBlob` — the text search matches. A row behind

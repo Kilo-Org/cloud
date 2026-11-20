@@ -9,8 +9,9 @@
 // the same decision tree. No React, no react-query, no expo modules —
 // that keeps it testable in plain Node.
 
-import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
+import { servedAnswer } from '@/lib/query/read-failure-variant';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 export type PrReviewQueryState =
   | {
@@ -68,14 +69,18 @@ export type PrReviewQueryState =
     };
 
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
-  // A read that never reached the server is the connection, not the backend:
-  // a transport rejection carries no tRPC code, and a code-less error is not a
-  // server answer (see `servedAnswer`). Checked before the code table so an
-  // offline inbox never reads "Something went wrong on our end".
-  if (!isTrpcClientError(error) && readTrpcErrorField(error, 'code') === undefined) {
+  const code = readTrpcErrorField(error, 'code');
+  // A read that never reached the server is the connection, not the backend.
+  // `servedAnswer` is the rule the rest of the app classifies with: a tRPC
+  // envelope carrying a code, or an HTTP status, proves the server answered —
+  // and a `TRPCClientError` wrapped around a failed fetch has neither. A bare
+  // top-level `code` still carries a verdict (`{ code: 'FORBIDDEN' }`), so the
+  // code is read first and only a code-less, answer-less error is the
+  // connection. Checked before the code table so an offline inbox never reads
+  // "Something went wrong on our end".
+  if (code === undefined && !servedAnswer(error)) {
     return { kind: 'offline' };
   }
-  const code = readTrpcErrorField(error, 'code');
   if (code === 'PRECONDITION_FAILED') {
     return { kind: 'reconnect' };
   }

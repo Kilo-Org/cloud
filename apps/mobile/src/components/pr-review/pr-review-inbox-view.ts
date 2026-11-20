@@ -44,6 +44,12 @@ export function selectPrInboxView(args: {
   isPending: boolean;
   /** A first-page read is in flight right now. */
   isFetching: boolean;
+  /**
+   * The device's committed connectivity is offline. Only a paused first read
+   * is affected: the online manager holds it, so it is pending without
+   * fetching, and the connection — not the backend — owns that state.
+   */
+  isOffline?: boolean;
   itemCount: number;
   firstPageErrorState: PrReviewQueryState | null;
   laterPageError: boolean;
@@ -59,6 +65,7 @@ export function selectPrInboxView(args: {
   const {
     isPending,
     isFetching,
+    isOffline = false,
     itemCount,
     firstPageErrorState,
     laterPageError,
@@ -82,13 +89,18 @@ export function selectPrInboxView(args: {
   // page that is pending without fetching — paused because the device reports
   // itself offline, cancelled, or never started — would otherwise keep the
   // skeleton up forever with nothing to press. It never settles on its own, so
-  // it takes the retryable body: nothing has loaded, nothing was reported
-  // empty, and the user gets the Retry that restarts the read.
+  // it takes a failure body: nothing has loaded, nothing was reported empty,
+  // and the user gets the Retry that restarts the read. A confirmed-offline
+  // device names the connection; every other pause keeps the read's own copy,
+  // because a cancelled or never-started read is not the network's fault.
   if (isPending) {
-    return {
-      kind: isFetching ? 'loading' : 'retryable',
-      showLoadMoreRetry: false,
-    };
+    let kind: PrInboxViewKind = 'retryable';
+    if (isFetching) {
+      kind = 'loading';
+    } else if (isOffline) {
+      kind = 'offline';
+    }
+    return { kind, showLoadMoreRetry: false };
   }
 
   if (itemCount === 0) {

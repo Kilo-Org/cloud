@@ -80,6 +80,11 @@ describe('classifyPrReviewQueryState', () => {
     expect(classifyPrReviewQueryState('string error')).toEqual({ kind: 'offline' });
     expect(classifyPrReviewQueryState(null)).toEqual({ kind: 'offline' });
     expect(classifyPrReviewQueryState(undefined)).toEqual({ kind: 'offline' });
+    // The device shape: tRPC wraps a failed fetch in a TRPCClientError whose
+    // `data` carries no code, so it IS a tRPC error and still reached no
+    // server. Reading only "not a tRPC error" left the server copy on screen
+    // for a missing network (offline force state, iOS simulator).
+    expect(classifyPrReviewQueryState({ name: 'TRPCClientError' })).toEqual({ kind: 'offline' });
   });
 
   it('falls back to retryable for tRPC 5xx-class codes', () => {

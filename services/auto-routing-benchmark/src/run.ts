@@ -153,10 +153,10 @@ import {
 } from './scheduler';
 import { catalogModelProviders } from './platform-models';
 import {
+  ACTIVE_MEASUREMENT_REVISION,
   deciderCasesForRouter,
   ENGINE_IDENTITY_REVISION,
   gradingRevision,
-  MEASUREMENT_REVISION,
   minimumCaseRevisions,
 } from './measurement-revision';
 
@@ -675,8 +675,8 @@ export async function publishPlatformRoutingTable(
 // image's pinned CLI, or any other execution input NOT captured by the dataset
 // hash changes in a way that invalidates prior measurements. Forces every
 // carried summary to be re-benchmarked on the next run. A change confined to some
-// cases raises MEASUREMENT_REVISION instead (src/measurement-revision.ts), which
-// re-measures only those cases.
+// cases adds a measurement revision instead (src/measurement-revision.ts), which
+// re-measures only those cases once ACTIVE_MEASUREMENT_REVISION reaches it.
 const BENCHMARK_ENGINE_VERSION = 1;
 
 function fnv1aHex(input: string): string {
@@ -954,7 +954,7 @@ export async function startRun(
         classifier_max_p95_latency_ms:
           kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
         engine_identity: engineIdentity,
-        measurement_revision: MEASUREMENT_REVISION,
+        measurement_revision: ACTIVE_MEASUREMENT_REVISION,
         purpose,
       },
       runModelRows,
@@ -984,7 +984,7 @@ export async function startRun(
   if (kind === 'decider') {
     // Re-measured pairs start from their previous run's results; only the cases measured
     // below their minimum revision are left to run.
-    const minimumRevisions = minimumCaseRevisions(router, MEASUREMENT_REVISION);
+    const minimumRevisions = minimumCaseRevisions(router, ACTIVE_MEASUREMENT_REVISION);
     try {
       await copyRemeasureBaselines(env.BENCH_DB, { runId, minimumRevisions });
       await reuseDeciderCaseResults(env.BENCH_DB, {
@@ -1033,7 +1033,7 @@ export async function startRun(
       startedAt,
       purpose,
       engineIdentity,
-      measurementRevision: MEASUREMENT_REVISION,
+      measurementRevision: ACTIVE_MEASUREMENT_REVISION,
     });
     return { runId, enqueuedModels: 0, skippedModels };
   }
@@ -1953,12 +1953,12 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             final_finish_reason: null,
             rep,
             timed_out: 0,
-            prompt_revision: MEASUREMENT_REVISION,
+            prompt_revision: state.measurementRevision,
           });
         } catch (error) {
           await upsertCaseResult(
             env.BENCH_DB,
-            failedRow(message, benchCase.id, null, startedAt, error, rep)
+            failedRow(message, benchCase.id, null, startedAt, error, rep, state.measurementRevision)
           );
         }
       }
@@ -2389,7 +2389,8 @@ function failedRow(
   routeKey: string | null,
   startedAt: number,
   error: unknown,
-  rep: number = 0
+  rep: number,
+  promptRevision: number
 ): CaseResultRow {
   return {
     run_id: message.runId,
@@ -2419,7 +2420,7 @@ function failedRow(
     final_finish_reason: null,
     rep,
     timed_out: 0,
-    prompt_revision: MEASUREMENT_REVISION,
+    prompt_revision: promptRevision,
   };
 }
 

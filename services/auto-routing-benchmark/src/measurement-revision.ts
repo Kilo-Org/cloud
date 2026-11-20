@@ -5,7 +5,7 @@ import type { DeciderCheck } from './grading';
 import { argvAffectedCases, PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 /**
- * Revision of the decider cases and grading a run measures. Every run records the revision it
+ * Newest defined revision of the decider cases and grading. Every run records the revision it
  * started under and keeps it to the end, and every case result records the revision that
  * measured it (`prompt_revision`), so one run never mixes two gradings of a case.
  *
@@ -19,6 +19,14 @@ import { argvAffectedCases, PROMPT_TRANSPORT_REVISION } from './prompt-transport
  * results it does change.
  */
 export const MEASUREMENT_REVISION = 3;
+
+/**
+ * The revision every new run starts under. Raising it to a newer {@link MEASUREMENT_REVISION}
+ * is a spending decision: every run the cron drain, pool admission, requeue or re-measure
+ * starts afterwards measures that revision's cases, and the platform table holds publication
+ * until every ready pair is measured under its grading.
+ */
+export const ACTIVE_MEASUREMENT_REVISION = 2;
 
 export const ENGINE_IDENTITY_REVISION = PROMPT_TRANSPORT_REVISION;
 

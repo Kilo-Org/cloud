@@ -16,8 +16,14 @@ import type * as ProfilesModule from './profiles';
 import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
+import { CONTINUATION_CASES } from './datasets/continuation-cases';
+import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
-import { deciderCasesForRouter, MEASUREMENT_REVISION } from './measurement-revision';
+import {
+  ACTIVE_MEASUREMENT_REVISION,
+  deciderCasesForRouter,
+  MEASUREMENT_REVISION,
+} from './measurement-revision';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
@@ -329,7 +335,7 @@ beforeEach(() => {
           purpose: run.purpose ?? 'platform',
           accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
           frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
-          measurement_revision: run.measurement_revision ?? MEASUREMENT_REVISION,
+          measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
           status: 'running',
           completed_at: null,
           error: null,
@@ -962,12 +968,30 @@ describe('POST /admin/runs', () => {
       runId: expect.any(String),
       entries: [{ model: 'owner/a', variant: 'high', providers: [] }],
       repetitions: 1,
-      caseIds: deciderCasesForRouter('efficient', MEASUREMENT_REVISION).map(
+      caseIds: deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION).map(
         benchCase => benchCase.id
       ),
       chunkSize: 1,
     });
     expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('runs a drained pair on the revision-2 cases while revision 3 is inactive', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(insertRun).mock.calls[0][1].measurement_revision).toBe(2);
+    const [[, schedule]] = vi.mocked(scheduleRunChunks).mock.calls;
+    expect(schedule.caseIds).toEqual(DECIDER_CASES.map(benchCase => benchCase.id));
+    const scheduled = new Set(schedule.caseIds);
+    expect(CONTINUATION_CASES.filter(benchCase => scheduled.has(benchCase.id))).toEqual([]);
+    const graded = deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION);
+    expect(graded.filter(benchCase => benchCase.requiredToolCalls !== undefined)).toEqual([]);
   });
 
   it('starts one run per queue for queue=both', async () => {
@@ -1032,7 +1056,7 @@ describe('POST /admin/runs', () => {
       runId: run.id,
       entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
       repetitions: 1,
-      caseIds: deciderCasesForRouter('efficient', MEASUREMENT_REVISION).map(
+      caseIds: deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION).map(
         benchCase => benchCase.id
       ),
       chunkSize: 1,

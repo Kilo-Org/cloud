@@ -117,7 +117,7 @@ export const benchmarkRuns = sqliteTable(
     // Which registry queue this run drained: 'platform' (saved platform decider
     // list) or 'user' (owner pools). Classifier runs are always 'platform'.
     purpose: text('purpose').$type<BenchmarkRunPurpose>().notNull().default('platform'),
-    // MEASUREMENT_REVISION the run started under: which cases it runs and how it grades them.
+    // ACTIVE_MEASUREMENT_REVISION the run started under: which cases it runs and how it grades them.
     // Runs from before the column existed measured revision 2.
     measurement_revision: integer('measurement_revision').notNull().default(2),
   },
@@ -211,7 +211,7 @@ export const caseResults = sqliteTable(
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
-    // MEASUREMENT_REVISION (src/measurement-revision.ts) of the call that produced this result.
+    // Measurement revision (src/measurement-revision.ts) of the call that produced this result.
     prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups

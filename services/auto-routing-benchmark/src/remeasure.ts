@@ -1,10 +1,6 @@
 import type { AutoRouter, CandidatePricing } from '@kilocode/auto-routing-contracts';
 import type { DeciderCase } from './datasets/decider-cases';
-import {
-  deciderCasesForRouter,
-  MEASUREMENT_REVISION,
-  minimumCaseRevisions,
-} from './measurement-revision';
+import { deciderCasesForRouter, minimumCaseRevisions } from './measurement-revision';
 import { REMEASURE_FRONTIER_INNER_QUOTE_CASES, snapshotPromptTokens } from './prompt-transport';
 import { variantFromStorage } from './reasoning-effort';
 
@@ -66,13 +62,13 @@ const READY_PAIR_FILTER = `p.router = ? AND p.engine_identity = ? AND p.repetiti
 
 /**
  * Current-identity ready pairs of one router whose provenance run lacks a valid measurement
- * of a current case: a result below its case's minimum revision (src/measurement-revision.ts),
- * or no result at all for a case added since. Projected spend covers the results below their
- * minimum: each one's measured cost, plus the snapshot prompt tokens at the model's catalog
- * prompt price for long-context cases. Added cases have no measured cost, so the projection
- * leaves them out and `unmeasuredResults` counts them. `request` queues the pairs in
- * `profile_remeasures`; `cancel` removes queued rows that no run has claimed. A dry run reads
- * only.
+ * of a case of `revision`: a result below its case's minimum revision
+ * (src/measurement-revision.ts), or no result at all for a case added since. Projected spend
+ * covers the results below their minimum: each one's measured cost, plus the snapshot prompt
+ * tokens at the model's catalog prompt price for long-context cases. Added cases have no
+ * measured cost, so the projection leaves them out and `unmeasuredResults` counts them.
+ * `request` queues the pairs in `profile_remeasures`; `cancel` removes queued rows that no run
+ * has claimed. A dry run reads only.
  */
 export async function planPromptTransportRemeasure(
   db: D1Database,
@@ -80,6 +76,7 @@ export async function planPromptTransportRemeasure(
     router: AutoRouter;
     engineIdentity: string;
     repetitions: number;
+    revision: number;
     action: RemeasureAction;
     prices: ReadonlyMap<string, CandidatePricing | null>;
     frontierInnerQuotes?: boolean;
@@ -87,10 +84,10 @@ export async function planPromptTransportRemeasure(
   }
 ): Promise<RemeasureRouterReport> {
   const frontierInnerQuotes = params.frontierInnerQuotes ?? REMEASURE_FRONTIER_INNER_QUOTE_CASES;
-  const minimums = minimumCaseRevisions(params.router, MEASUREMENT_REVISION, {
+  const minimums = minimumCaseRevisions(params.router, params.revision, {
     frontierInnerQuotes,
   });
-  const cases = deciderCasesForRouter(params.router, MEASUREMENT_REVISION);
+  const cases = deciderCasesForRouter(params.router, params.revision);
   const affected = cases.filter(benchCase => benchCase.id in minimums);
   const casesById = new Map<string, DeciderCase>(affected.map(c => [c.id, c]));
   // Materializing a snapshot builds a few hundred KB, so price each case once.
@@ -187,7 +184,7 @@ export async function planPromptTransportRemeasure(
     router: params.router,
     engineIdentity: params.engineIdentity,
     repetitions: params.repetitions,
-    promptRevision: MEASUREMENT_REVISION,
+    promptRevision: params.revision,
     frontierInnerQuotes,
     affectedCaseIds: [...casesById.keys()],
     pairs: pairDetails.length,

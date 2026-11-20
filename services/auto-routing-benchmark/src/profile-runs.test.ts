@@ -10,7 +10,7 @@ import type {
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
-import { deciderCasesForRouter, MEASUREMENT_REVISION } from './measurement-revision';
+import { ACTIVE_MEASUREMENT_REVISION, deciderCasesForRouter } from './measurement-revision';
 import type { BenchmarkJobMessage } from './run';
 import { CATALOG_CONTEXT_TOO_SMALL_REASON } from './platform-models';
 import {
@@ -320,7 +320,7 @@ beforeEach(() => {
           purpose: run.purpose ?? 'platform',
           accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
           frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
-          measurement_revision: run.measurement_revision ?? MEASUREMENT_REVISION,
+          measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
           status: 'running',
           completed_at: null,
           error: null,
@@ -373,9 +373,10 @@ beforeEach(() => {
   kvDelete.mockResolvedValue(undefined);
 });
 
-const CURRENT_EFFICIENT_CASE_IDS = deciderCasesForRouter('efficient', MEASUREMENT_REVISION).map(
-  benchCase => benchCase.id
-);
+const CURRENT_EFFICIENT_CASE_IDS = deciderCasesForRouter(
+  'efficient',
+  ACTIVE_MEASUREMENT_REVISION
+).map(benchCase => benchCase.id);
 
 const RUN_ROW_BASE = {
   router: 'efficient' as const,

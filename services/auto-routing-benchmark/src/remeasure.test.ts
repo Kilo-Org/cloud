@@ -17,6 +17,7 @@ import {
   settleRemeasuresForRun,
 } from './db';
 import {
+  ACTIVE_MEASUREMENT_REVISION,
   deciderCasesForRouter,
   MEASUREMENT_REVISION,
   minimumCaseRevisions,
@@ -33,6 +34,7 @@ const ENGINE = 'efficient:v1:test';
 const FRONTIER_ENGINE = 'frontier:v1:test';
 const MODEL = 'vendor/model';
 const current = { router: 'efficient' as const, engineIdentity: ENGINE, repetitions: 1 };
+const newest = { ...current, revision: MEASUREMENT_REVISION };
 const entry = { model: MODEL, variant: null };
 
 const quoted = (c: DeciderCase) => !c.longContext && deciderCliPrompt(c).includes('"');
@@ -231,7 +233,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     seedMeasuredPair();
     const before = tableDump();
     const report = await planPromptTransportRemeasure(db, {
-      ...current,
+      ...newest,
       action: 'dry-run',
       prices: new Map([
         [
@@ -261,7 +263,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     insertRun('old');
     seedMeasuredPair();
     const request = () =>
-      planPromptTransportRemeasure(db, { ...current, action: 'request', prices: new Map() });
+      planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
     expect((await request()).changed).toBe(1);
     expect((await request()).changed).toBe(0);
     expect(await listQueuedRemeasures(db, current, 'platform')).toHaveLength(1);
@@ -360,10 +362,38 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect(scheduled.length).toBeLessThan(DECIDER_CASES.length / 5);
   });
 
+  it('finds nothing to re-measure for pairs fully measured at the active revision', async () => {
+    insertRun('old');
+    for (const benchCase of DECIDER_CASES) {
+      insertResult('old', benchCase.id, { revision: PROMPT_TRANSPORT_REVISION });
+    }
+    insertProfile('old');
+    const before = tableDump();
+
+    const report = await planPromptTransportRemeasure(db, {
+      ...current,
+      revision: ACTIVE_MEASUREMENT_REVISION,
+      action: 'request',
+      prices: new Map(),
+    });
+
+    expect(report).toMatchObject({
+      promptRevision: 2,
+      pairs: 0,
+      affectedResults: 0,
+      unmeasuredResults: 0,
+      projectedCostUsd: 0,
+      changed: 0,
+    });
+    const continuationIds = new Set(CONTINUATION_CASES.map(c => c.id));
+    expect(report.affectedCaseIds.filter(id => continuationIds.has(id))).toEqual([]);
+    expect(tableDump()).toEqual(before);
+  });
+
   it('queues owner-only pairs for the owner queue', async () => {
     insertRun('old');
     seedMeasuredPair(MODEL, { platform: false, user: true });
-    await planPromptTransportRemeasure(db, { ...current, action: 'request', prices: new Map() });
+    await planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
     expect(await listQueuedRemeasures(db, current, 'user')).toEqual([
       expect.objectContaining({ model: MODEL, variant: '' }),
     ]);
@@ -375,7 +405,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     seedMeasuredPair('vendor/dead');
     seedMeasuredPair('vendor/failed');
     seedMeasuredPair('vendor/released');
-    await planPromptTransportRemeasure(db, { ...current, action: 'request', prices: new Map() });
+    await planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
     const pair = (model: string) => ({ model, variant: null });
 
     await markProfilesRunningForRun(db, 'dead-lane', [pair('vendor/dead')], current);
@@ -397,10 +427,10 @@ describe('prompt transport re-measure (real SQLite)', () => {
     insertRun('old');
     seedMeasuredPair('vendor/a');
     seedMeasuredPair('vendor/b');
-    await planPromptTransportRemeasure(db, { ...current, action: 'request', prices: new Map() });
+    await planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
     await markProfilesRunningForRun(db, 'running', [{ model: 'vendor/a', variant: null }], current);
     const report = await planPromptTransportRemeasure(db, {
-      ...current,
+      ...newest,
       action: 'cancel',
       prices: new Map(),
     });
@@ -420,6 +450,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
         router: 'frontier',
         engineIdentity: FRONTIER_ENGINE,
         repetitions: 1,
+        revision: MEASUREMENT_REVISION,
         action: 'dry-run',
         prices: new Map(),
         frontierInnerQuotes,

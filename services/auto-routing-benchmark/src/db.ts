@@ -58,7 +58,7 @@ import {
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
-import { MEASUREMENT_REVISION } from './measurement-revision';
+import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -309,7 +309,7 @@ export async function insertRun(
     repetitions: run.repetitions,
     classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
     engine_identity: run.engine_identity,
-    measurement_revision: run.measurement_revision ?? MEASUREMENT_REVISION,
+    measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
     purpose: run.purpose ?? 'platform',
   });
 

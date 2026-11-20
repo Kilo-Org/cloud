@@ -86,6 +86,7 @@ import {
   syncSubscriptionSnapshot,
 } from './subscriptions';
 import { planPromptTransportRemeasure } from './remeasure';
+import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
 
 const RemeasureRequestSchema = z.object({
   router: AutoRouterSchema.optional(),
@@ -362,6 +363,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
             router: selected,
             engineIdentity: computeEngineIdentity('decider', selected),
             repetitions: resolveEffectivePolicy(config).deciderRepetitions,
+            revision: ACTIVE_MEASUREMENT_REVISION,
             action,
             prices,
           })

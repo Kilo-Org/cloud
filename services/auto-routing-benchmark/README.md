@@ -1107,17 +1107,42 @@ Runbook, after the whole stack is merged and deployed (the migration applies on 
 4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
    its run.
 
-### Measurement revision 3: tool evidence
+### Measurement revision 3: tool evidence (defined, inactive)
 
-Every run records the revision it started under (`benchmark_runs.measurement_revision`,
-`MEASUREMENT_REVISION` in `src/measurement-revision.ts`), and every result stores the
-revision that measured it in `prompt_revision`, with the CLI's tool evidence (`tool_calls`,
-`tool_names`, `step_count`, `final_finish_reason`). Revision 3 changes only the efficient
-router: every `agentic_execution` case requires at least one tool call (a turn that ends
-with narration and no tool call scores 0), `supp-agent-term-pwd-base` accepts only `other`,
-and the 9 continuation cases (`src/datasets/continuation-cases.ts`) join the case set. The
-engine identity still hashes the revision-2 cases, so frontier results and efficient
-non-agentic results stay reusable.
+Every run records the revision it started under (`benchmark_runs.measurement_revision`),
+and every result stores the revision that measured it in `prompt_revision`, with the CLI's
+tool evidence (`tool_calls`, `tool_names`, `step_count`, `final_finish_reason`). Tool
+evidence is recorded at every revision. `src/measurement-revision.ts` separates two
+constants: `MEASUREMENT_REVISION` (3) is the newest defined revision, and
+`ACTIVE_MEASUREMENT_REVISION` (2) is the revision every new run starts under. `startRun`,
+`insertRun`'s default, case reuse and the `remeasure-prompt-transport` planner all use
+the active revision, so revision 3 is defined but no run measures it until someone raises
+`ACTIVE_MEASUREMENT_REVISION` to 3. Only `scripts/continuation-pilot.ts` runs revision 3
+cases today, explicitly.
+
+Revision 3 changes only the efficient router: every `agentic_execution` case requires at
+least one tool call (a turn that ends with narration and no tool call scores 0),
+`supp-agent-term-pwd-base` accepts only `other`, and the 9 continuation cases
+(`src/datasets/continuation-cases.ts`) join the case set. The engine identity still hashes
+the revision-2 cases, so frontier results and efficient non-agentic results stay reusable.
+
+Raising `ACTIVE_MEASUREMENT_REVISION` to 3 is a spending decision. From the next deploy:
+
+- Every efficient decider run the system starts on its own runs at revision 3: the
+  per-minute cron drain and the 05:00Z platform sync drain every `pending` profile (new
+  owner-pool or platform admissions, admin requeues of failed rows, stale rows a status
+  lookup re-admits, and every profile after a `deciderRepetitions` change), and each run
+  completion drains again. Such a run reuses the pair's non-agentic results but runs all
+  90 agentic cases and the 9 continuation cases per repetition.
+- Ready pairs keep serving and re-run nothing until the `remeasure-prompt-transport`
+  `request` action queues them.
+- The platform table stops publishing as soon as one ready platform pair is graded at
+  revision 3 while others are at 2, and resumes once every ready pair is re-measured. So
+  switching on in practice means re-measuring the platform pool. Estimates at 3
+  repetitions (2026-11-20 pool, catalog prices, no caching / half the input cached):
+  about $450–590 / $380–470 for the full pool (52 pairs, Kimi K3 and Grok 4.7 are 58%),
+  $63–90 / $50–65 for the 29 pairs that served the agentic routes in the last 24 hours,
+  and $16–22 / $13–16 for Ember and DeepSeek alone.
 
 `minimumCaseRevisions(router, revision)` maps each case to the oldest result revision a run
 may reuse: 2 for the argv-affected cases above, 3 for every efficient agentic and

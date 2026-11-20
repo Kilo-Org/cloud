@@ -619,7 +619,12 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     frame.owner === undefined ? [frame] : [frame.owner, frame]
   );
   const requiredOrigins = new Set<string>(requiredFrames.map(frame => frame.origin));
-  const frameByOrigin = new Map(requiredFrames.map(frame => [frame.origin, frame.frame]));
+  // An origin is labelled a frame only when no required document of that origin is the tab's top-level one: a same-site iframe's grant also covers its owner page.
+  const frameByOrigin = new Map<string, boolean>();
+
+  for (const frame of requiredFrames) {
+    frameByOrigin.set(frame.origin, (frameByOrigin.get(frame.origin) ?? true) && frame.frame);
+  }
 
   if (requiredOrigins.size === 0) {
     requiredOrigins.add(origin);

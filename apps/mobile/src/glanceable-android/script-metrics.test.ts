@@ -118,6 +118,16 @@ describe('Box top', () => {
     expect(unpadded).toBeLessThan(baseline + 0.86 * size);
   });
 
+  it('keeps a calibrated box exactly, with no padding behind it', () => {
+    // Mandaic, Nko, Samaritan and Syriac have no measured fallback font: they
+    // ship at the calibrated 1.62em box and draw in Roboto. The padding is a
+    // font measurement, so it must not touch a box no font measured.
+    for (const value of ['\u0840\u0841', '\u07CA\u07CB', '\u0800\u0801', '\u0710\u0711']) {
+      expect(lineBox(value, EM)).toBe(EM * TALL_LINE);
+      expect(ascent(value, EM)).toBeCloseTo(BASELINE * EM, 10);
+    }
+  });
+
   it('keeps a taller line above the same baseline', () => {
     const tall = boxTop('กำลังทำงาน', 11, 100);
     expect(tall).toBe(100 - ascent('กำลังทำงาน', 11));

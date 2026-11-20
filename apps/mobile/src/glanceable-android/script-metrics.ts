@@ -25,9 +25,6 @@ const TALL_LINE = 1.62;
 /** Android's font padding, added on top of a fallback font's own ascent. */
 const PADDING = 0.128;
 
-/** Roboto's own hhea ascent, before the font padding. */
-const ROBOTO_ASCENT = 0.928;
-
 type FontMetrics = { ascent: number; box: number };
 
 /** Every script without a measured fallback font draws in Roboto. */
@@ -36,11 +33,11 @@ const ROBOTO: FontMetrics = { ascent: BASELINE, box: LATIN_LINE };
 type ScriptMetrics = FontMetrics & { match: RegExp };
 
 /**
- * One script's fallback font: `metrics` are that font's hhea ascent and box.
- * Android draws a line with its font padding added above the baseline, so the
- * ascent gains `PADDING` and the box gains the same `PADDING`: the descent
- * below the baseline stays the font's own, and the box cannot cut into a
- * glyph's tail. `tall` marks a script the old 1.62em box covered, whose
+ * One script whose fallback font was measured: `metrics` are that font's hhea
+ * ascent and box. Android draws a line with its font padding added above the
+ * baseline, so the ascent gains `PADDING` and the box gains the same `PADDING`:
+ * the descent below the baseline stays the font's own, and the box cannot cut
+ * into a glyph's tail. `tall` marks a script the old 1.62em box covered, whose
  * shipping box is therefore floored there: a box that ships today never
  * shrinks.
  */
@@ -54,6 +51,16 @@ function script(
     box: Math.max(metrics.box + PADDING, floor),
     match,
   };
+}
+
+/**
+ * One script with no measured fallback font: it keeps the box the layouts were
+ * calibrated to, exactly, and draws in Roboto. `TALL_LINE` is a design constant
+ * rather than a font measurement, so no font padding is added to it: padding
+ * here would grow a box that ships today by a value no font asked for.
+ */
+function calibrated(match: RegExp): ScriptMetrics {
+  return { ascent: BASELINE, box: TALL_LINE, match };
 }
 
 /**
@@ -88,11 +95,12 @@ const SCRIPTS: readonly ScriptMetrics[] = [
   script(/\p{Script=Thai}/u, { ascent: 1.116, box: 1.372 }),
   script(/\p{Script=Yi}/u, { ascent: 1.16, box: 1.448 }),
   // These scripts fell inside the old 1.62em range, but their fallback fonts
-  // were never measured: they keep that floor and Roboto's ascent.
-  script(/\p{Script=Mandaic}/u, { ascent: ROBOTO_ASCENT, box: TALL_LINE, tall: true }),
-  script(/\p{Script=Nko}/u, { ascent: ROBOTO_ASCENT, box: TALL_LINE, tall: true }),
-  script(/\p{Script=Samaritan}/u, { ascent: ROBOTO_ASCENT, box: TALL_LINE, tall: true }),
-  script(/\p{Script=Syriac}/u, { ascent: ROBOTO_ASCENT, box: TALL_LINE, tall: true }),
+  // were never measured: they keep that calibrated box and Roboto's ascent,
+  // with no padding added to a box no font measured.
+  calibrated(/\p{Script=Mandaic}/u),
+  calibrated(/\p{Script=Nko}/u),
+  calibrated(/\p{Script=Samaritan}/u),
+  calibrated(/\p{Script=Syriac}/u),
 ];
 
 /** No measured fallback font starts below Armenian, so Latin, Greek and Cyrillic skip the search. */

@@ -1,6 +1,7 @@
 import {
   dateTimeFormat,
   deviceDecimalSeparator,
+  deviceUses24hourClock,
   durationFormat,
   listFormat,
   numberFormat,
@@ -89,15 +90,26 @@ const CLOCK_TIME: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-dig
 /**
  * Time of day in `locale` (`"2:40 AM"`), for a clock beside another.
  *
+ * The device's 12/24-hour setting wins over the language's own clock: an
+ * English phone set to a twenty-four-hour clock reads `13:45` where its
+ * language's pattern is twelve-hour. A device that reports no setting leaves the
+ * language default in place.
+ *
  * Asking for a numeric hour is not enough: a locale whose short time pattern
  * carries a padded hour pads it to two digits even then, so Gujarati reads
- * `02:40 AM` beside the `11:40 AM` that English and Arabic print. On a
- * twelve-hour clock the padded hour loses its leading zero; every other
- * character keeps the locale's own text, order and digits. A twenty-four-hour
- * clock keeps the padded hour, which is its uniform-width convention.
+ * `02:40 AM` beside the `11:40 AM` that English and Arabic print. The padded
+ * hour loses its leading zero on a twelve-hour clock; every other character
+ * keeps the locale's own text, order and digits. A twenty-four-hour clock keeps
+ * the padded hour, which is its uniform-width convention.
  */
 export function formatClockTime(date: Date, locale: string): string {
-  const formatter = dateTimeFormat(locale, CLOCK_TIME);
+  const uses24hourClock = deviceUses24hourClock();
+  const formatter = dateTimeFormat(
+    locale,
+    uses24hourClock === null
+      ? CLOCK_TIME
+      : { ...CLOCK_TIME, hourCycle: uses24hourClock ? 'h23' : 'h12' }
+  );
   const formatted = formatter.format(date);
   const parts = formatter.formatToParts(date);
   if (!parts.some(part => part.type === 'dayPeriod')) {

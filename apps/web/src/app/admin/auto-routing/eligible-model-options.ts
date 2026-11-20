@@ -1,4 +1,5 @@
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 
@@ -44,7 +45,7 @@ export function toEligibleModelOptions(models: SelectorListModel[]): ModelOption
       : [];
     return {
       id: model.id,
-      name: model.name,
+      name: modelNameWithRetirement(model),
       isFree: model.isFree,
       mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
       hasUserByokAvailable: model.hasUserByokAvailable,

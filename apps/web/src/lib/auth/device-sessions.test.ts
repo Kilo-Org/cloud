@@ -1081,7 +1081,6 @@ describe('device-sessions', () => {
 
     test('persists the key, the session, and the refresh token together', async () => {
       const result = await createDeviceSessionWithAttestedKey({
-        userId: testUserId,
         userAgent: 'attested-agent',
         user: fakeUser,
         verification: {
@@ -1140,7 +1139,6 @@ describe('device-sessions', () => {
       );
 
       await createDeviceSessionWithAttestedKey({
-        userId: testUserId,
         user: fakeUser,
         verification: {
           ok: true,
@@ -1168,14 +1166,12 @@ describe('device-sessions', () => {
 
       try {
         await createDeviceSessionWithAttestedKey({
-          userId: otherUserId,
-          user: fakeUser,
+          user: { ...fakeUser, id: otherUserId },
           verification: { ok: true, platform: 'ios', keyId, publicKey: 'Zmlyc3Q=' },
         });
 
         await expect(
           createDeviceSessionWithAttestedKey({
-            userId: testUserId,
             user: fakeUser,
             verification: { ok: true, platform: 'ios', keyId, publicKey: 'c2Vjb25k' },
           })

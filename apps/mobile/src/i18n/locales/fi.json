@@ -19,7 +19,9 @@
     "presenceStatus": "Isännät: {{connection}}",
     "commandStatus": "Komennon toimitus: {{status}}",
     "delivered": "Toimitettu",
-    "expired": "Vanhentunut"
+    "expired": "Vanhentunut",
+    "recoveryGaps_one": "{{displayCount}} osa tästä litteroinnista puuttuu.",
+    "recoveryGaps_other": "{{displayCount}} osaa tästä litteroinnista puuttuu."
   },
   "common": {
     "manageOnWeb": "Hallinnoi verkossa",
@@ -138,6 +140,7 @@
     "keepRunning": "Jatka suoritusta",
     "newSession": "Uusi istunto",
     "noModelsAvailable": "Ei malleja saatavilla",
+    "modelRetires": "Poistuu {{date}}",
     "notFound": "Kohdetta ei löytynyt",
     "online": "Verkossa",
     "open": "Avaa {{name}}",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
     "privateRepositoryA11y": "{{name}}, yksityinen tietovarasto",
     "legalDocumentEnglishOnly": "Tämä asiakirja on saatavilla vain englanniksi.",
-    "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen."
+    "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
+    "viewOnGitHub": "Katso PR GitHubissa"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -505,7 +510,7 @@
     "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
       "signIn": "Kirjautuminen",
-      "profileOrganizations": "Profiili ja organisaatiot"
+      "profileOrganizations": "Profiili & organisaatiot"
     }
   },
   "preferences": {
@@ -750,6 +755,9 @@
       "couldNotLoadMore": "Lisää kommentteja ei voitu ladata.",
       "retryLoadingMore": "Yritä ladata lisää kommentteja uudelleen",
       "loadMoreComments": "Lataa lisää kommentteja",
+      "conversationTruncated": "Näytetään vain {{displayCount}} ensimmäistä kommenttia.",
+      "conversationTruncated_one": "Näytetään vain {{displayCount}} ensimmäistä kommenttia.",
+      "conversationTruncated_other": "Näytetään vain {{displayCount}} ensimmäistä kommenttia.",
       "addReaction": "Lisää reaktio",
       "reactionPill": "Reaktio {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktio",
@@ -879,7 +887,6 @@
       "noAccess": "Sinulla ei ole oikeutta tarkastella tämän koodivaraston tarkistuksia.",
       "couldNotLoad": "Tarkistuksia ei voitu ladata.",
       "retryChecks": "Yritä uudelleen ladata tarkistukset",
-      "viewOnGitHub": "Katso PR GitHubissa",
       "noChecksReported": "Ei raportoituja tarkistuksia",
       "passed": "{{displayCount}} onnistui",
       "passed_one": "{{displayCount}} onnistui",
@@ -963,6 +970,8 @@
       "pendingComment": "lähettämätöntä kommenttia",
       "pendingComment_other": "lähettämätöntä kommenttia",
       "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
+      "submitCountOfTotal_one": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
+      "submitCountOfTotal_other": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
       "submitReview": "Lähetä katselmointi",
       "partialPostedFresh": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
@@ -1387,7 +1396,7 @@
     "followReviewMd": "Noudata REVIEW.md-ohjeita",
     "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen."
+      "notConnectedReadOnlyPlan": "Organisaation kokeilujakso on päättynyt, joten omistajan on päivitettävä laskutus osoitteessa kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
@@ -1396,7 +1405,7 @@
       "managedOnWebRepositories": "Valitse {{organization}}-organisaation repositoriot verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "descriptionReconnect": "Luo uusi työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
-      "descriptionOverview": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se seuraavalla näytöllä.",
+      "descriptionOverview": "Luo työtilan käyttöoikeustunnus ja liitä se seuraavalla näytöllä.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
       "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."
@@ -2788,6 +2797,8 @@
     "modelPicker": {
       "title": "Valitse malli",
       "noModelsDescription": "Valittavissa ei ole malleja.",
+      "allUnavailableTitle": "Yhtään mallia ei voi käyttää",
+      "allUnavailableDescription": "Lisää palveluntarjoajan avain ja yritä uudelleen.",
       "favorites": "Suosikit"
     },
     "modelSelector": {
@@ -3621,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "Nimeä organisaatio uudelleen",
-      "renamePlaceholder": "Organisaation nimi",
+      "renamePlaceholder": "Anna organisaation nimi",
       "balance": "Saldo",
       "plan": "Paketti",
       "planTeams": "Teams",
@@ -4081,7 +4092,13 @@
     "providerUnavailable": "Palveluntarjoaja ei ole juuri nyt käytettävissä. Lähetä uudelleen pian."
   },
   "settingsTools": {
-    "confirmTitle": "Vahvistetaanko tämä muutos?"
+    "confirmTitle": "Vahvistetaanko tämä muutos?",
+    "guarded": {
+      "spendAlertsOff": "Poistetaanko kuluhälytykset käytöstä? Et enää saisi ilmoituksia kulutusrajojen ylityksistä etkä tunneittaisista piikeistä.",
+      "balanceAlertsOff": "Poistetaanko saldohälytykset käytöstä? Et enää saisi ilmoituksia, kun kredittisi käyvät vähiin.",
+      "securityFindingsOff": "Poistetaanko tietoturvahavainnot käytöstä? Et enää saisi ilmoituksia uusista tietoturvahavainnoista.",
+      "hideBalanceOn": "Piilotetaanko saldosi? Kredittisaldot eivät enää näkyisi profiilinäytöillä ja organisaation keskusnäkymässä."
+    }
   },
   "appActions": {
     "start": {
@@ -4841,12 +4858,15 @@
     "inputDescription": "Tarkistaa jokaisen syötteen Enkrypt AI:lla, myös työkalujen tulokset. Kun Enkrypt ei ole käytettävissä, pyynnöt lähetetään tarkistamatta sen sijaan, että ne hylättäisiin.",
     "outputTitle": "Tulosteen suojakaiteet",
     "outputDescription": "Tarkistaa vastaukset Enkrypt AI:lla ennen kuin jäsenet saavat ne. Ei käytössä, ellet ota sitä käyttöön.",
+    "outputUnavailable": "Kilo ei ole ottanut tulosteen skannausta käyttöön tälle organisaatiolle, joten vastauksia ei tarkisteta eikä täällä ole mitään asetettavaa. Voit pyytää sitä ottamalla yhteyttä osoitteeseen {{supportEmail}}.",
     "detectorsHint": "Estä hylkää merkityn pyynnön. Vain kirjaus tallentaa sen viivästyttämättä pyyntöä.",
     "detectorsHintOutput": "Estä hylkää merkityn vastauksen. Vain kirjaus tallentaa sen viivästyttämättä vastausta.",
     "choiceLog": "Vain kirjaus",
     "applyTo": "Koskee",
     "applyToAllMembers": "Kaikki jäsenet",
     "applyKiloDefault": "Käytä Kilo-oletusta",
+    "applyKiloDefaultEnglishNote": "Kilon oletuskäytännön teksti on englanniksi, koska Kilo Gateway soveltaa sitä täsmälleen sellaisena kuin se on kirjoitettu.",
+    "applyKiloDefaultReplaceMessage": "Kilon oletuskäytäntö on kirjoitettu englanniksi ja korvaa sen, mitä asetit kohtaan Käytäntörikkomus. Käytäntötekstin kenttään syöttämääsi tekstiä ei voi palauttaa.",
     "invalidSavedTitle": "Tallennettuja syötetunnistimien asetuksia ei voi lukea",
     "invalidSavedBody": "Pyynnöt estetään, kunnes syötetunnistimet tallennetaan uudelleen. Alla olevat tunnistimet perustuvat Kilo-oletukseen.",
     "invalidSavedOutputTitle": "Tallennettuja tulostetunnistimien asetuksia ei voi lukea",
@@ -4981,6 +5001,7 @@
     "providersDescription": "Poista palveluntarjoaja käytöstä, niin Kilo ei enää reititä pyyntöjä sille tässä organisaatiossa.",
     "providersNeedCatalog": "Palveluntarjoajien kytkimet ovat vain luku -tilassa, kunnes koko mallikatalogi on ladattu. Muokkaa niitä napauttamalla yllä Yritä uudelleen.",
     "providersEmpty": "Haulla ei löytynyt palveluntarjoajia.",
+    "providersNone": "Tälle organisaatiolle ei ole saatavilla palveluntarjoajia.",
     "allowAllShown": "Salli kaikki näytetyt",
     "denyAllShown": "Estä kaikki näytetyt",
     "gatewaysDescription": "Kilo reitittää mallipyynnöt Vercel AI Gatewayn tai OpenRouterin kautta. Jos yhdyskäytävä on poistettu käytöstä, sen kautta kulkevat pyynnöt epäonnistuvat.",

@@ -19,7 +19,9 @@
     "presenceStatus": "主機：{{connection}}",
     "commandStatus": "命令傳送狀態：{{status}}",
     "delivered": "已送達",
-    "expired": "已過期"
+    "expired": "已過期",
+    "recoveryGaps_one": "此對話記錄缺少 {{displayCount}} 個部分。",
+    "recoveryGaps_other": "此對話記錄缺少 {{displayCount}} 個部分。"
   },
   "common": {
     "manageOnWeb": "在網頁上管理",
@@ -138,10 +140,12 @@
     "keepRunning": "繼續執行",
     "newSession": "新增工作階段",
     "noModelsAvailable": "沒有可用的模型",
+    "modelRetires": "於 {{date}} 退役",
     "notFound": "找不到項目。",
     "online": "在線上",
     "open": "開啟 {{name}}",
     "openPullRequest": "開啟提取要求",
+    "viewOnGitHub": "在 GitHub 上檢視 PR",
     "completed": "已完成",
     "pending": "待處理",
     "running": "執行中",
@@ -181,7 +185,8 @@
     "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
     "privateRepositoryA11y": "{{name}}，私有儲存庫",
     "legalDocumentEnglishOnly": "本文件僅提供英文版本。",
-    "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。"
+    "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。",
+    "organizationTrialEndedBillingAtKiloAi": "組織的試用期已結束，且沒有使用中的方案。您可以在 kilo.ai 更新帳單資訊，然後再試一次。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -695,7 +700,7 @@
     },
     "autoReviews": "自動審查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。"
+      "notConnectedReadOnlyPlan": "組織的試用期已結束，因此擁有者必須前往 kilo.ai 更新帳單資訊。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
@@ -704,7 +709,7 @@
       "managedOnWebRepositories": "請在電腦上透過網頁版為 {{organization}} 選擇儲存庫。",
       "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
       "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
-      "descriptionOverview": "為 {{organization}} 建立工作區存取權杖，然後在下一個畫面貼上。",
+      "descriptionOverview": "建立工作區存取權杖，然後在下一個畫面貼上。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖",
       "tokenRefused": "Bitbucket 未接受此工作區存取權杖。請確認其具有上方列出的權限範圍，然後再試一次。"
@@ -1270,7 +1275,7 @@
       "couldNotLoad": "無法載入資安問題。",
       "couldNotLoadMore": "無法載入更多資安問題。",
       "emptyDescription": "目前沒有需要處理的未解決資安問題。",
-      "emptyTitle": "沒有未解決的資安問題",
+      "emptyTitle": "沒有開啟的資安問題",
       "noMatchesDescription": "請嘗試調整或清除已選取的篩選條件。",
       "noMatchesTitle": "沒有符合篩選條件的資安問題"
     },
@@ -1473,7 +1478,7 @@
     "remediationUnavailable": {
       "findingNotFound": "這項資安問題已不存在。",
       "approvalRequired": "自動修復需要核准。手動開始修復，即表示核准這次修復。",
-      "findingNotOpen": "這項資安問題已不再處於未解決狀態。",
+      "findingNotOpen": "這項資安問題已不再開啟。",
       "repoNotInScope": "此存放庫未納入資安代理程式的監控範圍。",
       "analysisRequired": "開始修復前，請先執行程式碼庫分析。",
       "staleAnalysis": "這項資安問題在分析後有變更。開始修復前，請重新執行分析。",
@@ -2231,6 +2236,8 @@
     "modelPicker": {
       "title": "選取模型",
       "noModelsDescription": "沒有可選取的模型。",
+      "allUnavailableTitle": "沒有可使用的模型",
+      "allUnavailableDescription": "請新增供應商金鑰，然後再試一次。",
       "favorites": "我的最愛"
     },
     "modelSelector": {
@@ -2779,7 +2786,6 @@
       "skipped_one": "{{displayCount}} 項略過",
       "skipped_other": "{{displayCount}} 項略過",
       "title": "檢查",
-      "viewOnGitHub": "在 GitHub 上檢視 PR",
       "checkDetails": "檢查詳細資料"
     },
     "composer": {
@@ -2843,6 +2849,9 @@
       "couldNotLoad": "無法載入討論。",
       "couldNotLoadMore": "無法載入更多留言。",
       "loadMoreComments": "載入更多留言",
+      "conversationTruncated": "僅顯示前 {{displayCount}} 則留言。",
+      "conversationTruncated_one": "僅顯示前 {{displayCount}} 則留言。",
+      "conversationTruncated_other": "僅顯示前 {{displayCount}} 則留言。",
       "loading": "正在載入討論",
       "moderation": {
         "block": {
@@ -3234,6 +3243,8 @@
       "partialPostedStale_one": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
       "partialPostedStale_other": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
       "submitCountOfTotal": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
+      "submitCountOfTotal_one": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
+      "submitCountOfTotal_other": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
       "submitReview": "送出審查",
       "blockedRequestChanges": "請先填寫摘要或新增至少一則留言，才能要求變更。",
       "blockedComment": "請先填寫摘要或新增至少一則留言，才能送出留言型審查。"
@@ -3443,7 +3454,7 @@
       "planStatusLapsed": " · 已結束",
       "planEnded": "組織的試用期已結束，且沒有使用中的方案。",
       "manageBilling": "管理帳單",
-      "renamePlaceholder": "組織名稱",
+      "renamePlaceholder": "請輸入組織名稱",
       "renameTitle": "重新命名組織"
     },
     "inviteMember": {
@@ -4081,7 +4092,13 @@
     "providerUnavailable": "供應商目前無法使用。請稍後再重新傳送。"
   },
   "settingsTools": {
-    "confirmTitle": "確認此變更？"
+    "confirmTitle": "確認此變更？",
+    "guarded": {
+      "spendAlertsOff": "要關閉支出警示嗎？你將不再收到支出超過門檻和每小時飆升的通知。",
+      "balanceAlertsOff": "要關閉餘額警示嗎？當你的額度偏低時，你將不再收到通知。",
+      "securityFindingsOff": "要關閉安全性發現嗎？你將不再收到有關新安全性發現的通知。",
+      "hideBalanceOn": "要隱藏你的餘額嗎？額度餘額將不再顯示於個人資料畫面和組織中心。"
+    }
   },
   "appActions": {
     "start": {
@@ -4841,12 +4858,15 @@
     "inputDescription": "使用 Enkrypt AI 掃描每個輸入，包括工具結果。當 Enkrypt 無法使用時，請求不會被拒絕，而是在未經掃描的情況下傳送。",
     "outputTitle": "輸出護欄",
     "outputDescription": "在成員收到回應前，使用 Enkrypt AI 掃描回應。除非您開啟，否則為關閉狀態。",
+    "outputUnavailable": "Kilo 尚未為這個組織啟用輸出掃描，因此回應不會被檢查，這裡也沒有可設定的項目。如需申請啟用，請聯絡 {{supportEmail}}。",
     "detectorsHint": "封鎖會拒絕被標記的請求。僅記錄只會記錄該請求，不會延遲請求。",
     "detectorsHintOutput": "封鎖會讓被標記的回應失敗。僅記錄只會記錄該回應，不會延遲回應。",
     "choiceLog": "僅記錄",
     "applyTo": "套用至",
     "applyToAllMembers": "所有成員",
     "applyKiloDefault": "套用 Kilo 預設值",
+    "applyKiloDefaultEnglishNote": "Kilo 的預設政策文字是英文，因為 Kilo Gateway 會完全依原文套用。",
+    "applyKiloDefaultReplaceMessage": "Kilo 的預設政策以英文編寫，並取代你在政策違規中設定的內容。你在政策文字欄位中輸入的文字無法復原。",
     "invalidSavedTitle": "無法讀取已儲存的輸入偵測器設定",
     "invalidSavedBody": "在重新儲存輸入偵測器之前，請求會遭到封鎖。下方偵測器會從 Kilo 預設值開始。",
     "invalidSavedOutputTitle": "無法讀取已儲存的輸出偵測器設定",
@@ -4981,6 +5001,7 @@
     "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
     "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
     "providersEmpty": "沒有符合此搜尋的供應商。",
+    "providersNone": "此組織沒有可用的供應商。",
     "allowAllShown": "允許所有顯示項目",
     "denyAllShown": "拒絕所有顯示項目",
     "gatewaysDescription": "Kilo 會透過 Vercel AI Gateway 或 OpenRouter 路由模型請求。停用的閘道會使這些請求失敗。",

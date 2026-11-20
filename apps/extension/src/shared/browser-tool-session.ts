@@ -3048,8 +3048,7 @@ export const createBrowserToolSession = ({
 
       if (request === undefined) {
         return {
-          error:
-            'No matching network request. Use kilo_browser_network_requests for the numbered list.',
+          error: 'No matching network request. List the network requests for the numbered list.',
           ok: false,
         };
       }
@@ -3586,7 +3585,7 @@ export const createBrowserToolSession = ({
 
         if (list === undefined || tool === undefined) {
           return {
-            error: `WebMCP tool "${parsed.data.name}" is not available. Call kilo_browser_webmcp_list first.`,
+            error: `WebMCP tool "${parsed.data.name}" is not available. List the page's WebMCP tools first.`,
             ok: false,
           };
         }

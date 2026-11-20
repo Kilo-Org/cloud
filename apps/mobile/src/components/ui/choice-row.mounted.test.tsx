@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { i18n } from '@/i18n';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { formatList } from '@/lib/format';
 
 import { ChoiceRow } from './choice-row';
 
@@ -60,10 +62,11 @@ function rowControl(root: TestRenderer.ReactTestInstance) {
   return root.find(node => Object.is(node.type, 'Pressable'));
 }
 
-afterEach(() => {
+afterEach(async () => {
   act(() => renderer?.unmount());
   renderer = undefined;
   vi.mocked(Haptics.selectionAsync).mockReset();
+  await i18n.changeLanguage('en');
 });
 
 describe('ChoiceRow accessible name', () => {
@@ -90,7 +93,7 @@ describe('ChoiceRow accessible name', () => {
       })
     );
 
-    expect(control.props.accessibilityLabel).toBe('Lenient and Only serious problems');
+    expect(control.props.accessibilityLabel).toBe('Lenient, Only serious problems');
   });
 
   it('keeps the name while the row reports a save in flight', () => {
@@ -104,12 +107,25 @@ describe('ChoiceRow accessible name', () => {
       })
     );
 
-    expect(control.props.accessibilityLabel).toBe('Lenient and Only serious problems');
+    expect(control.props.accessibilityLabel).toBe('Lenient, Only serious problems');
     expect(control.props.accessibilityState).toEqual({
       checked: false,
       disabled: true,
       busy: true,
     });
+  });
+
+  // The Hindi catalog writes "कोड लिखें" beside "कोड लिखें और बदलें", so a list
+  // conjunction reads the caption as a second offered item.
+  it('separates a Hindi label from its caption with punctuation', async () => {
+    await i18n.changeLanguage('hi');
+    const label = i18n.t('agentChat.modeOptions.code');
+    const description = i18n.t('agentChat.modeOptions.codeDescription');
+
+    const control = rowControl(renderRow({ label, description, selected: false }));
+
+    expect(control.props.accessibilityLabel).toBe(`${label}, ${description}`);
+    expect(control.props.accessibilityLabel).not.toBe(formatList([label, description], 'hi'));
   });
 
   it('leaves a custom-content row on the name its own text builds', () => {

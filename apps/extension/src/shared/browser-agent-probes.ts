@@ -124,29 +124,51 @@ const readProbePayload = async <Parsed>(input: {
  * outside the document's scroll area, `aria-hidden`, `display:none`,
  * `visibility:hidden`, or text whose colour equals its background. Returns the
  * hidden text nodes' collapsed text, which the snapshot renderer matches
- * against its `- text:` leaves.
+ * against its lines.
+ *
+ * Only text equal to one of `candidates` (the names the snapshot is about to
+ * print) is checked and returned: the renderer asks about those names and no
+ * other, so the answer for every printed line is the one a check of every text
+ * node gives. Computed styles, resolved backgrounds and per-element verdicts
+ * are read once per element, so a large page costs one style read per element
+ * that holds printed text, not one per text node and ancestor.
  */
-export const HIDDEN_TEXT_PROBE_EXPRESSION = `(() => {
+export const hiddenTextProbeExpression = (candidates: readonly string[]): string => `(() => {
+  var CANDIDATES = new Set(${JSON.stringify(candidates)});
   var HIDDEN = [];
-  var seen = typeof Set === 'function' ? new Set() : null;
+  var seen = new Set();
   var collapse = function (value) { return String(value == null ? '' : value).replace(/\\s+/g, ' ').trim(); };
-  var add = function (value) { var text = collapse(value); if (text === '') { return; } if (seen !== null) { if (seen.has(text)) { return; } seen.add(text); } HIDDEN.push(text); };
-  var colorEqualsBackground = function (element) {
-    var own = getComputedStyle(element);
-    var color = own.color;
+  var add = function (value) { var text = collapse(value); if (!CANDIDATES.has(text) || seen.has(text)) { return; } seen.add(text); HIDDEN.push(text); };
+  var styles = new Map();
+  var styleOf = function (element) {
+    var style = styles.get(element);
+    if (style === undefined) { style = getComputedStyle(element); styles.set(element, style); }
+    return style;
+  };
+  var backgrounds = new Map();
+  var isTransparent = function (background) { return background === '' || background === 'transparent' || /rgba\\(\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*0\\s*\\)/.test(background); };
+  var backgroundOf = function (element) {
+    var chain = [];
     var node = element;
+    var resolved = null;
     while (node !== null && node.nodeType === 1) {
-      var style = getComputedStyle(node);
-      var background = style.backgroundColor;
-      var transparent = background === '' || background === 'transparent' || /rgba\\(\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*0\\s*\\)/.test(background);
-      if (!transparent) { return color === background; }
+      if (backgrounds.has(node)) { resolved = backgrounds.get(node); break; }
+      chain.push(node);
+      var background = styleOf(node).backgroundColor;
+      if (!isTransparent(background)) { resolved = background; break; }
       node = node.parentElement;
     }
-    return false;
+    for (var index = 0; index < chain.length; index += 1) { backgrounds.set(chain[index], resolved); }
+    return resolved;
   };
-  var isHiddenElement = function (element) {
+  var colorEqualsBackground = function (element) {
+    var background = backgroundOf(element);
+    return background !== null && styleOf(element).color === background;
+  };
+  var verdicts = new Map();
+  var checkHiddenElement = function (element) {
     if (element.closest('[aria-hidden="true"]') !== null) { return true; }
-    var style = getComputedStyle(element);
+    var style = styleOf(element);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') { return true; }
     var rects = element.getClientRects();
     if (rects.length === 0) { return true; }
@@ -161,14 +183,22 @@ export const HIDDEN_TEXT_PROBE_EXPRESSION = `(() => {
     if (left > scrollWidth || top > scrollHeight) { return true; }
     return colorEqualsBackground(element);
   };
+  var isHiddenElement = function (element) {
+    var verdict = verdicts.get(element);
+    if (verdict === undefined) { verdict = checkHiddenElement(element); verdicts.set(element, verdict); }
+    return verdict;
+  };
   var root = document.body || document.documentElement;
-  if (root === null) { return JSON.stringify({ hidden: [] }); }
+  if (root === null || CANDIDATES.size === 0) { return JSON.stringify({ hidden: [] }); }
   if (isHiddenElement(root)) { add(root.textContent); return JSON.stringify({ hidden: HIDDEN }); }
   var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
   var node = walker.nextNode();
   while (node !== null) {
     var parent = node.parentElement;
-    if (parent !== null && collapse(node.data) !== '' && isHiddenElement(parent)) { add(node.data); }
+    if (parent !== null) {
+      var text = collapse(node.data);
+      if (CANDIDATES.has(text) && !seen.has(text) && isHiddenElement(parent)) { add(text); }
+    }
     node = walker.nextNode();
   }
   return JSON.stringify({ hidden: HIDDEN });
@@ -176,14 +206,22 @@ export const HIDDEN_TEXT_PROBE_EXPRESSION = `(() => {
 
 const hiddenTextPayloadSchema = z.object({ hidden: z.array(z.string()).optional() });
 
-/** The hidden text one frame hides, as collapsed strings. */
+/**
+ * Which of `candidates` one frame hides, as collapsed strings. No candidate
+ * means nothing to ask, so the frame is not probed.
+ */
 export const readFrameHiddenText = async (
   session: Pick<BrowserToolPageSession, 'send'>,
-  frameId: string
+  frameId: string,
+  candidates: readonly string[]
 ): Promise<ReadonlySet<string>> => {
+  if (candidates.length === 0) {
+    return new Set();
+  }
+
   try {
     const payload = await readProbePayload({
-      expression: HIDDEN_TEXT_PROBE_EXPRESSION,
+      expression: hiddenTextProbeExpression(candidates),
       frameId,
       schema: hiddenTextPayloadSchema,
       session,

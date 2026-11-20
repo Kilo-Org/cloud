@@ -19,7 +19,9 @@
     "presenceStatus": "አስተናጋጆች፦ {{connection}}",
     "commandStatus": "የትዕዛዝ መድረስ፦ {{status}}",
     "delivered": "ደርሷል",
-    "expired": "ጊዜው አልፏል"
+    "expired": "ጊዜው አልፏል",
+    "recoveryGaps_one": "{{displayCount}} ክፍል ከዚህ የውይይት መዝገብ ጠፍቷል።",
+    "recoveryGaps_other": "{{displayCount}} ክፍሎች ከዚህ የውይይት መዝገብ ጠፍተዋል።"
   },
   "common": {
     "manageOnWeb": "በድር ላይ ያስተዳድሩ",
@@ -138,6 +140,7 @@
     "keepRunning": "እንዲሠራ ተወው",
     "newSession": "አዲስ ክፍለ ጊዜ",
     "noModelsAvailable": "ምንም ሞዴሎች የሉም",
+    "modelRetires": "በ{{date}} ጡረታ ይወጣል",
     "notFound": "አልተገኘም።",
     "online": "በመስመር ላይ",
     "open": "{{name}}ን ክፈት",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።",
     "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር",
     "legalDocumentEnglishOnly": "ይህ ሰነድ በእንግሊዝኛ ብቻ ይገኛል።",
-    "organizationTrialEndedBilling": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።"
+    "organizationTrialEndedBilling": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
+    "organizationTrialEndedBillingAtKiloAi": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
+    "viewOnGitHub": "PRን በGitHub እይ"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -505,7 +510,7 @@
     "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
     "changelogAreas": {
       "signIn": "መግቢያ",
-      "profileOrganizations": "መገለጫ እና ድርጅቶች"
+      "profileOrganizations": "መገለጫና ድርጅቶች"
     }
   },
   "preferences": {
@@ -750,6 +755,9 @@
       "couldNotLoadMore": "ተጨማሪ አስተያየቶችን መጫን አልተቻለም።",
       "retryLoadingMore": "ተጨማሪ አስተያየቶችን ለመጫን እንደገና ሞክር",
       "loadMoreComments": "ተጨማሪ አስተያየቶችን ጫን",
+      "conversationTruncated": "የመጀመሪያዎቹ {{displayCount}} አስተያየቶች ብቻ ይታያሉ።",
+      "conversationTruncated_one": "የመጀመሪያዎቹ {{displayCount}} አስተያየቶች ብቻ ይታያሉ።",
+      "conversationTruncated_other": "የመጀመሪያዎቹ {{displayCount}} አስተያየቶች ብቻ ይታያሉ።",
       "addReaction": "ምላሽ ጨምር",
       "reactionPill": "{{emoji}} ምላሽ፣ {{displayCount}} {{countLabel}}",
       "reaction_one": "ምላሽ",
@@ -879,7 +887,6 @@
       "noAccess": "የዚህን ማከማቻ ፍተሻዎች ለማየት ፈቃድ የለህም።",
       "couldNotLoad": "ፍተሻዎችን መጫን አልተቻለም።",
       "retryChecks": "ፍተሻዎችን እንደገና ሞክር",
-      "viewOnGitHub": "PRን በGitHub እይ",
       "noChecksReported": "ምንም ፍተሻዎች አልተዘገቡም",
       "passed": "{{displayCount}} አልፈዋል",
       "passed_one": "{{displayCount}} አልፈዋል",
@@ -934,9 +941,9 @@
       "checkFailedTitleGitLab": "የGitLab ግንኙነቱን መፈተሽ አልተቻለም።",
       "checkFailedTitleBitbucket": "የBitbucket ግንኙነቱን መፈተሽ አልተቻለም።",
       "providerCheckFailedMessage": "አቅራቢው ላይ መድረስ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
-      "reconnectTitle": "GitHubን እንደገና ማገናኘት",
-      "reconnectTitleGitLab": "GitLabን እንደገና ማገናኘት",
-      "reconnectTitleBitbucket": "Bitbucketን እንደገና ማገናኘት",
+      "reconnectTitle": "GitHubን እንደገና አገናኝ",
+      "reconnectTitleGitLab": "GitLabን እንደገና አገናኝ",
+      "reconnectTitleBitbucket": "Bitbucketን እንደገና አገናኝ",
       "reconnectDescription": "የGitHub ግንኙነትህ ፈቃድ ተሰርዟል።",
       "gitlabDescription": "የማዋሃድ ጥያቄዎችን በሞባይል ይገምግሙ",
       "gitlabInstanceMismatchTitle": "የGitLab ግንኙነት ለሌላ ኢንስታንስ ነው",
@@ -963,6 +970,8 @@
       "pendingComment": "ያልተላኩ አስተያየቶች",
       "pendingComment_other": "ያልተላኩ አስተያየቶች",
       "submitCountOfTotal": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_one": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_other": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
       "submitReview": "ግምገማውን አስገባ",
       "partialPostedFresh": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
       "partialPostedFresh_one": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
@@ -1387,7 +1396,7 @@
     "followReviewMd": "REVIEW.mdን ይከተሉ",
     "followReviewMdSubtitle": "በእያንዳንዱ ማከማቻ ውስጥ ያሉትን የREVIEW.md መመሪያ ፋይሎች ይከተሉ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።"
+      "notConnectedReadOnlyPlan": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ስለዚህ ባለቤት በkilo.ai ላይ የክፍያ መረጃውን ማዘመን አለበት።"
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
@@ -1396,7 +1405,7 @@
       "managedOnWebRepositories": "ለ{{organization}} ማከማቻዎችን ከኮምፒውተር በድር ላይ ይምረጡ።",
       "description": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "descriptionReconnect": "ለ{{organization}} አዲስ የሥራ ቦታ መዳረሻ ቶከን እንደገና ይፍጠሩና ከታች ይለጥፉት።",
-      "descriptionOverview": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና በሚቀጥለው ማያ ገጽ ላይ ይለጥፉት።",
+      "descriptionOverview": "የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና በሚቀጥለው ማያ ገጽ ላይ ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
       "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
       "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
@@ -1720,7 +1729,7 @@
       "dueThisWeekDetail_one": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "dueThisWeekDetail_other": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "noDeadline": "ምንም ጊዜ ገደብ የለም",
-      "reviewSlaAssignment": "የተወሰኑትን የSLA ጊዜ ገደቦች ይገምግሙ",
+      "reviewSlaAssignment": "የSLA ምደባን ይገምግሙ",
       "allOpenFindingsTracked": "ሁሉም ክፍት ግኝቶች በክትትል ላይ ናቸው"
     },
     "dismiss": {
@@ -2788,7 +2797,9 @@
     "modelPicker": {
       "title": "የሞዴል ምርጫ",
       "favorites": "ተወዳጆች",
-      "noModelsDescription": "ለመምረጥ ምንም ሞዴሎች የሉም።"
+      "noModelsDescription": "ለመምረጥ ምንም ሞዴሎች የሉም።",
+      "allUnavailableTitle": "ምንም ሞዴል መጠቀም አይቻልም",
+      "allUnavailableDescription": "የአቅራቢ ቁልፍ ጨምረው እንደገና ይሞክሩ።"
     },
     "modelSelector": {
       "provider": "አቅራቢ {{id}}",
@@ -3621,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "የድርጅቱን ስም ይቀይሩ",
-      "renamePlaceholder": "የድርጅት ስም",
+      "renamePlaceholder": "የድርጅት ስም ያስገቡ",
       "balance": "ቀሪ ሂሳብ",
       "plan": "ዕቅድ",
       "planTeams": "Teams",
@@ -4081,7 +4092,13 @@
     "providerUnavailable": "አቅራቢው አሁን አይገኝም። በአጭር ጊዜ ውስጥ በድጋሚ ይላኩ።"
   },
   "settingsTools": {
-    "confirmTitle": "ይህን ለውጥ ያረጋግጡ?"
+    "confirmTitle": "ይህን ለውጥ ያረጋግጡ?",
+    "guarded": {
+      "spendAlertsOff": "የወጪ ማንቂያዎችን ያጥፉ? ስለ ወጪ ጣሪያ መሻገር እና ስለ በየሰዓቱ ጭማሪዎች ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "balanceAlertsOff": "የቀሪ ሂሳብ ማንቂያዎችን ያጥፉ? ክሬዲቶችዎ ሲያንሱ ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "securityFindingsOff": "የደህንነት ግኝቶችን ያጥፉ? ስለ አዳዲስ የደህንነት ግኝቶች ማሳወቂያዎችን መቀበል ያቆማሉ።",
+      "hideBalanceOn": "ቀሪ ሂሳቦችዎን ይደብቁ? የክሬዲት ቀሪ ሂሳቦች በመገለጫ ገጾች እና በድርጅት ማዕከል ላይ ከእንግዲህ አይታዩም።"
+    }
   },
   "appActions": {
     "start": {
@@ -4841,12 +4858,15 @@
     "inputDescription": "የመሣሪያ ውጤቶችን ጨምሮ እያንዳንዱን ግብዓት በEnkrypt AI ይቃኛል። Enkrypt በማይገኝበት ጊዜ ጥያቄዎች ውድቅ ከመደረግ ይልቅ ሳይቃኙ ይላካሉ።",
     "outputTitle": "የውጤት ጥበቃ ገደቦች",
     "outputDescription": "አባላት ምላሾችን ከመቀበላቸው በፊት በEnkrypt AI ይቃኛል። እርስዎ ካላበሩት በስተቀር ጠፍቷል።",
+    "outputUnavailable": "Kilo ለዚህ ድርጅት የውጤት ቅኝት አልከፈተም፣ ስለዚህ ምላሾች አይመረመሩም እና እዚህ የሚያዘጋጁት ነገር የለም። እንዲከፈት ለመጠየቅ {{supportEmail}} ያግኙ።",
     "detectorsHint": "«አግድ» የተጠቆመ ጥያቄን ውድቅ ያደርጋል። «መዝግብ ብቻ» ጥያቄውን ሳያዘገይ ይመዘግበዋል።",
     "detectorsHintOutput": "«አግድ» የተጠቆመ ምላሽን ያከሽፋል። «መዝግብ ብቻ» ምላሹን ሳያዘገይ ይመዘግበዋል።",
     "choiceLog": "መዝግብ ብቻ",
     "applyTo": "የሚተገበርበት",
     "applyToAllMembers": "ሁሉም አባላት",
     "applyKiloDefault": "የKilo ነባሪን ተግብር",
+    "applyKiloDefaultEnglishNote": "የKilo ነባሪ የፖሊሲ ጽሑፍ በእንግሊዝኛ ነው፣ ምክንያቱም Kilo Gateway እንደተጻፈው በትክክል ይተገብረዋል።",
+    "applyKiloDefaultReplaceMessage": "የKilo ነባሪ ፖሊሲ በእንግሊዝኛ የተጻፈ ሲሆን በፖሊሲ ጥሰት ውስጥ ያስቀመጡትን ይተካል። በፖሊሲ ጽሑፍ መስክ ውስጥ ያስገቡት ጽሑፍ መመለስ አይቻልም።",
     "invalidSavedTitle": "የተቀመጡ የግብዓት መመርመሪያ ቅንብሮችን ማንበብ አልተቻለም",
     "invalidSavedBody": "የግብዓት መመርመሪያዎቹ እንደገና እስኪቀመጡ ድረስ ጥያቄዎች ይታገዳሉ። ከታች ያሉት መመርመሪያዎች ከKilo ነባሪ ይጀምራሉ።",
     "invalidSavedOutputTitle": "የተቀመጡ የውጤት መመርመሪያ ቅንብሮችን ማንበብ አልተቻለም",
@@ -4981,6 +5001,7 @@
     "providersDescription": "Kilo ለዚህ ድርጅት ወደ አንድ አቅራቢ ማዘዋወሩን እንዲያቆም አቅራቢውን ያጥፉት።",
     "providersNeedCatalog": "ሙሉው የሞዴል ካታሎግ እስኪጫን ድረስ የአቅራቢ ማብሪያ/ማጥፊያዎች ሊቀየሩ አይችሉም። እነሱን ለማርትዕ ከላይ ያለውን እንደገና ሞክር ይንኩ።",
     "providersEmpty": "ከዚህ ፍለጋ ጋር የሚዛመዱ አቅራቢዎች የሉም።",
+    "providersNone": "ለዚህ ድርጅት የሚገኙ አቅራቢዎች የሉም።",
     "allowAllShown": "የሚታዩትን ሁሉ ፍቀድ",
     "denyAllShown": "የሚታዩትን ሁሉ ከልክል",
     "gatewaysDescription": "Kilo የሞዴል ጥያቄዎችን በVercel AI Gateway ወይም በOpenRouter በኩል ያዘዋውራል። የተሰናከለ ጌትዌይ እነዚያን ጥያቄዎች ያከሽፋል።",

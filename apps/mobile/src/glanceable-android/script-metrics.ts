@@ -36,17 +36,24 @@ const ROBOTO: FontMetrics = { ascent: BASELINE, box: LATIN_LINE };
 type ScriptMetrics = FontMetrics & { match: RegExp };
 
 /**
- * One script's fallback font: `metrics` are that font's hhea ascent and box,
- * with Android's font padding already added to the ascent. `tall` marks a
- * script the old 1.62em box covered, whose shipping box is therefore floored
- * there: a box that ships today never shrinks.
+ * One script's fallback font: `metrics` are that font's hhea ascent and box.
+ * Android draws a line with its font padding added above the baseline, so the
+ * ascent gains `PADDING` and the box gains the same `PADDING`: the descent
+ * below the baseline stays the font's own, and the box cannot cut into a
+ * glyph's tail. `tall` marks a script the old 1.62em box covered, whose
+ * shipping box is therefore floored there: a box that ships today never
+ * shrinks.
  */
 function script(
   match: RegExp,
   metrics: { ascent: number; box: number; tall?: boolean }
 ): ScriptMetrics {
   const floor = metrics.tall === true ? TALL_LINE : LATIN_LINE;
-  return { ascent: metrics.ascent + PADDING, box: Math.max(metrics.box, floor), match };
+  return {
+    ascent: metrics.ascent + PADDING,
+    box: Math.max(metrics.box + PADDING, floor),
+    match,
+  };
 }
 
 /**

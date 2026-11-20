@@ -35,31 +35,31 @@ describe('Line box per script', () => {
 
   it('gives Thai and Myanmar the box of their own fallback font', () => {
     const latin = Math.ceil(11 * LATIN_LINE);
-    expect(lineBox('กำลังทำงาน', 11)).toBe(16);
+    expect(lineBox('กำลังทำงาน', 11)).toBe(17);
     expect(lineBox('กำลังทำงาน', 11)).toBeGreaterThan(latin);
     expect(lineBox('အလုပ်လုပ်နေသည်', 11)).toBeGreaterThan(lineBox('กำลังทำงาน', 11));
-    expect(lineBox('အလုပ်လုပ်နေသည်', EM)).toBe(219);
+    expect(lineBox('အလုပ်လုပ်နေသည်', EM)).toBe(232);
   });
 
   it('takes the measured box of every script outside the old range', () => {
-    expect(lineBox('עובד', EM)).toBe(137);
-    expect(lineBox('ກຳລັງເຮັດວຽກ', EM)).toBe(165);
-    expect(lineBox('កំពុងធ្វើការ', EM)).toBe(187);
-    expect(lineBox('მუშაობს', EM)).toBe(136);
-    expect(lineBox('աշխատում', EM)).toBe(136);
-    expect(lineBox('በመስራት ላይ', EM)).toBe(137);
+    expect(lineBox('עובד', EM)).toBe(150);
+    expect(lineBox('ກຳລັງເຮັດວຽກ', EM)).toBe(178);
+    expect(lineBox('កំពុងធ្វើការ', EM)).toBe(200);
+    expect(lineBox('მუშაობს', EM)).toBe(149);
+    expect(lineBox('աշխատում', EM)).toBe(149);
+    expect(lineBox('በመስራት ላይ', EM)).toBe(150);
   });
 
   it('never shrinks a script the old 1.62em box covered', () => {
     expect(lineBox('काम करत आहे', EM)).toBe(EM * TALL_LINE);
     // Arabic measures taller than the floor it shipped with.
-    expect(lineBox('جارٍ العمل', EM)).toBe(171);
-    expect(lineBox('العمل', 11)).toBe(Math.ceil(11 * 1.703));
+    expect(lineBox('جارٍ العمل', EM)).toBe(184);
+    expect(lineBox('العمل', 11)).toBe(Math.ceil(11 * (1.703 + 0.128)));
   });
 
   it('takes the tallest box among a mixed line', () => {
-    expect(lineBox('Aก', EM)).toBe(Math.ceil(EM * 1.372));
-    expect(lineBox('Aအ', EM)).toBe(Math.ceil(EM * 2.184));
+    expect(lineBox('Aก', EM)).toBe(Math.ceil(EM * (1.372 + 0.128)));
+    expect(lineBox('Aအ', EM)).toBe(Math.ceil(EM * (2.184 + 0.128)));
   });
 });
 
@@ -84,25 +84,32 @@ describe('Box top', () => {
     expect(boxTop('Working', 20, 92)).toBe(92 - 21.12);
   });
 
-  it('starts a taller script box one padded ascent above the baseline', () => {
-    // 13sp Myanmar: hhea ascent 1.324 + 0.128 padding = 1.452em, so 18.876dp;
-    // box ceil(13 * 2.184) = 29dp. The box must start at the ascent, not a
-    // half-growth above it, or the glyph descent hangs outside the box.
+  it('gives a taller script a box that holds its whole descent', () => {
+    // 13sp Myanmar (`မြန်မာ`): hhea ascent 1.324 + 0.128 font
+    // padding = 1.452em (18.876dp); hhea box 2.184 + the same 0.128 padding =
+    // 2.312em, so ceil(13 * 2.312) = 31dp. The box must start one ascent above
+    // the baseline, and the padding must reach the box as well as the ascent:
+    // otherwise the box's descent (2.312 - 1.452 = 0.860em) is 0.128em short of
+    // the glyphs' own descent and their tails hang outside it.
     const size = 13;
     const baseline = 100;
-    const ascentEm = 1.452;
-    const box = 29;
-    expect(ascent('မြန်မာ', size)).toBeCloseTo(ascentEm * size, 10);
-    expect(lineBox('မြန်မာ', size)).toBe(box);
-    expect(boxTop('မြန်မာ', size, baseline)).toBeCloseTo(baseline - ascentEm * size, 10);
-    const bottom = boxTop('မြန်မာ', size, baseline) + lineBox('မြန်မာ', size);
-    // baseline - 18.876 + 29 = baseline + 10.124: the descent the box carries.
-    expect(bottom).toBeCloseTo(baseline + 10.124, 10);
-    expect(bottom).toBeGreaterThanOrEqual(baseline + 0.732 * size);
-    // The half-growth version ended at baseline + 4.6, 4.9dp short of the ink.
-    expect(boxTop('မြန်မာ', size, baseline)).toBeGreaterThan(
-      baseline - ascentEm * size - (box - Math.ceil(size * LATIN_LINE)) / 2
-    );
+    const MEASURED = 'မြန်မာ';
+    expect(ascent(MEASURED, size)).toBeCloseTo(1.452 * size, 10);
+    expect(lineBox(MEASURED, size)).toBe(31);
+    expect(boxTop(MEASURED, size, baseline)).toBeCloseTo(baseline - 1.452 * size, 10);
+
+    // The box runs 18.876dp up and 31 - 18.876 = 12.124dp down, which covers the
+    // glyphs' 0.860em (11.18dp) descent with headroom.
+    const bottom = boxTop(MEASURED, size, baseline) + lineBox(MEASURED, size);
+    expect(bottom).toBeCloseTo(baseline + 12.124, 10);
+    expect(bottom).toBeGreaterThanOrEqual(baseline + 0.86 * size);
+    expect(2.312 - 1.452).toBeCloseTo(0.86, 10);
+
+    // Without the padding on the box the bottom fell 0.128em (1.664dp) short of
+    // the descent, and with the half-growth top it was 5.5dp shorter again.
+    const unpadded = baseline - 1.452 * size + Math.ceil(size * 2.184);
+    expect(unpadded).toBeCloseTo(baseline + 10.124, 10);
+    expect(unpadded).toBeLessThan(baseline + 0.86 * size);
   });
 
   it('keeps a taller line above the same baseline', () => {
@@ -114,20 +121,21 @@ describe('Box top', () => {
   it('anchors the box edges exactly, with the Latin numbers unchanged', () => {
     // Every number below is the pre-change value of the same function, written
     // out: for Latin the dropped half-growth term was exactly 0, so these are
-    // the numbers this file shipped before the change.
+    // the doubles this file shipped before the change.
     expect(boxTop('Working', 11, 100)).toBe(88.384);
+    expect(boxTop('Working', 13, 100)).toBe(86.27199999999999);
     expect(boxTop('Working', 20, 92)).toBe(70.88);
-    for (const [size, top, boxTopAt100, aboveAt100, inAt10, centredAt50] of [
-      [11, 10, 88.384, 96.616, 21.616, 54.116],
-      [13, 10, 86.272, 95.728, 23.728, 54.728],
-      [20, 10, 78.88, 94.12, 31.12, 57.62],
+    for (const [size, boxTopAt100, aboveAt100, inAt10, centredAt50] of [
+      [11, 88.384, 96.616, 21.616, 54.116],
+      [13, 86.27199999999999, 95.72800000000001, 23.728, 54.728],
+      [20, 78.88, 94.12, 31.12, 57.620000000000005],
     ] as const) {
-      expect(boxTop('Working', size, 100)).toBeCloseTo(boxTopAt100, 10);
-      expect(baselineAbove('Working', size, 100)).toBeCloseTo(aboveAt100, 10);
-      // The top clamp is `baselineIn`, and it puts the box exactly on `top`.
-      expect(insideBand({ value: 'Working', size, baseline: 0, top })).toBeCloseTo(inAt10, 10);
-      expect(boxTop('Working', size, inAt10)).toBeCloseTo(top, 10);
-      expect(centredLineBaseline('Working', size, 50)).toBeCloseTo(centredAt50, 10);
+      expect(boxTop('Working', size, 100)).toBe(boxTopAt100);
+      expect(baselineAbove('Working', size, 100)).toBe(aboveAt100);
+      // The top clamp is `baselineIn`, and it puts the box exactly on the top.
+      expect(insideBand({ value: 'Working', size, baseline: 0, top: 10 })).toBe(inAt10);
+      expect(boxTop('Working', size, inAt10)).toBe(10);
+      expect(centredLineBaseline('Working', size, 50)).toBe(centredAt50);
       expect(centredLineBaseline('Working', size, 50)).toBe(centredBaseline(size, 50));
     }
     // A taller script lands on both edges exactly too.

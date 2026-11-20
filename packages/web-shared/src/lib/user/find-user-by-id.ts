@@ -1,4 +1,4 @@
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
  */
 export async function findUserById(
   userId: string,
-  fromDb: typeof db = db
+  fromDb: DrizzleConnection = db
 ): Promise<User | undefined> {
   return await fromDb.query.kilocode_users.findFirst({
     where: eq(kilocode_users.id, userId),

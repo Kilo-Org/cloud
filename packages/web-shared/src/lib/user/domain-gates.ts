@@ -9,7 +9,7 @@ import type { User } from '@kilocode/db/schema';
 
 export function isUserBlacklistedByDomain(
   existingUser: Pick<User, 'google_user_email'>,
-  fromDb: typeof db = db
+  fromDb: Pick<typeof db, 'select'> = db
 ): Promise<boolean> {
   return isEmailBlacklisted(existingUser.google_user_email, fromDb);
 }

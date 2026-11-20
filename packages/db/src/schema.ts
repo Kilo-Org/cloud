@@ -2750,6 +2750,11 @@ export const payment_methods = pgTable(
   ]
 );
 export type MicrodollarUsage = typeof microdollar_usage.$inferSelect;
+// Storage parameters that Drizzle cannot declare: migration 0374 sets
+// `autovacuum_vacuum_insert_scale_factor = 0` and
+// `autovacuum_vacuum_insert_threshold = 500000`, so insert-triggered vacuum
+// keeps the newest pages all-visible for index-only scans such as the
+// spend-alert hourly rollup. `schema.test.ts` asserts them.
 export const microdollar_usage = pgTable(
   'microdollar_usage',
   {

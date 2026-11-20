@@ -286,6 +286,18 @@ it('migration 0370 keeps one busy-table lock per transaction', () => {
   expect(createTables).not.toContain('ALTER TABLE');
 });
 
+it('migration 0374 keeps insert-triggered autovacuum frequent on microdollar_usage', async () => {
+  const result = await schemaTestDb.db.execute<{ reloptions: string[] | null }>(sql`
+    SELECT reloptions FROM pg_class WHERE oid = to_regclass('public.microdollar_usage')
+  `);
+  expect(result.rows[0]?.reloptions).toEqual(
+    expect.arrayContaining([
+      'autovacuum_vacuum_insert_scale_factor=0',
+      'autovacuum_vacuum_insert_threshold=500000',
+    ])
+  );
+});
+
 it('migration 0345 backfills old owners and folders to activity and copies built-in agent overrides', async () => {
   const migration = fs.readFileSync(
     path.join(__dirname, 'migrations/0345_cloud_agent_stacked_workspaces.sql'),

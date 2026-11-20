@@ -28,7 +28,7 @@ export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid';
 export const LANDING_URL =
   process.env.NODE_ENV === 'production' ? 'https://kilo.ai' : 'http://localhost:3001';
 
-type AppUrlEnvironment = {
+export type AppUrlEnvironment = {
   appUrlOverride?: string;
   nodeEnv?: string;
   port?: string;

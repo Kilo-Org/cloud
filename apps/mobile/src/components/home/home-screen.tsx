@@ -15,10 +15,11 @@ import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { NewTaskFromPictureButton } from '@/components/home/new-task-from-picture-button';
 import { ProductChoices } from '@/components/home/product-choices';
-import { ContextControl } from '@/components/context-control';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { UpNextSection } from '@/components/todos/up-next-section';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { SCREEN_BODY_CLASS, SCREEN_SECTION_GAP_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 
@@ -34,7 +35,8 @@ export function HomeScreen() {
   const homeBriefing = useHomeBriefing();
   const refetch = context.isError ? context.refetch : sessions.refetch;
   const headerTitle = buildTimedGreeting();
-  const liveContent = liveSessionContent(context, sessions);
+  const connectivity = useCommittedConnectivityStatus();
+  const liveContent = liveSessionContent(context, sessions, connectivity);
   const centerFeedback = liveContent === 'error' && !context.isReady && !context.accountReady;
 
   const handleRefresh = useCallback(() => {
@@ -83,6 +85,7 @@ export function HomeScreen() {
           <ContextControl failurePlacement={context.organizationId === null ? 'row' : 'none'} />
         }
         allowInlineActionsStacking={false}
+        inlineActionsMinWidth={CONTEXT_CONTROL_INLINE_MIN_DP}
       />
       <View className="flex-1" style={centerFeedback ? sideInsetStyle : undefined}>
         {centerFeedback ? (

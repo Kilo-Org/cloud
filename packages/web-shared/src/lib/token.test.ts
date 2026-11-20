@@ -331,6 +331,30 @@ describe('Token Functions', () => {
       ).toMatch(/^Invalid token \([a-f0-9-]+\)$/);
     });
 
+    it('marks only an attested cloud-agent-next runtime bearer as runtime-proxied', () => {
+      const runtimeToken = signedToken({
+        aud: KILO_API_AUDIENCE,
+        runtimeAuthorization: {
+          id: '11111111-1111-4111-8111-111111111111',
+          resourceKind: 'cloud-agent-next',
+          resourceId: 'agent_123',
+        },
+      });
+      const attested = validateAuthorizationHeader(
+        new Headers({ authorization: `Bearer ${runtimeToken}` }),
+        { runtimeProxyAttestationVerified: true }
+      );
+      const personal = validateAuthorizationHeader(
+        new Headers({ authorization: `Bearer ${generateApiToken(mockUser)}` }),
+        { runtimeProxyAttestationVerified: true }
+      );
+
+      expect(attested.error).toBeUndefined();
+      expect(attested.cloudAgentRuntimeProxied).toBe(true);
+      expect(personal.error).toBeUndefined();
+      expect(personal.cloudAgentRuntimeProxied).toBe(false);
+    });
+
     it('should return error when authorization header is missing', () => {
       const headers = new Headers();
 

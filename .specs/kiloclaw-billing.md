@@ -355,7 +355,11 @@ lapses, with email notifications at each stage.
    a Commit deduction, bonus projection, auto top-up, past-due transition, or
    period advancement. A Stripe-funded final term MUST be made non-renewing
    beginning 30 days before its verified final boundary, while allowing a
-   later explicit Standard choice to replace that cancellation.
+   later explicit Standard choice to replace that cancellation. When the
+   payment provider subscription has ended, a pending conversion without
+   explicit Standard continuation MUST NOT keep the subscription active, and
+   a Commit retirement guard MUST cancel the local subscription instead of
+   mutating the ended provider subscription.
 8. A pending pre-cutoff Standard-to-Commit switch MAY be canceled before it
    starts, leaving the customer on Standard. Once that qualified switch starts,
    the resulting Commit period is the final Commit term.
@@ -433,8 +437,8 @@ rules resolve conflicts.
    successful payment: advancing the billing period, mutating the
    plan, updating the credit renewal timestamp, updating the
    commitment end date, and recovering the subscription to active
-   status. No other event or background process MAY perform these
-   operations on a hybrid row.
+   status, subject to Stripe-Funded Credit Settlement rule 11. No other
+   event or background process MAY perform these operations on a hybrid row.
 2. Subscription status-change events from the payment provider for
    hybrid rows MUST be limited to propagating cancel intent and
    dunning states. They MUST NOT overwrite the payment source,
@@ -820,7 +824,7 @@ rows renew.
    external payment identifier for settlement. When the invoice has no
    charge identifier, the system MUST fall back to the invoice
    identifier so `$0` KiloClaw invoices still settle exactly once.
-6. On successful settlement the system MUST:
+6. On successful settlement the system MUST, subject to rule 11:
    a. Set payment source to `credits`, preserving the payment
    provider subscription ID (converting a legacy Stripe row to
    hybrid, or no-op for an already-hybrid row).
@@ -834,8 +838,8 @@ rows renew.
    Commit Retirement fail-closed anomaly handling instead.
    e. Clear past-due state and any auto-top-up marker for the
    prior period.
-7. If a scheduled plan change matches the settled invoice's plan,
-   the system MUST clear the schedule tracking state atomically
+7. Except as rule 11 states, if a scheduled plan change matches the settled
+   invoice's plan, the system MUST clear the schedule tracking state atomically
    with settlement. If the invoice plan differs from the current
    plan and there is no matching scheduled change, the system MUST
    treat the settled invoice as authoritative only when Commit Retirement
@@ -843,16 +847,26 @@ rows renew.
 8. If the subscription was past-due or suspended before settlement,
    the system MUST trigger the auto-resume procedure after the
    settlement transaction commits (see Auto-Resume on Payment
-   Recovery).
+   Recovery), except as rule 11 states.
 9. After the settlement transaction commits, the system MUST
    trigger a bonus credit evaluation as described in Credit
    Enrollment rule 6.
 10. `$0` KiloClaw invoices MUST still run the settlement path so
     Stripe-created subscriptions can transition out of the
-    intermediate Stripe-funded state into the hybrid activated state.
+    intermediate Stripe-funded state into the hybrid activated state
+    when rule 11 permits activation.
     Revenue side effects that require a paid amount, such as revenue
     analytics or affiliate sale events, MUST apply their own
     `amount_paid > 0` guard and MUST NOT block settlement.
+11. Determine whether a provider subscription has ended from its live Stripe
+    status (`canceled` or `incomplete_expired`), not from the local status.
+    For an ended provider subscription, settlement MUST record the ledger
+    entries but MUST NOT reactivate the subscription, reset the past-due
+    timer, clear suspension or destruction state, trigger auto-resume, send an
+    activation email, or attempt provider non-renewal. When an invoice from
+    an ended provider subscription is ambiguous or forbidden under Commit
+    Retirement, settlement MUST leave the subscription row unchanged so
+    expiry enforcement still has the canonical boundary.
 
 ### Revenue and External Reporting
 
@@ -1530,6 +1544,12 @@ rows renew.
    requirements on credit transaction records.
 
 ### Changelog
+
+#### 2026-11-19 -- End stranded final Commit subscriptions
+
+- Required a provider-ended final Commit subscription to cancel locally even when a pending conversion lacks explicit Standard continuation.
+- Required the Commit retirement guard to cancel the local subscription when the provider subscription has already ended.
+- Stopped late settlement of an ended provider subscription from reactivating the local subscription.
 
 #### 2026-08-05 -- Close fresh KiloClaw instance provisioning
 

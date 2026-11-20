@@ -27,6 +27,8 @@ export type LocalAgentCapabilities = {
   dialogs: boolean;
   fileUpload: boolean;
   tabGroups: boolean;
+  /** The loopback hub may send `hub.keepalive`; an extension that omits it drops the connection over that frame. */
+  keepalive: boolean;
 };
 
 export type LocalAgentExtensionHello = {
@@ -51,6 +53,8 @@ export type LocalAgentHubHello = {
 export type LocalAgentIncomingEnvelope =
   | { type: 'controller.connected'; controllerId: string }
   | { type: 'controller.disconnected'; controllerId: string }
+  /** Carries nothing: receiving a WebSocket message resets Chrome's idle timer for the service worker. */
+  | { type: 'hub.keepalive' }
   | { type: 'rpc'; controllerId: string; message: JsonRpcMessage };
 
 export type LocalAgentOutgoingEnvelope =
@@ -63,6 +67,7 @@ const capabilitiesSchema = z.object({
   console: z.boolean(),
   dialogs: z.boolean(),
   fileUpload: z.boolean(),
+  keepalive: z.boolean(),
   network: z.boolean(),
   tabGroups: z.boolean(),
   trustedInput: z.boolean(),
@@ -95,6 +100,8 @@ const controllerDisconnectedSchema = z.object({
   type: z.literal('controller.disconnected'),
 });
 
+const keepaliveSchema = z.object({ type: z.literal('hub.keepalive') });
+
 const rpcEnvelopeSchema = z.object({
   controllerId: z.uuid(),
   message: z.record(z.string(), z.unknown()),
@@ -125,6 +132,10 @@ export const parseIncomingEnvelope = (value: unknown): LocalAgentIncomingEnvelop
 
   if (disconnected.success) {
     return { controllerId: disconnected.data.controllerId, type: 'controller.disconnected' };
+  }
+
+  if (keepaliveSchema.safeParse(value).success) {
+    return { type: 'hub.keepalive' };
   }
 
   const rpc = rpcEnvelopeSchema.safeParse(value);

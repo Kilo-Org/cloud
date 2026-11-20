@@ -2,72 +2,15 @@ import { createServer } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
-  benchmarkPairUnavailableReason,
+  benchmarkPairUnavailability,
   CATALOG_CONTEXT_TOO_SMALL_REASON,
   CATALOG_PAIR_UNAVAILABLE_REASON,
   MIN_BENCHMARK_INPUT_TOKENS,
   catalogCandidatePrices,
-  catalogModelProviders,
   fetchBenchmarkModelCatalog,
   catalogSupportsBenchmarkPair,
   platformRegistryEntries,
 } from './platform-models';
-
-describe('catalog inference providers', () => {
-  it('preserves every canonical upstream identity rather than using the model author', () => {
-    const catalog = BenchmarkModelCatalogSchema.parse({
-      data: [
-        {
-          id: 'meta-llama/llama-3.3-70b-instruct',
-          inference_provider_ids: ['deepinfra', 'fireworks', 'together'],
-        },
-      ],
-    });
-    expect(catalogModelProviders(catalog, 'meta-llama/llama-3.3-70b-instruct')).toEqual([
-      'deepinfra',
-      'fireworks',
-      'together',
-    ]);
-  });
-
-  it('uses the canonical target providers instead of stale alias metadata', () => {
-    const catalog = BenchmarkModelCatalogSchema.parse({
-      data: [
-        {
-          id: '~vendor/latest',
-          alias_target: 'vendor/current',
-          inference_provider_ids: ['deepinfra'],
-        },
-        { id: 'vendor/current', inference_provider_ids: ['google-vertex', 'google-ai-studio'] },
-      ],
-    });
-    expect(catalogModelProviders(catalog, '~vendor/latest')).toEqual([
-      'google-vertex',
-      'google-ai-studio',
-    ]);
-  });
-
-  it('returns unknown when a model or its provider metadata is absent', () => {
-    const catalog = BenchmarkModelCatalogSchema.parse({
-      data: [{ id: 'anthropic/claude-sonnet' }],
-    });
-    expect(catalogModelProviders(catalog, 'anthropic/claude-sonnet')).toEqual([]);
-    expect(catalogModelProviders(catalog, 'missing/model')).toEqual([]);
-  });
-
-  it('retains published alias providers when the target is not listed', () => {
-    const catalog = BenchmarkModelCatalogSchema.parse({
-      data: [
-        {
-          id: '~vendor/latest',
-          alias_target: 'vendor/missing',
-          inference_provider_ids: ['deepinfra', 'deepinfra'],
-        },
-      ],
-    });
-    expect(catalogModelProviders(catalog, '~vendor/latest')).toEqual(['deepinfra']);
-  });
-});
 
 describe('catalog candidate pricing', () => {
   it('keeps normal models usable alongside variable-price virtual models', () => {
@@ -302,15 +245,24 @@ describe('platform catalog expansion', () => {
       ],
     });
     const reason = (model: string, variant: string | null = null) =>
-      benchmarkPairUnavailableReason(executable, { model, variant });
-    expect(reason('reka-like/model', 'high')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
-    expect(reason('reserved/model')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
+      benchmarkPairUnavailability(executable, { model, variant });
+    expect(reason('reka-like/model', 'high')).toEqual({
+      failureClass: 'context_too_small',
+      reason: CATALOG_CONTEXT_TOO_SMALL_REASON,
+    });
+    expect(reason('reserved/model')).toEqual({
+      failureClass: 'context_too_small',
+      reason: CATALOG_CONTEXT_TOO_SMALL_REASON,
+    });
     expect(reason('capped/model')).toBeNull();
     expect(reason('default-reserve/model')).toBeNull();
     expect(reason('roomy/model')).toBeNull();
     expect(reason('unknown/model')).toBeNull();
     expect(reason('malformed/model')).toBeNull();
-    expect(reason('missing/model')).toBe(CATALOG_PAIR_UNAVAILABLE_REASON);
+    expect(reason('missing/model')).toEqual({
+      failureClass: 'catalog_absent',
+      reason: CATALOG_PAIR_UNAVAILABLE_REASON,
+    });
     expect(
       catalogSupportsBenchmarkPair(executable, { model: 'reserved/model', variant: null })
     ).toBe(true);

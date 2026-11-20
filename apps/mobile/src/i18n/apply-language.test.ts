@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite for the device language, the picker preference and the RTL relaunch. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   registerNeedsInputCategories: vi.fn(),
   getLanguagePickerBridge: vi.fn(),
   setLanguagePickerBridge: vi.fn(),
+  flushAllDrafts: vi.fn(),
 }));
 
 vi.mock('expo', () => ({ reloadAppAsync: mocks.reloadAppAsync }));
@@ -56,6 +58,9 @@ vi.mock('@/lib/picker-bridge', () => ({
   getLanguagePickerBridge: mocks.getLanguagePickerBridge,
   setLanguagePickerBridge: mocks.setLanguagePickerBridge,
 }));
+// The apply module loads the draft store lazily, so the module identity the
+// dynamic import resolves is the mocked one.
+vi.mock('@/lib/persist/drafts', () => ({ flushAllDrafts: mocks.flushAllDrafts }));
 
 // The launch-time category registration resolves the button titles from the
 // active i18n instance, so every test records the language (and the copy the
@@ -80,6 +85,7 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     mocks.writeLanguageReturnTarget.mockReset().mockResolvedValue(undefined);
     mocks.writeDirectionAttemptAsync.mockReset().mockResolvedValue(true);
     mocks.readDirectionAttemptAsync.mockReset().mockResolvedValue(null);
+    mocks.flushAllDrafts.mockReset().mockResolvedValue(undefined);
     mocks.syncRtl.mockReset().mockReturnValue(false);
     mocks.i18nManager.isRTL = false;
     mocks.preference = 'device';
@@ -313,6 +319,7 @@ describe('automatic relaunch — login draft flush', () => {
     mocks.getLanguagePreference.mockImplementation(() => mocks.preference);
     mocks.getLanguagePickerBridge.mockReset().mockReturnValue(null);
     mocks.persistLoginDrafts.mockReset().mockResolvedValue(undefined);
+    mocks.flushAllDrafts.mockReset().mockResolvedValue(undefined);
     await i18n.changeLanguage('en');
   });
 
@@ -341,6 +348,27 @@ describe('automatic relaunch — login draft flush', () => {
     // in the same JS context the reload discards.
     expect(reloadsWhenFlushed).toEqual([0]);
     expect(mocks.reloadAppAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('flushes every pending durable draft before the automatic relaunch', async () => {
+    mocks.syncRtl.mockReturnValue(false);
+    const reloadsWhenFlushed: number[] = [];
+    const attemptsWhenFlushed: number[] = [];
+    mocks.flushAllDrafts.mockImplementation(() => {
+      reloadsWhenFlushed.push(mocks.reloadAppAsync.mock.calls.length);
+      attemptsWhenFlushed.push(mocks.writeDirectionAttemptAsync.mock.calls.length);
+      return Promise.resolve();
+    });
+
+    await expect(applyDeviceLanguage('ar')).resolves.toEqual({ kind: 'restarting-rtl' });
+
+    expect(mocks.flushAllDrafts).toHaveBeenCalledTimes(1);
+    expect(mocks.reloadAppAsync).toHaveBeenCalledTimes(1);
+    // The relaunch is already recorded when the flush runs, and the reload
+    // starts only after the flush finished: the debounced writes it forces
+    // live in the JS context the reload discards.
+    expect(attemptsWhenFlushed).toEqual([1]);
+    expect(reloadsWhenFlushed).toEqual([0]);
   });
 
   it('does not flush for a manual pick whose own beforeReload handles it', async () => {

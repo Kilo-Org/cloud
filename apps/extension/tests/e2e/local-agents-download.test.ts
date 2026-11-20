@@ -1,5 +1,6 @@
 /* eslint-disable import/max-dependencies, import/no-nodejs-modules, max-lines, promise/avoid-new, vitest/no-conditional-in-test -- the spec reads a real downloads directory and drives a real hub session */
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { z } from 'zod';
 import { hashBrowserToolArguments } from '../../src/shared/browser-agent-checks';
 import {
@@ -57,12 +58,17 @@ const grant = (origin: string) => [
   { class: 'read', origin },
 ];
 
-/** How many tabs the browser holds, from a `browser_tabs list` answer: the same count is how "no second tab" shows. */
-const listedTabCount = (answer: LocalAgentToolResponse): number => {
-  const parsed: unknown = JSON.parse(answer.kind === 'result' ? answer.text : '{"tabs":[]}');
-
-  return z.object({ tabs: z.array(z.record(z.string(), z.unknown())) }).parse(parsed).tabs.length;
-};
+/**
+ * Every open tab's id, read from the extension page. `browser_tabs list` is not
+ * the surface for "no second tab": it lists only the session's inspectable
+ * tabs, and the tab a guarded `new` opens stays blank because its navigation
+ * was refused, so a correct list is empty there. A failed answer throws instead
+ * of counting as zero, which would make a `0 === 0` comparison prove nothing.
+ */
+const openTabIds = (sidePanel: Page): Promise<number[]> =>
+  sidePanel.evaluate(
+    "chrome.tabs.query({}).then(tabs => tabs.map(tab => tab.id)).then(ids => { if (ids.length === 0) { throw new Error('the browser reported no tabs'); } return ids; })"
+  );
 
 const permissionItemSchema = z.object({
   class: z.string(),
@@ -592,9 +598,7 @@ test('a first browser_tabs new to an attachment asks first, and its approved rep
     await expectNothingSaved(downloadsPath);
 
     // The refused call already opened its tab; the repeat must not open another.
-    const tabsAfterGuard = listedTabCount(
-      await session.callTool('browser_tabs', { action: 'list' }, { authorized: grants })
-    );
+    const tabsAfterGuard = await openTabIds(sidePanel);
 
     // The CLI repeats the `browser_tabs` call with the token: the runtime drives the tab that step opened.
     const approved = await session.callTool('browser_tabs', params, {
@@ -610,11 +614,8 @@ test('a first browser_tabs new to an attachment asks first, and its approved rep
       isError: approved.kind === 'result' ? approved.isError : true,
       keptReport: text.includes('The file was downloaded; the page did not change.'),
       named: text.includes(DOWNLOAD_FILENAME),
-      tabs:
-        listedTabCount(
-          await session.callTool('browser_tabs', { action: 'list' }, { authorized: grants })
-        ) === tabsAfterGuard,
-    }).toStrictEqual({ isError: false, keptReport: true, named: true, tabs: true });
+      tabs: await openTabIds(sidePanel),
+    }).toStrictEqual({ isError: false, keptReport: true, named: true, tabs: tabsAfterGuard });
   } finally {
     await launch.close();
     await hub.close();

@@ -184,6 +184,25 @@ export type ProfileStackParents = {
   overview: boolean;
 };
 
+/**
+ * A route name a trigger screen needs beneath itself: the triggers list, the
+ * same rule the profiles list gives the profile screens (`LIST_CHILD_PARENTS`).
+ * The repair hook reads it from `useRepairTriggerRouteStack`, whose `self` and
+ * parents resolve through the trigger routes rather than the profile ones.
+ */
+export const TRIGGERS_LIST_ROUTE_NAME = 'triggers/index';
+
+/**
+ * The route names the trigger screens register under in the Profile tab's
+ * Stack, the names the layout declares and the repair's focus check compares
+ * against (`use-repair-trigger-route-stack.ts`).
+ */
+export const TRIGGER_ROUTE_NAMES: readonly string[] = [
+  TRIGGERS_LIST_ROUTE_NAME,
+  'triggers/new',
+  'triggers/[trigger-id]',
+];
+
 /** The profile screens below the list: they only need the list beneath them. */
 export const LIST_CHILD_PARENTS: ProfileStackParents = { list: true, overview: false };
 

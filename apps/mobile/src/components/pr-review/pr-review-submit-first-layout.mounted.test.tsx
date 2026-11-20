@@ -299,7 +299,7 @@ describe('PrReviewSubmit first body frame', () => {
       pendingQueue.write({ hydrated: true });
     });
 
-    expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review', 'Cancel'] }]);
+    expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review'] }]);
   });
 
   it('never paints the block reason or a field-less body on the way to the settled frame', () => {
@@ -310,7 +310,7 @@ describe('PrReviewSubmit first body frame', () => {
       footerPreference.write({ hasLoaded: true });
     });
 
-    expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review', 'Cancel'] }]);
+    expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review'] }]);
     expect(record.events.some(event => event.kind === 'block-reason')).toBe(false);
   });
 });

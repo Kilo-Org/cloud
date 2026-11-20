@@ -215,7 +215,6 @@ describe('POST /api/auth/native/exchange integration', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(credentials);
     expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
-      userId: user.id,
       userAgent: undefined,
       user: expect.objectContaining({ id: user.id }),
       verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },

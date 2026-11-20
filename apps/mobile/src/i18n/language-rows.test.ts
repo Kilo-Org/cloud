@@ -26,6 +26,32 @@ describe('languageRows', () => {
   it('returns nothing when the query matches no language', () => {
     expect(languageRows('klingon')).toHaveLength(0);
   });
+
+  it('matches the generated German names', () => {
+    expect(languageRows('Arabisch', 'de').map(row => row.tag)).toContain('ar');
+    expect(languageRows('Japanisch', 'de').map(row => row.tag)).toContain('ja');
+    expect(languageRows('Brasilien', 'de').map(row => row.tag)).toContain('pt-BR');
+  });
+
+  it('matches the folded needle the user typed', () => {
+    expect(languageRows('arabisch', 'de').map(row => row.tag)).toContain('ar');
+  });
+
+  it('answers by endonym and English name under a UI language ICU cannot fully name', () => {
+    expect(languageRows('espanol', 'mg').map(row => row.tag)).toContain('es');
+  });
+
+  it('keeps every row in the same order the localized names add search terms', () => {
+    expect(languageRows('', 'de').map(row => row.tag)).toEqual(
+      languageRows('').map(row => row.tag)
+    );
+    expect(languageRows('', 'de')).toHaveLength(SUPPORTED_LANGUAGES.length);
+  });
+
+  it('keeps the English answers and the no-match state with a UI language', () => {
+    expect(languageRows('german', 'en').map(row => row.tag)).toContain('de');
+    expect(languageRows('klingon', 'de')).toHaveLength(0);
+  });
 });
 
 describe('languagePickerItems', () => {

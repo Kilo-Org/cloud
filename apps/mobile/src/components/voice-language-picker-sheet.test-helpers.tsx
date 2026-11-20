@@ -54,6 +54,12 @@ vi.mock('expo-router', () => ({
 }));
 // The sheet reaches `voiceInputLanguageDisplayName`, which imports both native
 // modules; mock them so the node environment never loads the native packages.
+// The sheet reads the resolved UI language so its search terms carry that
+// language's generated names; the store behind it reaches expo-secure-store,
+// which the node environment cannot load.
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'de',
+}));
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US' }],
 }));

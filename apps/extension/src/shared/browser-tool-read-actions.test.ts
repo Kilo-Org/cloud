@@ -1,12 +1,16 @@
 /* eslint-disable id-length, jest/no-conditional-in-test, jest/max-expects, max-lines, require-await, sort-keys, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/no-useless-undefined -- Fake CDP session returns verbatim responses for assertions; masked-output tests assert many unrelated fields at once. */
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
+import { pngScanlinesOf, writeRgbPng } from './browser-png-test-images';
 import {
   READ_BROWSER_TOOL_NAMES,
   isReadBrowserToolName,
   runReadBrowserTool,
 } from './browser-tool-read-actions';
+import { captureBrowserAriaSnapshot } from './browser-tool-snapshot';
 import type { BrowserAriaNode, BrowserToolPageSession } from './browser-tool-snapshot';
+import { captureAgentSnapshotView } from './browser-agent-frames';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
 import type { ScreenshotMaskInput, ScreenshotMaskResult } from './browser-screenshot-masking';
 
@@ -296,6 +300,25 @@ describe('browser_find', () => {
     expect(text).toContain('- button "Submit" [ref=e12]');
   });
 
+  it('keeps the refs of the last snapshot: a find only adds to the registry', async () => {
+    const { session } = createSession();
+    const registrations: unknown[] = [];
+    const recording: BrowserToolPageSession = {
+      ...session,
+      registerRefs: (_refs, options) => {
+        registrations.push(options);
+      },
+    };
+
+    await runReadBrowserTool('browser_find', { text: 'submit' }, recording);
+    await runReadBrowserTool('browser_find', { text: 'submit' }, recording, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+    await runReadBrowserTool('browser_snapshot', {}, recording);
+
+    expect(registrations).toStrictEqual([{ merge: true }, { merge: true }, { merge: false }]);
+  });
+
   it('finds by regex', async () => {
     const { session } = createSession();
     const result = await runReadBrowserTool('browser_find', { regex: '/wel+come/i' }, session);
@@ -335,6 +358,155 @@ describe('browser_find', () => {
     await expect(
       runReadBrowserTool('browser_find', { regex: 'a', text: 'a' }, session)
     ).resolves.toMatchObject({ ok: false });
+  });
+
+  // More printed lines than one snapshot shows, short enough that all of them fit one result: the needle is the 2,102nd line.
+  const LONG_TREE: BrowserAriaNode[] = [
+    axNode({
+      childIds: [
+        ...[...Array.from({ length: 2100 }).keys()].map(index => `i${String(index)}`),
+        'n',
+      ],
+      nodeId: 'root',
+      role: 'generic',
+    }),
+    ...[...Array.from({ length: 2100 }).keys()].map(index =>
+      axNode({
+        backendDOMNodeId: 1000 + index,
+        name: String(index),
+        nodeId: `i${String(index)}`,
+        role: 'button',
+      })
+    ),
+    axNode({ backendDOMNodeId: 99_999, name: 'Needle 777', nodeId: 'n', role: 'button' }),
+  ];
+  const MAIN_ONLY_FRAME_TREE = {
+    frameTree: {
+      frame: {
+        id: 'main',
+        securityOrigin: 'https://app.example.com',
+        url: 'https://app.example.com/dashboard',
+      },
+    },
+  };
+
+  it('finds a match past the lines one snapshot prints, with its ref', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE });
+    const result = await runReadBrowserTool('browser_find', { text: 'Needle 777' }, session);
+
+    expect(String(result.ok ? result.value : '')).toContain('Found 1 match(es) for "Needle 777"');
+    expect(String(result.ok ? result.value : '')).toContain('- button "Needle 777" [ref=e99999]');
+  });
+
+  it('finds a match past the printed lines for an agent caller and registers its ref', async () => {
+    const registered: string[][] = [];
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const result = await runReadBrowserTool(
+      'browser_find',
+      { text: 'Needle 777' },
+      {
+        ...session,
+        registerRefs: entries => {
+          registered.push(entries.map(entry => entry.ref));
+        },
+      },
+      { agentScope: { readableOrigins: ['https://app.example.com'] } }
+    );
+
+    expect(String(result.ok ? result.value : '')).toContain('- button "Needle 777" [ref=e99999]');
+    expect(registered.at(-1)).toContain('e99999');
+  });
+
+  it('leaves browser_snapshot capped at the printed-line limit', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const panel = await runReadBrowserTool('browser_snapshot', {}, session);
+    const agent = await runReadBrowserTool('browser_snapshot', {}, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+
+    for (const result of [panel, agent]) {
+      expect(String(result.ok ? result.value : '')).toContain('(snapshot truncated at 2000 lines)');
+      expect(String(result.ok ? result.value : '')).not.toContain('Needle 777');
+    }
+  });
+
+  it('walks the same number of lines on the DOM-walker fallback as on the accessibility tree', async () => {
+    // An empty accessibility tree sends the capture to the injected DOM walker.
+    const { commands, session } = createSession({ axNodes: [] });
+    await runReadBrowserTool('browser_find', { text: 'Needle' }, session);
+    const walker = commands.find(
+      command =>
+        command.method === 'Runtime.evaluate' &&
+        String(command.params?.['expression']).includes('"maxNameLength"')
+    );
+
+    expect(String(walker?.params?.['expression'])).toContain('"maxLines":50000');
+  });
+
+  it('names the line bound a capture actually stopped at', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const panel = await captureBrowserAriaSnapshot(session, { maxLines: 5 });
+    const agent = await captureAgentSnapshotView(
+      session,
+      { readableOrigins: ['https://app.example.com'] },
+      { maxLines: 5 }
+    );
+
+    for (const text of [panel.text, agent.text]) {
+      expect(text).toContain('(snapshot truncated at 5 lines)');
+    }
+  });
+
+  // More lines than a search reads: the needle sits past the search's line bound.
+  const PAST_FIND_BOUND_TREE: BrowserAriaNode[] = [
+    axNode({
+      childIds: [
+        ...[...Array.from({ length: 50_005 }).keys()].map(index => `b${String(index)}`),
+        'n',
+      ],
+      nodeId: 'root',
+      role: 'generic',
+    }),
+    ...[...Array.from({ length: 50_005 }).keys()].map(index =>
+      axNode({
+        backendDOMNodeId: 1000 + index,
+        name: `Item ${String(index)}`,
+        nodeId: `b${String(index)}`,
+        role: 'button',
+      })
+    ),
+    axNode({ backendDOMNodeId: 999_999, name: 'Needle 9', nodeId: 'n', role: 'button' }),
+  ];
+
+  it('says a search that hit its line bound stopped there, and where, instead of "No matches"', async () => {
+    const { session } = createSession({
+      axNodes: PAST_FIND_BOUND_TREE,
+      frameTree: MAIN_ONLY_FRAME_TREE,
+    });
+    const panel = await runReadBrowserTool('browser_find', { text: 'Needle 9' }, session);
+    const agent = await runReadBrowserTool('browser_find', { text: 'Needle 9' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+
+    for (const result of [panel, agent]) {
+      const text = String(result.ok ? result.value : '');
+
+      expect(text).not.toContain('No matches');
+      expect(text).toContain(
+        'No match for "Needle 9" in the first 50000 lines of the page snapshot. The search stopped there, after button \'Item 49999\'; the rest of the page was not searched.'
+      );
+    }
+  });
+
+  it('notes where a search that hit its line bound stopped when it still found matches', async () => {
+    const { session } = createSession({ axNodes: PAST_FIND_BOUND_TREE });
+    const result = await runReadBrowserTool('browser_find', { text: 'Item 4999' }, session);
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('Found 11 match(es) for "Item 4999"');
+    expect(text).toContain(
+      "The search stopped after 50000 lines, at button 'Item 49999'; the rest of the page was not searched."
+    );
   });
 });
 
@@ -388,6 +560,48 @@ describe('browser_take_screenshot', () => {
       dataUrl: 'data:image/png;base64,RlJFU0g=',
       mediaType: 'image/png',
     });
+  });
+
+  it('re-deflates the forced frame for size without changing its scanlines', async () => {
+    const png = writeRgbPng({ level: 0, size: { height: 120, width: 200 } });
+    const frame = Buffer.from(png).toString('base64');
+    const { session } = createSession({ freshFrame: frame });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
+    const { dataUrl } = z
+      .object({ dataUrl: z.string() })
+      .parse(result.ok ? result.value : undefined);
+    const base64 = dataUrl.replace('data:image/png;base64,', '');
+
+    expect(base64.length).toBeGreaterThan(0);
+    expect(base64.length).toBeLessThan(frame.length);
+    expect(pngScanlinesOf(Buffer.from(base64, 'base64')).equals(pngScanlinesOf(png))).toBe(true);
+  });
+
+  it('re-deflates a masked image the masker encoded for speed', async () => {
+    const png = writeRgbPng({ level: 0, size: { height: 120, width: 200 } });
+    const masked = Buffer.from(png).toString('base64');
+    const { session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      freshFrame: 'RlJFU0g=',
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 120, clientWidth: 200 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 120, clientWidth: 200 },
+      },
+    });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: async () => ({ dataUrl: `data:image/png;base64,${masked}`, ok: true }),
+    });
+    const { dataUrl } = z
+      .object({ dataUrl: z.string() })
+      .parse(result.ok ? result.value : undefined);
+    const base64 = dataUrl.replace('data:image/png;base64,', '');
+
+    expect(base64.length).toBeLessThan(masked.length);
+    expect(pngScanlinesOf(Buffer.from(base64, 'base64')).equals(pngScanlinesOf(png))).toBe(true);
   });
 
   it('falls back to a plain capture when the tab cannot force a frame', async () => {

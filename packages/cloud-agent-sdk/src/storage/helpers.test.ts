@@ -306,8 +306,10 @@ beforeEach(() => {
   orderingEvidence = new Map();
 });
 
-function upsert(arr: Part[], part: Part, eventTime?: number): Part[] {
-  return upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, orderingEvidence);
+function upsert(arr: Part[], part: Part, eventTime?: number, bucket = part.messageID): Part[] {
+  // One identity keys the whole update: the bucket the backend stores the part
+  // under. It equals the part's own label unless a caller passes another.
+  return upsertPartDroppingStaleSyntheticParts(bucket, arr, part, eventTime, orderingEvidence);
 }
 
 describe('insertSortedBy', () => {
@@ -434,6 +436,32 @@ describe('upsertPartDroppingStaleSyntheticParts', () => {
     const result = upsert([syntheticFile], realFile);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-file-0', 'prt-file']);
+  });
+
+  test('drops the placeholder by the bucket the parts are stored under', () => {
+    // The bucket is the identity every backend operation uses (`getParts`,
+    // `deletePart`, `applyPartDelta`), so the placeholder comparison reads it
+    // too. Here the authoritative part's own label names another message than
+    // the bucket: the bucket decides, and the placeholder of the same type goes.
+    const syntheticPart = {
+      id: 'optimistic-text',
+      sessionID: 's',
+      messageID: 'msg-A',
+      type: 'text',
+      text: 'hello',
+      synthetic: true,
+    } as Part;
+    const realPart = {
+      id: 'prt-real',
+      sessionID: 's',
+      messageID: 'msg-B',
+      type: 'text',
+      text: 'hello',
+    } as Part;
+
+    const result = upsert([syntheticPart], realPart, undefined, 'msg-A');
+
+    expect(result.map(part => part.id)).toEqual(['prt-real']);
   });
 });
 

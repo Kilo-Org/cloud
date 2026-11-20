@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import {
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
   CustomRouterErrorResponseSchema,
-  customRouterEntryRef,
+  toCustomRouterEntryRef,
   type BenchmarkConfig,
   type ClientCustomRouterEntry,
   type InternalClientEvalResultRequest,
@@ -83,7 +83,7 @@ function upload(
   return {
     ...context,
     engineIdentity: ENGINE,
-    entry: customRouterEntryRef(localModel),
+    entry: toCustomRouterEntryRef(localModel),
     variant: 'low',
     caseId: exactCase!.id,
     rep: 0,
@@ -123,26 +123,27 @@ describe('client eval (real SQLite)', () => {
     };
   });
 
-  it('plans every variant and case once, then only what is missing', async () => {
-    const otherCase = DECIDER_CASES.find(benchCase => benchCase.id !== exactCase.id);
-    if (!otherCase) throw new Error('dataset needs a second case');
+  it('plans every variant, case and repetition until uploaded, then only what is missing', async () => {
     const fresh = await planClientEval(db, CONFIG, context, deps.source);
     expect(fresh).toMatchObject({
       baseRouter: 'efficient',
       engineIdentity: ENGINE,
-      repetitions: 1,
+      repetitions: 3,
     });
-    expect(fresh.items).toHaveLength(2 * DECIDER_CASES.length);
+    expect(fresh.items).toHaveLength(2 * 3 * DECIDER_CASES.length);
 
     await gradeClientEvalResult(db, CONFIG, upload(), deps);
+    await gradeClientEvalResult(db, CONFIG, upload({ rep: 1 }), deps);
     await gradeClientEvalResult(db, CONFIG, upload({ variant: 'high' }), deps);
 
     const resumed = await planClientEval(db, CONFIG, context, deps.source);
-    expect(resumed.items).toHaveLength(fresh.items.length - 2);
+    expect(resumed.items).toHaveLength(fresh.items.length - 3);
     const planned = new Set(resumed.items.map(i => JSON.stringify([i.variant, i.caseId, i.rep])));
     expect(planned.has(JSON.stringify(['low', exactCase.id, 0]))).toBe(false);
+    expect(planned.has(JSON.stringify(['low', exactCase.id, 1]))).toBe(false);
+    expect(planned.has(JSON.stringify(['low', exactCase.id, 2]))).toBe(true);
     expect(planned.has(JSON.stringify(['high', exactCase.id, 0]))).toBe(false);
-    expect(planned.has(JSON.stringify(['low', otherCase.id, 0]))).toBe(true);
+    expect(planned.has(JSON.stringify(['high', exactCase.id, 1]))).toBe(true);
     expect(resumed.staleEntries).toEqual([]);
   });
 
@@ -150,7 +151,7 @@ describe('client eval (real SQLite)', () => {
     sqlite
       .prepare(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity,
       repetitions, status, run_id, requested_at, updated_at)
-      VALUES ('efficient', 'vendor/platform', 'low', ?, 1, 'ready', 'platform-run', 'a', 'a')`)
+      VALUES ('efficient', 'vendor/platform', 'low', ?, 3, 'ready', 'platform-run', 'a', 'a')`)
       .run(ENGINE);
     const entries = [{ ...localModel, measuredAs: 'vendor/platform' }];
     deps.source.fetchImpl = async () => new Response('catalog unavailable', { status: 503 });
@@ -186,7 +187,7 @@ describe('client eval (real SQLite)', () => {
     sqlite.exec(`UPDATE client_profiles SET engine_identity = 'efficient:v0:old'`);
 
     const plan = await planClientEval(db, CONFIG, context, deps.source);
-    expect(plan.items).toHaveLength(2 * DECIDER_CASES.length);
+    expect(plan.items).toHaveLength(2 * 3 * DECIDER_CASES.length);
     expect(plan.staleEntries).toEqual([
       { entry: { kind: 'client', provider: 'ollama', model: 'qwen3:32b' }, variant: 'low' },
     ]);
@@ -195,7 +196,7 @@ describe('client eval (real SQLite)', () => {
   it('keeps client measurements scoped to their owner', async () => {
     await gradeClientEvalResult(db, CONFIG, upload(), deps);
     const other = await planClientEval(db, CONFIG, { ...context, ownerId: 'org-2' }, deps.source);
-    expect(other.items).toHaveLength(2 * DECIDER_CASES.length);
+    expect(other.items).toHaveLength(2 * 3 * DECIDER_CASES.length);
   });
 
   it('grades mechanically, rolls up the profile, and returns the stored score on retry', async () => {
@@ -232,7 +233,7 @@ describe('client eval (real SQLite)', () => {
       accuracy: 0.5,
       avg_cost_usd: 0.001,
       engine_identity: ENGINE,
-      repetitions: 1,
+      repetitions: 3,
     });
     expect(profile?.route_summaries).toEqual([
       expect.objectContaining({
@@ -396,7 +397,7 @@ describe('client eval (real SQLite)', () => {
     await expect(
       gradeClientEvalResult(db, CONFIG, upload({ variant: 'max' }), deps)
     ).rejects.toBeInstanceOf(ClientEvalError);
-    await expect(gradeClientEvalResult(db, CONFIG, upload({ rep: 2 }), deps)).rejects.toMatchObject(
+    await expect(gradeClientEvalResult(db, CONFIG, upload({ rep: 3 }), deps)).rejects.toMatchObject(
       { code: 'invalid_request' }
     );
     expect(await listOwnerClientProfiles(db, context, 'efficient')).toEqual([]);

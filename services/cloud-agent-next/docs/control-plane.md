@@ -704,8 +704,13 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   environment's build commands. They run only in the environment build, so the wrapper skips them on
   every session start. The remaining setup commands (request-supplied and profile) run as
   `session_setup`, then `startCommands` run as `start`, on a fresh start and an environment snapshot
-  start. Every list is non-fatal: each failure (kind, index, redacted command text, exit code or
-  timeout, bounded redacted output tail) is collected, the next command still runs, and
+  start. A re-prepare that keeps every prepared root unchanged and only adds roots does not run
+  them again: the commands already ran in that workspace, and a start command would launch a
+  second process beside the first. A re-prepare that removes a prepared root, changes a root's
+  branch, or adopts or re-clones a root it had already prepared runs them again, because that
+  workspace is no longer the one the commands were run on. Every list is non-fatal: each failure
+  (kind, index, redacted command text, exit code or timeout, bounded redacted output tail) is
+  collected, the next command still runs, and
   `session.ready` reports up to 20 as `commandFailures`. The Sandbox DO logs only kind, index, exit
   code, termination reason and elapsed time, and stores a note of at most 2000 characters for the
   route's attempt. The first prompt delivered after that preparation carries the note in its
@@ -2312,6 +2317,56 @@ Ingest checks the user and immutable Cloud Agent session owner
 under the row lock, applies the existing `status_transition_id` ordering, and
 broadcasts `session.status.updated` through the existing UserConnectionDO. A browser
 still uses one user-level WebSocket for the whole sidebar, not one per session.
+
+Kilo v2 has no session-ingest client, so the same publication also carries what that
+client writes for Kilo v1. `lastActivityAt` is the receipt time of the latest event
+that wrote the transcript (`TRANSCRIPT_EVENT_TYPES` in `list-status.ts`); ingest
+moves `cli_sessions_v2.last_activity_at` forward only, which keeps a working chat in
+the active-session list and dates its row. It rides status changes and refreshes,
+each at most once a minute: busy and retry refresh on any event, and any other
+status refreshes when transcript activity is newer than the last snapshot, so a
+wait on input while subagents keep working still proves the session live.
+`rename` is a native rename of the root: a root `conversation.source` whose source
+names the root too (one naming another session is never stored), whose session title
+differs from the stored source and is not a creation placeholder. A rename forces a
+snapshot and stays in newer snapshots
+until one is delivered, naming the snapshot that first carried it. Ingest applies it
+like a CLI rename report (it replaces a generated title), with a `session.updated`
+notification, in the status transaction and only while the stored
+`status_transition_id` is older than that first snapshot: a late publication cannot
+replace a newer rename, and a repeat of a delivered rename cannot replace a later user
+rename. Kilo v1 never sends `conversation.source`: its CLI keeps reporting its own
+titles.
+
+`liveSummary` and `totalCostMicrodollars` are the session card summary and cost total
+of a Kilo v2 root, the `cli_sessions_v2.live_summary` and `total_cost_microdollars`
+that the session-ingest client writes for Kilo v1. Lists, the session card and the
+briefing read them from the row; only an open chat reads the cost from the Session DO.
+`native-live-summary.ts` folds each stored root `conversation.message.updated` into a
+summary kept in DO storage, in the transaction that stores the event: the last started
+tool names the step through the shared step table (`shell` runs like `bash`), an
+unfinished reasoning item at the end of the content is `thinking`, the last `todowrite`
+is the plan, the latest assistant message's error is the failure (`aborted` is
+`cancelled`, `provider.*` is `provider`, `tool.*` is `tool`, anything else `other`),
+and a new root user message starts a turn with an empty summary. Kilo v2 reports no
+session diff, so `changes` stays null. The root's idle `session.status` clears the step
+and plan in the transaction that stores it, as the Kilo v1 idle transition does, so a
+turn that opens without a root user message (a background command's completion) does
+not start with the last turn's step; an idle or failed snapshot shows no step or plan.
+That turn's busy `session.status` clears the failure in the transaction that stores it,
+as the Kilo v1 busy transition does, so the working snapshot does not show the previous
+turn's failure while the session works; the failure otherwise stays until such a busy
+status or a new root user message starts a turn. The cost is the root's assistant-only cost
+total (`cost-total.ts`), the same value an open chat shows. Both ride every snapshot of
+a root with a native transcript and are absent for Kilo v1, whose ingest client keeps
+writing them. The first summary forces a snapshot; a changed one refreshes at most once
+per 10 seconds, the Kilo v1 summary write window, and status changes carry the final
+value of a turn. Ingest writes the summary in the status transaction only when the
+publication's status is not stale and the summary changed, so a late publication cannot
+replace a newer summary; a change under an unchanged status refreshes a session card
+that follows the session, as the Kilo v1 summary write does. It moves the cost forward
+only, together with the activity in one statement that writes no row version unless one
+of them advances.
 
 Publication has one durable, coalescing latest-status obligation per Session DO.
 Its monotonic ULID cursor survives eviction and clock rollback. Each RPC has a

@@ -441,7 +441,10 @@
     },
     {
       "files": [
+        "modules/kilo-apple-model/output-budget.test.ts",
+        "modules/kilo-launcher-surfaces/payload.test.ts",
         "src/components/ui/icons.test.ts",
+        "src/lib/chat/chat-fixture.test.ts",
         "src/lib/chat/store.test.ts",
         "src/lib/expo-router-linking.mounted.test.tsx",
         "src/test/renderer.mounted.test.tsx"

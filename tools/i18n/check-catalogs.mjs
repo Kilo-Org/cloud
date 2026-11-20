@@ -19,13 +19,13 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
-  catalogEntryKind,
+  catalogEntryNames,
   catalogTags,
   countPlaceholderBases,
   flattenCatalog,
@@ -93,6 +93,9 @@ function catalogsOf(root) {
  * The value records why the split is real. Adding an entry claims the call sites
  * mean different things; removing one promises the copy means the same thing
  * everywhere it appears.
+ *
+ * Each key is the copy compared through `wording()`, so it is trimmed, case
+ * folded and stripped of trailing sentence punctuation.
  */
 const TWO_SENSE_COPY = new Map([
   [
@@ -107,6 +110,10 @@ const TWO_SENSE_COPY = new Map([
   [
     'contact support',
     'the recovery action beside a Code Reviewer alert, versus the support contact beside the AI Guardrails availability notice',
+  ],
+  [
+    'terms of service',
+    "the document's own title on the Legal screen and the PR-discussion alert, versus the form the sign-in consent sentence's verb governs in an inflected language",
   ],
   [
     'receipt',
@@ -195,7 +202,9 @@ const WORDED_COUNTS = new Set([
   'agentChat.contextUsage.stepsCount:one:ar',
   'agentChat.contextUsage.stepsCount:two:ar',
   'agentChat.contextUsage.modelsCount:two:ar',
+  'nativeRemote.recoveryGaps:two:ar',
   'prReview.discussion.comment:two:ar',
+  'prReview.tabs.discussionAccessibility:two:ar',
   'prReview.hunkRows.fileLoadedCount:two:ar',
   'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
   'organization.kiloPass.paidSeat:one:ar',
@@ -930,6 +939,84 @@ function checkAgentEditorCopy(values, english, label) {
 const MISCASED_PULL_REQUEST_TERM =
   /(?<![A-Za-zÀ-ÿ])pR(?![A-Za-zÀ-ÿ])|(?<![A-Za-zÀ-ÿ])pull-Request(?![A-Za-zÀ-ÿ])/;
 
+/**
+ * The list conjunction `Intl.ListFormat` puts between two items in `tag`, read
+ * from the formatter itself rather than a hand-written table: the sentence and
+ * every catalog's own list join have to agree on one separator, and only the
+ * platform knows it. Two sentinels that no label can contain isolate the
+ * junction: the run between them is what the conjunction writes, spaces and
+ * all (" and ", " und ", " و", "和").
+ */
+const listConjunctions = new Map();
+function listConjunctionOf(tag) {
+  if (!listConjunctions.has(tag)) {
+    let conjunction = null;
+    try {
+      const joined = new Intl.ListFormat(tag, { style: 'long', type: 'conjunction' }).format([
+        '\u0001\u0001',
+        '\u0002\u0002',
+      ]);
+      conjunction = joined.split('\u0001\u0001')[1]?.split('\u0002\u0002')[0] ?? null;
+    } catch {
+      // A tag `Intl` refuses is reported once, by the catalog loop.
+      conjunction = null;
+    }
+    listConjunctions.set(tag, conjunction === '' ? null : conjunction);
+  }
+  return listConjunctions.get(tag);
+}
+
+/**
+ * The catalog keys the changelog sentence names as areas. `changelog-screen.ts`
+ * maps eight areas; three are product names it writes itself, and the rest
+ * render from these keys, so each of them becomes one item of the list.
+ */
+const CHANGELOG_AREA_KEYS = [
+  'common.chat',
+  'common.notifications',
+  'integrations.title',
+  'profile.changelogAreas.signIn',
+  'profile.changelogAreas.profileOrganizations',
+];
+
+/**
+ * The tag the app builds its formatters with. `lib/intl-cache.ts` names the
+ * script or the region for two catalogs whose bare tag resolves to other data,
+ * so a rule that reads the raw catalog name would judge the wrong conjunction
+ * for them.
+ */
+const FORMATTER_TAGS = new Map([
+  ['pt', 'pt-PT'],
+  ['sr', 'sr-Latn'],
+]);
+
+/**
+ * The changelog screen names the areas a release's fixes touched as one
+ * `Intl.ListFormat` sentence, so each area label is one item of that list. A
+ * label that carries the catalog's own list conjunction doubles it and the
+ * reader cannot tell where one area ends: Hindi read "Cloud Agent, Security
+ * Agent और प्रोफ़ाइल और संगठन" for three areas. The label joins its two nouns
+ * with the language's own compound form instead (an ampersand, "व", "与"), and
+ * the list supplies the only conjunction in the sentence.
+ */
+function checkChangelogAreaLabels(tag, values, label) {
+  const problems = [];
+  const conjunction = listConjunctionOf(FORMATTER_TAGS.get(tag) ?? tag);
+  if (conjunction === null) {
+    return problems;
+  }
+  for (const key of CHANGELOG_AREA_KEYS) {
+    const value = values.get(key);
+    if (value === undefined || !value.includes(conjunction)) {
+      continue;
+    }
+    problems.push(
+      `${label}: "${key}" contains the list conjunction "${conjunction.trim()}"; the changelog sentence joins the areas itself, so join this label's nouns another way`
+    );
+  }
+  return problems;
+}
+
 /** Reject the miscased pull-request term, in English and in every locale. */
 function checkPullRequestTerm(values, label) {
   const problems = [];
@@ -1004,14 +1091,9 @@ function placeholderTokens(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
 }
 
-/** The `{{token}}` set of one string, as a sorted, counted signature. */
-function placeholders(value) {
-  return placeholderTokens(value).sort().join(',');
-}
-
-/** The tokens of a `placeholders` signature. */
-function signatureTokens(signature) {
-  return signature === '' ? [] : signature.split(',');
+/** The sorted, comma-joined signature the diagnostics print for one token list. */
+function signature(tokens) {
+  return tokens.slice().sort().join(',');
 }
 
 /** The `$t(key)` set of one string. A copy names a label; it never spells it. */
@@ -1171,6 +1253,18 @@ function holdsLabel(values, run) {
   return false;
 }
 
+/**
+ * The catalog key a node names as a plain string: unwrapped from its
+ * TypeScript-only wrappers, a `Literal` string, and non-empty. Any other node,
+ * including a template literal and an empty string, names no key here.
+ */
+function staticStringKey(node) {
+  const value = unwrap(node);
+  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
+    ? value.value
+    : null;
+}
+
 /** The catalog key a property's value translates, when it is `t('literal')`. */
 function propertyTranslation(property) {
   const value = unwrap(property.value);
@@ -1181,10 +1275,7 @@ function propertyTranslation(property) {
   if (first === undefined) {
     return null;
   }
-  const key = unwrap(first);
-  return key.type === 'Literal' && typeof key.value === 'string' && key.value !== ''
-    ? key.value
-    : null;
+  return staticStringKey(first);
 }
 
 /**
@@ -1313,10 +1404,12 @@ function scanSource(catalog, root) {
   }
   // A key the source builds from the catalog has no literal of its own, so the
   // literals beside it stand in for it: `generic.body.` plus `chatMessage` is
-  // `generic.body.chatMessage`. The set is copied because the expansion grows
-  // it while it runs.
+  // `generic.body.chatMessage`. The literals are snapshotted once: a second
+  // head must not prefix a key an earlier head already synthesized, since
+  // `a.` then `b.` over the literal `c` would also yield `b.a.c`.
+  const literals = [...referenced];
   for (const prefix of keyPrefixes) {
-    for (const value of [...referenced]) {
+    for (const value of literals) {
       referenced.add(`${prefix}${value}`);
     }
   }
@@ -1342,13 +1435,7 @@ function mobileCalledKey(call, file) {
     problems.push(`${file}: t() called with a template literal; the key check cannot see it`);
     return { key: null, problems };
   }
-  return {
-    key:
-      key.type === 'Literal' && typeof key.value === 'string' && key.value !== ''
-        ? key.value
-        : null,
-    problems,
-  };
+  return { key: staticStringKey(first), problems };
 }
 
 /**
@@ -1391,9 +1478,7 @@ function pushCalledKey(call) {
   if (value === null) {
     return null;
   }
-  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
-    ? value.value
-    : null;
+  return staticStringKey(value);
 }
 
 /**
@@ -1574,7 +1659,7 @@ function wording(value, language = 'en') {
     .trim()
     .toLocaleUpperCase(language)
     .toLocaleLowerCase(language)
-    .replace(/[.!:。！：]+$/u, '');
+    .replace(/[.!:。！：।॥]+$/u, '');
 }
 
 function pluralBaseKey(key) {
@@ -1636,16 +1721,17 @@ function familyVisibleCounts(english, base) {
 
 /**
  * Whether a plural category's placeholder set is English's plus tokens from its
- * own family. Returns false for a non-plural key, for a dropped required token,
- * and for a token no value of the family uses.
+ * own family. `actualTokens` and `expectedTokens` are the category's own
+ * `{{token}}` lists, one element per placeholder. Returns false for a non-plural
+ * key, for a dropped required token, and for a token no value of the family uses.
  */
-function addsFamilyPlaceholderOnly(english, key, actual, expected) {
+function addsFamilyPlaceholderOnly(english, key, actualTokens, expectedTokens) {
   const parts = pluralParts(key);
   if (!parts) {
     return false;
   }
-  const required = new Set(signatureTokens(expected));
-  const used = new Set(signatureTokens(actual));
+  const required = new Set(expectedTokens);
+  const used = new Set(actualTokens);
   if (used.size <= required.size) {
     return false;
   }
@@ -1823,28 +1909,14 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
   }
   // `catalogTags` counts only regular files, so a directory named like a
   // catalog would vanish from `present` and from this rule without a trace.
-  // Naming it here keeps the stray entry a reported problem instead.
-  for (const name of nonFileCatalogEntries(dir)) {
+  // Naming it here keeps the stray entry a reported problem instead, which is
+  // why this reader rejects the other kind.
+  for (const name of catalogEntryNames(dir, 'file')) {
     problems.push(
       `${catalogName}: catalog "${name}.json" is not a regular file; remove it or make it a catalog`
     );
   }
   return problems;
-}
-
-/**
- * The `.json`-named entries of `dir` that are not regular files, sorted.
- *
- * Deliberately different from the tag set `catalogTags` builds: this names
- * 'unreadable' and 'other' entries, while the tag set keeps 'file' and
- * 'unreadable'. So a directory named like a catalog is reported here instead
- * of vanishing from `present` without a trace.
- */
-function nonFileCatalogEntries(dir) {
-  return readdirSync(dir, { withFileTypes: true })
-    .filter(entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== 'file')
-    .map(entry => entry.name.replace(/\.json$/, ''))
-    .sort();
 }
 
 function checkEnglishCopies({ catalogName, english }) {
@@ -1872,15 +1944,21 @@ function checkEnglishCopies({ catalogName, english }) {
   // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
   // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
-    if (
-      keys.length < 2 ||
-      TWO_SENSE_COPY.has(wording(value)) ||
-      keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
-    ) {
+    if (keys.length < 2 || keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))) {
       continue;
     }
+    const folded = wording(value);
+    if (TWO_SENSE_COPY.has(folded)) {
+      continue;
+    }
+    // The remedy prints the folded form, because that is the one the exemption
+    // lookup compares; adding the raw copy would not exempt it.
+    const foldNote =
+      folded === value
+        ? ''
+        : ' (entries are compared after trimming, case folding and dropping trailing sentence punctuation)';
     problems.push(
-      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add the string to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs with the two senses it carries.`
+      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add "${folded}" to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs${foldNote} with the two senses it carries.`
     );
   }
   return problems;
@@ -1956,6 +2034,7 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
     ...checkEnglishValues({ catalogName, english, englishValues }),
     ...checkAgentEditorCopy(english, english, label),
     ...checkPullRequestTerm(english, label),
+    ...checkChangelogAreaLabels('en', english, label),
   ];
 }
 
@@ -2204,12 +2283,12 @@ function checkValuePlaceholders({
   requiredCounts,
 }) {
   const problems = [];
-  const expected = placeholders(englishValue);
-  const actual = placeholders(value);
-  const expectedSet = placeholderTokens(englishValue);
-  const actualSet = placeholderTokens(value);
-  const dropped = expectedSet.filter(name => !actualSet.includes(name));
-  const added = actualSet.some(name => !expectedSet.includes(name));
+  const expectedTokens = placeholderTokens(englishValue);
+  const actualTokens = placeholderTokens(value);
+  const expected = signature(expectedTokens);
+  const actual = signature(actualTokens);
+  const dropped = expectedTokens.filter(name => !actualTokens.includes(name));
+  const added = actualTokens.some(name => !expectedTokens.includes(name));
   // A visible count the form must show and does not. `requiredCounts` comes
   // from the whole family, not from the reference, because a reference may
   // spell its own numeral out ("1 live session") while a sibling carries the
@@ -2218,7 +2297,9 @@ function checkValuePlaceholders({
   // names its key, category and locale. A form that also uses a token the
   // family never uses is the mismatch below instead: its signature names both.
   const missingCounts =
-    countsMayBeWorded || added ? [] : [...requiredCounts].filter(name => !actualSet.includes(name));
+    countsMayBeWorded || added
+      ? []
+      : [...requiredCounts].filter(name => !actualTokens.includes(name));
   for (const name of missingCounts) {
     problems.push(
       `${label}: "${key}" drops {{${name}}} without a reviewed worded form (WORDED_COUNTS)`
@@ -2238,7 +2319,7 @@ function checkValuePlaceholders({
       ));
   if (
     actual !== expected &&
-    !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
+    !addsFamilyPlaceholderOnly(english, key, actualTokens, expectedTokens) &&
     !explained
   ) {
     problems.push(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
@@ -2249,10 +2330,10 @@ function checkValuePlaceholders({
       `${label}: "${key}" $t() references differ from English (${expectedRefs || 'none'})`
     );
   }
-  const expectedTokens = expansionTokens(englishValue).join(',');
-  if (expansionTokens(value).join(',') !== expectedTokens) {
+  const expectedExpansions = expansionTokens(englishValue).join(',');
+  if (expansionTokens(value).join(',') !== expectedExpansions) {
     problems.push(
-      `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedTokens || 'none'})`
+      `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedExpansions || 'none'})`
     );
   }
   return problems;
@@ -2463,6 +2544,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a
     // category suffix. The English `_one`/`_other` siblings of a family

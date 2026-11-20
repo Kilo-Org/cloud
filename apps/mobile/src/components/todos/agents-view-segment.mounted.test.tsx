@@ -3,7 +3,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { type AgentsView, AgentsViewSegment } from './agents-view-segment';
+import { type AgentsView } from '@/lib/agents-view';
+import { AgentsViewSegment } from './agents-view-segment';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },

@@ -109,16 +109,19 @@
         "src/plugins/store/node.ts",
         "src/plugins/store/*.test.ts",
         "src/plugins/store/expo-fixture.ts",
-        "src/plugins/remote-mcp/remote-mcp.test.ts",
         "src/plugins/remote-mcp/remote-mcp-fixture.ts",
         "src/plugins/remote-mcp/remote-mcp-oauth-fixture.ts",
-        "src/plugins/remote-mcp/app.ts",
         "src/plugins/conformance.test.ts",
         "src/core/resume-fixture.ts",
         "src/core/image.test.ts"
       ],
       "rules": {
-        "import/no-nodejs-modules": "off",
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      "files": ["src/plugins/remote-mcp/app.ts"],
+      "rules": {
         "unicorn/no-null": "off"
       }
     },

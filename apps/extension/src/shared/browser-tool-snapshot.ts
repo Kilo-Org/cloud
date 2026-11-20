@@ -14,6 +14,7 @@ export type BrowserToolPageSession = Pick<
   | 'attach'
   | 'captureViewportImage'
   | 'consoleMessages'
+  | 'isolatedProbe'
   | 'networkRequestsSinceLoad'
   | 'registerRefs'
   | 'resolveTarget'
@@ -28,6 +29,8 @@ export const MAX_BROWSER_TOOL_RESULT_LENGTH = 60_000;
 export const MAX_BROWSER_TOOL_NAME_LENGTH = 300;
 /** How many aria snapshot lines `browser_find` shows after a match. */
 export const MAX_BROWSER_TOOL_FIND_CONTEXT_LINES = 3;
+/** Lines `browser_find` walks: far past one snapshot's printed lines, still a stop for a pathologically large or deep tree. */
+export const MAX_BROWSER_TOOL_FIND_LINES = 50_000;
 
 /**
  * An extension page has no workspace root, so a Playwright `filename` argument
@@ -160,6 +163,12 @@ export interface BrowserSnapshotArguments {
   readonly target?: string | undefined;
 }
 
+/** A capture's own options: the tool's arguments plus how many lines the tree walk renders. */
+export interface BrowserSnapshotCaptureOptions extends BrowserSnapshotArguments {
+  /** Lines rendered before the walk stops; defaults to `MAX_BROWSER_TOOL_SNAPSHOT_LINES`. */
+  readonly maxLines?: number | undefined;
+}
+
 export interface BrowserAriaSnapshotCapture {
   readonly lines: readonly BrowserAriaSnapshotLine[];
   readonly refs: readonly BrowserToolRefEntry[];
@@ -263,10 +272,12 @@ export const renderBrowserAriaSnapshot = (snapshot: BrowserAriaSnapshot): string
 
 /**
  * Render an `Accessibility.getFullAXTree` payload as a Playwright-shaped aria
- * snapshot. Ignored wrapper nodes are flattened (their children render at the
- * wrapper's depth); interactive nodes get `[ref=eN]` where N is the backend
- * node id, so a ref resolves to the same element on every snapshot until
- * navigation clears the session registry.
+ * snapshot. A node that prints no line (ignored, unnamed, or role-less) adds
+ * no level: its children render at its depth, so a line nests only under the
+ * printed lines above it, and `depth` counts printed levels as Playwright's
+ * does. Interactive nodes get `[ref=eN]` where N is the backend node id, so a
+ * ref resolves to the same element on every snapshot until navigation clears
+ * the session registry.
  */
 export const buildBrowserAriaSnapshot = (
   nodes: readonly BrowserAriaNode[],
@@ -274,6 +285,8 @@ export const buildBrowserAriaSnapshot = (
     readonly boxForBackendNodeId?: (backendNodeId: number) => string | undefined;
     readonly depth?: number;
     readonly rootBackendNodeId?: number;
+    /** Lines rendered before the walk stops; a snapshot prints `MAX_BROWSER_TOOL_SNAPSHOT_LINES`, a search reads `MAX_BROWSER_TOOL_FIND_LINES`. */
+    readonly maxLines?: number;
   } = {}
 ): BrowserAriaSnapshot => {
   const byId = new Map<string, BrowserAriaNode>();
@@ -315,7 +328,7 @@ export const buildBrowserAriaSnapshot = (
   let truncated = false;
 
   const visit = (node: BrowserAriaNode, depth: number): void => {
-    if (lines.length >= MAX_BROWSER_TOOL_SNAPSHOT_LINES) {
+    if (lines.length >= (options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)) {
       truncated = true;
 
       return;
@@ -338,6 +351,7 @@ export const buildBrowserAriaSnapshot = (
     });
     const ignored = node.ignored === true;
     const textRole = TEXT_ROLES.has(role);
+    const linesBefore = lines.length;
 
     if (!ignored) {
       if (textRole) {
@@ -360,12 +374,14 @@ export const buildBrowserAriaSnapshot = (
       }
     }
 
-    if (options.depth !== undefined && depth >= options.depth) {
+    const childDepth = lines.length > linesBefore ? depth + 1 : depth;
+
+    if (options.depth !== undefined && childDepth > options.depth) {
       return;
     }
 
     for (const child of children) {
-      visit(child, ignored ? depth : depth + 1);
+      visit(child, childDepth);
     }
   };
 
@@ -520,6 +536,7 @@ const DOM_ARIA_SNAPSHOT_FUNCTION = `function (options) {
       refs.push({ ref: ref, selector: selectorOf(element) });
     }
     var children = Array.prototype.filter.call(element.children, visible);
+    var linesBefore = lines.length;
     if (role === '' && name !== '' && children.length === 0) {
       lines.push({ depth: depth, name: name, role: '', textLeaf: true });
     } else if (role !== '' && (name !== '' || interactive)) {
@@ -531,7 +548,8 @@ const DOM_ARIA_SNAPSHOT_FUNCTION = `function (options) {
       }
       lines.push(line);
     }
-    for (var index = 0; index < element.children.length; index++) { walk(element.children[index], depth + 1); }
+    var childDepth = lines.length > linesBefore ? depth + 1 : depth;
+    for (var index = 0; index < element.children.length; index++) { walk(element.children[index], childDepth); }
   };
   var root = rootSelector === null ? (document.body || document.documentElement) : document.querySelector(rootSelector);
   if (root) { walk(root, 0); }
@@ -562,13 +580,14 @@ const captureDomAriaSnapshot = async (
   options: {
     readonly boxes?: boolean;
     readonly depth?: number;
+    readonly maxLines?: number;
     readonly rootSelector?: string;
   }
 ): Promise<BrowserAriaSnapshot> => {
   const result = await readRuntimeEvaluateValue(
     session,
     buildDomSnapshotExpression({
-      maxLines: MAX_BROWSER_TOOL_SNAPSHOT_LINES,
+      maxLines: options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES,
       maxNameLength: MAX_BROWSER_TOOL_NAME_LENGTH,
       ...(options.boxes === undefined ? {} : { boxes: options.boxes }),
       ...(options.depth === undefined ? {} : { depth: options.depth }),
@@ -664,7 +683,7 @@ const resolveTargetSelector = async (
  */
 const captureAxTreeSnapshot = async (
   session: BrowserToolPageSession,
-  options: BrowserSnapshotArguments,
+  options: BrowserSnapshotCaptureOptions,
   rootBackendNodeId: number | undefined
 ): Promise<BrowserAriaSnapshot | undefined> => {
   try {
@@ -680,6 +699,7 @@ const captureAxTreeSnapshot = async (
     const treeOptions = {
       ...(options.depth === undefined ? {} : { depth: options.depth }),
       ...(rootBackendNodeId === undefined ? {} : { rootBackendNodeId }),
+      ...(options.maxLines === undefined ? {} : { maxLines: options.maxLines }),
     };
     const initial = buildBrowserAriaSnapshot(nodes, treeOptions);
 
@@ -716,7 +736,8 @@ const captureAxTreeSnapshot = async (
  */
 export const captureBrowserAriaSnapshot = async (
   session: BrowserToolPageSession,
-  options: BrowserSnapshotArguments
+  options: BrowserSnapshotCaptureOptions,
+  registration: { readonly mergeRefs?: boolean } = {}
 ): Promise<BrowserAriaSnapshotCapture> => {
   const rootBackendNodeId =
     options.target === undefined || options.target === ''
@@ -729,20 +750,23 @@ export const captureBrowserAriaSnapshot = async (
     (await captureDomAriaSnapshot(session, {
       ...(options.boxes === undefined ? {} : { boxes: options.boxes }),
       ...(options.depth === undefined ? {} : { depth: options.depth }),
+      ...(options.maxLines === undefined ? {} : { maxLines: options.maxLines }),
       ...(options.target === undefined || options.target === ''
         ? {}
         : { rootSelector: await resolveTargetSelector(session, options.target) }),
     }));
 
   const targeted = options.target !== undefined && options.target !== '';
-  session.registerRefs(resolvedSnapshot.refs, { merge: targeted });
+  session.registerRefs(resolvedSnapshot.refs, {
+    merge: targeted || registration.mergeRefs === true,
+  });
 
   const body =
     resolvedSnapshot.lines.length === 0
       ? '(no accessibility nodes)'
       : renderBrowserAriaSnapshot(resolvedSnapshot);
   const text = resolvedSnapshot.truncated
-    ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
+    ? `${body}\n... (snapshot truncated at ${String(options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;
 
   return {

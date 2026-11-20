@@ -63,7 +63,13 @@ export function ScopeListScreen() {
                 key={org.organizationId}
                 icon={Building2}
                 title={org.organizationName}
-                subtitle={org.role === 'member' ? t('codeReviewer.scopeList.viewOnly') : undefined}
+                // Every scope row says what it covers, as Personal does; a
+                // member's row says instead that the scope is read-only.
+                subtitle={
+                  org.role === 'member'
+                    ? t('codeReviewer.scopeList.viewOnly')
+                    : t('common.organizationRepositories')
+                }
                 onPress={() => {
                   openScope(org.organizationId);
                 }}

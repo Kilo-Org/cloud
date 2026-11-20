@@ -12,11 +12,11 @@ import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { Card } from '@/components/ui/card';
+import { Section } from '@/components/ui/section';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { PrReviewOverviewSkeleton } from '@/components/pr-review/pr-review-overview-skeleton';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
 import { PrMergeSectionProvider } from '@/components/pr-review/merge/pr-merge-section-provider';
@@ -119,11 +119,16 @@ export function PrReviewOverview({
   }, [t]);
 
   const state = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
-  // A retryable gateway-class failure (retryable or service-unavailable)
-  // with cached data keeps it on screen: a failed background refetch of a
-  // previously loaded PR must not blank the overview. Every other state, or
-  // a first load with no data, renders the error states below.
-  const keepCachedData = state?.kind === 'retryable' || state?.kind === 'service-unavailable';
+  // A recoverable failure (transient, gateway, or a read that never reached
+  // the server) with cached data keeps it on screen: a failed background
+  // refetch of a previously loaded PR must not blank the overview — and a
+  // reader who went offline has even less reason to lose what they had.
+  // Every other state, or a first load with no data, renders the error states
+  // below.
+  const keepCachedData =
+    state?.kind === 'retryable' ||
+    state?.kind === 'service-unavailable' ||
+    state?.kind === 'offline';
   if (state && (!pr.data || !keepCachedData)) {
     if (state.kind === 'not-found') {
       return (
@@ -213,6 +218,20 @@ export function PrReviewOverview({
         />
       );
     }
+    // The read never reached the server: name the connection, not the backend,
+    // and keep the Retry a restored network makes useful.
+    if (state.kind === 'offline') {
+      return (
+        <QueryError
+          refreshControl={refreshControl}
+          variant="offline"
+          onRetry={() => {
+            void pr.refetch();
+          }}
+          isRetrying={pr.isFetching}
+        />
+      );
+    }
     // retryable / service-unavailable: the review read path could not serve
     // the request. A BAD_GATEWAY (service-unavailable) — the authorization
     // layer in front of GitHub, a GitHub 5xx, or a provider transport
@@ -288,8 +307,7 @@ export function PrReviewOverview({
 
       <PrOverviewMeta overview={data} />
 
-      <View className="gap-2">
-        <PrReviewSectionLabel label={t('prReview.description')} />
+      <Section label={t('prReview.description')}>
         {data.bodyMarkdown && data.bodyMarkdown.trim().length > 0 ? (
           <Card>
             <MarkdownText value={data.bodyMarkdown} variant="assistant" />
@@ -299,7 +317,7 @@ export function PrReviewOverview({
             {t('prReview.noDescriptionProvided')}
           </Text>
         )}
-      </View>
+      </Section>
 
       <PrReviewChecksSection owner={owner} repo={repo} number={number} checks={checks} />
 

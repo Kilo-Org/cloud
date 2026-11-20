@@ -6,6 +6,7 @@ import {
   INSET_MIN_ASYMMETRY_DP,
   INSET_MIN_GAP_DP,
   INSET_MIN_WIDTH_SHARE,
+  TOLERANCE_DP,
 } from './thresholds';
 
 const fmt = (value: number) => `${Math.round(value * 10) / 10} dp`;
@@ -31,11 +32,18 @@ export function checkInsetAsymmetry(tree: LayoutTree): Finding[] {
     if (!node.hasContainer || node.isControl || node.scroll.x || node.scroll.y) continue;
     const [x, y, width, height] = node.rect;
     if (height > maxHeight) continue;
+    // Part of the node is outside the window or a scroller: children wholly out
+    // there are dropped, so the content's union no longer says where its edges are.
+    const [, , visibleWidth, visibleHeight] = node.visibleRect;
+    if (visibleWidth < width - TOLERANCE_DP || visibleHeight < height - TOLERANCE_DP) continue;
     const children = node.children.filter(child => !child.absolute);
     if (children.length === 0) continue;
     const content = union(children.map(child => child.rect));
     const { safeArea, window } = tree.env;
-    const top = Math.max(0, content[1] - y - (y <= 1 ? safeArea.top : 0));
+    // The top of a presented sheet holds the platform's grabber, so a node that
+    // starts there pads for it the way a screen's top pads for the status bar.
+    const sheetTop = node.presented !== undefined && y <= node.presented.dy + TOLERANCE_DP;
+    const top = sheetTop ? 0 : Math.max(0, content[1] - y - (y <= 1 ? safeArea.top : 0));
     const bottomGap = Math.max(
       0,
       bottom(node.rect) -

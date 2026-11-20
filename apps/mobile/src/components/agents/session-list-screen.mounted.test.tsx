@@ -87,8 +87,8 @@ const searchInput = vi.hoisted(() => ({
 }));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 // Mutable so a case can put the tree in an RTL interface: the header action's
-// letterspaced capitals are LTR-only and must drop under RTL, keeping the
-// Arabic label's joins.
+// letterspaced capitals drop for right-to-left script copy inside an RTL
+// interface, which keeps the Arabic label's joins.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 // The screen's graph reaches `expo` through the session helpers and its rows
 // reach the haptics module; both read the `__DEV__` global the test renderer
@@ -182,6 +182,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({
     fontScale: state.fontScale,
     width: state.windowWidth,
@@ -755,42 +757,27 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(action('New session')).toBeDefined();
   });
 
-  it('names the accepted-empty body history link and the header control after the same destination', async () => {
+  it('keeps the accepted-empty body to creation, with history in the header alone', async () => {
     await renderScreen();
     const historyLabel = i18n.t('agents.sessionList.pastSessions');
-    const bodyLink = nodes('Pressable').find(
-      node => node.props.testID === 'agents-view-history-empty'
-    );
-    if (!bodyLink) {
-      throw new Error('Missing body history link');
-    }
-    expect(bodyLink.props.accessibilityLabel).toBe(historyLabel);
-    expect(bodyLink.findByType(Text).children).toEqual([historyLabel]);
-    // One destination carries one name, so the header control and the body link
-    // both read it; only their test ids tell the two controls apart.
+    // The header control is the one route into stored history: an accepted
+    // empty body that carried a second link repeated the control above it and
+    // offered nothing the reader could not already press.
+    expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
-    // The body link is the second route into stored history: pressing it must
-    // reach the same destination the header control does.
-    pressControl('agents-view-history-empty');
-    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
-    // The non-empty live list keeps the history route in the header alone: the
-    // body link is gone, and the header keeps the same name.
-    state.live.activeSessions = [row];
-    await renderScreen();
     expect(nodes('Pressable').some(node => node.props.testID === 'agents-view-history-empty')).toBe(
       false
     );
-    expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
+    expect(action('New session')).toBeDefined();
   });
 
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
-    // The full controls row exists only over a non-empty live list (the
-    // accepted-empty state withholds the row and carries the history route in
-    // the body), so a populated render covers it before this case switches to
-    // the empty body it tests. The list controls share the title's row through
-    // `inlineActions`; the heading keeps `flex-1 min-w-0`, so the title keeps
-    // its tail ellipsis and nothing stacks the controls onto a second row.
+    // The full controls row exists only over a non-empty live list, so a
+    // populated render covers it before this case switches to the empty body it
+    // tests. The list controls share the title's row through `inlineActions`;
+    // the heading keeps `flex-1 min-w-0`, so the title keeps its tail ellipsis
+    // and nothing stacks the controls onto a second row.
     state.live.activeSessions = [row];
     await renderScreen();
     expect(header().props.inlineActions).toBeDefined();
@@ -868,6 +855,70 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('Skeleton')).toHaveLength(0);
     expect(text()).toContain('Nothing running right now');
     expect(state.announcements).toEqual(['Loading…']);
+  });
+
+  it('names the offline state instead of a load that cannot start', async () => {
+    // A confirmed-offline device pauses the first read: pending never settles,
+    // so the screen owes the person the offline state with its own Retry, not a
+    // "Loading…" line and eight skeletons that would never land.
+    state.internet = 'offline';
+    state.connection.isConnected = false;
+    state.live.hasAcceptedSuccess = false;
+    state.live.isPaused = true;
+    await renderScreen();
+    expect(listSkeletons()).toHaveLength(0);
+    expect(text()).not.toContain('Loading…');
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    // One statement: the card already names the connection, so the inline line
+    // does not repeat it.
+    expect(text()).not.toContain('No internet connection');
+    expect(text()).not.toContain('Nothing running right now');
+
+    // The offline card takes no pull: a refresh there could not settle, and a
+    // failed one would paint "Couldn't refresh" over the list after reconnect.
+    expect(requireNode('CenteredState').props.refreshControl).toBeUndefined();
+
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    // The card's Retry asks the boundary read, which settles by failing; the
+    // paused live read is left to React Query's reconnect refetch, so the press
+    // cannot hold the lock for the whole outage.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
+    expect(state.refetch).not.toHaveBeenCalled();
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    // The lock released: the second press is not dropped.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(2);
+
+    // On an organization scope the same press leaves the boundary read failed,
+    // and that failure is the outage rather than a verdict on the organization:
+    // the card stays instead of "Couldn't load your organizations".
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    await renderScreen();
+    // The surface keeps the offline card; the header's context control may name
+    // the failed organizations read on its own, but the list never falls to the
+    // organization-unavailable state.
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    expect(text()).not.toContain(i18n.t('organization.boundary.unavailableSessionsDescription'));
+
+    // The connection returns: the paused read resumes by itself and the card
+    // gives way to the confirmed list. The boundary read answers again too.
+    state.organization.organizationId = null;
+    state.boundary.isError = false;
+    state.internet = 'online';
+    state.connection.isConnected = true;
+    state.live.isPaused = false;
+    state.live.hasAcceptedSuccess = true;
+    await renderScreen();
+    expect(text()).not.toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain('Nothing running right now');
   });
 
   it('keeps list identity, row identity, navigation, run state, and scroll policy through reconnect and refresh failure', async () => {

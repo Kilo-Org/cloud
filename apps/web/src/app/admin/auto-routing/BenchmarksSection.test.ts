@@ -1,11 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
-import type {
-  BenchmarkConfig,
-  BenchmarkRoutingTableResponse,
+import {
+  BenchmarkConfigResponseSchema,
+  type BenchmarkConfig,
+  type BenchmarkRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  ConfigSaveWarnings,
   configToFormState,
   effortCoverageForModel,
   formStateToConfig,
@@ -237,6 +239,55 @@ describe('compact route rankings', () => {
     const html = renderToStaticMarkup(React.createElement(RoutingTableView, { data }));
     expect(html).toContain('legacy · low');
     expect(html).toContain('Below threshold');
+  });
+});
+
+describe('config save drain', () => {
+  it('parses every drain outcome the worker reports', () => {
+    const parse = (drain: unknown) =>
+      BenchmarkConfigResponseSchema.safeParse({
+        config: null,
+        policySettings: null,
+        warnings: [],
+        drain,
+      }).success;
+    // The console rejects the whole save when this schema fails, so each value
+    // the worker can send has to parse here.
+    for (const skipped of ['active_run', 'nothing_pending', 'timeout', 'failed', null]) {
+      expect(parse({ runId: null, entryCount: 0, skipped })).toBe(true);
+    }
+    expect(parse({ runId: 'run-1', entryCount: 3, skipped: null })).toBe(true);
+    expect(parse({ runId: null, entryCount: 0, skipped: 'unknown_reason' })).toBe(false);
+  });
+});
+
+describe('config save warnings', () => {
+  it('shows each warning with its kind and the worker’s next step', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ConfigSaveWarnings, {
+        warnings: [
+          {
+            kind: 'registry_sync_failed',
+            message: 'Platform registry sync failed (catalog 503). Save again to retry now.',
+          },
+          {
+            kind: 'routing_table_publish_failed',
+            message: 'Routing table publish failed (D1 overloaded).',
+          },
+        ],
+      })
+    );
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Platform registry not synced');
+    expect(html).toContain('Platform registry sync failed (catalog 503). Save again to retry now.');
+    expect(html).toContain('Routing table not republished');
+    expect(html).toContain('Routing table publish failed (D1 overloaded).');
+  });
+
+  it('renders nothing after a clean save', () => {
+    expect(renderToStaticMarkup(React.createElement(ConfigSaveWarnings, { warnings: [] }))).toBe(
+      ''
+    );
   });
 });
 

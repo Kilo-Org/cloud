@@ -285,6 +285,21 @@ export function CloudAgentProvider({ children, userId, organizationId }: CloudAg
             networkMode: 'always',
           })
         ),
+        getAgentBoard: ({ sessionId, signal }) => {
+          const deadline = AbortSignal.any([
+            ...(signal ? [signal] : []),
+            AbortSignal.timeout(30_000),
+          ]);
+          return organizationId
+            ? trpcClient.organizations.cloudAgentNext.getAgentBoard.query(
+                { cloudAgentSessionId: sessionId, organizationId },
+                { signal: deadline, context: { skipBatch: true } }
+              )
+            : trpcClient.cloudAgentNext.getAgentBoard.query(
+                { cloudAgentSessionId: sessionId },
+                { signal: deadline, context: { skipBatch: true } }
+              );
+        },
         send,
 
         interrupt: async payload => {

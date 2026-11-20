@@ -20,10 +20,16 @@ import { Section } from '@/components/ui/section';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import {
+  bitbucketRowStatus,
+  type BitbucketRowStatus,
+  classifyBitbucketConnection,
+} from '@/lib/code-reviewer-bitbucket';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import {
   PERSONAL_SCOPE,
+  useBitbucketIntegrationStatus,
   useBitbucketReadiness,
   useGitHubStatus,
   useGitLabStatus,
@@ -89,9 +95,17 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const bitbucketReadiness = useBitbucketReadiness(scope);
+  // A personal scope hides the Bitbucket row (it is org-only), so its status
+  // read sends no request there either — and its error cannot deny access.
+  const bitbucketStatus = useBitbucketIntegrationStatus(scope, !isPersonal);
   const access = classifyOrganizationScopeAccess({
     isOrganizationScope: !isPersonal,
-    errors: [githubStatus.error, gitlabStatus.error, bitbucketReadiness.error],
+    errors: [
+      githubStatus.error,
+      gitlabStatus.error,
+      bitbucketReadiness.error,
+      bitbucketStatus.error,
+    ],
   });
 
   // Re-resolve membership and every platform status together: a restored
@@ -103,14 +117,15 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
       githubStatus.refetch(),
       gitlabStatus.refetch(),
       bitbucketReadiness.refetch(),
+      bitbucketStatus.refetch(),
     ]);
   };
 
   if (access !== 'granted') {
     return (
       <ScopeAccessDeniedScreen
-        title={scopeTitle}
-        eyebrow={t('common.codeReviewer')}
+        title={t('common.codeReviewer')}
+        subtitle={scopeTitle}
         backFallback={CODE_REVIEWER_HOME_PATH}
         kind={access}
         onRetry={() => void retryAccess()}
@@ -118,7 +133,8 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
           organizations.isFetching ||
           githubStatus.isFetching ||
           gitlabStatus.isFetching ||
-          bitbucketReadiness.isFetching
+          bitbucketReadiness.isFetching ||
+          bitbucketStatus.isFetching
         }
       />
     );
@@ -134,6 +150,19 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
     return githubStatus;
   };
 
+  // The Bitbucket row answers from both reads — the readiness alone reports a
+  // Bitbucket OAuth connection as "Not connected".
+  const rowStatus = bitbucketRowStatus(
+    classifyBitbucketConnection({ readiness: bitbucketReadiness, status: bitbucketStatus })
+  );
+  const ROW_SUBTITLE_BY_STATUS = {
+    checking: i18n.t('codeReviewer.platformList.checking'),
+    'status-unavailable': i18n.t('codeReviewer.platformList.statusUnavailable'),
+    connected: i18n.t('common.connected'),
+    'needs-attention': i18n.t('codeReviewer.platformList.needsAttention'),
+    'not-connected': i18n.t('common.notConnected'),
+  } as const satisfies Record<BitbucketRowStatus, string>;
+
   const platforms = ALL_PLATFORMS.filter(
     platform => PLATFORM_CAPABILITIES[platform].scopes === 'all' || !isPersonal
   );
@@ -141,13 +170,12 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={scopeTitle}
-        // The same one-line header the review list for this scope paints, so
-        // both scopes report one header height and the platform rows never move
-        // when the name arrives with the membership read: a longer name
-        // tail-truncates inside that line.
-        titleNumberOfLines={1}
-        eyebrow={t('common.codeReviewer')}
+        title={t('common.codeReviewer')}
+        // The scope is the subtitle under the product name, the one two-line
+        // header every Code Reviewer screen paints: a longer organization name
+        // tail-truncates inside that line, so the rows never move when it
+        // arrives with the membership read.
+        subtitle={scopeTitle}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Section label={t('codeReviewer.platformList.platforms')}>
@@ -159,7 +187,11 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                   key={platform}
                   icon={PLATFORM_ICONS[platform]}
                   title={PLATFORM_CAPABILITIES[platform].label}
-                  subtitle={connectionSubtitle(status)}
+                  subtitle={
+                    platform === 'bitbucket'
+                      ? ROW_SUBTITLE_BY_STATUS[rowStatus]
+                      : connectionSubtitle(status)
+                  }
                   onPress={() => {
                     pushOnce(`/(app)/code-reviewer/${scope}/${platform}` as Href);
                   }}

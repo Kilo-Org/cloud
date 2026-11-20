@@ -1,7 +1,7 @@
 /* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
 import { z } from 'zod';
 import type { LocalAgentBrowserBridge } from './browser-bridge';
-import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
+import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES, SESSION_LOST_MESSAGE } from './jsonrpc';
 import type { JsonRpcParams, JsonRpcResult } from './jsonrpc';
 import type { LocalAgentControllerRegistry } from './registry';
 
@@ -37,10 +37,15 @@ export const createLocalAgentDispatcher = ({
   bridge: LocalAgentBrowserBridge;
   registry: LocalAgentControllerRegistry;
 }): LocalAgentDispatcher => {
-  /** A session handle is usable only by the controller that opened it. */
+  /**
+   * A session handle is usable only by the controller that opened it. Any other
+   * handle is one this extension no longer holds for that controller (the
+   * connection that opened it dropped, or the hub came back with new
+   * controllers): nothing runs, and the CLI may open a new session.
+   */
   const ownedBy = async (controllerId: string, sessionHandle: string): Promise<void> => {
     if ((await registry.sessionOwner(sessionHandle)) !== controllerId) {
-      throw invalidParams('Unknown session handle.');
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.sessionLost, SESSION_LOST_MESSAGE);
     }
   };
 

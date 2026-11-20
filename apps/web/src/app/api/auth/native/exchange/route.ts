@@ -93,7 +93,6 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
   if (verification.keyId !== undefined) {
     try {
       const combined = await createDeviceSessionWithAttestedKey({
-        userId: auth.user.id,
         userAgent,
         user: auth.user,
         verification,

@@ -80,7 +80,10 @@ while IFS= read -r pkg; do
   affects "$pkg" || continue
   if [ -d "$pkg/src" ]; then
     if [[ "$pkg" == apps/mobile ]]; then
-      mobile_lint_dirs+=("$pkg/src")
+      # Local Expo modules carry app TypeScript too (module test harnesses read
+      # the native sources they ship), so the mobile lint covers both trees and
+      # matches `apps/mobile` package.json's own lint target.
+      mobile_lint_dirs+=("$pkg/src" "$pkg/modules")
     else
       lint_dirs+=("$pkg/src")
     fi

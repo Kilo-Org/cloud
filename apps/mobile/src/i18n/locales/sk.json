@@ -19,7 +19,11 @@
     "presenceStatus": "Hostitelia: {{connection}}",
     "commandStatus": "Doručenie príkazu: {{status}}",
     "delivered": "Doručené",
-    "expired": "Platnosť vypršala"
+    "expired": "Platnosť vypršala",
+    "recoveryGaps_one": "Chýba {{displayCount}} časť tohto prepisu.",
+    "recoveryGaps_few": "Chýbajú {{displayCount}} časti tohto prepisu.",
+    "recoveryGaps_many": "Chýba {{displayCount}} časti tohto prepisu.",
+    "recoveryGaps_other": "Chýba {{displayCount}} častí tohto prepisu."
   },
   "common": {
     "manageOnWeb": "Spravovať na webe",
@@ -138,16 +142,19 @@
     "keepRunning": "Nechať bežať",
     "newSession": "Nová relácia",
     "noModelsAvailable": "Žiadne dostupné modely",
+    "modelRetires": "Ukončí sa {{date}}",
     "notFound": "Nenájdené",
     "online": "Pripojené",
     "open": "Otvoriť {{name}}",
     "openPullRequest": "Otvoriť PR",
+    "viewOnGitHub": "Zobraziť PR na GitHub",
     "completed": "Dokončené",
     "pending": "Čaká sa",
     "running": "Prebieha",
     "performance": "Výkon",
     "preferences": "Predvoľby",
     "privacyPolicy": "Zásady ochrany osobných údajov",
+    "termsOfService": "Podmienky používania",
     "profile": "Profil",
     "reactions": "Reakcií",
     "recent": "Nedávne",
@@ -171,6 +178,7 @@
     "generating": "Generuje sa…",
     "working": "Pracuje sa",
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
+    "organizationRepositories": "Repozitáre organizácie",
     "dismissed": "Ignorované",
     "agent": "agent",
     "durationMinuteShort": "min",
@@ -179,7 +187,8 @@
     "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
     "privateRepositoryA11y": "{{name}}, súkromné úložisko",
     "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine.",
-    "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova."
+    "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova.",
+    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova."
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -217,8 +226,8 @@
     "verifyCode": "Overiť kód",
     "resendCode": "Odoslať kód znova",
     "termsPrefix": "Pokračovaním súhlasíte s našimi ",
+    "termsInSentence": "Podmienkami poskytovania služieb",
     "terms": "Podmienkami",
-    "termsInSentence": "Podmienkami",
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ďalšie možnosti prihlásenia",
@@ -273,6 +282,9 @@
     "credits": "Kredity",
     "failedToLoadBalance": "Zostatok sa nepodarilo načítať. Klepnutím to skús znova.",
     "balanceLoadFailed": "Zostatok sa nepodarilo načítať",
+    "balanceUnreachable": "Server je nedostupný. Skúste to znova.",
+    "balanceAccessDenied": "Nemáte oprávnenie zobraziť tento zostatok.",
+    "balanceUnavailable": "Zostatok sa nepodarilo načítať.",
     "hideBalance": "Skryť zostatok",
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
@@ -503,7 +515,7 @@
     "changelogFixesPolish": "Opravy a vylepšenia v celej aplikácii.",
     "changelogAreas": {
       "signIn": "Prihlásenie",
-      "profileOrganizations": "Profil a organizácie"
+      "profileOrganizations": "Profil i organizácie"
     }
   },
   "preferences": {
@@ -768,6 +780,11 @@
       "couldNotLoadMore": "Ďalšie komentáre sa nepodarilo načítať.",
       "retryLoadingMore": "Znova načítať ďalšie komentáre",
       "loadMoreComments": "Načítať ďalšie komentáre",
+      "conversationTruncated": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
+      "conversationTruncated_one": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
+      "conversationTruncated_other": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
+      "conversationTruncated_few": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
+      "conversationTruncated_many": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
       "addReaction": "Pridať reakciu",
       "reactionPill": "reakcia {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcia",
@@ -783,7 +800,6 @@
       "replyPlaceholder": "Odpoveď…",
       "replyBody": "Text odpovede",
       "submitReply": "Odoslať odpoveď",
-      "termsTitle": "Podmienky používania",
       "termsCopy": "Na pridávanie príspevkov musíš mať aspoň 13 rokov.",
       "termsAcceptRetry": "Podmienky sa nepodarilo prijať. Skontroluj pripojenie a skús to znova.",
       "viewTerms": "Zobraziť podmienky",
@@ -904,7 +920,6 @@
       "noAccess": "Nemáš prístup ku kontrolám tohto repozitára.",
       "couldNotLoad": "Kontroly sa nepodarilo načítať.",
       "retryChecks": "Znova načítať kontroly",
-      "viewOnGitHub": "Zobraziť PR na GitHub",
       "noChecksReported": "Žiadne výsledky kontrol",
       "passed": "úspešné: {{displayCount}}",
       "passed_one": "úspešné: {{displayCount}}",
@@ -967,9 +982,9 @@
       "checkFailedTitleGitLab": "Pripojenie k službe GitLab sa nepodarilo skontrolovať.",
       "checkFailedTitleBitbucket": "Pripojenie k službe Bitbucket sa nepodarilo skontrolovať.",
       "providerCheckFailedMessage": "Nepodarilo sa spojiť s poskytovateľom. Skontroluj pripojenie a skús to znova.",
-      "reconnectTitle": "Opätovné pripojenie k službe GitHub",
-      "reconnectTitleGitLab": "Opätovné pripojenie k službe GitLab",
-      "reconnectTitleBitbucket": "Opätovné pripojenie k službe Bitbucket",
+      "reconnectTitle": "Pripojiť GitHub znova",
+      "reconnectTitleGitLab": "Pripojiť GitLab znova",
+      "reconnectTitleBitbucket": "Pripojiť Bitbucket znova",
       "reconnectDescription": "Prístup k tvojmu účtu GitHub bol odvolaný.",
       "gitlabDescription": "Kontrolovať merge requesty v mobile",
       "gitlabInstanceMismatchTitle": "Pripojenie ku GitLabu je pre inú inštanciu",
@@ -996,6 +1011,10 @@
       "pendingComment": "neodoslaných komentárov",
       "pendingComment_other": "neodoslaných komentárov",
       "submitCountOfTotal": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_one": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_few": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_many": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_other": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
       "submitReview": "Odoslať kontrolu",
       "partialPostedFresh": "Počet odoslaných komentárov: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Počet odoslaných komentárov: {{displayFreshCount}}. ",
@@ -1070,7 +1089,12 @@
     "tabs": {
       "overview": "Prehľad",
       "files": "Súbory",
-      "discussion": "Diskusia"
+      "discussion": "Diskusia",
+      "discussionAccessibility_one": "{{title}}: 1 komentár",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentárov",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentárov",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentáre",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentára"
     },
     "fileStatus": {
       "modified": "Upravené",
@@ -1178,16 +1202,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agent ťa potrebuje",
-      "agentAttentionSubtitle": "otázky, žiadosti o povolenie a potrebné odpovede",
+      "agentAttentionSubtitle": "Otázky, žiadosti o povolenie a potrebné odpovede",
       "agentUpdatesTitle": "Novinky od agenta",
-      "agentUpdatesSubtitle": "správy agenta počas úlohy",
+      "agentUpdatesSubtitle": "Správy agenta počas úlohy",
       "sessionStatusTitle": "Stav relácie",
-      "sessionStatusSubtitle": "dokončená / zlyhala / pripravená na ovládanie",
-      "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
+      "sessionStatusSubtitle": "Dokončená / zlyhala / pripravená na ovládanie",
+      "balanceAlertsSubtitle": "Upozornenia na nízky zostatok organizácie",
       "balanceAlertsUnavailable": "Pripojte sa k organizácii, aby ste získali upozornenia na zostatok.",
-      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA",
+      "securityFindingsSubtitle": "Nové zistenia a pripomienky SLA",
       "securityFindingsUnavailable": "Zapnite Bezpečnostného agenta Kilo v rozsahu, aby ste získali bezpečnostné zistenia.",
-      "spendAlertsSubtitle": "prekročenia prahov a hodinové špičky",
+      "spendAlertsSubtitle": "Prekročenia prahov a hodinové špičky",
       "spendAlertsToggle": "Kategória upozornení na výdavky"
     },
     "history": {
@@ -1269,7 +1293,7 @@
     },
     "instructions": {
       "title": "Vlastné pokyny",
-      "deprecation": "Podpora vlastných pokynov sa plánuje ukončiť. Presuňte tieto pokyny do súboru REVIEW.md vo svojom repozitári.",
+      "deprecation": "Vlastné pokyny budú odstránené. Presuňte tieto pokyny do súboru REVIEW.md vo svojom repozitári.",
       "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…",
       "clearTitle": "Odstrániť vlastné pokyny?",
       "clearMessage": "Uloženie prázdneho poľa odstráni vlastné pokyny uložené pre tohto recenzenta."
@@ -1429,12 +1453,16 @@
     "followReviewMd": "Riadiť sa pokynmi v REVIEW.md",
     "followReviewMdSubtitle": "Dodržiavať pokyny v súbore REVIEW.md každého repozitára",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie."
+      "notConnectedReadOnlyPlan": "Skúšobné obdobie organizácie sa skončilo, preto vlastník musí aktualizovať fakturáciu na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "managedOnWebTitle": "Spravuje sa na webe",
+      "managedOnWebShort": "Toto pripojenie sa spravuje na webe z počítača.",
+      "managedOnWebRepositories": "Vyberte repozitáre pre {{organization}} na webe z počítača.",
       "description": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
       "descriptionReconnect": "Vytvorte nový prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
+      "descriptionOverview": "Vytvorte prístupový token pracovného priestoru a vložte ho na ďalšej obrazovke.",
       "scopes": "Účet: čítanie · Repozitáre: čítanie/zápis · PR: čítanie · Webhooky: čítanie/zápis",
       "tokenPlaceholder": "Prístupový token pracovného priestoru",
       "tokenRefused": "Bitbucket neprijal tento token pracovného priestoru. Skontrolujte, či má oprávnenia uvedené vyššie, a potom to skúste znova."
@@ -1455,13 +1483,14 @@
     "platformList": {
       "checking": "Kontroluje sa…",
       "statusUnavailable": "Stav nie je dostupný",
+      "needsAttention": "Vyžaduje pozornosť",
       "platforms": "Platformy",
       "activity": "Aktivita"
     },
     "providerConnect": {
-      "githubApp": "Aplikáciu GitHub",
+      "githubApp": "aplikáciu GitHub",
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
-      "gitlabAccount": "Účet GitLab",
+      "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
       "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky."
     },
@@ -2877,6 +2906,8 @@
     "modelPicker": {
       "title": "Vybrať model",
       "noModelsDescription": "Na výber nie sú žiadne modely.",
+      "allUnavailableTitle": "Nedá sa použiť žiadny model",
+      "allUnavailableDescription": "Pridaj kľúč poskytovateľa a skús to znova.",
       "favorites": "Obľúbené"
     },
     "modelSelector": {
@@ -3134,6 +3165,7 @@
     "noSessionsDescription": "Prihlás sa do aplikácie Kilo na inom zariadení a zobrazí sa tu.",
     "signInScopeNote": "Zobrazujú sa tu prihlásenia cez aplikáciu Kilo, Kilo CLI a webový prehliadač. Prihlásenia z editora nie sú uvedené.",
     "signedIn": "Prihlásenie: {{signedIn}} · Posledná aktivita: {{lastSeen}}",
+    "signedInThisDevice": "Prihlásenie: {{signedIn}} · {{thisDevice}}",
     "thisDevice": "Toto zariadenie",
     "viewProfile": "Zobraziť profil",
     "signOutThisDevice": "Odhlásiť toto zariadenie",
@@ -3298,6 +3330,8 @@
     "retryHint": "Znova načíta stav Kilo Pass.",
     "endedOn": "Skončené {{date}}",
     "notAvailableInApp": "Kilo Pass nie je dostupný v aplikácii.",
+    "notAvailableTitle": "Kilo Pass sa v aplikácii neponúka",
+    "noPassDescription": "Tento účet nemá Kilo Pass.",
     "statusActive": "Aktívne",
     "statusTrialing": "Skúšobné obdobie",
     "statusPastDue": "Platba po splatnosti",
@@ -3580,7 +3614,7 @@
       "retentionLimit": "Zobrazujú sa najnovšie faktúry."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Zapnúť upozornenie na nízky zostatok",
+      "subtitle": "Keď zostatok tejto organizácie klesne pod nastavenú sumu, na zadané adresy sa odošle e-mailové upozornenie.",
       "notifyEmailsLabel": "E-mailové adresy na upozornenia",
       "permissionDenied": "Nemáš povolenie spravovať upozornenia na fakturáciu.",
       "separateEmailsHint": "Viaceré e-mailové adresy oddeľ čiarkami.",
@@ -3656,6 +3690,7 @@
       "truncated": "V tejto hodine je viac požiadaviek, než zoznam zobrazuje.",
       "emptyTitle": "V tejto hodine nie sú žiadne požiadavky",
       "emptyDescription": "Ak chcete zobraziť skoršie požiadavky, použite tlačidlo „Staršia hodina“.",
+      "emptyBoundDescription": "Záznamy požiadaviek nesiahajú ďalej do minulosti.",
       "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
       "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
       "tokens": "{{input}} vstup · {{output}} výstup",
@@ -3726,10 +3761,9 @@
     },
     "hub": {
       "renameTitle": "Premenovať organizáciu",
-      "renamePlaceholder": "Názov organizácie",
+      "renamePlaceholder": "Zadajte názov organizácie",
       "balance": "Zostatok",
-      "organizationSeats": "Miesta v organizácii",
-      "plan": "Plán organizácie",
+      "plan": "Plán",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Skončený",
@@ -3765,7 +3799,8 @@
     "signupStepUp": "Na dokončenie vytvorenia účtu použi „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithGoogle)“.",
-    "invalidCode": "Tento kód je nesprávny. Skús to znova.",
+    "signupStepUpBack": "Na dokončenie vytvorenia účtu sa vráť späť a použi „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Skús to znova alebo použi „$t(login.resendCode)“.",
     "codeInProgress": "Tvoj kód sa spracúva. Chvíľu počkaj a skús to znova.",
     "tooManyAttempts": "Príliš veľa pokusov. Vyžiadaj si nový kód.",
     "invalidToken": "Prihlásenie zlyhalo. Skús to znova.",
@@ -3894,6 +3929,7 @@
   },
   "modelChat": {
     "offlineFailure": "Tento model vyžaduje pripojenie na internet. Pripojte sa a skúste to znova alebo prepnite na model v tomto zariadení.",
+    "connectionLost": "Pripojenie k modelu sa prerušilo. Skontroluj pripojenie a skús to znova.",
     "empty": {
       "title": "Začať chat",
       "description": "Pošlite správu a porozprávajte sa s modelom."
@@ -4035,6 +4071,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) odošle na tento koncový bod krátku požiadavku na inferenciu pomocou vybraného protokolu a modelu. Poskytovateľ si za ňu môže účtovať poplatok.",
       "connectionSucceeded": "Model úspešne spracoval požiadavku pomocou tohto protokolu.",
       "connectionFailed": "Model nedokázal spracovať požiadavku. Skontrolujte základnú URL API, protokol, prihlasovacie údaje a ID modelu.",
+      "requestTimedOut": "Koncový bod včas neodpovedal. Skontrolujte základnú URL API a pripojenie a skúste to znova.",
+      "requestUnauthorized": "Koncový bod odmietol prihlasovacie údaje. Skontrolujte API kľúč a vlastné hlavičky a skúste to znova.",
+      "requestNotFound": "Koncový bod alebo model sa nenašiel. Skontrolujte základnú URL API a ID modelu.",
+      "requestRateLimited": "Koncový bod obmedzuje požiadavky. Chvíľu počkajte a skúste to znova.",
+      "requestUnavailable": "Koncový bod je teraz nedostupný. Skúste to o chvíľu znova.",
+      "requestUnreachable": "Koncový bod sa nepodarilo dosiahnuť. Skontrolujte základnú URL API a pripojenie.",
+      "requestInvalidResponse": "Koncový bod neodpovedal v očakávanom formáte. Skontrolujte, či základná URL API a protokol zodpovedajú serveru, a skúste to znova.",
+      "discoveryNoModels": "Koncový bod neuviedol žiadne modely. Zadajte modely ručne.",
+      "connectionIncomplete": "Model odpovedal, ale nedokončil odpoveď. Skúste to znova alebo skontrolujte ID modelu a protokol.",
       "invalidInput": "Zadajte názov servera, platné hlavičky a aspoň jeden model s jedinečným ID a názvom. Limity tokenov musia byť kladné celé čísla.",
       "invalidUrl": "Zadajte základnú URL API s HTTP alebo HTTPS bez prihlasovacích údajov, parametrov dopytu alebo fragmentu.",
       "publicHttp": "Verejné koncové body HTTP nie sú povolené. Použite HTTPS alebo súkromný lokálny koncový bod.",
@@ -4173,10 +4218,20 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
     },
-    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov."
+    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov.",
+    "providerKeyRefused": "Poskytovateľ odmietol prihlasovacie údaje. Skontrolujte jeho API kľúč a skúste odoslať znova.",
+    "providerModelMissing": "Tento backend už tento model neposkytuje. Vyberte iný.",
+    "providerRateLimited": "Poskytovateľ obmedzuje požiadavky. Chvíľu počkajte a skúste odoslať znova.",
+    "providerUnavailable": "Poskytovateľ je teraz nedostupný. O chvíľu skúste odoslať znova."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrdiť túto zmenu?"
+    "confirmTitle": "Potvrdiť túto zmenu?",
+    "guarded": {
+      "spendAlertsOff": "Vypnúť upozornenia na výdavky? Prestanete dostávať oznámenia o prekročení prahov výdavkov a o hodinových špičkách.",
+      "balanceAlertsOff": "Vypnúť upozornenia na zostatok? Prestanete dostávať oznámenia, keď budete mať málo kreditov.",
+      "securityFindingsOff": "Vypnúť bezpečnostné zistenia? Prestanete dostávať oznámenia o nových bezpečnostných zisteniach.",
+      "hideBalanceOn": "Skryť zostatky? Zostatky kreditov sa už nebudú zobrazovať na obrazovkách profilu a v centre organizácie."
+    }
   },
   "appActions": {
     "start": {
@@ -4560,6 +4615,7 @@
     "pickPackToBuyAgain": "Ak chcete začať nový nákup, vyberte balík vyššie.",
     "purchasePending": "Obchod túto platbu ešte spracúva. Kredity dostanete hneď, ako schváli transakciu.",
     "buyAgain": "Kúpiť znova",
+    "checkPurchase": "Skontrolovať nákup",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
   },
@@ -4661,7 +4717,9 @@
     },
     "saveSheet": {
       "title": "Uložiť do zoznamu",
-      "saved": "Uložené do zoznamu {{list}}"
+      "saved": "Uložené do zoznamu {{list}}",
+      "saveFailed": "Úlohu sa nepodarilo uložiť. Skontrolujte pripojenie a skúste to znova.",
+      "saveRefused": "Úlohu sa nepodarilo uložiť do tohto zoznamu. Vyberte iný zoznam."
     }
   },
   "agentBriefing": {
@@ -4673,6 +4731,7 @@
     "empty": "Žiadna aktivita v tomto okne prehľadu",
     "emptyHint": "Vaše cloudové a CLI relácie programovania sa tu zobrazia, keď má naplánovaný prehľad aktivitu.",
     "loadError": "Prehľady sa nepodarilo načítať",
+    "estimateLoadError": "Odhad sa nepodarilo načítať.",
     "view": "Čítať prehľad",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4779,7 +4838,7 @@
     "topFeatures": "Najpoužívanejšie funkcie",
     "emptyTitle": "V tomto období žiadne využitie",
     "unavailableTitle": "Využitie nie je k dispozícii",
-    "unavailableDescription": "Tento pracovný priestor nevykazuje využitie. Opakovanie nepomôže.",
+    "unavailableDescription": "Využitie nie je pre tento pracovný priestor nastavené. Ak očakávate, že sa tu využitie zobrazí, kontaktujte podporu.",
     "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
     "viewDetails": "Zobraziť podrobnosti o využití"
   },
@@ -4787,7 +4846,7 @@
     "title": "Integrácie",
     "sectionTitle": "Pripojené služby",
     "entrySubtitle": "GitHub, Slack, Linear a ďalšie",
-    "subtitle": "Prepojte svoje vývojárske nástroje a pracovné postupy s Kilo",
+    "subtitle": "Prepojte svoje vývojárske nástroje a pracovné postupy s Kilo.",
     "disconnect": "Odpojiť",
     "disconnectTitle": "Odpojiť {{provider}}?",
     "disconnectMessage": "Kilo prestane reagovať v službe {{provider}}. Kedykoľvek ju môžete znova pripojiť.",
@@ -4948,7 +5007,7 @@
   },
   "organizationGuardrails": {
     "title": "AI ochranné mechanizmy",
-    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia.",
+    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI ochranné mechanizmy nie sú zapnuté",
     "unavailable": "Kilo zapína AI ochranné mechanizmy pre organizáciu na požiadanie. Kontaktujte {{supportEmail}} a tím Kilo ich zapne pre vašu organizáciu.",
     "contactSupport": "Kontaktovať podporu",
@@ -4960,12 +5019,15 @@
     "inputDescription": "Skenuje každý vstup pomocou Enkrypt AI vrátane výsledkov nástrojov. Keď je Enkrypt nedostupný, požiadavky sa odosielajú bez skenovania namiesto toho, aby boli odmietnuté.",
     "outputTitle": "Výstupné ochranné mechanizmy",
     "outputDescription": "Skenuje odpovede pomocou Enkrypt AI predtým, než ich členovia dostanú. Predvolene vypnuté, kým ich nezapnete.",
+    "outputUnavailable": "Kilo pre túto organizáciu nezapol skenovanie výstupu, takže odpovede sa nekontrolujú a tu nie je čo nastaviť. Ak o to chcete požiadať, kontaktujte {{supportEmail}}.",
     "detectorsHint": "Blokovanie odmietne označenú požiadavku. Voľba Iba zaznamenať ju len zaznamená bez zdržania požiadavky.",
     "detectorsHintOutput": "Blokovanie spôsobí zlyhanie označenej odpovede. Voľba Iba zaznamenať ju len zaznamená bez zdržania odpovede.",
     "choiceLog": "Iba zaznamenať",
     "applyTo": "Použiť na",
     "applyToAllMembers": "Všetci členovia",
     "applyKiloDefault": "Použiť predvolené nastavenia Kilo",
+    "applyKiloDefaultEnglishNote": "Text predvolených zásad Kilo je v angličtine, pretože Kilo Gateway ich uplatňuje presne tak, ako sú napísané.",
+    "applyKiloDefaultReplaceMessage": "Predvolené zásady Kilo sú napísané v angličtine a nahradia to, čo ste nastavili v časti Porušenie zásad. Text, ktorý ste zadali do poľa textu zásad, sa nedá obnoviť.",
     "invalidSavedTitle": "Uložené nastavenia vstupných detektorov sa nedajú prečítať",
     "invalidSavedBody": "Požiadavky sú blokované, kým sa vstupné detektory znova neuložia. Nižšie uvedené detektory vychádzajú z predvolených nastavení Kilo.",
     "invalidSavedOutputTitle": "Uložené nastavenia výstupných detektorov sa nedajú prečítať",
@@ -5086,7 +5148,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Podniková funkcia",
-    "enterpriseOnly": "Toto je funkcia určená iba pre podniky.",
+    "enterpriseOnly": "Poskytovatelia a modely sú dostupné v pláne Enterprise.",
     "readOnly": "Tieto nastavenia môžu meniť iba vlastníci organizácie a správcovia.",
     "loadError": "Poskytovateľov a modely nebolo možné načítať",
     "tabModels": "Modely",
@@ -5100,6 +5162,8 @@
     "providersDescription": "Vypnutím poskytovateľa zastavíte smerovanie Kilo naň pre túto organizáciu.",
     "providersNeedCatalog": "Prepínače poskytovateľov zostanú iba na čítanie, kým sa nenačíta celý katalóg modelov. Ak ich chcete upraviť, ťuknite vyššie na Skúsiť znova.",
     "providersEmpty": "Tomuto hľadaniu nezodpovedajú žiadni poskytovatelia.",
+    "providersNone": "Pre túto organizáciu nie sú k dispozícii žiadni poskytovatelia.",
+    "providersUnavailable": "Zoznam poskytovateľov sa nepodarilo načítať.",
     "allowAllShown": "Povoliť všetky zobrazené",
     "denyAllShown": "Zamietnuť všetky zobrazené",
     "gatewaysDescription": "Kilo smeruje požiadavky na modely cez Vercel AI Gateway alebo OpenRouter. Vypnutá brána spôsobí zlyhanie týchto požiadaviek.",

@@ -16,9 +16,28 @@ const mocks = vi.hoisted(() => ({
   demo: vi.fn(() => null),
   redirect: vi.fn(() => null),
   credential: vi.fn(),
+  fixture: undefined as string | undefined,
+  param: undefined as string | undefined,
 }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({ NativeSyncClient: mocks.client }));
-vi.mock('expo-router', () => ({ Redirect: mocks.redirect }));
+vi.mock('expo-router', () => ({
+  Redirect: mocks.redirect,
+  useLocalSearchParams: () => ({ nativeRemoteFixture: mocks.param }),
+}));
+vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  // The shared `cn` helper reaches `@/i18n`, which installs this plugin.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/native-remote/native-remote-transcript', () => ({
+  NativeRemoteTranscript: 'NativeRemoteTranscript',
+}));
+vi.mock('@/lib/native-remote/use-native-session', () => ({
+  useNativeSession: () => ({ conversation: undefined }),
+}));
 vi.mock('@/components/native-remote/native-remote-demo', () => ({ NativeRemoteDemo: mocks.demo }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => mocks }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => mocks }));
@@ -31,6 +50,16 @@ vi.mock('@/lib/config', () => ({
   },
 }));
 vi.mock('@/lib/native-remote-credential', () => ({ nativeRemoteCredential: mocks.credential }));
+vi.mock('@/lib/native-remote-fixture', () => ({
+  nativeRemoteFixtureClient: vi.fn(() => ({})),
+  nativeRemoteFixtureSummary: {
+    sessionID: 'ses-fixture',
+    tenant: { type: 'user', id: 'fixture-owner' },
+    live: true,
+    createdAt: 1,
+  },
+  readNativeRemoteFixture: () => mocks.fixture as string | undefined,
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -41,6 +70,8 @@ beforeEach(() => {
   mocks.organizationId = null;
   mocks.isLoaded = true;
   mocks.url = 'http://localhost:8817';
+  mocks.fixture = undefined;
+  mocks.param = undefined;
 });
 afterEach(() => {
   vi.clearAllMocks();
@@ -134,5 +165,59 @@ describe('native remote entry', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+
+  it('serves the link-selected transcript fixture without an account token', () => {
+    // The handler link (`+native-intent.tsx`) selected the fixture state.
+    mocks.fixture = 'gaps';
+    mocks.token = undefined;
+    const renderer = mount();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.client).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(1);
+    act(() => {
+      renderer.unmount();
+    });
+    mocks.fixture = undefined;
+  });
+
+  it('serves the param-selected fixture the gate deep link carries', () => {
+    mocks.param = 'gaps';
+    mocks.token = undefined;
+    const renderer = mount();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.client).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(1);
+    act(() => {
+      renderer.unmount();
+    });
+    mocks.param = undefined;
+  });
+
+  it('finds no fixture when neither carrier selected one', () => {
+    mocks.token = undefined;
+    const renderer = mount();
+    expect(mocks.redirect).toHaveBeenCalled();
+    expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(0);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('never serves a selected fixture in a production build', () => {
+    // Both carriers hold a state, and the production guard still refuses first.
+    mocks.fixture = 'gaps';
+    mocks.param = 'gaps';
+    mocks.token = undefined;
+    vi.stubGlobal('__DEV__', false);
+    const renderer = mount();
+    expect(mocks.redirect).toHaveBeenCalled();
+    expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(0);
+    expect(mocks.client).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+    mocks.fixture = undefined;
+    mocks.param = undefined;
   });
 });

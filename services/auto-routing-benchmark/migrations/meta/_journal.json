@@ -225,6 +225,27 @@
       "when": 1793979873424,
       "tag": "0031_routing_selection_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1795133175213,
+      "tag": "0032_profile_failure_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1795152485834,
+      "tag": "0033_daily_alias_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1795160874961,
+      "tag": "0034_measurement_revision_tool_evidence",
+      "breakpoints": true
     }
   ]
 }

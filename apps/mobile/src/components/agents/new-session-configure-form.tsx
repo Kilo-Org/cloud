@@ -24,12 +24,13 @@ import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 /**
@@ -169,7 +170,9 @@ export function NewSessionConfigureForm({
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
-  const sideInsetStyle = useSideInsetStyle();
+  // The body clears the side insets itself; the pinned footer clears them on
+  // its own bar, so the container around both must not add them again.
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   // The footer reserves the platform inset. The lift above moves the scroll
   // body and footer together; the prompt yields height to the viewport.
   // The scroll view takes no keyboard inset of its own: iOS sized that inset
@@ -256,6 +259,7 @@ export function NewSessionConfigureForm({
     <ScrollView
       ref={scrollRef}
       className="flex-1"
+      style={sideInsetMarginStyle}
       contentContainerClassName={cn('flex-grow', SCREEN_BODY_CLASS)}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -379,10 +383,8 @@ export function NewSessionConfigureForm({
         (and the rest of the form) down after it has settled.
       */}
       {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
-        <View>
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">
-            {t('common.changes')}
-          </Text>
+        <View className="gap-2">
+          <FormFieldLabel label={t('common.changes')} />
           <SegmentedControl
             accessibilityLabel={t('common.changes')}
             options={[
@@ -487,7 +489,7 @@ export function NewSessionConfigureForm({
   // a navigation-bar height above it. It follows the keyboard and never
   // depends on a frame the platform reported late.
   return (
-    <View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout}>
+    <View className="flex-1" onLayout={handleContainerLayout}>
       <KeyboardLiftView
         className="flex-1 bg-background"
         height={Math.max(0, keyboardHeight - bottom)}

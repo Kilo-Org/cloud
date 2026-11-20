@@ -161,6 +161,13 @@ describe('runtime contract mirror parity', () => {
       skill({ files: { 'a/../b.md': 'x' } }),
       skill({ files: { 'SKILL.md': 'x' } }),
       skill({ files: { 'skill.md': 'x' } }),
+      skill({ files: { './SKILL.md': 'x' } }),
+      skill({ files: { './skill.md': 'x' } }),
+      skill({ files: { 'a/./SKILL.md': 'x' } }),
+      skill({ files: { '.': 'x' } }),
+      skill({ files: { x: 'a', './x': 'b' } }),
+      skill({ files: { 'A.md': 'a', 'a.md': 'b' } }),
+      skill({ files: { 'allowed.md': 'x' } }),
       skill({ files: { 'big.md': 'c'.repeat(100_000) } }),
       skill({ files: { 'big.md': 'c'.repeat(100_001) } }),
       skill({

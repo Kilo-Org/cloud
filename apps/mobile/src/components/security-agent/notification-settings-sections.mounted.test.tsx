@@ -5,7 +5,7 @@
 // so a heading is the only thing that tells the two of them apart.
 
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Section } from '@/components/ui/section';
 import { i18n } from '@/i18n';
@@ -46,6 +46,26 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     primary: '#00f',
   }),
 }));
+const loadedConfig: Record<string, unknown> = {
+  isEnabled: true,
+  newFindingNotificationsEnabled: true,
+  newFindingNotificationMinSeverity: 'high',
+  slaNotificationsEnabled: true,
+  slaNotificationMinSeverity: 'medium',
+  slaNotificationWarningDays: 7,
+};
+
+const config = vi.hoisted(() => ({
+  data: null as Record<string, unknown> | null,
+  isLoading: false,
+  isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  error: null as unknown,
+  refetch: vi.fn(),
+}));
+const platformError = vi.hoisted(() => ({ props: null as Record<string, unknown> | null }));
+
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => ({
     canManage: true,
@@ -55,19 +75,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
     isError: false,
     refetch: vi.fn(),
   }),
-  useSecurityAgentConfig: () => ({
-    data: {
-      isEnabled: true,
-      newFindingNotificationsEnabled: true,
-      newFindingNotificationMinSeverity: 'high',
-      slaNotificationsEnabled: true,
-      slaNotificationMinSeverity: 'medium',
-      slaNotificationWarningDays: 7,
-    },
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useSecurityAgentConfig: () => config,
   useSaveSecurityAgentConfig: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
@@ -109,7 +117,10 @@ vi.mock('@/components/ui/radio-group', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: 'PlatformErrorScreen',
+  PlatformErrorScreen: (props: Record<string, unknown>) => {
+    platformError.props = props;
+    return null;
+  },
 }));
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: () => null,
@@ -123,6 +134,15 @@ const PERSONAL_SCOPE = 'personal';
 const ORGANIZATION_SCOPE = '00000000-0000-4000-8000-000000000001';
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+beforeEach(() => {
+  config.data = loadedConfig;
+  config.isError = false;
+  config.fetchStatus = 'idle';
+  config.isPending = false;
+  config.error = null;
+  platformError.props = null;
+});
 
 afterEach(() => {
   act(() => {
@@ -207,5 +227,35 @@ describe('organization scope', () => {
     expect(screen.root.findByType('TabScreenScrollView').props.contentContainerClassName).toBe(
       SCREEN_BODY_CLASS
     );
+  });
+});
+
+describe('config load failure', () => {
+  beforeEach(() => {
+    config.data = null;
+    config.isError = true;
+    config.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    platformError.props = null;
+  });
+
+  afterEach(() => {
+    config.data = loadedConfig;
+    config.isError = false;
+    config.error = null;
+    platformError.props = null;
+  });
+
+  it('titles the failure with the screen and leaves the description to the variant', () => {
+    mount(ORGANIZATION_SCOPE);
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('failed first read did not render the failure screen');
+    }
+    // The failed read is named once, in the error's own title. A message here
+    // would repeat the same words above the variant's cause.
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.notifications.couldNotLoad'));
+    expect(error.message).toBeUndefined();
+    expect(error.variant).toBe('server');
   });
 });

@@ -140,6 +140,7 @@
     "keepRunning": "Jatka suoritusta",
     "newSession": "Uusi istunto",
     "noModelsAvailable": "Ei malleja saatavilla",
+    "modelRetires": "Poistuu {{date}}",
     "notFound": "Kohdetta ei löytynyt",
     "online": "Verkossa",
     "open": "Avaa {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
     "privateRepositoryA11y": "{{name}}, yksityinen tietovarasto",
     "legalDocumentEnglishOnly": "Tämä asiakirja on saatavilla vain englanniksi.",
-    "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen."
+    "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen.",
+    "viewOnGitHub": "Katso PR GitHubissa"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
       "signIn": "Kirjautuminen",
-      "profileOrganizations": "Profiili ja organisaatiot"
+      "profileOrganizations": "Profiili & organisaatiot"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Lisää kommentteja ei voitu ladata.",
       "retryLoadingMore": "Yritä ladata lisää kommentteja uudelleen",
       "loadMoreComments": "Lataa lisää kommentteja",
+      "conversationTruncated": "Näytetään vain {{displayCount}} ensimmäistä kommenttia.",
+      "conversationTruncated_one": "Näytetään vain {{displayCount}} ensimmäistä kommenttia.",
+      "conversationTruncated_other": "Näytetään vain {{displayCount}} ensimmäistä kommenttia.",
       "addReaction": "Lisää reaktio",
       "reactionPill": "Reaktio {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktio",
@@ -881,7 +886,6 @@
       "noAccess": "Sinulla ei ole oikeutta tarkastella tämän koodivaraston tarkistuksia.",
       "couldNotLoad": "Tarkistuksia ei voitu ladata.",
       "retryChecks": "Yritä uudelleen ladata tarkistukset",
-      "viewOnGitHub": "Katso PR GitHubissa",
       "noChecksReported": "Ei raportoituja tarkistuksia",
       "passed": "{{displayCount}} onnistui",
       "passed_one": "{{displayCount}} onnistui",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Noudata REVIEW.md-ohjeita",
     "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
       "notConnectedReadOnlyPlan": "Organisaation kokeilujakso on päättynyt, joten omistajan on päivitettävä laskutus osoitteessa kilo.ai."
     },
     "bitbucketConnect": {

@@ -140,6 +140,7 @@
     "keepRunning": "Jätka tööd",
     "newSession": "Uus seanss",
     "noModelsAvailable": "Mudeleid pole saadaval",
+    "modelRetires": "Aegub {{date}}",
     "notFound": "Ei leitud",
     "online": "Võrgus",
     "open": "Ava {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
     "privateRepositoryA11y": "{{name}}, privaatne repositoorium",
     "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles.",
-    "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida."
+    "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida.",
+    "viewOnGitHub": "Vaata PR-i GitHubis"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
     "changelogAreas": {
       "signIn": "Sisselogimine",
-      "profileOrganizations": "Profiil ja organisatsioonid"
+      "profileOrganizations": "Profiil ning organisatsioonid"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Lisakommentaare ei õnnestunud laadida.",
       "retryLoadingMore": "Proovi lisakommentaare uuesti laadida",
       "loadMoreComments": "Laadi rohkem kommentaare",
+      "conversationTruncated": "Kuvatakse ainult esimesed {{displayCount}} kommentaari.",
+      "conversationTruncated_one": "Kuvatakse ainult esimesed {{displayCount}} kommentaari.",
+      "conversationTruncated_other": "Kuvatakse ainult esimesed {{displayCount}} kommentaari.",
       "addReaction": "Lisa reaktsioon",
       "reactionPill": "{{emoji}} reaktsioon, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktsioon",
@@ -881,7 +886,6 @@
       "noAccess": "Sul puudub juurdepääs selle hoidla kontrollidele.",
       "couldNotLoad": "Kontrollide laadimine ebaõnnestus.",
       "retryChecks": "Proovi kontrollide laadimist uuesti",
-      "viewOnGitHub": "Vaata PR-i GitHubis",
       "noChecksReported": "Kontrollidest pole teatatud",
       "passed": "{{displayCount}} edukalt läbitud",
       "passed_one": "{{displayCount}} edukalt läbitud",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pole ühendatud. Palu organisatsiooni omanikul, administraatoril või arveldushalduril see ühendada.",
       "notConnectedReadOnlyPlan": "Organisatsiooni prooviperiood on lõppenud, seega peab omanik arvelduse kilo.ai keskkonnas uuendama."
     },
     "bitbucketConnect": {

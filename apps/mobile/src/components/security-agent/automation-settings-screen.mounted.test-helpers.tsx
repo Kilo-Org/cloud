@@ -15,6 +15,7 @@ const config = vi.hoisted(() => ({
   isError: false,
   isPending: false,
   fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+  error: null as unknown,
   refetch: vi.fn(),
 }));
 const retryConfig = vi.hoisted(() => ({
@@ -54,6 +55,7 @@ const connectivity = vi.hoisted(() => ({
 const platformError = vi.hoisted(() => ({
   props: null as {
     title: string;
+    errorTitle?: string;
     variant?: string;
     message?: string;
     onRetry?: () => void;
@@ -130,6 +132,7 @@ vi.mock('@/components/ui/preference-row', () => ({
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: (props: {
     title: string;
+    errorTitle?: string;
     variant?: string;
     message?: string;
     onRetry?: () => void;

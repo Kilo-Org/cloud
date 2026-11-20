@@ -26,6 +26,11 @@ import {
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
+  modelNameWithRetirement,
+  retirementDate,
+  retirementNoteSuffix,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
+import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -151,12 +156,13 @@ describe('formatName', () => {
     expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
   });
 
-  it('leaves names that already end with a parenthesis untouched', () => {
+  it('gives names that already end with a parenthesis no retirement date', () => {
     const model = buildModel({
       name: 'Test Model (free)',
       expiration_date: '2099-01-15',
     });
     expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (free)');
+    expect(retirementDate(model, NOT_PREFERRED)).toBeUndefined();
   });
 
   it('appends (new) for recently created preferred models', () => {
@@ -177,23 +183,23 @@ describe('formatName', () => {
     expect(formatName(model, 0)).toBe('Test Model');
   });
 
-  it('appends the retirement date in UTC when it is within one month', () => {
-    const model = buildModel({
-      pricing: { prompt: '0.00002', completion: '0' },
-      expiration_date: '2026-07-01',
-    });
-    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (retires Jul 1)');
-  });
-
-  it('does not append the retirement date when it is more than one month away', () => {
-    const model = buildModel({ expiration_date: '2026-07-18' });
+  it('reports the retirement date when it is within one month', () => {
+    const model = buildModel({ expiration_date: '2026-07-01' });
+    expect(retirementDate(model, NOT_PREFERRED)).toBe('2026-07-01');
     expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
   });
 
-  it('prefers the (new) marker over the retirement marker', () => {
+  it('reports no retirement date when it is more than one month away', () => {
+    const model = buildModel({ expiration_date: '2026-07-18' });
+    expect(retirementDate(model, NOT_PREFERRED)).toBeUndefined();
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+
+  it('prefers the (new) marker over the retirement date', () => {
     const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
     const model = buildModel({ created: recentlyCreated, expiration_date: '2026-07-01' });
     expect(formatName(model, 0)).toBe('Test Model (new)');
+    expect(retirementDate(model, 0)).toBeUndefined();
   });
 
   it('returns the name unchanged when no markers apply', () => {
@@ -220,6 +226,43 @@ describe('formatName', () => {
     const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
     const model = buildModel({ id: 'openrouter/auto', created: recentlyCreated });
     expect(formatName(model, 0)).toBe('OpenRouter Test Model (new)');
+  });
+});
+
+describe('retirement note', () => {
+  const NOT_PREFERRED = -1;
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-17T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('builds the English note the web shows', () => {
+    expect(retirementNoteSuffix('2026-07-01')).toBe(' (retires Jul 1)');
+  });
+
+  it('builds no note without a date', () => {
+    expect(retirementNoteSuffix(undefined)).toBe('');
+    expect(retirementNoteSuffix('')).toBe('');
+  });
+
+  it('appends the web note to the name', () => {
+    expect(modelNameWithRetirement({ name: 'Test Model', retires_on: '2026-07-01' })).toBe(
+      'Test Model (retires Jul 1)'
+    );
+  });
+
+  it('leaves the name alone without a date', () => {
+    expect(modelNameWithRetirement({ name: 'Test Model' })).toBe('Test Model');
+  });
+
+  it('normalizes a timestamp-shaped expiration date to its UTC day', () => {
+    expect(
+      retirementDate(buildModel({ expiration_date: '2026-07-01T12:00:00Z' }), NOT_PREFERRED)
+    ).toBe('2026-07-01');
   });
 });
 

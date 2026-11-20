@@ -59,15 +59,16 @@ export type ConnectCardOffer = {
   noteKey: string | undefined;
   /**
    * The same restriction for the compact row after a repository is selected.
-   * That row has no title, so its first-connect copy names the provider itself
-   * where the card leans on its header for that.
+   * That row has no title, so a note whose sentence names no provider states
+   * the name in `compactContextKey` above it instead of leaning on a header.
    */
   compactNoteKey: string | undefined;
   /**
    * A subject line the compact row states above `compactNoteKey` when that
-   * note's only subject is a pronoun. The reconnect sentence is provider
-   * neutral (the sheet shows it above a title that names the provider), so the
-   * headerless row supplies that name itself instead of leaving "it" unbound.
+   * note's only subject is a pronoun. The reconnect and role sentences are
+   * provider neutral (the sheet shows them above a title that names the
+   * provider), so the headerless row supplies that name itself instead of
+   * leaving "it" unbound.
    */
   compactContextKey: string | undefined;
 };
@@ -128,9 +129,10 @@ export function connectCardOffer(
     return {
       offersAction: false,
       noteKey: 'prReview.connect.bitbucketAdminOnlyDescription',
-      // The compact row carries no header, so this copy names Bitbucket itself.
-      compactNoteKey: 'codeReviewer.bitbucket.notConnectedReadOnly',
-      compactContextKey: undefined,
+      // The compact row carries no header, so the subject line above the note
+      // states Bitbucket and the note stays the provider-neutral role sentence.
+      compactNoteKey: 'prReview.connect.bitbucketAdminOnlyDescription',
+      compactContextKey: 'prReview.connect.bitbucketNotConnectedTitle',
     };
   }
   return {

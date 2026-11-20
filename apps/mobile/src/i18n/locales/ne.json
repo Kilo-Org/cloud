@@ -140,6 +140,7 @@
     "keepRunning": "चलिरहन दिनुहोस्",
     "newSession": "नयाँ सत्र",
     "noModelsAvailable": "कुनै मोडेल उपलब्ध छैन",
+    "modelRetires": "{{date}} मा अवकाश हुन्छ",
     "notFound": "फेला परेन।",
     "online": "अनलाइन",
     "open": "{{name}} खोल्नुहोस्",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। संस्थाको मालिकले kilo.ai मा बिलिङ अद्यावधिक गर्न सक्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "privateRepositoryA11y": "{{name}}, निजी रिपोजिटरी",
     "legalDocumentEnglishOnly": "यो कागजात अङ्ग्रेजीमा मात्र उपलब्ध छ।",
-    "organizationTrialEndedBilling": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।"
+    "organizationTrialEndedBilling": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+    "viewOnGitHub": "GitHub मा PR हेर्नुहोस्"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "सम्पूर्ण एपमा समाधान र सुधारहरू।",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल र संस्थाहरू"
+      "profileOrganizations": "प्रोफाइल तथा संस्थाहरू"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "थप टिप्पणीहरू लोड गर्न सकिएन।",
       "retryLoadingMore": "थप टिप्पणीहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
       "loadMoreComments": "थप टिप्पणीहरू लोड गर्नुहोस्",
+      "conversationTruncated": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
+      "conversationTruncated_one": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
+      "conversationTruncated_other": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
       "addReaction": "प्रतिक्रिया थप्नुहोस्",
       "reactionPill": "{{emoji}} प्रतिक्रिया, {{displayCount}} {{countLabel}}",
       "reaction_one": "प्रतिक्रिया",
@@ -881,7 +886,6 @@
       "noAccess": "तपाईंसँग यो रिपोजिटरीका जाँचहरू हेर्ने अनुमति छैन।",
       "couldNotLoad": "जाँचहरू लोड गर्न सकिएन।",
       "retryChecks": "जाँचहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
-      "viewOnGitHub": "GitHub मा PR हेर्नुहोस्",
       "noChecksReported": "कुनै जाँचको नतिजा आएको छैन",
       "passed": "{{displayCount}} सफल",
       "passed_one": "{{displayCount}} सफल",
@@ -936,9 +940,9 @@
       "checkFailedTitleGitLab": "GitLab जडान जाँच्न सकिएन।",
       "checkFailedTitleBitbucket": "Bitbucket जडान जाँच्न सकिएन।",
       "providerCheckFailedMessage": "प्रदायकमा पुग्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
-      "reconnectTitle": "GitHub मा पुनः जडान",
-      "reconnectTitleGitLab": "GitLab मा पुनः जडान",
-      "reconnectTitleBitbucket": "Bitbucket मा पुनः जडान",
+      "reconnectTitle": "GitHub मा पुनः जडान गर्नुहोस्",
+      "reconnectTitleGitLab": "GitLab मा पुनः जडान गर्नुहोस्",
+      "reconnectTitleBitbucket": "Bitbucket मा पुनः जडान गर्नुहोस्",
       "reconnectDescription": "तपाईंको GitHub जडानको अनुमति रद्द भएको छ।",
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरूको समीक्षा गर्नुहोस्",
       "gitlabInstanceMismatchTitle": "GitLab जडान अर्को इन्स्टेन्सका लागि हो",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "REVIEW.md का निर्देशन पालना गर्नुहोस्",
     "followReviewMdSubtitle": "हरेक रिपोजिटरीको REVIEW.md फाइलमा भएका निर्देशन पालना गर्नुहोस्",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जडान भएको छैन। यसलाई जडान गर्न संस्थाको मालिक, प्रशासक वा बिलिङ व्यवस्थापकलाई अनुरोध गर्नुहोस्।",
       "notConnectedReadOnlyPlan": "संस्थाको परीक्षण अवधि सकिएको छ, त्यसैले मालिकले kilo.ai मा बिलिङ अद्यावधिक गर्नुपर्छ।"
     },
     "bitbucketConnect": {

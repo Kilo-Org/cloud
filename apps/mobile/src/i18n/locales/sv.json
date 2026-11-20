@@ -140,10 +140,12 @@
     "keepRunning": "Fortsätt köra",
     "newSession": "Ny session",
     "noModelsAvailable": "Inga modeller tillgängliga",
+    "modelRetires": "Utgår {{date}}",
     "notFound": "Hittades inte",
     "online": "Uppkopplad",
     "open": "Öppna {{name}}",
     "openPullRequest": "Öppna PR",
+    "viewOnGitHub": "Visa PR på GitHub",
     "completed": "Slutförd",
     "pending": "Väntar",
     "running": "Körs",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
     "changelogAreas": {
       "signIn": "Inloggning",
-      "profileOrganizations": "Profil och organisationer"
+      "profileOrganizations": "Profil & organisationer"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Kunde inte läsa in fler kommentarer.",
       "retryLoadingMore": "Försök läsa in fler kommentarer igen",
       "loadMoreComments": "Läs in fler kommentarer",
+      "conversationTruncated": "Visar bara de första {{displayCount}} kommentarerna.",
+      "conversationTruncated_one": "Visar bara de första {{displayCount}} kommentarerna.",
+      "conversationTruncated_other": "Visar bara de första {{displayCount}} kommentarerna.",
       "addReaction": "Lägg till en reaktion",
       "reactionPill": "{{emoji}}-reaktion, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
@@ -881,7 +886,6 @@
       "noAccess": "Du har inte åtkomst till kontrollerna för det här kodarkivet.",
       "couldNotLoad": "Kunde inte läsa in kontrollerna.",
       "retryChecks": "Försök läsa in kontrollerna igen",
-      "viewOnGitHub": "Visa PR på GitHub",
       "noChecksReported": "Inga kontroller rapporterade",
       "passed": "Godkänt: {{displayCount}}",
       "passed_one": "Godkänt: {{displayCount}}",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Be en organisationsägare, administratör eller faktureringsansvarig att ansluta Bitbucket.",
       "notConnectedReadOnlyPlan": "Organisationens provperiod har löpt ut, så en ägare måste uppdatera faktureringen på kilo.ai."
     },
     "bitbucketConnect": {

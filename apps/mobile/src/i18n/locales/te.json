@@ -140,10 +140,12 @@
     "keepRunning": "అమలు కొనసాగించండి",
     "newSession": "కొత్త సెషన్",
     "noModelsAvailable": "మోడళ్లు అందుబాటులో లేవు",
+    "modelRetires": "{{date}}న రిటైర్ అవుతుంది",
     "notFound": "దొరకలేదు.",
     "online": "ఆన్‌లైన్",
     "open": "{{name}}ను తెరవండి",
     "openPullRequest": "పుల్ రిక్వెస్ట్ తెరవండి",
+    "viewOnGitHub": "GitHubలో PRని చూడండి",
     "completed": "పూర్తయింది",
     "pending": "వేచి ఉంది",
     "running": "నడుస్తోంది",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "యాప్ అంతటా పరిష్కారాలు మరియు మెరుగుదలలు.",
     "changelogAreas": {
       "signIn": "సైన్ ఇన్",
-      "profileOrganizations": "ప్రొఫైల్ మరియు సంస్థలు"
+      "profileOrganizations": "ప్రొఫైల్ ఇంకా సంస్థలు"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయలేకపోయాము.",
       "retryLoadingMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "loadMoreComments": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయండి",
+      "conversationTruncated": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
+      "conversationTruncated_one": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
+      "conversationTruncated_other": "మొదటి {{displayCount}} వ్యాఖ్యలను మాత్రమే చూపిస్తున్నాము.",
       "addReaction": "స్పందనను జోడించండి",
       "reactionPill": "{{emoji}} స్పందన, {{displayCount}} {{countLabel}}",
       "reaction_one": "స్పందన",
@@ -881,7 +886,6 @@
       "noAccess": "ఈ రిపోజిటరీ తనిఖీలను చూడటానికి మీకు అనుమతి లేదు.",
       "couldNotLoad": "తనిఖీలను లోడ్ చేయలేకపోయాము.",
       "retryChecks": "తనిఖీల కోసం మళ్లీ ప్రయత్నించండి",
-      "viewOnGitHub": "GitHubలో PRని చూడండి",
       "noChecksReported": "తనిఖీల సమాచారం లేదు",
       "passed": "{{displayCount}} విజయవంతమయ్యాయి",
       "passed_one": "{{displayCount}} విజయవంతమయ్యాయి",
@@ -936,9 +940,9 @@
       "checkFailedTitleGitLab": "GitLab కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "checkFailedTitleBitbucket": "Bitbucket కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "providerCheckFailedMessage": "ప్రొవైడర్‌ను చేరుకోలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
-      "reconnectTitle": "GitHubకు మళ్లీ కనెక్షన్",
-      "reconnectTitleGitLab": "GitLabకు మళ్లీ కనెక్షన్",
-      "reconnectTitleBitbucket": "Bitbucketకు మళ్లీ కనెక్షన్",
+      "reconnectTitle": "GitHubను మళ్లీ కనెక్ట్ చేయండి",
+      "reconnectTitleGitLab": "GitLabను మళ్లీ కనెక్ట్ చేయండి",
+      "reconnectTitleBitbucket": "Bitbucketను మళ్లీ కనెక్ట్ చేయండి",
       "reconnectDescription": "మీ GitHub కనెక్షన్ అనుమతిని రద్దు చేశారు.",
       "gitlabDescription": "మొబైల్‌లో మెర్జ్ రిక్వెస్ట్‌లను సమీక్షించండి",
       "gitlabInstanceMismatchTitle": "GitLab కనెక్షన్ మరో ఇన్స్టాన్స్ కోసం ఉంది",
@@ -1392,7 +1396,6 @@
     "followReviewMd": "REVIEW.mdను అనుసరించండి",
     "followReviewMdSubtitle": "ప్రతి రిపోజిటరీలోని REVIEW.md ఫైల్ సూచనలను పాటించండి",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket కనెక్ట్ కాలేదు. దీన్ని కనెక్ట్ చేయమని సంస్థ యజమాని, నిర్వాహకుడు లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
       "notConnectedReadOnlyPlan": "సంస్థ యొక్క ట్రయల్ ముగిసింది, కాబట్టి యజమాని kilo.ai లో బిల్లింగ్‌ను అప్‌డేట్ చేయాలి."
     },
     "bitbucketConnect": {

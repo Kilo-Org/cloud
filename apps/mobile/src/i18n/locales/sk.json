@@ -142,10 +142,12 @@
     "keepRunning": "Nechať bežať",
     "newSession": "Nová relácia",
     "noModelsAvailable": "Žiadne dostupné modely",
+    "modelRetires": "Ukončí sa {{date}}",
     "notFound": "Nenájdené",
     "online": "Pripojené",
     "open": "Otvoriť {{name}}",
     "openPullRequest": "Otvoriť PR",
+    "viewOnGitHub": "Zobraziť PR na GitHub",
     "completed": "Dokončené",
     "pending": "Čaká sa",
     "running": "Prebieha",
@@ -509,7 +511,7 @@
     "changelogFixesPolish": "Opravy a vylepšenia v celej aplikácii.",
     "changelogAreas": {
       "signIn": "Prihlásenie",
-      "profileOrganizations": "Profil a organizácie"
+      "profileOrganizations": "Profil i organizácie"
     }
   },
   "preferences": {
@@ -774,6 +776,11 @@
       "couldNotLoadMore": "Ďalšie komentáre sa nepodarilo načítať.",
       "retryLoadingMore": "Znova načítať ďalšie komentáre",
       "loadMoreComments": "Načítať ďalšie komentáre",
+      "conversationTruncated": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
+      "conversationTruncated_one": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
+      "conversationTruncated_other": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
+      "conversationTruncated_few": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
+      "conversationTruncated_many": "Zobrazuje sa len prvých {{displayCount}} komentárov.",
       "addReaction": "Pridať reakciu",
       "reactionPill": "reakcia {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcia",
@@ -909,7 +916,6 @@
       "noAccess": "Nemáš prístup ku kontrolám tohto repozitára.",
       "couldNotLoad": "Kontroly sa nepodarilo načítať.",
       "retryChecks": "Znova načítať kontroly",
-      "viewOnGitHub": "Zobraziť PR na GitHub",
       "noChecksReported": "Žiadne výsledky kontrol",
       "passed": "úspešné: {{displayCount}}",
       "passed_one": "úspešné: {{displayCount}}",
@@ -972,9 +978,9 @@
       "checkFailedTitleGitLab": "Pripojenie k službe GitLab sa nepodarilo skontrolovať.",
       "checkFailedTitleBitbucket": "Pripojenie k službe Bitbucket sa nepodarilo skontrolovať.",
       "providerCheckFailedMessage": "Nepodarilo sa spojiť s poskytovateľom. Skontroluj pripojenie a skús to znova.",
-      "reconnectTitle": "Opätovné pripojenie k službe GitHub",
-      "reconnectTitleGitLab": "Opätovné pripojenie k službe GitLab",
-      "reconnectTitleBitbucket": "Opätovné pripojenie k službe Bitbucket",
+      "reconnectTitle": "Pripojiť GitHub znova",
+      "reconnectTitleGitLab": "Pripojiť GitLab znova",
+      "reconnectTitleBitbucket": "Pripojiť Bitbucket znova",
       "reconnectDescription": "Prístup k tvojmu účtu GitHub bol odvolaný.",
       "gitlabDescription": "Kontrolovať merge requesty v mobile",
       "gitlabInstanceMismatchTitle": "Pripojenie ku GitLabu je pre inú inštanciu",
@@ -1444,7 +1450,6 @@
     "followReviewMd": "Riadiť sa pokynmi v REVIEW.md",
     "followReviewMdSubtitle": "Dodržiavať pokyny v súbore REVIEW.md každého repozitára",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nie je pripojený. Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho pripojil.",
       "notConnectedReadOnlyPlan": "Skúšobné obdobie organizácie sa skončilo, preto vlastník musí aktualizovať fakturáciu na kilo.ai."
     },
     "bitbucketConnect": {
@@ -1480,9 +1485,9 @@
       "activity": "Aktivita"
     },
     "providerConnect": {
-      "githubApp": "Aplikáciu GitHub",
+      "githubApp": "aplikáciu GitHub",
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
-      "gitlabAccount": "Účet GitLab",
+      "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
       "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky."
     },

@@ -314,7 +314,8 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     });
 
     const text = renderedText(renderer);
-    expect(text).toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketNotConnectedTitle'));
+    expect(text).toContain(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
     expect(text).not.toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
     expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
@@ -337,7 +338,7 @@ describe('NewSessionRepositorySection Bitbucket connect authority', () => {
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t('prReview.connect.reconnectTitleBitbucket'));
     expect(text).toContain(i18n.t('prReview.connect.reconnectAdminOnlyDescription'));
-    expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(text).not.toContain(i18n.t('prReview.connect.bitbucketNotConnectedTitle'));
     expect(textNode(renderer, i18n.t('common.connect'))).toBeUndefined();
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(1);
   });

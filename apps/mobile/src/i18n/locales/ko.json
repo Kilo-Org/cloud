@@ -140,6 +140,7 @@
     "keepRunning": "계속 실행",
     "newSession": "새 세션",
     "noModelsAvailable": "사용 가능한 모델 없음",
+    "modelRetires": "{{date}}에 단종",
     "notFound": "항목을 찾을 수 없습니다.",
     "online": "온라인",
     "open": "{{name}} 열기",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요.",
     "privateRepositoryA11y": "{{name}}, 비공개 저장소",
     "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다.",
-    "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다."
+    "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
+    "viewOnGitHub": "GitHub에서 PR 보기"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "앱 전반의 수정 및 개선 사항.",
     "changelogAreas": {
       "signIn": "로그인",
-      "profileOrganizations": "프로필 및 조직"
+      "profileOrganizations": "프로필과 조직"
     }
   },
   "preferences": {
@@ -697,7 +699,6 @@
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket 연결이 설정되지 않았습니다. 조직 소유자, 관리자 또는 결제 관리자에게 연결을 요청하세요.",
       "notConnectedReadOnlyPlan": "조직의 체험이 종료되었으므로 소유자가 kilo.ai에서 결제 정보를 업데이트해야 합니다."
     },
     "bitbucketConnect": {
@@ -2784,7 +2785,6 @@
       "skipped_one": "{{displayCount}}개 건너뜀",
       "skipped_other": "{{displayCount}}개 건너뜀",
       "title": "검사",
-      "viewOnGitHub": "GitHub에서 PR 보기",
       "checkDetails": "검사 세부 정보"
     },
     "composer": {
@@ -2846,6 +2846,9 @@
       "commentActions": "댓글 작업",
       "comment": "댓글 {{displayCount}}개",
       "comment_other": "댓글 {{displayCount}}개",
+      "conversationTruncated": "처음 {{displayCount}}개의 댓글만 표시합니다.",
+      "conversationTruncated_other": "처음 {{displayCount}}개의 댓글만 표시합니다.",
+      "conversationTruncated_one": "처음 {{displayCount}}개의 댓글만 표시합니다.",
       "couldNotLoad": "토론을 불러오지 못했습니다.",
       "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
       "loadMoreComments": "댓글 더 불러오기",

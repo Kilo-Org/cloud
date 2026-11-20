@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  baselineAbove,
   boxTop,
   centredBaseline,
   centredLineBaseline,
@@ -76,16 +77,66 @@ describe('Ascent per script', () => {
 
 describe('Box top', () => {
   it('places a Latin line by Roboto exactly as before', () => {
-    expect(boxTop('Working', 11, 100)).toBe(100 - BASELINE * 11);
-    expect(boxTop('Working', 20, 92)).toBe(92 - BASELINE * 20);
+    // The dropped half-growth term was exactly 0 for Latin: lineBox is
+    // ceil(size * 1.32), so these numbers are the pre-change ones.
+    expect(boxTop('Working', 11, 100)).toBe(100 - 11.616);
+    expect(boxTop('Working', 13, 100)).toBeCloseTo(100 - 13.728, 10);
+    expect(boxTop('Working', 20, 92)).toBe(92 - 21.12);
   });
 
-  it('keeps a taller line centred on the same baseline', () => {
-    const tall = boxTop('กำลังทำงาน', 11, 100);
-    expect(tall).toBe(
-      100 - ascent('กำลังทำงาน', 11) - (lineBox('กำลังทำงาน', 11) - Math.ceil(11 * LATIN_LINE)) / 2
+  it('starts a taller script box one padded ascent above the baseline', () => {
+    // 13sp Myanmar: hhea ascent 1.324 + 0.128 padding = 1.452em, so 18.876dp;
+    // box ceil(13 * 2.184) = 29dp. The box must start at the ascent, not a
+    // half-growth above it, or the glyph descent hangs outside the box.
+    const size = 13;
+    const baseline = 100;
+    const ascentEm = 1.452;
+    const box = 29;
+    expect(ascent('မြန်မာ', size)).toBeCloseTo(ascentEm * size, 10);
+    expect(lineBox('မြန်မာ', size)).toBe(box);
+    expect(boxTop('မြန်မာ', size, baseline)).toBeCloseTo(baseline - ascentEm * size, 10);
+    const bottom = boxTop('မြန်မာ', size, baseline) + lineBox('မြန်မာ', size);
+    // baseline - 18.876 + 29 = baseline + 10.124: the descent the box carries.
+    expect(bottom).toBeCloseTo(baseline + 10.124, 10);
+    expect(bottom).toBeGreaterThanOrEqual(baseline + 0.732 * size);
+    // The half-growth version ended at baseline + 4.6, 4.9dp short of the ink.
+    expect(boxTop('မြန်မာ', size, baseline)).toBeGreaterThan(
+      baseline - ascentEm * size - (box - Math.ceil(size * LATIN_LINE)) / 2
     );
+  });
+
+  it('keeps a taller line above the same baseline', () => {
+    const tall = boxTop('กำลังทำงาน', 11, 100);
+    expect(tall).toBe(100 - ascent('กำลังทำงาน', 11));
     expect(tall).toBeLessThan(boxTop('Working', 11, 100));
+  });
+
+  it('anchors the box edges exactly, with the Latin numbers unchanged', () => {
+    // Every number below is the pre-change value of the same function, written
+    // out: for Latin the dropped half-growth term was exactly 0, so these are
+    // the numbers this file shipped before the change.
+    expect(boxTop('Working', 11, 100)).toBe(88.384);
+    expect(boxTop('Working', 20, 92)).toBe(70.88);
+    for (const [size, top, boxTopAt100, aboveAt100, inAt10, centredAt50] of [
+      [11, 10, 88.384, 96.616, 21.616, 54.116],
+      [13, 10, 86.272, 95.728, 23.728, 54.728],
+      [20, 10, 78.88, 94.12, 31.12, 57.62],
+    ] as const) {
+      expect(boxTop('Working', size, 100)).toBeCloseTo(boxTopAt100, 10);
+      expect(baselineAbove('Working', size, 100)).toBeCloseTo(aboveAt100, 10);
+      // The top clamp is `baselineIn`, and it puts the box exactly on `top`.
+      expect(insideBand({ value: 'Working', size, baseline: 0, top })).toBeCloseTo(inAt10, 10);
+      expect(boxTop('Working', size, inAt10)).toBeCloseTo(top, 10);
+      expect(centredLineBaseline('Working', size, 50)).toBeCloseTo(centredAt50, 10);
+      expect(centredLineBaseline('Working', size, 50)).toBe(centredBaseline(size, 50));
+    }
+    // A taller script lands on both edges exactly too.
+    for (const size of [11, 13, 20]) {
+      const above = baselineAbove('မြန်မာ', size, 100);
+      expect(boxTop('မြန်မာ', size, above) + lineBox('မြန်မာ', size)).toBeCloseTo(100, 10);
+      const inside = insideBand({ value: 'မြန်မာ', size, baseline: 0, top: 7 });
+      expect(boxTop('မြန်မာ', size, inside)).toBeCloseTo(7, 10);
+    }
   });
 });
 
@@ -110,14 +161,13 @@ describe('Centring on an arbitrary line', () => {
       ['काम करत आहे', 14, 62],
     ] as const) {
       const baseline = centredLineBaseline(value, size, cy);
-      // `boxTop` splits the extra height of a taller box around the design line,
-      // so this is the exact inverse of it, and the box centre lands on `cy`.
+      // The box runs from baseline - ascent to that + lineBox, so its centre is
+      // exactly cy once the baseline is cy + ascent - lineBox / 2.
       expect(boxTop(value, size, baseline) + lineBox(value, size) / 2).toBeCloseTo(cy, 10);
-      // The shift from the design baseline is exactly the ascent's own shift.
-      expect(baseline - centredBaseline(size, cy)).toBeCloseTo(
-        ascent(value, size) - BASELINE * size,
-        10
-      );
+      // And the box really holds the ink: it starts at the ascent above the
+      // baseline (that is where the glyphs start) and its bottom is the box's.
+      expect(boxTop(value, size, baseline)).toBeCloseTo(cy - lineBox(value, size) / 2, 10);
+      expect(boxTop(value, size, baseline)).toBeLessThanOrEqual(baseline);
     }
   });
 

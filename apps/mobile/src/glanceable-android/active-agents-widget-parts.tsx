@@ -72,19 +72,25 @@ export const CARD_PAD = 16;
  */
 export { lineBox };
 
-/** Top of the box whose baseline sits at `baseline`, from the ascent of the font that draws `value`. */
+/**
+ * Top of the box whose baseline sits at `baseline`. The box starts one ascent
+ * above the baseline whatever script draws: a taller fallback font raises the
+ * box's top by its own ascent, and the rest of its taller box hangs below the
+ * baseline as descent. Adding a share of the extra height here would lift the
+ * box off its ink and leave the glyphs' descent outside the box.
+ */
 export function boxTop(value: string, size: number, baseline: number): number {
-  return baseline - ascent(value, size) - (lineBox(value, size) - Math.ceil(size * LATIN_LINE)) / 2;
+  return baseline - ascent(value, size);
 }
 
-/** The baseline whose line box (Latin or taller script) ends at `bottom`. */
+/** The baseline whose line box (Latin or taller script) ends exactly at `bottom`. */
 export function baselineAbove(value: string, size: number, bottom: number): number {
-  return bottom - lineBox(value, size) - boxTop(value, size, 0);
+  return bottom - lineBox(value, size) + ascent(value, size);
 }
 
-/** The baseline whose line box (Latin or taller script) starts at `top`. */
+/** The baseline whose line box (Latin or taller script) starts exactly at `top`. */
 function baselineIn(value: string, size: number, top: number): number {
-  return top + ascent(value, size) + (lineBox(value, size) - Math.ceil(size * LATIN_LINE)) / 2;
+  return top + ascent(value, size);
 }
 
 /** Float noise below a twentieth of a dp is not an overflow; the design grid is in whole dp. */
@@ -136,13 +142,13 @@ export function insideBand(spec: BandSpec): number {
 }
 
 /**
- * The baseline that centres `value`'s own line box on `cy`. `boxTop` splits a
- * taller box's extra height around the design line, so the box centre sits
- * `ascent(value, size) - ceil(size * LATIN_LINE) / 2` below the baseline, for
- * every script. Latin text gets exactly the number `centredBaseline` gives.
+ * The baseline that centres `value`'s own line box on `cy`. The box runs from
+ * `baseline - ascent` to that plus `lineBox`, so its centre is on `cy` when the
+ * baseline is `cy + ascent - lineBox / 2`. For Latin, `lineBox` is exactly
+ * `ceil(size * LATIN_LINE)`, so this is the number `centredBaseline` gives.
  */
 export function centredLineBaseline(value: string, size: number, cy: number): number {
-  return cy + ascent(value, size) - Math.ceil(size * LATIN_LINE) / 2;
+  return cy + ascent(value, size) - lineBox(value, size) / 2;
 }
 
 /** The baseline that centres a shared row on `cy`: its box is its tallest part's. */

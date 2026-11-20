@@ -39,3 +39,6 @@ BEGIN
 		END;
 	END LOOP;
 END $$;
+--> statement-breakpoint
+-- The migrator applies every pending migration in one transaction; keep the timeout to this file.
+SET LOCAL lock_timeout TO DEFAULT;

@@ -97,6 +97,7 @@ export function TodoNotesSection({ todo }: Readonly<{ todo: TodoItemDetail }>) {
     <View>
       <SectionHeader
         label={t('todos.item.notes')}
+        inset
         actionLabel={actionLabel}
         onActionPress={() => {
           if (editing) {

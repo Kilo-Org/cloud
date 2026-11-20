@@ -14,6 +14,7 @@ import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import {
   type DenyListModel,
+  denyListRowNote,
   matchesSearch,
   type ModelAccessDraft,
   setModelsAllowed,
@@ -42,7 +43,7 @@ function ListHeader({
 }>) {
   return (
     <View className="gap-3 pt-3 pb-3">
-      <Text variant="caption">{description}</Text>
+      <Text variant="muted">{description}</Text>
       <SearchField
         defaultValue={search}
         placeholder={searchPlaceholder}
@@ -102,6 +103,12 @@ export function ProviderAllowList({
     [draft, disabled, onChange, shown.length]
   );
 
+  // Two causes leave the list empty: a query filtered every provider out, or
+  // the catalog names no provider at all.
+  const emptyLabel = search.trim()
+    ? t('organizationModelAccess.providersEmpty')
+    : t('organizationModelAccess.providersNone');
+
   return (
     <FlashList
       data={shown}
@@ -143,7 +150,7 @@ export function ProviderAllowList({
           }
         />
       }
-      ListEmptyComponent={<NoMatch label={t('organizationModelAccess.providersEmpty')} />}
+      ListEmptyComponent={<NoMatch label={emptyLabel} />}
     />
   );
 }
@@ -186,6 +193,7 @@ export function ModelDenyList({
         <PreferenceRow
           title={item.name}
           subtitle={item.id}
+          note={denyListRowNote(item, t)}
           value={!draft.modelDenyList.includes(item.id)}
           disabled={disabled}
           onValueChange={next => {
@@ -194,7 +202,7 @@ export function ModelDenyList({
         />
       </RowGroupItem>
     ),
-    [draft, disabled, onChange, shown.length]
+    [draft, disabled, onChange, shown.length, t]
   );
 
   const emptyLabel = (() => {

@@ -73,7 +73,9 @@ describe('isFeatureFlagEnabledOrDevelopment', () => {
       await expect(
         isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', 'user-2')
       ).resolves.toBe(true);
-      expect(mockGetFeatureFlag).toHaveBeenCalledWith('cloud-agent-devcontainer', 'user-2');
+      expect(mockGetFeatureFlag).toHaveBeenCalledWith('cloud-agent-devcontainer', 'user-2', {
+        personProperties: undefined,
+      });
     } finally {
       replacedEnv.restore();
     }

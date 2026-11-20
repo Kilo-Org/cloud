@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Befehlszustellung: {{status}}",
     "delivered": "Zugestellt",
-    "expired": "Abgelaufen"
+    "expired": "Abgelaufen",
+    "recoveryGaps_one": "{{displayCount}} Teil dieses Transkripts fehlt.",
+    "recoveryGaps_other": "{{displayCount}} Teile dieses Transkripts fehlen."
   },
   "common": {
     "manageOnWeb": "Im Web verwalten",
@@ -138,6 +140,7 @@
     "keepRunning": "Weiterlaufen lassen",
     "newSession": "Neue Sitzung",
     "noModelsAvailable": "Keine Modelle verfügbar",
+    "modelRetires": "Läuft aus am {{date}}",
     "notFound": "Der Inhalt wurde nicht gefunden.",
     "online": "Verbunden",
     "open": "{{name}} öffnen",
@@ -148,6 +151,7 @@
     "performance": "Leistung",
     "preferences": "Einstellungen",
     "privacyPolicy": "Datenschutzerklärung",
+    "termsOfService": "Nutzungsbedingungen",
     "profile": "Profil",
     "reactions": "Reaktionen",
     "recent": "Zuletzt",
@@ -171,6 +175,7 @@
     "generating": "Wird generiert…",
     "working": "In Bearbeitung",
     "yourOwnRepositories": "Deine eigenen Code-Repositories",
+    "organizationRepositories": "Code-Repositories der Organisation",
     "dismissed": "Verworfen",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -179,7 +184,9 @@
     "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "privateRepositoryA11y": "{{name}}, privates Repository",
     "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
-    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen."
+    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
+    "organizationTrialEndedBillingAtKiloAi": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
+    "viewOnGitHub": "PR auf GitHub ansehen"
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -217,8 +224,8 @@
     "verifyCode": "Code bestätigen",
     "resendCode": "Code erneut senden",
     "termsPrefix": "Wenn du fortfährst, akzeptierst du unsere ",
-    "terms": "Nutzungsbedingungen",
     "termsInSentence": "Nutzungsbedingungen",
+    "terms": "Nutzungsbedingungen",
     "termsConnector": " und ",
     "termsSuffix": ".",
     "moreSignInOptions": "Weitere Anmeldeoptionen",
@@ -273,6 +280,9 @@
     "credits": "Guthaben",
     "failedToLoadBalance": "Dein Guthaben konnte nicht geladen werden. Tippe, um es erneut zu versuchen.",
     "balanceLoadFailed": "Guthaben nicht geladen",
+    "balanceUnreachable": "Server nicht erreichbar. Versuch es erneut.",
+    "balanceAccessDenied": "Du hast keine Berechtigung, dieses Guthaben zu sehen.",
+    "balanceUnavailable": "Guthaben konnte nicht geladen werden.",
     "hideBalance": "Guthaben ausblenden",
     "showBalance": "Guthaben anzeigen",
     "balanceHidden": "Guthaben ausgeblendet",
@@ -503,7 +513,7 @@
     "changelogFixesPolish": "Fehlerbehebungen und Verbesserungen in der gesamten App.",
     "changelogAreas": {
       "signIn": "Anmeldung",
-      "profileOrganizations": "Profil und Organisationen"
+      "profileOrganizations": "Profil & Organisationen"
     }
   },
   "preferences": {
@@ -577,14 +587,14 @@
     },
     "category": {
       "agentAttentionTitle": "Der Agent braucht dich",
-      "agentAttentionSubtitle": "fragen, Berechtigungsanfragen und erforderliche Eingaben",
+      "agentAttentionSubtitle": "Fragen, Berechtigungsanfragen und erforderliche Eingaben",
       "agentUpdatesTitle": "Neuigkeiten vom Agenten",
-      "agentUpdatesSubtitle": "nachrichten des Agenten während der Bearbeitung",
+      "agentUpdatesSubtitle": "Nachrichten des Agenten während der Bearbeitung",
       "sessionStatusTitle": "Sitzungsstatus",
-      "sessionStatusSubtitle": "beendet / fehlgeschlagen / bereit zur Steuerung",
-      "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
+      "sessionStatusSubtitle": "Beendet / fehlgeschlagen / bereit zur Steuerung",
+      "balanceAlertsSubtitle": "Warnungen bei niedrigem Organisationsguthaben",
       "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Guthabenwarnungen zu erhalten.",
-      "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen",
+      "securityFindingsSubtitle": "Neue Sicherheitsbefunde und SLA-Erinnerungen",
       "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten in einem Bereich, um Sicherheitsbefunde zu erhalten.",
       "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
       "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“"
@@ -668,7 +678,7 @@
     },
     "instructions": {
       "title": "Benutzerdefinierte Anweisungen",
-      "deprecation": "Benutzerdefinierte Anweisungen sollen künftig entfallen. Verschiebe diese Richtlinien stattdessen in eine REVIEW.md-Datei in deinem Repository.",
+      "deprecation": "Benutzerdefinierte Anweisungen werden entfernt. Verschiebe diese Richtlinien stattdessen in eine REVIEW.md-Datei in deinem Repository.",
       "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …",
       "clearTitle": "Benutzerdefinierte Anweisungen entfernen?",
       "clearMessage": "Wenn du ein leeres Feld speicherst, werden die für diesen Reviewer gespeicherten benutzerdefinierten Anweisungen gelöscht."
@@ -693,12 +703,16 @@
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen."
+      "notConnectedReadOnlyPlan": "Die Testphase der Organisation ist beendet, daher muss ein Inhaber die Abrechnung unter kilo.ai aktualisieren."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
+      "managedOnWebTitle": "Im Web verwaltet",
+      "managedOnWebShort": "Diese Verbindung wird im Web über einen Computer verwaltet.",
+      "managedOnWebRepositories": "Wähle die Repositories für {{organization}} im Web über einen Computer aus.",
       "description": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "descriptionReconnect": "Erstelle ein neues Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
+      "descriptionOverview": "Erstelle ein Workspace-Zugriffstoken und füge es auf dem nächsten Bildschirm ein.",
       "scopes": "Konto: Lesen · Repositories: Lesen/Schreiben · Pull-Requests: Lesen · Webhooks: Lesen/Schreiben",
       "tokenPlaceholder": "Workspace-Zugriffstoken",
       "tokenRefused": "Bitbucket hat dieses Workspace-Zugriffstoken nicht akzeptiert. Prüfe, ob es die oben genannten Berechtigungen enthält, und versuche es dann erneut."
@@ -734,6 +748,7 @@
     "platformList": {
       "activity": "Aktivität",
       "checking": "Wird geprüft …",
+      "needsAttention": "Aktion erforderlich",
       "platforms": "Plattformen",
       "statusUnavailable": "Status nicht verfügbar"
     },
@@ -2224,6 +2239,8 @@
     "modelPicker": {
       "title": "Modell wählen",
       "noModelsDescription": "Es stehen keine Modelle zur Auswahl.",
+      "allUnavailableTitle": "Kein Modell kann verwendet werden",
+      "allUnavailableDescription": "Füge einen Anbieterschlüssel hinzu und versuche es erneut.",
       "favorites": "Favoriten"
     },
     "modelSelector": {
@@ -2466,6 +2483,7 @@
     "noSessions": "Keine aktiven Sitzungen",
     "noSessionsDescription": "Melde dich auf einem anderen Gerät in der Kilo-App an. Das Gerät erscheint dann hier.",
     "signedIn": "Angemeldet: {{signedIn}} · Zuletzt aktiv: {{lastSeen}}",
+    "signedInThisDevice": "Angemeldet: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Hier erscheinen Anmeldungen über die Kilo-App, die Kilo CLI und einen Webbrowser. Editor-Anmeldungen werden nicht aufgeführt.",
     "thisDevice": "Dieses Gerät",
     "viewProfile": "Profil ansehen",
@@ -2627,6 +2645,8 @@
     "retryHint": "Ruft den Status von Kilo Pass erneut ab.",
     "endedOn": "Beendet am {{date}}",
     "notAvailableInApp": "Kilo Pass ist in der App nicht verfügbar.",
+    "notAvailableTitle": "Kilo Pass gibt es nicht in der App",
+    "noPassDescription": "Dieses Konto hat keinen Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Testphase",
     "statusPastDue": "Zahlung überfällig",
@@ -2697,6 +2717,7 @@
     "revokeConsent": "Einwilligung widerrufen",
     "revokeConsentTitle": "Einwilligung zur Datenweitergabe widerrufen?",
     "acceptAndContinue": "Akzeptieren und fortfahren",
+    "loadingConsentSettings": "Deine Einwilligungseinstellungen werden geladen…",
     "decline": "Ablehnen",
     "declineAndSignOut": "Ablehnen und abmelden",
     "declineTitle": "Datenweitergabe ablehnen?",
@@ -2768,7 +2789,6 @@
       "skipped_one": "{{displayCount}} übersprungen",
       "skipped_other": "{{displayCount}} übersprungen",
       "title": "Prüfungen",
-      "viewOnGitHub": "PR auf GitHub ansehen",
       "checkDetails": "details zur Prüfung"
     },
     "composer": {
@@ -2832,6 +2852,9 @@
       "couldNotLoad": "Die Diskussion konnte nicht geladen werden.",
       "couldNotLoadMore": "Weitere Kommentare konnten nicht geladen werden.",
       "loadMoreComments": "Weitere Kommentare laden",
+      "conversationTruncated": "Es werden nur die ersten {{displayCount}} Kommentare angezeigt.",
+      "conversationTruncated_one": "Es werden nur die ersten {{displayCount}} Kommentare angezeigt.",
+      "conversationTruncated_other": "Es werden nur die ersten {{displayCount}} Kommentare angezeigt.",
       "loading": "Diskussion wird geladen",
       "moderation": {
         "block": {
@@ -2882,7 +2905,6 @@
       "submitReply": "Antwort senden",
       "termsAcceptRetry": "Die Nutzungsbedingungen konnten nicht akzeptiert werden. Prüfe deine Verbindung und versuche es erneut.",
       "termsCopy": "Du musst mindestens 13 Jahre alt sein, um Beiträge zu veröffentlichen.",
-      "termsTitle": "Nutzungsbedingungen",
       "threadAccessibilityLabel": "Diskussionsthread {{anchorLabel}}",
       "unavailable": "Die Diskussion ist nicht verfügbar.",
       "unavailableMessage": "Dieser Pull-Request wurde möglicherweise entfernt.",
@@ -3224,6 +3246,8 @@
       "partialPostedStale_one": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "partialPostedStale_other": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "submitCountOfTotal": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitCountOfTotal_one": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitCountOfTotal_other": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
       "submitReview": "Prüfung senden",
       "blockedRequestChanges": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um Änderungen anzufordern.",
       "blockedComment": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um ein Review mit Kommentaren zu senden."
@@ -3236,6 +3260,9 @@
     },
     "tabs": {
       "discussion": "Diskussion",
+      "discussionAccessibility": "{{title}}: {{displayCount}} Kommentare",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} Kommentare",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
       "files": "Dateien",
       "overview": "Übersicht"
     },
@@ -3424,14 +3451,13 @@
     "hub": {
       "balance": "Guthaben",
       "lowBalanceBelow": "Unter {{amount}}",
-      "organizationSeats": "Nutzerplätze der Organisation",
-      "plan": "Organisationsplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Beendet",
       "planEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan.",
       "manageBilling": "Abrechnung verwalten",
-      "renamePlaceholder": "Name der Organisation",
+      "renamePlaceholder": "Gib einen Namen für die Organisation ein",
       "renameTitle": "Organisation umbenennen"
     },
     "inviteMember": {
@@ -3468,7 +3494,7 @@
       "retentionLimit": "Es werden die neuesten Rechnungen angezeigt."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Warnung bei niedrigem Guthaben aktivieren",
+      "subtitle": "Sende eine E-Mail-Warnung an die angegebenen Adressen, wenn das Guthaben dieser Organisation unter den festgelegten Betrag fällt.",
       "notifyEmailsLabel": "E-Mail-Adressen für Benachrichtigungen",
       "permissionDenied": "Du hast keine Berechtigung, Abrechnungswarnungen zu verwalten.",
       "separateEmailsHint": "Trenne mehrere E-Mail-Adressen durch Kommas.",
@@ -3544,6 +3570,7 @@
       "truncated": "Diese Stunde enthält mehr Anfragen, als die Liste anzeigt.",
       "emptyTitle": "Keine Anfragen in dieser Stunde",
       "emptyDescription": "Tippe auf „Frühere Stunde“, um frühere Anfragen anzuzeigen.",
+      "emptyBoundDescription": "Weiter zurück reichen die Anfrageprotokolle nicht.",
       "loadError": "Anfrage-Logs konnten nicht geladen werden.",
       "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
       "tokens": "{{input}} ein · {{output}} aus",
@@ -3644,7 +3671,8 @@
     "signupStepUp": "Wähle „$t(login.moreSignInOptions)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpApple": "Wähle „$t(login.signInWithApple)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpGoogle": "Wähle „$t(login.signInWithGoogle)“, um die Erstellung deines Kontos abzuschließen.",
-    "invalidCode": "Dieser Code ist falsch. Bitte versuche es erneut.",
+    "signupStepUpBack": "Um die Erstellung deines Kontos abzuschließen, geh zurück und wähle „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Versuche es erneut oder wähle „$t(login.resendCode)“.",
     "codeInProgress": "Dein Code wird verarbeitet. Warte einen Moment und versuche es erneut.",
     "tooManyAttempts": "Du hast zu viele Versuche unternommen. Bitte fordere einen neuen Code an.",
     "invalidToken": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
@@ -3773,6 +3801,7 @@
   },
   "modelChat": {
     "offlineFailure": "Dieses Modell benötigt eine Internetverbindung. Stelle eine Verbindung her und versuche es erneut, oder wechsle zu einem Modell auf diesem Gerät.",
+    "connectionLost": "Die Verbindung zum Modell wurde unterbrochen. Prüfe deine Verbindung und versuche es erneut.",
     "empty": {
       "title": "Chat starten",
       "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
@@ -3912,6 +3941,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sendet eine kurze Inferenzanfrage mit dem ausgewählten Protokoll und Modell an diesen Endpunkt. Der Anbieter kann dafür Gebühren berechnen.",
       "connectionSucceeded": "Das Modell hat eine Anfrage mit diesem Protokoll erfolgreich ausgeführt.",
       "connectionFailed": "Das Modell konnte eine Anfrage nicht ausführen. Prüfe die API-Basis-URL, das Protokoll, die Zugangsdaten und die Modell-ID.",
+      "requestTimedOut": "Der Endpunkt hat nicht rechtzeitig geantwortet. Prüfe die API-Basis-URL und deine Verbindung und versuche es dann erneut.",
+      "requestUnauthorized": "Der Endpunkt hat die Zugangsdaten abgelehnt. Prüfe den API-Schlüssel und die benutzerdefinierten Header und versuche es dann erneut.",
+      "requestNotFound": "Der Endpunkt oder das Modell wurde nicht gefunden. Prüfe die API-Basis-URL und die Modell-ID.",
+      "requestRateLimited": "Der Endpunkt begrenzt Anfragen. Warte einen Moment und versuche es erneut.",
+      "requestUnavailable": "Der Endpunkt ist derzeit nicht verfügbar. Versuche es gleich noch einmal.",
+      "requestUnreachable": "Der Endpunkt konnte nicht erreicht werden. Prüfe die API-Basis-URL und deine Verbindung.",
+      "requestInvalidResponse": "Der Endpunkt hat nicht im erwarteten Format geantwortet. Prüfe, ob API-Basis-URL und Protokoll zum Server passen, und versuche es dann erneut.",
+      "discoveryNoModels": "Der Endpunkt hat keine Modelle aufgelistet. Gib Modelle manuell ein.",
+      "connectionIncomplete": "Das Modell hat geantwortet, aber nicht abgeschlossen. Versuche es erneut oder prüfe die Modell-ID und das Protokoll.",
       "invalidInput": "Gib einen Backend-Namen, gültige Header und mindestens ein Modell mit eindeutiger ID und eindeutigem Namen ein. Token-Limits müssen positive ganze Zahlen sein.",
       "invalidUrl": "Gib eine HTTP- oder HTTPS-API-Basis-URL ohne Zugangsdaten, Abfrageparameter oder Fragment ein.",
       "publicHttp": "Öffentliche HTTP-Endpunkte sind nicht erlaubt. Verwende HTTPS oder einen privaten lokalen Endpunkt.",
@@ -4050,10 +4088,20 @@
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
     },
-    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden."
+    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden.",
+    "providerKeyRefused": "Der Anbieter hat die Zugangsdaten abgelehnt. Prüfe dessen API-Schlüssel und sende dann erneut.",
+    "providerModelMissing": "Dieses Backend stellt dieses Modell nicht mehr bereit. Wähle ein anderes.",
+    "providerRateLimited": "Der Anbieter begrenzt Anfragen. Warte einen Moment und sende dann erneut.",
+    "providerUnavailable": "Der Anbieter ist derzeit nicht verfügbar. Sende in Kürze erneut."
   },
   "settingsTools": {
-    "confirmTitle": "Diese Änderung bestätigen?"
+    "confirmTitle": "Diese Änderung bestätigen?",
+    "guarded": {
+      "spendAlertsOff": "Ausgabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr über Überschreitungen der Ausgabenschwellen und stündliche Spitzen erhalten.",
+      "balanceAlertsOff": "Guthabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr erhalten, wenn Ihr Guthaben knapp wird.",
+      "securityFindingsOff": "Sicherheitsbefunde ausschalten? Sie würden keine Benachrichtigungen mehr über neue Sicherheitsbefunde erhalten.",
+      "hideBalanceOn": "Guthaben ausblenden? Ihre Guthaben würden dann nicht mehr auf den Profilseiten und im Organisations-Hub angezeigt."
+    }
   },
   "appActions": {
     "start": {
@@ -4425,6 +4473,7 @@
     "pickPackToBuyAgain": "Wähle oben ein Paket aus, um einen neuen Kauf zu starten.",
     "purchasePending": "Der Store verarbeitet diese Zahlung noch. Deine Credits werden gutgeschrieben, sobald er die Belastung genehmigt.",
     "buyAgain": "Erneut kaufen",
+    "checkPurchase": "Kauf prüfen",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   },
@@ -4518,7 +4567,9 @@
     },
     "saveSheet": {
       "title": "In Liste speichern",
-      "saved": "In {{list}} gespeichert"
+      "saved": "In {{list}} gespeichert",
+      "saveFailed": "Aufgabe konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut.",
+      "saveRefused": "Aufgabe konnte nicht in dieser Liste gespeichert werden. Wähle eine andere Liste."
     }
   },
   "agentBriefing": {
@@ -4530,6 +4581,7 @@
     "empty": "Keine Aktivität in diesem Briefing-Zeitraum.",
     "emptyHint": "Deine Cloud- und CLI-Coding-Sitzungen erscheinen hier, wenn ein geplantes Briefing Aktivität hat.",
     "loadError": "Briefings konnten nicht geladen werden",
+    "estimateLoadError": "Die Schätzung konnte nicht geladen werden.",
     "view": "Briefing lesen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4628,7 +4680,7 @@
     "topFeatures": "Top-Funktionen",
     "emptyTitle": "Keine Nutzung in diesem Zeitraum",
     "unavailableTitle": "Nutzung nicht verfügbar",
-    "unavailableDescription": "Dieser Workspace meldet keine Nutzung. Erneutes Versuchen hilft nicht.",
+    "unavailableDescription": "Die Nutzungserfassung ist für diesen Workspace nicht eingerichtet. Wende dich an den Kundendienst, wenn du hier Nutzungsdaten erwartest.",
     "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
     "viewDetails": "Nutzungsdetails anzeigen"
   },
@@ -4636,7 +4688,7 @@
     "title": "Integrationen",
     "sectionTitle": "Verbundene Dienste",
     "entrySubtitle": "GitHub, Slack, Linear und mehr",
-    "subtitle": "Verbinde deine Entwicklungstools und Workflows mit Kilo",
+    "subtitle": "Verbinde deine Entwicklungstools und Workflows mit Kilo.",
     "disconnect": "Trennen",
     "disconnectTitle": "{{provider}} trennen?",
     "disconnectMessage": "Kilo reagiert dann nicht mehr in {{provider}}. Du kannst die Verbindung jederzeit wiederherstellen.",
@@ -4797,7 +4849,7 @@
   },
   "organizationGuardrails": {
     "title": "KI-Guardrails",
-    "permissionDenied": "Nur Inhaber und Admins der Organisation können KI-Guardrails verwalten.",
+    "permissionDenied": "Nur Inhaber und Admins der Organisation können KI-Guardrails verwalten. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "KI-Guardrails sind nicht aktiviert",
     "unavailable": "Kilo aktiviert KI-Guardrails für eine Organisation auf Anfrage. Kontaktiere {{supportEmail}}, und das Kilo-Team schaltet sie für deine Organisation ein.",
     "contactSupport": "Support kontaktieren",
@@ -4809,12 +4861,15 @@
     "inputDescription": "Prüft jede Eingabe mit Enkrypt AI, einschließlich Tool-Ergebnissen. Wenn Enkrypt nicht verfügbar ist, werden Anfragen ungeprüft gesendet, statt abgelehnt zu werden.",
     "outputTitle": "Ausgabe-Guardrails",
     "outputDescription": "Prüft Antworten mit Enkrypt AI, bevor Mitglieder sie erhalten. Standardmäßig aus.",
+    "outputUnavailable": "Kilo hat die Ausgabeprüfung für diese Organisation nicht aktiviert, daher werden Antworten nicht geprüft und hier gibt es nichts einzustellen. Kontaktiere {{supportEmail}}, um sie anzufordern.",
     "detectorsHint": "Blockieren lehnt eine markierte Anfrage ab. Nur protokollieren zeichnet sie auf, ohne die Anfrage zu verzögern.",
     "detectorsHintOutput": "Blockieren lässt eine markierte Antwort fehlschlagen. Nur protokollieren zeichnet sie auf, ohne die Antwort zu verzögern.",
     "choiceLog": "Nur protokollieren",
     "applyTo": "Anwenden auf",
     "applyToAllMembers": "Alle Mitglieder",
     "applyKiloDefault": "Kilo-Standard anwenden",
+    "applyKiloDefaultEnglishNote": "Der Text der Kilo-Standardrichtlinie ist auf Englisch, weil das Kilo Gateway ihn genau so anwendet, wie er geschrieben ist.",
+    "applyKiloDefaultReplaceMessage": "Die Kilo-Standardrichtlinie ist auf Englisch verfasst und ersetzt, was du unter Richtlinienverstoß festgelegt hast. Der im Feld für den Richtlinientext eingegebene Text kann nicht wiederhergestellt werden.",
     "invalidSavedTitle": "Gespeicherte Einstellungen der Eingabe-Detektoren können nicht gelesen werden",
     "invalidSavedBody": "Anfragen werden blockiert, bis die Eingabe-Detektoren erneut gespeichert werden. Die Detektoren unten basieren auf dem Kilo-Standard.",
     "invalidSavedOutputTitle": "Gespeicherte Einstellungen der Ausgabe-Detektoren können nicht gelesen werden",
@@ -4935,7 +4990,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise-Funktion",
-    "enterpriseOnly": "Diese Funktion ist nur für Enterprise verfügbar.",
+    "enterpriseOnly": "Anbieter und Modelle sind im Enterprise-Tarif verfügbar.",
     "readOnly": "Nur Inhaber und Admins der Organisation können diese Einstellungen ändern.",
     "loadError": "Anbieter und Modelle konnten nicht geladen werden",
     "tabModels": "Modelle",
@@ -4949,6 +5004,8 @@
     "providersDescription": "Deaktiviere einen Anbieter, damit Kilo für diese Organisation nicht mehr an ihn weiterleitet.",
     "providersNeedCatalog": "Anbieter-Schalter bleiben schreibgeschützt, bis der vollständige Modellkatalog geladen ist. Tippe oben auf Erneut versuchen, um sie zu bearbeiten.",
     "providersEmpty": "Keine Anbieter entsprechen dieser Suche.",
+    "providersNone": "Für diese Organisation sind keine Anbieter verfügbar.",
+    "providersUnavailable": "Die Anbieterliste konnte nicht geladen werden.",
     "allowAllShown": "Alle angezeigten zulassen",
     "denyAllShown": "Alle angezeigten sperren",
     "gatewaysDescription": "Kilo leitet Modellanfragen über Vercel AI Gateway oder OpenRouter weiter. Bei einem deaktivierten Gateway schlagen diese Anfragen fehl.",

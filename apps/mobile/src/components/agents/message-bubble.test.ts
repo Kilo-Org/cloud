@@ -426,6 +426,7 @@ async function renderBubbleWithHandlers(
     retryAvailable?: boolean;
     failedPreparation?: PreparationAttempt;
     onCopyToComposer?: (text: string) => void;
+    composerText?: string;
     onRestoreQueued?: (m: StoredMessage) => void;
     onLongPressDetails?: (m: StoredMessage) => void;
     condenseToolCalls?: boolean;
@@ -771,6 +772,38 @@ describe('MessageBubble failure footer', () => {
     expect(
       findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
     ).toBeNull();
+  });
+
+  it('copies the question back from a chat failure stated under the answer’s words', async () => {
+    const onCopyToComposer = vi.fn<(text: string) => void>();
+    const words = assistantMessageWithText('m-partial');
+    for (const deliveryState of [
+      {
+        status: 'failed',
+        error: '',
+        reason: 'chat-response',
+        detailKey: 'modelChat.connectionLost',
+      },
+      { status: 'failed', error: '', reason: 'interrupted' },
+    ] satisfies MessageDeliveryStatement[]) {
+      // eslint-disable-next-line no-await-in-loop -- one render per ending
+      const tree = await renderBubbleWithHandlers(words, {
+        deliveryState,
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+        onCopyToComposer,
+        composerText: 'tell a story',
+      });
+      const copy = findElementByType(
+        tree,
+        'Button',
+        p => p.accessibilityLabel === 'Copy to composer'
+      );
+      if (copy === null) {
+        throw new Error(`no Copy to composer under the ${deliveryState.reason} row`);
+      }
+      (copy.props.onPress as () => void)();
+    }
+    expect(onCopyToComposer.mock.calls).toEqual([['tell a story'], ['tell a story']]);
   });
 
   it('gives both recovery controls the shared state-surface target', async () => {

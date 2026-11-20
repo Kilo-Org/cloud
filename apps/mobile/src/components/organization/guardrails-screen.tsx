@@ -14,7 +14,11 @@ import { Lock, Mail } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { openExternalUrl } from '@/lib/external-link';
 import { useOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
-import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import {
+  isMoneyRole,
+  useOrgBoundary,
+  useOrgWithMembers,
+} from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 
@@ -133,7 +137,11 @@ export function OrganizationGuardrailsScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GuardrailsForm organizationId={organizationId} data={query.data} />
+        <GuardrailsForm
+          organizationId={organizationId}
+          canManageBilling={isMoneyRole(role)}
+          data={query.data}
+        />
       </TabScreenScrollView>
     </View>
   );

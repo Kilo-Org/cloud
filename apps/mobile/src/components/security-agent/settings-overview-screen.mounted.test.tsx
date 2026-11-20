@@ -375,7 +375,7 @@ describe.each([
       );
       // The empty list makes "choose which repositories to monitor" untrue, so
       // the row names the step that actually unblocks it.
-      expect(cta?.props.subtitle).toBe('Grant the Kilo GitHub App access to repositories');
+      expect(cta?.props.subtitle).toBe('Grant the Kilo GitHub App access to repositories.');
     }
   );
 

@@ -4,6 +4,7 @@ import { createTabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
 import type { BrowserRuntime } from './browser-runtime';
 import type { BrowserCaller } from './browser-caller';
+import { STALE_REF_ERROR } from './browser-agent-checks';
 import type {
   BrowserScriptingApi,
   BrowserScriptingInjectionResult,
@@ -69,7 +70,7 @@ const createScriptingHarness = () => {
       readonly args: string[];
       readonly func: (...args: string[]) => InjectionResult;
       readonly target: { readonly tabId: number; readonly documentIds?: string[] };
-      readonly world: 'MAIN';
+      readonly world: 'ISOLATED' | 'MAIN';
     }): Promise<BrowserScriptingInjectionResult[]> => {
       const code = details.args[0] ?? '';
 
@@ -77,7 +78,7 @@ const createScriptingHarness = () => {
 
       const payload = code.includes('__buildAria')
         ? {
-            lines: ['- button "Go" e1'],
+            lines: ['- button "Go" [ref=e1]'],
             nextRef: 1,
             refs: [{ ref: 'e1', selector: 'button.go' }],
           }
@@ -140,7 +141,7 @@ describe('browser runtime ref lifetime', () => {
 
     expect(outcome).toMatchObject({
       kind: 'result',
-      result: { error: expect.stringContaining('Unknown element reference') as unknown, ok: false },
+      result: { error: STALE_REF_ERROR, ok: false },
     });
   });
 });

@@ -77,7 +77,15 @@ describe('POST /api/auth/native/exchange', () => {
   });
 
   it('refuses a device the verifier rejects', async () => {
-    mockVerifyAdmissionAsync.mockResolvedValue({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    mockVerifyAdmissionAsync.mockResolvedValue({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'challenge_unknown_or_expired',
+        source: 'challenge',
+        proofPlatform: 'android',
+      },
+    });
 
     const response = await POST(createRequest(bearerHeaders));
 
@@ -204,7 +212,6 @@ describe('POST /api/auth/native/exchange', () => {
       expiresIn: 3600,
     });
     expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
-      userId: fakeUser.id,
       userAgent: undefined,
       user: fakeUser,
       verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },

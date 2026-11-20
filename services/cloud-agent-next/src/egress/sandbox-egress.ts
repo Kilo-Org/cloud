@@ -1,5 +1,6 @@
 import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
+import type { NetworkSecretRouting } from '../network-secrets/substitution.js';
 import type { SandboxContainers } from '../sandbox-containers/SandboxContainers.js';
 import { isAllowedEgressUrl } from '../sandbox-control/egress-policy.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
@@ -31,8 +32,9 @@ export function egressAuditStore(
 export type SandboxEgressPolicy = {
   /** The canonical effective allowlist. Without it, every destination is allowed. */
   allowlist?: readonly string[];
-  /** Records one audit row for each request before the allowlist decision is applied. */
+  /** Records one audit row for each request before returning a denial or sending upstream. */
   audit?: { allocationRef: string; store: () => EgressAuditStoreStub };
+  routeNetworkSecrets?: (request: Request) => Promise<NetworkSecretRouting>;
 };
 
 /**
@@ -48,18 +50,24 @@ export async function proxySandboxEgress(
 ): Promise<Response> {
   const url = new URL(request.url);
   const allowed = policy.allowlist === undefined || isAllowedEgressUrl(url, policy.allowlist);
+  const networkSecret = allowed ? await policy.routeNetworkSecrets?.(request) : undefined;
   if (policy.audit !== undefined) {
     const audit = policy.audit;
     try {
+      const credentials =
+        networkSecret && networkSecret.type !== 'unmanaged' ? networkSecret.audit : [];
       const input = EgressAuditRequestSchema.parse({
         requestId: crypto.randomUUID(),
         allocationRef: audit.allocationRef,
         timestamp: new Date().toISOString(),
         method: request.method.slice(0, 32),
-        hostname: url.hostname.slice(0, 253).replace(/[^a-zA-Z0-9._:[\]-]/g, '_'),
+        hostname: /kcp\d+\./.test(url.hostname)
+          ? 'redacted.invalid'
+          : url.hostname.slice(0, 253).replace(/[^a-zA-Z0-9._:[\]-]/g, '_'),
         protocol: url.protocol,
         port: Number(url.port || (url.protocol === 'https:' ? 443 : 80)),
-        decision: allowed ? 'allowed' : 'denied',
+        decision: allowed && networkSecret?.type !== 'denied' ? 'allowed' : 'denied',
+        ...(credentials.length > 1 ? { credentialDecisions: credentials } : credentials[0]),
       });
       await withDORetry(
         audit.store,
@@ -85,7 +93,10 @@ export async function proxySandboxEgress(
     }
   }
   if (!allowed) return new Response('Egress destination disallowed', { status: 403 });
-  if (policy.audit !== undefined || policy.allowlist !== undefined) {
+  if (networkSecret?.type === 'denied') return networkSecret.response;
+  if (networkSecret?.type === 'rewritten') {
+    request = networkSecret.request;
+  } else if (policy.audit !== undefined || policy.allowlist !== undefined) {
     const headers = new Headers(request.headers);
     if (policy.allowlist !== undefined) headers.set('Host', url.host);
     request = new Request(request, { headers, redirect: 'manual' });
@@ -104,5 +115,5 @@ export async function proxySandboxEgress(
     }
     return env.SESSION_SYNC.fetch(request);
   }
-  return next(request);
+  return networkSecret?.type === 'rewritten' ? fetch(request) : next(request);
 }

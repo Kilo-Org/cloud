@@ -71,12 +71,13 @@ describe('PreferencesScreen hub', () => {
 
     expect(hubRows(renderer)).toHaveLength(7);
     expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal' });
-    // The voice-input explanation is the card's caption, not a third subtitle
-    // line on the row it names.
+    // The Voice input screen explains gateway transcription. A caption under
+    // this card sat below the last row, which has its own subtitle, so the hub
+    // does not repeat it.
     expect(row(renderer, 'Voice input').props).toMatchObject({ icon: 'Mic' });
     expect(
       renderer.root.findAll(node => String(node.type) === 'Text').map(node => node.props.children)
-    ).toContain(i18n.t('preferences.gatewayTranscriptionSubtitle'));
+    ).not.toContain(i18n.t('preferences.gatewayTranscriptionSubtitle'));
     expect(row(renderer, 'Translate tool summaries').props).toMatchObject({
       icon: 'WandSparkles',
       subtitle:

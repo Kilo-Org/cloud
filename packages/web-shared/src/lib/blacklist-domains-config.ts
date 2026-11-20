@@ -38,13 +38,18 @@ export const BlacklistDomainsInputSchema = z.object({
 });
 
 /**
- * Accepts `asia`, `.asia` and `ASIA` alike, and stores the bare label: the
- * matcher walks the label suffixes of an email host, so `asia` matches every
- * `*.asia` address.
+ * Accepts `asia`, `.asia`, `ASIA` and `asia.` alike, strips the leading and
+ * trailing dots, and stores only the bare label: the matcher walks the label
+ * suffixes of an email host, so `asia` matches every `*.asia` address.
  */
 export function normalizeSignupTlds(values: readonly string[]): string[] {
   const normalized = values
-    .map(value => value.trim().toLowerCase().replace(/^\.+/, ''))
+    .map(value =>
+      value
+        .trim()
+        .toLowerCase()
+        .replace(/^\.+|\.+$/g, '')
+    )
     .filter(Boolean);
   return [...new Set(normalized)];
 }

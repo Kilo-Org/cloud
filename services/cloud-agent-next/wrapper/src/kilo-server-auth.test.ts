@@ -106,4 +106,45 @@ describe('kilo server connections', () => {
       { path: '/global/health', authorization: null },
     ]);
   });
+
+  it('sends the credential on a relative path', async () => {
+    const target = server();
+    const response = await fetchKiloServer(target, '/pty');
+
+    expect(response.ok).toBe(true);
+    expect(seen).toEqual([{ path: '/pty', authorization: target.authorization ?? null }]);
+  });
+
+  it('sends the credential on an absolute URL of the same origin', async () => {
+    const target = server();
+    const response = await fetchKiloServer(target, new URL('/pty', target.url));
+
+    expect(response.ok).toBe(true);
+    expect(seen).toEqual([{ path: '/pty', authorization: target.authorization ?? null }]);
+  });
+
+  it('refuses an absolute URL of another origin and sends nothing', async () => {
+    const target = server();
+    const decoyRequests: string[] = [];
+    const decoy = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        decoyRequests.push(request.url);
+        return Response.json([]);
+      },
+    });
+    try {
+      const refusal = await fetchKiloServer(target, new URL('/pty', decoy.url)).catch(
+        (error: unknown) => error
+      );
+      const message = refusal instanceof Error ? refusal.message : '';
+      expect(refusal).toBeInstanceOf(Error);
+      expect(message).toContain(new URL(target.url).origin);
+      expect(decoyRequests).toEqual([]);
+      expect(seen).toEqual([]);
+    } finally {
+      await decoy.stop(true);
+    }
+  });
 });

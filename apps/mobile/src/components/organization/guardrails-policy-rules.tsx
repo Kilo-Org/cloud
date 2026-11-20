@@ -13,6 +13,7 @@ import {
 } from '@/components/organization/guardrails-rule-menu';
 import { SettingsValueRow } from '@/components/organization/settings-form-sections';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { FormField } from '@/components/ui/form-field';
 import { Trash2 } from '@/components/ui/icons';
@@ -20,7 +21,8 @@ import { MenuSheet } from '@/components/ui/menu-sheet';
 import { Text } from '@/components/ui/text';
 import { selectionHaptic } from '@/lib/haptics';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { LINE_ACTION_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import {
   GUARDRAILS_LIMITS,
   type OrgPolicyRule,
@@ -93,13 +95,20 @@ export function PolicyRulesEditor({
         <Text variant="caption">{t('organizationGuardrails.rulesEmpty')}</Text>
       ) : (
         rules.map((rule, index) => (
-          <View key={ruleKeys[index] ?? index} className="gap-3 rounded-lg bg-background p-3">
+          <Card key={ruleKeys[index] ?? index}>
             <View className="flex-row items-center justify-between gap-2">
               <Text className="text-sm font-medium text-foreground">
                 {t('organizationGuardrails.ruleNumber', { number: index + 1 })}
               </Text>
+              {/* The rule's delete action is the shared compact icon control:
+                  the glyph alone measures 16dp, so the box carries the 32dp
+                  target and the 8dp slop takes the reach to 48dp. The box sits
+                  inside the row rather than pulled past its end edge, because
+                  this row has no end padding for a pull to consume and Android
+                  delivers a touch only inside the parent's bounds. */}
               <Pressable
-                className={`${LINE_ACTION_BOX_CLASS} items-center justify-center active:opacity-70`}
+                className={cn(COMPACT_CONTROL_BOX_CLASS, 'shrink-0 active:opacity-70')}
+                hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
                 disabled={disabled}
                 accessibilityRole="button"
                 accessibilityLabel={t('organizationGuardrails.ruleRemove', {
@@ -197,7 +206,7 @@ export function PolicyRulesEditor({
                 })}
               </View>
             </View>
-          </View>
+          </Card>
         ))
       )}
       <Button

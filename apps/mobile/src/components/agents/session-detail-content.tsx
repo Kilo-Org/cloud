@@ -244,7 +244,11 @@ import {
   type AgentStackState,
   openComposerWithOutcome,
 } from '@/components/agents/new-session-navigation-outcome';
-import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import {
+  useBackToAgentsSessions,
+  useSessionHeaderBack,
+} from '@/lib/navigation/back-to-agents-sessions';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -349,6 +353,11 @@ export function SessionDetailContent({
   // A Back that lands while one of the composer's pickers is still opening is
   // delivered to this screen by the native stack; it closes the picker instead.
   usePickerAboveLeaveGuard();
+  // The terminal card's way back: it truncates the stack to the sessions list,
+  // and takes this route's place when it is the stack's only route.
+  const handleBackToSessions = useBackToAgentsSessions();
+  // The header's Back answers the same way: history first, then the list.
+  const sessionHeaderBack = useSessionHeaderBack();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
@@ -1913,13 +1922,6 @@ export function SessionDetailContent({
     }
   }, [manager, t]);
 
-  const handleBackToSessions = useCallback(() => {
-    // POP_TO reuses the `(tabs)` route under this screen and truncates every
-    // `agent-chat` route above it, so a composer still on the stack under a
-    // missing session is gone with it.
-    router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
-  }, [router]);
-
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
       if (activeSessionType === 'remote') {
@@ -2982,6 +2984,7 @@ export function SessionDetailContent({
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback={AGENTS_SESSIONS_HREF}
+            onBack={sessionHeaderBack}
             headerRight={headerRight}
             headerRightShrinks
             {...(rename.isTitleInteractive
@@ -2998,12 +3001,14 @@ export function SessionDetailContent({
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
               layout={reducedMotion ? undefined : LinearTransition.duration(150)}
-              className="px-4 pb-3"
+              style={sideInsetStyle}
             >
-              <ActiveProfileIndicator
-                state={sessionProfileIndicatorState}
-                onPress={openSessionProfileEditor}
-              />
+              <View className="px-4 pb-3">
+                <ActiveProfileIndicator
+                  state={sessionProfileIndicatorState}
+                  onPress={openSessionProfileEditor}
+                />
+              </View>
             </Animated.View>
           ) : null}
           {sessionGoal !== null ? (
@@ -3224,6 +3229,7 @@ export function SessionDetailContent({
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
             className="bg-background"
+            style={sideInsetStyle}
           >
             {sessionFooterItem === 'working' ? (
               /* Raw list on purpose: working-indicator.tsx derives the label
@@ -3254,42 +3260,46 @@ export function SessionDetailContent({
           </Animated.View>
         ) : null}
 
-        {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
+        {/* The blocking cards sit beside the side insets the transcript and
+            the composer clear. */}
+        <View className="shrink" style={sideInsetStyle}>
+          {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
 
-        {blockingInteraction === 'question' && activeQuestion ? (
-          <QuestionCard
-            key={activeQuestion.requestId}
-            questions={activeQuestion.questions}
-            onAnswer={answers => {
-              void handleAnswerQuestion(answers);
-            }}
-            onReject={() => {
-              void handleRejectQuestion();
-            }}
-            isSubmitting={isAnswering}
-            requestId={activeQuestion.requestId}
-            submissionError={questionSubmissionError}
-            pendingCount={blockingRequestCount}
-          />
-        ) : null}
+          {blockingInteraction === 'question' && activeQuestion ? (
+            <QuestionCard
+              key={activeQuestion.requestId}
+              questions={activeQuestion.questions}
+              onAnswer={answers => {
+                void handleAnswerQuestion(answers);
+              }}
+              onReject={() => {
+                void handleRejectQuestion();
+              }}
+              isSubmitting={isAnswering}
+              requestId={activeQuestion.requestId}
+              submissionError={questionSubmissionError}
+              pendingCount={blockingRequestCount}
+            />
+          ) : null}
 
-        {blockingInteraction === 'permission' &&
-        activePermission &&
-        activePermission.requestId !== suppressedRequestId ? (
-          <PermissionCard
-            key={activePermission.requestId}
-            permission={activePermission.permission}
-            patterns={activePermission.patterns}
-            metadata={activePermission.metadata}
-            onRespond={response => {
-              void handleRespondToPermission(response);
-            }}
-            isSubmitting={isRespondingToPermission}
-            requestId={activePermission.requestId}
-            submissionError={permissionSubmissionError}
-            pendingCount={blockingRequestCount}
-          />
-        ) : null}
+          {blockingInteraction === 'permission' &&
+          activePermission &&
+          activePermission.requestId !== suppressedRequestId ? (
+            <PermissionCard
+              key={activePermission.requestId}
+              permission={activePermission.permission}
+              patterns={activePermission.patterns}
+              metadata={activePermission.metadata}
+              onRespond={response => {
+                void handleRespondToPermission(response);
+              }}
+              isSubmitting={isRespondingToPermission}
+              requestId={activePermission.requestId}
+              submissionError={permissionSubmissionError}
+              pendingCount={blockingRequestCount}
+            />
+          ) : null}
+        </View>
 
         {isReadOnlyFooterPlaceholderVisible ? <SessionReadOnlyFooterPlaceholder /> : null}
 

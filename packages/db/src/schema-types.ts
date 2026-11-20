@@ -1701,12 +1701,10 @@ export const MAX_ORGANIZATION_GROUPS = 100;
 export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
 
 // Persisted shape of organization group policies. The runtime Zod contracts,
-// per-policy schemas, limits, defaults, and helpers live in the web app
-// (`apps/web/src/lib/organizations/group-policies`) so this package stays
+// per-policy schemas, limits, defaults, and helpers live in web-shared
+// (`packages/web-shared/src/lib/organizations/group-policies`) so this package stays
 // focused on database concerns. These structural types exist only to type the
 // `jsonb` columns in `schema.ts`; the app-side schemas assert compatibility.
-export type OrganizationGroupPolicyType = 'model_access';
-
 export type OrganizationGroupModelAccessPolicy = {
   type: 'model_access';
   data:
@@ -1715,7 +1713,32 @@ export type OrganizationGroupModelAccessPolicy = {
     | { mode: 'selected'; model_allow_list: string[]; provider_allow_list: string[] };
 };
 
-export type OrganizationGroupPolicy = OrganizationGroupModelAccessPolicy;
+type OrganizationPermissionAction = 'allow' | 'ask' | 'deny';
+type OrganizationPermissionRule = { pattern: string; action: OrganizationPermissionAction };
+
+export type OrganizationGroupAgentPermissionsPolicy = {
+  type: 'agent_permissions';
+  data: {
+    schema_version: 1;
+    unrestricted_mode?: 'allow' | 'deny';
+    tools?: Record<
+      string,
+      | OrganizationPermissionAction
+      | { rules: OrganizationPermissionRule[]; fallback?: OrganizationPermissionAction }
+    >;
+    shell?: Partial<
+      Record<
+        'bash' | 'powershell',
+        { fallback: 'ask' | 'deny'; rules: OrganizationPermissionRule[] }
+      >
+    >;
+  };
+};
+
+export type OrganizationGroupPolicy =
+  | OrganizationGroupModelAccessPolicy
+  | OrganizationGroupAgentPermissionsPolicy;
+export type OrganizationGroupPolicyType = OrganizationGroupPolicy['type'];
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
 
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);
@@ -3029,6 +3052,18 @@ const CustomLlmRemoveFromBodyPathSchema = z.string().superRefine((path, ctx) => 
   }
 });
 
+/**
+ * Replaces each reasoning effort a request names with the effort the upstream receives, for
+ * example `{ "xhigh": "high", "max": "high" }`. It rewrites only effort fields, so a disable sent
+ * another way, such as `reasoning.enabled: false`, is unaffected.
+ */
+export const ReasoningEffortMapSchema = z.partialRecord(
+  ReasoningEffortSchema,
+  ReasoningEffortSchema
+);
+
+export type ReasoningEffortMap = z.infer<typeof ReasoningEffortMapSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
   /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
@@ -3042,6 +3077,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(CustomLlmRemoveFromBodyPathSchema).optional(),
   reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
+  reasoning_effort_map: ReasoningEffortMapSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -3166,7 +3202,7 @@ export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
  * partner first and fall back to the regular route when it answers with an
  * unsuccessful status. User BYOK keys and other user-paid routes are unaffected. When the
  * definition declares `opencode_settings.reasoning_options`, a request for a reasoning effort
- * outside them skips the partner up front.
+ * outside them, after `reasoning_effort_map` applies, skips the partner up front.
  */
 export const CustomLlmPartnerSchema = z.object({
   /** The provider slug the partner serves the model as. Organization provider allow

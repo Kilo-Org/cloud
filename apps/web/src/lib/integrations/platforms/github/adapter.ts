@@ -16,6 +16,124 @@ import {
 
 export type { GitHubAppType } from './app-selector';
 
+const MAX_GITHUB_PAGINATION_PAGES = 100;
+const MAX_GITHUB_PAGINATION_ITEMS = 10_000;
+
+/**
+ * Cumulative response bytes one paginated read keeps across its pages. A real page of 100
+ * repositories or branches is about 100 KiB, so MAX_GITHUB_PAGINATION_PAGES full pages come to
+ * roughly 10 MiB; 16 MiB leaves headroom for payloads larger than that.
+ */
+export const MAX_GITHUB_LISTING_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Total duration of one paginated read, shared by every page request. A real page answers in
+ * well under a second, so the page cap is reached in seconds and this limit applies only to a
+ * read far slower than a listing.
+ */
+export const GITHUB_LISTING_TIMEOUT_MS = 60_000;
+
+/** User-facing copy for a listing that exceeded the server-side pagination budget. */
+export const GITHUB_LISTING_BUDGET_MESSAGE =
+  'This GitHub installation has more repositories or branches than Kilo can list. Limit its repository access and try again.';
+
+/** Raised when one paginated read passes a page, item, byte or duration bound. */
+export class GitHubListingBudgetExceededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GitHubListingBudgetExceededError';
+  }
+}
+
+/**
+ * One paginated read's budget: the response bytes it keeps across pages and the single
+ * total-duration signal every page request of that read shares. A read that exceeds either
+ * limit fails with an error naming the read.
+ */
+class GitHubListingBudget {
+  readonly signal: AbortSignal;
+  private readonly controller = new AbortController();
+  private readonly context: string;
+  private readonly timer: NodeJS.Timeout;
+  private readonly timeoutError: GitHubListingBudgetExceededError;
+  private retainedBytes = 0;
+
+  constructor(context: string) {
+    this.context = context;
+    this.timeoutError = new GitHubListingBudgetExceededError(
+      `GitHub pagination limit exceeded: ${context} did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+    );
+    this.timer = setTimeout(() => {
+      // undici rejects with the abort reason itself, and Octokit's fetch wrapper rethrows that
+      // rejection unchanged only when its name is `AbortError`; any other reason is wrapped in a
+      // RequestError 500. The reason therefore carries the typed error as its cause, and the
+      // paginating loops read it back through deadlineError().
+      const abortReason = new Error(this.timeoutError.message);
+      abortReason.name = 'AbortError';
+      Object.defineProperty(abortReason, 'cause', { value: this.timeoutError });
+      this.controller.abort(abortReason);
+    }, GITHUB_LISTING_TIMEOUT_MS);
+    this.timer.unref?.();
+    this.signal = this.controller.signal;
+  }
+
+  /**
+   * The typed deadline error. A page request aborted by the timeout reaches its caller as an
+   * `AbortError` or a wrapper around it, so a loop whose signal has fired reports this instead.
+   */
+  deadlineError(): GitHubListingBudgetExceededError {
+    return this.timeoutError;
+  }
+
+  retain(bytes: number): void {
+    this.retainedBytes += bytes;
+    if (this.retainedBytes > MAX_GITHUB_LISTING_BYTES) {
+      throw new GitHubListingBudgetExceededError(
+        `GitHub pagination limit exceeded: ${this.context} returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`
+      );
+    }
+  }
+
+  dispose(): void {
+    clearTimeout(this.timer);
+  }
+}
+
+/**
+ * Runs one page request and reports the budget's typed deadline error when the read ran out of
+ * time: Octokit surfaces an aborted request as an `AbortError` or a wrapper around it, and only
+ * the caller knows that the abort came from the budget. Any other failure is rethrown unchanged.
+ */
+async function withListingDeadline<T>(
+  budget: GitHubListingBudget,
+  request: () => Promise<T>
+): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    if (budget.signal.aborted) throw budget.deadlineError();
+    throw error;
+  }
+}
+
+/**
+ * Enforces the server-side pagination bounds for every paginating helper in this
+ * adapter: pagination continues only within MAX_GITHUB_PAGINATION_PAGES pages and
+ * MAX_GITHUB_PAGINATION_ITEMS items, and exceeding either bound fails with an error.
+ */
+function checkGitHubPaginationBounds(page: number, itemCount: number, context: string): void {
+  if (page > MAX_GITHUB_PAGINATION_PAGES) {
+    throw new GitHubListingBudgetExceededError(
+      `GitHub pagination limit exceeded: ${context} returned more than ${MAX_GITHUB_PAGINATION_PAGES} pages`
+    );
+  }
+  if (itemCount > MAX_GITHUB_PAGINATION_ITEMS) {
+    throw new GitHubListingBudgetExceededError(
+      `GitHub pagination limit exceeded: ${context} returned more than ${MAX_GITHUB_PAGINATION_ITEMS} items`
+    );
+  }
+}
+
 export type GitHubInstallationRequest = {
   id: string;
   accountId: string;
@@ -31,20 +149,44 @@ export async function fetchGitHubInstallationRequests(
   const auth = createAppAuth({ appId: credentials.appId, privateKey: credentials.privateKey });
   const { token } = await auth({ type: 'app' });
   const octokit = new Octokit({ auth: token });
-  const requests = await octokit.paginate(
-    octokit.apps.listInstallationRequestsForAuthenticatedApp,
-    {
-      per_page: 100,
-    }
-  );
 
-  return requests.map(request => ({
-    id: request.id.toString(),
-    accountId: request.account.id.toString(),
-    accountLogin: 'login' in request.account ? request.account.login : request.account.slug,
-    requesterId: request.requester?.id?.toString() ?? null,
-    requesterLogin: request.requester?.login ?? null,
-  }));
+  const perPage = 100;
+  const context = 'installation request listing';
+  const budget = new GitHubListingBudget(context);
+  try {
+    const requests: GitHubInstallationRequest[] = [];
+    let page = 1;
+
+    while (true) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.apps.listInstallationRequestsForAuthenticatedApp({
+          per_page: perPage,
+          page,
+          request: { signal: budget.signal },
+        })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
+
+      requests.push(
+        ...data.map(request => ({
+          id: request.id.toString(),
+          accountId: request.account.id.toString(),
+          accountLogin: 'login' in request.account ? request.account.login : request.account.slug,
+          requesterId: request.requester?.id?.toString() ?? null,
+          requesterLogin: request.requester?.login ?? null,
+        }))
+      );
+
+      const isLastPage = data.length < perPage;
+      if (!isLastPage) page++;
+      checkGitHubPaginationBounds(page, requests.length, context);
+      if (isLastPage) break;
+    }
+
+    return requests;
+  } finally {
+    budget.dispose();
+  }
 }
 
 /**
@@ -215,32 +357,45 @@ type GitHubBranch = {
  */
 async function listInstallationRepositories(octokit: Octokit): Promise<GitHubRepository[]> {
   const perPage = 100;
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
+  const context = 'repository listing';
+  const budget = new GitHubListingBudget(context);
 
-  while (true) {
-    const { data } = await octokit.apps.listReposAccessibleToInstallation({
-      per_page: perPage,
-      page,
-    });
+  try {
+    const repositories: GitHubRepository[] = [];
+    let page = 1;
 
-    repositories.push(
-      ...data.repositories
-        .filter(repository => !repository.archived)
-        .map(repository => ({
-          id: repository.id,
-          name: repository.name,
-          full_name: repository.full_name,
-          private: repository.private,
-          created_at: repository.created_at ?? new Date().toISOString(),
-        }))
-    );
+    while (true) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.apps.listReposAccessibleToInstallation({
+          per_page: perPage,
+          page,
+          request: { signal: budget.signal },
+        })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data.repositories)));
 
-    if (data.repositories.length < perPage) break;
-    page++;
+      repositories.push(
+        ...data.repositories
+          .filter(repository => !repository.archived)
+          .map(repository => ({
+            id: repository.id,
+            name: repository.name,
+            full_name: repository.full_name,
+            private: repository.private,
+            created_at: repository.created_at ?? new Date().toISOString(),
+          }))
+      );
+
+      const isLastPage = data.repositories.length < perPage;
+      if (!isLastPage) page++;
+      checkGitHubPaginationBounds(page, repositories.length, context);
+      if (isLastPage) break;
+    }
+
+    return repositories;
+  } finally {
+    budget.dispose();
   }
-
-  return repositories;
 }
 
 export async function fetchGitHubRepositories(
@@ -290,26 +445,39 @@ export async function fetchGitHubBranches(
   const defaultBranch = repoData.default_branch;
 
   const branches: GitHubBranch[] = [];
-  let page = 1;
   const perPage = 100;
+  const context = 'branch listing';
+  const budget = new GitHubListingBudget(context);
 
-  while (true) {
-    const { data } = await octokit.repos.listBranches({
-      owner,
-      repo,
-      per_page: perPage,
-      page,
-    });
+  try {
+    let page = 1;
 
-    branches.push(
-      ...data.map(branch => ({
-        name: branch.name,
-        isDefault: branch.name === defaultBranch,
-      }))
-    );
+    while (true) {
+      const { data } = await withListingDeadline(budget, () =>
+        octokit.repos.listBranches({
+          owner,
+          repo,
+          per_page: perPage,
+          page,
+          request: { signal: budget.signal },
+        })
+      );
+      budget.retain(Buffer.byteLength(JSON.stringify(data)));
 
-    if (data.length < perPage) break;
-    page++;
+      branches.push(
+        ...data.map(branch => ({
+          name: branch.name,
+          isDefault: branch.name === defaultBranch,
+        }))
+      );
+
+      const isLastPage = data.length < perPage;
+      if (!isLastPage) page++;
+      checkGitHubPaginationBounds(page, branches.length, context);
+      if (isLastPage) break;
+    }
+  } finally {
+    budget.dispose();
   }
 
   return branches;
@@ -1311,6 +1479,19 @@ export class GitHubRateLimitError extends Error {
 }
 
 /**
+ * Thrown when a GraphQL response body reports a top-level `errors` list or
+ * omits data the caller asked for. GitHub answers those with HTTP 200, so
+ * without this the failed read would look like a definite answer and callers
+ * would store it as one.
+ */
+export class GitHubGraphQlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GitHubGraphQlError';
+  }
+}
+
+/**
  * Thrown when GitHub rejects the App credentials with a 401 on the
  * installation-token mint in {@link getCollaboratorPermissionLevel}. A mint
  * 401 means the App ID or private key Kilo configured is not accepted, a
@@ -1420,6 +1601,45 @@ export function toGitHubRateLimitError(error: unknown): GitHubRateLimitError | n
   if (error instanceof GitHubRateLimitError) return error;
   if (!isGitHubRateLimitError(error)) return null;
   return new GitHubRateLimitError(parseRateLimitResetAt(error));
+}
+
+// GraphQL reports rate limiting in a HTTP 200 body; scan every entry because
+// the limiting error is not guaranteed to be first.
+const GRAPHQL_RATE_LIMIT_CODES = new Set([
+  'RATE_LIMITED',
+  'SECONDARY_RATE_LIMIT',
+  'ABUSE_DETECTION',
+]);
+
+export const graphQlEnvelopeSchema = z.object({
+  data: z.unknown().optional(),
+  errors: z.array(z.unknown()).optional(),
+});
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+export function isRateLimitGraphQlError(entry: unknown): boolean {
+  if (!isRecord(entry)) return false;
+  const codes: unknown[] = [entry.type];
+  if (isRecord(entry.extensions)) codes.push(entry.extensions.code);
+  return codes.some(
+    code => typeof code === 'string' && GRAPHQL_RATE_LIMIT_CODES.has(code.toUpperCase())
+  );
+}
+
+/**
+ * GraphQL answers rate limits with HTTP 200, so there are no rate headers to
+ * classify. Reuse the adapter's header parser against a synthetic 429 carrying
+ * the response's actual headers to keep one deadline rule.
+ */
+export function graphQlRateLimitError(headers: unknown): GitHubRateLimitError | null {
+  return toGitHubRateLimitError({
+    status: 429,
+    message: 'GitHub GraphQL rate limit',
+    response: { headers },
+  });
 }
 
 /**
@@ -1685,6 +1905,12 @@ function normalizeReviewDecision(decision: string | null | undefined): ReviewDec
   }
 }
 
+const reviewDecisionEntrySchema = z
+  .object({
+    pullRequest: z.object({ reviewDecision: z.string().nullable() }).nullable(),
+  })
+  .nullable();
+
 /** Largest PR number GitHub's GraphQL `Int` argument can carry. */
 const GRAPHQL_INT_MAX = 2_147_483_647;
 
@@ -1717,15 +1943,20 @@ type ReviewDecisionQueryEntry = {
 /**
  * Fetches `reviewDecision` for multiple PRs in a single aliased GraphQL query.
  * All PRs must belong to the same installation (one token is generated).
- * Returns a Map from alias → ReviewDecision|null. Entries that are not
- * actionable (see {@link isActionableReviewDecisionInput}) are absent from the
- * Map, which callers read as "no review decision".
+ * Returns a Map from alias → ReviewDecision|null, where `null` means GitHub
+ * definitively reported no review decision. Entries that are not actionable
+ * (see {@link isActionableReviewDecisionInput}) are absent from the Map, which
+ * callers read as "no review decision".
  *
  * Repository coordinates and PR numbers cross the GraphQL boundary as
  * operation variables, so the document text holds only fixed literals and the
  * generated `pr<N>` aliases.
  *
- * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ * @throws {GitHubGraphQlError} when GitHub's response reports errors or does
+ *   not carry a decision for every requested PR, so a failed read is never
+ *   returned as a definite `null`.
+ * @throws {GitHubRateLimitError} on a GraphQL rate limit or a 403 secondary
+ *   rate limit.
  */
 export async function fetchBatchedReviewDecisions(args: {
   installationId: string;
@@ -1766,18 +1997,42 @@ export async function fetchBatchedReviewDecisions(args: {
   });
 
   try {
-    const response = (await octokit.request('POST /graphql', {
+    const response = await octokit.request('POST /graphql', {
       query: `query(${variableDeclarations}) {\n${fields}\n}`,
       variables,
-    })) as {
-      data: {
-        data: Record<string, { pullRequest: { reviewDecision: string | null } | null } | null>;
-      };
-    };
+    });
+
+    const body = graphQlEnvelopeSchema.safeParse(response.data);
+    if (!body.success) {
+      throw new GitHubGraphQlError(
+        'GitHub returned an invalid GraphQL response for review decisions'
+      );
+    }
+    if (body.data.errors && body.data.errors.length > 0) {
+      if (body.data.errors.some(isRateLimitGraphQlError)) {
+        const rateError = graphQlRateLimitError(response.headers);
+        if (rateError) throw rateError;
+      }
+      throw new GitHubGraphQlError('GitHub reported errors while reading review decisions');
+    }
+    const data = body.data.data;
+    if (!isRecord(data)) {
+      throw new GitHubGraphQlError('GitHub did not return review decision data');
+    }
 
     for (const { callerAlias, fieldAlias } of entries) {
-      const repoData = response.data.data?.[fieldAlias];
-      result.set(callerAlias, normalizeReviewDecision(repoData?.pullRequest?.reviewDecision));
+      if (!(fieldAlias in data)) {
+        throw new GitHubGraphQlError(
+          'GitHub did not return a review decision for every requested pull request'
+        );
+      }
+      const entry = reviewDecisionEntrySchema.safeParse(data[fieldAlias]);
+      if (!entry.success) {
+        throw new GitHubGraphQlError(
+          'GitHub returned an invalid GraphQL response for review decisions'
+        );
+      }
+      result.set(callerAlias, normalizeReviewDecision(entry.data?.pullRequest?.reviewDecision));
     }
     return result;
   } catch (error) {
@@ -1789,10 +2044,13 @@ export async function fetchBatchedReviewDecisions(args: {
 
 /**
  * Fetches the rolled-up `reviewDecision` for a single PR via GitHub's GraphQL API.
- * Returns lowercase values matching our DB enum, or `null` when GitHub returns
- * null (no required reviewers and no review submitted yet). A coordinate or PR
- * number that is not actionable yields `null` without any request.
- * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ * Returns lowercase values matching our DB enum, or `null` only when GitHub
+ * definitively reports null (no required reviewers and no review submitted
+ * yet). A coordinate or PR number that is not actionable yields `null` without
+ * any request.
+ * @throws {GitHubGraphQlError} when the read did not complete.
+ * @throws {GitHubRateLimitError} on a GraphQL rate limit or a 403 secondary
+ *   rate limit.
  */
 export async function fetchPullRequestReviewDecision(args: {
   installationId: string;

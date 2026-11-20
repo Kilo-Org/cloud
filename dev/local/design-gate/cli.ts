@@ -5,7 +5,7 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
-import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
+import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import {
   compareProof,
   prepareProof,
@@ -113,6 +113,7 @@ export type CliArgs =
 export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
   run    --link <deeplink> [--link ...] [--targets <file>] [--matrix base|standard|full] [--cell <id> ...] [--observe-ms ${DEFAULT_OBSERVE_MS}]
          --cell adds a cell to the preset (${CELL_IDS.join(', ')}); font-max sets the largest text size and restores it after the run
+         On iOS, landscape rotates the simulator and fails when the display did not flip; compact needs an iPhone SE or mini (--device).
   scan   [--source probe|uiautomator|agent-device] [--session <agent-device session>]   waits for a settled layout on the accessibility sources
   motion --link <deeplink> [--tap <text|testID|label>] [--seconds 3] [--observe-ms ${DEFAULT_OBSERVE_MS}]   exit 1 on an interaction layout shift
   prepare --base <exact-40hex> --head <exact-40hex> --targets <proof-manifest.json> --out <new-dir>
@@ -339,7 +340,9 @@ export function resolveTargets(
   links: readonly string[],
   targetsJson: string | undefined
 ): Target[] {
-  const entries: { id?: string; link: string; after?: string }[] = links.map(link => ({ link }));
+  const entries: { id?: string; link: string; after?: string; hold?: boolean }[] = links.map(
+    link => ({ link })
+  );
   if (targetsJson !== undefined) {
     const parsed: unknown = JSON.parse(targetsJson);
     const list =
@@ -353,15 +356,24 @@ export function resolveTargets(
         entries.push({ link: entry });
         continue;
       }
-      const { id, name, link, after } = (
+      const { id, name, link, after, hold } = (
         typeof entry === 'object' && entry !== null ? entry : {}
       ) as Record<string, unknown>;
       if (typeof link !== 'string')
         throw new UsageError('Every --targets entry needs a string link');
       if (after !== undefined && typeof after !== 'string')
         throw new UsageError('A --targets entry after must be a string link');
+      if (hold !== undefined && typeof hold !== 'boolean')
+        throw new UsageError('A --targets entry hold must be true or false');
+      if (hold === true && after === undefined)
+        throw new UsageError('A held target needs an after link to release it');
       const explicit = typeof id === 'string' ? id : typeof name === 'string' ? name : undefined;
-      entries.push({ id: explicit, link, ...(after === undefined ? {} : { after }) });
+      entries.push({
+        id: explicit,
+        link,
+        ...(after === undefined ? {} : { after }),
+        ...(hold === true ? { hold: true } : {}),
+      });
     }
   }
   const seen = new Map<string, number>();
@@ -373,6 +385,7 @@ export function resolveTargets(
       id: count === 1 ? base : `${base}-${count}`,
       link: entry.link,
       ...(entry.after === undefined ? {} : { after: entry.after }),
+      ...(entry.hold === true ? { hold: true } : {}),
     };
   });
 }
@@ -631,6 +644,11 @@ async function scanOutcome(
   screenshot.completedMs = deps.clock.now() - started;
   const after = await readTree();
   const image = readRgba(files.absolute(files.screenshot), deps.exec);
+  const scaled = withScreenshotScale(dump, image.width);
+  if (scaled !== dump) {
+    dump = scaled;
+    writeJson(files.absolute(files.dump), dump);
+  }
   const alignment = captureAlignment(
     before,
     screenshot,

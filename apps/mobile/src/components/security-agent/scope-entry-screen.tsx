@@ -67,7 +67,7 @@ function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
   const scopeTitle = useSecurityScopeTitle(scope);
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={scopeTitle} eyebrow={t('common.securityAgent')} />
+      <ScreenHeader title={t('common.securityAgent')} subtitle={scopeTitle} />
       <ScopeEntryBodySkeleton />
     </View>
   );
@@ -219,8 +219,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (view === 'denied') {
     return (
       <ScopeAccessDeniedScreen
-        title={scopeTitle}
-        eyebrow={t('common.securityAgent')}
+        title={t('common.securityAgent')}
+        subtitle={scopeTitle}
         kind={access === 'not-found' ? 'not-found' : 'denied'}
         onRetry={() => void recovery.retry()}
         isRetrying={recovery.isRetrying}
@@ -280,8 +280,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     });
     return (
       <PlatformErrorScreen
-        title={scopeTitle}
-        eyebrow={t('common.securityAgent')}
+        title={t('common.securityAgent')}
+        subtitle={scopeTitle}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
         variant={failure.variant}
         message={failure.descriptionKey ? t(failure.descriptionKey) : undefined}
@@ -305,12 +305,18 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // A failed or pending mount-time mint keeps this setup screen up; the
       // button resolves (re-mints) the URL on press. An error-only page here
       // made the landing permanently unusable on a transient backend failure.
+      //
+      // The audit action resolves after the capability read, so the band is
+      // reserved at its height from the first frame: the icon cannot grow the
+      // header when it lands.
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            title={scopeTitle}
-            eyebrow={t('common.securityAgent')}
+            title={t('common.securityAgent')}
+            subtitle={scopeTitle}
             headerRight={auditAction}
+            headerRightWidth={48}
+            reserveHeaderRightSpace
           />
           {!connectUrl && isMinting ? (
             <ScopeEntryBodySkeleton />
@@ -348,9 +354,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            title={scopeTitle}
-            eyebrow={t('common.securityAgent')}
+            title={t('common.securityAgent')}
+            subtitle={scopeTitle}
             headerRight={auditAction}
+            headerRightWidth={48}
+            reserveHeaderRightSpace
           />
           {!reauthUrl && !connectUrl && isMinting ? (
             <ScopeEntryBodySkeleton />

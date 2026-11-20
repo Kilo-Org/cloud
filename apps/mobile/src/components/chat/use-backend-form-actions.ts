@@ -6,8 +6,10 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { checkBackendConnection, discoverBackendModels } from '@/lib/chat/backend-request';
 import {
   BACKEND_INPUT_ERROR_KEYS,
+  BACKEND_REQUEST_ERROR_KEYS,
   BackendInputError,
   type BackendModel,
+  BackendRequestError,
   type ChatBackendDraft,
 } from '@/lib/chat/backend-store';
 import { normalizeBackendUrl } from '@/lib/chat/backend-url';
@@ -63,6 +65,8 @@ export function useBackendFormActions({
       return;
     }
     let allowLocalHttp = approved;
+    // The catch needs the signal to tell a cancel from a failure.
+    const controller = new AbortController();
     try {
       assertBackendTransport(fields.current.baseUrl);
       if (
@@ -76,7 +80,6 @@ export function useBackendFormActions({
         onSave(backendDraftFromFields(fields.current, allowLocalHttp));
         return;
       }
-      const controller = new AbortController();
       pending.current?.abort();
       pending.current = controller;
       setBusy(true);
@@ -99,7 +102,19 @@ export function useBackendFormActions({
         }
       }
     } catch (error) {
-      if (error instanceof BackendInputError && error.problem === 'httpApprovalRequired') {
+      // A newer attempt aborted this controller: the outcome is no longer this
+      // attempt's to report. The epoch check above the try already answers for
+      // a changed account, so a stale attempt keeps its own staleBackend status.
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (error instanceof BackendRequestError) {
+        // A caller cancel has no copy, because nothing renders it.
+        if (error.problem === 'cancelled') {
+          return;
+        }
+        setStatus(BACKEND_REQUEST_ERROR_KEYS[error.problem]);
+      } else if (error instanceof BackendInputError && error.problem === 'httpApprovalRequired') {
         const endpoint = normalizeBackendUrl(fields.current.baseUrl, true);
         const requestedUrl = fields.current.baseUrl;
         Alert.alert(
@@ -122,15 +137,16 @@ export function useBackendFormActions({
           // unapproved and the caller keeps the failure status.
           { cancelable: true }
         );
+      } else if (error instanceof BackendInputError) {
+        setStatus(BACKEND_INPUT_ERROR_KEYS[error.problem]);
       } else {
-        setStatus(
-          error instanceof BackendInputError
-            ? BACKEND_INPUT_ERROR_KEYS[error.problem]
-            : FAILURE_KEYS[action]
-        );
+        setStatus(FAILURE_KEYS[action]);
       }
     } finally {
-      setBusy(false);
+      // A superseded attempt must not clear the newer attempt's busy state.
+      if (pending.current === controller) {
+        setBusy(false);
+      }
     }
   }
 

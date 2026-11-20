@@ -52,6 +52,7 @@ const RuntimeSkillFilesContractSchema = z
         pathInvalidCharacters: path => `Skill file path rejected: ${path}`,
         pathRejected: path => `Skill file path rejected: ${path}`,
         manifestInFiles: 'SKILL.md must be passed as rawMarkdown, not inside files',
+        duplicatePath: path => `Skill companion file path duplicates another file: ${path}`,
         fileTooLarge: () =>
           overLimitMessage(
             'Skill companion file',
@@ -132,11 +133,7 @@ export const RuntimeAgentContractSchema = z.object({
     }),
 });
 
-/**
- * Every kilo command field the runtime contract accepts. The schema below is
- * built from this map, and the import derives its allowed field sets from the
- * same keys, so a field added here is a field the import can carry.
- */
+/** Every kilo command field the runtime contract accepts. */
 const RUNTIME_KILO_COMMAND_SHAPE = {
   name: z
     .string()

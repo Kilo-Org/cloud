@@ -49,6 +49,16 @@ export function isRetriggerableReviewStatus(status: string): boolean {
   return isCodeReviewStatus(status) && RETRIGGERABLE_STATUSES.has(status);
 }
 
+// A cancelled review whose `terminal_reason` is `superseded` was replaced by a
+// newer commit, so there is no head to re-review and the server refuses the
+// retry. The Retry control must not be offered for it.
+export function canRetriggerReview(review: {
+  status: string;
+  terminal_reason: string | null | undefined;
+}): boolean {
+  return isRetriggerableReviewStatus(review.status) && review.terminal_reason !== 'superseded';
+}
+
 export function hasInFlightReview(reviews: readonly { status: string }[]): boolean {
   return reviews.some(review => isInFlightReviewStatus(review.status));
 }

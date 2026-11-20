@@ -1,5 +1,6 @@
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
-import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
 
 export type NewSessionPrefillParams = {

@@ -61,6 +61,21 @@ function contentChunksOf(content: unknown): unknown[] {
  * `thinking` chunk instead. */
 const MESSAGE_REASONING_FIELDS = ['reasoning_details', 'reasoning_content', 'reasoning'];
 
+/** The effort the Mistral thinking transform sends when the request carries none. */
+const MISTRAL_DEFAULT_REASONING_EFFORT = 'high';
+
+/**
+ * Sets the effort the Mistral thinking transform would otherwise default to, so that steps
+ * before it, such as a custom LLM's `reasoning_effort_map`, see the effort Mistral receives.
+ */
+export function applyMistralDefaultReasoningEffort(request: GatewayRequest) {
+  if (request.kind !== 'chat_completions' || isReasoningExplicitlyDisabled(request)) return;
+  const body = request.body;
+  if ((body.reasoning?.effort ?? body.reasoning_effort) == null) {
+    body.reasoning_effort = MISTRAL_DEFAULT_REASONING_EFFORT;
+  }
+}
+
 /**
  * Inverse of the Mistral thinking response transform, for Mistral's Chat Completions API:
  * replays assistant reasoning as the `thinking` content chunk Mistral expects back and carries
@@ -71,10 +86,9 @@ export function applyMistralThinkingRequestTransform(request: GatewayRequest) {
   if (request.kind !== 'chat_completions') return;
   const body = request.body;
   // Mistral reasons only when asked to, while OpenRouter's reasoning models reason by default.
-  body.reasoning_effort =
-    isReasoningExplicitlyDisabled(request) || body.reasoning?.enabled === false
-      ? 'none'
-      : (body.reasoning?.effort ?? body.reasoning_effort ?? 'high');
+  body.reasoning_effort = isReasoningExplicitlyDisabled(request)
+    ? 'none'
+    : (body.reasoning?.effort ?? body.reasoning_effort ?? MISTRAL_DEFAULT_REASONING_EFFORT);
   delete body.reasoning;
 
   for (const message of body.messages) {

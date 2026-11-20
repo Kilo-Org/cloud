@@ -89,6 +89,7 @@ describe('adminGatewayConfigRouter', () => {
       experimental_byok: [organizationId.toUpperCase()],
       enkrypt_output_guardrail: [organizationId.toUpperCase()],
       gateway_settings: [organizationId],
+      org_permission_policy: [organizationId.toUpperCase()],
     });
     await caller.admin.gatewayConfig.set(input);
 
@@ -96,10 +97,36 @@ describe('adminGatewayConfigRouter', () => {
       experimental_byok: [organizationId],
       enkrypt_output_guardrail: [organizationId],
       gateway_settings: [organizationId],
+      org_permission_policy: [organizationId],
     });
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
       vercel_routing_opt_out_models: normalizedOptOutModels,
     });
+  });
+
+  it('preserves the permission-policy allowlist when an older client omits it', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+
+    await caller.admin.gatewayConfig.setOrganizationFeatures({
+      experimental_byok: [],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+      org_permission_policy: [organizationId],
+    });
+    const saved = await caller.admin.gatewayConfig.setOrganizationFeatures({
+      experimental_byok: [organizationId],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+    });
+
+    expect(saved).toEqual({
+      experimental_byok: [organizationId],
+      enkrypt_output_guardrail: [],
+      gateway_settings: [],
+      org_permission_policy: [organizationId],
+    });
+    await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toEqual(saved);
   });
 
   it('keeps the routing configuration when organization features are saved', async () => {
@@ -110,6 +137,7 @@ describe('adminGatewayConfigRouter', () => {
       experimental_byok: [],
       enkrypt_output_guardrail: [],
       gateway_settings: ['00000000-0000-4000-8000-000000000001'],
+      org_permission_policy: [],
     });
 
     await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
@@ -126,6 +154,7 @@ describe('adminGatewayConfigRouter', () => {
         experimental_byok: ['not-an-id'],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
+        org_permission_policy: [],
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);
@@ -141,6 +170,7 @@ describe('adminGatewayConfigRouter', () => {
         experimental_byok: [first.id.toUpperCase(), first.id],
         enkrypt_output_guardrail: [first.id, second.id],
         gateway_settings: [first.id.toUpperCase(), second.id.toUpperCase(), second.id],
+        org_permission_policy: [second.id],
       });
 
       expect(preview).toHaveLength(2);
@@ -163,6 +193,7 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [crypto.randomUUID()],
           enkrypt_output_guardrail: [],
           gateway_settings: [organization.id, crypto.randomUUID()],
+          org_permission_policy: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: false }]);
     });
@@ -180,6 +211,7 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [organization.id],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
+          org_permission_policy: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: true }]);
     });
@@ -192,47 +224,54 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
+          org_permission_policy: [],
         })
       ).resolves.toEqual([]);
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
     });
 
-    it.each(['experimental_byok', 'enkrypt_output_guardrail', 'gateway_settings'] as const)(
-      'rejects invalid IDs in %s without writing configuration',
-      async feature => {
-        const caller = await createCallerForUser(admin.id);
+    it.each([
+      'experimental_byok',
+      'enkrypt_output_guardrail',
+      'gateway_settings',
+      'org_permission_policy',
+    ] as const)('rejects invalid IDs in %s without writing configuration', async feature => {
+      const caller = await createCallerForUser(admin.id);
 
-        await expect(
-          caller.admin.gatewayConfig.previewOrganizationFeatures({
-            experimental_byok: [],
-            enkrypt_output_guardrail: [],
-            gateway_settings: [],
-            [feature]: ['not-an-id'],
-          })
-        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-        expect(await db.select().from(ai_gateway_config)).toEqual([]);
-      }
-    );
+      await expect(
+        caller.admin.gatewayConfig.previewOrganizationFeatures({
+          experimental_byok: [],
+          enkrypt_output_guardrail: [],
+          gateway_settings: [],
+          org_permission_policy: [],
+          [feature]: ['not-an-id'],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
 
-    it.each(['experimental_byok', 'enkrypt_output_guardrail', 'gateway_settings'] as const)(
-      'rejects more than 1000 entries in %s before deduplication',
-      async feature => {
-        const caller = await createCallerForUser(admin.id);
+    it.each([
+      'experimental_byok',
+      'enkrypt_output_guardrail',
+      'gateway_settings',
+      'org_permission_policy',
+    ] as const)('rejects more than 1000 entries in %s before deduplication', async feature => {
+      const caller = await createCallerForUser(admin.id);
 
-        await expect(
-          caller.admin.gatewayConfig.previewOrganizationFeatures({
-            experimental_byok: [],
-            enkrypt_output_guardrail: [],
-            gateway_settings: [],
-            [feature]: Array.from(
-              { length: ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT + 1 },
-              () => '9d278969-5453-4ae3-a51f-a8d2274a7b56'
-            ),
-          })
-        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-        expect(await db.select().from(ai_gateway_config)).toEqual([]);
-      }
-    );
+      await expect(
+        caller.admin.gatewayConfig.previewOrganizationFeatures({
+          experimental_byok: [],
+          enkrypt_output_guardrail: [],
+          gateway_settings: [],
+          org_permission_policy: [],
+          [feature]: Array.from(
+            { length: ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT + 1 },
+            () => '9d278969-5453-4ae3-a51f-a8d2274a7b56'
+          ),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
 
     it('leaves existing routing configuration and organization features unchanged', async () => {
       const caller = await createCallerForUser(admin.id);
@@ -242,6 +281,7 @@ describe('adminGatewayConfigRouter', () => {
         experimental_byok: [],
         enkrypt_output_guardrail: [],
         gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+        org_permission_policy: [],
       });
       const beforePreview = await db.select().from(ai_gateway_config);
 
@@ -250,6 +290,7 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [organization.id],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
+          org_permission_policy: [],
         })
       ).resolves.toEqual([{ id: organization.id, name: organization.name, isDeleted: false }]);
 
@@ -266,6 +307,7 @@ describe('adminGatewayConfigRouter', () => {
           experimental_byok: [organization.id],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
+          org_permission_policy: [],
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
@@ -438,6 +480,7 @@ describe('adminGatewayConfigRouter', () => {
         experimental_byok: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [organizationId],
+        org_permission_policy: [],
       });
       await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
 

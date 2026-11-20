@@ -36,7 +36,12 @@ const buttons = vi.hoisted(() => ({
 }));
 
 const screenHeaders = vi.hoisted(() => ({
-  rendered: [] as { eyebrow?: string; reserveEyebrow?: boolean; eyebrowPlaceholder?: unknown }[],
+  rendered: [] as {
+    subtitle?: string;
+    reserveSubtitle?: boolean;
+    subtitlePlaceholder?: unknown;
+    titleAccessory?: unknown;
+  }[],
 }));
 
 const viewRenders = vi.hoisted(() => ({
@@ -122,6 +127,10 @@ vi.mock('expo-haptics', () => ({
 vi.mock('@kilocode/app-shared/code-review', () => ({
   isCancellableReviewStatus: () => statusHelpers.cancellable,
   isRetriggerableReviewStatus: () => statusHelpers.retriggerable,
+  // Mirrors the real predicate exactly (`packages/app-shared/src/code-review/status.ts`),
+  // so the superseded case exercises the real rule rather than a stub.
+  canRetriggerReview: (review: { status: string; terminal_reason?: string | null }) =>
+    statusHelpers.retriggerable && review.terminal_reason !== 'superseded',
   isInFlightReviewStatus: (status: string) =>
     status === 'pending' || status === 'queued' || status === 'running',
 }));
@@ -149,12 +158,15 @@ vi.mock('@/components/query-error', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: {
-    eyebrow?: string;
-    reserveEyebrow?: boolean;
-    eyebrowPlaceholder?: unknown;
+    subtitle?: string;
+    reserveSubtitle?: boolean;
+    subtitlePlaceholder?: unknown;
+    titleAccessory?: unknown;
   }) => {
     screenHeaders.rendered.push(props);
-    return null;
+    // The real header paints the accessory on the title line, so the stub does
+    // too: a test that asserts what the screen states must see that text.
+    return props.titleAccessory ?? null;
   },
 }));
 vi.mock('@/components/ui/button', () => ({
@@ -388,7 +400,7 @@ beforeEach(() => {
 });
 
 describe('ReviewDetailScreen outcome-first order', () => {
-  it('leads with conclusion, then findings, council, gate, then metadata', () => {
+  it('leads with the conclusion in the header, then findings, council, gate, then metadata', () => {
     detail.data = {
       success: true,
       review: makeReview({
@@ -411,8 +423,11 @@ describe('ReviewDetailScreen outcome-first order', () => {
 
     const texts = renderScreen();
 
+    // The outcome leads: the header badge is the first thing the screen states,
+    // ahead of the pull-request title and every section below it.
     const idx = (marker: string) => texts.indexOf(marker);
     expect(idx('Completed')).toBeGreaterThanOrEqual(0);
+    expect(idx('Fix login')).toBeGreaterThan(idx('Completed'));
     expect(idx('Findings')).toBeGreaterThan(idx('Completed'));
     expect(idx('Council')).toBeGreaterThan(idx('Findings'));
     expect(idx('Gate')).toBeGreaterThan(idx('Council'));
@@ -420,7 +435,7 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(texts).toContain('$123.00');
   });
 
-  it('states the review status once, above the findings', () => {
+  it('states the review status once, on the header line, and never in a section', () => {
     detail.data = {
       success: true,
       review: makeReview({ status: 'completed', completed_at: '2024-01-01T00:05:00.000Z' }),
@@ -428,13 +443,16 @@ describe('ReviewDetailScreen outcome-first order', () => {
     };
 
     const texts = renderScreen();
+
+    // The status is the header's accessory, so the header owns the word and no
+    // block in the body re-labels the outcome by hand.
+    expect(screenHeaders.rendered).toHaveLength(1);
+    expect(screenHeaders.rendered[0]?.titleAccessory).toBeTruthy();
+
     const findingsIndex = texts.indexOf('Findings');
     const detailsIndex = texts.indexOf('Details');
     expect(findingsIndex).toBeGreaterThanOrEqual(0);
     expect(detailsIndex).toBeGreaterThan(findingsIndex);
-
-    // The conclusion above the findings owns the status word; the council and
-    // gate cards never repeat it.
     expect(texts.slice(0, findingsIndex)).toContain('Completed');
     expect(texts.slice(findingsIndex, detailsIndex)).not.toContain('Completed');
   });
@@ -1047,7 +1065,7 @@ describe('ReviewDetailScreen error states', () => {
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
   });
 
-  it('keeps the eyebrow line it reserved while loading through a failed read', () => {
+  it('keeps the subtitle line it reserved while loading through a failed read', () => {
     detail.isError = true;
     detail.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     detail.data = null;
@@ -1059,9 +1077,9 @@ describe('ReviewDetailScreen error states', () => {
     // Nothing paints over the line while no read runs, so the header stops
     // pulsing as soon as the failure lands.
     expect(screenHeaders.rendered).toHaveLength(1);
-    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.subtitle).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeUndefined();
   });
 
   it('reserves the line with the placeholder bar while the read runs', () => {
@@ -1070,23 +1088,23 @@ describe('ReviewDetailScreen error states', () => {
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
+    expect(screenHeaders.rendered[0]?.subtitle).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeTruthy();
   });
 
-  it('keeps the eyebrow line through a not-found answer', () => {
+  it('keeps the subtitle line through a not-found answer', () => {
     detail.isError = true;
     detail.error = { data: { code: 'NOT_FOUND' } };
     detail.data = null;
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeUndefined();
   });
 
-  it('paints the review repository on the eyebrow line once the read answers', () => {
+  it('paints the review repository on the subtitle line once the read answers', () => {
     detail.data = {
       success: true,
       review: makeReview(),
@@ -1095,8 +1113,8 @@ describe('ReviewDetailScreen error states', () => {
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.eyebrow).toBe('org/repo');
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(false);
+    expect(screenHeaders.rendered[0]?.subtitle).toBe('org/repo');
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
   });
 });
 
@@ -1752,6 +1770,32 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
 
     expect(labels).toContain('Retry review');
     expect(labels).not.toContain('Fix settings');
+  });
+
+  it('offers no Retry for a review a newer commit replaced', () => {
+    // A manual review always qualifies for Retry through its own config, so this
+    // isolates the superseded rule: only the terminal reason may remove the button.
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview({
+      status: 'cancelled',
+      manual_config: { agentConfig: {} },
+      terminal_reason: 'superseded',
+    });
+
+    expect(labels).not.toContain('Retry review');
+  });
+
+  it('keeps Retry for a cancelled review the user stopped', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview({
+      status: 'cancelled',
+      manual_config: { agentConfig: {} },
+      terminal_reason: 'user_cancelled',
+    });
+
+    expect(labels).toContain('Retry review');
   });
 
   it('shows neither control while the config loads', () => {

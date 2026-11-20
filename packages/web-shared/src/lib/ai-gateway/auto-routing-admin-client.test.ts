@@ -61,6 +61,7 @@ describe('auto routing admin client', () => {
       'https://auto-routing.example.com/admin/classifier-model',
       {
         method: 'GET',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
         },
@@ -81,6 +82,7 @@ describe('auto routing admin client', () => {
       'https://auto-routing.example.com/admin/classifier-model',
       {
         method: 'PUT',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
@@ -103,6 +105,7 @@ describe('auto routing admin client', () => {
       'https://auto-routing.example.com/admin/classifier-model',
       {
         method: 'PUT',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
@@ -125,6 +128,7 @@ describe('auto routing admin client', () => {
       'https://auto-routing.example.com/admin/classifier-analytics?period=7d',
       {
         method: 'GET',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
         },
@@ -155,6 +159,7 @@ describe('platform routing mode admin client', () => {
         `https://auto-routing.example.com/admin/routing-mode?${new URLSearchParams(owner)}`,
         {
           method: 'GET',
+          signal: expect.any(AbortSignal),
           headers: { authorization: `Bearer ${INTERNAL_API_SECRET}` },
         }
       );
@@ -181,6 +186,7 @@ describe('platform routing mode admin client', () => {
         'https://auto-routing.example.com/admin/routing-mode',
         {
           method: 'PUT',
+          signal: expect.any(AbortSignal),
           headers: {
             authorization: `Bearer ${INTERNAL_API_SECRET}`,
             'content-type': 'application/json',

@@ -17,6 +17,7 @@ const organizationCaller: GatewayCaller = {
   kind: 'signed-in',
   user: { id: 'user-1' } as User,
   organizationId: 'org-1',
+  cloudAgentRuntimeProxied: false,
 };
 
 const inputGuardrail: OrganizationSettings = {

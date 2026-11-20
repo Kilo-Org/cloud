@@ -203,14 +203,14 @@ describe('review window', () => {
     });
   });
 
-  it('keeps the Vercel cron cadence equal to the bucket width', () => {
+  it('keeps the Vercel schedule cadence equal to the bucket width', () => {
     const config = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'vercel.json'), 'utf8')) as {
-      crons: { path: string; schedule: string }[];
+      schedules: Record<string, { path: string; schedule: string }>;
     };
-    const cronSchedule = config.crons.find(
-      cron => cron.path === '/api/cron/code-review-outcome-aggregate'
+    const schedule = Object.values(config.schedules).find(
+      entry => entry.path === '/api/cron/code-review-outcome-aggregate'
     )?.schedule;
-    expect(cronSchedule).toBe(`*/${REVIEW_BUCKET_MINUTES} * * * *`);
+    expect(schedule).toBe(`*/${REVIEW_BUCKET_MINUTES} * * * *`);
   });
 });
 

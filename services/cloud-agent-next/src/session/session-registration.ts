@@ -209,6 +209,15 @@ function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
+  if (
+    Object.keys(input.profile?.resolved?.networkSecrets ?? {}).length > 0 &&
+    allocation.sandboxProvider !== 'cloudflare-containers'
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Network secrets require a Cloudflare sandbox',
+    });
+  }
   const request = input.runtime ?? {};
   const provider = allocation.sandboxProvider;
   if (egressRequestSupported(provider, request)) return;
@@ -977,6 +986,11 @@ async function issueSessionRuntimeAuthorization(
       token: created.token,
       seal: await sealRuntimeAuthorization(created.authorization, nextAuthSecret),
     };
+    // Only a model the caller's organization catalogue makes available may serve a
+    // session. This create-time check answers that for a prompt turn, which carries
+    // the model in this request. The AI gateway enforces the same requirement for
+    // the session at inference time (`resolveProviderAndPolicy` ->
+    // `getEffectiveModelDecision`), before any upstream request.
     if (initialTurn?.type === 'prompt') {
       await assertKiloModelAvailable({
         env: ctx.env,

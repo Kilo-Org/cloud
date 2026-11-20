@@ -91,6 +91,7 @@ import {
   type PartnerCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
+import { withReasoningEffortMap } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-effort-map';
 import {
   buildDirectProvider,
   type DirectUpstreamAuth,
@@ -395,8 +396,8 @@ function providerSettingsAllowPartner(
  * `reasoning-content` and `reasoning` transforms drop the `reasoning` object and forward only its
  * effort, behind an existing `reasoning_effort`, so `reasoning.enabled: false` does not reach the
  * upstream there and `reasoning_effort` wins over `reasoning.effort`. Null when the request
- * carries no effort, even though `mistral-thinking` then sends `high`: the partner is not skipped
- * for an effort the client did not choose.
+ * carries no effort, even though `mistral-thinking` then sends `high`, after
+ * `reasoning_effort_map`: the partner is not skipped for an effort the client did not choose.
  */
 function getUpstreamReasoningEffort(
   request: GatewayRequest,
@@ -408,15 +409,19 @@ function getUpstreamReasoningEffort(
   if (replacesReasoningObject && request.kind === 'chat_completions') {
     const effort = request.body.reasoning_effort ?? request.body.reasoning?.effort;
     if (effort) return effort;
-    return isReasoningExplicitlyDisabled(request) ? 'none' : null;
+    // The transform drops the reasoning object, so a disable inside it never reaches the upstream.
+    const disabledOutsideReasoningObject =
+      request.body.enable_thinking === false || request.body.thinking?.type === 'disabled';
+    return disabledOutsideReasoningObject ? 'none' : null;
   }
-  const disabledByReasoningObject =
-    request.kind === 'chat_completions' && request.body.reasoning?.enabled === false;
-  if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
+  if (isReasoningExplicitlyDisabled(request)) return 'none';
   return getReasoningEffort(request);
 }
 
-/** Whether the partner declares its supported efforts and the request asks for one it lacks. */
+/**
+ * Whether the partner declares its supported efforts and the request asks for one it lacks, once
+ * the definition's `reasoning_effort_map` has rewritten it.
+ */
 function requestsUnsupportedReasoningEffort(
   partner: PartnerCustomLlm,
   request: GatewayRequest
@@ -425,7 +430,10 @@ function requestsUnsupportedReasoningEffort(
   const supported = getSupportedReasoningEfforts(definition.opencode_settings?.reasoning_options);
   if (!supported) return false;
   const effort = ReasoningEffortSchema.safeParse(
-    getUpstreamReasoningEffort(request, definition.reasoning_details_transform)
+    getUpstreamReasoningEffort(
+      withReasoningEffortMap(request, definition.reasoning_effort_map),
+      definition.reasoning_details_transform
+    )
   );
   return effort.success && !supported.has(effort.data);
 }

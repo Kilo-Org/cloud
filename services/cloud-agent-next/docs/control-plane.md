@@ -69,6 +69,63 @@ the adapter's optional members, because a stub adapter has none.
 
 ## 3. Topology and identities
 
+### Network secrets
+
+Environment and profile rows can use `delivery: 'network'`. Existing rows keep `env` delivery.
+Network values store `{ "network": <RSA+AES envelope> }`, not an ordinary envelope.
+Older Workers reject this wrapper instead of delivering plaintext during a rollout or rollback.
+The profile merge carries encrypted `networkSecrets` separately from environment values.
+Only Cloudflare Containers can prepare a workspace with network secrets. Other providers fail
+with `Network secrets require a Cloudflare sandbox`; no plaintext fallback exists.
+
+The Sandbox DO stores one encrypted network-secret snapshot per workspace scope in
+`network_secret_snapshots`. Each entry has a `kcp1` alias with purpose `secret`.
+Allocation changes retire active grants, not this snapshot. Reissued grants reuse its aliases.
+Route release keeps the snapshot. Workspace or standalone session deletion removes it.
+The spec and wrapper receive only `KEY=<alias>`.
+Workspace setup commands and agent commands use the same aliases.
+
+Cloudflare snapshot builders also receive aliases in their setup environment. The environment
+coordinator stores encrypted, build-scoped grants and owns their allocation and deadline.
+Builder aliases use the same `kcp1` purpose and resolver RPC contract. Every fresh Cloudflare
+builder installs outbound interception, with or without network secrets, because a refused start
+can retain interception rules. All builder HTTP(S) egress therefore invokes `ContainersOutbound`
+once per request. Build tools must trust the injected CA; a client with pinned certificates fails.
+The shared resolver routes
+their `environment-build:<id>` scope to that coordinator, and uses the same admission helper.
+The proxy still authenticates the platform container identity. Only an active `preparing` build
+can resolve its aliases. Capture, cancellation, expiry, and terminal cleanup revoke them.
+Vercel builders refuse network secrets. Build aliases expire with the build; saved tool configuration
+should reference the variable name rather than persist an expanded build alias.
+
+`ContainersOutbound` checks egress policy, then routes network aliases before SCM forwarding.
+Restricted egress includes the snapshot's exact secret hosts. The existing credential admission
+checks the live allocation, container binding, owner, scope membership, and grant expiry.
+The existing `resolveCredential` RPC decrypts a network value only for an admitted request.
+The provider-neutral substitution module supports header values and Basic passwords.
+It replaces exact alias tokens only, pins the Host header, and never follows redirects.
+
+Network secrets require HTTPS on port 443. IP literals, local or metadata names, Kilo endpoints,
+and managed SCM endpoints cannot receive them. `npm.pkg.github.com` is an explicit exception.
+Configured Kilo and GitLab hosts are checked again at grant creation and resolution.
+An unknown alias, wrong host, unsupported URL placement, or mixed SCM/network request receives
+a specific `403 network_secret_*` response. Temporary resolver faults return retryable
+`503 network_secret_unavailable`, not an unknown-secret error. The retry flag follows the resolver's
+classification; permanent policy failures return a value-free denial. No upstream request follows a denial.
+Bodies and responses are not substituted. Header echoes and exchanged tokens can expose values.
+Clients that validate token formats locally can fail because they see an alias.
+
+Egress audit records include `credentialKey` and `credentialDecision` for one credential, or a
+`credentialDecisions` list on the same record for multiple credentials. They never include values,
+aliases, request paths, or query strings. A wrong host fails immediately instead of producing
+an unclear upstream authentication error. Token-format checks can fail before a request exists.
+
+Feature-era private route and audit records are not backward-compatible with pre-feature Workers.
+A rollback must retain a Worker version that understands these records. The PostgreSQL wrapper
+still prevents an older reader from projecting a network value as a plaintext environment variable.
+
+### Ownership
+
 - One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`.
 - Sandbox ownership has exactly two supported forms: **one standalone session without a workspace
   per sandbox**, or **one workspace per sandbox, containing any number of sessions**. Sessions in
@@ -704,8 +761,13 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   environment's build commands. They run only in the environment build, so the wrapper skips them on
   every session start. The remaining setup commands (request-supplied and profile) run as
   `session_setup`, then `startCommands` run as `start`, on a fresh start and an environment snapshot
-  start. Every list is non-fatal: each failure (kind, index, redacted command text, exit code or
-  timeout, bounded redacted output tail) is collected, the next command still runs, and
+  start. A re-prepare that keeps every prepared root unchanged and only adds roots does not run
+  them again: the commands already ran in that workspace, and a start command would launch a
+  second process beside the first. A re-prepare that removes a prepared root, changes a root's
+  branch, or adopts or re-clones a root it had already prepared runs them again, because that
+  workspace is no longer the one the commands were run on. Every list is non-fatal: each failure
+  (kind, index, redacted command text, exit code or timeout, bounded redacted output tail) is
+  collected, the next command still runs, and
   `session.ready` reports up to 20 as `commandFailures`. The Sandbox DO logs only kind, index, exit
   code, termination reason and elapsed time, and stores a note of at most 2000 characters for the
   route's attempt. The first prompt delivered after that preparation carries the note in its
@@ -2313,6 +2375,56 @@ under the row lock, applies the existing `status_transition_id` ordering, and
 broadcasts `session.status.updated` through the existing UserConnectionDO. A browser
 still uses one user-level WebSocket for the whole sidebar, not one per session.
 
+Kilo v2 has no session-ingest client, so the same publication also carries what that
+client writes for Kilo v1. `lastActivityAt` is the receipt time of the latest event
+that wrote the transcript (`TRANSCRIPT_EVENT_TYPES` in `list-status.ts`); ingest
+moves `cli_sessions_v2.last_activity_at` forward only, which keeps a working chat in
+the active-session list and dates its row. It rides status changes and refreshes,
+each at most once a minute: busy and retry refresh on any event, and any other
+status refreshes when transcript activity is newer than the last snapshot, so a
+wait on input while subagents keep working still proves the session live.
+`rename` is a native rename of the root: a root `conversation.source` whose source
+names the root too (one naming another session is never stored), whose session title
+differs from the stored source and is not a creation placeholder. A rename forces a
+snapshot and stays in newer snapshots
+until one is delivered, naming the snapshot that first carried it. Ingest applies it
+like a CLI rename report (it replaces a generated title), with a `session.updated`
+notification, in the status transaction and only while the stored
+`status_transition_id` is older than that first snapshot: a late publication cannot
+replace a newer rename, and a repeat of a delivered rename cannot replace a later user
+rename. Kilo v1 never sends `conversation.source`: its CLI keeps reporting its own
+titles.
+
+`liveSummary` and `totalCostMicrodollars` are the session card summary and cost total
+of a Kilo v2 root, the `cli_sessions_v2.live_summary` and `total_cost_microdollars`
+that the session-ingest client writes for Kilo v1. Lists, the session card and the
+briefing read them from the row; only an open chat reads the cost from the Session DO.
+`native-live-summary.ts` folds each stored root `conversation.message.updated` into a
+summary kept in DO storage, in the transaction that stores the event: the last started
+tool names the step through the shared step table (`shell` runs like `bash`), an
+unfinished reasoning item at the end of the content is `thinking`, the last `todowrite`
+is the plan, the latest assistant message's error is the failure (`aborted` is
+`cancelled`, `provider.*` is `provider`, `tool.*` is `tool`, anything else `other`),
+and a new root user message starts a turn with an empty summary. Kilo v2 reports no
+session diff, so `changes` stays null. The root's idle `session.status` clears the step
+and plan in the transaction that stores it, as the Kilo v1 idle transition does, so a
+turn that opens without a root user message (a background command's completion) does
+not start with the last turn's step; an idle or failed snapshot shows no step or plan.
+That turn's busy `session.status` clears the failure in the transaction that stores it,
+as the Kilo v1 busy transition does, so the working snapshot does not show the previous
+turn's failure while the session works; the failure otherwise stays until such a busy
+status or a new root user message starts a turn. The cost is the root's assistant-only cost
+total (`cost-total.ts`), the same value an open chat shows. Both ride every snapshot of
+a root with a native transcript and are absent for Kilo v1, whose ingest client keeps
+writing them. The first summary forces a snapshot; a changed one refreshes at most once
+per 10 seconds, the Kilo v1 summary write window, and status changes carry the final
+value of a turn. Ingest writes the summary in the status transaction only when the
+publication's status is not stale and the summary changed, so a late publication cannot
+replace a newer summary; a change under an unchanged status refreshes a session card
+that follows the session, as the Kilo v1 summary write does. It moves the cost forward
+only, together with the activity in one statement that writes no row version unless one
+of them advances.
+
 Publication has one durable, coalescing latest-status obligation per Session DO.
 Its monotonic ULID cursor survives eviction and clock rollback. Each RPC has a
 5-second deadline and failed publication retries on the shared alarm after 30
@@ -2546,3 +2658,28 @@ cp packages/session-ingest-contracts/src/cloud-agent-billing.ts services/cloud-a
 ```
 
 The mirror test requires exact source equality. Verify the standalone Docker wrapper build after schema changes.
+
+
+### Runtime proxy origin proof rollout
+
+Origin proof support ships in two releases. Deploy the compatibility release fully
+before merging the enforcement release. A PR merge alone is not the deployment gate.
+
+1. **Compatibility:** Containers outbound and Vercel network policies add
+   `x-kilo-runtime-proxy-origin`. The facade, Session DO, Sandbox DO RPC inputs and
+   Session Sync authorization binding accept and forward the optional proof.
+   Allocations do not require proof yet. Session Sync still omits the proof when
+   it calls the authorization binding, so its deployment order does not matter.
+2. **Enforcement:** Deploy Session Sync proof forwarding before Cloud Agent.
+   Cloud Agent then marks new allocations and requires their platform proof.
+   Existing allocations remain exempt until they stop.
+
+Before the enforcement release, verify that every active Cloud Agent version has
+the compatibility readers and outbound proof injection. Search Worker logs for
+`runtime_proxy_origin_proof_unavailable`: each line is an egress that sent no proof.
+Also run one live Vercel sandbox request that sets its own
+`x-kilo-runtime-proxy-origin`. The facade must receive only the injected proof.
+Readers treat a value that is not exactly one proof, such as a joined duplicate,
+as absent. Keep the releases separate;
+deploying both PRs together removes the compatibility boundary. For a rollback after
+enforcement, use the compatibility release as the Cloud Agent rollback target.

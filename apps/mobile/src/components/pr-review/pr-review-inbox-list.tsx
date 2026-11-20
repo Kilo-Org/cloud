@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { InboxEmpty } from '@/components/pr-review/pr-review-inbox-empty';
@@ -27,6 +27,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganization } from '@/lib/organization-context';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import {
   providerPrRefLabel,
@@ -82,9 +83,11 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
     setOrganizationId(null);
   };
   const reconnectOnly = inbox.githubNeedsReconnect && !inbox.isPending && inbox.items.length === 0;
+  const connectivity = useCommittedConnectivityStatus();
   const view = selectPrInboxView({
     isPending: inbox.isPending,
     isFetching: inbox.isFetching,
+    isOffline: connectivity === 'offline',
     itemCount: inbox.items.length,
     firstPageErrorState:
       inbox.firstPageErrorState ?? (reconnectOnly ? { kind: 'reconnect' } : null),
@@ -101,7 +104,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
   // Landscape: the side insets keep the rows and the header content clear of
   // the sensor housing; portrait insets are zero. The page gutter itself is
   // drawn by the rows and the header block, not by the content container.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   const contentContainerStyle = useMemo<ViewStyle>(
     () => ({ paddingLeft: insets.left, paddingRight: insets.right }),
     [insets.left, insets.right]

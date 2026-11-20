@@ -1,8 +1,9 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests: one mock harness mounts every row shape, its trailing variants and its note line. */
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type LucideIcon } from '@/components/ui/icons';
+import { formatList } from '@/lib/format';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 import { act, TestRenderer } from '@/test/renderer';
 
@@ -62,7 +63,10 @@ function renderRow(props: {
   busy?: boolean;
   onValueChange: (next: boolean) => void;
   resolveValue?: () => boolean;
+  title?: string;
   subtitle?: string;
+  note?: string;
+  accessibilityLabel?: string;
   inactiveSubtitle?: string;
   testID?: string;
 }) {
@@ -286,6 +290,92 @@ describe('PreferenceRow', () => {
     expect(copies[1]?.props.className).toContain('-ms-[100%]');
   });
 
+  it('paints the note as a third, smaller muted line under the subtitle', () => {
+    // A retiring model's date belongs to the model id, not to the subtitle's
+    // sentence: it reads model, what the switch controls, then when it goes, and
+    // takes the smaller muted face so it never competes with the title.
+    const root = renderRow({
+      value: true,
+      title: 'openrouter',
+      subtitle: 'Anthropic',
+      note: 'Retires Nov 22',
+      onValueChange: () => undefined,
+    });
+    const lines = root.findAll(node => Object.is(node.type, 'Text'));
+
+    expect(lines.map(node => node.props.children)).toEqual([
+      'openrouter',
+      'Anthropic',
+      'Retires Nov 22',
+    ]);
+    expect(String(lines[2]?.props.className)).toContain('text-muted-foreground');
+    expect(String(lines[2]?.props.className)).toContain('text-xs');
+    expect(String(lines[0]?.props.className)).not.toContain('text-xs');
+  });
+
+  it('gives the switch one spoken name, the title joined with the note', () => {
+    // A reader who cannot see the third line would hear only the model id; the
+    // retirement date joins it through the shared list formatter instead.
+    const root = renderRow({
+      value: true,
+      title: 'openrouter',
+      note: 'Retires Nov 22',
+      onValueChange: () => undefined,
+    });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+
+    expect(toggle.props.accessibilityLabel).toBe(
+      formatList(['openrouter', 'Retires Nov 22'], 'en')
+    );
+  });
+
+  it("joins the note to the caller's spoken override, never to the title", () => {
+    const root = renderRow({
+      value: true,
+      title: 'openrouter',
+      accessibilityLabel: 'Spend alerts for Acme',
+      note: 'Retires Nov 22',
+      onValueChange: () => undefined,
+    });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    const label = toggle.props.accessibilityLabel as string;
+
+    expect(label).toBe(formatList(['Spend alerts for Acme', 'Retires Nov 22'], 'en'));
+    expect(label).not.toContain('openrouter');
+  });
+
+  it('keeps a row without a note to its own lines and its unjoined name', () => {
+    // The control case: the extra line exists only when a caller asks for it,
+    // and the spoken name is exactly the title the row already showed.
+    const root = renderRow({
+      value: true,
+      title: 'openrouter',
+      subtitle: 'Anthropic',
+      onValueChange: () => undefined,
+    });
+    const lines = root.findAll(node => Object.is(node.type, 'Text'));
+
+    expect(lines.map(node => node.props.children)).toEqual(['openrouter', 'Anthropic']);
+    expect(root.find(node => Object.is(node.type, 'Switch')).props.accessibilityLabel).toBe(
+      'openrouter'
+    );
+
+    // An override is the whole name when there is no note to join.
+    const overridden = renderRow({
+      value: true,
+      title: 'openrouter',
+      subtitle: undefined,
+      accessibilityLabel: 'Spend alerts for Acme',
+      onValueChange: () => undefined,
+    });
+    expect(
+      overridden.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
+    ).toEqual(['openrouter']);
+    expect(overridden.find(node => Object.is(node.type, 'Switch')).props.accessibilityLabel).toBe(
+      'Spend alerts for Acme'
+    );
+  });
+
   it('draws its icon in the shared neutral tile, the column the neighbouring destination rows use', () => {
     // A switch row standing above a `ConfigureRow` in one list (Voice input:
     // gateway transcription over transcription model and language) must start
@@ -351,20 +441,20 @@ describe('PreferenceRow', () => {
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
   });
 
-  it('paints an unavailable row with the muted pair instead of the accent', () => {
+  it('paints an unavailable row with the quiet pair instead of the accent', () => {
     // A dimmed title beside a full-strength accent track reads as both
     // unavailable and on, and Android folds the colours into the switch
     // drawables with no unavailable appearance of its own. The row therefore
-    // yields the light override and lets the shared switch paint its muted pair.
+    // yields the light override and lets the shared switch paint its quiet pair.
     schemeState.current = 'light';
     platformState.os = 'android';
     const root = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
     const trackColor = toggle.props.trackColor as { false: string; true: string };
 
-    expect(trackColor.false).toBe(lightColors.mutedSoft);
-    expect(trackColor.true).toBe(lightColors.mutedSoft);
-    expect(toggle.props.thumbColor).toBe(lightColors.foreground);
+    expect(trackColor.false).toBe(lightColors.ringTrack);
+    expect(trackColor.true).toBe(lightColors.ringTrack);
+    expect(toggle.props.thumbColor).toBe(lightColors.muted);
   });
 });
 

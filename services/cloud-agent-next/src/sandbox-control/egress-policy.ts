@@ -41,6 +41,7 @@ export function buildNativeEgressAllowlist(input: {
   env: KiloTargetEnv & { WORKER_URL?: string };
   kiloToken?: string;
   repositoryUrl?: string;
+  networkSecretHosts?: readonly string[];
 }): string[] {
   const targets = deriveKiloSandboxTargets(input.env, input.kiloToken ?? '', {
     requireHttps: true,
@@ -65,6 +66,7 @@ export function buildNativeEgressAllowlist(input: {
     }
     return nativeEgressAllowlistSchema.parse([
       ...input.allowlist,
+      ...(input.networkSecretHosts ?? []),
       ...GIT_DOMAINS,
       ...urls.map(url => url.hostname),
     ]);

@@ -10,15 +10,15 @@ import {
 } from './lifecycle';
 import type { PartsSnapshot } from './helpers';
 import {
-  EMPTY_PARTS,
   appendPartTextChunks,
-  clonePart,
+  createPartViewCache,
   createReadonlyPartView,
   createSubscriberRegistry,
   insertSortedBy,
   isSupportedDeltaField,
   messageIdKey,
   publishPartsChanged,
+  readPartsSnapshot,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -28,6 +28,9 @@ function createMemoryStorage(): SessionStorage {
 
   const parts = new Map<string, Part[]>();
   const partsSnapshot: PartsSnapshot = new Map<string, readonly ReadonlyPart[] | null>();
+  // Immutable views of the stored parts, per message and kept across snapshot
+  // rebuilds so a rebuild reuses the view of every part that did not change.
+  const partViews = createPartViewCache();
   // Ordering evidence of the last accepted update per part, owned next to the
   // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
   const partEvidence = new Map<string, number>();
@@ -59,10 +62,12 @@ function createMemoryStorage(): SessionStorage {
       clear: () => parts.clear(),
     },
     snapshot: partsSnapshot,
+    views: partViews,
     evidence: partEvidence,
     subscribers,
     beforeStructuralChange: () => {},
     publishPartsRevision: () => {},
+    publishMessagesRevision: () => {},
   };
 
   const storage: SessionStorage = {
@@ -89,7 +94,14 @@ function createMemoryStorage(): SessionStorage {
       const arr = parts.get(messageId) ?? [];
       parts.set(
         messageId,
-        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence, authoritative)
+        upsertPartDroppingStaleSyntheticParts(
+          messageId,
+          arr,
+          part,
+          eventTime,
+          partEvidence,
+          authoritative
+        )
       );
       publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
@@ -113,15 +125,7 @@ function createMemoryStorage(): SessionStorage {
     },
 
     getParts(messageId) {
-      const cached = partsSnapshot.get(messageId);
-      if (cached) return cached;
-
-      const arr = parts.get(messageId);
-      if (!arr || arr.length === 0) return EMPTY_PARTS;
-
-      const snapshot = arr.map(part => createReadonlyPartView(clonePart(part)));
-      partsSnapshot.set(messageId, snapshot);
-      return snapshot;
+      return readPartsSnapshot(messageId, parts.get(messageId), partsSnapshot, partViews);
     },
 
     getPart(messageId, partId) {

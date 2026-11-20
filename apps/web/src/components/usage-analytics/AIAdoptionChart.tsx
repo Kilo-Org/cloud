@@ -51,7 +51,7 @@ export interface AIAdoptionChartProps {
 }
 
 export function AIAdoptionChart({
-  adoption: { timeseries, weeklyTrends, userScores, isNewOrganization, isLoading },
+  adoption: { timeseries, weeklyTrends, userScores, isNewOrganization, isLoading, unavailable },
   organizationId,
 }: AIAdoptionChartProps) {
   const [activeTab, setActiveTab] = useState<'timeline' | 'distribution'>('timeline');
@@ -186,7 +186,7 @@ export function AIAdoptionChart({
               </p>
             </div>
           </div>
-          {!isLoading && (
+          {!isLoading && !unavailable && (
             <div className="flex items-center gap-4">
               <Select
                 value={activeTab}
@@ -229,7 +229,14 @@ export function AIAdoptionChart({
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        {isNewOrganization ? (
+        {unavailable ? (
+          <div className="flex h-[180px] w-full flex-col items-center justify-center gap-1 text-center">
+            <p className="text-sm font-medium">AI adoption score is temporarily unavailable</p>
+            <p className="text-muted-foreground text-sm">
+              Usage data is slow to load. Try again in a few minutes.
+            </p>
+          </div>
+        ) : isNewOrganization ? (
           <AIAdoptionEmptyState />
         ) : activeTab === 'timeline' ? (
           <>

@@ -439,6 +439,7 @@ const DEV_ROUTES: readonly (readonly [RegExp, string, 'self'?])[] = [
   [/^dev\/security-agent-reauthorize-fixture/, '(auth)/security-agent-reauthorize-fixture'],
   [/^dev\/model-picker-fixture\/multiple-providers/, '(app)/agent-chat/model-picker'],
   [/^dev\/profile-picker-fixture/, '(app)/agent-chat/profile-picker'],
+  [/^dev\/context-picker-fixture/, '(app)/context-picker'],
   [/^dev\/organization-invoices-fixture/, '(app)/(tabs)/(3_profile)/organization/invoices-fixture'],
   [/^dev\/personal-invoices-fixture\//, '(app)/(tabs)/(3_profile)/personal-invoices-fixture'],
   [/^dev\/credits-pack-prices-fixture/, '(app)/credits-pack-prices-fixture'],
@@ -490,8 +491,8 @@ export function expectedOutcome(
 // --- Settled-state check (the old check-batch.mjs) -------------------------
 
 const NOT_FOUND = [
-  /^page not found$/i,
-  /^not found$/i,
+  // "Not found", "Page not found", and a titled one: "Trigger not found".
+  /\bnot found$/i,
   /not found\.$/i,
   /may have been removed or is no longer available/i,
   /this link is no longer valid/i,

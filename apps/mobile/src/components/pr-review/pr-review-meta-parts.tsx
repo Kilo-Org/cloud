@@ -16,7 +16,7 @@ import {
   MessageSquare,
 } from '@/components/ui/icons';
 import { PrAvatar } from '@/components/pr-review/pr-review-overview-parts';
-import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrOverviewDto } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -101,32 +101,32 @@ function PrReviewersSection({ reviewers }: Readonly<{ reviewers: PrOverviewDto['
   const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.overview.reviewers')} />
-      {reviewers.map(reviewer => {
-        const tone = reviewerStateTone(reviewer.state);
-        const StateIcon = REVIEWER_STATE_ICON[reviewer.state];
-        const stateLabel = t(reviewerStateLabelKey(reviewer.state));
-        return (
-          <View key={reviewer.login} accessible className="flex-row items-center gap-2">
-            <PrAvatar avatarUrl={reviewer.avatarUrl} login={reviewer.login} />
-            <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
-              {reviewer.login}
-            </Text>
-            <StateIcon size={14} color={colors[REVIEWER_TONE_COLOR[tone]]} />
-            <Text className={cn('text-xs', REVIEWER_TONE_CLASS[tone])}>{stateLabel}</Text>
-          </View>
-        );
-      })}
-    </View>
+    <Section label={t('prReview.overview.reviewers')}>
+      <View className="gap-2">
+        {reviewers.map(reviewer => {
+          const tone = reviewerStateTone(reviewer.state);
+          const StateIcon = REVIEWER_STATE_ICON[reviewer.state];
+          const stateLabel = t(reviewerStateLabelKey(reviewer.state));
+          return (
+            <View key={reviewer.login} accessible className="flex-row items-center gap-2">
+              <PrAvatar avatarUrl={reviewer.avatarUrl} login={reviewer.login} />
+              <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
+                {reviewer.login}
+              </Text>
+              <StateIcon size={14} color={colors[REVIEWER_TONE_COLOR[tone]]} />
+              <Text className={cn('text-xs', REVIEWER_TONE_CLASS[tone])}>{stateLabel}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </Section>
   );
 }
 
 function PrAssigneesRow({ assignees }: Readonly<{ assignees: PrOverviewDto['assignees'] }>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.overview.assignees')} />
+    <Section label={t('prReview.overview.assignees')}>
       <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
         {assignees.map(assignee => (
           <View key={assignee.login} className="flex-row items-center gap-1.5">
@@ -137,7 +137,7 @@ function PrAssigneesRow({ assignees }: Readonly<{ assignees: PrOverviewDto['assi
           </View>
         ))}
       </View>
-    </View>
+    </Section>
   );
 }
 
@@ -145,31 +145,32 @@ function PrLinkedIssues({ issues }: Readonly<{ issues: PrOverviewDto['linkedIssu
   const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.overview.linkedIssues')} />
-      {issues.map(issue => {
-        const Icon = issue.closed ? CircleCheck : CircleDot;
-        return (
-          <Pressable
-            key={issue.number}
-            accessibilityRole="link"
-            accessibilityLabel={t('prReview.overview.openIssueA11y', { number: issue.number })}
-            onPress={() => {
-              void WebBrowser.openBrowserAsync(issue.url);
-            }}
-            className="min-h-11 flex-row items-center gap-2 active:opacity-70"
-          >
-            <Icon size={14} color={issue.closed ? colors.mutedForeground : colors.good} />
-            <Text variant="mono" className="text-muted-foreground">
-              #{issue.number}
-            </Text>
-            <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
-              {issue.title}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+    <Section label={t('prReview.overview.linkedIssues')}>
+      <View className="gap-2">
+        {issues.map(issue => {
+          const Icon = issue.closed ? CircleCheck : CircleDot;
+          return (
+            <Pressable
+              key={issue.number}
+              accessibilityRole="link"
+              accessibilityLabel={t('prReview.overview.openIssueA11y', { number: issue.number })}
+              onPress={() => {
+                void WebBrowser.openBrowserAsync(issue.url);
+              }}
+              className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+            >
+              <Icon size={14} color={issue.closed ? colors.mutedForeground : colors.good} />
+              <Text variant="mono" className="text-muted-foreground">
+                #{issue.number}
+              </Text>
+              <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
+                {issue.title}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Section>
   );
 }
 
@@ -185,10 +186,9 @@ export function PrOverviewMeta({ overview }: Readonly<{ overview: PrOverviewDto 
     <View className="gap-4">
       <PrTimelineLine overview={overview} />
       {overview.labels.length > 0 ? (
-        <View className="gap-2">
-          <PrReviewSectionLabel label={t('prReview.overview.labels')} />
+        <Section label={t('prReview.overview.labels')}>
           <PrLabelChips labels={overview.labels} />
-        </View>
+        </Section>
       ) : null}
       {reviewers.length > 0 ? <PrReviewersSection reviewers={reviewers} /> : null}
       {overview.assignees.length > 0 ? <PrAssigneesRow assignees={overview.assignees} /> : null}

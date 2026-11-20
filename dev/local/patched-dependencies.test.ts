@@ -91,7 +91,11 @@ type VersionCheck = {
   uncomparable: string[];
 };
 
-const plainVersion = /^\d+\.\d+\.\d+/;
+// One exact published version, with an optional prerelease or build suffix, and
+// nothing else. Anchoring matters: an unanchored pattern accepts a compound
+// range such as `23.0.0 <24` and would compare it as a single version instead
+// of reporting it as uncomparable.
+const plainVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 function versionCheck({
   entries,
@@ -317,6 +321,24 @@ test('the version comparison reports a mirror it cannot compare instead of skipp
     assert.deepEqual(versionMismatches(pairs), []);
     assert.deepEqual(uncomparable, [
       "stripe@23.0.0 has an overrides value '>=23.0.0 <24' that states no single version, so the two cannot be compared",
+    ]);
+
+    // A range whose lower bound is a full version must not pass as one version:
+    // the pattern is anchored, so `23.0.0 <24` is uncomparable, not a compare.
+    fs.writeFileSync(
+      filePath,
+      [
+        'overrides:',
+        "  stripe: '23.0.0 <24'",
+        'patchedDependencies:',
+        '  stripe@23.0.0: patches/stripe@23.0.0.patch',
+        '',
+      ].join('\n')
+    );
+    const compound = versionCheck(readWorkspaceDocument(filePath));
+    assert.deepEqual(compound.pairs, []);
+    assert.deepEqual(compound.uncomparable, [
+      "stripe@23.0.0 has an overrides value '23.0.0 <24' that states no single version, so the two cannot be compared",
     ]);
 
     // `catalog:` states no version of its own but names the catalog pin, so it

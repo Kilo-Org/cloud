@@ -211,7 +211,6 @@ export async function GET(request: Request) {
         const owner = await getOrganizationOwner(tx, lockedOrg.id);
 
         if (!owner) {
-          // No owner yet (invite not accepted) - skip this org for now
           // We still update the timestamp so we don't keep retrying
           await markResetTimestamp(tx, lockedOrg.id, now);
 

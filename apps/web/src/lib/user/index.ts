@@ -360,7 +360,6 @@ export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
   assert(existingUser, `User not found for kiloUserId: ${existing_kilo_user_id}`);
 
   if (existingUser.hosted_domain !== args.hosted_domain) {
-    //This really should only affect legacy users.
     await db
       .update(kilocode_users)
       .set({ hosted_domain: args.hosted_domain })
@@ -371,7 +370,6 @@ export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
     existingUser.hosted_domain = args.hosted_domain;
   }
 
-  // Sync display_name from OAuth on every sign-in
   if (args.display_name) {
     await db
       .update(user_auth_provider)
@@ -590,7 +588,6 @@ export async function createOrUpdateUser(
     return successResult({ user: existingUser, isNew: false });
   }
 
-  // check to see if we have a user with the same email
   const userByEmail = await findUserByEmail(args.google_user_email);
   if (userByEmail) {
     const existingProviders = await getUserAuthProviders(userByEmail.id);
@@ -667,7 +664,6 @@ export async function createOrUpdateUser(
           return { success: false, error: linkResult.error };
         }
       }
-      // Successfully linked account, return the existing user
       if (deferSignInAnalytics) {
         return successResult({
           user: linkedUser,
@@ -707,7 +703,6 @@ export async function createOrUpdateUser(
       });
       return successResult({ user: linkedUser, isNew: false });
     } else {
-      // User signed in with a different ID, but same email
       posthogClient.capture({
         distinctId: userByEmail.google_user_email,
         event: 'user_signed_in_with_different_id',

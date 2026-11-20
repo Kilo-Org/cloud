@@ -20,10 +20,6 @@ import {
   type SpendAlertRuleView,
 } from '@/lib/spend-alerts/settings';
 
-// ---------------------------------------------------------------------------
-// Schemas
-// ---------------------------------------------------------------------------
-
 const SpendAlertRuleKindSchema = z.enum(['threshold', 'anomaly']);
 const SpendAlertWindowHoursSchema = z.union([z.literal(24), z.literal(168), z.literal(720)]);
 
@@ -121,9 +117,7 @@ const SpendAlertOutputSchema = z.object({
 
 type SpendAlertOutput = z.infer<typeof SpendAlertOutputSchema>;
 
-// ---------------------------------------------------------------------------
 // Mapping between the wire (USD) and the stored (microdollars) representation
-// ---------------------------------------------------------------------------
 
 function toWireRule(rule: SpendAlertRuleView): z.infer<typeof SpendAlertRuleOutputSchema> {
   return {
@@ -151,10 +145,6 @@ function toStoredRule(rule: z.infer<typeof SpendAlertRuleInputSchema>): SpendAle
     pushEnabled: rule.pushEnabled,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Read helpers
-// ---------------------------------------------------------------------------
 
 async function readSpendAlertsCategoryEnabled(userId: string): Promise<boolean> {
   const [row] = await db
@@ -195,10 +185,6 @@ function settingsPayload(
     spend: settings.spend,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Router definition
-// ---------------------------------------------------------------------------
 
 export const spendAlertRouter = createTRPCRouter({
   get: baseProcedure

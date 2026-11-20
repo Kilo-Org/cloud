@@ -118,10 +118,6 @@ async function seedGitLabIntegration(): Promise<void> {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Role matrix: every organization-security-agent-router procedure × five roles
-// ---------------------------------------------------------------------------
-
 const memberProcedures: Array<{ name: string; input: Record<string, unknown> }> = [
   { name: 'trackUiInteraction', input: { interaction: 'findings_filtered' } },
   { name: 'getPermissionStatus', input: {} },
@@ -188,10 +184,6 @@ describe('organization security agent router role matrix', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// connectWithPAT: rejects roles outside ORGANIZATION_BILLING_ROLES
-// ---------------------------------------------------------------------------
-
 describe('gitlabRouter.connectWithPAT role gate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -228,11 +220,6 @@ describe('gitlabRouter.connectWithPAT role gate', () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// GitLab OAuth role gate: start and callback both require a role in
-// ORGANIZATION_BILLING_ROLES, with or without a stored integration row.
-// ---------------------------------------------------------------------------
 
 describe('GitLab OAuth connect billing role gate', () => {
   const firstConnect: Array<{ roleKey: RoleKey; denial: string | null }> = [

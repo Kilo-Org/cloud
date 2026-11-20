@@ -853,7 +853,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
     const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
 
-    // Fetch live worker status for all instances.
     // DB may be marked destroyed while DO is still retrying destroy.
     let workerStatus: PlatformDebugStatusResponse | null = null;
     let workerStatusError: string | null = null;

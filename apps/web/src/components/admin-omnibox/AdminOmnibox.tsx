@@ -22,7 +22,6 @@ import type { OmniboxContext, OmniboxActionGroup } from './types';
 import { Shield, User, MapPin, ExternalLink, Info, Zap, Building2 } from 'lucide-react';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 
-// Build version - using a constant for now, could be injected at build time
 const BUILD_VERSION = 'dev';
 
 /**

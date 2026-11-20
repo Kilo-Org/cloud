@@ -76,7 +76,6 @@ describe('SsoAccountMismatchNotice', () => {
   });
 });
 
-// --- Transient failure of the single action ---
 //
 // The notice's one action signs out and continues. A network failure must not
 // strand the visitor: the action comes back enabled and an inline error says

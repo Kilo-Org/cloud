@@ -2907,8 +2907,6 @@ describe('isCardFingerprintEligibleForFreeCredits', () => {
   });
 });
 
-// === handleSuccessfulChargeWithPayment tests ===
-
 describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', () => {
   const makeCharge = (params: { id: string; amount: number; customer: string }) =>
     ({

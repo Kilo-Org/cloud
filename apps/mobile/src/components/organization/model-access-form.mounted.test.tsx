@@ -437,11 +437,17 @@ describe('ModelAccessForm with no provider rows', () => {
     const onRetryCatalog = vi.fn<() => void>();
     const root = render(undefined, { catalog: [], onRetryCatalog });
 
-    // The notice is screen-level, so it is on the default tab already.
-    const caption = root
+    // The notice is screen-level, so it is on the default tab already. It reads
+    // as body text on the warning tile, not as a muted caption.
+    const noticeText = root
       .findAllByType('Text' as never)
       .find(node => node.props.children === i18n.t('organizationModelAccess.providersUnavailable'));
-    expect(caption?.props.variant).toBe('caption');
+    expect(noticeText?.props.variant).not.toBe('caption');
+    expect(noticeText?.props.className).toContain('text-foreground');
+    const noticeTile = root
+      .findAllByType('View' as never)
+      .find(node => String(node.props.className).includes('bg-warn-tile-bg'));
+    expect(noticeTile?.props.className).toContain('border-warn-tile-border');
 
     selectTab(root, 'providers');
     expect(root.findAllByType('ProviderAllowList' as never)).toHaveLength(0);

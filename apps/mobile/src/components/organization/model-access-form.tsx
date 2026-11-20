@@ -195,11 +195,11 @@ export function ModelAccessForm({
   return (
     <View className="flex-1">
       <View className="gap-3 px-4 pt-3">
+        {/* The warning tile marks missing data; the message takes the body
+            ink, because the muted neutral fails body-text contrast on it. */}
         {notice === null ? null : (
-          <View className="flex-row items-center gap-3 rounded-md bg-muted-soft px-3 py-2">
-            <Text variant="caption" className="flex-1">
-              {notice}
-            </Text>
+          <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
+            <Text className="flex-1 text-foreground">{notice}</Text>
             <Button
               variant="outline"
               size="sm"

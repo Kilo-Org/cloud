@@ -161,6 +161,45 @@ export const RuntimeSkillsSchema = z
     `Maximum ${RuntimeProfileLimits.MAX_RUNTIME_SKILLS} runtime skills allowed`
   );
 
+/** Keep only the companion files the current path rule accepts, whatever the stored shape. */
+export function projectStoredRuntimeSkills(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const skills: unknown[] = value;
+  return skills.map(skill => {
+    if (typeof skill !== 'object' || skill === null || !('files' in skill)) return skill;
+    const files = skill.files;
+    if (typeof files !== 'object' || files === null || Array.isArray(files)) return skill;
+    const companions = Object.fromEntries(
+      Object.entries(files as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    );
+    return { ...skill, files: acceptedRuntimeSkillFiles(companions).accepted };
+  });
+}
+
+/**
+ * Route spec read back from storage: its runtime skills keep the entries the
+ * current path rule accepts, so a spec written under an earlier rule still
+ * loads. A spec that arrives on the wire is parsed with
+ * `controlPlaneRouteSpecSchema` and stays strict.
+ */
+export function projectStoredRouteSpecSkills(spec: unknown): unknown {
+  if (typeof spec !== 'object' || spec === null || !('runtimeSkills' in spec)) return spec;
+  return { ...spec, runtimeSkills: projectStoredRuntimeSkills(spec.runtimeSkills) };
+}
+
+/**
+ * Runtime skills read back from storage. A bundle written under an earlier path
+ * rule keeps the companion files the current rule accepts, so a stored session
+ * or registration parses with the rest of its configuration. Anything a caller
+ * supplies is validated with `RuntimeSkillsSchema` instead.
+ */
+export const PersistedRuntimeSkillsSchema = z.preprocess(
+  projectStoredRuntimeSkills,
+  RuntimeSkillsSchema.optional()
+);
+
 export type RuntimeSkillInput = z.infer<typeof RuntimeSkillSchema>;
 
 const PermissionActionSchema = z.enum(['allow', 'ask', 'deny']);

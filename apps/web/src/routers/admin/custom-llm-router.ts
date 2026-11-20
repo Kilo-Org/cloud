@@ -110,12 +110,18 @@ const DeleteCustomLlmSchema = z.object({
   public_id: publicIdSchema,
 });
 
+const SetCustomLlmEnabledSchema = z.object({
+  public_id: publicIdSchema,
+  is_enabled: z.boolean(),
+});
+
 export const adminCustomLlmRouter = createTRPCRouter({
   list: adminProcedure.query(async () => {
     const rows = await db
       .select({
         public_id: custom_llm2.public_id,
         definition: custom_llm2.definition,
+        is_enabled: custom_llm2.is_enabled,
       })
       .from(custom_llm2)
       .orderBy(asc(custom_llm2.public_id));
@@ -167,6 +173,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
         .returning({
           public_id: custom_llm2.public_id,
           definition: custom_llm2.definition,
+          is_enabled: custom_llm2.is_enabled,
         });
 
       return updated;
@@ -182,6 +189,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
       .returning({
         public_id: custom_llm2.public_id,
         definition: custom_llm2.definition,
+        is_enabled: custom_llm2.is_enabled,
       });
 
     return inserted;
@@ -214,11 +222,13 @@ export const adminCustomLlmRouter = createTRPCRouter({
           internal_id: input.internal_id,
         },
         encrypted_api_key: source.encrypted_api_key,
+        is_enabled: source.is_enabled,
       })
       .onConflictDoNothing()
       .returning({
         public_id: custom_llm2.public_id,
         definition: custom_llm2.definition,
+        is_enabled: custom_llm2.is_enabled,
       });
 
     if (!inserted) {
@@ -229,6 +239,27 @@ export const adminCustomLlmRouter = createTRPCRouter({
     }
 
     return inserted;
+  }),
+
+  setEnabled: adminProcedure.input(SetCustomLlmEnabledSchema).mutation(async ({ input }) => {
+    const [updated] = await db
+      .update(custom_llm2)
+      .set({ is_enabled: input.is_enabled })
+      .where(eq(custom_llm2.public_id, input.public_id))
+      .returning({
+        public_id: custom_llm2.public_id,
+        definition: custom_llm2.definition,
+        is_enabled: custom_llm2.is_enabled,
+      });
+
+    if (!updated) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `Custom LLM with public_id "${input.public_id}" not found`,
+      });
+    }
+
+    return updated;
   }),
 
   delete: adminProcedure.input(DeleteCustomLlmSchema).mutation(async ({ input }) => {

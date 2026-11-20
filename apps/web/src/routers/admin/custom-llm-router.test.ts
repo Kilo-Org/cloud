@@ -464,6 +464,7 @@ describe('adminCustomLlmRouter', () => {
           display_name: 'Copied GPT-4',
           internal_id: 'copied-gpt-4',
         },
+        is_enabled: true,
       });
 
       const [sourceRow] = await db
@@ -513,7 +514,11 @@ describe('adminCustomLlmRouter', () => {
         };
         delete copiedDefinition.internal_id;
 
-        expect(result).toEqual({ public_id: copiedPublicId, definition: copiedDefinition });
+        expect(result).toEqual({
+          public_id: copiedPublicId,
+          definition: copiedDefinition,
+          is_enabled: true,
+        });
         expect(result.definition).not.toHaveProperty('internal_id');
 
         const [sourceRow] = await db
@@ -1116,6 +1121,81 @@ describe('adminCustomLlmRouter', () => {
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
 
       expect(row).toBeUndefined();
+    });
+  });
+
+  describe('setEnabled', () => {
+    it('disables and re-enables a custom LLM without touching its definition or credentials', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-toggle';
+
+      const created = await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: validDefinition,
+        credentials: { type: 'api_key', api_key: 'sk-secret' },
+      });
+      expect(created.is_enabled).toBe(true);
+      const [before] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, publicId));
+
+      const disabled = await caller.admin.customLlm.setEnabled({
+        public_id: publicId,
+        is_enabled: false,
+      });
+      expect(disabled).toEqual({
+        public_id: publicId,
+        definition: validDefinition,
+        is_enabled: false,
+      });
+      const listResult = await caller.admin.customLlm.list();
+      expect(listResult.items.find(item => item.public_id === publicId)?.is_enabled).toBe(false);
+
+      // Saving the definition keeps a disabled custom LLM disabled.
+      const updated = await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: { ...validDefinition, display_name: 'Renamed' },
+      });
+      expect(updated.is_enabled).toBe(false);
+
+      const enabled = await caller.admin.customLlm.setEnabled({
+        public_id: publicId,
+        is_enabled: true,
+      });
+      expect(enabled.is_enabled).toBe(true);
+      const [after] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, publicId));
+      expect(after?.encrypted_api_key).toEqual(before?.encrypted_api_key);
+    });
+
+    it('copies the source enabled state', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: 'kilo-internal/test-model-disabled-source',
+        definition: validDefinition,
+        credentials: { type: 'api_key', api_key: 'sk-secret' },
+      });
+      await caller.admin.customLlm.setEnabled({
+        public_id: 'kilo-internal/test-model-disabled-source',
+        is_enabled: false,
+      });
+
+      const copied = await caller.admin.customLlm.copy({
+        source_public_id: 'kilo-internal/test-model-disabled-source',
+        public_id: 'kilo-internal/test-model-disabled-copy',
+        display_name: 'Disabled copy',
+      });
+      expect(copied.is_enabled).toBe(false);
+    });
+
+    it('rejects an unknown public_id', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await expect(
+        caller.admin.customLlm.setEnabled({ public_id: 'kilo-internal/missing', is_enabled: false })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 });

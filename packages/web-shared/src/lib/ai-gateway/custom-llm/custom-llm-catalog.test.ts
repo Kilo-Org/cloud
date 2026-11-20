@@ -126,6 +126,29 @@ describe('custom LLM catalog', () => {
     }
   });
 
+  test('skips disabled custom LLMs and partners', async () => {
+    await db.insert(custom_llm2).values([
+      { public_id: 'acme/disabled-model', definition: customLlmDefinition(), is_enabled: false },
+      {
+        public_id: 'acme/disabled-partner',
+        definition: partnerCustomLlmDefinition('acme'),
+        is_enabled: false,
+      },
+    ]);
+    try {
+      await expect(findCustomLlm('acme/disabled-model')).resolves.toBeNull();
+      await expect(findPartnerCustomLlm('acme/disabled-partner')).resolves.toBeNull();
+      const fetched = await fetchCustomLlmsFromDatabase();
+      expect(fetched.map(customLlm => customLlm.public_id)).toEqual(
+        expect.not.arrayContaining(['acme/disabled-model'])
+      );
+      await expect(isCustomLlm('acme/private-model')).resolves.toBe(true);
+    } finally {
+      await deleteCustomLlmForTest('acme/disabled-model');
+      await deleteCustomLlmForTest('acme/disabled-partner');
+    }
+  });
+
   describe('partners', () => {
     test('finds a partner by id regardless of case', async () => {
       await expect(findPartnerCustomLlm('acme/partner-model')).resolves.toMatchObject({

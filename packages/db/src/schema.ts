@@ -3233,6 +3233,7 @@ export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
   definition: jsonb().notNull().$type<CustomLlmDefinition>(),
   encrypted_api_key: jsonb().$type<EncryptedData>(),
+  is_enabled: boolean().notNull().default(true),
 });
 
 export type CustomLlm2 = typeof custom_llm2.$inferSelect;

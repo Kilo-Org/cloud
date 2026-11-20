@@ -557,9 +557,13 @@ export async function lookupCustomRouterStatuses(
                   clientProfileComplete(context.baseRouter, current.repetitions)
                 );
             // A blocked link is surfaced on a variant that has no ready measurement of its
-            // own, so the owner learns why it did not reuse the platform's result.
+            // own, so the owner learns why it did not reuse the platform's result. A real
+            // client-eval failure keeps its own reason: the link refusal never overwrites it.
             const refusal =
-              item.linkRefusal && status.status !== 'ready' && status.status !== 'stale'
+              item.linkRefusal &&
+              status.failureReason === null &&
+              status.status !== 'ready' &&
+              status.status !== 'stale'
                 ? { failureReason: item.linkRefusal.reason }
                 : {};
             return { variant, linked: Boolean(linked), ...status, ...refusal };

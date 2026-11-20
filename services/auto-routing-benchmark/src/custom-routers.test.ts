@@ -482,6 +482,16 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(measured.entries[0]?.variants).toEqual([
       { variant: 'low', linked: false, status: 'ready', failureReason: null },
     ]);
+    // A real client-eval failure keeps its own reason: the link refusal never overwrites it.
+    sqlite.prepare("DELETE FROM client_profiles WHERE id = 'current'").run();
+    clientProfile({ id: 'failed', accuracy: 0, updatedAt: '2026-10-11', status: 'failed' });
+    sqlite
+      .prepare("UPDATE client_profiles SET failure_reason = 'grader exploded' WHERE id = 'failed'")
+      .run();
+    const failed = await lookupCustomRouterStatuses(db, CONFIG, context, blockedSource);
+    expect(failed.entries[0]?.variants).toEqual([
+      { variant: 'low', linked: false, status: 'failed', failureReason: 'grader exploded' },
+    ]);
   });
 
   it('resolves no platform pairs for a non-enrollable gateway entry and reports why', async () => {

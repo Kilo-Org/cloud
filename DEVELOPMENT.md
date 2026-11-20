@@ -441,6 +441,7 @@ pnpm dev:pixel-diff --before /tmp/proof/base-panel.png --after /tmp/proof/head-p
 ```
 
 Use fixture builds and the same Chromium executable for both captures.
+Give each capture a new `--out` path, including a repeat of the same build.
 Set `EXTENSION_E2E_EXECUTABLE_PATH` if you need to select that executable.
 This captures the extension document, not browser-owned dialogs or other browser controls.
 

@@ -57,8 +57,8 @@ catalog:
   google-auth-library: 10.6.2
   hono: 4.13.16
   jose: 6.2.17
-  # Named by the root manifest's devDependency and by the `overrides` entry
-  # below, so the catalog pin is the one place both readers take it from.
+  # Named by the root and apps/web manifests and by the `overrides` entry
+  # below, so the catalog pin is the one place all three readers take it from.
   js-yaml: 4.3.2
   jsonwebtoken: 9.0.3
   # One Next release for the three apps and web-shared. web-shared must resolve

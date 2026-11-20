@@ -4774,6 +4774,7 @@
     "connectedTo": "Povezano s {{account}}",
     "disconnected": "Veza s {{provider}} je prekinuta",
     "disconnectFailed": "Nije moguće prekinuti vezu s {{provider}}",
+    "disconnectRetry": "Slack nije mogao potvrditi prekid veze. Pokušaj ponovo.",
     "couldNotLoad": "Nije moguće učitati integracije",
     "permissionDenied": "Nemate dozvolu za upravljanje ovim integracijama.",
     "managedByOwner": "Zamolite vlasnika organizacije da promijeni vezu koju ne možete promijeniti.",

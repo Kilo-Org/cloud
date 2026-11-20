@@ -4774,6 +4774,7 @@
     "connectedTo": "Connectat a {{account}}",
     "disconnected": "S'ha desconnectat {{provider}}",
     "disconnectFailed": "No s'ha pogut desconnectar {{provider}}",
+    "disconnectRetry": "Slack no ha pogut confirmar la desconnexió. Torna-ho a provar.",
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "managedByOwner": "Demana a un propietari de l'organització que canviï una connexió que no pots canviar.",

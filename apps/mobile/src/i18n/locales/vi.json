@@ -4695,6 +4695,7 @@
     "connectedTo": "Đã kết nối với {{account}}",
     "disconnected": "Đã ngắt kết nối {{provider}}",
     "disconnectFailed": "Không thể ngắt kết nối {{provider}}",
+    "disconnectRetry": "Slack không thể xác nhận việc ngắt kết nối. Hãy thử lại.",
     "couldNotLoad": "Không thể tải các tích hợp",
     "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
     "managedByOwner": "Hãy yêu cầu chủ sở hữu của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",

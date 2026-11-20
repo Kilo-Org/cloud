@@ -4695,6 +4695,7 @@
     "connectedTo": "{{account}} に接続済み",
     "disconnected": "{{provider}} の接続を解除しました",
     "disconnectFailed": "{{provider}} の接続を解除できませんでした",
+    "disconnectRetry": "Slack が接続の解除を確認できませんでした。もう一度お試しください。",
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
     "managedByOwner": "変更できない接続については、組織のオーナーに変更を依頼してください。",

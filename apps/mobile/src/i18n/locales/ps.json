@@ -4695,6 +4695,7 @@
     "connectedTo": "له {{account}} سره نښلول شوی",
     "disconnected": "له {{provider}} سره اړیکه پرې شوه",
     "disconnectFailed": "له {{provider}} سره اړیکه پرې نه شوه",
+    "disconnectRetry": "Slack نه شو کولی د اړیکې پرې کېدل تایید کړي. بیا هڅه وکړئ.",
     "couldNotLoad": "ادغامونه راوړل نه شول",
     "permissionDenied": "تاسو د دې ادغامونو د مدیریت اجازه نه لرئ.",
     "managedByOwner": "د سازمان له مالک څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",

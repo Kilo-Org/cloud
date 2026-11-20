@@ -4695,6 +4695,7 @@
     "connectedTo": "Yhdistetty: {{account}}",
     "disconnected": "Yhteys palveluun {{provider}} katkaistu",
     "disconnectFailed": "Yhteyttä palveluun {{provider}} ei voitu katkaista",
+    "disconnectRetry": "Slack ei voinut vahvistaa yhteyden katkaisua. Yritä uudelleen.",
     "couldNotLoad": "Integraatioita ei voitu ladata",
     "permissionDenied": "Sinulla ei ole oikeutta hallita näitä integraatioita.",
     "managedByOwner": "Pyydä organisaation omistajaa muuttamaan yhteyttä, jota et voi muuttaa.",

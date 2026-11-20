@@ -4695,6 +4695,7 @@
     "connectedTo": "{{account}} hisobiga ulangan",
     "disconnected": "{{provider}} xizmati uzildi",
     "disconnectFailed": "{{provider}} xizmatini uzib boʻlmadi",
+    "disconnectRetry": "Slack uzilishni tasdiqlay olmadi. Qayta urinib ko'ring.",
     "couldNotLoad": "Integratsiyalarni yuklab boʻlmadi",
     "permissionDenied": "Sizda bu integratsiyalarni boshqarish uchun ruxsat yoʻq.",
     "managedByOwner": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasiga murojaat qiling.",

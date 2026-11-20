@@ -4695,6 +4695,7 @@
     "connectedTo": "Terhubung ke {{account}}",
     "disconnected": "{{provider}} telah diputuskan",
     "disconnectFailed": "Tidak dapat memutuskan {{provider}}",
+    "disconnectRetry": "Slack tidak dapat mengonfirmasi pemutusan. Coba lagi.",
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",

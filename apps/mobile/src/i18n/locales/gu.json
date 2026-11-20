@@ -4695,6 +4695,7 @@
     "connectedTo": "{{account}} સાથે કનેક્ટ થયેલ",
     "disconnected": "{{provider}} ડિસ્કનેક્ટ થયું",
     "disconnectFailed": "{{provider}} ડિસ્કનેક્ટ કરી શકાયું નહીં",
+    "disconnectRetry": "Slack ડિસ્કનેક્શનની પુષ્ટિ કરી શક્યું નહીં. ફરી પ્રયાસ કરો.",
     "couldNotLoad": "ઇન્ટિગ્રેશન્સ લોડ કરી શકાયા નહીં",
     "permissionDenied": "તમને આ ઇન્ટિગ્રેશન્સ મેનેજ કરવાની પરવાનગી નથી.",
     "managedByOwner": "તમે ન બદલી શકો એવું કનેક્શન બદલવા માટે સંસ્થાના માલિકને કહો.",

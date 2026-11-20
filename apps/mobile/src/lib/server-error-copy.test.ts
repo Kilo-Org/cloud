@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
+import { SLACK_DISCONNECT_UNCONFIRMED_MESSAGE } from '@kilocode/app-shared/integrations-errors';
 import { i18n } from '@/i18n';
 import {
   isTrialExpiredRefusal,
@@ -94,6 +95,14 @@ describe('knownServerErrorMessage', () => {
       expect(copy).not.toBe(sentence);
     }
   );
+
+  // Slack did not answer, so the integration stays connected and the person can
+  // press Disconnect again; the copy must say the retry is possible.
+  it('explains an unconfirmed Slack disconnect as a retry', () => {
+    const unconfirmed = makeError('SERVICE_UNAVAILABLE', SLACK_DISCONNECT_UNCONFIRMED_MESSAGE);
+    expect(knownServerErrorCopyKey(unconfirmed)).toBe('integrations.disconnectRetry');
+    expect(knownServerErrorMessage(unconfirmed)).toBe(i18n.t('integrations.disconnectRetry'));
+  });
 
   // `assertEnabled` refuses save, reject and approve with this one sentence, so
   // its copy must describe the gate and never one action's outcome.

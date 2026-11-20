@@ -4695,6 +4695,7 @@
     "connectedTo": "Ansluten till {{account}}",
     "disconnected": "{{provider}} har kopplats från",
     "disconnectFailed": "Det gick inte att koppla från {{provider}}",
+    "disconnectRetry": "Slack kunde inte bekräfta frånkopplingen. Försök igen.",
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
     "managedByOwner": "Be en ägare i organisationen att ändra en anslutning som du inte kan ändra.",

@@ -4695,6 +4695,7 @@
     "connectedTo": "Imeunganishwa na {{account}}",
     "disconnected": "{{provider}} imetenganishwa",
     "disconnectFailed": "Imeshindwa kutenganisha {{provider}}",
+    "disconnectRetry": "Slack haikuweza kuthibitisha kutenganisha. Jaribu tena.",
     "couldNotLoad": "Imeshindwa kupakia miunganisho",
     "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
     "managedByOwner": "Mwombe mmiliki wa shirika abadilishe muunganisho ambao huwezi kubadilisha.",

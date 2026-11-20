@@ -4695,6 +4695,7 @@
     "connectedTo": "متصل به {{account}}",
     "disconnected": "اتصال {{provider}} قطع شد",
     "disconnectFailed": "قطع اتصال {{provider}} ممکن نشد",
+    "disconnectRetry": "Slack نتوانست قطع اتصال را تأیید کند. دوباره تلاش کنید.",
     "couldNotLoad": "بارگیری یکپارچه‌سازی‌ها ممکن نشد",
     "permissionDenied": "شما اجازهٔ مدیریت این یکپارچه‌سازی‌ها را ندارید.",
     "managedByOwner": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک سازمان درخواست کنید.",

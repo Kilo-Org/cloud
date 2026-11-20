@@ -19,6 +19,7 @@ import {
   getSlackCredentialByIntegrationId,
   writeSlackCredential,
 } from '@/lib/integrations/platforms/slack/credential-store';
+import { SLACK_DISCONNECT_UNCONFIRMED_MESSAGE } from '@kilocode/app-shared/integrations-errors';
 import { SlackCredentialDecryptionError } from '@/lib/integrations/platforms/slack/credential-encryption';
 import { captureException } from '@sentry/nextjs';
 
@@ -157,17 +158,113 @@ export async function exchangeSlackOAuthCode(code: string): Promise<SlackOAuthEx
 }
 
 /**
- * Revoke Slack access token
+ * Outcome of asking Slack to revoke a token.
+ * `already_invalid` means Slack no longer honours the token, so nothing is left to revoke.
+ * `temporary_failure` means the call did not settle the question and is worth retrying.
  */
-export async function revokeSlackToken(accessToken: string): Promise<boolean> {
-  const client = new WebClient(accessToken);
+export type SlackTokenRevocation =
+  | { status: 'revoked' }
+  | { status: 'already_invalid'; slackError: string }
+  | { status: 'temporary_failure'; reason: SlackTokenRevocationFailureReason };
+
+export type SlackTokenRevocationFailureReason =
+  | 'rate_limited'
+  | 'http_error'
+  | 'network'
+  | 'unknown';
+
+/** Slack error codes that mean the token is already gone, so revocation is complete. */
+const SLACK_TOKEN_ALREADY_INVALID_ERRORS: Record<string, true> = {
+  token_revoked: true,
+  invalid_auth: true,
+  not_authed: true,
+  account_inactive: true,
+  token_expired: true,
+};
+
+/**
+ * Read the `code` (and the platform error string, when present) out of a thrown value.
+ * The `@slack/web-api` errors are plain objects with these fields; nothing else is read,
+ * so an unrecognised value simply yields the `unknown` shape.
+ */
+function readSlackApiError(error: unknown): { code: string | null; slackError: string | null } {
+  if (typeof error !== 'object' || error === null) {
+    return { code: null, slackError: null };
+  }
+
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : null;
+
+  if (!('data' in error)) {
+    return { code, slackError: null };
+  }
+
+  const data = error.data;
+  const slackError =
+    typeof data === 'object' && data !== null && 'error' in data && typeof data.error === 'string'
+      ? data.error
+      : null;
+
+  return { code, slackError };
+}
+
+function getRevocationFailureReason(code: string | null): SlackTokenRevocationFailureReason {
+  switch (code) {
+    case 'slack_webapi_rate_limited_error':
+      return 'rate_limited';
+    case 'slack_webapi_http_error':
+      return 'http_error';
+    case 'slack_webapi_request_error':
+      return 'network';
+    default:
+      return 'unknown';
+  }
+}
+
+function reportRevocationFailure(
+  reason: SlackTokenRevocationFailureReason,
+  slackError: string | null
+): SlackTokenRevocation {
+  // Never hand the SDK error to Sentry: its payload can carry the request config.
+  captureException(new Error(`Slack token revocation failed: ${reason}`), {
+    tags: { component: 'slack-service', op: 'revoke-slack-token' },
+    extra: { reason, slackError: slackError ?? undefined },
+  });
+
+  return { status: 'temporary_failure', reason };
+}
+
+/**
+ * Revoke Slack access token.
+ * Never throws: a Slack refusal is reported in the result, because the caller has to tell
+ * "Slack says the token is already dead" apart from "Slack did not answer".
+ */
+export async function revokeSlackToken(accessToken: string): Promise<SlackTokenRevocation> {
+  // The SDK's default policy retries for about thirty minutes, well past the tRPC
+  // route's 800 s budget; one bounded retry keeps a single blip from failing the
+  // disconnect while still letting the caller answer with the retryable error.
+  const client = new WebClient(accessToken, {
+    retryConfig: { retries: 1, minTimeout: 500, maxTimeout: 2_000 },
+  });
 
   try {
     const result = await client.auth.revoke();
-    return result.ok === true;
+    // The SDK throws on `ok:false`, so a resolved non-ok body only comes from a stand-in.
+    if (result.ok === true) {
+      return { status: 'revoked' };
+    }
+    return reportRevocationFailure('unknown', null);
   } catch (error) {
-    console.error('Failed to revoke Slack token:', error);
-    return false;
+    const { code, slackError } = readSlackApiError(error);
+
+    if (
+      code === 'slack_webapi_platform_error' &&
+      slackError !== null &&
+      SLACK_TOKEN_ALREADY_INVALID_ERRORS[slackError] === true
+    ) {
+      return { status: 'already_invalid', slackError };
+    }
+
+    return reportRevocationFailure(getRevocationFailureReason(code), slackError);
   }
 }
 
@@ -317,13 +414,29 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 /**
- * Load the bot token for an integration from the encrypted credential store.
- *
- * Returns null when no credential row exists, the row is revoked, or the row cannot
- * be read. Failures are reported to the error tracker with the integration id only;
- * callers treat null as "no access token" and surface their own user-facing error.
+ * A credential-store read that keeps "nothing is stored" apart from "something is
+ * stored but this code cannot use it". Only `absent` means no Slack grant can be
+ * reached through the row.
  */
-export async function getSlackBotToken(integration: PlatformIntegration): Promise<string | null> {
+export type SlackBotTokenRead =
+  | { status: 'available'; token: string }
+  | { status: 'absent' }
+  | { status: 'unavailable'; reason: 'read_failed' | 'decrypt_failed' };
+
+/**
+ * Load the bot token for an integration from the encrypted credential store,
+ * reporting why a token is not available.
+ *
+ * Failures are reported to the error tracker with the integration id only. An
+ * integration with no exclusive owner is reported as `read_failed`: the row records
+ * a connection this code cannot address, which is not the same as having none.
+ *
+ * A credential row already marked revoked reports `absent`: the store refuses to
+ * decrypt it, and Slack has already given up that token.
+ */
+export async function readSlackBotToken(
+  integration: PlatformIntegration
+): Promise<SlackBotTokenRead> {
   const owner = getOwnerFromInstallation(integration);
   if (!owner) {
     captureException(new Error('Slack integration has no exclusive owner'), {
@@ -331,7 +444,7 @@ export async function getSlackBotToken(integration: PlatformIntegration): Promis
       tags: { component: 'slack-service', op: 'read-slack-credential' },
       extra: { integrationId: integration.id },
     });
-    return null;
+    return { status: 'unavailable', reason: 'read_failed' };
   }
 
   let credential: SlackOAuthCredential | null;
@@ -343,12 +456,16 @@ export async function getSlackBotToken(integration: PlatformIntegration): Promis
       tags: { component: 'slack-service', op: 'read-slack-credential' },
       extra: { integrationId: integration.id },
     });
-    return null;
+    return { status: 'unavailable', reason: 'read_failed' };
   }
-  if (!credential) return null;
+  if (!credential) return { status: 'absent' };
 
   try {
-    return decryptSlackBotToken(credential, owner);
+    // A revoked row decrypts to null: Slack already dropped that token, so nothing
+    // is live and the row is safe to remove.
+    const token = decryptSlackBotToken(credential, owner);
+    if (!token) return { status: 'absent' };
+    return { status: 'available', token };
   } catch (error) {
     captureException(error, {
       level: 'error',
@@ -358,8 +475,20 @@ export async function getSlackBotToken(integration: PlatformIntegration): Promis
         kind: error instanceof SlackCredentialDecryptionError ? error.kind : 'unknown',
       },
     });
-    return null;
+    return { status: 'unavailable', reason: 'decrypt_failed' };
   }
+}
+
+/**
+ * Load the bot token for an integration from the encrypted credential store.
+ *
+ * Returns null when no credential row exists, the row is revoked, or the row cannot
+ * be read. Failures are reported to the error tracker with the integration id only;
+ * callers treat null as "no access token" and surface their own user-facing error.
+ */
+export async function getSlackBotToken(integration: PlatformIntegration): Promise<string | null> {
+  const read = await readSlackBotToken(integration);
+  return read.status === 'available' ? read.token : null;
 }
 
 /**
@@ -542,13 +671,26 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   const shouldDeleteSlackInstallation =
     integration.integration_status === INTEGRATION_STATUS.ACTIVE;
 
-  // Revoke the stored credential if we have one
-  const botToken = await getSlackBotToken(integration);
-  if (shouldDeleteSlackInstallation && botToken) {
-    try {
-      await revokeSlackToken(botToken);
-    } catch (error) {
-      console.error('Failed to revoke Slack token:', error);
+  // Revoke the stored credential if we have one. A Slack refusal that does not
+  // settle the token's state keeps the row, so a retry starts the revoke again.
+  const tokenRead = await readSlackBotToken(integration);
+  if (shouldDeleteSlackInstallation) {
+    if (tokenRead.status === 'unavailable') {
+      // The grant may still be live in Slack and this row is the only pointer to it,
+      // so the row and its credential survive until the credential can be read.
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+      });
+    }
+    if (tokenRead.status === 'available') {
+      const revocation = await revokeSlackToken(tokenRead.token);
+      if (revocation.status === 'temporary_failure') {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+        });
+      }
     }
   }
 

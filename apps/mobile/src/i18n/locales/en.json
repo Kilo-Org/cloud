@@ -4695,6 +4695,7 @@
     "connectedTo": "Connected to {{account}}",
     "disconnected": "{{provider}} disconnected",
     "disconnectFailed": "Could not disconnect {{provider}}",
+    "disconnectRetry": "Slack could not confirm the disconnect. Try again.",
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
     "managedByOwner": "Ask an organization owner to change connections you can't edit.",

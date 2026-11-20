@@ -4695,6 +4695,7 @@
     "connectedTo": "Konektatuta: {{account}}",
     "disconnected": "{{provider}} deskonektatu da",
     "disconnectFailed": "Ezin izan da {{provider}} deskonektatu",
+    "disconnectRetry": "Slack-ek ezin izan du deskonexioa berretsi. Saiatu berriro.",
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
     "managedByOwner": "Eskatu erakundearen jabe bati aldatu ezin duzun konexio bat alda dezan.",

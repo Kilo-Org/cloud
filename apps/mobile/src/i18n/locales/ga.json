@@ -4932,6 +4932,7 @@
     "connectedTo": "Ceangailte le {{account}}",
     "disconnected": "Dícheanglaíodh {{provider}}",
     "disconnectFailed": "Níorbh fhéidir {{provider}} a dhícheangal",
+    "disconnectRetry": "Níorbh fhéidir le Slack an dícheangal a dhearbhú. Bain triail as arís.",
     "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
     "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
     "managedByOwner": "Iarr ar úinéir eagraíochta ceangal nach féidir leat a athrú.",

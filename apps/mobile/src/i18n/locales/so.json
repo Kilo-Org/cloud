@@ -4695,6 +4695,7 @@
     "connectedTo": "Ku xidhan {{account}}",
     "disconnected": "{{provider}} waa la gooyay",
     "disconnectFailed": "Lama goyn karo {{provider}}",
+    "disconnectRetry": "Slack ma xaqiijin karin goynta isku-xidhka. Mar kale isku day.",
     "couldNotLoad": "Lama soo gelin karo isku-xidhka",
     "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
     "managedByOwner": "Weydii milkiilaha ururka si uu u beddelo isku-xidhka aadan beddeli karin.",

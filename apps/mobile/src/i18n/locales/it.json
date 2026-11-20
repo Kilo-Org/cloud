@@ -4774,6 +4774,7 @@
     "connectedTo": "Collegato a {{account}}",
     "disconnected": "{{provider}} scollegato",
     "disconnectFailed": "Impossibile scollegare {{provider}}",
+    "disconnectRetry": "Slack non è riuscito a confermare lo scollegamento. Riprova.",
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
     "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",

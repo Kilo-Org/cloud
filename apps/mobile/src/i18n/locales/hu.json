@@ -4695,6 +4695,7 @@
     "connectedTo": "Csatlakoztatva: {{account}}",
     "disconnected": "{{provider}} leválasztva",
     "disconnectFailed": "Nem sikerült leválasztani: {{provider}}",
+    "disconnectRetry": "A Slack nem tudta megerősíteni a leválasztást. Próbáld újra.",
     "couldNotLoad": "Nem sikerült betölteni az integrációkat",
     "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
     "managedByOwner": "Kérd meg a szervezet egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",

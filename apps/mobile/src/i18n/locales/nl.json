@@ -4695,6 +4695,7 @@
     "connectedTo": "Gekoppeld aan {{account}}",
     "disconnected": "{{provider}} ontkoppeld",
     "disconnectFailed": "Kan {{provider}} niet ontkoppelen",
+    "disconnectRetry": "Slack kon de ontkoppeling niet bevestigen. Probeer het opnieuw.",
     "couldNotLoad": "Kan integraties niet laden",
     "permissionDenied": "Je hebt geen toestemming om deze integraties te beheren.",
     "managedByOwner": "Vraag een eigenaar van de organisatie om een koppeling te wijzigen die je zelf niet kunt wijzigen.",

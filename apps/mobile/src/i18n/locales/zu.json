@@ -4695,6 +4695,7 @@
     "connectedTo": "Ixhunywe ku-{{account}}",
     "disconnected": "I-{{provider}} inqanyuliwe",
     "disconnectFailed": "Akukwazekanga ukunqamula i-{{provider}}",
+    "disconnectRetry": "I-Slack ayikwazanga ukuqinisekisa ukunqanyulwa koxhumano. Zama futhi.",
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
     "managedByOwner": "Cela umnikazi wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",

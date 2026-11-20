@@ -4695,6 +4695,7 @@
     "connectedTo": "Nakakonekta sa {{account}}",
     "disconnected": "Nadiskonekta ang {{provider}}",
     "disconnectFailed": "Hindi ma-diskonekta ang {{provider}}",
+    "disconnectRetry": "Hindi makumpirma ng Slack ang pagdiskonekta. Subukan muli.",
     "couldNotLoad": "Hindi ma-load ang mga integration",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
     "managedByOwner": "Hilingin sa isang may-ari ng organisasyon na baguhin ang isang koneksyong hindi mo mababago.",

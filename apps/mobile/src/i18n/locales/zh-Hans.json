@@ -4695,6 +4695,7 @@
     "connectedTo": "已连接到 {{account}}",
     "disconnected": "已断开 {{provider}} 的连接",
     "disconnectFailed": "无法断开 {{provider}} 的连接",
+    "disconnectRetry": "Slack 无法确认已断开连接。请重试。",
     "couldNotLoad": "无法加载集成",
     "permissionDenied": "你没有管理这些集成的权限。",
     "managedByOwner": "请联系组织所有者更改你无法更改的连接。",

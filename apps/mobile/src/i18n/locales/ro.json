@@ -4774,6 +4774,7 @@
     "connectedTo": "Conectat la {{account}}",
     "disconnected": "{{provider}} a fost deconectat",
     "disconnectFailed": "{{provider}} nu a putut fi deconectat",
+    "disconnectRetry": "Slack nu a putut confirma deconectarea. Încearcă din nou.",
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
     "managedByOwner": "Cere unui proprietar al organizației să modifice o conexiune pe care nu o poți modifica.",

@@ -11,6 +11,7 @@ import {
 import type { BrowserGrant, StepTokenStore } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall } from './browser-agent-gate';
 import type { AgentPreflight } from './browser-agent-gate';
+import type { AgentFrameInventory } from './browser-agent-frames';
 import type { BrowserToolResolvedTarget } from './browser-tool-session';
 
 type CdpHandler = (
@@ -300,6 +301,7 @@ const run = (
     readonly args?: Record<string, unknown>;
     readonly authorized?: readonly BrowserGrant[];
     readonly probe?: Record<string, unknown>;
+    readonly readFrames?: () => Promise<AgentFrameInventory>;
     readonly session?: FakeGateSession;
     readonly stepTokens?: readonly string[];
     readonly toolName: string;
@@ -313,6 +315,7 @@ const run = (
     args: input.args ?? {},
     authorized: input.authorized ?? grants,
     consumeStepToken: (token, binding) => tokens.consume(token, binding),
+    ...(input.readFrames === undefined ? {} : { readFrames: input.readFrames }),
     session:
       input.session ?? createSession(input.probe === undefined ? {} : { probe: input.probe }),
     sessionHandle: 'session-1',
@@ -1246,6 +1249,42 @@ describe('sensitive steps', () => {
     });
 
     expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.oauthConsent);
+  });
+
+  it('does not judge a frame target by the top page when this read no longer knows its frame', async () => {
+    const frames = [
+      { id: 'main', origin: 'https://app.example.com', url: 'https://app.example.com/' },
+      {
+        id: 'f1',
+        origin: 'https://pay.example.com',
+        parentId: 'main',
+        url: 'https://pay.example.com/login/oauth/authorize',
+      },
+    ];
+    // The first read resolves the target's frame; the read before the action no longer lists it.
+    const reads = [frames, frames.slice(0, 1)];
+    const result = await run({
+      args: { target: 'e12' },
+      readFrames: async () => ({
+        childSessions: new Map(),
+        complete: true,
+        frames: reads.splice(0, 1).flat(),
+      }),
+      session: createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: 'https://pay.example.com/login/oauth/authorize',
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      }),
+      toolName: 'browser_click',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.frameUnverified);
   });
 
   it('classifies a file upload as sensitive', async () => {

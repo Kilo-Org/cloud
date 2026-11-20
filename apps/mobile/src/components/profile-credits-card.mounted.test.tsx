@@ -1116,7 +1116,14 @@ describe('CreditsCard organization balance source', () => {
       // The row stays in the tree, so the block keeps the height the amount
       // paints at; no other copy of the caption can be visible beside it.
       expect(captions).toHaveLength(1);
-      const [caption] = captions;
+      const caption = renderer.root.find(
+        node =>
+          Object.is(node.type, 'Text') &&
+          node.children.some(
+            child =>
+              typeof child === 'string' && child === 'Available to spend in this organization'
+          )
+      );
       expect(hasClasses(caption, ['text-xs', 'opacity-0'])).toBe(true);
       expect(caption.props.accessibilityElementsHidden).toBe(true);
       expect(caption.props.importantForAccessibility).toBe('no');

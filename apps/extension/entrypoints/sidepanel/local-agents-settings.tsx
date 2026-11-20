@@ -60,8 +60,10 @@ const PERMISSION_WAIT_MS = 2000;
  * `nativeMessaging` for the native host and `downloads`, which the browser
  * cannot grant at install time without disabling the extension for every
  * existing user. A refusal or a prompt nobody answers is not an error: the
- * native endpoint reports `host_missing`, the loopback endpoint still works,
- * and the agent's download guard falls back to cancelling at the response.
+ * native endpoint reports `host_missing`, the loopback endpoint still works, and
+ * every step still runs — but without `downloads` no download can be held or
+ * cancelled, so a file a step does start is reported as possibly saved instead
+ * of being guarded.
  */
 const requestLocalAgentPermissions = async (): Promise<void> => {
   const settled = Promise.withResolvers<void>();

@@ -75,9 +75,11 @@ export const toolGrantClass = (toolName: string): BrowserGrantClass =>
 /**
  * Every tool whose page action can start a download: a click, a dropped or
  * dragged item, a key press (Enter on a focused link), a form filled or
- * submitted, the two tools that run model-authored code, and a load the page
- * did not ask a human for — a navigate to an attachment URL, a back/forward to
- * one, or a tab opened at a URL that answers with a file.
+ * submitted, the two tools that run model-authored code, an answer to a JS
+ * dialog — the click that opened it returns at once, and its handler resumes in
+ * the answer — and a load the page did not ask a human for: a navigate to an
+ * attachment URL, a back/forward to one, or a tab opened at a URL that answers
+ * with a file.
  */
 const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
   'browser_click',
@@ -86,6 +88,8 @@ const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
   'browser_evaluate',
   // Fills each field through the page's own `input`/`change` handler, and clicks a checkbox or radio into place.
   'browser_fill_form',
+  // The dialog's owner resumes in this call: the click that opened it has already answered.
+  'browser_handle_dialog',
   'browser_navigate',
   'browser_navigate_back',
   'browser_navigate_forward',
@@ -111,6 +115,69 @@ export const canStartDownload = (toolName: string, args: Record<string, unknown>
 };
 
 /**
+ * The one guard a call runs, chosen once from the browser and the optional
+ * `downloads` permission — never two at a time, because each one decides the
+ * same item and the later one would only overrule the earlier.
+ * - `hold`: `chrome.downloads.onDeterminingFilename` exists, so the item is held before its file exists.
+ * - `intercept`: Chrome without the permission, so the response that would become a file is failed.
+ * - `legacy`: neither the event nor a permission to hold with (`downloadsApi` is `undefined` only on a browser
+ *   whose `chrome.downloads` cannot be read), so the item is cancelled after it starts.
+ * - `none`: this call cannot start a download, or its approval already names the one file it buys.
+ *
+ * `holdsDownloads` is whether this browser has the event at all, which is what the hold object exists for; a hold
+ * without the permission cannot answer it, so the permission picks `intercept` there and never `hold`.
+ */
+export type DownloadTier =
+  /** `onDeterminingFilename` holds the item before its file exists. */
+  | 'hold'
+  /** The response that would become a file is failed, because the permission to hold it is not granted. */
+  | 'intercept'
+  /** The item is cancelled after it starts: a browser with neither the event nor the permission. */
+  | 'legacy'
+  /** This call cannot start a download, or its approval already names the one file it buys. */
+  | 'none';
+
+export const downloadTierOf = ({
+  approved,
+  canDownload,
+  canIntercept,
+  hasHold,
+  hasPermission,
+  needsTheFile,
+  sensitiveToken,
+}: {
+  /** Whether this call redeemed a download approval. */
+  readonly approved: boolean;
+  /** Whether this call is an agent call that can start a download at all. */
+  readonly canDownload: boolean;
+  /** Whether this tab can pause a response at all: a debugger backend, so Chrome and not Firefox. */
+  readonly canIntercept: boolean;
+  /** Whether the browser raises `onDeterminingFilename`, so a hold can decide an item. */
+  readonly hasHold: boolean;
+  /** Whether the optional `downloads` permission is granted right now. */
+  readonly hasPermission: boolean;
+  /** Whether the approval still names the one file it buys: without it nothing could be exempt from the guard. */
+  readonly needsTheFile: boolean;
+  /** Set when the gate already refused this step for a sensitive target: the guard would only repeat that. */
+  readonly sensitiveToken: boolean;
+}): DownloadTier => {
+  if (!canDownload || sensitiveToken) {
+    return 'none';
+  }
+
+  if (!hasPermission) {
+    // Without the permission the hold's event does not exist: the response is the only thing left to fail.
+    return canIntercept ? 'intercept' : 'none';
+  }
+
+  if (!hasHold) {
+    return approved && !needsTheFile ? 'none' : 'legacy';
+  }
+
+  return 'hold';
+};
+
+/**
  * The tab an approved download step opened is gone, so there is no tab to
  * repeat that step on. Opening a fresh one would download the file again
  * without the approval the human gave.
@@ -119,13 +186,46 @@ export const DOWNLOAD_STEP_TAB_GONE_ERROR =
   'The tab that step opened is gone. Take a fresh snapshot and try again (blocked).';
 
 /**
- * A refusal for a download-capable call when neither guard can run: the
- * optional `downloads` permission is missing and the tab's target cannot
- * intercept responses either. The switch re-requests the permission, so the
- * message names the one action that fixes it.
+ * A report for a download the browser started where nothing could hold it: the
+ * optional `downloads` permission is missing, so `onDeterminingFilename` does
+ * not exist. On Chrome the response interceptor still stops an http(s)
+ * attachment, so this text is only reached by a `blob:`, `data:` or
+ * `<a download>` file no network response can fail. The step ran and the file
+ * may exist, so the text names both and the one action that guards the next.
  */
 export const DOWNLOAD_PERMISSION_MISSING_ERROR =
-  'The browser cannot cancel downloads for this agent call: the optional Downloads permission is not granted (blocked). Turn "Allow local agents" off and on again to grant it, then retry.';
+  'A download may have been saved: the optional Downloads permission is not granted, so the download guard could not watch it. Turn "Allow local agents" off and on again to grant it, then retry.';
+
+/**
+ * The refusal for an http(s) download the response interceptor stopped: the file
+ * is named, and the approval is named as the thing the Downloads permission
+ * makes possible. Without that permission a step token cannot be redeemed, so no
+ * approval is offered — the text asks for the grant instead.
+ */
+export const downloadStoppedWithoutPermissionError = (filename: string): string =>
+  `The download of ${filename} was stopped before it was saved. Granting the optional Downloads permission lets this download be approved and repeated.`;
+
+/**
+ * The line for the files one call started besides the file its approval bought:
+ * one click can start several, and the approval names exactly one of them. The
+ * call did what the human approved, so these are named as stopped — a refusal
+ * would read as "the approved file never landed".
+ */
+export const alsoStoppedDownloadsText = (filenames: readonly string[]): string => {
+  const names = [...new Set(filenames)].join(', ');
+
+  return `${names}: the download was stopped before it was saved — each file needs its own approval, and the permission covers one download at a time.`;
+};
+
+/**
+ * The refusal for an approval that could not produce its file: Chrome's own
+ * multiple-downloads limiter blocks the approved repeat, so the browser creates
+ * no item at all. The approval is still unspent — a second human approval must
+ * not be needed for a file Chrome silently swallowed — and the text names the
+ * browser setting that unblocks it.
+ */
+export const DOWNLOAD_BLOCKED_BY_BROWSER_ERROR =
+  'The browser blocked this download. The user can allow automatic downloads for this site in Chrome, then repeat the step.';
 
 const DEFAULT_PORTS = { 'http:': '80', 'https:': '443' } as const;
 
@@ -430,7 +530,8 @@ export const sensitiveReasonForField = (kind: BrowserSensitiveField['kind']): st
   }
 };
 
-const STEP_TOKEN_TTL_MS = 60_000;
+/** How long a step token, and the one file its need names, lives. */
+export const STEP_TOKEN_TTL_MS = 60_000;
 
 /** What a step token binds: the tab, the element, the tool, and the exact arguments. */
 export interface StepTokenBinding {
@@ -443,11 +544,16 @@ export interface StepTokenBinding {
   readonly toolName: string;
 }
 
-/** The one download a step's approval buys: the tab it was on and the url of the file it started. */
-export interface StepTokenNeed {
-  readonly tabId: number;
-  readonly url: string;
-}
+/**
+ * The one download a step's approval buys: the tab it was on and the url of the file it started.
+ *
+ * `page` covers any download of that page — a repeat that regenerates its link (`?click=2`) is the same file the
+ * human approved. `exact` covers one url alone: it is what a refusal arms when the call's own requests named none of
+ * the stopped files, so the file the step meant is unknown and only the file the browser named may pass.
+ */
+export type StepTokenNeed =
+  | { readonly kind: 'exact'; readonly tabId: number; readonly url: string }
+  | { readonly kind: 'page'; readonly tabId: number; readonly url: string };
 
 export interface StepTokenIssue extends StepTokenBinding {
   /** The download this approval is for, when the step was refused for one: the call keeps that file alone. */

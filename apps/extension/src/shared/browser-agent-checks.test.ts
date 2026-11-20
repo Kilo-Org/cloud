@@ -5,6 +5,7 @@ import {
   canStartDownload,
   classifyFormField,
   createStepTokenStore,
+  downloadTierOf,
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
@@ -99,6 +100,66 @@ describe('download-capable tools', () => {
   it('leaves a tool that only reads the page alone', () => {
     expect(canStartDownload('browser_snapshot')).toBe(false);
     expect(canStartDownload('browser_take_screenshot')).toBe(false);
+  });
+});
+
+describe('download tier choice', () => {
+  const base = {
+    approved: false,
+    canDownload: true,
+    canIntercept: true,
+    hasHold: true,
+    hasPermission: true,
+    needsTheFile: false,
+    sensitiveToken: false,
+  } as const;
+
+  it('holds on a browser with the event and the permission', () => {
+    expect(downloadTierOf(base)).toBe('hold');
+  });
+
+  it('intercepts only when the event exists and the permission is withheld, so the hold is never armed alone', () => {
+    expect(downloadTierOf({ ...base, hasPermission: false })).toBe('intercept');
+    // A browser that cannot pause a response has nothing to fall back to.
+    expect(downloadTierOf({ ...base, canIntercept: false, hasPermission: false })).toBe('none');
+  });
+
+  it('keeps the legacy cancel-after-start guard on a browser with the permission but no event', () => {
+    expect(downloadTierOf({ ...base, hasHold: false })).toBe('legacy');
+  });
+
+  it('names one tier per permission and browser combination, never two', () => {
+    const tiers = [true, false].flatMap(hasHold =>
+      [true, false].flatMap(hasPermission =>
+        [true, false].map(canIntercept =>
+          downloadTierOf({ ...base, canIntercept, hasHold, hasPermission })
+        )
+      )
+    );
+
+    // Every combination picks at most one tier: the hold wins with the permission, the interceptor only without it.
+    expect(tiers).toStrictEqual([
+      'hold',
+      'hold',
+      'intercept',
+      'none',
+      'legacy',
+      'legacy',
+      'intercept',
+      'none',
+    ]);
+  });
+
+  it('chooses no guard for a call that cannot start a download or already spent its token', () => {
+    expect(downloadTierOf({ ...base, canDownload: false })).toBe('none');
+    expect(downloadTierOf({ ...base, sensitiveToken: true })).toBe('none');
+  });
+
+  it('guards nothing on a browser whose only guard is the legacy one, when the approval names no file', () => {
+    expect(downloadTierOf({ ...base, approved: true, hasHold: false })).toBe('none');
+    expect(downloadTierOf({ ...base, approved: true, hasHold: false, needsTheFile: true })).toBe(
+      'legacy'
+    );
   });
 });
 
@@ -198,7 +259,7 @@ describe('step tokens', () => {
   it('keeps the file an approval is for, for the whole life of the token', () => {
     let clock = 1000;
     const store = createStepTokenStore({ now: () => clock, random: () => 'token-need' });
-    const need = { tabId: 7, url: 'https://example.com/invoice.pdf' };
+    const need = { kind: 'page' as const, tabId: 7, url: 'https://example.com/invoice.pdf' };
     const token = store.issue({ ...binding, need, reason: SENSITIVE_REASON.download });
 
     // A human takes half a minute: no download record survives that long, and the token still names the file.

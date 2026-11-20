@@ -559,6 +559,15 @@ export interface BrowserToolSession {
   /** Returns the downloads seen since the last call and clears them. */
   readonly takeDownloads: () => readonly BrowserToolDownload[];
   /**
+   * Calls `listener` for every `Fetch.requestPaused` the tab reports, and
+   * returns the function that stops it. A response-stage interceptor arms the
+   * pause and answers every one it receives: a pause nobody answers holds the
+   * page forever, so this is the only door to the event.
+   */
+  readonly watchFetchPauses: (
+    listener: (params: Record<string, unknown> | undefined) => void
+  ) => () => void;
+  /**
    * Calls `listener` for every download the tab announces as it arrives, and
    * returns the function that stops it. A guard that keeps listening for a late
    * download needs the announcement itself: the browser names a download a
@@ -1611,6 +1620,8 @@ export const createBrowserToolSession = ({
   const downloadBuffer: BrowserToolDownload[] = [];
   // Listeners a still-armed guard registered for the announcement itself, not the buffer it drains.
   const downloadListeners = new Set<(download: BrowserToolDownload) => void>();
+  // Listeners a live response interceptor registered for the pauses it must answer, one per armed interceptor.
+  const fetchPauseListeners = new Set<(params: Record<string, unknown> | undefined) => void>();
   const networkById = new Map<string, MutableNetworkRequest>();
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
@@ -2048,6 +2059,15 @@ export const createBrowserToolSession = ({
 
     if (method === 'Browser.downloadWillBegin' || method === 'Page.downloadWillBegin') {
       handleDownloadWillBegin(params);
+      return;
+    }
+
+    if (method === 'Fetch.requestPaused') {
+      // One interceptor at a time per tab: every listener answers, and an armed interceptor owns the tab's pauses.
+      for (const listener of fetchPauseListeners) {
+        listener(params);
+      }
+
       return;
     }
 
@@ -2712,6 +2732,16 @@ export const createBrowserToolSession = ({
 
     return () => {
       downloadListeners.delete(listener);
+    };
+  };
+
+  const watchFetchPauses = (
+    listener: (params: Record<string, unknown> | undefined) => void
+  ): (() => void) => {
+    fetchPauseListeners.add(listener);
+
+    return () => {
+      fetchPauseListeners.delete(listener);
     };
   };
 
@@ -3797,6 +3827,7 @@ export const createBrowserToolSession = ({
       takeDownloads,
       viewportState,
       watchDownloads,
+      watchFetchPauses,
     };
   };
 
@@ -3844,5 +3875,6 @@ export const createBrowserToolSession = ({
     takeDownloads,
     viewportState,
     watchDownloads,
+    watchFetchPauses,
   };
 };

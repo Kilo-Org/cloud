@@ -660,7 +660,7 @@ test('apply keeps completed-run results, summaries and routing artifacts byte-id
   }
 });
 
-test('apply is idempotent: a second pass writes nothing and reports identical state', async () => {
+test('a second apply preserves the verified state', async () => {
   const f = fixture();
   try {
     seed(f.sqlite);
@@ -669,8 +669,57 @@ test('apply is idempotent: a second pass writes nothing and reports identical st
     const second = await run(f.path, ['--apply', ...BASE_ARGS]);
     assert.equal(second.code, EXIT.ok);
     assert.deepEqual(snapshot(f.sqlite), first);
-    // Second pass found nothing running, so it wrote only the sweeps, which matched 0 rows.
-    assert.equal(second.last('pass'), undefined);
+  } finally {
+    f.close();
+  }
+});
+
+test('apply closes a queued chunk left behind by runs that are already terminal', async () => {
+  // The last run can finish before all of its chunks leave the queue.
+  const f = fixture();
+  try {
+    holdOperatorLease(f.sqlite);
+    insertDeciderRun(f.sqlite, { id: 'run-done-a', status: 'failed' });
+    insertDeciderRun(f.sqlite, { id: 'run-done-b', status: 'failed' });
+    insertChunk(f.sqlite, {
+      runId: 'run-done-a',
+      model: 'vendor/a',
+      chunk: 0,
+      status: 'completed',
+    });
+    insertChunk(f.sqlite, { runId: 'run-done-a', model: 'vendor/a', chunk: 1, status: 'queued' });
+    insertChunk(f.sqlite, { runId: 'run-done-b', model: 'vendor/b', chunk: 0, status: 'pending' });
+    // A profile nobody owns any more: the park statement is the third settle write.
+    insertProfile(f.sqlite, { model: 'vendor/orphan', status: 'error_pending' });
+
+    const before = snapshot(f.sqlite);
+    assert.equal(before.running_runs, 0, 'precondition: no live run to cancel');
+    assert.ok(before.unfinished_chunks > 0, 'precondition: an unfinished chunk survives');
+
+    const result = await run(f.path, ['--apply', ...BASE_ARGS]);
+    assert.equal(result.code, EXIT.ok, JSON.stringify(result.events));
+    assert.equal(result.last('apply_ok').passes, 1);
+
+    const chunks = f.sqlite
+      .prepare('SELECT id, status, slot, token, lease_until FROM scheduler_chunks ORDER BY id')
+      .all();
+    assert.deepEqual(
+      chunks.map(row => row.status),
+      ['completed', 'completed', 'completed'],
+      'every unfinished chunk of a non-running run is closed'
+    );
+    assert.deepEqual(
+      chunks.map(row => [row.slot, row.token, Number(row.lease_until)]),
+      [
+        [null, null, 0],
+        [null, null, 0],
+        [null, null, 0],
+      ],
+      'a closed chunk retains no claim'
+    );
+    const after = snapshot(f.sqlite);
+    assert.equal(after.unfinished_chunks, 0);
+    assert.equal(after.running_profiles, 0, 'the orphaned running profile is parked');
   } finally {
     f.close();
   }

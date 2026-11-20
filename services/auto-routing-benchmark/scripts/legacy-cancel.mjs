@@ -816,10 +816,11 @@ export async function runLegacyCancel({
       report(log, 'before', before);
       const cancelled = new Set(first);
       let passes = 0;
-      for (; passes < MAX_PASSES; passes += 1) {
+      while (passes < MAX_PASSES) {
         const ids = (await executor.read(runningRunsSql())).map(row => String(row.id));
-        if (ids.length === 0) break;
         for (const id of ids) cancelled.add(id);
+        // Terminal runs can still have unfinished chunks. Run the guarded sweep even
+        // when there are no live runs to cancel.
         const changed = await executor.write(
           buildStatements({
             expectToken: args.expectToken,
@@ -827,7 +828,9 @@ export async function runLegacyCancel({
             runIds: ids,
           })
         );
-        report(log, 'pass', { pass: passes + 1, runIds: ids, changed });
+        passes += 1;
+        report(log, 'pass', { pass: passes, runIds: ids, changed });
+        if (ids.length === 0) break;
         // Every statement is guarded by the database clock. A pass that wrote nothing while
         // live runs remain means the lease guard refused the writes (the lease ran down or
         // was replaced while the request was in flight). Retrying cannot help and would only

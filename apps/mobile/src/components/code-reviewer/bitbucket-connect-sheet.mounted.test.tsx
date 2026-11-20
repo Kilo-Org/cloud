@@ -143,7 +143,9 @@ describe('BitbucketConnectSheet', () => {
 
     expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
-    expect(denied?.props.description).toBe(i18n.t('prReview.connect.adminOnlyConnectDescription'));
+    expect(denied?.props.description).toBe(
+      i18n.t('prReview.connect.bitbucketAdminOnlyDescription')
+    );
   });
 
   it('names the roles that can reconnect a connected token', async () => {
@@ -174,7 +176,7 @@ describe('BitbucketConnectSheet', () => {
     // key: the shared ended-plan sentence keeps the "then try again" clause for
     // the surfaces with no control.
     expect(await descriptionBlocks(denied?.props.description as ReactNode)).toEqual([
-      { text: i18n.t('prReview.connect.adminOnlyConnectDescription'), variant: 'muted' },
+      { text: i18n.t('prReview.connect.bitbucketAdminOnlyDescription'), variant: 'muted' },
       { text: i18n.t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'), variant: 'muted' },
     ]);
     // The plan is the blocker the reader cannot clear by role, so the denial
@@ -205,7 +207,9 @@ describe('BitbucketConnectSheet', () => {
     // sentence — a second block would name a blocker this state does not have —
     // and a retry changes nothing, so the denial offers no control.
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
-    expect(denied?.props.description).toBe(i18n.t('prReview.connect.adminOnlyConnectDescription'));
+    expect(denied?.props.description).toBe(
+      i18n.t('prReview.connect.bitbucketAdminOnlyDescription')
+    );
     expect(denied?.props.action).toBeUndefined();
   });
 

@@ -163,11 +163,13 @@ export type OpenAiChatGptDatabase = DrizzleConnection;
  * another process cannot interleave. `is_enabled` is read with the payload: a
  * person can disable the row through the ordinary BYOK toggle without touching
  * the stored status, so the payload alone cannot decide eligibility.
+ * `options.onlyWithUsageLimit` matches only a row that records a usage limit, so
+ * a locking read of a row without one takes no lock.
  */
 export async function readOpenAiChatGptConnectionRow(
   fromDb: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
-  options: { forUpdate?: boolean } = {}
+  options: { forUpdate?: boolean; onlyWithUsageLimit?: boolean } = {}
 ) {
   const query = fromDb
     .select({
@@ -176,7 +178,14 @@ export async function readOpenAiChatGptConnectionRow(
       created_by: openai_chatgpt_connections.created_by,
     })
     .from(openai_chatgpt_connections)
-    .where(openAiChatGptOwnerWhere(owner));
+    .where(
+      options.onlyWithUsageLimit
+        ? and(
+            openAiChatGptOwnerWhere(owner),
+            isNotNull(openai_chatgpt_connections.usage_limit_reached_at)
+          )
+        : openAiChatGptOwnerWhere(owner)
+    );
 
   const rows = options.forUpdate ? await query.for('update').limit(1) : await query.limit(1);
   return rows[0] ?? null;
@@ -366,10 +375,14 @@ export async function readOpenAiChatGptUsageLimit(
 async function withConnectionHoldingToken(
   owner: OpenAiChatGptOwner,
   accessToken: string,
-  write: (tx: OpenAiChatGptDatabase, connection: OpenAiChatGptConnection) => Promise<void>
+  write: (tx: OpenAiChatGptDatabase, connection: OpenAiChatGptConnection) => Promise<void>,
+  options: { onlyWithUsageLimit?: boolean } = {}
 ): Promise<void> {
   await db.transaction(async tx => {
-    const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
+    const row = await readOpenAiChatGptConnectionRow(tx, owner, {
+      forUpdate: true,
+      onlyWithUsageLimit: options.onlyWithUsageLimit,
+    });
     if (!row) return;
     const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
     if (!connection || connection.access_token !== accessToken) return;
@@ -410,26 +423,41 @@ export async function recordOpenAiChatGptUsageLimit(
  * only signal that proves the limit no longer applies. Waiting for the recorded
  * window instead would keep the notice up after the person can work again.
  *
- * The update matches only a row that still carries a record, so a success on a
- * connection that never hit a limit writes nothing. The report is applied only
- * while `accessToken` is still the owner's stored credential, so a late success
- * from a replaced credential cannot drop the limit its own connection recorded.
+ * Almost every success finds nothing to clear, so the common case must not take
+ * the owner's row lock: parallel requests of one person would queue on it. An
+ * unlocked read skips the transaction when the row records no limit. It reads
+ * the replica: a stale replica that still shows a cleared limit only falls
+ * through to the locked path, which re-checks on the primary; one that misses a
+ * limit recorded moments ago skips this clear, and the next success clears it.
+ * The locked read matches only a row that records a limit, so even the locked
+ * path never locks a row without one.
+ *
+ * The report is applied only while `accessToken` is still the owner's stored
+ * credential, so a late success from a replaced credential cannot drop the limit
+ * its own connection recorded.
  */
 export async function clearOpenAiChatGptUsageLimit(
   owner: OpenAiChatGptOwner,
   accessToken: string
 ): Promise<void> {
-  await withConnectionHoldingToken(owner, accessToken, async tx => {
-    await tx
-      .update(openai_chatgpt_connections)
-      .set({ ...NO_USAGE_LIMIT })
-      .where(
-        and(
-          openAiChatGptOwnerWhere(owner),
-          isNotNull(openai_chatgpt_connections.usage_limit_reached_at)
-        )
-      );
-  });
+  const recorded = await readDb
+    .select({ usage_limit_reached_at: openai_chatgpt_connections.usage_limit_reached_at })
+    .from(openai_chatgpt_connections)
+    .where(openAiChatGptOwnerWhere(owner))
+    .limit(1);
+  if (!recorded[0]?.usage_limit_reached_at) return;
+
+  await withConnectionHoldingToken(
+    owner,
+    accessToken,
+    async tx => {
+      await tx
+        .update(openai_chatgpt_connections)
+        .set({ ...NO_USAGE_LIMIT })
+        .where(openAiChatGptOwnerWhere(owner));
+    },
+    { onlyWithUsageLimit: true }
+  );
 }
 
 /**

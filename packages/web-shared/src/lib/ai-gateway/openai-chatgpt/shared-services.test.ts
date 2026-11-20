@@ -2,7 +2,7 @@ jest.mock('./served-models', () => ({
   isOpenAiModelServed: jest.fn(async () => true),
 }));
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { kilocode_users, openai_chatgpt_connections, type User } from '@kilocode/db/schema';
@@ -16,6 +16,7 @@ import {
   clearOpenAiChatGptUsageLimit,
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
+  readOpenAiChatGptConnectionRow,
   readOpenAiChatGptUsageLimit,
   recordOpenAiChatGptUsageLimit,
   saveOpenAiChatGptConnection,
@@ -357,6 +358,68 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
 
     await clearOpenAiChatGptUsageLimit(personalOwner, REPLACEMENT_ACCESS_TOKEN);
     await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
+  });
+
+  it('takes no row lock and writes nothing when a success finds no recorded limit', async () => {
+    const person = await insertTestUser({
+      google_user_email: `usage-limit-no-lock-${randomUUID()}@example.com`,
+    });
+    const personalOwner: OpenAiChatGptOwner = { kiloUserId: person.id, organizationId: null };
+    await saveOpenAiChatGptConnection(personalOwner, connection('no-lock@example.com'), person.id);
+
+    const transaction = jest.spyOn(db, 'transaction');
+    try {
+      // A concurrent holder of the row lock, as a refresh or another report is.
+      // A clear that locked the row would wait here for the holder to commit.
+      await db.transaction(async holder => {
+        await readOpenAiChatGptConnectionRow(holder, personalOwner, { forUpdate: true });
+        transaction.mockClear();
+        await expect(
+          clearOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN)
+        ).resolves.toBeUndefined();
+      });
+      expect(transaction).not.toHaveBeenCalled();
+    } finally {
+      transaction.mockRestore();
+    }
+    await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
+  });
+
+  it('does not lock a row without a recorded limit when the locked read asks only for limits', async () => {
+    const person = await insertTestUser({
+      google_user_email: `usage-limit-locked-read-${randomUUID()}@example.com`,
+    });
+    const personalOwner: OpenAiChatGptOwner = { kiloUserId: person.id, organizationId: null };
+    await saveOpenAiChatGptConnection(
+      personalOwner,
+      connection('locked-read@example.com'),
+      person.id
+    );
+
+    await db.transaction(async holder => {
+      await readOpenAiChatGptConnectionRow(holder, personalOwner, { forUpdate: true });
+      await db.transaction(async tx => {
+        await expect(
+          readOpenAiChatGptConnectionRow(tx, personalOwner, {
+            forUpdate: true,
+            onlyWithUsageLimit: true,
+          })
+        ).resolves.toBeNull();
+      });
+    });
+
+    await recordOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN, {
+      code: null,
+      resetsAt: null,
+    });
+    await db.transaction(async tx => {
+      await expect(
+        readOpenAiChatGptConnectionRow(tx, personalOwner, {
+          forUpdate: true,
+          onlyWithUsageLimit: true,
+        })
+      ).resolves.not.toBeNull();
+    });
   });
 
   it('deletes the shared row and leaves the member row in place', async () => {

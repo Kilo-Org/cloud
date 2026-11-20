@@ -16,8 +16,9 @@ export const maxDuration = 300;
  * One spend-alert sweep tick: re-derive the hourly buckets for the usage delta
  * and decide those scopes (plus any rule still firing). The sweep never walks
  * the owner population, so an idle fleet costs a single empty range scan. A
- * tick whose rollup was locked out or timed out decides nothing and still
- * returns 200; the summary's `rollup` field says which.
+ * duplicate invocation that finds a rollup already running leaves the tick to
+ * it and returns 200 with `rollup: 'locked'`; a failed rollup, including a
+ * timed-out one, fails the request.
  *
  * Delivery runs in its own cron (`drain-spend-alert-deliveries`) so a slow or
  * killed sweep cannot stop the outbox from draining that tick.

@@ -910,8 +910,8 @@ describe('runSpendAlertSweep candidate set and batching', () => {
       expect(selectCalls()).toBe(0);
       expect(loadScopeSnapshots).not.toHaveBeenCalled();
       expect(mockSweepLog).toHaveBeenCalledWith(
-        'Spend alert sweep rollup did not run',
-        expect.objectContaining({ reason: 'locked', rollupMs: expect.any(Number) })
+        'Spend alert sweep skipped: rollup already running',
+        expect.objectContaining({ rollupMs: expect.any(Number) })
       );
       expect(mockSweepLog).not.toHaveBeenCalledWith(
         'Spend alert sweep phases completed',
@@ -919,7 +919,7 @@ describe('runSpendAlertSweep candidate set and batching', () => {
       );
     });
 
-    it('runs the settings, lock and rollup in order inside one transaction', async () => {
+    it('runs the statement timeout, lock and rollup in order inside one transaction', async () => {
       const { database, txStatements, topLevelStatements } = pagedFiringDatabase(
         () => [],
         rollupRows(['user:owner-1'])
@@ -930,52 +930,29 @@ describe('runSpendAlertSweep candidate set and batching', () => {
 
       expect(result.rollupStatus).toBe('completed');
       expect(topLevelStatements).toEqual([]);
-      expect(txStatements).toHaveLength(5);
+      expect(txStatements).toHaveLength(3);
       expect(txStatements[0]?.sql).toBe(`SET LOCAL statement_timeout = '120000'`);
-      expect(txStatements[1]?.sql).toBe(`SET LOCAL lock_timeout = '5000'`);
-      expect(txStatements[2]?.sql).toBe(`SET LOCAL idle_in_transaction_session_timeout = '10000'`);
-      expect(txStatements[3]?.sql).toContain('pg_try_advisory_xact_lock');
-      expect(txStatements[3]?.params).toEqual([SPEND_ALERT_ROLLUP_LOCK_KEY]);
-      expect(txStatements[4]?.sql).toContain('INSERT INTO "spend_alert_hourly"');
+      expect(txStatements[1]?.sql).toContain('pg_try_advisory_xact_lock');
+      expect(txStatements[1]?.params).toEqual([SPEND_ALERT_ROLLUP_LOCK_KEY]);
+      expect(txStatements[2]?.sql).toContain('INSERT INTO "spend_alert_hourly"');
     });
 
-    it.each(['57014', '55P03'])(
-      'skips the run without throwing when the rollup fails with SQLSTATE %s',
-      async code => {
-        mockSweepLog.mockClear();
-        const { database, selectCalls } = pagedFiringDatabase(
-          () => [],
-          rollupRows(['user:owner-1']),
-          {
-            rollupError: wrapperError(code),
-          }
-        );
-        const loadScopeSnapshots = jest.fn(async () => new Map<string, SpendAlertScopeSnapshot>());
-
-        const result = await runSpendAlertSweep(
-          database,
-          { store: { loadScopeSnapshots } },
-          { now: NOW }
-        );
-
-        expect(result).toMatchObject({ ...SKIPPED_COUNTS, rollupStatus: 'timed_out' });
-        expect(selectCalls()).toBe(0);
-        expect(loadScopeSnapshots).not.toHaveBeenCalled();
-        expect(mockSweepLog).toHaveBeenCalledWith(
-          'Spend alert sweep rollup did not run',
-          expect.objectContaining({ reason: 'timed_out', sqlState: code })
-        );
-      }
-    );
-
+    // A timed-out or lock-blocked rollup fails the run as before, so a rollup
+    // that keeps failing stays visible as a failing cron instead of a quiet skip.
     it.each([
+      ['a statement timeout', wrapperError('57014')],
+      ['a lock timeout', wrapperError('55P03')],
       ['a unique violation', wrapperError('23505')],
       ['a plain error', new Error('boom')],
-    ])('rethrows %s from the rollup', async (_name, error) => {
-      const { database } = pagedFiringDatabase(() => [], [], { rollupError: error });
-      const { store } = recordingStore();
+    ])('rethrows %s from the rollup without deciding', async (_name, error) => {
+      const { database, selectCalls } = pagedFiringDatabase(() => [], [], { rollupError: error });
+      const loadScopeSnapshots = jest.fn(async () => new Map<string, SpendAlertScopeSnapshot>());
 
-      await expect(runSpendAlertSweep(database, { store }, { now: NOW })).rejects.toBe(error);
+      await expect(
+        runSpendAlertSweep(database, { store: { loadScopeSnapshots } }, { now: NOW })
+      ).rejects.toBe(error);
+      expect(selectCalls()).toBe(0);
+      expect(loadScopeSnapshots).not.toHaveBeenCalled();
     });
   });
 });

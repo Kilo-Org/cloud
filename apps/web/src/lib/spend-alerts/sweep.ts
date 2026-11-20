@@ -20,15 +20,14 @@ import {
 } from './settings';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { db as defaultDb, DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
-import { getPostgresErrorCode } from '@/lib/db-errors';
 
 /**
  * The spend-alert engine. A sweep is one statement that re-derives the hourly
  * rollup for the scopes that had usage in the lookback window, and then a
  * decision for exactly those scopes — never a walk over the owner population.
- * The cron's rollup runs under an advisory lock and bounded timeouts
- * ({@link runGuardedHourlyRollup}); a run that cannot complete it decides
- * nothing and leaves the work to the next tick.
+ * The cron's rollup runs under an advisory lock and a statement timeout
+ * ({@link runGuardedHourlyRollup}); a run that finds a concurrent rollup in
+ * progress leaves the tick to it.
  *
  * The decision reads are set-based: a run decides its candidate scopes in
  * bounded batches, and each batch costs one settings+rules+state read and (for
@@ -630,78 +629,53 @@ export const SPEND_ALERT_ROLLUP_LOCK_KEY = 'spend-alert-hourly-rollup';
  * statement timeout, so the bound is owned by this code instead of inherited and
  * never cancels a rollup the server would have let finish. It still ends well
  * inside the five-minute tick and leaves 180 s of the route's 300 s
- * `maxDuration` for the firing walk and the capped decision phase; the rollup is
- * idempotent, so a cancelled run is retried by the next tick.
+ * `maxDuration` for the firing walk and the capped decision phase.
+ *
+ * A cancelled rollup is not caught: it fails the request like any other error,
+ * so a rollup that keeps failing stays visible as a failing cron.
  */
 export const ROLLUP_STATEMENT_TIMEOUT_MS = 120_000;
 
-/**
- * Lock timeout for the guarded rollup. The upsert must not queue behind row
- * locks on `spend_alert_hourly`: failing fast and retrying next tick is cheaper
- * than holding the scan's work while waiting.
- */
-export const ROLLUP_LOCK_TIMEOUT_MS = 5_000;
-
-/**
- * Idle-in-transaction timeout for the guarded rollup. If the function is killed
- * between statements, the server ends the transaction and releases the lock.
- */
-export const ROLLUP_IDLE_IN_TRANSACTION_TIMEOUT_MS = 10_000;
-
-/** SQLSTATEs that mean the rollup was cancelled: statement timeout and lock timeout. */
-const ROLLUP_TIMEOUT_SQLSTATES: ReadonlySet<string> = new Set(['57014', '55P03']);
-
 export type SpendAlertRollupAttempt =
   | { status: 'completed'; rollup: SpendAlertRollup }
-  | { status: 'locked' }
-  | { status: 'timed_out'; sqlState: string };
+  | { status: 'locked' };
 
 /**
- * Runs {@link sweepHourlyBuckets} for the cron under an advisory lock and bounded
- * timeouts, so overlapping ticks cannot stack the large statement and one
- * cannot run unbounded.
+ * Runs {@link sweepHourlyBuckets} for the cron under an advisory lock and a
+ * statement timeout, so a duplicate invocation cannot run a second copy of the
+ * large statement next to the first.
  *
- * The timeouts are `SET LOCAL` inside the transaction: Supabase's pooler drops
+ * The timeout is `SET LOCAL` inside the transaction: Supabase's pooler drops
  * session-level `SET`, so only a transaction-scoped setting reaches the
  * statement (and cannot leak to the next user of the pooled connection). The
  * lock is `pg_try_advisory_xact_lock`, so a run that finds it held returns
  * `'locked'` instead of waiting, and it is released on commit or rollback.
  *
- * A timeout rolls the transaction back, so nothing partial is written and the
- * lock is released. Any other error is rethrown.
+ * Only a run that is rolling up right now holds the lock, and the statement
+ * timeout bounds how long it can, so the holder started at most that long ago
+ * and its window covers this run's. Skipping therefore loses nothing the holder
+ * does not re-derive and decide; rows newer than the holder's `now` fall in an
+ * hour every later tick still re-derives. Errors, timeouts included, are
+ * rethrown.
  */
 export async function runGuardedHourlyRollup(
   database: Db,
   options: { now: Date }
 ): Promise<SpendAlertRollupAttempt> {
   const { now } = options;
-  try {
-    return await database.transaction(async (tx): Promise<SpendAlertRollupAttempt> => {
-      await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${ROLLUP_STATEMENT_TIMEOUT_MS}'`));
-      await tx.execute(sql.raw(`SET LOCAL lock_timeout = '${ROLLUP_LOCK_TIMEOUT_MS}'`));
-      await tx.execute(
-        sql.raw(
-          `SET LOCAL idle_in_transaction_session_timeout = '${ROLLUP_IDLE_IN_TRANSACTION_TIMEOUT_MS}'`
-        )
-      );
+  return database.transaction(async (tx): Promise<SpendAlertRollupAttempt> => {
+    await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${ROLLUP_STATEMENT_TIMEOUT_MS}'`));
 
-      const lock = await tx.execute<{ acquired: boolean }>(
-        sql`SELECT pg_catalog.pg_try_advisory_xact_lock(pg_catalog.hashtextextended(${SPEND_ALERT_ROLLUP_LOCK_KEY}, 0)) AS acquired`
-      );
-      if (lock.rows[0]?.acquired !== true) return { status: 'locked' };
+    const lock = await tx.execute<{ acquired: boolean }>(
+      sql`SELECT pg_catalog.pg_try_advisory_xact_lock(pg_catalog.hashtextextended(${SPEND_ALERT_ROLLUP_LOCK_KEY}, 0)) AS acquired`
+    );
+    if (lock.rows[0]?.acquired !== true) return { status: 'locked' };
 
-      return {
-        status: 'completed',
-        rollup: await sweepHourlyBuckets(tx, { lookbackHours: LOOKBACK_HOURS, now }),
-      };
-    });
-  } catch (error) {
-    const sqlState = getPostgresErrorCode(error);
-    if (sqlState !== null && ROLLUP_TIMEOUT_SQLSTATES.has(sqlState)) {
-      return { status: 'timed_out', sqlState };
-    }
-    throw error;
-  }
+    return {
+      status: 'completed',
+      rollup: await sweepHourlyBuckets(tx, { lookbackHours: LOOKBACK_HOURS, now }),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -938,8 +912,8 @@ export type SpendAlertSweepResult = {
   cleared: number;
   deliveriesEnqueued: number;
   /**
-   * Whether the rollup ran. Anything but `'completed'` means the run decided
-   * nothing and all counts are zero. Optional for the same reason as `timings`;
+   * Whether the rollup ran. `'locked'` means a concurrent run held the rollup
+   * lock, so this run decided nothing and all counts are zero. Optional for the same reason as `timings`;
    * {@link runSpendAlertSweep} always sets it.
    */
   rollupStatus?: SpendAlertRollupAttempt['status'];
@@ -992,9 +966,9 @@ function rotatedSlice(scopeKeys: string[], now: Date, take: number): string[] {
  * slots they were granted, so a scope either stretch deferred is reached again
  * without depending on its bucket changing a second time.
  *
- * The rollup runs under {@link runGuardedHourlyRollup}: if another run holds the
- * rollup lock or the statement times out, this run decides nothing and reports
- * the reason in `rollupStatus`, leaving the work to the next tick.
+ * The rollup runs under {@link runGuardedHourlyRollup}: if a concurrent run holds
+ * the rollup lock, this run leaves the tick to that run, decides nothing, and
+ * reports `rollupStatus: 'locked'`.
  */
 export async function runSpendAlertSweep(
   database: Db,
@@ -1007,16 +981,11 @@ export async function runSpendAlertSweep(
   const attempt = await runGuardedHourlyRollup(database, { now });
   const rollupMs = Date.now() - rollupStartedAt;
 
-  // Decide nothing when the rollup did not run. The decisions would compare
-  // stale (lower) rolling sums, so a firing rule could clear spuriously and then
-  // fire again on the next tick, sending a duplicate alert. Skipping is safe:
-  // the candidate set is re-derived every tick (rollup window) and still-firing
-  // rules are persisted, so the next successful tick decides everything this one
-  // would have. Delivery runs in its own cron and is unaffected.
-  if (attempt.status !== 'completed') {
-    sentryLogger('cron', 'warning')('Spend alert sweep rollup did not run', {
-      reason: attempt.status,
-      ...(attempt.status === 'timed_out' ? { sqlState: attempt.sqlState } : {}),
+  // A concurrent run holds the rollup lock and covers this tick's window (see
+  // runGuardedHourlyRollup), and it decides after its own rollup. Deciding here
+  // as well would read buckets that run has not committed yet.
+  if (attempt.status === 'locked') {
+    sentryLogger('cron', 'info')('Spend alert sweep skipped: rollup already running', {
       rollupMs,
     });
     return {

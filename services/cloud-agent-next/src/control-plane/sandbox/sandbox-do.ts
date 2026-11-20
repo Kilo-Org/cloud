@@ -5328,7 +5328,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
       });
       const updated =
         adoptCandidate && replacingCanonical ? setAllMemberHandles(seeded, finalHandle) : seeded;
-      if (updated === grant) return { kind: 'handle', handle: finalHandle };
+      // A served handle must resolve at the facade for this fence, so a member row
+      // that already holds the string is returned only while the accepted set
+      // still carries it. Otherwise the claim continues to verification and the
+      // accepted-entry transaction below, keeping the member rows, the accepted
+      // set and the adoption marker consistent.
+      const finalDigest = candidateDigest ?? (await digestRuntimeProxyHandle(finalHandle));
+      if (updated === grant && acceptedDigests.has(finalDigest))
+        return { kind: 'handle', handle: finalHandle };
 
       const claims = await verifyRuntimeCredentialProxyHandle(this.env, finalHandle);
       if (!claims || claims.userId !== input.ownerId) return { kind: 'fail' };

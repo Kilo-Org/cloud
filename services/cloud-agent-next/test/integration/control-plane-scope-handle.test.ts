@@ -678,3 +678,171 @@ describe('SandboxControlV2 scope-handle resolution', () => {
     expect(outcome.organizationId).toBe(ORG_ID);
   });
 });
+
+describe('adopted-handle claim and accepted-set consistency', () => {
+  it('records and serves the handle the member rows already hold', async () => {
+    const { sandbox, wrapper, scopeGrantId, members } = await createSharedScope(2);
+    const [creator, sibling] = members;
+    if (!creator || !sibling) throw new Error('Expected two scope members');
+    const fence = await currentFence(sandbox);
+
+    // A live accepted entry for a string no member row holds keeps the scope
+    // adopted under this fence while the rows' own string has no entry.
+    const other = createRuntimeProxyGrant({
+      plane: 'control',
+      authorizationId: crypto.randomUUID(),
+      sessionId: creator.sessionId,
+      kiloSessionId: creator.kiloId,
+      userId: USER_ID,
+      orgId: ORG_ID,
+      mode: 'direct',
+      allocationId: fence.allocationId,
+      providerInstanceId: fence.providerInstanceId,
+      connectionId: fence.connectionId,
+      wrapperInstanceId: fence.wrapperInstanceId,
+      leaseExpiresAt: Date.now() + 3_600_000,
+      state: 'active',
+    });
+    const markerHandle = await issueRuntimeCredentialProxyHandle(env, other);
+    await runInDurableObject(sandbox, instance => {
+      instance.ctx.storage.kv.delete('runtime_proxy_accepted_handles');
+    });
+    await seedAccepted(sandbox, scopeGrantId, markerHandle, creator, fence);
+
+    // A fresh attempt for the creator re-runs prepare on the same wrapper, so the
+    // mint returns the fence's persisted grant: the string its row already holds.
+    const input = await runInDurableObject(sandbox, async (_instance, state) => {
+      const db = drizzle(state.storage);
+      const route = await readRoute(db, creator.sessionId);
+      if (!route?.credentialSource) throw new Error('missing route');
+      db.update(routes)
+        .set({ state: 'failed' })
+        .where(eq(routes.session_id, creator.sessionId))
+        .run();
+      const { kilo: _kilo, ...spec } = route.spec;
+      const git = spec.git;
+      return {
+        spec: {
+          ...spec,
+          ...(git
+            ? { git: { url: git.url, ...(git.platform ? { platform: git.platform } : {}) } }
+            : {}),
+        },
+        credentials: route.credentialSource,
+      };
+    });
+    await sandbox.prepare(input);
+    const frame = await wrapper.nextSkipping(['worktree.snapshot', 'session.credentials']);
+    if (frame?.type !== 'session.prepare') throw new Error(`expected prepare, got ${frame?.type}`);
+    const served = frame.credentials?.proxy?.handle ?? '';
+    expect(served).toBe(creator.handle);
+    wrapper.send({ type: 'session.ready', sessionId: creator.sessionId });
+    await waitFor(async () =>
+      expect((await sandbox.status({ sessionId: creator.sessionId })).view.state).toBe('ready')
+    );
+
+    // The facade resolves the served string for this fence.
+    await expect(resolveHandle(sandbox, served)).resolves.toMatchObject({ type: 'served' });
+
+    // And the accepted set carries it, so a later resolution still works.
+    const servedDigest = await digestRuntimeProxyHandle(served);
+    const stored = await runInDurableObject(sandbox, instance => {
+      const store = instance.ctx.storage.kv.get<
+        Record<string, Array<{ handleDigest: string; exp: number }>>
+      >('runtime_proxy_accepted_handles');
+      return (store?.[scopeGrantId] ?? []).filter(
+        entry => entry.handleDigest === servedDigest && entry.exp > Date.now()
+      );
+    });
+    expect(stored).toHaveLength(1);
+  });
+
+  it('returns fail and serves nothing when the candidate handle does not verify for the owner', async () => {
+    const { sandbox, scopeGrantId, members } = await createSharedScope(2);
+    const [member] = members;
+    if (!member) throw new Error('Expected a scope member');
+    const fence = await currentFence(sandbox);
+
+    // A live accepted entry for a string no member row holds keeps the scope
+    // adoptable under this fence, so the claim below reaches its candidate branch.
+    const gate = createRuntimeProxyGrant({
+      plane: 'control',
+      authorizationId: crypto.randomUUID(),
+      sessionId: member.sessionId,
+      kiloSessionId: member.kiloId,
+      userId: USER_ID,
+      orgId: ORG_ID,
+      mode: 'direct',
+      allocationId: fence.allocationId,
+      providerInstanceId: fence.providerInstanceId,
+      connectionId: fence.connectionId,
+      wrapperInstanceId: fence.wrapperInstanceId,
+      leaseExpiresAt: Date.now() + 3_600_000,
+      state: 'active',
+    });
+    const gateHandle = await issueRuntimeCredentialProxyHandle(env, gate);
+    await runInDurableObject(sandbox, instance => {
+      instance.ctx.storage.kv.delete('runtime_proxy_accepted_handles');
+    });
+    await seedAccepted(sandbox, scopeGrantId, gateHandle, member, fence);
+
+    const foreign = await issueRuntimeCredentialProxyHandle(
+      env,
+      createRuntimeProxyGrant({
+        plane: 'control',
+        authorizationId: crypto.randomUUID(),
+        sessionId: member.sessionId,
+        kiloSessionId: member.kiloId,
+        userId: OTHER_USER_ID,
+        orgId: ORG_ID,
+        mode: 'direct',
+        allocationId: fence.allocationId,
+        providerInstanceId: fence.providerInstanceId,
+        connectionId: fence.connectionId,
+        wrapperInstanceId: fence.wrapperInstanceId,
+        leaseExpiresAt: Date.now() + 3_600_000,
+        state: 'active',
+      })
+    );
+    const exp = (jwt.decode(foreign) as { exp: number }).exp * 1000;
+    const outcome = await runInDurableObject(sandbox, async (instance, state) => {
+      const holder = instance as unknown as {
+        claimAdoptedScopeHandle(input: {
+          sessionId: string;
+          attemptId: string;
+          ownerId: string;
+          kiloSessionId: string;
+          candidate: { handle: string; exp: number; issuerSessionId: string } | null;
+          mintFence: AcceptedHandleFence;
+        }): Promise<{ kind: string; handle?: string }>;
+      };
+      const db = drizzle(state.storage);
+      const route = await readRoute(db, member.sessionId);
+      if (route === null) throw new Error('missing route');
+      db.update(routes)
+        .set({ state: 'preparing' })
+        .where(eq(routes.session_id, member.sessionId))
+        .run();
+      return holder.claimAdoptedScopeHandle({
+        sessionId: member.sessionId,
+        attemptId: route.attemptId,
+        ownerId: USER_ID,
+        kiloSessionId: member.kiloId,
+        candidate: { handle: foreign, exp, issuerSessionId: member.sessionId },
+        mintFence: fence,
+      });
+    });
+    expect(outcome.kind).toBe('fail');
+    expect(outcome.handle).toBeUndefined();
+
+    // Nothing was accepted for the rejected string.
+    const foreignDigest = await digestRuntimeProxyHandle(foreign);
+    const entries = await runInDurableObject(sandbox, instance => {
+      const store = instance.ctx.storage.kv.get<Record<string, Array<{ handleDigest: string }>>>(
+        'runtime_proxy_accepted_handles'
+      );
+      return Object.values(store ?? {}).flat();
+    });
+    expect(entries.some(entry => entry.handleDigest === foreignDigest)).toBe(false);
+  });
+});

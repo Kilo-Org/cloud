@@ -583,21 +583,35 @@ describe('browser-tool-page-actions', () => {
       expect(tabs.updates).toStrictEqual([]);
     });
 
-    it('reports a bare missing tab for an index past every browser tab', async () => {
-      const tabs = createFakeTabsApi([inspectableTab(1, 'Agent', 'https://agent.example.com/')]);
-
-      const result = await runPageBrowserTool(
-        'kilo_browser_tabs',
-        { action: 'select', index: 5 },
-        undefined,
-        {
-          agentAccess: { actOrigins: [], groupTabs: [1], navigateOrigins: [], readableOrigins: [] },
-          tabId: 1,
-          tabsApi: tabs.tabsApi,
-        }
+    it('answers one refusal for every index past the agent list, never the browser’s tab count', async () => {
+      // One reachable tab and four inspectable ones: a different answer for 1-3 than for 4 would report how many tabs the browser holds.
+      const tabs = createFakeTabsApi([
+        inspectableTab(1, 'Agent', 'https://agent.example.com/'),
+        inspectableTab(2, 'Bank', 'https://bank.example.com/'),
+        inspectableTab(3, 'Mail', 'https://mail.example.com/'),
+        inspectableTab(4, 'Docs', 'https://docs.example.com/'),
+        inspectableTab(5, 'News', 'https://news.example.com/'),
+      ]);
+      const options = {
+        agentAccess: {
+          actOrigins: [],
+          groupTabs: [1],
+          navigateOrigins: [],
+          readableOrigins: [],
+        },
+        tabId: 1,
+        tabsApi: tabs.tabsApi,
+      };
+      const answers = await Promise.all(
+        [1, 2, 3, 4, 9].map(index =>
+          runPageBrowserTool('kilo_browser_tabs', { action: 'select', index }, undefined, options)
+        )
       );
 
-      expect(result).toStrictEqual({ error: 'No tab at index 5.', ok: false });
+      for (const answer of answers) {
+        expect(answer).toStrictEqual({ error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false });
+      }
+
       expect(tabs.updates).toStrictEqual([]);
     });
 

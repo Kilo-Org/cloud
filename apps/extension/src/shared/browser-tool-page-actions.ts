@@ -836,28 +836,25 @@ type ReachableTabResolution =
 
 /**
  * The tab at a listed index. `list` numbers only the reachable tabs, so select
- * and close resolve the same way. When that index instead names a browser tab
- * outside the session, the model reached for the user's tab: the D9 refusal
- * says so. Any other index past the list is just a number that names nothing.
+ * and close resolve the same way. Every index past that list is one refusal
+ * when the caller is an agent: a different answer for a browser tab the list
+ * omits would report how many tabs the browser holds. Without agent access
+ * the list is the browser's, so a past index names nothing.
  */
 const reachableTabAt = (
   tabs: readonly InspectableTab[],
   access: BrowserAgentAccess | undefined,
   index: number
 ): ReachableTabResolution => {
-  const reachable = reachableTabs(tabs, access);
-  const tab = reachable[index];
+  const tab = reachableTabs(tabs, access)[index];
 
   if (tab !== undefined) {
     return { ok: true, tab };
   }
 
-  const named = tabs[index];
-
-  // The index reaches into the browser's own numbering, which the list no longer uses: that tab is not this caller's.
-  return named !== undefined && !reachable.includes(named)
-    ? { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false }
-    : { error: `No tab at index ${String(index)}.`, ok: false };
+  return access === undefined
+    ? { error: `No tab at index ${String(index)}.`, ok: false }
+    : { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false };
 };
 
 /**

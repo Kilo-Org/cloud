@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the sheet draws the whole-body load, permission, paused and terminal failure states beside the form from one draft */
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
@@ -77,8 +78,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   // reader while `useBillingAction` offers the step from the same predicate.
   const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
-  // The whole-body load failure below blames the connection or the server, so
-  // it reads the same committed connectivity the offline banner paints.
   const connectivity = useCommittedConnectivityStatus();
 
   // Restore the reason and comment from the stored draft once, so a retry
@@ -166,8 +165,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   if (findingQuery.isError && !findingQuery.data) {
-    // The error title names what failed and the classified variant supplies the
-    // cause and next step; naming the failed action in both said neither.
+    // The title names what failed; the variant supplies the cause and next step.
     return (
       <DismissSheetFrame>
         <QueryError

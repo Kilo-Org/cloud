@@ -5,10 +5,31 @@ import {
 } from './permission-policy.schema';
 import fixtures from './v1-fixtures.json';
 
-test.each([fixtures.layered, fixtures.enabled_empty, fixtures.disabled])(
+test.each([
+  fixtures.layered,
+  fixtures.scoped_auto_approve,
+  fixtures.enabled_empty,
+  fixtures.disabled,
+])(
   'round trips the supported member fixture without rewriting its rules or omissions ($revision, $managed)',
   fixture => {
     expect(MemberPermissionPolicySchema.parse(fixture)).toStrictEqual(fixture);
+  }
+);
+
+test.each(['allow', 'ask', true, false, null])(
+  'rejects an invalid auto-approval value: %j',
+  auto_approve => {
+    const data = { schema_version: 1, auto_approve };
+    expect(
+      OrganizationGroupPoliciesSchema.safeParse([{ type: 'agent_permissions', data }]).success
+    ).toBe(false);
+    expect(
+      MemberPermissionPolicySchema.safeParse({
+        ...fixtures.enabled_empty,
+        policy: { agent_permissions: { layers: [data] } },
+      }).success
+    ).toBe(false);
   }
 );
 

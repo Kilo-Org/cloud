@@ -66,6 +66,29 @@
       { "tool": "external_directory", "resource": "/other", "decision": "inherit" }
     ]
   },
+  "scoped_auto_approve": {
+    "schema_version": 1,
+    "organization_id": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
+    "managed": true,
+    "revision": 13,
+    "max_age_seconds": 300,
+    "policy": {
+      "agent_permissions": {
+        "layers": [
+          { "schema_version": 1, "auto_approve": "deny" },
+          {
+            "schema_version": 1,
+            "tools": {
+              "edit": "ask",
+              "webfetch": {
+                "rules": [{ "pattern": "docs.example.test/*", "action": "allow" }]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
   "enabled_empty": {
     "schema_version": 1,
     "organization_id": "9d278969-5453-4ae3-a51f-a8d2274a7b56",

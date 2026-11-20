@@ -35,6 +35,11 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
   });
   const groupNames = new Map(groups.data?.groups.map(group => [group.id, group.name]));
   const inspection = diagnostics.data;
+  const autoApproveBlocked =
+    inspection?.response.managed &&
+    inspection.response.policy.agent_permissions?.layers.some(
+      layer => layer.auto_approve === 'deny'
+    );
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 p-5">
@@ -88,6 +93,12 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
             <p className="type-label text-muted-foreground">
               The strictest applicable tool or shell decision wins.
             </p>
+            <dl className="type-label flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+              <dt className="font-medium">Auto-approve for managed actions</dt>
+              <dd className="text-muted-foreground">
+                {autoApproveBlocked ? 'Disabled' : 'No organization restriction'}
+              </dd>
+            </dl>
             <PolicySource
               name="Organization default"
               policies={inspection.sources.defaultPolicies}

@@ -1721,6 +1721,7 @@ export type OrganizationGroupAgentPermissionsPolicy = {
   data: {
     schema_version: 1;
     unrestricted_mode?: 'allow' | 'deny';
+    auto_approve?: 'deny';
     tools?: Record<
       string,
       | OrganizationPermissionAction

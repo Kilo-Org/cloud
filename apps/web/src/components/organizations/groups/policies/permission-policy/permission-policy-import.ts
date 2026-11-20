@@ -101,6 +101,7 @@ const policyFields = new Set([
   'data',
   'schema_version',
   'unrestricted_mode',
+  'auto_approve',
   'tools',
   'shell',
   'bash',

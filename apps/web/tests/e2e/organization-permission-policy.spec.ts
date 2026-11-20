@@ -2,6 +2,7 @@ import { expect, test } from '@chromatic-com/playwright';
 import type { Locator, Page, TestInfo } from '@playwright/test';
 import type { OrganizationPermissionPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
 import { readFile } from 'node:fs/promises';
+import { z } from 'zod';
 import { permissionPolicyTest } from './organization-permission-policy-fixture';
 
 const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
@@ -23,6 +24,7 @@ test.describe('organization permission policy API', () => {
 const trialConfig = `{
   // Synthetic local trial configuration; the importer must not include provider settings.
   "provider": { "example": { "options": { "baseURL": "https://provider.example.com" } } },
+  "autoApprove": true,
   "permission": {
     "websearch": "deny",
     "external_directory": { "/workspace/shared/*": "allow" },
@@ -55,10 +57,16 @@ const defaultAgentPolicy = {
   },
 } satisfies OrganizationPermissionPolicy;
 
+const restrictiveDefaultAgentPolicy = {
+  ...defaultAgentPolicy,
+  data: { ...defaultAgentPolicy.data, auto_approve: 'deny' },
+} satisfies OrganizationPermissionPolicy;
+
 const groupAgentPolicy = {
   type: 'agent_permissions',
   data: {
     schema_version: 1,
+    auto_approve: 'deny',
     tools: {
       external_directory: {
         rules: [{ pattern: '/workspace/shared/private/*', action: 'deny' }],
@@ -66,6 +74,11 @@ const groupAgentPolicy = {
       },
     },
   },
+} satisfies OrganizationPermissionPolicy;
+
+const neutralGroupAgentPolicy = {
+  type: 'agent_permissions',
+  data: { schema_version: 1, tools: { edit: 'ask' } },
 } satisfies OrganizationPermissionPolicy;
 
 const retiredClientPolicy = {
@@ -80,6 +93,14 @@ const retiredClientPolicy = {
 const button = (scope: Page | Locator, name: string) =>
   scope.getByRole('button', { name, exact: true });
 const groupsPath = (organization: { id: string }) => `/organizations/${organization.id}/groups`;
+const autoApproveLabel = 'Auto-approve for managed actions';
+const autoApproveSummary = 'Auto-approve disabled for managed actions';
+
+async function signInAs(page: Page, email: string, callbackPath: string) {
+  const signIn = new URLSearchParams({ fakeUser: email, callbackPath });
+  await page.goto(`/users/sign_in?${signIn}`);
+  await page.waitForURL(url => url.pathname === callbackPath, { timeout: 60_000 });
+}
 
 async function savePolicy(drawer: Locator, revision: number) {
   const save = button(drawer, 'Save policy');
@@ -110,14 +131,16 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
   permissionPolicyTest(
     'reviews a local policy, saves organization and group restrictions, and inspects member sources',
     { tag: '@permission-policy-write' },
-    async ({ page, permissionFixture }, testInfo) => {
+    async ({ baseURL, browser, page, permissionFixture }, testInfo) => {
       permissionPolicyTest.setTimeout(180_000);
       const {
         admin,
         member,
+        ungroupedMember,
         managed,
         disabled,
         group,
+        neutralGroup,
         disabledGroup,
         readDefault,
         readGroupPolicies,
@@ -126,14 +149,28 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
       const agentHeading = drawer.getByRole('heading', { name: 'Agent permissions', exact: true });
       const defaultPermissions = button(page, 'Default permissions');
       const groupPermissions = button(page, `Permissions for ${group.name}`);
+      const neutralGroupPermissions = button(page, `Permissions for ${neutralGroup.name}`);
+      const inspectMemberPolicy = button(page, 'Inspect member policy');
+      const memberSelect = drawer.getByLabel('Member', { exact: true });
+      const autoApprove = drawer.getByLabel(autoApproveLabel, { exact: true });
+      const autoApproveStatus = drawer
+        .locator('dl')
+        .filter({
+          has: page.getByRole('term').and(page.getByText(autoApproveLabel, { exact: true })),
+        })
+        .getByRole('definition');
+      const policySource = (name: string) =>
+        drawer.locator('section').filter({ has: page.getByRole('heading', { name, exact: true }) });
+      const defaultSource = policySource('Organization default');
       const tool = drawer.getByLabel('Tool', { exact: true });
       const resource = drawer.getByRole('group', { name: 'external_directory' });
       const unmatched = resource.getByLabel('Unmatched calls');
+      const editDecision = drawer
+        .getByRole('group', { name: 'edit', exact: true })
+        .getByLabel('Tool decision');
       const save = button(drawer, 'Save policy');
       const managedPath = groupsPath(managed);
-      const signIn = new URLSearchParams({ fakeUser: admin.email, callbackPath: managedPath });
-      await page.goto(`/users/sign_in?${signIn}`);
-      await page.waitForURL(url => url.pathname === managedPath, { timeout: 60_000 });
+      await signInAs(page, admin.email, managedPath);
 
       const existingGroupRevision = ((await readDefault())?.policy_revision ?? 0) + 1;
       await permissionPolicyTest.step(
@@ -160,7 +197,7 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
           await button(drawer, 'Validate JSON').click();
           await button(drawer, 'Use in editor').click();
           await savePolicy(drawer, existingGroupRevision);
-          expect(await readGroupPolicies()).toEqual([existingGroupPolicy]);
+          expect(await readGroupPolicies(group.id)).toEqual([existingGroupPolicy]);
           await button(drawer, 'Close drawer').click();
         }
       );
@@ -168,6 +205,9 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
       const initial = await readDefault();
       const defaultRevision = existingGroupRevision + 1;
       const groupRevision = defaultRevision + 1;
+      const neutralGroupRevision = groupRevision + 1;
+      const groupRemovalRevision = neutralGroupRevision + 1;
+      const restrictiveDefaultRevision = groupRemovalRevision + 1;
 
       await permissionPolicyTest.step(
         'Reject a retired policy and invalid tool key, then review local JSONC',
@@ -201,6 +241,7 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
           await previewImport.click();
           await expect(preview.getByText(/other configuration fields were ignored/i)).toBeVisible();
           await expect(preview).not.toContainText('provider.example.com');
+          await expect(preview).not.toContainText(/autoApprove|auto_approve/);
           const importShell = drawer.getByLabel('Shell for imported commands');
           const importFallback = drawer.getByLabel('Unlisted commands for imported shell');
           await expect(importShell).toHaveValue('');
@@ -213,6 +254,7 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
           await expect(useDraft).toBeEnabled();
           await useDraft.click();
           await expect(unmatched).toHaveValue('inherit');
+          await expect(autoApprove).toHaveValue('inherit');
           expect(await readDefault()).toEqual(initial);
         }
       );
@@ -286,6 +328,10 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
           await unrestricted.selectOption('inherit');
           await expect(unrestricted).toBeDisabled();
 
+          await expect(autoApprove).toHaveValue('inherit');
+          await autoApprove.selectOption({ label: 'Disable auto-approve' });
+          await expect(autoApprove).toHaveValue('deny');
+
           await tool.selectOption('websearch');
           const websearch = drawer.getByRole('group', { name: 'websearch', exact: true });
           await expect(websearch.getByText(/Organization default: Block\./)).toBeVisible();
@@ -328,46 +374,107 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
           await expect(save).toBeInViewport();
           await capture(page, testInfo, 'managed-group-permissions-mobile');
           await savePolicy(drawer, groupRevision);
-          expect(await readGroupPolicies()).toEqual([groupAgentPolicy]);
+          expect(await readGroupPolicies(group.id)).toEqual([groupAgentPolicy]);
           await button(drawer, 'Close drawer').click();
         }
       );
 
       await permissionPolicyTest.step(
-        'Inspect revision and actual default and group sources',
+        'Save a tool rule in the second group without adding an auto-approve restriction',
         async () => {
           await page.setViewportSize({ width: 1440, height: 980 });
+          await neutralGroupPermissions.click();
+          await expect(agentHeading).toBeVisible();
+          await expect(autoApprove).toBeEnabled();
+          await expect(autoApprove).toHaveValue('inherit');
+          await tool.selectOption('edit');
+          await editDecision.selectOption('ask');
+          await savePolicy(drawer, neutralGroupRevision);
+          expect(await readGroupPolicies(neutralGroup.id)).toEqual([neutralGroupAgentPolicy]);
+          await button(drawer, 'Close drawer').click();
+        }
+      );
+
+      const diagnosedPolicy = await permissionPolicyTest.step(
+        'Inspect independent sources and see the restriction only for the grouped member',
+        async () => {
           const saved = await readDefault();
-          expect(saved?.policy_revision).toBe(groupRevision);
+          expect(saved?.policy_revision).toBe(neutralGroupRevision);
           expect(saved?.default_policies.filter(policy => policy.type !== 'model_access')).toEqual([
             defaultAgentPolicy,
           ]);
-          await button(page, 'Inspect member policy').click();
-          const memberSelect = drawer.getByLabel('Member', { exact: true });
+          await inspectMemberPolicy.click();
           await memberSelect.selectOption(member.id);
-          await expect(
-            drawer.getByText(`Revision ${groupRevision}`, { exact: true })
-          ).toBeVisible();
-          await expect(drawer.getByText('Organization default', { exact: true })).toBeVisible();
-          await expect(drawer.getByText(group.name, { exact: true })).toBeVisible();
+          const revision = drawer.getByText(`Revision ${neutralGroupRevision}`, { exact: true });
+          await expect(revision).toBeVisible();
+          await expect(autoApproveStatus).toHaveText('Disabled');
+          await expect(defaultSource).toBeVisible();
+          await expect(defaultSource).not.toContainText(autoApproveSummary);
+          await expect(policySource(group.name)).toContainText(autoApproveSummary);
+          await expect(policySource(neutralGroup.name)).toBeVisible();
+          await expect(policySource(neutralGroup.name)).not.toContainText(autoApproveSummary);
           await expect(drawer.getByText(/client access/i)).toHaveCount(0);
-          await expect(
-            drawer.getByText(`Revision ${groupRevision}`, { exact: true })
-          ).toBeInViewport({ ratio: 1 });
+          await expect(revision).toBeInViewport({ ratio: 1 });
           await capture(page, testInfo, 'managed-member-policy-sources');
           const effective = drawer.getByText('Effective policy JSON', { exact: true });
           await effective.click();
           const policy = JSON.parse(await drawer.locator('details[open] pre').innerText());
+          const layers = [
+            defaultAgentPolicy.data,
+            groupAgentPolicy.data,
+            neutralGroupAgentPolicy.data,
+          ];
           expect(policy).toEqual({
-            agent_permissions: {
-              layers: expect.arrayContaining([defaultAgentPolicy.data, groupAgentPolicy.data]),
-            },
+            agent_permissions: { layers: expect.arrayContaining(layers) },
           });
-          expect(policy.agent_permissions.layers).toHaveLength(2);
+          expect(policy.agent_permissions.layers).toHaveLength(layers.length);
           await memberSelect.selectOption(admin.id);
+          await expect(autoApproveStatus).toHaveText('No organization restriction');
           await expect(drawer.getByText('No group policy contributions.')).toBeVisible();
-          await expect(drawer.getByText('Organization default', { exact: true })).toBeVisible();
-          await expect(drawer.getByText(group.name, { exact: true })).toBeHidden();
+          await expect(defaultSource).toBeVisible();
+          await expect(policySource(group.name)).toHaveCount(0);
+          await expect(policySource(neutralGroup.name)).toHaveCount(0);
+          return policy;
+        }
+      );
+
+      await permissionPolicyTest.step(
+        'Retrieve the same anonymous layers with the grouped member’s credential',
+        async () => {
+          const memberContext = await browser.newContext({ baseURL });
+          try {
+            const memberPage = await memberContext.newPage();
+            await signInAs(memberPage, member.email, managedPath);
+            const organizationApi = new URL(`/api/organizations/${managed.id}/`, baseURL);
+            const tokenUrl = new URL('user-tokens', organizationApi);
+            const cookies = await memberContext.cookies(tokenUrl.href);
+            const cookie = cookies.map(({ name, value }) => `${name}=${value}`).join('; ');
+            // Keep the short-lived bearer out of Playwright's HTTP traces.
+            const credential = await fetch(tokenUrl, {
+              method: 'POST',
+              headers: { Cookie: cookie },
+              redirect: 'error',
+              signal: AbortSignal.timeout(30_000),
+            });
+            expect(credential.status).toBe(200);
+            const { token } = z.object({ token: z.string().min(1) }).parse(await credential.json());
+            const response = await fetch(new URL('policy/permission', organizationApi), {
+              headers: { Authorization: `Bearer ${token}` },
+              redirect: 'error',
+              signal: AbortSignal.timeout(30_000),
+            });
+            expect(response.status).toBe(200);
+            expect(await response.json()).toEqual({
+              schema_version: 1,
+              organization_id: managed.id,
+              managed: true,
+              revision: neutralGroupRevision,
+              max_age_seconds: expect.any(Number),
+              policy: diagnosedPolicy,
+            });
+          } finally {
+            await memberContext.close();
+          }
         }
       );
 
@@ -379,12 +486,52 @@ permissionPolicyTest.describe('Enterprise permission policy editor', () => {
           await button(drawer, 'Remove policy').click();
           await button(drawer, 'Remove').click();
           await expect(
-            drawer.getByText(`Revision ${groupRevision + 1}`, { exact: true })
+            drawer.getByText(`Revision ${groupRemovalRevision}`, { exact: true })
           ).toBeVisible();
           await expect(button(drawer, 'Remove policy')).toHaveCount(0);
           await expect(save).toBeDisabled();
-          expect(await readGroupPolicies()).toEqual([]);
+          expect(await readGroupPolicies(group.id)).toEqual([]);
+          expect(await readGroupPolicies(neutralGroup.id)).toEqual([neutralGroupAgentPolicy]);
           expect((await readDefault())?.default_policies).toContainEqual(defaultAgentPolicy);
+          await button(drawer, 'Close drawer').click();
+        }
+      );
+
+      await permissionPolicyTest.step(
+        'Disable auto-approve at the organization default and verify the inherited lock',
+        async () => {
+          await defaultPermissions.click();
+          await expect(autoApprove).toHaveValue('inherit');
+          await autoApprove.selectOption('deny');
+          await savePolicy(drawer, restrictiveDefaultRevision);
+          expect((await readDefault())?.default_policies).toContainEqual(
+            restrictiveDefaultAgentPolicy
+          );
+          await button(drawer, 'Close drawer').click();
+
+          await neutralGroupPermissions.click();
+          await expect(autoApprove).toHaveValue('inherit');
+          await expect(autoApprove).toBeDisabled();
+          await expect(autoApprove).toHaveAccessibleDescription(
+            /^Disabled by the organization default\./
+          );
+          await tool.selectOption('edit');
+          await expect(editDecision).toHaveValue('ask');
+          await expect(autoApprove).toBeInViewport({ ratio: 1 });
+          await capture(page, testInfo, 'managed-auto-approve-inherited');
+          await button(drawer, 'Close drawer').click();
+
+          await inspectMemberPolicy.click();
+          for (const { id } of [admin, ungroupedMember]) {
+            await memberSelect.selectOption(id);
+            await expect(
+              drawer.getByText(`Revision ${restrictiveDefaultRevision}`, { exact: true })
+            ).toBeVisible();
+            await expect(autoApproveStatus).toHaveText('Disabled');
+            await expect(defaultSource).toContainText(autoApproveSummary);
+            await expect(drawer.getByText('No group policy contributions.')).toBeVisible();
+          }
+          await button(drawer, 'Close drawer').click();
         }
       );
 

@@ -13,18 +13,25 @@ const retiredPolicy = {
 };
 
 describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p', parse => {
-  test.each(fixtures.layered.policy.agent_permissions.layers)(
-    'round trips agent permissions producer fixture %# without altering its policy data',
-    data => {
-      const policy = { type: agentType, data };
-      const text = `{
+  test.each([
+    ...fixtures.layered.policy.agent_permissions.layers,
+    ...fixtures.scoped_auto_approve.policy.agent_permissions.layers,
+  ])('round trips agent permissions producer fixture %# without altering its policy data', data => {
+    const policy = { type: agentType, data };
+    const text = `{
       // Comments, braces [{, and trailing commas are supported.
       "type": "${agentType}",
       "data": ${JSON.stringify(data)},
     }`;
-      expect(parse(text)).toStrictEqual({ status: 'valid', policy, warnings: [] });
-    }
-  );
+    expect(parse(text)).toStrictEqual({ status: 'valid', policy, warnings: [] });
+  });
+
+  test.each(['allow', true, null])('rejects invalid scoped auto-approval: %j', auto_approve => {
+    expect(parse(agentDocument({ auto_approve }))).toEqual({
+      status: 'invalid',
+      errors: ['data.auto_approve: Invalid value.'],
+    });
+  });
 
   test.each(['{}', '{"type":"agent_permissions","data":', '{"bad":"\\q"}', '[]', 'null'])(
     'rejects non-policy or malformed input: %s',
@@ -151,6 +158,16 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
 });
 
 describe('legacy Kilo configuration', () => {
+  test('does not import a local auto-approve preference as a managed restriction', () => {
+    expect(
+      reviewPermissionPolicyImport('{"autoApprove": true, "permission": {"edit": "ask"}}')
+    ).toEqual({
+      status: 'valid',
+      policy: { type: agentType, data: { schema_version: 1, tools: { edit: 'ask' } } },
+      warnings: [expect.stringMatching(/other configuration fields were ignored/i)],
+    });
+  });
+
   const text = `{
     "permission": {
       "edit": "deny",

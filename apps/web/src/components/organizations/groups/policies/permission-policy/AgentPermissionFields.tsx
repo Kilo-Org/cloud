@@ -38,6 +38,7 @@ export function AgentPermissionFields({
   onChange: (draft: AgentDraft) => void;
 }) {
   const unrestrictedBlocked = inherited?.unrestricted_mode === 'deny';
+  const autoApproveBlocked = inherited?.auto_approve === 'deny';
   return (
     <Tabs defaultValue="tools">
       <TabsList aria-label="Agent permission sections">
@@ -63,6 +64,23 @@ export function AgentPermissionFields({
           }
           onChange={mode =>
             onChange({ ...draft, unrestricted_mode: mode === 'inherit' ? undefined : mode })
+          }
+        />
+        <PolicySelect
+          label="Auto-approve for managed actions"
+          value={draft.auto_approve ?? 'inherit'}
+          options={[
+            { value: 'inherit', label: 'No additional restriction' },
+            { value: 'deny', label: 'Disable auto-approve', disabled: autoApproveBlocked },
+          ]}
+          disabled={disabled || (autoApproveBlocked && draft.auto_approve === undefined)}
+          description={
+            autoApproveBlocked
+              ? 'Disabled by the organization default. A group cannot re-enable it.'
+              : 'Requires manual approval when a managed action needs approval. Members can still auto-approve eligible actions outside managed policy.'
+          }
+          onChange={mode =>
+            onChange({ ...draft, auto_approve: mode === 'deny' ? mode : undefined })
           }
         />
         <ToolPermissions

@@ -31,6 +31,7 @@ const AgentPermissionsDataSchema = z
   .strictObject({
     schema_version: z.literal(1),
     unrestricted_mode: z.enum(['allow', 'deny']).optional(),
+    auto_approve: z.literal('deny').optional(),
     tools: z
       .record(
         z

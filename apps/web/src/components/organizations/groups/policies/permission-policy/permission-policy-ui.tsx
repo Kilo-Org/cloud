@@ -40,7 +40,7 @@ export function policyJson(policy: PolicyDraft) {
 }
 
 export function policySummary(policy: OrganizationPermissionPolicy) {
-  const { tools, shell, unrestricted_mode } = policy.data;
+  const { tools, shell, unrestricted_mode, auto_approve } = policy.data;
   const toolCount = Object.keys(tools ?? {}).length;
   return [
     `${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}`,
@@ -50,6 +50,7 @@ export function policySummary(policy: OrganizationPermissionPolicy) {
         ? `${Object.keys(shell).length} shell ${Object.keys(shell).length === 1 ? 'profile' : 'profiles'}`
         : 'All shell kinds blocked',
     ...(unrestricted_mode === 'deny' ? ['Unrestricted mode blocked'] : []),
+    ...(auto_approve === 'deny' ? ['Auto-approve disabled for managed actions'] : []),
   ].join(' · ');
 }
 

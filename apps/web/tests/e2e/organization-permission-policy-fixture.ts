@@ -32,21 +32,25 @@ function permissionPolicyFixture(db: DrizzleClient['db']) {
   const owner = newUser('owner', 'Trial owner');
   const admin = newUser('admin', 'Trial administrator');
   const member = newUser('member', 'Trial engineer');
+  const ungroupedMember = newUser('member', 'Trial analyst');
   const managed = { id: randomUUID(), name: 'Managed policy trial' };
   const disabled = { id: randomUUID(), name: 'Disabled policy trial' };
   const group = { id: randomUUID(), name: 'Platform Engineering' };
+  const neutralGroup = { id: randomUUID(), name: 'Release Engineering' };
   const disabledGroup = { id: randomUUID(), name: 'Control Engineering' };
   const organizationIds = [managed.id, disabled.id];
-  const users = [owner, admin, member];
+  const users = [owner, admin, member, ungroupedMember];
   const features = sql`coalesce(${ai_gateway_config.config}->'organization_features', '{}'::jsonb)`;
   const allowlist = sql`coalesce(${features}->'org_permission_policy', '[]'::jsonb)`;
 
   return {
     admin,
     member,
+    ungroupedMember,
     managed,
     disabled,
     group,
+    neutralGroup,
     disabledGroup,
     async seed() {
       await db.transaction(async tx => {
@@ -81,13 +85,16 @@ function permissionPolicyFixture(db: DrizzleClient['db']) {
           );
         await tx.insert(organization_groups).values([
           { ...group, organization_id: managed.id },
+          { ...neutralGroup, organization_id: managed.id },
           { ...disabledGroup, organization_id: disabled.id },
         ]);
-        await tx.insert(organization_group_memberships).values({
-          group_id: group.id,
-          organization_id: managed.id,
-          kilo_user_id: member.id,
-        });
+        await tx.insert(organization_group_memberships).values(
+          [group, neutralGroup].map(({ id }) => ({
+            group_id: id,
+            organization_id: managed.id,
+            kilo_user_id: member.id,
+          }))
+        );
         await tx.insert(ai_gateway_config).values({}).onConflictDoNothing();
         await tx
           .update(ai_gateway_config)
@@ -105,11 +112,11 @@ function permissionPolicyFixture(db: DrizzleClient['db']) {
         .where(eq(organization_group_policy_settings.organization_id, managed.id));
       return row;
     },
-    async readGroupPolicies() {
+    async readGroupPolicies(groupId: string) {
       const [row] = await db
         .select({ policies: organization_groups.policies })
         .from(organization_groups)
-        .where(eq(organization_groups.id, group.id));
+        .where(eq(organization_groups.id, groupId));
       return row?.policies;
     },
     async cleanup() {

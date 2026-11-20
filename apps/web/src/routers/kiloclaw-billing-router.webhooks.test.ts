@@ -28,6 +28,17 @@ import { sandboxIdFromUserId } from '@kilocode/worker-utils/sandbox-id';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import type Stripe from 'stripe';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
+
+it('does not repair Stripe intro schedules after end of life', async () => {
+  const { ensureAutoIntroSchedule } = await import('@/lib/kiloclaw/stripe-handlers');
+  await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(
+    () => false,
+    () => ensureAutoIntroSchedule('sub_intro_eol')
+  );
+  expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+  expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+});
 
 describe('handleKiloClawSubscriptionUpdated', () => {
   let handleKiloClawSubscriptionUpdated: (params: {
@@ -461,9 +472,14 @@ describe('handleKiloClawSubscriptionDeleted', () => {
     );
   });
 
-  it.each([null, 'auto', 'user'] as const)(
-    'converts a final Commit row to credits only with explicit Standard consent (scheduled by %s)',
-    async scheduledBy => {
+  it.each([
+    [null, true],
+    ['auto', true],
+    ['user', true],
+    ['user', false],
+  ] as const)(
+    'converts a final Commit row only with explicit consent (scheduled by %s) and paid hosting available (%s)',
+    async (scheduledBy, hostingAvailable) => {
       const { instance, subscription: existing } = await insertFinalCommitFixture({
         stripeSubscriptionId: 'sub_deleted_without_consent',
       });
@@ -489,27 +505,31 @@ describe('handleKiloClawSubscriptionDeleted', () => {
         priceId: 'price_commit',
       });
 
-      await handleKiloClawSubscriptionDeleted({
-        eventId: 'evt_deleted_without_consent',
-        subscription,
-      });
+      await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(
+        () => hostingAvailable,
+        () =>
+          handleKiloClawSubscriptionDeleted({
+            eventId: 'evt_deleted_without_consent',
+            subscription,
+          })
+      );
 
       const [row] = await db
         .select()
         .from(kiloclaw_subscriptions)
         .where(eq(kiloclaw_subscriptions.id, existing.id));
-      const hasConsent = scheduledBy === 'user';
+      const converts = scheduledBy === 'user' && hostingAvailable;
       expect(row).toEqual(
         expect.objectContaining({
-          status: hasConsent ? 'active' : 'canceled',
+          status: converts ? 'active' : 'canceled',
           plan: 'commit',
           payment_source: 'credits',
-          stripe_subscription_id: hasConsent ? null : 'sub_deleted_without_consent',
-          credit_renewal_at: hasConsent ? row.current_period_end : null,
+          stripe_subscription_id: converts ? null : 'sub_deleted_without_consent',
+          credit_renewal_at: converts ? row.current_period_end : null,
           pending_conversion: false,
           cancel_at_period_end: false,
-          scheduled_plan: hasConsent ? 'standard' : null,
-          scheduled_by: hasConsent ? 'user' : null,
+          scheduled_plan: converts ? 'standard' : null,
+          scheduled_by: converts ? 'user' : null,
         })
       );
       const changeLogs = await db
@@ -518,7 +538,7 @@ describe('handleKiloClawSubscriptionDeleted', () => {
         .where(eq(kiloclaw_subscription_change_log.subscription_id, existing.id));
       expect(changeLogs).toEqual([
         expect.objectContaining(
-          hasConsent
+          converts
             ? {
                 action: 'payment_source_changed',
                 reason: 'stripe_subscription_deleted_convert_to_credits',

@@ -192,12 +192,13 @@ async function detectorIds(
  * Runs on the primary; gateway code calls `recordEnkryptUsage` instead.
  */
 export async function recordEnkryptUsageLocally(
-  usageWrite: EnkryptUsageWrite
+  usageWrite: EnkryptUsageWrite,
+  fromDb: typeof db = db
 ): Promise<EnkryptUsageWriteResponse['status']> {
   const { id, occurredAt } = usageWrite;
   const chargedMicrodollars = enkryptCreditsToMicrodollars(usageWrite.creditsCost);
 
-  const outcome = await db.transaction(async tx => {
+  const outcome = await fromDb.transaction(async tx => {
     const apiKindId = await lookupId(
       () =>
         tx

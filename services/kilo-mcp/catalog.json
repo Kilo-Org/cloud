@@ -22285,7 +22285,8 @@
                                 "type": "array",
                                 "items": {
                                   "type": "string",
-                                  "minLength": 1
+                                  "minLength": 1,
+                                  "maxLength": 200
                                 }
                               },
                               "provider_allow_list": {
@@ -22293,7 +22294,8 @@
                                 "type": "array",
                                 "items": {
                                   "type": "string",
-                                  "minLength": 1
+                                  "minLength": 1,
+                                  "maxLength": 64
                                 }
                               }
                             },
@@ -22302,7 +22304,8 @@
                               "model_allow_list",
                               "provider_allow_list"
                             ],
-                            "additionalProperties": false
+                            "additionalProperties": false,
+                            "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                           }
                         ]
                       }
@@ -22730,7 +22733,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 200
                               }
                             },
                             "provider_allow_list": {
@@ -22738,7 +22742,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 64
                               }
                             }
                           },
@@ -22747,7 +22752,8 @@
                             "model_allow_list",
                             "provider_allow_list"
                           ],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                         }
                       ]
                     }
@@ -22982,7 +22988,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 200
                               }
                             },
                             "provider_allow_list": {
@@ -22990,7 +22997,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 64
                               }
                             }
                           },
@@ -22999,7 +23007,8 @@
                             "model_allow_list",
                             "provider_allow_list"
                           ],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON."
                         }
                       ]
                     }

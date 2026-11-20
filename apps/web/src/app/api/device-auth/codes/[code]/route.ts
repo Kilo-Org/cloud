@@ -3,6 +3,8 @@ import {
   pollDeviceAuthRequest,
   denyDeviceAuthRequest,
   cancelDeviceAuthRequest,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
 } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
@@ -74,13 +76,17 @@ function getDeviceCancelRateLimitKey(code: string): string {
   return crypto.createHmac('sha256', NEXTAUTH_SECRET).update(code).digest('base64url');
 }
 
+/**
+ * The refusal code decides the status, so copy edits cannot change it. A refusal
+ * this route does not answer with is a bug: it is reported and answered as 500.
+ */
 function deviceAuthFailureResponse(error: unknown, notPendingMessage: string): Response {
-  if (error instanceof Error) {
-    if (error.message === 'Device authorization request not found') {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (error instanceof DeviceAuthRefusalError) {
+    if (error.code === DEVICE_AUTH_REFUSAL_CODES.requestNotFound) {
+      return NextResponse.json({ error: error.code, message: 'Not found' }, { status: 404 });
     }
-    if (error.message === 'Device authorization request is not pending') {
-      return NextResponse.json({ error: notPendingMessage }, { status: 409 });
+    if (error.code === DEVICE_AUTH_REFUSAL_CODES.requestNotPending) {
+      return NextResponse.json({ error: error.code, message: notPendingMessage }, { status: 409 });
     }
   }
   const message = error instanceof Error ? error.message : String(error);

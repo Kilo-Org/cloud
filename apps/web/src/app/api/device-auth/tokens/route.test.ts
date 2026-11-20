@@ -12,8 +12,9 @@ jest.mock('@/lib/device-auth/device-auth', () => {
 });
 import {
   approveDeviceAuthRequest,
-  DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
-  DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
+  refusalCopyFor,
 } from '@/lib/device-auth/device-auth';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { POST } from './route';
@@ -88,14 +89,19 @@ describe('POST /api/device-auth/tokens', () => {
       user: defineTestUser({ id: 'user-1' }),
       authFailedResponse: null,
     });
-    mockApprove.mockRejectedValueOnce(new Error(DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE));
+    mockApprove.mockRejectedValueOnce(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired)
+    );
 
     const response = await POST(
       createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders)
     );
 
     expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE });
+    expect(await response.json()).toEqual({
+      error: DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired,
+      message: refusalCopyFor(DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired),
+    });
   });
 
   it('answers 409 when the approval does not confirm the client it names', async () => {
@@ -103,45 +109,47 @@ describe('POST /api/device-auth/tokens', () => {
       user: defineTestUser({ id: 'user-1' }),
       authFailedResponse: null,
     });
-    mockApprove.mockRejectedValueOnce(new Error(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE));
+    mockApprove.mockRejectedValueOnce(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch)
+    );
 
     const response = await POST(
       createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders)
     );
 
     expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE });
+    expect(await response.json()).toEqual({
+      error: DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch,
+      message: refusalCopyFor(DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch),
+    });
   });
 
   it.each([
     {
-      message: 'Device authorization request not found',
+      code: DEVICE_AUTH_REFUSAL_CODES.requestNotFound,
       status: 404,
-      error: 'Not found',
     },
     {
-      message: 'Device authorization request is not pending',
+      code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
       status: 409,
-      error: 'Device authorization request can no longer be approved',
     },
     {
-      message: 'Device authorization request has expired',
+      code: DEVICE_AUTH_REFUSAL_CODES.requestExpired,
       status: 410,
-      error: 'Device authorization request has expired',
     },
-  ])('returns $status when approval fails with "$message"', async ({ message, status, error }) => {
+  ])('returns $status when the approval refuses with $code', async ({ code, status }) => {
     mockGetUserFromSession.mockResolvedValue({
       user: defineTestUser({ id: 'user-1' }),
       authFailedResponse: null,
     });
-    mockApprove.mockRejectedValueOnce(new Error(message));
+    mockApprove.mockRejectedValueOnce(new DeviceAuthRefusalError(code));
 
     const response = await POST(
       createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders)
     );
 
     expect(response.status).toBe(status);
-    expect(await response.json()).toEqual({ error });
+    expect(await response.json()).toEqual({ error: code, message: refusalCopyFor(code) });
     expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', {});
   });
 

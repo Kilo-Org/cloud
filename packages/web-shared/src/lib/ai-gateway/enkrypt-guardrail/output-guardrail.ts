@@ -33,6 +33,7 @@ import type {
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { KEEP_ALIVE_COMMENT } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
+import { countEnkryptCalls } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -288,9 +289,10 @@ export async function guardEnkryptOutput({
   const format = bodyFormat(response);
   const requestLogs: Promise<EnkryptRequestLog>[] = [];
   const captureResponse = Promise.withResolvers<boolean>();
+  const calls = countEnkryptCalls();
   const deps = {
     apiKey: ENKRYPT_API_KEY,
-    fetch,
+    fetch: calls.fetch,
     timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
     signal,
     requestLog: captureRequestLogs && {
@@ -384,7 +386,7 @@ export async function guardEnkryptOutput({
         }
       })();
       const logged = scanned.then(records => recordOutputUsageRecords(records ?? []));
-      after(logged);
+      after(logged.finally(calls.flush));
       captureRequestLogs?.(async (shouldCaptureResponse = true) => {
         captureResponse.resolve(shouldCaptureResponse);
         await scanned;
@@ -470,7 +472,7 @@ export async function guardEnkryptOutput({
     };
   })();
   const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordOutputUsageRecords);
-  after(recorded);
+  after(recorded.finally(calls.flush));
   captureRequestLogs?.(async (shouldCaptureResponse = true) => {
     captureResponse.resolve(shouldCaptureResponse);
     const { usageRecords } = await scanned;

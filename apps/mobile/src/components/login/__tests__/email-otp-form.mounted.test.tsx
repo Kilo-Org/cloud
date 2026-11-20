@@ -314,3 +314,21 @@ describe('EmailOtpForm action labels', () => {
     expect(actionLabel(mounted.root, i18n.t('login.resendCode')).props.numberOfLines).toBe(1);
   });
 });
+
+describe('EmailOtpForm browser fallback', () => {
+  // The mounted flow proves the control's presence and wiring; this pins the
+  // busy edge it cannot see: the whole step locks while the browser opens.
+  it('disables the step and spins the action while the browser sign-in starts', () => {
+    const { mounted } = mount({
+      onBrowserSignIn: vi.fn<() => void>(),
+      browserSignInStarting: true,
+    });
+    for (const button of mounted.root.findAllByType('Button')) {
+      expect(button.props.disabled).toBe(true);
+    }
+    expect(
+      mounted.root.findByProps({ accessibilityLabel: i18n.t('login.moreSignInOptions') }).props
+        .loading
+    ).toBe(true);
+  });
+});

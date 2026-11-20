@@ -248,6 +248,8 @@ describe('Organizations', () => {
           'requireSeats',
           'role',
           'seatCount',
+          'trialEndsAt',
+          'trialStatus',
         ].sort()
       );
       expect(Object.keys(result[0].seatCount).sort()).toEqual(['total', 'used'].sort());
@@ -276,6 +278,59 @@ describe('Organizations', () => {
       const [row] = await getUserOrganizationsWithSeats(user.id);
 
       expect(row?.isTrialExpiredForEnforcement).toBe(false);
+    });
+
+    test('publishes a running trial with the date it ends', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Trial Readout Org', user.id);
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      // A fresh organization is deep inside its 14-day window, so the row
+      // carries the stage a client renders "on trial" from.
+      expect(row?.trialStatus).toBe('trial_active');
+      // The date is the organization's own trial end, published as an ISO
+      // instant so a device never parses a Postgres timestamp.
+      expect(String(row?.trialEndsAt)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(Date.parse(String(row?.trialEndsAt))).toBe(
+        Date.parse(String(organization.free_trial_end_at))
+      );
+    });
+
+    test('publishes no trial once it has lapsed', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Lapsed Readout Org', user.id);
+      await db
+        .update(organizations)
+        .set({
+          free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          require_seats: true,
+        })
+        .where(eq(organizations.id, organization.id));
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      expect(row?.trialStatus).toBeNull();
+      expect(row?.trialEndsAt).toBeNull();
+    });
+
+    test('publishes no trial once a seat subscription pays for the plan', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Subscribed Readout Org', user.id);
+      await db.insert(organization_seats_purchases).values({
+        subscription_stripe_id: 'sub_readout_active',
+        organization_id: organization.id,
+        seat_count: 5,
+        amount_usd: 50.0,
+        starts_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        subscription_status: 'active',
+      });
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      expect(row?.trialStatus).toBeNull();
+      expect(row?.trialEndsAt).toBeNull();
     });
 
     test('keeps a lapsed trial entitled when trial messaging is suppressed', async () => {
@@ -829,6 +884,46 @@ describe('Organizations', () => {
           invitationToken: invitation.token,
         })
       ).toBe(false);
+      const result = await acceptOrganizationInvite(member.id, invitation.token, {
+        provider: 'workos',
+        ssoSourceOrganizationId: organization.id,
+      });
+      expect(result.success).toBe(true);
+      const membership = await db.query.organization_memberships.findFirst({
+        where: and(
+          eq(organization_memberships.organization_id, organization.id),
+          eq(organization_memberships.kilo_user_id, member.id)
+        ),
+      });
+      expect(membership?.role).toBe('admin');
+    });
+
+    test('recognizes the invited account when its stored normalized email is stale', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser({
+        google_user_email: 'jit-stale-current@example.com',
+        normalized_email: 'jit-stale-old@example.com',
+      });
+      const organization = await createOrganization('SSO Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ sso_domain: 'example.com' })
+        .where(eq(organizations.id, organization.id));
+      const invitation = await inviteUserToOrganization(
+        organization.id,
+        owner.id,
+        'jit-stale-current@example.com',
+        'admin'
+      );
+
+      // The invitation claims the account, so SSO provisioning defers to it.
+      expect(
+        await addSsoUserToOrganization(organization.id, member.id, {
+          invitationToken: invitation.token,
+        })
+      ).toBe(false);
+      expect(await isOrganizationMember(db, organization.id, member.id)).toBe(false);
+
       const result = await acceptOrganizationInvite(member.id, invitation.token, {
         provider: 'workos',
         ssoSourceOrganizationId: organization.id,

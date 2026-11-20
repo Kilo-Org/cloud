@@ -331,8 +331,8 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NATIVE_ADMISSION_DEV_SENTINEL` - When `true`, non-production accepts the fixed device-attestation sentinel from devices that cannot attest (simulator, emulator without Play Services). Ignored when `NODE_ENV=production`. The mobile build reads the same name. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
-- `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]
-- `GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS` - Comma-separated SHA-256 signing certificate digests (hex) accepted for the Android app. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Android package name (`com.kilocode.kiloapp`), verified against the Play Integrity verdict. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS` - Comma-separated SHA-256 digests of accepted Play signing certificates. Use the base64url encoding from `certificateSha256Digest`, not the hex fingerprint. [SERVER]
 
 ### Ablation / Experimentation
 

@@ -22,6 +22,7 @@ import { evaluateContainerAllocations } from './container-allocations';
 import { evaluateQueueBacklogAlert } from './queue-backlog-evaluate';
 import { queryUsageQueueBacklog } from './usage-queue-backlog-query';
 import { evaluateDeadLetterQueueAlert } from './dead-letter-queue-evaluate';
+import { ENKRYPT_DEAD_LETTER_QUEUE_NAME } from './dead-letter-queue';
 
 /**
  * Compute the burn rate from an observed bad-event fraction and the SLO.
@@ -339,6 +340,12 @@ export async function evaluateAlerts(env: Env): Promise<void> {
     await evaluateDeadLetterQueueAlert(env);
   } catch (err) {
     errors.push(new Error('dead_letter_queue evaluation', { cause: err }));
+  }
+
+  try {
+    await evaluateDeadLetterQueueAlert(env, ENKRYPT_DEAD_LETTER_QUEUE_NAME);
+  } catch (err) {
+    errors.push(new Error('enkrypt_dead_letter_queue evaluation', { cause: err }));
   }
 
   if (errors.length > 0) {

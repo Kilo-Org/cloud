@@ -72,6 +72,7 @@ import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
+import { adminEnkryptCallsRouter } from '@/routers/admin/enkrypt-calls-router';
 import { adminAutoFreeConfigRouter } from '@/routers/admin/auto-free-config-router';
 import { adminGatewayModelListsRouter } from '@/routers/admin/gateway-model-lists-router';
 import { adminVercelModelIdOverridesRouter } from '@/routers/admin/vercel-model-id-overrides-router';
@@ -2911,6 +2912,7 @@ export const adminRouter = createTRPCRouter({
   gatewayConfig: adminGatewayConfigRouter,
   autoFreeConfig: adminAutoFreeConfigRouter,
   gatewayModelLists: adminGatewayModelListsRouter,
+  enkryptCalls: adminEnkryptCallsRouter,
   vercelModelIdOverrides: adminVercelModelIdOverridesRouter,
   preferredProviderOrder: adminPreferredProviderOrderRouter,
   customPricing: adminCustomPricingRouter,

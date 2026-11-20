@@ -12,7 +12,9 @@ import {
 } from '@kilocode/db/schema';
 import { MAX_ORGANIZATION_GROUPS, OrganizationSettingsSchema } from '@kilocode/db/schema-types';
 import {
+  describeModelAccessPolicyWriteRefusal,
   OrganizationGroupPoliciesSchema,
+  OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPolicySchema,
   ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
   type OrganizationGroupPolicies,
@@ -57,7 +59,17 @@ export function normalizeOrganizationGroupPolicy(
   policyInput: OrganizationGroupPolicy
 ): OrganizationGroupPolicy {
   const policy = OrganizationGroupPolicySchema.parse(policyInput);
-  return normalizeRegisteredOrganizationGroupPolicy(policy);
+  const normalized = normalizeRegisteredOrganizationGroupPolicy(policy);
+  if (normalized.type !== 'model_access') return normalized;
+  const parsed = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(normalized);
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: describeModelAccessPolicyWriteRefusal(parsed.error),
+      cause: parsed.error,
+    });
+  }
+  return parsed.data;
 }
 
 function upsertPolicy(

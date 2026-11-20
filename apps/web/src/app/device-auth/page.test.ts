@@ -84,6 +84,22 @@ describe('DeviceAuthPage requesting client', () => {
     });
   });
 
+  test.each([
+    ['lower case without the separator', 'abcd1234'],
+    ['a typed space in place of the separator', 'abcd 1234'],
+    ['the canonical form', 'ABCD-1234'],
+  ])('resolves a code typed as %s', async (_label, typed) => {
+    getDeviceAuthRequest.mockResolvedValue(requestedClient);
+    isDeviceAuthRequestExpired.mockReturnValue(false);
+
+    const element = (await DeviceAuthPage({
+      searchParams: Promise.resolve({ code: typed }),
+    })) as { props: { code: string } };
+
+    // The page, its stored lookup and every redirect must use one canonical code.
+    expect(element.props.code).toBe('ABCD-1234');
+  });
+
   test('hands no client for a request that names none', async () => {
     getDeviceAuthRequest.mockResolvedValue({
       ...requestedClient,

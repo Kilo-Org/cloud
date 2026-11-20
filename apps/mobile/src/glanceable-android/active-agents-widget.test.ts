@@ -130,8 +130,9 @@ describe('Home widget geometry per cell and state', () => {
   });
 
   it.each(CELLS)(
-    'keeps Approve 4dp before `+` and splits their targets at the gap at %dx%d',
+    'gives `+` and Approve a 48dp target each without moving `+` at %dx%d',
     (width, height) => {
+      const pad = padFor(width, height);
       for (const state of [STATES['needs input with Approve'], STATES.approving]) {
         for (const rtl of [false, true]) {
           const root = render(stateProps(state), [width, height], rtl).light;
@@ -140,22 +141,27 @@ describe('Home widget geometry per cell and state', () => {
           if (approve === null || plus === null) {
             throw new Error('both actions draw');
           }
-          close(plus.x + plus.width, width - padFor(width, height));
-          expect(plus.x - (approve.x + approve.width)).toBeCloseTo(GLYPH_GAP, 5);
+          // `+` never moves: its glyph still ends on the padding line.
+          close(plus.x + plus.width, width - pad);
+          const gap = plus.x - (approve.x + approve.width);
+          expect(gap).toBeGreaterThanOrEqual(GLYPH_GAP - 1e-6);
+          // Approve moves left only as far as the two 48dp targets need, and no more
+          // than the 6dp the narrowest cell with both actions asks for.
+          const atFourDp = plus.x - GLYPH_GAP - approve.width;
+          expect(approve.x).toBeLessThanOrEqual(atFourDp + 1e-6);
+          expect(atFourDp - approve.x).toBeLessThanOrEqual(6 + 1e-6);
           const plusTarget = ltr(rectOf(byKey(root, 'create-target')), frame);
-          // `+` owns the trailing edge from the middle of the gap: the largest target
-          // that cannot overlap Approve's, and 48dp wherever the glyph is large enough.
-          expect(plusTarget.x).toBeCloseTo(plus.x - GLYPH_GAP / 2, 5);
+          // `+` owns the trailing edge: its target runs to the widget's right edge.
           expect(plusTarget.x + plusTarget.width).toBeCloseTo(width, 5);
-          if (plus.width >= 32) {
-            expect(plusTarget.width).toBeGreaterThanOrEqual(48);
-          }
+          expect(plusTarget.width).toBeGreaterThanOrEqual(48);
           if (state === STATES.approving) {
             expect(hasKey(root, 'approve-target')).toBe(false);
           } else {
             const approveTarget = ltr(rectOf(byKey(root, 'approve-target')), frame);
+            // The two targets meet at the split: disjoint, and each keeps 48dp.
             expect(approveTarget.x + approveTarget.width).toBeCloseTo(plusTarget.x, 5);
             expect(approveTarget.width).toBeGreaterThanOrEqual(48);
+            expect(approveTarget.x).toBeGreaterThanOrEqual(-0.05);
             // Each target covers its whole control.
             expect(approveTarget.x).toBeLessThanOrEqual(approve.x + 0.05);
             for (const [control, hit] of [
@@ -215,20 +221,22 @@ describe('Home widget design coordinates at the design frames', () => {
     const root = at(DESIGN.small);
     expect(rect(root, 'logo')).toEqual({ x: 16, y: 16, width: 24, height: 24 });
     expect(rect(root, 'create-glyph')).toEqual({ x: 130, y: 16, width: 24, height: 24 });
-    expect(rect(root, 'approve-glyph')).toEqual({ x: 102, y: 16, width: 24, height: 24 });
-    // `+` owns 16 + 24 + 2dp: the most it can take without overlapping Approve.
-    expect(rect(root, 'create-target')).toMatchObject({ x: 128, width: 42 });
-    expect(rect(root, 'approve-target')).toMatchObject({ x: 80, width: 48 });
+    expect(rect(root, 'approve-glyph')).toEqual({ x: 98, y: 16, width: 24, height: 24 });
+    // `+` owns the trailing 48dp; Approve's glyph moves the 4dp that split needs.
+    expect(rect(root, 'create-target')).toMatchObject({ x: 122, width: 48 });
+    expect(rect(root, 'approve-target')).toMatchObject({ x: 74, width: 48 });
     expect(rect(root, 'count').x).toBe(16);
     const footer = rect(root, 'footer');
     close(footer.y + footer.height, 170 - 16);
     expect(byKey(root, 'line-0').props.text).toBe('Review the release');
   });
 
-  it('draws Medium with the Approve pill 4dp before `+` and two rows', () => {
+  it('draws Medium with the Approve pill before `+` and two rows', () => {
     const root = at(DESIGN.medium);
-    expect(rect(root, 'approve-pill')).toEqual({ x: 234, y: 16, width: 86, height: 24 });
+    expect(rect(root, 'approve-pill')).toEqual({ x: 230, y: 16, width: 86, height: 24 });
     expect(rect(root, 'create-glyph')).toEqual({ x: 324, y: 16, width: 24, height: 24 });
+    expect(rect(root, 'create-target')).toMatchObject({ x: 316, width: 48 });
+    expect(rect(root, 'approve-target')).toMatchObject({ x: 230, width: 86 });
     expect(rect(root, 'logo')).toEqual({ x: 16, y: 16, width: 24, height: 24 });
     expect(hasKey(root, 'row-1-title')).toBe(true);
     expect(hasKey(root, 'row-2-title')).toBe(false);
@@ -251,7 +259,7 @@ describe('Home widget design coordinates at the design frames', () => {
     expect(byKey(rowRoot, 'footer').props.text).toBe('Checked 8:00 PM');
     const narrowRoot = at(DESIGN.narrow);
     expect(rect(narrowRoot, 'create-glyph')).toEqual({ x: 134, y: 14, width: 24, height: 24 });
-    expect(rect(narrowRoot, 'approve-glyph')).toEqual({ x: 106, y: 14, width: 24, height: 24 });
+    expect(rect(narrowRoot, 'approve-glyph')).toEqual({ x: 100, y: 14, width: 24, height: 24 });
     expect(rect(narrowRoot, 'logo')).toEqual({ x: 14, y: 18, width: 16, height: 16 });
     const land = at(DESIGN.landscape);
     expect(rect(land, 'create-glyph')).toEqual({ x: 581, y: 15, width: 32, height: 32 });

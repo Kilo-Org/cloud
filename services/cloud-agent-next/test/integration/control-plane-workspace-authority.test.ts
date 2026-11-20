@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import type { CloudAgentWorkspaceDO } from '../../src/control-plane/workspace/workspace-do.js';
 import { cloudAgentChildSessions } from '../../src/control-plane/session/sqlite-schema.js';
+import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../../src/cloud-agent-authority.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
@@ -110,6 +111,21 @@ async function registerChat(input: {
 
 function workspaceStub(sessionId: string): DurableObjectStub<CloudAgentWorkspaceDO> {
   return workspaces.getByName(sessionDoName(USER_ID, sessionId));
+}
+
+/**
+ * Settles a Durable Object call and returns its rejection, or undefined when it
+ * succeeded. The handler is attached in the same turn as the call, so the
+ * Durable Object reply is never reported as an unhandled rejection.
+ */
+async function delegationOutcome(call: Promise<unknown>): Promise<Error | undefined> {
+  try {
+    await call;
+  } catch (error) {
+    if (error instanceof Error) return error;
+    throw error;
+  }
+  return undefined;
 }
 
 async function legacyChildRows(stub: DurableObjectStub<SandboxSessionV2>, children: string[]) {
@@ -375,5 +391,49 @@ describe('workspace authority lifecycle', () => {
         organizationId: null,
       })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('workspace authority delegation', () => {
+  it('delegates only to a session id this Worker allocated', async () => {
+    const root = workspaceSessionId();
+    const stored = authorization(root);
+    await registerChat({
+      sessionId: root,
+      allowSubagentSessions: true,
+      worktreeId: worktreeFor(root),
+      authorization: stored,
+    });
+    const workspace = workspaceStub(root);
+    await expect(workspace.describe()).resolves.toMatchObject({ state: 'active' });
+
+    const authority = {
+      version: 1 as const,
+      ownerId: USER_ID,
+      parentSessionId: root,
+      organizationId: null,
+      authorizationId: stored.id,
+      expiresAt: Math.floor(Date.parse(stored.delegationExpiresAt) / 1000),
+    };
+
+    const rejectedChild = await delegationOutcome(
+      workspace.authorizeChild({ authority, childSessionId: 'workspace_not-a-uuid' })
+    );
+    expect(rejectedChild?.message).toContain('server-allocated');
+    const rejectedChat = await delegationOutcome(
+      workspace.authorizeChat({ chatSessionId: 'workspace_not-a-uuid' })
+    );
+    expect(rejectedChat?.message).toContain('server-allocated');
+
+    // A well-formed id passes the format guard, so the call reaches the next
+    // check and fails there; an unattached workspace refuses it. Any other
+    // outcome means a well-formed id was refused as malformed.
+    const acceptedFormat = await delegationOutcome(
+      workspaceStub(workspaceSessionId()).authorizeChild({
+        authority,
+        childSessionId: workspaceSessionId(),
+      })
+    );
+    expect(acceptedFormat?.message).toBe(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
   });
 });

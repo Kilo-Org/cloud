@@ -287,7 +287,10 @@ describe('profile failure transitions (production migrations and real SQLite)', 
 
   it.each([
     { failure: { failureClass: 'model_not_found', reason: 'gone' }, catalog: { data: [] } },
-    { failure: { failureClass: 'catalog_absent', reason: 'Not in the catalog.' }, catalog: { data: [] } },
+    {
+      failure: { failureClass: 'catalog_absent', reason: 'Not in the catalog.' },
+      catalog: { data: [] },
+    },
     { failure: providerDown, catalog: { data: [] } },
     { failure: providerDown, catalog: tooSmallCatalog },
   ] satisfies { failure: ProfileFailure; catalog: unknown }[])(
@@ -680,8 +683,8 @@ describe('catalog load deferrals (production migrations and real SQLite)', () =>
     await scheduleRunChunks(db, {
       runId: 'run',
       entries: [
-        { model: 'a/model', variant: null, providers: ['deepinfra'] },
-        { model: 'b/model', variant: null, providers: ['together'] },
+        { model: 'a/model', variant: null },
+        { model: 'b/model', variant: null },
       ],
       repetitions: 1,
       caseIds: ['case-a'],

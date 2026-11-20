@@ -1434,8 +1434,8 @@ describe('GET /admin/registry', () => {
     expect(body.failedEntries).toEqual(failedEntries);
     expect(listCurrentFailedProfiles).toHaveBeenCalledWith(env.BENCH_DB, {
       router: 'efficient',
-      engineIdentity: expect.any(String),
-      repetitions: 1,
+      engineIdentity: body.engineIdentity,
+      repetitions: body.repetitions,
     });
   });
 });

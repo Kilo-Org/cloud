@@ -20,8 +20,12 @@ catalog:
   '@octokit/auth-app': 8.2.0
   # The logs API and the logs SDK move together: the SDK declares the API at its
   # own 0.x release, so a pair one minor apart installs a second copy of the
-  # interface the SDK implements, and only one copy reaches the registered
-  # provider. One catalog line per side keeps them on one release line.
+  # interface the SDK implements. One catalog line per side keeps them on one
+  # release line.
+  # The pair is capped by the '@opentelemetry/core' override below at 2.8.0:
+  # sdk-logs declares core at its own release line, so a newer pair would run the
+  # SDK against a core below what it asks for. 0.219.0 is the newest release whose
+  # core is exactly 2.8.0. Move this pair together with any future core bump.
   '@opentelemetry/api-logs': 0.219.0
   '@opentelemetry/sdk-logs': 0.219.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,

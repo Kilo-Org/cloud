@@ -160,6 +160,31 @@ function isTimeout(error: unknown, signal: AbortSignal): boolean {
   return name === 'TimeoutError' || name === 'AbortError';
 }
 
+function measuredReply(
+  reply: ProbeReply,
+  request: ProbeRunRequest,
+  latencyMs: number,
+  exitCode: number
+): CliRunResult {
+  return {
+    text: reply.text,
+    // The gateway bills every call and usually reports the cost; when it leaves the cost out,
+    // price the reported tokens at the run's catalog rates rather than recording none.
+    costUsd: reply.costUsd ?? catalogUsageCostUsd(request.catalogModel, reply),
+    inputTokens: reply.inputTokens,
+    cachedInputTokens: reply.cachedInputTokens,
+    outputTokens: reply.outputTokens,
+    reasoningTokens: reply.reasoningTokens,
+    latencyMs,
+    exitCode,
+    stderrTail: reply.errorMessage ?? '',
+    eventCount: reply.eventCount,
+    lastEventTypes: [...reply.lastEventTypes],
+    tools: toolsOf(reply),
+    timedOut: false,
+  };
+}
+
 /**
  * Runs one probe case straight through the gateway: no CLI, no container. The request is
  * the captured template plus the transcript's history up to the cut, so the reply is the
@@ -249,26 +274,14 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
     throw new Error('probe stream was cut after the gateway billed for output');
   }
   if (reply.errorMessage !== null && reply.toolCalls.length === 0 && reply.text.length === 0) {
-    return unbilledFailure(`provider error: ${reply.errorMessage}`, latencyMs);
+    const diagnostic = `provider error: ${reply.errorMessage}`;
+    // A terminal provider error that reported usage was billed, so its cost and tokens stay
+    // in the ledger and the case is graded as a failure instead of being retried for free.
+    if (!billed) return unbilledFailure(diagnostic, latencyMs);
+    return { ...measuredReply(reply, request, latencyMs, 1), stderrTail: diagnostic };
   }
 
-  return {
-    text: reply.text,
-    // The gateway bills every call and usually reports the cost; when it leaves the cost out,
-    // price the reported tokens at the run's catalog rates rather than recording none.
-    costUsd: reply.costUsd ?? catalogUsageCostUsd(request.catalogModel, reply),
-    inputTokens: reply.inputTokens,
-    cachedInputTokens: reply.cachedInputTokens,
-    outputTokens: reply.outputTokens,
-    reasoningTokens: reply.reasoningTokens,
-    latencyMs,
-    exitCode: 0,
-    stderrTail: reply.errorMessage ?? '',
-    eventCount: reply.eventCount,
-    lastEventTypes: [...reply.lastEventTypes],
-    tools: toolsOf(reply),
-    timedOut: false,
-  };
+  return measuredReply(reply, request, latencyMs, 0);
 }
 
 /** The timeout a probe request honours, shared with the CLI container path. */

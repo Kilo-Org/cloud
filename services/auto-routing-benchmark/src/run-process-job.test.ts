@@ -644,6 +644,38 @@ describe('processJob — scheduler-owned execution', () => {
       );
     });
 
+    it('records a billed provider error as a failed case instead of deferring it for a paid retry', async () => {
+      mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
+      vi.mocked(runProbeCaseViaGateway).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: '',
+        costUsd: 0.0008,
+        inputTokens: 4000,
+        outputTokens: 12,
+        exitCode: 1,
+        stderrTail: 'provider error: rate limit exceeded',
+        lastEventTypes: ['error'],
+        tools: { calls: 0, names: [], steps: 0, finalFinishReason: null },
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(failChunk).not.toHaveBeenCalled();
+      expect(clearUnbilledCase).not.toHaveBeenCalled();
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({
+          case_id: probeCase.id,
+          score: 0,
+          cost_usd: 0.0008,
+          input_tokens: 4000,
+          output_tokens: 12,
+          error: 'provider error: rate limit exceeded',
+        })
+      );
+    });
+
     it('scores a probe that narrates and stops without a tool call as zero', async () => {
       mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
       vi.mocked(runProbeCaseViaGateway).mockResolvedValueOnce({

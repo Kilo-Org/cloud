@@ -101,6 +101,22 @@ function responsesText(text: string, cost: number | null): string {
   ].join('');
 }
 
+function responsesFailure(message: string, usage: Record<string, unknown> | null): string {
+  const event = (type: string, payload: Record<string, unknown>) =>
+    `event: ${type}\ndata: ${JSON.stringify({ type, ...payload })}\n\n`;
+  return [
+    event('response.created', { response: { id: 'resp_5', created_at: 1, model } }),
+    event('response.failed', {
+      response: {
+        id: 'resp_5',
+        status: 'failed',
+        error: { message },
+        ...(usage === null ? {} : { usage }),
+      },
+    }),
+  ].join('');
+}
+
 function chatToolCalls(cost: number): string {
   const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
     `data: ${JSON.stringify({
@@ -564,6 +580,32 @@ describe('probe executor — failures keep the paid-call policy', () => {
     const result = await run({ fetchImpl: withTimeout(20) });
     expect(result).toMatchObject({ timedOut: true, exitCode: 1, costUsd: 0 });
     expect(result.stderrTail).toBe(`probe request timed out after ${PROBE_TIMEOUT_MS}ms`);
+  });
+
+  it('records a terminal provider error that reported usage as a billed failure', async () => {
+    replies.push({
+      status: 200,
+      body: responsesFailure('upstream overloaded', {
+        input_tokens: 4000,
+        output_tokens: 12,
+        cost: 0.0008,
+      }),
+    });
+    const result = await run();
+    expect(result.exitCode).toBe(1);
+    expect(result.costUsd).toBe(0.0008);
+    expect(result.inputTokens).toBe(4000);
+    expect(result.outputTokens).toBe(12);
+    expect(result.stderrTail).toBe('provider error: upstream overloaded');
+    expect(isUnbilledTransientProviderResult(result)).toBe(false);
+  });
+
+  it('defers a terminal provider error that reported no usage', async () => {
+    replies.push({ status: 200, body: responsesFailure('service unavailable', null) });
+    const result = await run();
+    expect(result.costUsd).toBe(0);
+    expect(result.inputTokens).toBeNull();
+    expect(isUnbilledTransientProviderResult(result)).toBe(true);
   });
 
   it('treats a rejected model as unavailable, which fails the entry permanently', async () => {

@@ -68,12 +68,21 @@ export function selectReplicaUrls({
 
 /**
  * The part of a client address that picks its replica: the /64 prefix of an IPv6 address,
- * which privacy extensions keep while rotating the rest, otherwise the address itself.
+ * which privacy extensions keep while rotating the rest, otherwise the address itself. An
+ * IPv4-mapped address (`::ffff:a.b.c.d` or `::ffff:xxxx:xxxx`) keys as its IPv4 address; its
+ * /64 prefix is 0 for every client.
  */
 export function replicaAffinityKey(ip: string): string {
   if (!ip.includes(':')) return ip;
+  const dottedMapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (dottedMapped?.[1]) return dottedMapped[1];
   const parsed = parseIPv6(ip);
-  return parsed === null ? ip : (parsed >> BigInt(64)).toString(16);
+  if (parsed === null) return ip;
+  if (parsed >> BigInt(32) === BigInt(0xffff)) {
+    const v4 = Number(parsed & BigInt(0xffffffff));
+    return [v4 >>> 24, (v4 >>> 16) & 255, (v4 >>> 8) & 255, v4 & 255].join('.');
+  }
+  return (parsed >> BigInt(64)).toString(16);
 }
 
 /**

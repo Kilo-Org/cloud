@@ -244,6 +244,13 @@ describe('drizzle', () => {
       expect(replicaAffinityKey('2001:db8:1:2::1')).not.toBe(replicaAffinityKey('2001:db8:1:3::1'));
       expect(replicaAffinityKey('203.0.113.1')).toBe('203.0.113.1');
     });
+
+    it('keys an IPv4-mapped address as its IPv4 address in either form', () => {
+      expect(replicaAffinityKey('::ffff:192.0.2.1')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('::ffff:c000:201')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('::FFFF:C000:0201')).toBe('192.0.2.1');
+      expect(replicaAffinityKey('::ffff:c000:202')).not.toBe(replicaAffinityKey('::ffff:c000:201'));
+    });
   });
 
   describe('createReadDb', () => {

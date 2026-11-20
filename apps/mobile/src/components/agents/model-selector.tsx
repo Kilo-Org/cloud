@@ -384,6 +384,7 @@ export function ModelPickerOptionRow({
   acceptsVariant,
   isFavorite,
   showProvider,
+  suppressUnavailableCheck = false,
   onSelectModel,
   onSelectVariant,
   onToggleFavorite,
@@ -404,6 +405,13 @@ export function ModelPickerOptionRow({
    * accessibility label keeps the name either way.
    */
   showProvider: boolean;
+  /**
+   * Whether a selected unavailable row drops its check. The all-unavailable
+   * sheet sets it, because its state already says nothing can be picked;
+   * elsewhere the muted check still marks an unavailable row that is the
+   * session's model.
+   */
+  suppressUnavailableCheck?: boolean;
   onSelectModel: (option: SessionModelOption) => void;
   onSelectVariant: (variant: string) => void;
   onToggleFavorite: (option: SessionModelOption) => void;
@@ -523,11 +531,13 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
-        {/* An unavailable row draws no check: a check would claim the row is a
-         * valid selection. The column stays reserved so nothing moves. */}
+        {/* The all-unavailable sheet drops the check from an unavailable row:
+         * a check there would claim a selection its state denies. Elsewhere a
+         * muted check still marks an unavailable row that is the session's
+         * model. The column stays reserved so nothing moves. */}
         <View className="items-center justify-center" style={{ width: CHECK_COLUMN_DP }}>
-          {selected && !option.unavailable ? (
-            <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors)} />
+          {selected && !(option.unavailable && suppressUnavailableCheck) ? (
+            <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />
           ) : null}
         </View>
         <Pressable

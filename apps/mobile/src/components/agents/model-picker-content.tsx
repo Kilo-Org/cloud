@@ -196,6 +196,21 @@ export function ModelPickerContent() {
     [acceptsVariant, bridge, closePicker]
   );
 
+  // A remote session whose CLI reports no models projects one row with
+  // `unavailable: true` and the session's current selection, so the sheet drew
+  // a dead row with no explanation of why it could not be picked. The state
+  // sits in the list header rather than in the zero-rows branch so the row the
+  // session is on, the search field and the sheet's height keep their places;
+  // `instance-picker`'s zero-instance state is the same shape. The state also
+  // owns the way out: an unavailable model is a missing credential, so its one
+  // action opens the provider-key form instead of leaving the sheet a dead end.
+  // It also owns the row's check: with nothing pickable, a check would claim a
+  // selection the state denies.
+  const allOptionsUnavailable =
+    bridge !== undefined &&
+    bridge.options.length > 0 &&
+    bridge.options.every(option => option.unavailable === true);
+
   // Hoisted out of the list body: the inline arrow gave the virtualized list a
   // new renderer on every render, which re-rendered every mounted row. Height
   // differs between the group header and a model row, so `getItemType` lets
@@ -218,6 +233,7 @@ export function ModelPickerContent() {
           acceptsVariant={acceptsVariant}
           isFavorite={item.isFavorite}
           showProvider={item.showsProvider}
+          suppressUnavailableCheck={allOptionsUnavailable}
           onSelectModel={handleSelectModel}
           onSelectVariant={handleSelectVariant}
           onToggleFavorite={handleToggleFavorite}
@@ -226,6 +242,7 @@ export function ModelPickerContent() {
     },
     [
       acceptsVariant,
+      allOptionsUnavailable,
       handleSelectModel,
       handleSelectVariant,
       handleToggleFavorite,
@@ -245,17 +262,6 @@ export function ModelPickerContent() {
       />
     );
   }
-
-  // A remote session whose CLI reports no models projects one row with
-  // `unavailable: true` and the session's current selection, so the sheet drew
-  // a dead row with no explanation of why it could not be picked. The state
-  // sits in the list header rather than in the zero-rows branch so the row the
-  // session is on, the search field and the sheet's height keep their places;
-  // `instance-picker`'s zero-instance state is the same shape. The state also
-  // owns the way out: an unavailable model is a missing credential, so its one
-  // action opens the provider-key form instead of leaving the sheet a dead end.
-  const allOptionsUnavailable =
-    bridge.options.length > 0 && bridge.options.every(option => option.unavailable === true);
 
   return (
     <PickerSheet

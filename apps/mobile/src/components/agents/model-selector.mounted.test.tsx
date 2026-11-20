@@ -190,19 +190,29 @@ describe('ModelPickerOptionRow unavailable row', () => {
     expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
   });
 
-  it('draws no check on a selected unavailable row and keeps the badge copy readable', () => {
+  it('marks a selected unavailable row with the muted check and keeps the badge copy readable', () => {
     const renderer = renderRow(
       cliCatalogOption({ unavailable: true, hasUserByokAvailable: true, name: 'Minimax M2.5' }),
       { selected: true }
     );
 
     // A container opacity would re-multiply the badge copy, which is the
-    // defect this change removes.
+    // defect this change removes; only the non-text check carries the dim.
     const views = renderer.root.findAll(
       node => typeof node.type === 'string' && (node.type as string) === 'View'
     );
     expect(views.some(node => String(node.props.className).includes('opacity-50'))).toBe(false);
-    // A check claims the row is a valid selection, and the row refuses the pick.
+    expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+  });
+
+  it('draws no check on a selected unavailable row the all-unavailable sheet shows', () => {
+    const renderer = renderRow(cliCatalogOption({ unavailable: true, name: 'Minimax M2.5' }), {
+      selected: true,
+      suppressUnavailableCheck: true,
+    });
+
+    // Nothing is pickable in that sheet, so a check would claim a selection
+    // the state above denies.
     expect(checkAccessories(renderer)).toHaveLength(0);
   });
 

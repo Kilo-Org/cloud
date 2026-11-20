@@ -191,6 +191,7 @@ const CASES: Case[] = [
   { locale: 'te', key: 'securityAgent.findingList.emptyTitle', value: 'ఓపెన్ సమస్యలు లేవు' },
   { locale: 'ur', key: 'securityAgent.findingList.emptyTitle', value: 'کوئی کھلا مسئلہ نہیں' },
   { locale: 'vi', key: 'securityAgent.findingList.emptyTitle', value: 'Không có vấn đề đang mở' },
+  { locale: 'mn', key: 'securityAgent.findingList.emptyTitle', value: 'Нээлттэй асуудал байхгүй' },
   { locale: 'zh-Hant', key: 'securityAgent.findingList.emptyTitle', value: '沒有開啟的資安問題' },
   {
     locale: 'zu',

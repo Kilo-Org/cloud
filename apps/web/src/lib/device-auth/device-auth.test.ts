@@ -25,8 +25,9 @@ import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_PENDING_LOCK_WAIT_MS,
   DEVICE_AUTH_CODE_LIFETIME_SECONDS,
-  DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
-  DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
+  normalizeDeviceAuthUserCode,
   getDeviceAuthPendingLink,
 } from './device-auth';
 import { createPendingLink, hashPendingLinkSecret } from '@/lib/auth/pending-link';
@@ -103,6 +104,22 @@ describe('Device Auth', () => {
     test('is an alias for generateUserCode', () => {
       // They are the same function reference.
       expect(generateDeviceCode).toBe(generateUserCode);
+    });
+  });
+
+  describe('normalizeDeviceAuthUserCode', () => {
+    test.each([
+      ['abcd-efgh', 'ABCD-EFGH'],
+      ['ABCDEFGH', 'ABCD-EFGH'],
+      ['abcd efgh', 'ABCD-EFGH'],
+      ['ABCD-EFGH', 'ABCD-EFGH'],
+      ['ABCD\tEFGH', 'ABCD-EFGH'],
+    ])('canonicalizes %j to %j', (input, expected) => {
+      expect(normalizeDeviceAuthUserCode(input)).toBe(expected);
+    });
+
+    test('returns a cleaned value that is not a whole code', () => {
+      expect(normalizeDeviceAuthUserCode(' abc')).toBe('ABC');
     });
   });
 
@@ -489,11 +506,13 @@ describe('Device Auth', () => {
     ])('refuses %s and leaves the request pending', async (_label, confirmedClientId) => {
       const { userCode } = await createDeviceAuthRequest({ requestingClient });
 
-      await expect(
-        approveDeviceAuthRequest(userCode, testUserId, {
-          ...(confirmedClientId ? { confirmedClientId } : {}),
-        })
-      ).rejects.toThrow(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE);
+      const refusal = approveDeviceAuthRequest(userCode, testUserId, {
+        ...(confirmedClientId ? { confirmedClientId } : {}),
+      });
+      await expect(refusal).rejects.toBeInstanceOf(DeviceAuthRefusalError);
+      await expect(refusal).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch,
+      });
 
       expect(await getDeviceAuthRequest(userCode)).toMatchObject({
         status: 'pending',
@@ -528,18 +547,18 @@ describe('Device Auth', () => {
     });
 
     test('throws error for non-existent request', async () => {
-      await expect(approveDeviceAuthRequest('XXX-XXX', testUserId)).rejects.toThrow(
-        'Device authorization request not found'
-      );
+      await expect(approveDeviceAuthRequest('XXX-XXX', testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.requestNotFound,
+      });
     });
 
     test('throws error for already approved request', async () => {
       const { userCode } = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(userCode, testUserId);
 
-      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-        'Device authorization request is not pending'
-      );
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+      });
     });
 
     test('concurrent approvals preserve the single winning user', async () => {
@@ -566,9 +585,9 @@ describe('Device Auth', () => {
 
           expect(approved).toHaveLength(1);
           expect(rejected).toHaveLength(1);
-          expect(rejected[0]?.reason).toEqual(
-            new Error('Device authorization request is not pending')
-          );
+          expect(rejected[0]?.reason).toMatchObject({
+            code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+          });
           expect((await getDeviceAuthRequest(userCode))?.kilo_user_id).toBe(approved[0]?.value);
           expect((await consumeDeviceAuthByDeviceCode(deviceCode)).userId).toBe(approved[0]?.value);
         }
@@ -590,9 +609,9 @@ describe('Device Auth', () => {
           .where(eq(device_auth_requests.user_code, userCode));
         const before = await getDeviceAuthRequest(userCode);
 
-        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-          'Device authorization request is not pending'
-        );
+        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+          code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+        });
 
         expect(await getDeviceAuthRequest(userCode)).toEqual(before);
       }
@@ -621,9 +640,9 @@ describe('Device Auth', () => {
       const selectSpy = jest.spyOn(db, 'select').mockReturnValueOnce(staleSelect);
 
       try {
-        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-          'Device authorization request is not pending'
-        );
+        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+          code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+        });
         expect((await getDeviceAuthRequest(userCode))?.status).toBe('denied');
       } finally {
         selectSpy.mockRestore();
@@ -654,9 +673,9 @@ describe('Device Auth', () => {
       });
 
       try {
-        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-          'Device authorization request has expired'
-        );
+        await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+          code: DEVICE_AUTH_REFUSAL_CODES.requestExpired,
+        });
         expect((await getDeviceAuthRequest(userCode))?.status).toBe('expired');
       } finally {
         jest.useRealTimers();
@@ -672,9 +691,9 @@ describe('Device Auth', () => {
         .set({ expires_at: new Date(Date.now() - 1000).toISOString() })
         .where(eq(device_auth_requests.user_code, userCode));
 
-      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-        'Device authorization request has expired'
-      );
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.requestExpired,
+      });
     });
   });
 
@@ -692,9 +711,9 @@ describe('Device Auth', () => {
 
           expect(succeeded).toHaveLength(1);
           expect(rejected).toHaveLength(1);
-          expect(rejected[0]?.reason).toEqual(
-            new Error('Device authorization request is not pending')
-          );
+          expect(rejected[0]?.reason).toMatchObject({
+            code: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+          });
           expect((await getDeviceAuthRequest(userCode))?.status).toBe(succeeded[0]?.value);
         } finally {
           await db.delete(device_auth_requests).where(eq(device_auth_requests.user_code, userCode));
@@ -945,9 +964,9 @@ describe('Device Auth', () => {
         email: testUserEmail,
         displayName: 'octocat',
       });
-      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-        DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE
-      );
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired,
+      });
 
       await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: false });
       const request = await getDeviceAuthRequest(userCode);
@@ -1337,9 +1356,9 @@ describe('Device Auth', () => {
       // request deadline hides it.
       await expect(getDeviceAuthPendingLink(userCode)).resolves.toBeNull();
 
-      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
-        'Device authorization request has expired'
-      );
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
+        code: DEVICE_AUTH_REFUSAL_CODES.requestExpired,
+      });
       const request = await getDeviceAuthRequest(userCode);
       expect(request?.status).toBe('expired');
     });

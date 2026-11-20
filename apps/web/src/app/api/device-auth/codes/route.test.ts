@@ -35,6 +35,68 @@ describe('POST /api/device-auth/codes', () => {
     jest.clearAllMocks();
   });
 
+  test('refuses an unreadable body instead of opening the plain flow', async () => {
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: '{',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'INVALID_REQUEST_BODY',
+      message: 'This sign-in request could not be read. Start the sign-in again.',
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test.each(['', '   '])('keeps the plain flow for a body of %j', async body => {
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requestingClient: expect.anything() })
+    );
+  });
+
+  test.each([
+    ['an empty token', ''],
+    ['an oversized token', 'a'.repeat(513)],
+  ])('names the sign-in link when the request carries %s', async (_label, pendingLinkToken) => {
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({ pendingLinkToken }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
+    // The failing field is the pending-link token, so the refusal must not
+    // blame the requesting client the caller never sent.
+    expect(await response.json()).toEqual({
+      error: 'PENDING_LINK_INVALID',
+      message: 'This sign-in link could not be read. Start the sign-in again.',
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   test('refuses a pending link token that names no live pending link', async () => {
     mockGetPendingLink.mockResolvedValue(null);
 

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from '@jest/globals';
 
-import { DeviceAuthClient } from './DeviceAuthClient';
+import { DeviceAuthClient, DeviceAuthAppReturn } from './DeviceAuthClient';
 import {
   buildDeviceAuthVerificationUrl,
   closeDeviceAuthWindowIfAppMode,
@@ -231,6 +231,25 @@ describe('DeviceAuthClient pending link', () => {
     expect(html).not.toContain('checked=""');
     expect(authorizeButton(html)).toContain('disabled=""');
     expect(html).toContain('Choose whether to add the sign-in method above to authorize.');
+  });
+});
+
+describe('DeviceAuthAppReturn', () => {
+  const renderReturn = () =>
+    renderToStaticMarkup(React.createElement(DeviceAuthAppReturn, {}));
+
+  test('names the app as the destination of the control', () => {
+    const html = renderReturn();
+
+    expect(html).toContain('Return to the app');
+    expect(html).toContain('You can close this window');
+  });
+
+  test('offers the return control as a button, not a link that leaves the page', () => {
+    const html = renderReturn();
+
+    expect(html).toContain('<button');
+    expect(html).not.toContain('<a ');
   });
 });
 

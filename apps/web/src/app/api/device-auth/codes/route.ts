@@ -4,6 +4,8 @@ import {
   createDeviceAuthRequest,
   DEVICE_AUTH_REFUSAL_CODES,
   DeviceAuthPendingLimitError,
+  refusalCopyFor,
+  type DeviceAuthRefusalCode,
 } from '@/lib/device-auth/device-auth';
 import {
   requestingClientSchema,
@@ -23,26 +25,53 @@ import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
 /**
  * The optional body of a pairing request. A caller that names the OAuth client
  * it is asking about gets that client shown on the approval page and confirmed
- * by the approver; a caller that sends no body keeps the plain flow.
+ * by the approver. A caller that sends no body keeps the plain flow; a body
+ * that cannot be read is refused; a field that fails its schema is named by its
+ * own refusal code.
  */
 const CreateCodesBodySchema = z.object({
   requesting_client: requestingClientSchema.optional(),
   pendingLinkToken: z.string().trim().min(1).max(512).optional(),
 });
 
+type ReadRequestBodyResult =
+  | { ok: true; client: RequestingClient | null; pendingLinkToken?: string }
+  | { ok: false; code: DeviceAuthRefusalCode };
+
 /**
  * The requesting client named by the body, or null when it names none.
  * A body that names an unusable client is refused rather than trimmed, so the
  * page never shows a description the approver cannot decide on.
  */
-async function readRequestingClient(
-  request: Request
-): Promise<
-  { ok: true; client: RequestingClient | null; pendingLinkToken?: string } | { ok: false }
-> {
-  const body: unknown = await request.json().catch(() => null);
-  const parsed = CreateCodesBodySchema.safeParse(body ?? {});
-  if (!parsed.success) return { ok: false };
+async function readRequestingClient(request: Request): Promise<ReadRequestBodyResult> {
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch {
+    return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestBody };
+  }
+
+  if (rawBody.trim() === '') return { ok: true, client: null };
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestBody };
+  }
+
+  const parsed = CreateCodesBodySchema.safeParse(body);
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    if (field === 'requesting_client') {
+      return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestingClient };
+    }
+    if (field === 'pendingLinkToken') {
+      return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkInvalid };
+    }
+    return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestBody };
+  }
+
   const payload = parsed.data.requesting_client;
   return {
     ok: true,
@@ -60,8 +89,8 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
   if (!requestingClient.ok) {
     return NextResponse.json(
       {
-        error: DEVICE_AUTH_REFUSAL_CODES.invalidRequestingClient,
-        message: 'Invalid requesting client',
+        error: requestingClient.code,
+        message: refusalCopyFor(requestingClient.code),
       },
       { status: 400 }
     );

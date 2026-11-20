@@ -14,14 +14,12 @@ jest.mock('@/lib/device-auth/device-auth', () => {
   class DeviceAuthPendingLimitError extends Error {}
   return {
     DeviceAuthPendingLimitError,
+    ...jest.requireActual('@/lib/device-auth/refusal-codes'),
     createDeviceAuthRequest: jest.fn(),
     pollDeviceAuthRequest: jest.fn(),
     denyDeviceAuthRequest: jest.fn(),
     consumeDeviceAuthByDeviceCode: jest.fn(),
     approveDeviceAuthRequest: jest.fn(),
-    DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE:
-      'Device authorization client confirmation does not match',
-    DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE: 'Device authorization pending link choice is required',
   };
 });
 

@@ -89,7 +89,10 @@ vi.mock('expo-router', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   trpcClient: { organizations: { create: { mutate: mocks.createMutate } } },
-  useTRPC: () => ({ organizations: { list: { queryKey: () => ['organizations.list'] } } }),
+  useTRPC: () => ({
+    organizations: { list: { queryKey: () => ['organizations.list'] } },
+    user: { getMe: { queryKey: () => ['user.getMe'] } },
+  }),
 }));
 
 // The identity the screen reads, controllable per case: the trial sentence is
@@ -197,6 +200,24 @@ function submitOf(renderer: ReactTestRenderer): ReactTestInstance {
 
 function texts(renderer: ReactTestRenderer): unknown[] {
   return renderer.root.findAllByType('Text').flatMap(node => node.props.children);
+}
+
+function findByTestID(root: ReactTestInstance, testID: string): ReactTestInstance[] {
+  return root.findAll(node => node.props.testID === testID);
+}
+
+/**
+ * The offer line: `painted` is how many live copies state the sentence, and the
+ * hidden copy that owns the line's height is present on every answer, laid out
+ * at the device width and font scale and not read aloud, so a late or
+ * reconciled answer paints over the same box instead of moving the form.
+ */
+function expectOfferLine(renderer: ReactTestRenderer, testIDPrefix: string, painted: number) {
+  expect(findByTestID(renderer.root, testIDPrefix)).toHaveLength(painted);
+  const reserved = findByTestID(renderer.root, `${testIDPrefix}-reserve`);
+  expect(reserved).toHaveLength(1);
+  expect(reserved[0]?.props.accessibilityElementsHidden).toBe(true);
+  expect(reserved[0]?.props.importantForAccessibility).toBe('no-hide-descendants');
 }
 
 async function type(renderer: ReactTestRenderer, value: string) {
@@ -478,34 +499,34 @@ describe('CreateOrganizationScreen', () => {
     unmount();
   });
 
-  it('states the trial only for an account the procedure grants one to', async () => {
-    const trialNote =
-      'Your first organization includes a 14-day Enterprise trial. Plans are bought on the web.';
-
+  it('states the trial only for an account the procedure grants one to, over a reserved line', async () => {
     identity.trialEligible.current = true;
     const eligible = await mount();
-    expect(texts(eligible.renderer)).toContain(trialNote);
+    expectOfferLine(eligible.renderer, 'organization-create-trial-note', 1);
     eligible.unmount();
 
     // The chrome that holds the form while the draft loads states it on the same
     // answer, so a slow draft never drops the sentence from an offered create.
     formDraft.current.kind = 'loading';
     const eligibleChrome = await mount();
-    expect(texts(eligibleChrome.renderer)).toContain(trialNote);
+    expectOfferLine(eligibleChrome.renderer, 'organization-create-trial-note-loading', 1);
     eligibleChrome.unmount();
 
     formDraft.current.kind = 'ready';
     identity.trialEligible.current = false;
     const ineligible = await mount();
-    expect(texts(ineligible.renderer)).not.toContain(trialNote);
+    // Nothing is painted, but the line's height is still owned, so the form sits
+    // where an offered create's form sits.
+    expectOfferLine(ineligible.renderer, 'organization-create-trial-note', 0);
     ineligible.unmount();
 
     // Unknown is not `true`: a cold start that has not answered yet promises no
-    // window, because the create procedure may still refuse one.
+    // window, because the create procedure may still refuse one. The reserved
+    // line keeps the box, so the answer that arrives later paints in place.
     identity.trialEligible.current = undefined;
     formDraft.current.kind = 'loading';
     const unknown = await mount();
-    expect(texts(unknown.renderer)).not.toContain(trialNote);
+    expectOfferLine(unknown.renderer, 'organization-create-trial-note-loading', 0);
     unknown.unmount();
   });
 
@@ -541,6 +562,25 @@ describe('CreateOrganizationScreen', () => {
     // The draft became the organization's record: it must not seed a later
     // create, so the completion drops it before the list refresh.
     expect(formDraft.clear).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('refetches the account read once the create lands, so a consumed offer stops being stated', async () => {
+    mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['organizations.list'] });
+    // The create may have consumed the trial, so the identity answer the
+    // sentence is gated on cannot stay cached: the next read reports the
+    // account as ineligible and the line stops promising the offer.
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['user.getMe'] });
     unmount();
   });
 });

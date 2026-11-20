@@ -101,6 +101,38 @@ function NameField({ disabled, textProps, onChangeText, onSubmitEditing }: NameF
 }
 
 /**
+ * The offer line, with its height owned whether or not it is stated. A hidden
+ * copy of the sentence lays the line out at the device width and font scale, so
+ * a cold start that has not answered and an account the create procedure grants
+ * nothing to reserve the same space and never move the form. Only an explicit
+ * eligible answer paints it, and the hidden copy is not read aloud.
+ */
+function TrialOfferNote({
+  offersTrial,
+  testIDPrefix,
+}: Readonly<{ offersTrial: boolean; testIDPrefix: string }>) {
+  const { t } = useTranslation();
+  return (
+    <View>
+      <View
+        className="opacity-0"
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        testID={`${testIDPrefix}-reserve`}
+      >
+        <Text variant="caption">{t('organization.create.trialNote')}</Text>
+      </View>
+      {offersTrial ? (
+        <View className="absolute inset-0 justify-center" testID={testIDPrefix}>
+          <Text variant="caption">{t('organization.create.trialNote')}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
  * Creates an organization with the same defaults the web create flow uses:
  * `autoAddCreator` (the caller becomes its owner) and the enterprise plan's
  * 14-day trial, which the procedure applies only when the creator has not
@@ -179,7 +211,10 @@ function CreateOrganizationLoading({ offersTrial }: Readonly<{ offersTrial: bool
       <View className="gap-2">
         <NameField disabled textProps={EMPTY_NAME_TEXT_PROPS} />
       </View>
-      {offersTrial ? <Text variant="caption">{t('organization.create.trialNote')}</Text> : null}
+      <TrialOfferNote
+        offersTrial={offersTrial}
+        testIDPrefix="organization-create-trial-note-loading"
+      />
       <Button className={STATE_ACTION_CLASS} disabled>
         <Text>{t('organization.create.title')}</Text>
       </Button>
@@ -250,6 +285,9 @@ function CreateOrganizationBody({
       // this screen) and can never seed a later create.
       onDraftClear();
       try {
+        // The create may have consumed the offer, so the identity answer that
+        // gates the copy is refetched with the list.
+        void queryClient.invalidateQueries({ queryKey: trpc.user.getMe.queryKey() });
         // The membership has to be in the cached list before the selection
         // moves, or the boundary would read the fresh selection as a lost
         // membership.
@@ -367,7 +405,7 @@ function CreateOrganizationBody({
           onSubmitEditing={submit}
         />
       </View>
-      {offersTrial ? <Text variant="caption">{t('organization.create.trialNote')}</Text> : null}
+      <TrialOfferNote offersTrial={offersTrial} testIDPrefix="organization-create-trial-note" />
       {message == null ? null : (
         <Text
           className={message.tone === 'error' ? 'text-sm text-destructive' : undefined}

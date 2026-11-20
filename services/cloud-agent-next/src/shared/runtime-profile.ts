@@ -53,17 +53,44 @@ export type RuntimeInstructionInput = z.infer<typeof RuntimeInstructionSchema>;
 
 const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
 
-/** Shared by schema validation and the legacy writer that skips unsafe files. */
+/** Shared by schema validation and the writer that keeps only accepted paths. */
 export function isSafeSkillFilePath(path: string): boolean {
   return (
     path.length > 0 &&
     path.length <= RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH &&
     SKILL_FILE_PATH_PATTERN.test(path) &&
-    !path.startsWith('/') &&
+    path.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..') &&
     !path.includes('..') &&
-    !path.includes('//') &&
     path.toLowerCase() !== 'skill.md'
   );
+}
+
+export type AcceptedRuntimeSkillFiles = {
+  accepted: Record<string, string>;
+  rejected: Array<{ path: string; reason: 'path' | 'duplicate' }>;
+};
+
+/** Split a companion-file map into the entries the writer keeps and why the rest are dropped. */
+export function acceptedRuntimeSkillFiles(
+  files: Record<string, string>
+): AcceptedRuntimeSkillFiles {
+  const accepted: Record<string, string> = {};
+  const rejected: AcceptedRuntimeSkillFiles['rejected'] = [];
+  const seen = new Set<string>();
+  for (const [path, content] of Object.entries(files)) {
+    if (!isSafeSkillFilePath(path)) {
+      rejected.push({ path, reason: 'path' });
+      continue;
+    }
+    const folded = path.toLowerCase();
+    if (seen.has(folded)) {
+      rejected.push({ path, reason: 'duplicate' });
+      continue;
+    }
+    seen.add(folded);
+    accepted[path] = content;
+  }
+  return { accepted, rejected };
 }
 
 /** Validate a map of companion files bundled with a skill. */
@@ -77,12 +104,20 @@ const RuntimeSkillFilesSchema = z
     `A skill may have at most ${RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
   )
   .superRefine((files, ctx) => {
+    const { accepted, rejected } = acceptedRuntimeSkillFiles(files);
+    const first = rejected[0];
+    if (first) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          first.reason === 'path'
+            ? `Skill file path rejected: ${first.path}`
+            : `Skill file path duplicates another companion file: ${first.path}`,
+      });
+      return;
+    }
     let total = 0;
-    for (const [path, content] of Object.entries(files)) {
-      if (!isSafeSkillFilePath(path)) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
+    for (const content of Object.values(accepted)) {
       total += content.length;
     }
     if (total > RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {

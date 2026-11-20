@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { CircleCheck, CircleMinus, CircleX, Clock, Flag, Info } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { capitalize, cn } from '@/lib/utils';
 import {
   requestNotSentReason,
   type RequestLogByokCandidate,
@@ -19,7 +19,6 @@ import {
   inferenceProviderNames,
   rejectedResultLabel,
   type StepTone,
-  capitalize,
   isPartnerFailover,
   partnerInferenceProviderOf,
   partnerName,

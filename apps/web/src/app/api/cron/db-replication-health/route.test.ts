@@ -160,6 +160,23 @@ describe('GET /api/cron/db-replication-health', () => {
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 
+  it('alerts with each report error as written, without a primary-failure label', async () => {
+    mockCollect.mockResolvedValue(
+      report({
+        healthy: false,
+        errors: ['POSTGRES_REPLICAS_DISABLED names unknown replicas: eu-central-3'],
+      })
+    );
+
+    const response = await GET(createRequest({ authorization: 'Bearer cron-secret' }));
+
+    const body = await response.json();
+    expect(body.problems).toEqual([
+      'POSTGRES_REPLICAS_DISABLED names unknown replicas: eu-central-3',
+    ]);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
   it('does not alert for an at-risk Snowflake slot while replication is disabled', async () => {
     mockCollect.mockResolvedValue(
       report({

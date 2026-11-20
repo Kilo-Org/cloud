@@ -69,9 +69,9 @@ export async function GET(request: Request) {
       problems.push(`slot ${slot.slot_name}: wal_status=${slot.wal_status}, active=${slot.active}`);
     }
   }
-  for (const error of report.errors) {
-    problems.push(`primary query failed: ${error}`);
-  }
+  // Each report error names its own source: a primary query, the replica inventory, or the
+  // POSTGRES_REPLICAS_DISABLED list. Not all of them are primary failures, so add no prefix.
+  problems.push(...report.errors);
 
   if (problems.length > 0) {
     console.error(JSON.stringify({ type: 'db_replication_health_alert', problems }));

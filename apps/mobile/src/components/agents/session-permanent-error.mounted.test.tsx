@@ -50,25 +50,22 @@ describe('SessionPermanentError recovery', () => {
     expect(actions(renderer)).toHaveLength(0);
   });
 
-  it.each([true, false])(
-    'draws one retry when the denial can clear, loading=%s',
-    isRetrying => {
-      const retry = vi.fn<() => void>();
-      const renderer = mountCard(retry, isRetrying);
-      const [attempt, ...rest] = actions(renderer);
-      if (!attempt) {
-        throw new Error('the card rendered no retry');
-      }
-      expect(rest).toHaveLength(0);
-      expect(attempt.props.label).toBe(i18n.t('common.retry'));
-      expect(attempt.props.loading).toBe(isRetrying);
-
-      act(() => {
-        (attempt.props.onPress as () => void)();
-      });
-      expect(retry).toHaveBeenCalledTimes(1);
+  it.each([true, false])('draws one retry when the denial can clear, loading=%s', isRetrying => {
+    const retry = vi.fn<() => void>();
+    const renderer = mountCard(retry, isRetrying);
+    const [attempt, ...rest] = actions(renderer);
+    if (!attempt) {
+      throw new Error('the card rendered no retry');
     }
-  );
+    expect(rest).toHaveLength(0);
+    expect(attempt.props.label).toBe(i18n.t('common.retry'));
+    expect(attempt.props.loading).toBe(isRetrying);
+
+    act(() => {
+      (attempt.props.onPress as () => void)();
+    });
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
 
   it('keeps the error body out of the action slot', () => {
     const renderer = mountCard();

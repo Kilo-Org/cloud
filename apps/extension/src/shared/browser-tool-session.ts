@@ -5,7 +5,7 @@ import { TAB_TAKEN_ERROR } from './browser-caller';
 import { STALE_REF_ERROR } from './browser-agent-checks';
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
 import { readIsolatedFrames } from './browser-agent-isolated-probe';
-import type { IsolatedAgentProbe } from './browser-agent-isolated-probe';
+import type { IsolatedAgentProbe, IsolatedFrameTree } from './browser-agent-isolated-probe';
 import type { AgentFrameInventory } from './browser-agent-frames';
 import { spliceScriptingFrames } from './browser-tool-scripting-frames';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
@@ -2754,20 +2754,28 @@ export const createBrowserToolSession = ({
       return { lines: snapshot.data.lines, ok: true };
     }
 
+    // The page walker numbered each frame line by its own `querySelectorAll` over the live document, so the owners must be read after it, never from an inventory taken earlier: a frame added, removed or reordered in between would shift the indices and nest one frame's document under another's line.
+    const frameTree = async (): Promise<IsolatedFrameTree | undefined> => {
+      if (isolatedProbe === undefined) {
+        return undefined;
+      }
+
+      const probed = await readIsolatedFrames(isolatedProbe);
+
+      // Without the probe the inventory is the only frame list there is, and its owners cannot be re-read.
+      if (probed.complete) {
+        return probed;
+      }
+
+      const inventory = await scope.readFrames?.();
+
+      return inventory?.owners === undefined
+        ? undefined
+        : { complete: inventory.complete, frames: inventory.frames, owners: inventory.owners };
+    };
+
     const spliced = await spliceScriptingFrames(snapshot.data, depth, {
-      frameTree: async () => {
-        const inventory = await scope.readFrames?.();
-
-        if (inventory?.owners !== undefined) {
-          return {
-            complete: inventory.complete,
-            frames: inventory.frames,
-            owners: inventory.owners,
-          };
-        }
-
-        return isolatedProbe === undefined ? undefined : readIsolatedFrames(isolatedProbe);
-      },
+      frameTree,
       readFrame: async (frameId, maxDepth, timeoutMs) => {
         const frame = await runScriptingPageScript({
           frameId,

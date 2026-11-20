@@ -45,16 +45,24 @@ const grant = (origin: string) => [
 /**
  * How many tabs the browser holds, from a `browser_tabs list` answer: the same
  * count is how "no second tab" shows. An agent reads the text shape Playwright
- * MCP prints, one `- N: [title](url)` line per tab.
+ * MCP prints, one `- N: [title](url)` line per tab. A failed answer, a text
+ * shape this reader does not know, or an empty list throws instead of counting
+ * as zero, which would make a `0 === 0` comparison prove nothing.
  */
 const listedTabCount = (answer: LocalAgentToolResponse): number => {
   if (answer.kind !== 'result') {
-    return 0;
+    throw new Error(`browser_tabs list failed: ${JSON.stringify(answer)}`);
   }
 
-  return answer.text
+  const count = answer.text
     .split('\n')
     .filter(line => /^- \d+: (?:\(current\) )?\[.*\]\(.*\)$/u.test(line.trim())).length;
+
+  if (count === 0) {
+    throw new Error(`browser_tabs list reported no tabs: ${answer.text}`);
+  }
+
+  return count;
 };
 
 const permissionItemSchema = z.object({

@@ -56,6 +56,7 @@ import {
   readPaidBenchmarkQuote,
   readPaidBenchmarkRequest,
   startPaidBenchmarkRequestStatements,
+  syncPaidRequestCaseDisplayStatements,
   type PaidBenchmarkRequestRow,
   type PaidCaseKey,
   type PaidCreditOwner,
@@ -490,6 +491,12 @@ export async function finishPaidBenchmarkRequest(
   options: { now?: number } = {}
 ): Promise<PaidBenchmarkRequestRow | null> {
   if (request.status !== 'active') return request;
+  // Display rows follow the canonical runs before anything is counted. A case that has
+  // conclusively finished unusable is already terminal, so without this the request would
+  // wait forever on a `queued` row nobody can measure again.
+  await env.BENCH_DB.batch(
+    syncPaidRequestCaseDisplayStatements(env.BENCH_DB, { requestId: request.id, now: options.now })
+  );
   const counts = await readRequestCounts(env.BENCH_DB, request.id);
   if (counts.total < planSlotCount(plan)) return request;
   if (counts.queued > 0 || counts.running > 0) return request;
@@ -1167,6 +1174,18 @@ export async function reconcilePaidBenchmarkRequests(
       // request never reaches this branch, so nothing auto-resumes a user or credit pause.
       // The same classification as the click path: a permanent plan refusal becomes a visible
       // failed request instead of an `active` row that silently does nothing forever.
+      // Settle first: a request whose staged slots already finished unusable is terminal on
+      // this confirmation and must never re-enter the launcher. `finish` is a no-op while
+      // any slot is still live, so real work is launched exactly as before.
+      const settledFirst = await finishPaidBenchmarkRequest(env, current, plan, { now });
+      if (settledFirst?.status === 'completed') {
+        summary.completed.push(request.id);
+        continue;
+      }
+      if (settledFirst?.status === 'failed') {
+        summary.failed.push(request.id);
+        continue;
+      }
       await launchPaidRun(env, current.id);
       current = (await readPaidBenchmarkRequest(env.BENCH_DB, current.id)) ?? current;
       summary.staged += 1;

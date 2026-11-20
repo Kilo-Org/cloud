@@ -1422,3 +1422,205 @@ describe('stage reuse eligibility', () => {
     expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_request_cases')).toBe(0);
   });
 });
+
+describe('terminal unusable measurement', () => {
+  /** Quote, start and advance the real staging path until the request is active. */
+  async function activeRequest(): Promise<{ requestId: string; cases: number }> {
+    const quoted = await quote();
+    if (quoted.status !== 'ready') throw new Error('quote not ready');
+    const started = await startResult(await post(startRequest(quoted.id)));
+    if (started.status !== 'started') throw new Error('start refused');
+    let progress = started.request;
+    for (let attempt = 0; attempt < 20 && progress.status === 'preparing'; attempt += 1)
+      progress = await progressBody(await post(progressRequest()));
+    if (progress.status !== 'active')
+      throw new Error(`expected an active request, got ${progress.status}`);
+    return { requestId: progress.id, cases: SLOTS };
+  }
+
+  /**
+   * Settle every canonical case run of the request the way the measured path does for a
+   * scored, unusable result: terminal `settled` with `result_usable = 0` and the scored
+   * error of that exact execution. The display rows are deliberately left untouched, which
+   * is the state that stranded the request.
+   */
+  function settleUnusable(
+    error: string,
+    only?: ReadonlyArray<{ model: string; variant: string; rep: number; case_id: string }>
+  ): void {
+    sqlite
+      .prepare(
+        `INSERT INTO case_results (
+          run_id, model, variant, case_id, score, latency_ms, error, exit_code, rep,
+          timed_out, prompt_revision
+        )
+        SELECT 'exec-1', model, variant, case_id, 0, 1, ?, 1, rep, 0, 1
+        FROM benchmark_case_runs`
+      )
+      .run(error);
+    const rows = sqlite.prepare('SELECT model, variant, rep, case_id FROM benchmark_case_runs')
+      .all() as Array<{ model: string; variant: string; rep: number; case_id: string }>;
+    const named = only
+      ? new Set(only.map(row => JSON.stringify([row.model, row.variant, row.rep, row.case_id])))
+      : null;
+    for (const row of rows) {
+      if (named && !named.has(JSON.stringify([row.model, row.variant, row.rep, row.case_id])))
+        continue;
+      sqlite
+        .prepare(
+          `UPDATE benchmark_case_runs
+          SET status = 'settled', result_usable = 0, settled_at = '2026-01-02T00:00:00.000Z',
+            settlement_id = 'settle-unusable', executor_run_id = 'exec-1',
+            executor_token = 'token-1'
+          WHERE model = ? AND variant = ? AND rep = ? AND case_id = ?`
+        )
+        .run(row.model, row.variant, row.rep, row.case_id);
+    }
+  }
+
+  function insertPriorCharge(requestId: string, microdollars: number): void {
+    const run = sqlite
+      .prepare('SELECT model, variant, rep, case_id FROM benchmark_case_runs LIMIT 1')
+      .get() as { model: string; variant: string; rep: number; case_id: string };
+    sqlite
+      .prepare(
+        `INSERT INTO paid_model_requests (
+          id, engine_identity, model, variant, rep, case_id, generation, pool_request_id,
+          state, assignment_id, owner_type, owner_id, platform_covered, reason, created_at,
+          updated_at
+        ) VALUES ('mr-prior', ?, ?, ?, ?, ?, 1, ?, 'completed', 'assignment-prior', 'user',
+          'user-1', 0, NULL, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE, run.model, run.variant, run.rep, run.case_id, requestId);
+    sqlite
+      .prepare(
+        `INSERT INTO paid_attempt_usage (
+          usage_id, model_request_id, request_id, engine_identity, model, variant, rep,
+          case_id, generation, owner_type, owner_id, microdollars, platform_covered, created_at
+        ) VALUES ('usage-prior', 'mr-prior', ?, ?, ?, ?, ?, ?, 1, 'user', 'user-1', ?, 0,
+          '2026-01-01T00:00:00.000Z')`
+      )
+      .run(
+        requestId,
+        ENGINE,
+        run.model,
+        run.variant,
+        run.rep,
+        run.case_id,
+        microdollars
+      );
+    // The store's receipt batch also raises the request total; mirror it.
+    sqlite
+      .prepare('UPDATE paid_benchmark_requests SET charged_microdollars = ? WHERE id = ?')
+      .run(microdollars, requestId);
+  }
+
+  it('terminalizes a request whose measured slots all finished unusable, once', async () => {
+    // The exact fixture: every staged slot's canonical run settled with a scored
+    // `admission_unavailable` and `result_usable = 0`, its display row still `queued`.
+    const { requestId } = await activeRequest();
+    insertPriorCharge(requestId, 250);
+    settleUnusable('admission_unavailable: The gateway could not confirm admission; retry.');
+    expect(requestRow()?.status).toBe('active');
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db));
+    // Visible terminal state with a clear reason, never a silent `active` row.
+    expect(summary.failed).toEqual([requestId]);
+    expect(requestRow()).toMatchObject({ status: 'failed' });
+    const failed = sqlite
+      .prepare(
+        'SELECT status, failure_reason, failure_retryable FROM paid_benchmark_requests WHERE id = ?'
+      )
+      .get(requestId) as { status: string; failure_reason: string; failure_retryable: number };
+    expect(failed.status).toBe('failed');
+    expect(failed.failure_reason).toBe('No case produced a usable result.');
+    // Retryable: the owner may confirm again; nothing resumes this confirmation by itself.
+    expect(failed.failure_retryable).toBe(1);
+    // Each display row carries the scored error, so the console shows why the slot failed.
+    expect(
+      sqlite
+        .prepare('SELECT DISTINCT status, reason FROM paid_benchmark_request_cases WHERE request_id = ?')
+        .all(requestId)
+    ).toEqual([
+      { status: 'failed', reason: 'admission_unavailable: The gateway could not confirm admission; retry.' },
+    ]);
+    // The prior billed call is untouched: no retro refund, no new spend, no new run.
+    expect(
+      sqlite.prepare('SELECT COUNT(*) AS count FROM paid_attempt_usage').get()
+    ).toEqual({ count: 1 });
+    const runs = countRows('SELECT COUNT(*) AS count FROM benchmark_runs');
+    const caseRuns = countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs');
+
+    // The same confirmation never relaunches: the next pass finds nothing live.
+    const again = await reconcilePaidBenchmarkRequests(paidBindings(db));
+    expect(again).toMatchObject({ failed: [], completed: [] });
+    expect(requestRow()?.status).toBe('failed');
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_runs')).toBe(runs);
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs')).toBe(caseRuns);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_attempt_usage')).toBe(1);
+
+    // The owner's own progress read reports the same terminal state.
+    const progress = await progressBody(await post(progressRequest()));
+    expect(progress.status).toBe('failed');
+    if (progress.status !== 'failed') return;
+    expect(progress.reason).toBe('No case produced a usable result.');
+    expect(progress.retryable).toBe(true);
+    expect(progress.counts.failed).toBe(SLOTS);
+    expect(progress.chargedMicrodollars).toBe(250);
+  });
+
+  it('keeps a live slot live, completes on a usable slot and promotes a late usable result', async () => {
+    // Two slots behave differently: one conclusively unusable while the other is still
+    // pending, so the request must NOT be terminalized yet; then the unusable slot's own
+    // run proves usable late and must be promoted to done, and the request completes once
+    // the last slot is terminal.
+    const { requestId } = await activeRequest();
+    const [first, second] = sqlite
+      .prepare('SELECT model, variant, rep, case_id FROM benchmark_case_runs ORDER BY case_id LIMIT 2')
+      .all() as Array<{ model: string; variant: string; rep: number; case_id: string }>;
+    settleUnusable('admission_unavailable: retry.', [first]);
+
+    const firstPass = await progressBody(await post(progressRequest()));
+    if (firstPass.status !== 'active') throw new Error(`expected active, got ${firstPass.status}`);
+    expect(firstPass.counts.queued).toBe(SLOTS - 1);
+    expect(firstPass.counts.failed).toBe(1);
+    expect(firstPass.counts.done).toBe(0);
+    expect(requestRow()?.status).toBe('active');
+
+    // A late usable result for that same execution arrives (the run's own late-result path
+    // raises `result_usable` on the terminal row). The next read promotes it, never counts
+    // it as a failure.
+    sqlite
+      .prepare(
+        `UPDATE benchmark_case_runs SET result_usable = 1
+        WHERE model = ? AND variant = ? AND rep = ? AND case_id = ?`
+      )
+      .run(first.model, first.variant, first.rep, first.case_id);
+    const promoted = await progressBody(await post(progressRequest()));
+    if (promoted.status !== 'active') throw new Error(`expected active, got ${promoted.status}`);
+    expect(promoted.counts.done).toBe(1);
+    expect(promoted.counts.failed).toBe(0);
+    expect(
+      sqlite
+        .prepare(
+          'SELECT status, reason FROM paid_benchmark_request_cases WHERE request_id = ? AND case_id = ?'
+        )
+        .get(requestId, first.case_id)
+    ).toEqual({ status: 'done', reason: null });
+
+    // Every remaining slot finishes usable too: the request completes with its pins intent.
+    sqlite
+      .prepare(
+        `UPDATE benchmark_case_runs
+        SET status = 'settled', result_usable = 1, settled_at = '2026-01-02T00:00:00.000Z',
+          settlement_id = 'settle-usable', executor_run_id = 'exec-2', executor_token = 'token-2'
+        WHERE status = 'queued'`
+      )
+      .run();
+    const completed = await progressBody(await post(progressRequest()));
+    expect(completed.status).toBe('completed');
+    if (completed.status !== 'completed') return;
+    expect(completed.counts.done).toBe(SLOTS);
+    expect(completed.counts.failed).toBe(0);
+  });
+});

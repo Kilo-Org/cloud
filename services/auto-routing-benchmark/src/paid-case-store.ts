@@ -2144,6 +2144,64 @@ export function failPaidBenchmarkRequestStatements(
   });
 }
 
+/**
+ * Bring one request's **display** rows in line with the canonical case runs.
+ *
+ * `paid_benchmark_request_cases` is the console and aggregation view; `benchmark_case_runs`
+ * is the measurement. A case that has conclusively finished unusable — `settled` with
+ * `result_usable = 0`, or `failed` — must not leave its display row `queued`, or the
+ * request waits forever on work nobody can measure any more. This is the only reconciliation
+ * that turns a measured slot into `done`.
+ *
+ * Only a terminal canonical state can move a row: `queued`, `running`, `paused` and
+ * `cancelled` are never read here, so a transient stop is never reported as terminal.
+ * Terminal means:
+ * - `settled` + `result_usable = 1`  → `done`, reason cleared;
+ * - `settled` + `result_usable = 0`  → `failed`, with the run's own reason, else the scored
+ *   error of that exact execution, else a generic unusable-result reason;
+ * - `failed`                          → `failed`, with the reason its own writer recorded.
+ *
+ * The update is idempotent and also promotes an already `failed` row when its run later
+ * proves usable: a shared result that lands after the slot was written stays reusable, so
+ * `result_usable = 1` always wins. `reused` and `paused` rows are never touched, so a
+ * historical reuse and a payment pause keep their own meaning. Nothing here charges, and no
+ * statement creates work: it only re-labels rows whose canonical run is already terminal.
+ */
+export function syncPaidRequestCaseDisplayStatements(
+  db: D1Database,
+  input: { requestId: string; now?: number }
+): D1PreparedStatement[] {
+  const at = iso(input.now ?? Date.now());
+  return [
+    db
+      .prepare(
+        `UPDATE paid_benchmark_request_cases AS rc
+        SET status = CASE WHEN run.result_usable = 1 THEN 'done' ELSE 'failed' END,
+          reason = CASE WHEN run.result_usable = 1 THEN NULL
+            ELSE COALESCE(
+              run.failure_reason,
+              (SELECT result.error FROM case_results AS result
+                WHERE result.run_id = run.executor_run_id
+                  AND result.model = run.model AND result.variant = run.variant
+                  AND result.case_id = run.case_id AND result.rep = run.rep
+                LIMIT 1),
+              'No usable result.'
+            )
+          END,
+          updated_at = ?
+        FROM benchmark_case_runs AS run
+        WHERE run.engine_identity = rc.engine_identity
+          AND run.model = rc.model AND run.variant = rc.variant
+          AND run.rep = rc.rep AND run.case_id = rc.case_id
+          AND rc.request_id = ?
+          -- 'failed' is included so a late usable result can promote it to 'done'.
+          AND rc.status IN ('queued', 'running', 'failed')
+          AND run.status IN ('settled', 'failed')`
+      )
+      .bind(at, input.requestId),
+  ];
+}
+
 const PROGRESS_CASE_STATUSES = ['queued', 'running', 'reused', 'done', 'failed', 'paused'] as const;
 
 type ProgressCaseRow = {

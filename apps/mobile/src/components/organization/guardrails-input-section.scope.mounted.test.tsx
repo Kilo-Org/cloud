@@ -69,10 +69,10 @@ type TestNode = {
   findAll(predicate: (node: TestNode) => boolean): TestNode[];
 };
 
-/** The draft the section edits: input on, one policy text, output off. */
-function draftFor(groupId: string | null): GuardrailsDraft {
+/** The draft the section edits: input on by default, one policy text, output off. */
+function draftFor(groupId: string | null, inputEnabled = true): GuardrailsDraft {
   return {
-    inputEnabled: true,
+    inputEnabled,
     groupId,
     detectors: {
       injection_attack: { enabled: true, action: 'log' },
@@ -216,6 +216,18 @@ describe('InputGuardrailsSection scope row', () => {
     ).toBeUndefined();
     expect(findAll(renderer.root, 'Chevron')).toEqual([]);
     expect(h.sheetVisible).toBe(false);
+  });
+
+  it('hides the scope row with the fields when the input guardrail is off', async () => {
+    // The row lives in the section's `intro`, which renders only while the
+    // section's fields do. Switching the guardrail off puts nothing in scope,
+    // so the row goes with the detectors instead of claiming a scope.
+    const renderer = await mountSection(draftFor(null, false), []);
+
+    expect(renderedText(renderer.root)).not.toContain(i18n.t('organizationGuardrails.applyTo'));
+    expect(renderedText(renderer.root)).not.toContain(
+      i18n.t('organizationGuardrails.applyToAllMembers')
+    );
   });
 
   it('opens the group picker from the scope row when a group exists', async () => {

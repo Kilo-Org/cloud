@@ -1409,6 +1409,112 @@ describe('browser tool session scripting backend', () => {
     });
   });
 
+  it('ends a back navigation that went nowhere instead of waiting for a load', async () => {
+    vi.useFakeTimers();
+
+    try {
+      type Updated = (tabId: number, changeInfo: { readonly status?: string }) => void;
+      const listeners: Updated[] = [];
+      const shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+      const tabsApi: BrowserTabsApi = {
+        get: tabId => ({ id: tabId, ...shown }),
+        onUpdated: {
+          addListener: listener => {
+            listeners.push(listener);
+          },
+          removeListener: () => {
+            listeners.length = 0;
+          },
+        },
+        query: () => [],
+        update: tabId => ({ id: tabId }),
+      };
+      const session = createBrowserToolSession({
+        scriptingApi: createScriptingApi().api,
+        tabId: 7,
+        tabsApi,
+      });
+      let settled = false;
+      const navigated = (async () => {
+        const result = await session.callTool('browser_navigate_back', {});
+
+        settled = true;
+
+        return result;
+      })();
+
+      // A no-op: history.back() with no entry reports nothing at all.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(settled).toBe(true);
+
+      // Let the full timeout fire too, so a slow answer cannot outlive the test.
+      await vi.advanceTimersByTimeAsync(15_000);
+      await expect(navigated).resolves.toStrictEqual({
+        error: 'The page has no history entry to go back to.',
+        ok: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not end a cross-document navigation on its first url-only update', async () => {
+    type Updated = (
+      tabId: number,
+      changeInfo: { readonly status?: string; readonly url?: string }
+    ) => void;
+    const listeners: Updated[] = [];
+    let shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+    const emit = (changeInfo: { readonly status?: string; readonly url?: string }) => {
+      for (const listener of listeners) {
+        listener(7, changeInfo);
+      }
+    };
+    const tabsApi: BrowserTabsApi = {
+      get: tabId => ({ id: tabId, ...shown }),
+      onUpdated: {
+        addListener: listener => {
+          listeners.push(listener);
+        },
+        removeListener: () => {
+          listeners.length = 0;
+        },
+      },
+      query: () => [],
+      update: tabId => ({ id: tabId }),
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: createScriptingApi().api,
+      tabId: 7,
+      tabsApi,
+    });
+    let settled = false;
+    const navigated = (async () => {
+      const result = await session.callTool('browser_navigate_back', {});
+
+      settled = true;
+
+      return result;
+    })();
+
+    await vi.waitFor(() => {
+      expect(listeners).toHaveLength(1);
+    });
+    // The new document's url arrives before any loading status: the tab still reports the old document as complete.
+    shown = { status: 'complete', title: 'Tab', url: 'https://example.com/previous' };
+    emit({ url: 'https://example.com/previous' });
+    await flushPendingWork();
+    expect(settled).toBe(false);
+
+    emit({ status: 'loading' });
+    emit({ status: 'complete' });
+
+    await expect(navigated).resolves.toStrictEqual({
+      ok: true,
+      value: { title: 'Tab', url: 'https://example.com/previous' },
+    });
+  });
+
   it('refuses a data: navigation without touching the tab', async () => {
     const updates: unknown[] = [];
     const tabsApi: BrowserTabsApi = {

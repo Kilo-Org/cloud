@@ -357,6 +357,25 @@ export async function readOutstandingRuleset(
  */
 const storedSessionSchema = z.object({ directory: z.string() }).passthrough();
 
+const carriedSlugSchema = z.string().min(1);
+const carriedShareSchema = z.object({ url: z.string().min(1) }).transform(value => value.url);
+
+/**
+ * The two fields a re-point copies from the unvalidated session read besides
+ * the ones it forwards whole: the `slug` the import body takes as a string, and
+ * the `share` whose URL names that slug. A value of the wrong shape reads as
+ * absent, as the directory does, instead of failing the session step.
+ */
+function carriedSlug(value: unknown): string | undefined {
+  const parsed = carriedSlugSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function carriedShareUrl(value: unknown): string | undefined {
+  const parsed = carriedShareSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
 /** True when every rule of `permission` is already present in `stored`. */
 function rulesetCovers(
   stored: ReadonlyArray<{ permission: string; pattern: string; action: string }>,
@@ -1004,20 +1023,24 @@ export function createWrapperKiloClient(
         await rememberOutstandingRuleset(sessionId, recordRuleset);
       }
       const owed = recordRuleset ?? remembered;
+      // The record read is unvalidated JSON. The record's slug names the share
+      // URL it carries, so a re-point carries that slug instead of renaming the
+      // record and leaving the share URL naming the old one.
+      const shareURL = carriedShareUrl(record?.share);
       const imported = await v2Client.kilocode.sessionImport.session(
         {
           query_directory: directory,
           body_directory: directory,
           id: sessionId,
           projectID: project.id,
-          slug: sessionId.slice(0, 24),
           // A re-pointed record keeps the fields it already carries.
+          slug: carriedSlug(record?.slug) ?? sessionId.slice(0, 24),
           title: record?.title ?? 'New session - ' + new Date(now).toISOString(),
           version: KILO_CLI_VERSION,
           ...(record ? { force: true } : {}),
           ...(record?.workspaceID === undefined ? {} : { workspaceID: record.workspaceID }),
           ...(record?.parentID === undefined ? {} : { parentID: record.parentID }),
-          ...(record?.share === undefined ? {} : { shareURL: record.share.url }),
+          ...(shareURL === undefined ? {} : { shareURL }),
           ...(record?.summary === undefined ? {} : { summary: record.summary }),
           ...(record?.revert === undefined ? {} : { revert: record.revert }),
           timeCreated: record?.time?.created ?? now,

@@ -894,11 +894,12 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     // what the wrapper's argument turns into.
     type EnsureSessionRecord = {
       id: string;
+      slug?: string;
       directory: string;
       title?: string;
       workspaceID?: string;
       parentID?: string;
-      share?: { url: string };
+      share?: { url: string } | null;
       summary?: {
         additions: number;
         deletions: number;
@@ -918,6 +919,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         force?: boolean;
         directory?: string;
         projectID?: string;
+        slug?: string;
         title?: string;
         workspaceID?: string;
         parentID?: string;
@@ -1108,6 +1110,60 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         timeCompacting: created + 2,
         timeArchived: created + 3,
       });
+    });
+
+    it('carries the record slug when the import re-points it', async () => {
+      const sessionId = 'ses_record_with_original_slug';
+      const directory = temporaryDirectory('kilo-api-slug-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-slug-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        slug: 'ses_original_slug',
+        directory: otherDirectory,
+        share: { url: 'https://share.example/ses_original_slug' },
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      const parameters = stub.imports[0];
+      if (!parameters) throw new Error('Expected a session import');
+      expect(parameters.body.slug).toBe('ses_original_slug');
+      expect(parameters.body.shareURL).toBe('https://share.example/ses_original_slug');
+    });
+
+    it('names the import after the session when the record carries no slug', async () => {
+      const sessionId = 'ses_record_without_slug';
+      const directory = temporaryDirectory('kilo-api-absent-slug-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-absent-slug-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      expect(stub.imports[0]?.body.slug).toBe(sessionId.slice(0, 24));
+    });
+
+    it('imports a record whose share is null without a share URL', async () => {
+      const sessionId = 'ses_record_null_share';
+      const directory = temporaryDirectory('kilo-api-null-share-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-null-share-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        share: null,
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      const parameters = stub.imports[0];
+      if (!parameters) throw new Error('Expected a session import');
+      expect(parameters.body.force).toBe(true);
+      expect(parameters.body).not.toHaveProperty('shareURL');
     });
 
     it('applies a record ruleset through the update endpoint', async () => {

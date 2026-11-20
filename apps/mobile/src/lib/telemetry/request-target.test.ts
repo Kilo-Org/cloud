@@ -91,6 +91,14 @@ describe('stripQueryString', () => {
     );
   });
 
+  it('keeps a single-label host with a port and drops a query value carrying an at-sign', () => {
+    const procedure = ['x', 'y'].join('.');
+    const url = `https://host:3000${TRPC_PATH}${procedure}?email=${MEMBER}`;
+
+    expect(stripQueryString(url)).toBe(`https://host:3000${TRPC_PATH}${procedure}`);
+    expect(trpcProcedureText(url)).toBe(procedure);
+  });
+
   it('keeps an IPv4 authority with a port and drops a query value carrying an at-sign', () => {
     const procedure = ['x', 'y'].join('.');
     const url = `https://127.0.0.1:8080${TRPC_PATH}${procedure}?x=${MEMBER}`;

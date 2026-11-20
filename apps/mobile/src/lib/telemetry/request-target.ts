@@ -67,9 +67,10 @@ export function stripQueryString(url: string): string {
     // the text is a plain origin and path.
     //
     // A run that carries a ':' may be either userinfo or an authority with a
-    // port, so the delimiter is read against the run's shape: a run that reads
-    // as a host closes the authority there, and any other run is userinfo, so
-    // the authority continues past the delimiter.
+    // port, so the delimiter is read against the run's shape. The authority
+    // closes at a delimiter when the run before it reads as a host, and a query
+    // or fragment closes it once a path has begun. Any other run is userinfo,
+    // so the authority continues past the delimiter.
     let lastAt = -1;
     let colonBefore = false;
     for (let i = schemeEnd; i < url.length; i += 1) {
@@ -78,11 +79,14 @@ export function stripQueryString(url: string): string {
         lastAt = i;
       } else if (c === ':') {
         colonBefore = true;
-      } else if (
-        (c === '/' || c === '?' || c === '#') &&
-        (lastAt !== -1 || !colonBefore || isHostLike(url.slice(schemeEnd, i)))
-      ) {
-        break;
+      } else if (c === '/' || c === '?' || c === '#') {
+        const candidate = url.slice(schemeEnd, i);
+        // A path has already begun, so a query or fragment after it is a query
+        // or fragment, whatever an `@` inside it looks like.
+        const pastPath = c !== '/' && candidate.includes('/');
+        if (lastAt !== -1 || !colonBefore || pastPath || isHostLike(candidate)) {
+          break;
+        }
       }
     }
     if (lastAt === -1) {

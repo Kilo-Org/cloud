@@ -4,6 +4,8 @@ import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import {
   backfillDayLedger,
   evaluateRunClaim,
+  pauseRunsAtDailyCaps,
+  pauseRunsAtRunCap,
   readRunSpendState,
   readSpendTotals,
   utcDayOf,
@@ -210,6 +212,21 @@ describe('benchmark spend ledger and caps', () => {
       .prepare('SELECT COALESCE(SUM(spent_usd), 0) AS total FROM benchmark_spend_ledger')
       .get() as { total: number };
     expect(total.total).toBe(0);
+  });
+
+  it('pauses at the per-run cap even on a day far under the day cap', async () => {
+    insertRun(sqlite, { spentUsd: 55 });
+    insertRun(sqlite, { id: 'other-run', spentUsd: 1 });
+    insertFreshResult(sqlite, { costUsd: 55, startedAt: dayStart() });
+
+    const paused = await pauseRunsAtRunCap(db, CAPS.perRunUsd);
+
+    expect(paused).toEqual([{ runId: RUN, scope: 'run' }]);
+    expect((await readRunSpendState(db, RUN))?.pauseScope).toBe('run');
+    // A run under its own cap is untouched.
+    expect((await readRunSpendState(db, 'other-run'))?.paused).toBe(false);
+    // The day ledger is far below the day cap, so the day sweep pauses nothing.
+    expect(await pauseRunsAtDailyCaps(db, CAPS)).toEqual([]);
   });
 
   it('reports UTC day boundaries, not local ones', () => {

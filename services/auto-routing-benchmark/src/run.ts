@@ -185,6 +185,7 @@ import {
   batchOwnerFor,
   evaluateRunClaim,
   pauseRunsAtDailyCaps,
+  pauseRunsAtRunCap,
   resolveSpendCaps,
   resumeRunFromSpendCap,
   utcDayOf,
@@ -1536,13 +1537,18 @@ export async function dispatchScheduler(env: Env): Promise<void> {
     env.BENCHMARK_SCHEDULER_CONFIG,
     (await getSchedulerOverrides(env.BENCH_DB)).overrides
   );
-  // Cross-run half of the in-flight guard. A day or owner cap belongs to the whole
-  // fleet, so it is evaluated once here, before any claim; paused runs then claim
-  // nothing because the lane-head query excludes them.
-  const paused = await pauseRunsAtDailyCaps(env.BENCH_DB, {
-    perDayUsd: config.perDayUsd,
-    perOwnerDayUsd: config.perOwnerDayUsd,
-  });
+  // In-flight guard, evaluated before any claim. The per-run sweep marks a run that
+  // reached its own cap; the daily sweep pauses every running run once the day or an
+  // owner's budget is spent. Both apply to runs that started before this release,
+  // because the run column and the day ledger are seeded from recorded results.
+  const pausedAtRunCap = await pauseRunsAtRunCap(env.BENCH_DB, config.perRunUsd);
+  const paused = [
+    ...pausedAtRunCap,
+    ...(await pauseRunsAtDailyCaps(env.BENCH_DB, {
+      perDayUsd: config.perDayUsd,
+      perOwnerDayUsd: config.perOwnerDayUsd,
+    })),
+  ];
   if (paused.length > 0) {
     console.log(
       JSON.stringify({

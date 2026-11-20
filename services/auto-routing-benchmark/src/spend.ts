@@ -1324,6 +1324,28 @@ export function ownerKey(owner: SpendOwner): string {
 }
 
 /**
+ * Pauses every running run whose own recorded fresh spend reached `perRunUsd`, in one
+ * UPDATE from each run's own column. This is the per-run half of the in-flight guard:
+ * it is what turns "claims nothing" into a visible `paused` state, and it applies to a
+ * run that was already running when the cap shipped, because the column is seeded for
+ * every run and the condition is re-evaluated each pass.
+ */
+export async function pauseRunsAtRunCap(
+  db: D1Database,
+  perRunUsd: number
+): Promise<Array<{ runId: string; scope: 'run' }>> {
+  const rows = await db
+    .prepare(
+      `UPDATE benchmark_runs SET spend_pause_scope = 'run'
+       WHERE status = 'running' AND spend_pause_scope IS NULL AND spent_usd >= ?
+       RETURNING id`
+    )
+    .bind(perRunUsd)
+    .all<{ id: string }>();
+  return rows.results.map(row => ({ runId: row.id, scope: 'run' as const }));
+}
+
+/**
  * Pauses every running run the day or owner caps have reached, in two statements —
  * one read of the day's ledger rows, one UPDATE — and returns what it paused.
  *

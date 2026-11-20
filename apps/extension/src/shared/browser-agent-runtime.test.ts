@@ -6128,6 +6128,79 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
     });
   });
 
+  it('judges a dialog answer by the origin of the frame that opened it, not the tab’s document', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    // A confirm opened by a cross-origin frame: its handler resumes in that frame when answered.
+    pageDialog(cdp, {
+      message: 'Pay now?',
+      type: 'confirm',
+      url: `${payOrigin}/checkout`,
+    });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    // The tab's own act grant covers nothing here: the answer acts in the frame's origin.
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: payOrigin }],
+      kind: 'needs_permission',
+      result: {
+        error: NEEDS_PERMISSION_ERROR,
+        ok: false,
+      },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+  });
+
+  it('answers a dialog a granted frame opened once that frame’s origin is granted', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(cdp, { message: 'Pay now?', type: 'confirm', url: `${payOrigin}/checkout` });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    const answered = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'act', origin: payOrigin }] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+
+    expect(answered).toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'confirm' } },
+    });
+  });
+
+  it('tells a safe-mode panel the dialog is the user’s to answer, naming no tool it cannot call', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(
+      runtime.runTool({
+        arguments: { target: '#save' },
+        caller: panel(),
+        safeMode: true,
+        tabId: TAB_ID,
+        // The agent session holds this tab, so the panel's call is a take-over first.
+        takeOver: true,
+        toolName: 'kilo_browser_click',
+      })
+    ).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog with message "Saved"]: answer it on the page; this mode cannot answer dialogs',
+      },
+    });
+  });
+
   it('names the panel’s own answering tool to the panel', async () => {
     const { cdp, runtime } = await createHarness();
 
@@ -6181,7 +6254,11 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
     cdp.setProbe({ fields: [{ kind: 'password' }], paymentFormSubmit: false });
     const stepToken = expectStepToken(await type([]));
 
-    cdp.emit('Page.javascriptDialogOpening', { message: 'Saved', type: 'alert' });
+    cdp.emit('Page.javascriptDialogOpening', {
+      message: 'Saved',
+      type: 'alert',
+      url: `${MAIN_ORIGIN}/dashboard`,
+    });
     await expect(type([stepToken])).resolves.toMatchObject({ result: { ok: false } });
     await call(runtime, 'browser_handle_dialog', { accept: true });
 
@@ -6888,8 +6965,13 @@ describe('a download the dialog answer starts', () => {
     return { hold, reports };
   };
 
+  // Chrome always names the frame that opened the dialog, and the answer is judged against that origin.
   const dialogOpened = (cdp: FakeCdp): void => {
-    cdp.emit('Page.javascriptDialogOpening', { message: 'Leave this page?', type: 'confirm' });
+    cdp.emit('Page.javascriptDialogOpening', {
+      message: 'Leave this page?',
+      type: 'confirm',
+      url: `${MAIN_ORIGIN}/dashboard`,
+    });
   };
 
   /** The tab's session records a dialog only once it exists, and a read is what creates it. */

@@ -33,19 +33,34 @@ export class BrowserToolDialogOpenError extends Error {
 export const isHandleDialogTool = (toolName: string): boolean =>
   toolName === HANDLE_DIALOG_TOOL || toolName === toKiloBrowserToolName(HANDLE_DIALOG_TOOL);
 
+/** What the modal state may say about one dialog: its message, and whether this caller can answer it. */
+export interface ModalStateReading {
+  /** Whether the caller may read the opening frame's message, as a snapshot treats that frame's text. */
+  readonly messageReadable: boolean;
+  /** False for a caller whose tool set leaves the handler out (safe mode is read-only): the dialog is the user's to answer. */
+  readonly answerable?: boolean;
+}
+
 /**
  * Playwright MCP's modal-state section for one open dialog. A dialog opened by
  * a frame the caller may not read keeps its message back, as a snapshot keeps
- * that frame's text back.
+ * that frame's text back. A caller that cannot answer one is pointed at the
+ * page, never at a tool its mode does not expose.
  */
 export const modalStateText = (
   dialog: BrowserToolDialog,
   toolName: string,
-  messageReadable: boolean
+  reading: ModalStateReading
 ): string => {
+  const { answerable = true, messageReadable } = reading;
   const description = messageReadable
     ? `"${dialog.type}" dialog with message "${dialog.message}"`
     : `"${dialog.type}" dialog (message withheld: no read permission for the frame that opened it)`;
+
+  if (!answerable) {
+    return `### Modal state\n- [${description}]: answer it on the page; this mode cannot answer dialogs`;
+  }
+
   // The answering tool in the caller's own spelling: the panel's tools carry the `kilo_` prefix, the CLI's do not.
   const handler = toolName.startsWith(KILO_BROWSER_TOOL_PREFIX)
     ? toKiloBrowserToolName(HANDLE_DIALOG_TOOL)
@@ -58,9 +73,9 @@ export const modalStateText = (
 export const dialogRefusalText = (
   dialog: BrowserToolDialog,
   toolName: string,
-  messageReadable: boolean
+  reading: ModalStateReading
 ): string =>
-  `Tool "${toolName}" does not handle the modal state.\n\n${modalStateText(dialog, toolName, messageReadable)}`;
+  `Tool "${toolName}" does not handle the modal state.\n\n${modalStateText(dialog, toolName, reading)}`;
 
 /**
  * The result of a call during which the page opened a dialog. The step that

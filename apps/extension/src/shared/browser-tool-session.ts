@@ -9,7 +9,7 @@ import type { IsolatedAgentProbe, IsolatedFrameTree } from './browser-agent-isol
 import type { AgentFrameInventory } from './browser-agent-frames';
 import { spliceScriptingFrames } from './browser-tool-scripting-frames';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
-import { BrowserToolDialogOpenError } from './browser-tool-dialog';
+import { BROWSER_TOOL_DIALOG_OPEN_ERROR, BrowserToolDialogOpenError } from './browser-tool-dialog';
 import {
   redactSensitiveBody,
   redactSensitiveHeaders,
@@ -3798,6 +3798,11 @@ export const createBrowserToolSession = ({
   const evaluateInTab = async (code: string, timeoutMs?: number): Promise<EvalTabResult> => {
     if (disposed) {
       return { error: BROWSER_TOOL_SESSION_DISPOSED_ERROR, ok: false };
+    }
+
+    // Page code answers nothing while a dialog is open: refusing here fails at once instead of sitting out the eval's timeout.
+    if (dialog !== undefined) {
+      return { error: BROWSER_TOOL_DIALOG_OPEN_ERROR, ok: false };
     }
 
     try {

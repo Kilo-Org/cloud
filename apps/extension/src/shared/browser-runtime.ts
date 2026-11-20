@@ -121,6 +121,12 @@ export interface BrowserToolRunInput {
   readonly tabId: number;
   /** A panel sets this only after its take-over confirmation. */
   readonly takeOver?: boolean;
+  /**
+   * The caller's mode, when it has one: safe mode exposes only the read-only
+   * tools, so a modal state must not name an answer it cannot call. Absent for a
+   * CLI agent, whose tool set always has `browser_handle_dialog`.
+   */
+  readonly safeMode?: boolean;
   readonly title?: string;
   readonly toolName: string;
 }
@@ -2804,14 +2810,26 @@ export const createBrowserRuntime = ({
    * answer `Page.getFrameTree` while its dialog is open, so the tab's own
    * document comes from the tab: answering the dialog acts on that tab.
    */
-  const dialogFrameInventory = async (tabId: number): Promise<AgentFrameInventory> => {
+  /**
+   * The frames a dialog answer is judged by. The page cannot report them (its
+   * renderer is blocked), but the dialog names the frame that opened it: that
+   * frame's document is the one the answer acts in, so its origin is the act
+   * origin. A dialog with no url is attributed to no frame at all, which fails
+   * closed as `opaque:null`.
+   */
+  const dialogFrameInventory = async (
+    tabId: number,
+    dialog: BrowserToolDialog
+  ): Promise<AgentFrameInventory> => {
     const tab = await tabsApi.get?.(tabId);
-    const url = tab?.url ?? '';
+    const url = dialog.url ?? tab?.url ?? '';
+    const origin =
+      dialog.url === undefined ? 'opaque:null' : (toBrowserOrigin(dialog.url) ?? 'opaque:null');
 
     return {
       childSessions: new Map(),
       complete: false,
-      frames: [{ id: 'main', origin: toBrowserOrigin(url) ?? 'opaque:null', url }],
+      frames: [{ id: 'main', origin, url }],
     };
   };
 
@@ -3019,12 +3037,21 @@ export const createBrowserRuntime = ({
     arguments: toolArguments,
     caller,
     options,
+    safeMode,
     step: stepInput,
     tabId,
     takeOver,
     title,
     toolName,
   }: BrowserToolRunInput): Promise<BrowserToolRunOutcome> => {
+    // A safe-mode caller has only the read-only tools, so its modal state says the dialog is the user's to answer.
+    const dialogReading = (
+      dialog: BrowserToolDialog,
+      context: BrowserAgentCallContext | undefined
+    ) => ({
+      answerable: safeMode !== true,
+      messageReadable: dialogMessageReadable(dialog, context),
+    });
     // An agent reaches only its own session's tabs; the group is the boundary (D9).
     // A session with nothing shared yet is refused too: no group means no reach.
     if (caller.kind === 'agent' && !groups.isTabAllowed(caller.sessionHandle, tabId)) {
@@ -3132,7 +3159,7 @@ export const createBrowserRuntime = ({
         const dialogRefusal = (dialog: BrowserToolDialog): BrowserToolRunOutcome => ({
           kind: 'result',
           result: {
-            error: dialogRefusalText(dialog, toolName, dialogMessageReadable(dialog, agentContext)),
+            error: dialogRefusalText(dialog, toolName, dialogReading(dialog, agentContext)),
             ok: false,
           },
         });
@@ -3238,10 +3265,10 @@ export const createBrowserRuntime = ({
                 args: argsRecord,
                 authorized: agentContext.authorized,
                 consumeStepToken: (token, binding) => tokens.consume(token, binding),
-                // The answer to a dialog is checked against the tab's document, which the page cannot report now.
+                // The page cannot report its frames while a dialog blocks it, so the answer is judged against the frame that opened the dialog: its handler resumes there.
                 ...(openDialog === undefined
                   ? {}
-                  : { readFrames: () => dialogFrameInventory(tabId) }),
+                  : { readFrames: () => dialogFrameInventory(tabId, openDialog) }),
                 session,
                 sessionHandle: sessionKey,
                 stepTokens: agentContext.sensitive ?? [],
@@ -4188,7 +4215,7 @@ export const createBrowserRuntime = ({
           const modalState = modalStateText(
             dialogAfterCall,
             toolName,
-            dialogMessageReadable(dialogAfterCall, agentContext)
+            dialogReading(dialogAfterCall, agentContext)
           );
 
           // A guarded `browser_tabs new` names the tab it opened even when the dialog swallowed its answer:
@@ -4365,14 +4392,19 @@ export const createBrowserRuntime = ({
         const blocking = session.pendingDialog();
 
         if (error instanceof BrowserToolDialogOpenError && blocking !== undefined) {
-          const readable = dialogMessageReadable(
-            blocking,
-            caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined
-          );
-
           return {
             kind: 'result',
-            result: { error: dialogRefusalText(blocking, toolName, readable), ok: false },
+            result: {
+              error: dialogRefusalText(
+                blocking,
+                toolName,
+                dialogReading(
+                  blocking,
+                  caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined
+                )
+              ),
+              ok: false,
+            },
           };
         }
 

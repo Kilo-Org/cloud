@@ -1122,6 +1122,21 @@ describe('browser tool session', () => {
     await expect(read).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
   });
 
+  it('refuses a page-code eval at once while a dialog is open, instead of waiting it out', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+    const sentBefore = debuggerApi.commands.length;
+
+    // The workflow eval path runs page code through the session; on an open dialog it would sit out its 5 s timeout.
+    await expect(session.evaluateInTab('return 1')).resolves.toStrictEqual({
+      error: BROWSER_TOOL_DIALOG_OPEN_ERROR,
+      ok: false,
+    });
+    expect(debuggerApi.commands).toHaveLength(sentBefore);
+  });
+
   it('resolves a snapshot ref to its backend node id and a selector through the DOM domain', async () => {
     const { debuggerApi, session } = createSession();
 

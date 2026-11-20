@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -59,11 +59,17 @@ export function GuardrailsForm({
   const [syncedKey, setSyncedKey] = useState(serverKey);
   const [baseline, setBaseline] = useState(() => toDraft(config));
   const [draft, setDraft] = useState(() => toDraft(config));
+  // The Kilo Default confirmation outlives the render that opened it, so a
+  // refetch can rebase the form while its sheet is up. The confirm has to write
+  // onto the rebased draft rather than the one the opening render closed over,
+  // so both writers keep this ref in step with the state they set.
+  const draftRef = useRef(draft);
   // Both sections' text fields are uncontrolled: they read their `defaultValue`
   // on mount, so replacing the whole draft (a rebase, a save's answer, Cancel)
   // remounts them rather than leaving text the draft no longer holds.
   const [draftGeneration, setDraftGeneration] = useState(0);
   const replaceDraft = (next: GuardrailsDraft) => {
+    draftRef.current = next;
     setDraft(next);
     setDraftGeneration(generation => generation + 1);
   };
@@ -98,7 +104,8 @@ export function GuardrailsForm({
   const firstIssue = issues[0];
   const editDraft = (update: (current: GuardrailsDraft) => GuardrailsDraft) => {
     clearWhere(() => true);
-    const next = update(draft);
+    const next = update(draftRef.current);
+    draftRef.current = next;
     setDraft(next);
     guard.handleDirtyChange(!draftsEqual(next, baseline, outputAvailable));
   };

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the output gate and the preset confirmation cases share one mock harness. */
 // The guardrails form's output gate and its Kilo Default confirmation. Output
 // guardrails that Kilo has not enabled keep their title and say why nothing can
 // be set, instead of vanishing; applying Kilo Default asks first, because it
@@ -28,6 +29,7 @@ type ConfirmRequest = {
  */
 type PolicyProps = {
   draft: {
+    inputEnabled: boolean;
     detectors: {
       policy_violation: {
         format: 'rules' | 'policy_text';
@@ -100,18 +102,20 @@ vi.mock('@/components/ui/text', async () => {
 
 /** The saved configuration the form starts from, in the router's output shape. */
 function payload({
+  enabled = true,
   outputAvailable = false,
   policyText = '',
   policyFormat = 'rules',
   policyRules = 0,
 }: {
+  enabled?: boolean;
   outputAvailable?: boolean;
   policyText?: string;
   policyFormat?: 'rules' | 'policy_text';
   policyRules?: number;
 } = {}): OrgGuardrails {
   return {
-    enabled: true,
+    enabled,
     group_id: null,
     detectors: {
       injection_attack: { enabled: true, action: 'log' },
@@ -211,6 +215,40 @@ async function mountForm(data: OrgGuardrails): Promise<RenderWithProvidersResult
   const { renderer, unmount } = await renderWithProviders(createElement(Harness));
   openUnmounts.push(unmount);
   return renderer;
+}
+
+type LiveForm = {
+  renderer: RenderWithProvidersResult['renderer'];
+  /** Re-render with new server data, the way a refetch moves the form's props. */
+  rebase: (data: OrgGuardrails) => void;
+};
+
+/**
+ * Mount the form over mutable data so a case can rebase it the way a background
+ * refetch does, while keeping the same component instance and its state.
+ */
+async function mountLiveForm(data: OrgGuardrails): Promise<LiveForm> {
+  // The harness hands its own setter back on render, so a rebase moves the
+  // saved data through the harness's state rather than replacing the element
+  // tree, which would remount the form and throw away the state under test.
+  let setSaved: (next: OrgGuardrails) => void = () => {
+    throw new Error('the harness did not render');
+  };
+  function Harness() {
+    const [saved, setLive] = useState(() => data);
+    setSaved = setLive;
+    return createElement(GuardrailsForm, { organizationId: 'org-1', data: saved });
+  }
+  const { renderer, unmount } = await renderWithProviders(createElement(Harness));
+  openUnmounts.push(unmount);
+  return {
+    renderer,
+    rebase: next => {
+      act(() => {
+        setSaved(next);
+      });
+    },
+  };
 }
 
 /** The policy the input section last rendered, which is what a press would read. */
@@ -329,5 +367,36 @@ describe('GuardrailsForm apply Kilo Default', () => {
     expect(afterApply).toHaveBeenCalledTimes(1);
     expect(sectionPolicy().policy_text).toBe(KILO_DEFAULT_POLICY_TEXT);
     expect(sectionPolicy().format).toBe('policy_text');
+  });
+
+  it('applies the preset to the draft a refetch rebased while the confirmation was up', async () => {
+    // The confirmation outlives the render that opened it, so the confirm has
+    // to write onto the newer server values rather than the ones it started
+    // from: an input toggle saved elsewhere must survive the preset press.
+    const { rebase } = await mountLiveForm(
+      payload({ enabled: false, policyText: 'Our own policy.', policyFormat: 'policy_text' })
+    );
+    const afterApply = vi.fn<() => void>();
+
+    applyKiloDefault(afterApply);
+
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    const [firstCall] = h.confirm.mock.calls;
+    if (!firstCall) {
+      throw new TypeError('the form did not ask for a confirmation');
+    }
+    const [request] = firstCall;
+
+    rebase(payload({ enabled: true, policyText: 'Our own policy.', policyFormat: 'policy_text' }));
+    expect(h.sectionProps?.draft.inputEnabled).toBe(true);
+
+    act(() => {
+      request.onConfirm();
+    });
+
+    expect(afterApply).toHaveBeenCalledTimes(1);
+    expect(sectionPolicy().policy_text).toBe(KILO_DEFAULT_POLICY_TEXT);
+    expect(sectionPolicy().format).toBe('policy_text');
+    expect(h.sectionProps?.draft.inputEnabled).toBe(true);
   });
 });

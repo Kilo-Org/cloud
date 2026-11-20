@@ -56,6 +56,8 @@ export type BaseConnectionConfig<T = unknown> = {
   onReconnectExhaustionChange?: ((exhausted: boolean) => void) | undefined;
 };
 
+export type SocketPhase = 'absent' | 'connecting' | 'open';
+
 export type Connection = {
   connect: () => void;
   disconnect: () => void;
@@ -63,6 +65,10 @@ export type Connection = {
   retryReconnect: () => void;
   recoverAfterSuccessfulMutation: () => void;
   destroy: () => void;
+  /** Phase of the socket this connection holds now: `connecting` while a
+   *  handshake is in flight, `open` when it is usable, `absent` for no socket
+   *  and every closed or closing state. */
+  socketPhase: () => SocketPhase;
 };
 
 export const MAX_RECONNECT_ATTEMPTS = 8;
@@ -685,6 +691,13 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     connected = false;
   }
 
+  function socketPhase(): SocketPhase {
+    if (ws === null) return 'absent';
+    if (ws.readyState === WebSocket.OPEN) return 'open';
+    if (ws.readyState === WebSocket.CONNECTING) return 'connecting';
+    return 'absent';
+  }
+
   return {
     connect,
     disconnect,
@@ -692,6 +705,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     retryReconnect,
     recoverAfterSuccessfulMutation,
     destroy,
+    socketPhase,
   };
 }
 

@@ -1089,17 +1089,13 @@ export const createDownloadHold = ({
         }
 
         if (now() >= until) {
-          // A decision this call owns is its answer; an item of its own it could not decide, a file the browser
-          // Announced and never created, or a Document this call started that the browser has not answered yet may
-          // Still become a file. Only a call with none of those started no download.
+          // A decision this call owns is its answer; an item of its own it could not decide, or a file the browser
+          // Announced and never created, may exist; nothing at all is a call that started no download.
           if (decided.length > 0) {
             return 'decided';
           }
 
-          // Read the sign again, at the exit: a Document that was still outstanding when this loop last looked can
-          // Land between that read and the bound, and answering `no_sign` then would report a file the call just
-          // Saved as "nothing happened".
-          return states.length > 0 || signed || sign === 'pending' ? 'waiting_for_item' : 'no_sign';
+          return states.length > 0 || signed ? 'waiting_for_item' : 'no_sign';
         }
 
         // An item of this call exists and its decision is not written yet: the call may not answer over it, however

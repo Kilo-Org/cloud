@@ -193,7 +193,11 @@ export interface DownloadHoldTab {
 export interface SettleWindow {
   /** The call's own start: a decision older than this belongs to a call already answered. */
   readonly since: number;
-  /** How long to wait for an item when nothing suggests a download started: a click's item is created a moment later. */
+  /**
+   * How long to wait for an item when nothing suggests a download started, measured from the call's own start.
+   * The settle adds {@link DOWNLOAD_SIGN_GRACE_MS} to this, measured from itself: the tab's announcement can
+   * land after the tool answered, and a grace spent before the settle began would miss it.
+   */
   readonly graceMs: number;
   /**
    * Whether something the call saw says a download started: the tab's own announcement, or a page load the
@@ -253,6 +257,12 @@ export const ATTRIBUTION_WAIT_MS = 250;
 
 /** How long an announcement waits for the item that claims it before it is reported as possibly saved. */
 export const TRIPWIRE_MS = 1500;
+
+/**
+ * How long a settle that entered with no sign keeps listening for one: measured on real Chrome, a click's
+ * `downloadWillBegin` landed at most 25 ms after the tool answered, so a grace measured from the call start misses it.
+ */
+export const DOWNLOAD_SIGN_GRACE_MS = 30;
 
 /** How long an announcement stays claimable by a late item. */
 const ANNOUNCEMENT_TTL_MS = 5000;
@@ -976,7 +986,9 @@ export const createDownloadHold = ({
     needOf,
     settle: async (session, window) => {
       const until = window.since + window.timeoutMs;
-      const graceUntil = window.since + window.graceMs;
+      // The announcement can arrive after the tool answered, so the grace is measured from this settle as well:
+      // a grace measured from the call alone is already spent when the settle begins, and the sign never lands.
+      const graceUntil = Math.max(window.since + window.graceMs, now() + DOWNLOAD_SIGN_GRACE_MS);
       let state: DownloadSettle = 'no_sign';
 
       for (;;) {

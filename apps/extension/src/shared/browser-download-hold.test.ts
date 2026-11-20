@@ -775,4 +775,34 @@ describe('a sign-gated settle', () => {
     await expect(settled).resolves.toBe('waiting_for_item');
     expect(reports).toStrictEqual([]);
   });
+
+  it('hears the announcement that lands after the tool answered, on that same call', async () => {
+    const downloads = makeDownloads();
+    const { hold } = makeHold(downloads);
+    let signed = false;
+
+    hold.tab(agentTab());
+
+    const callStartedAt = Date.now();
+
+    // The click dispatched at +0 and the tool answered at +110, so the settle began with the call-start grace
+    // (40 ms from +0) already spent: only a grace measured from the settle can still hear this file.
+    await vi.advanceTimersByTimeAsync(110);
+
+    const settled = hold.settle('session-1', {
+      graceMs: 40,
+      sign: sign(() => signed),
+      since: callStartedAt,
+      timeoutMs: 1500,
+    });
+
+    // The tab announces the file at +130, twenty milliseconds into the settle: inside the sign grace.
+    await vi.advanceTimersByTimeAsync(20);
+    signed = true;
+    await vi.advanceTimersByTimeAsync(1400);
+
+    // A signed call that decided nothing inside the bound: the call answers the refusal itself, not the next one.
+    await expect(settled).resolves.toBe('waiting_for_item');
+    expect(hold.drain('session-1')).toStrictEqual([]);
+  });
 });

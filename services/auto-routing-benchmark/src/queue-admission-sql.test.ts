@@ -11,7 +11,13 @@ import {
   drainQueue,
   type BenchmarkJobMessage,
 } from './run';
-import { claimScheduledChunks, scheduleRunChunks, schedulerConfig } from './scheduler';
+import {
+  claimScheduledChunks,
+  finishChunk,
+  scheduleRunChunks,
+  schedulerConfig,
+  startChunk,
+} from './scheduler';
 
 const NOW = Date.parse('2026-11-20T12:00:00.000Z');
 const BENCHMARK_USER = 'bot-internal-queue-admission';
@@ -210,7 +216,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     return sqlite.prepare('SELECT 1 FROM scheduler_runs WHERE run_id = ?').get(runId) !== undefined;
   }
 
-  it('starts a second run for a new entry beside an active 100-entry run and claims its first chunk in the same pass', async () => {
+  it('starts a second run for a new entry beside an active 100-entry run whose dispatcher claims its first chunk', async () => {
     const large = Array.from({ length: 100 }, (_, index) => `vendor/large-${index}`);
     insertRun('user-large', large);
     await initialize('user-large', large);
@@ -231,14 +237,33 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     expect(started.entryCount).toBe(1);
     expect(runningUserRuns()).toEqual(['user-large', runId]);
     expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: runId });
+    // The drain writes the run row and wakes the dispatcher, which materializes
+    // the run and claims its first chunk on the same wake.
+    expect(sent).toContainEqual(
+      expect.objectContaining({ runId, kind: 'decider', schedulerWake: true })
+    );
+    expect(sent.some(message => message.claimId)).toBe(false);
+    await dispatchScheduler(env);
+
     expect(initialized(runId)).toBe(true);
-    const claim = sent.find(message => message.runId === runId && message.model === NEW_MODEL);
+
+    // Every slot is held, so the next freed one must go to the new run's model,
+    // which holds fewer live chunks than any model of the large run.
+    const released = held[0];
+    if (!released) throw new Error('Expected a held claim');
+    await startChunk(env.BENCH_DB, released.id, released.token, Date.now());
+    await finishChunk(env.BENCH_DB, released.id, released.token);
+    await dispatchScheduler(env);
+
+    const claim = sent.find(
+      message => message.runId === runId && message.model === NEW_MODEL && message.claimId
+    );
     if (!claim?.claimId) throw new Error('Expected a claim for the new entry');
     expect(
       sqlite
-        .prepare('SELECT model, rep, chunk, status FROM scheduler_chunks WHERE id = ?')
+        .prepare('SELECT model, rep, chunk, status, slot FROM scheduler_chunks WHERE id = ?')
         .get(claim.claimId)
-    ).toEqual({ model: NEW_MODEL, rep: 0, chunk: 0, status: 'queued' });
+    ).toEqual({ model: NEW_MODEL, rep: 0, chunk: 0, status: 'queued', slot: released.slot });
   }, 30_000);
 
   it('waits while a run of the queue is still starting, then starts once it is initialized', async () => {

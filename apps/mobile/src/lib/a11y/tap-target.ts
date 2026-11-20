@@ -268,34 +268,26 @@ export const SWITCH_HOST_CLASS = 'h-[44px] -my-[8.5px] shrink-0 items-center jus
 export const SETTINGS_HEADING_LINE_DP = 21;
 
 /**
- * The band a settings section header's title row renders, in dp: the
- * control-size audit's floor rather than one heading line, because the row is
- * the switch's parent and a touch is delivered only inside each ancestor's
- * bounds. A row shrunk to the heading line clipped the switch's box, and the
- * band a touch could land in fell under {@link MIN_TAP_TARGET_DP}.
- */
-export const SETTINGS_SWITCH_ROW_DP = MIN_TAP_TARGET_DP;
-
-/**
  * The pull a settings section header takes below its title row, in dp:
- * `(28 - 21) / 2 = 3.5`. The switch's box is centred in the row, so half of the
- * band it adds over the heading line sits under the title's own line; the row's
- * bottom margin cancels exactly that half, and the title-to-description gap
- * stays the header group's `gap-3` (10.5dp) — the gap a section without a
- * switch has. A row sized by the switch instead pushed the description half a
- * box further from the title.
+ * `(28 - 21) / 2 = 3.5`, where the band is {@link MIN_TAP_TARGET_DP}. The
+ * switch's box is centred in the row, so half of the band it adds over the
+ * heading line sits under the title's own line; the row's bottom margin cancels
+ * exactly that half, and the title-to-description gap stays the header group's
+ * `gap-3` (10.5dp) — the gap a section without a switch has. A row sized by the
+ * switch instead pushed the description half a box further from the title.
  */
-export const SETTINGS_SWITCH_ROW_PULL_DP = (SETTINGS_SWITCH_ROW_DP - SETTINGS_HEADING_LINE_DP) / 2;
+export const SETTINGS_SWITCH_ROW_PULL_DP = (MIN_TAP_TARGET_DP - SETTINGS_HEADING_LINE_DP) / 2;
 
 /**
  * The title row of a settings section header with a switch, as
- * {@link SETTINGS_SWITCH_ROW_DP} plus the pull below it: `min-h-[28px]` for the
- * row's own band, `-mb-[3.5px]` for the bottom margin. The row's
- * `items-center` centres both the heading and the switch in that band, so the
- * switch's visible track (about 27dp) sits fully inside the delivered area
- * while its node keeps {@link TOUCH_TARGET_DP}. The row carries no negative top
- * margin: it starts at the header group's top, and anything above it is clipped
- * by the group.
+ * {@link MIN_TAP_TARGET_DP} plus the pull below it: `min-h-[28px]` for the row's
+ * own band (the control-size floor, because the row is the switch's parent and a
+ * touch is delivered only inside each ancestor's bounds), `-mb-[3.5px]` for the
+ * bottom margin. The row's `items-center` centres both the heading and the
+ * switch in that band, so the switch's visible track (about 27dp) sits fully
+ * inside the delivered area while its node keeps {@link TOUCH_TARGET_DP}. The
+ * row carries no negative top margin: it starts at the header group's top, and
+ * anything above it is clipped by the group.
  */
 export const SETTINGS_SWITCH_ROW_CLASS = 'min-h-[28px] -mb-[3.5px]';
 

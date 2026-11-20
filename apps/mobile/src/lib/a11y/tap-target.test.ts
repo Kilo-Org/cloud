@@ -66,7 +66,6 @@ import {
   SECTION_ACTION_LABEL_LINE_DP,
   SETTINGS_HEADING_LINE_DP,
   SETTINGS_SWITCH_ROW_CLASS,
-  SETTINGS_SWITCH_ROW_DP,
   SETTINGS_SWITCH_ROW_PULL_DP,
   STATE_ACTION_CLASS,
   STATE_ACTION_TARGET_DP,
@@ -302,12 +301,9 @@ describe('shared tap-target geometry', () => {
     const height = await compiledDp(SETTINGS_SWITCH_ROW_CLASS, 'minHeight');
     const marginBottom = await compiledDp(SETTINGS_SWITCH_ROW_CLASS, 'marginBottom');
     expect(height).toBe(MIN_TAP_TARGET_DP);
-    expect(height).toBe(SETTINGS_SWITCH_ROW_DP);
     expect(marginBottom).toBe(-3.5);
     expect(marginBottom).toBe(-SETTINGS_SWITCH_ROW_PULL_DP);
-    expect(SETTINGS_SWITCH_ROW_PULL_DP).toBe(
-      (SETTINGS_SWITCH_ROW_DP - SETTINGS_HEADING_LINE_DP) / 2
-    );
+    expect(SETTINGS_SWITCH_ROW_PULL_DP).toBe((MIN_TAP_TARGET_DP - SETTINGS_HEADING_LINE_DP) / 2);
     // The pull is the row's only vertical margin, and it is below the row: a
     // negative top margin would start the row above the header group's top,
     // where the group clips it. A class with no top margin compiles to no
@@ -319,7 +315,7 @@ describe('shared tap-target geometry', () => {
     ).toEqual(['-mb-[3.5px]']);
     // The band plus the pull is the heading line plus twice the half line the
     // switch's centred box adds, so the row's band is the whole difference.
-    expect(SETTINGS_HEADING_LINE_DP + 2 * SETTINGS_SWITCH_ROW_PULL_DP).toBe(SETTINGS_SWITCH_ROW_DP);
+    expect(SETTINGS_HEADING_LINE_DP + 2 * SETTINGS_SWITCH_ROW_PULL_DP).toBe(MIN_TAP_TARGET_DP);
   });
 
   it('renders a screen header title control on its own 48dp node', async () => {

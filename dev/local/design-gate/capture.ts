@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/paint-state';
 import {
-  CAPTURE_ALIGNMENT_BUDGET_MS,
+  CAPTURE_GAP_BUDGET_MS,
   captureAlignment,
   screenshotObservation,
   type CaptureAlignment,
@@ -193,18 +193,6 @@ export function inAppSampleInterval(dumpMs: number): number {
   return Math.max(IN_APP_SAMPLE_INTERVAL_MS, Math.ceil(dumpMs * 2));
 }
 
-/**
- * The window one capture may span, given what one of its dumps costs.
- *
- * The bracket reads two full trees around the screenshot, so on a screen whose
- * dump costs half a second the reads alone exceed the default window and a
- * perfectly aligned capture is reported inconclusive. The window grows with the
- * measurement and never shrinks below the constant: a cheap screen keeps it.
- */
-export function captureBudgetMs(dumpMs: number): number {
-  return Math.max(CAPTURE_ALIGNMENT_BUDGET_MS, Math.ceil(dumpMs * 2) + 1_000);
-}
-
 /** One sampling window, sized for the settle it spans. */
 function startSampling(
   ctx: { probe: Pick<ProbeClient, 'startSampling'>; observeMs: number },
@@ -349,12 +337,18 @@ async function reportLogBox(probe: ProbeClient, log: (line: string) => void): Pr
     }
     if (result.exposing === 0) {
       log(
-        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast still painting is reported as a dev-overlay warning'
+        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast' +
+          ' still painting is reported as a dev-overlay finding at the level LogBox' +
+          ' painted, or by its message text when the dump carries no level chrome (an' +
+          ' error fails the run)'
       );
       return;
     }
     log(
-      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted the switch; a dev toast still painting is reported as a dev-overlay warning`
+      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted` +
+        ' the switch; a dev toast still painting is reported as a dev-overlay finding at' +
+        ' the level LogBox painted, or by its message text when the dump carries no level' +
+        ' chrome (an error fails the run)'
     );
   } catch (error) {
     log(`design-gate: LogBox disable unavailable: ${String(error)}`);
@@ -392,8 +386,8 @@ export function screenFindings(args: {
       cell: args.cell,
       target: args.target,
       element: rootRef(args.dump),
-      measured: alignment.after.completedMs - alignment.before.startedMs,
-      expected: `matching probe states bracketing a screenshot within ${alignment.budgetMs} ms`,
+      measured: alignment.gapMs,
+      expected: `matching probe states read within ${CAPTURE_GAP_BUDGET_MS} ms of each side of the screenshot`,
       unit: 'ms',
       message: `${alignment.reason} The screenshot is preserved; pixel-to-tree rules were skipped.`,
     });
@@ -601,16 +595,6 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       `design-gate: ${target.id} one in-app dump costs ${dumpMs}ms; sampling every ${samplingMs}ms`
     );
   }
-  // The bracket reads two full trees around the screenshot, so on a screen whose
-  // dump is expensive those reads alone outlast the default window and a correct
-  // bracket is reported inconclusive. The window follows the same measurement; a
-  // cheap screen keeps the constant.
-  const alignmentBudgetMs = captureBudgetMs(dumpMs);
-  if (alignmentBudgetMs > CAPTURE_ALIGNMENT_BUDGET_MS) {
-    ctx.log(
-      `design-gate: ${target.id} one dump costs ${dumpMs}ms; alignment window ${alignmentBudgetMs}ms`
-    );
-  }
   await startSampling(ctx, samplingMs);
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
@@ -719,8 +703,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenshot,
     after,
     layoutSignature,
-    screenshotObservation(dump, image),
-    alignmentBudgetMs
+    screenshotObservation(dump, image)
   );
   const stillLoading = loadingPlaceholder(normalize(dump));
   const sampled: Sampled = {

@@ -42,28 +42,36 @@ export function projectPrivateWorktreePaths<T extends object>(
     }
   }
 
-  // The directory set is complete before the walk, so each escaped pattern is
-  // compiled once per call instead of once per string property.
-  const privatePatterns = [...privateDirectories].map(
-    directory => new RegExp(directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
-  );
+  // The directory set is complete before the walk: escape every collected
+  // directory once, combine them into one pattern with the longest directory
+  // first, and reuse that pattern for the whole walk.
+  const orderedDirectories = [...privateDirectories].sort((a, b) => b.length - a.length);
+  const privatePattern =
+    orderedDirectories.length === 0
+      ? undefined
+      : new RegExp(
+          orderedDirectories
+            .map(directory => directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('|'),
+          'gi'
+        );
 
-  const project = (target: object) => {
+  const project = (target: object, pattern: RegExp) => {
     const entries: [string, unknown][] = Object.entries(target);
     for (const [key, current] of entries) {
       if (typeof current === 'string') {
-        let projected = current;
-        for (const pattern of privatePatterns) {
-          projected = projected.replace(pattern, () => publicDirectory);
-        }
-        Reflect.set(target, key, projected);
+        Reflect.set(
+          target,
+          key,
+          current.replace(pattern, () => publicDirectory)
+        );
       } else if (typeof current === 'object' && current !== null) {
-        project(current);
+        project(current, pattern);
       }
     }
   };
 
   const projected = structuredClone(value);
-  if (privatePatterns.length > 0) project(projected);
+  if (privatePattern) project(projected, privatePattern);
   return projected;
 }

@@ -97,6 +97,8 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
     icon: 'clock',
   }),
   getSupersedingFindingId: () => mocks.supersedingFindingId,
+  isSupersededFinding: (finding: { status: string }) =>
+    finding.status === 'ignored' && mocks.supersedingFindingId !== null,
 }));
 
 type R = TestRenderer.ReactTestRenderer;
@@ -338,6 +340,26 @@ describe('FindingDetailsPanel dates block', () => {
     mocks.supersedingFindingId = 'finding-2';
     renderPanel(findingFixture({ status: 'ignored' }));
     expect(dateRows()[1]).toMatchObject({ label: 'securityAgent.findingDetails.supersededOn' });
+  });
+
+  // The reference only counts while the row is still ignored, so a row the
+  // source later reports fixed keeps its own date row instead of the
+  // supersession note.
+  it('ignores a superseding reference on a row that is no longer ignored', () => {
+    mocks.deadlineState = { kind: 'fixed', beforeDeadline: true, fixedAt: new Date(0) };
+    mocks.supersedingFindingId = 'finding-2';
+    renderPanel(
+      findingFixture({
+        status: 'fixed',
+        fixed_at: '2026-10-30T00:00:00.000Z',
+        updated_at: '2026-10-30T00:00:00.000Z',
+      })
+    );
+    expect(dateRows().map(row => row.label)).toEqual([
+      'securityAgent.findingDetails.detected',
+      'common.updated',
+      'securityAgent.filter.fixed',
+    ]);
   });
 
   it('keeps the fixed date row and drops the deadline row once the source reports the finding fixed', () => {

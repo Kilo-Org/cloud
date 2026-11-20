@@ -19,7 +19,9 @@
     "presenceStatus": "主机：{{connection}}",
     "commandStatus": "命令送达状态：{{status}}",
     "delivered": "已送达",
-    "expired": "已过期"
+    "expired": "已过期",
+    "recoveryGaps_one": "此对话记录缺少 {{displayCount}} 个部分。",
+    "recoveryGaps_other": "此对话记录缺少 {{displayCount}} 个部分。"
   },
   "common": {
     "manageOnWeb": "在网页上管理",
@@ -57,6 +59,7 @@
     "link": "链接",
     "takingLonger": "用时比预期更长。你可以关闭此页面，稍后再查看。",
     "model": "模型",
+    "notSelected": "未选择",
     "accessDenied": "无权访问",
     "allRepositories": "全部仓库",
     "personal": "个人",
@@ -147,6 +150,7 @@
     "performance": "性能",
     "preferences": "偏好设置",
     "privacyPolicy": "隐私政策",
+    "termsOfService": "服务条款",
     "profile": "个人资料",
     "reactions": "表情回应",
     "recent": "最近",
@@ -170,6 +174,7 @@
     "generating": "正在生成…",
     "working": "处理中",
     "yourOwnRepositories": "你自己的仓库",
+    "organizationRepositories": "组织的仓库",
     "dismissed": "已忽略",
     "agent": "智能体",
     "durationMinuteShort": "min",
@@ -216,8 +221,8 @@
     "verifyCode": "验证",
     "resendCode": "重新发送验证码",
     "termsPrefix": "继续即表示你同意我们的",
+    "termsInSentence": "服务条款",
     "terms": "条款",
-    "termsInSentence": "条款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登录方式",
@@ -667,7 +672,7 @@
     },
     "instructions": {
       "title": "自定义说明",
-      "deprecation": "自定义说明功能计划停用。请将这些准则移至仓库中的 REVIEW.md 文件。",
+      "deprecation": "自定义说明功能将被移除。请将这些准则移至仓库中的 REVIEW.md 文件。",
       "placeholder": "例如：遵循我们的错误处理规范…",
       "clearTitle": "移除自定义说明？",
       "clearMessage": "保存空字段将删除为此审查者存储的自定义说明。"
@@ -696,8 +701,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
+      "managedOnWebTitle": "在网页版管理",
+      "managedOnWebShort": "此连接需在电脑上通过网页版进行管理。",
+      "managedOnWebRepositories": "请在电脑上通过网页版为 {{organization}} 选择仓库。",
       "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
       "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
+      "descriptionOverview": "为 {{organization}} 创建工作区访问令牌，然后在下一个页面中粘贴。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌",
       "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
@@ -733,6 +742,7 @@
     "platformList": {
       "activity": "活动",
       "checking": "正在检查…",
+      "needsAttention": "需要处理",
       "platforms": "平台",
       "statusUnavailable": "无法获取状态"
     },
@@ -2223,6 +2233,8 @@
     "modelPicker": {
       "title": "选择模型",
       "noModelsDescription": "没有可选择的模型。",
+      "allUnavailableTitle": "无法使用任何模型",
+      "allUnavailableDescription": "添加提供商密钥，然后重试。",
       "favorites": "收藏"
     },
     "modelSelector": {
@@ -2465,6 +2477,7 @@
     "noSessions": "暂无已登录的设备",
     "noSessionsDescription": "在其他设备上登录 Kilo 应用后，即可在这里看到该设备。",
     "signedIn": "登录于 {{signedIn}} · 最后在线 {{lastSeen}}",
+    "signedInThisDevice": "登录于 {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "这里会显示来自 Kilo 应用、Kilo CLI 和浏览器的登录。编辑器的登录不会列出。",
     "thisDevice": "此设备",
     "webBrowser": "浏览器",
@@ -2626,6 +2639,8 @@
     "retryHint": "重新获取 Kilo Pass 状态。",
     "endedOn": "{{date}} 已结束",
     "notAvailableInApp": "Kilo Pass 在应用中不可用。",
+    "notAvailableTitle": "应用内不提供 Kilo Pass",
+    "noPassDescription": "此账户没有 Kilo Pass。",
     "statusActive": "生效中",
     "statusTrialing": "试用中",
     "statusPastDue": "付款逾期",
@@ -2696,6 +2711,7 @@
     "revokeConsent": "撤销授权",
     "revokeConsentTitle": "撤销数据共享授权？",
     "acceptAndContinue": "同意并继续",
+    "loadingConsentSettings": "正在加载你的授权设置…",
     "decline": "拒绝",
     "declineAndSignOut": "拒绝并退出登录",
     "declineTitle": "拒绝数据共享？",
@@ -2881,7 +2897,6 @@
       "submitReply": "提交回复",
       "termsAcceptRetry": "未能确认同意服务条款。请检查网络连接后重试。",
       "termsCopy": "年满 13 岁才能发布内容。",
-      "termsTitle": "服务条款",
       "threadAccessibilityLabel": "讨论串 {{anchorLabel}}",
       "unavailable": "无法查看讨论",
       "unavailableMessage": "此拉取请求可能已被删除。",
@@ -3235,6 +3250,9 @@
     },
     "tabs": {
       "discussion": "讨论",
+      "discussionAccessibility": "{{title}}：{{displayCount}} 条评论",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}} 条评论",
+      "discussionAccessibility_one": "{{title}}：1 条评论",
       "files": "文件",
       "overview": "概览"
     },
@@ -3423,8 +3441,7 @@
     "hub": {
       "balance": "余额",
       "lowBalanceBelow": "低于 {{amount}}",
-      "organizationSeats": "组织席位",
-      "plan": "组织套餐",
+      "plan": "套餐",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 已结束",
@@ -3467,7 +3484,7 @@
       "retentionLimit": "仅显示最近的发票。"
     },
     "lowBalanceAlert": {
-      "enableA11y": "启用余额不足提醒",
+      "subtitle": "当此组织的余额低于你设置的金额时，向你填写的邮箱发送邮件提醒。",
       "notifyEmailsLabel": "接收通知的邮箱",
       "permissionDenied": "你没有管理账单提醒的权限。",
       "separateEmailsHint": "多个邮箱请用逗号分隔。",
@@ -3543,6 +3560,7 @@
       "truncated": "该小时的请求数超出列表可显示的数量。",
       "emptyTitle": "该小时暂无请求",
       "emptyDescription": "使用“上一小时”查看更早的请求。",
+      "emptyBoundDescription": "请求日志最多只能追溯到此处。",
       "loadError": "无法加载请求日志。",
       "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
       "tokens": "输入 {{input}} · 输出 {{output}}",
@@ -3643,7 +3661,8 @@
     "signupStepUp": "如需完成账户创建，请选择“$t(login.moreSignInOptions)”。",
     "signupStepUpApple": "如需完成账户创建，请选择“$t(login.signInWithApple)”。",
     "signupStepUpGoogle": "如需完成账户创建，请选择“$t(login.signInWithGoogle)”。",
-    "invalidCode": "验证码不正确。请重试。",
+    "signupStepUpBack": "如需完成账户创建，请返回上一步并选择“$t(login.moreSignInOptions)”。",
+    "invalidCode": "验证码不正确或已过期。请重试，或选择“$t(login.resendCode)”。",
     "codeInProgress": "正在处理你的验证码。请稍后重试。",
     "tooManyAttempts": "尝试次数过多。请重新获取验证码。",
     "invalidToken": "登录失败。请重试。",
@@ -3772,6 +3791,7 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要联网。请连接网络后重试，或切换到此设备上的模型。",
+    "connectionLost": "与模型的连接已断开。请检查网络连接后重试。",
     "empty": {
       "title": "开始聊天",
       "description": "发送消息以与模型聊天。"
@@ -3911,6 +3931,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection)会使用所选协议和模型向此端点发送一个简短的推理请求。提供商可能会对此收费。",
       "connectionSucceeded": "模型已使用此协议完成请求。",
       "connectionFailed": "模型无法完成请求。请检查 API 根地址、协议、凭据和模型 ID。",
+      "requestTimedOut": "端点未及时响应。请检查 API 根地址和网络连接，然后重试。",
+      "requestUnauthorized": "端点拒绝了凭据。请检查 API 密钥和自定义请求头，然后重试。",
+      "requestNotFound": "未找到端点或模型。请检查 API 根地址和模型 ID。",
+      "requestRateLimited": "端点正在限制请求。请稍等片刻后重试。",
+      "requestUnavailable": "端点当前不可用。请稍后重试。",
+      "requestUnreachable": "无法连接到端点。请检查 API 根地址和网络连接。",
+      "requestInvalidResponse": "端点返回的内容格式不符合预期。请检查 API 根地址和协议是否与服务器匹配，然后重试。",
+      "discoveryNoModels": "端点未列出任何模型。请手动输入模型。",
+      "connectionIncomplete": "模型已响应但未完成。请重试，或检查模型 ID 和协议。",
       "invalidInput": "请输入后端名称、有效的请求头，以及至少一个具有唯一 ID 和名称的模型。词元数限制必须为正整数。",
       "invalidUrl": "请输入 HTTP 或 HTTPS API 根地址，且不包含凭据、查询参数或片段。",
       "publicHttp": "不允许使用公共 HTTP 端点。请使用 HTTPS 或私有本地端点。",
@@ -4049,10 +4078,20 @@
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
     },
-    "creditsRequired": "额度不足，无法发送此消息。"
+    "creditsRequired": "额度不足，无法发送此消息。",
+    "providerKeyRefused": "提供商拒绝了凭据。请检查其 API 密钥，然后重新发送。",
+    "providerModelMissing": "此后端不再提供此模型。请选择其他。",
+    "providerRateLimited": "提供商正在限制请求。请稍等片刻后重新发送。",
+    "providerUnavailable": "提供商当前不可用。请稍后重新发送。"
   },
   "settingsTools": {
-    "confirmTitle": "确认此更改？"
+    "confirmTitle": "确认此更改？",
+    "guarded": {
+      "spendAlertsOff": "关闭支出提醒？你将不再收到有关支出阈值超限和每小时峰值的通知。",
+      "balanceAlertsOff": "关闭余额提醒？当你的额度不足时，你将不再收到通知。",
+      "securityFindingsOff": "关闭安全发现提醒？你将不再收到有关新安全发现的通知。",
+      "hideBalanceOn": "隐藏你的余额？额度余额将不再显示在个人资料页面和组织中心。"
+    }
   },
   "appActions": {
     "start": {
@@ -4424,6 +4463,7 @@
     "pickPackToBuyAgain": "请在上方选择一个套餐以开始新的购买。",
     "purchasePending": "商店仍在处理此笔付款。商店批准扣款后，你的点数就会到账。",
     "buyAgain": "再次购买",
+    "checkPurchase": "检查购买",
     "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"
   },
@@ -4517,7 +4557,9 @@
     },
     "saveSheet": {
       "title": "保存到列表",
-      "saved": "已保存到 {{list}}"
+      "saved": "已保存到 {{list}}",
+      "saveFailed": "无法保存待办事项。请检查网络连接后重试。",
+      "saveRefused": "无法将待办事项保存到此列表。请选择其他列表。"
     }
   },
   "agentBriefing": {
@@ -4529,6 +4571,7 @@
     "empty": "此简报时段内无活动",
     "emptyHint": "定时简报有活动时，你的云端和 CLI 编码会话将显示在这里。",
     "loadError": "无法加载简报",
+    "estimateLoadError": "无法加载预估。",
     "view": "阅读简报",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scorecardLabel": "$t(agentBriefing.view)：$t(agentBriefing.selectedSessions) {{sessions}}，$t(agentBriefing.snapshotPullRequests) {{pullRequests}}，$t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4627,7 +4670,7 @@
     "topFeatures": "常用功能",
     "emptyTitle": "此期间无用量",
     "unavailableTitle": "用量不可用",
-    "unavailableDescription": "此工作区未报告用量。重试不会有帮助。",
+    "unavailableDescription": "此工作区尚未设置用量。如果认为此处应显示用量，请联系支持团队。",
     "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
     "viewDetails": "查看用量详情"
   },
@@ -4635,7 +4678,7 @@
     "title": "集成",
     "sectionTitle": "已连接的服务",
     "entrySubtitle": "GitHub、Slack、Linear 等",
-    "subtitle": "将你的开发工具和工作流连接到 Kilo",
+    "subtitle": "将你的开发工具和工作流连接到 Kilo。",
     "disconnect": "断开连接",
     "disconnectTitle": "要断开 {{provider}} 的连接吗？",
     "disconnectMessage": "Kilo 将不再在 {{provider}} 中响应。你可以随时重新连接。",
@@ -4707,7 +4750,6 @@
       "nameLocked": "创建触发器后，名称无法更改。",
       "repositoryLocked": "创建触发器后，仓库无法更改。",
       "environmentAutomatic": "按仓库自动选择",
-      "notSelected": "未选择",
       "profileDefaults": "使用默认值",
       "profileHelp": "配置文件设置会在触发器运行时生效，其密钥届时解析。",
       "customAgent": "自定义智能体",
@@ -4797,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "人工智能护栏",
-    "permissionDenied": "只有组织所有者和管理员可以管理人工智能护栏。",
+    "permissionDenied": "只有组织所有者和管理员可以管理人工智能护栏。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "未启用人工智能护栏",
     "unavailable": "Kilo 可根据请求为组织启用人工智能护栏。请联系 {{supportEmail}}，Kilo 团队会为你的组织开启。",
     "contactSupport": "联系技术支持",
@@ -4935,7 +4977,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "企业版功能",
-    "enterpriseOnly": "这是仅限企业版使用的功能。",
+    "enterpriseOnly": "提供商和模型仅在企业版套餐中可用。",
     "readOnly": "只有组织所有者和管理员可以更改这些设置。",
     "loadError": "提供商和模型加载失败",
     "tabModels": "模型",
@@ -4949,6 +4991,7 @@
     "providersDescription": "关闭某个提供商即可阻止 Kilo 为此组织路由到该提供商。",
     "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
     "providersEmpty": "没有匹配此搜索的提供商。",
+    "providersNone": "此组织没有可用的提供商。",
     "allowAllShown": "允许所有显示的项",
     "denyAllShown": "拒绝所有显示的项",
     "gatewaysDescription": "Kilo 通过 Vercel AI Gateway 或 OpenRouter 路由模型请求。已禁用的网关会使这些请求失败。",

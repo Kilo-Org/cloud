@@ -1,5 +1,6 @@
 import { SignJWT } from 'jose';
 import { z } from 'zod';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
 import { RuntimeAdmissionSchema } from './runtime-authorization-contract';
@@ -10,7 +11,7 @@ import {
 } from './kilo-token-verification';
 
 export const KILO_TOKEN_VERSION = 3;
-const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
+const organizationRole = z.enum(ORGANIZATION_ROLES);
 
 /**
  * All known fields that can appear in a Kilo user JWT, sourced from
@@ -120,7 +121,9 @@ export async function signKiloToken(params: {
  * Verify a Kilo user JWT (HS256, version 3).
  *
  * Checks: signature, expiration (built into jose), version === 3, and that
- * kiloUserId is a non-empty string.
+ * kiloUserId is a non-empty string. When the token carries
+ * `cloudAgentAuthority`, it also checks that `iat` is present and not in the
+ * future.
  *
  * When `options.audience` is set, the token must have that exact audience.
  * When omitted, tokens that include an audience are rejected so a

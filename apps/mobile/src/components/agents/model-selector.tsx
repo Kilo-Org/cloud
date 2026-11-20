@@ -237,7 +237,11 @@ export function ModelSelector({
     value,
     providerAware,
     fallbackLabel: t('common.model'),
+    notSelectedLabel: t('common.notSelected'),
   });
+  // With no model chosen the label is a placeholder, so it takes the muted ink
+  // the Repository field's "Not selected" does rather than a chosen value's.
+  const nothingChosen = value === '';
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
@@ -262,6 +266,8 @@ export function ModelSelector({
   // the picker can explain each model.
   const chipDisabled = disabled || pickerOptions.length === 0;
   const accessibilityLabel = [
+    // "Not selected" alone would not say what is not selected.
+    nothingChosen ? t('common.model') : undefined,
     spokenModel,
     selectedUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
     lockLabel && disabled
@@ -291,7 +297,13 @@ export function ModelSelector({
 
   const selectorBody = (
     <View className="min-w-0 shrink flex-row items-center gap-1.5">
-      <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
+      <Text
+        className={cn(
+          'shrink text-sm font-medium',
+          nothingChosen ? 'text-muted-foreground' : 'text-foreground'
+        )}
+        numberOfLines={1}
+      >
         {label}
       </Text>
       {byok ? (
@@ -372,6 +384,7 @@ export function ModelPickerOptionRow({
   acceptsVariant,
   isFavorite,
   showProvider,
+  suppressUnavailableCheck = false,
   onSelectModel,
   onSelectVariant,
   onToggleFavorite,
@@ -392,6 +405,13 @@ export function ModelPickerOptionRow({
    * accessibility label keeps the name either way.
    */
   showProvider: boolean;
+  /**
+   * Whether a selected unavailable row drops its check. The all-unavailable
+   * sheet sets it, because its state already says nothing can be picked;
+   * elsewhere the muted check still marks an unavailable row that is the
+   * session's model.
+   */
+  suppressUnavailableCheck?: boolean;
   onSelectModel: (option: SessionModelOption) => void;
   onSelectVariant: (variant: string) => void;
   onToggleFavorite: (option: SessionModelOption) => void;
@@ -511,8 +531,12 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
+        {/* The all-unavailable sheet drops the check from an unavailable row:
+         * a check there would claim a selection its state denies. Elsewhere a
+         * muted check still marks an unavailable row that is the session's
+         * model. The column stays reserved so nothing moves. */}
         <View className="items-center justify-center" style={{ width: CHECK_COLUMN_DP }}>
-          {selected ? (
+          {selected && !(option.unavailable && suppressUnavailableCheck) ? (
             <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />
           ) : null}
         </View>

@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Text } from '@/components/ui/text';
 import { SaveProfileSheet, type SaveProfileSheetProps } from './save-profile-sheet';
 
 vi.mock('react-native', () => ({
@@ -107,7 +106,7 @@ function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
-/** The live refusal line's message: the reserved copy is hidden from readers. */
+/** The refusal line's message, or null while the sheet states none. */
 function liveMessage(renderer: TestRenderer.ReactTestRenderer): unknown {
   return renderer.root.findAllByType(AccessibleStatus)[0]?.props.message;
 }
@@ -138,7 +137,7 @@ describe('SaveProfileSheet', () => {
   it('shows the summary counts and the secrets note', () => {
     const renderer = mount();
 
-    expect(header(renderer).props.title).toBe('Save as Profile');
+    expect(header(renderer).props.title).toBe('Save as profile');
     expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
     expect(texts(renderer)).toContain('Secrets are encrypted before storage.');
     expect(renderer.root.findByType('Lock' as never)).toBeTruthy();
@@ -239,43 +238,26 @@ describe('SaveProfileSheet', () => {
     expect(header(renderer).props.doneDisabled).toBe(false);
   });
 
-  it('overlays the refusal on a reserved copy so a refused save moves no field', async () => {
+  it('states the refusal after the form, so the intro holds no empty line and a refused save moves no field', async () => {
     const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
     const renderer = mount({ onSave });
-    const reserved = renderer.root.findAll(
-      node => node.props.testID === 'save-profile-status-reserve'
-    )[0];
-    if (!reserved) {
-      throw new TypeError('the sheet has no reserved refusal copy');
-    }
+    const body = renderer.root.findByType('ScrollView' as never);
+    const lastBlock = () => {
+      const blocks = body.children.filter(
+        (child): child is TestRenderer.ReactTestInstance => typeof child !== 'string'
+      );
+      return blocks.at(-1);
+    };
 
-    // The reserved copy is laid out at the device font scale and width and kept
-    // from readers, so the slot's height comes from the real translation: no
-    // measured style, and the height is final on the first layout.
-    expect(reserved.props.accessibilityElementsHidden).toBe(true);
-    expect(reserved.props.importantForAccessibility).toBe('no-hide-descendants');
-    const [line] = reserved.findAll(node => node.type === Text);
-    if (!line) {
-      throw new TypeError('the reserved refusal copy is empty');
-    }
-    expect(line.props.children).toBe("Couldn't save profile");
-    const slot = renderer.root.findAll(node => node.props.testID === 'save-profile-status')[0];
-    if (!slot) {
-      throw new TypeError('the sheet has no refusal slot');
-    }
-    expect(slot.props.style).toBeUndefined();
+    // Before a save the status renders nothing, so no space is held for it.
+    expect(lastBlock()?.type).toBe(AccessibleStatus);
+    expect(liveMessage(renderer)).toBeNull();
 
     typeInto(renderer, 'Profile name', 'Retry me');
     await submit(renderer);
 
-    // The live refusal is an absolute overlay on the reserved block, so the
-    // fields above it keep their position.
-    expect(
-      renderer.root.findAll(node => node.props.testID === 'save-profile-status-reserve')
-    ).toHaveLength(1);
-    const live = renderer.root.findAll(node => node.props.testID === 'save-profile-status-live')[0];
-    expect(String(live?.props.className)).toContain('absolute');
-    expect(texts(renderer)).toContain("Couldn't save profile");
+    // The refusal is the body's last block: every field above it keeps its place.
+    expect(lastBlock()?.type).toBe(AccessibleStatus);
     expect(liveMessage(renderer)).toBe("Couldn't save profile");
   });
 

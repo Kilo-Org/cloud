@@ -3,6 +3,7 @@ import {
   MAX_RECONNECT_ATTEMPTS,
   type Connection,
   type ConnectionLifecycleHooks,
+  type SocketPhase,
 } from './base-connection';
 import { cloudAgentSdkRuntime } from './runtime';
 import {
@@ -89,6 +90,12 @@ type UserWebConnection = {
    */
   isConnected: () => boolean;
   /**
+   * Reports the phase of the current viewer socket. Independent of
+   * `isConnected`, which only turns true after the first parsed inbound
+   * message.
+   */
+  socketPhase: () => SocketPhase;
+  /**
    * Subscribes to transport-readiness transitions. The listener fires only
    * when the boolean value actually changes. The returned function
    * unsubscribes. Safe to call on a destroyed connection: the listener is
@@ -152,9 +159,39 @@ function parseCommandError(error: unknown): Error {
   return new Error(GENERIC_COMMAND_ERROR_MESSAGE);
 }
 
-function createUserWebConnection(
-  config: UserWebConnectionConfig
-): UserWebConnection & { retain: () => () => void } {
+type EdgeSignal = {
+  get: () => boolean;
+  set: (value: boolean) => void;
+  subscribe: (listener: (value: boolean) => void) => () => void;
+  clear: () => void;
+};
+
+/**
+ * One boolean edge signal: a synchronous snapshot plus listeners that fire
+ * only when the value actually changes. `clear` drops every listener; a
+ * subscription taken before it stays valid but never fires again.
+ */
+function createEdgeSignal(): EdgeSignal {
+  let value = false;
+  const listeners = new Set<(next: boolean) => void>();
+  return {
+    get: () => value,
+    set(next) {
+      if (value === next) return;
+      value = next;
+      for (const listener of listeners) listener(next);
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    clear: () => listeners.clear(),
+  };
+}
+
+function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnection {
   const connectionId = cloudAgentSdkRuntime.randomUUID();
   let token = '';
   let baseConnection: Connection | null = null;
@@ -165,7 +202,15 @@ function createUserWebConnection(
   let connectPromise: Promise<void> | null = null;
   let retainCount = 0;
   let commandRetainCount = 0;
-  let legacyRetained = false;
+  // The deprecated connect()/disconnect() pair owns one legacy lifetime. Its
+  // phase is explicit because a `disconnect()` can run synchronously inside
+  // `retainConnection()` (an `onError` or connection-signal listener), before
+  // the release closure that call returns exists.
+  type LegacyLifetime =
+    | { status: 'idle' }
+    | { status: 'retaining' }
+    | { status: 'held'; release: () => void };
+  let legacyLifetime: LegacyLifetime = { status: 'idle' };
   // True once the current base connection's socket has opened (i.e. the one-use
   // ingest ticket was consumed at the upgrade). Drives the pre-connect auth
   // refresh so only reconnects mint a fresh ticket, not the initial connect.
@@ -204,27 +249,13 @@ function createUserWebConnection(
   // Wrapper-owned transport-readiness state. The base connection deliberately
   // emits no callback on `destroy()`, so transitions around full release /
   // destroy are driven here rather than from base-connection callbacks.
-  let connected = false;
-  const connectionChangeListeners = new Set<(connected: boolean) => void>();
+  const connectionSignal = createEdgeSignal();
 
-  function setConnected(value: boolean): void {
-    if (connected === value) return;
-    connected = value;
-    for (const listener of connectionChangeListeners) listener(value);
-  }
-
-  // Wrapper-owned reconnect-exhaustion snapshot, mirroring `connected`. The base
-  // connection fires the two-edge callback; the wrapper keeps a synchronous
-  // snapshot so `isReconnectExhausted()` reads it without crossing the base
-  // boundary and listeners fire only on value changes.
-  let exhausted = false;
-  const exhaustionChangeListeners = new Set<(exhausted: boolean) => void>();
-
-  function setExhausted(value: boolean): void {
-    if (exhausted === value) return;
-    exhausted = value;
-    for (const listener of exhaustionChangeListeners) listener(value);
-  }
+  // Wrapper-owned reconnect-exhaustion snapshot, mirroring the readiness
+  // signal. The base connection fires the two-edge callback; the wrapper keeps
+  // a synchronous snapshot so `isReconnectExhausted()` reads it without
+  // crossing the base boundary.
+  const exhaustionSignal = createEdgeSignal();
 
   function hasLifetime(): boolean {
     return retainCount > 0;
@@ -267,6 +298,16 @@ function createUserWebConnection(
     initialAuthRetryAttempt = 0;
   }
 
+  /**
+   * Restart the pre-socket attempt series: drop the pending retry timer and its
+   * spent budget, clear exhaustion, and ask for a token again.
+   */
+  function restartPreSocketAttemptSeries(): void {
+    clearInitialAuthRetry();
+    exhaustionSignal.set(false);
+    startConnection(false);
+  }
+
   function scheduleInitialAuthRetry(expectedGeneration: number): void {
     if (destroyed || !hasLifetime() || expectedGeneration !== generation) return;
 
@@ -288,9 +329,7 @@ function createUserWebConnection(
     // Mirrors the base connection's resume paths: a fresh network or visibility
     // signal restarts the attempt series and clears exhaustion before the probe,
     // so the surface reads "reconnecting" rather than terminal while it tries.
-    clearInitialAuthRetry();
-    setExhausted(false);
-    startConnection(false);
+    restartPreSocketAttemptSeries();
   }
 
   function addPreSocketLifecycleListeners(): void {
@@ -367,8 +406,15 @@ function createUserWebConnection(
     if (destroyed) return () => {};
     retainCount += 1;
     if (retainCount === 1) {
-      addPreSocketLifecycleListeners();
-      startConnection();
+      try {
+        addPreSocketLifecycleListeners();
+        startConnection();
+      } catch (error) {
+        // A caller-supplied hook or auth callback threw during the start; roll
+        // the count back so a failed start does not hold a lifetime forever.
+        retainCount -= 1;
+        throw error;
+      }
     }
 
     let released = false;
@@ -467,7 +513,7 @@ function createUserWebConnection(
     baseConnection = createBaseConnection({
       lifecycleHooks: createLifecycleHooks(),
       maxReconnectAttempts: config.maxReconnectAttempts,
-      onReconnectExhaustionChange: setExhausted,
+      onReconnectExhaustionChange: exhaustionSignal.set,
       buildUrl,
       parseMessage: (data: unknown) => {
         if (typeof data !== 'string') return null;
@@ -490,10 +536,10 @@ function createUserWebConnection(
         startLiveness();
       },
       onConnected: () => {
-        setConnected(true);
+        connectionSignal.set(true);
       },
       onReconnected: () => {
-        setConnected(true);
+        connectionSignal.set(true);
         config.onReconnect?.();
         for (const listener of reconnectListeners) listener();
       },
@@ -503,11 +549,11 @@ function createUserWebConnection(
       onDisconnected: () => {
         currentWs = null;
         clearLiveness();
-        setConnected(false);
+        connectionSignal.set(false);
       },
       onUnexpectedDisconnect: () => {
         rejectPending('Connection lost during reconnect');
-        setConnected(false);
+        connectionSignal.set(false);
       },
       onError: config.onError,
       isAuthFailure: event => event.code === 4001 || event.code === 1008,
@@ -540,7 +586,7 @@ function createUserWebConnection(
       // only a token that finally resolves (manual retry, or lifecycle recovery
       // after signing in again) can clear it. Afterwards the base connection
       // emits its own edges, so the flag is left alone.
-      if (!baseConnection) setExhausted(false);
+      if (!baseConnection) exhaustionSignal.set(false);
       token = value;
       ensureBaseConnection();
       baseConnection?.connect();
@@ -554,9 +600,10 @@ function createUserWebConnection(
       // reconnects: once the cap is reached, publish the exhaustion edge so the
       // recovery surface renders instead of retrying silently forever. The
       // counter stays spent here; only `retryConnection()` or a lifecycle
-      // resume restarts the series, and both go through `clearInitialAuthRetry`.
+      // resume restarts the series, and both go through
+      // `restartPreSocketAttemptSeries`.
       if (initialAuthRetryAttempt + 1 >= maxInitialAuthAttempts) {
-        setExhausted(true);
+        exhaustionSignal.set(true);
         return;
       }
       scheduleInitialAuthRetry(expectedGeneration);
@@ -591,14 +638,28 @@ function createUserWebConnection(
     // `base-connection.destroy()` deliberately emits no `onDisconnected`
     // callback, so the wrapper must drive the disconnected transition itself
     // before the next `startConnection()` reopens from a false baseline.
-    setConnected(false);
-    setExhausted(false);
+    connectionSignal.set(false);
+    exhaustionSignal.set(false);
   }
 
   function connect(): void {
-    if (destroyed || legacyRetained) return;
-    legacyRetained = true;
-    retainConnection();
+    if (destroyed || legacyLifetime.status !== 'idle') return;
+    legacyLifetime = { status: 'retaining' };
+    let release: () => void;
+    try {
+      release = retainConnection();
+    } catch (error) {
+      legacyLifetime = { status: 'idle' };
+      throw error;
+    }
+    // A `disconnect()` that ran synchronously inside `retainConnection()` has
+    // already cleared the intent, so release this retain now instead of
+    // holding a lifetime nobody owns.
+    if (legacyLifetime.status !== 'retaining') {
+      release();
+      return;
+    }
+    legacyLifetime = { status: 'held', release };
   }
 
   type RawCommandWire = {
@@ -681,15 +742,19 @@ function createUserWebConnection(
     retain: retainConnection,
     connect,
     disconnect() {
-      if (!legacyRetained || destroyed) return;
-      legacyRetained = false;
-      retainCount -= 1;
-      if (retainCount === 0) stopConnection('Connection disconnected');
+      if (legacyLifetime.status === 'idle') return;
+      if (legacyLifetime.status === 'retaining') {
+        legacyLifetime = { status: 'idle' };
+        return;
+      }
+      const { release } = legacyLifetime;
+      legacyLifetime = { status: 'idle' };
+      release();
     },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      legacyRetained = false;
+      legacyLifetime = { status: 'idle' };
       retainCount = 0;
       commandRetainCount = 0;
       stopConnection('Connection destroyed');
@@ -698,24 +763,19 @@ function createUserWebConnection(
       systemListeners.clear();
       reconnectListeners.clear();
       sessionListeners.clear();
-      connectionChangeListeners.clear();
-      exhaustionChangeListeners.clear();
+      connectionSignal.clear();
+      exhaustionSignal.clear();
     },
-    isConnected: () => connected,
+    isConnected: connectionSignal.get,
+    socketPhase: () => baseConnection?.socketPhase() ?? 'absent',
     onConnectionChange(listener) {
       if (destroyed) return () => {};
-      connectionChangeListeners.add(listener);
-      return () => {
-        connectionChangeListeners.delete(listener);
-      };
+      return connectionSignal.subscribe(listener);
     },
-    isReconnectExhausted: () => exhausted,
+    isReconnectExhausted: exhaustionSignal.get,
     onReconnectExhaustionChange(listener) {
       if (destroyed) return () => {};
-      exhaustionChangeListeners.add(listener);
-      return () => {
-        exhaustionChangeListeners.delete(listener);
-      };
+      return exhaustionSignal.subscribe(listener);
     },
     retryConnection() {
       if (baseConnection) {
@@ -726,9 +786,7 @@ function createUserWebConnection(
       // No base connection yet means the failure was token acquisition, which
       // the wrapper owns: clear that state, restart the attempt budget, and ask
       // for a token again so the user can recover after signing in again.
-      clearInitialAuthRetry();
-      setExhausted(false);
-      if (!started && !connectPromise) startConnection(false);
+      restartPreSocketAttemptSeries();
     },
     subscribeToCliSession(sessionId) {
       if (destroyed) return () => {};

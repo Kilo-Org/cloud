@@ -281,13 +281,16 @@ export function useSecurityAgentCommands(scope: string): void {
   }, [batchStatusQuery.error]);
 
   useEffect(() => {
+    const perCommandResults = perCommandIds.map((id, index) => ({
+      id,
+      result: commandStatusQueries[index] ?? {},
+    }));
     const { terminalCommands, unavailableIds } = reconcileCommandStatuses({
       trackedIds,
       batchIds: useBatchPath ? batchIds : [],
-      perCommandIds,
       batchCommands: batchStatusQuery.data,
       batchSettled: useBatchPath && batchStatusQuery.data !== undefined,
-      perCommandResults: commandStatusQueries,
+      perCommandResults,
       processedTerminalIds: processedTerminalIdsRef.current,
     });
 

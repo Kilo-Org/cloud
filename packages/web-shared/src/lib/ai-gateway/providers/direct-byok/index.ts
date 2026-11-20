@@ -128,24 +128,37 @@ export function findDirectByokProvider(providerId: string): DirectByokProvider |
   return directByokProviderList.find(provider => provider.id === providerId);
 }
 
+/** Whether the provider maps its models to models.dev catalog ids, which catalog mode needs. */
+function hasCatalogData(provider: DirectByokProvider): boolean {
+  return provider.models_dev_id !== undefined;
+}
+
 /** Catalog mode needs models.dev data to map upstream models to catalog ids. */
 export function supportsCatalogMode(providerId: string): boolean {
-  return findDirectByokProvider(providerId)?.models_dev_id !== undefined;
+  const provider = findDirectByokProvider(providerId);
+  return provider !== undefined && hasCatalogData(provider);
 }
 
 export type DirectByokCatalogEntry = { catalogModelId: string; model: DirectByokModel };
+
+/** The catalog ids a provider with catalog data serves, with the model serving each. */
+async function listCatalogModelsOfProvider(
+  provider: DirectByokProvider
+): Promise<DirectByokCatalogEntry[]> {
+  if (!hasCatalogData(provider)) return [];
+  const entries: DirectByokCatalogEntry[] = [];
+  for (const [catalogModelId, model] of getPrimaryCatalogModels(await provider.models())) {
+    if (await isByokServableCatalogModelId(catalogModelId)) entries.push({ catalogModelId, model });
+  }
+  return entries;
+}
 
 /** The catalog ids a key of this provider serves in catalog mode, with the model serving each. */
 export async function listDirectByokCatalogModels(
   providerId: string
 ): Promise<DirectByokCatalogEntry[]> {
   const provider = findDirectByokProvider(providerId);
-  if (!provider?.models_dev_id) return [];
-  const entries: DirectByokCatalogEntry[] = [];
-  for (const [catalogModelId, model] of getPrimaryCatalogModels(await provider.models())) {
-    if (await isByokServableCatalogModelId(catalogModelId)) entries.push({ catalogModelId, model });
-  }
-  return entries;
+  return provider ? listCatalogModelsOfProvider(provider) : [];
 }
 
 /**
@@ -194,7 +207,7 @@ export async function findDirectByokCatalogModels(
   if (servedModelId === null) return [];
   const candidates = await Promise.all(
     directByokProviderList.map(async provider => {
-      if (!provider.models_dev_id) return [];
+      if (!hasCatalogData(provider)) return [];
       const model = getPrimaryCatalogModels(await provider.models()).get(servedModelId);
       return model ? [{ provider, model }] : [];
     })
@@ -232,10 +245,11 @@ async function getCatalogModeModelIds(
   isServingAllowed: DirectByokCatalogServingCheck
 ): Promise<ReadonlySet<string>> {
   const providersByModelId: CatalogModeProviders = new Map();
-  for (const key of keys.filter(isCatalogModeKey)) {
+  for (const key of keys) {
+    if (!key.serveCatalogModels) continue;
     const provider = findDirectByokProvider(key.providerId);
-    if (!provider) continue;
-    for (const { catalogModelId } of await listDirectByokCatalogModels(key.providerId)) {
+    if (!provider || !hasCatalogData(provider)) continue;
+    for (const { catalogModelId } of await listCatalogModelsOfProvider(provider)) {
       providersByModelId.set(catalogModelId, [
         ...(providersByModelId.get(catalogModelId) ?? []),
         provider,
@@ -281,7 +295,7 @@ export async function createDirectByokReferenceResolver(
   );
   return async modelId => {
     if (catalogModeProviderIds.size === 0) return modelId;
-    const directByok = await getDirectByokModel(modelId.toLowerCase());
+    const directByok = await getDirectByokModel(modelId);
     if (!directByok || !catalogModeProviderIds.has(directByok.provider.id)) return modelId;
     return getDirectByokCatalogModelId(directByok.model);
   };
@@ -302,17 +316,18 @@ async function getDirectByokModels(keys: EnabledByokProvider[]) {
 
 /**
  * Resolves a `<provider>/<model>` id to the provider and the model it serves, or null when either
- * is unknown.
+ * is unknown. The id is matched in any casing; the canonical form is lowercase.
  */
 export async function getDirectByokModel(
   requestedModel: string
 ): Promise<{ provider: DirectByokProvider; model: DirectByokModel } | null> {
+  const canonicalModelId = requestedModel.toLowerCase();
   const provider = directByokProviderList.find(provider =>
-    requestedModel.startsWith(`${provider.id}/`)
+    canonicalModelId.startsWith(`${provider.id}/`)
   );
   if (!provider) return null;
   const model = (await provider.models()).find(
-    model => formatDirectByokModelId(provider, model) === requestedModel
+    model => formatDirectByokModelId(provider, model) === canonicalModelId
   );
   return model ? { provider, model } : null;
 }

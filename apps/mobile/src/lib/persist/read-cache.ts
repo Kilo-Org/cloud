@@ -12,6 +12,7 @@ import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
+import { isForceStateHoldingReadCache } from '@/lib/force-state-fixture';
 import { READ_CACHE_SCOPE_PREFIX, readCacheScope } from '@/lib/persist/cache-scope';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
@@ -335,8 +336,13 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
   // start of sign-out, so a write is also refused while teardown is still
   // clearing scopes — even from a persister created at the current epoch while
   // the old user id is cached.
+  // A dev-only forced data state (`force-state-fixture.ts`) holds every write
+  // until the app restarts, so the blob keeps the snapshot from before it.
   const isPublicationAllowed = (): boolean =>
-    !isSignOutActive() && isCurrentAuthEpoch(epoch) && readCachedUserId(queryClient) === userId;
+    !isSignOutActive() &&
+    isCurrentAuthEpoch(epoch) &&
+    readCachedUserId(queryClient) === userId &&
+    !(__DEV__ && isForceStateHoldingReadCache());
 
   const storage: AsyncStorage = {
     getItem: async k => {

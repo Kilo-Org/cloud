@@ -178,7 +178,10 @@ vi.mock('@/components/ui/fab', async () => {
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
 }));
-vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: 'ContextControl',
+}));
 vi.mock('@/components/agents/platform-filter-modal', () => ({
   SessionFilterModal: 'SessionFilterModal',
 }));

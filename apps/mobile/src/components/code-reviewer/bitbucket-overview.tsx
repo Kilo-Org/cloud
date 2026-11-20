@@ -22,14 +22,14 @@ import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
+import { bitbucketRepair, classifyBitbucketConnection } from '@/lib/code-reviewer-bitbucket';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
+import { useBitbucketIntegrationStatus } from '@/lib/hooks/use-bitbucket';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
-  classifyProviderState,
   useBitbucketReadiness,
   type useReviewConfig,
   useSaveReviewConfig,
@@ -56,11 +56,18 @@ export function BitbucketOverview({
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
-  // Bitbucket is org-only, so the scope always names an organization, and the
-  // connect copy names it. Until the membership list resolves the name, the
-  // screen keeps its skeleton rather than painting an unfilled placeholder.
+  // The readiness read describes workspace access tokens only, so the
+  // integration status beside it is what tells a Bitbucket OAuth connection
+  // apart from a workspace with none.
+  const integrationStatus = useBitbucketIntegrationStatus(scope);
+  // Bitbucket is org-only, so the scope always names an organization, and both
+  // the header subtitle and the connect copy name it from this one read. Until
+  // the membership list resolves the name, the screen keeps its skeleton rather
+  // than painting an unfilled placeholder, and the subtitle holds the generic
+  // stand-in so the header keeps its line.
   const orgBoundary = useOrgBoundary(scope);
   const organizationName = orgBoundary.org?.organizationName;
+  const scopeTitle = organizationName ?? t('common.organization');
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
   const { reducedMotion } = useMotionPolicy();
@@ -68,32 +75,59 @@ export function BitbucketOverview({
   // error with retry, or a loading state -- never the header over an empty
   // scroll area.
   const configBody = useQueryBodyState(config);
-  const providerState = classifyProviderState({
-    isLoading: readiness.isLoading,
-    isError: readiness.isError,
-    isFetching: readiness.isFetching,
-    connected: readiness.data?.connected,
-    hasData: readiness.data !== undefined,
-    refetch: () => void readiness.refetch(),
-  });
+  const connection = classifyBitbucketConnection({ readiness, status: integrationStatus });
 
-  if (providerState.status === 'error') {
+  if (connection.kind === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <QueryError
-          onRetry={() => {
-            providerState.refetch();
-          }}
-          isRetrying={providerState.isRetrying}
+          variant={connection.variant}
+          onRetry={
+            connection.permanent
+              ? undefined
+              : () => {
+                  connection.refetch();
+                }
+          }
+          isRetrying={connection.isRetrying}
         />
       </View>
     );
   }
 
-  const isLoading =
-    providerState.status === 'loading' || permissionLoading || orgBoundary.isResolving;
-  const connected = providerState.status === 'connected';
+  // An organization connected through Bitbucket OAuth reads as one with no
+  // token integration: the connection lives on the web page that ran its
+  // consent, so this surface renders read-only — no connect action, no toggle,
+  // no config rows, and no repositories button. The header above already names
+  // the platform and the organization, so the card's line only says where the
+  // connection is managed. It waits for the membership read that decides
+  // whether the header can paint at all.
+  if (connection.kind === 'oauth-connected' || connection.kind === 'oauth-attention') {
+    const workspaceName = connection.kind === 'oauth-connected' ? connection.workspace : null;
+    return (
+      <View className="flex-1 bg-background">
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+          {orgBoundary.isResolving ? (
+            <PlatformOverviewSkeleton />
+          ) : (
+            <Card>
+              {workspaceName?.displayName ? (
+                <Text className="text-sm font-medium">{workspaceName.displayName}</Text>
+              ) : null}
+              <Text variant="muted" className="text-xs">
+                {t('codeReviewer.bitbucketConnect.managedOnWebShort')}
+              </Text>
+            </Card>
+          )}
+        </TabScreenScrollView>
+      </View>
+    );
+  }
+
+  const isLoading = connection.kind === 'loading' || permissionLoading || orgBoundary.isResolving;
+  const connected = connection.kind === 'token-connected';
 
   // A connected workspace whose config read failed (no cache to fall back on),
   // or whose idle read could not be restarted, has nothing to show: surface a
@@ -102,7 +136,7 @@ export function BitbucketOverview({
   if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <QueryError
           variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
           onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
@@ -125,14 +159,16 @@ export function BitbucketOverview({
     const canConnect = canEdit && organizationName !== undefined;
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <EmptyState
           icon={GitMerge}
           iconSize={28}
           title={t('prReview.connect.bitbucketNotConnectedTitle')}
           description={
             canConnect && readinessData
-              ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
+              ? t('codeReviewer.bitbucketConnect.descriptionOverview', {
+                  organization: organizationName,
+                })
               : t('codeReviewer.bitbucket.notConnectedReadOnly')
           }
           action={
@@ -195,7 +231,7 @@ export function BitbucketOverview({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}

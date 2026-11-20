@@ -55,6 +55,36 @@ export function getStoreCreditExpiryMessageKey(
   return undefined;
 }
 
+export type StoreCreditExpiryCaption = {
+  /** The one sentence the pack group states for every pack it lists. */
+  key: 'credits.appStoreExpiry' | 'credits.playOneYearExpiry' | 'credits.playNonexpiring';
+  /** Whether the packs this sentence describes expire. */
+  expires: boolean;
+};
+
+/**
+ * The one credit-expiry policy the pack group states below its rows, or
+ * `undefined` when the rows do not share one.
+ *
+ * A backend catalog is uniform — `getMobileCreditProducts` in
+ * `apps/web/src/lib/credits/store-products.ts` gives every pack the same
+ * policy — so one sentence describes the whole group. A mixed catalog, or a
+ * pack the backend gave no policy, has no single sentence to state: one
+ * caption would misdescribe the packs it does not cover, so the group draws
+ * none and each row's accessible label still carries its own policy sentence.
+ */
+export function getStoreCreditExpiryCaption(
+  products: readonly BackendStoreCreditProduct[],
+  storefront: 'app_store' | 'play'
+): StoreCreditExpiryCaption | undefined {
+  const stated = products.map(product => getStoreCreditExpiryMessageKey(product, storefront));
+  const [first] = stated;
+  if (first === undefined || stated.some(key => key !== first)) {
+    return undefined;
+  }
+  return { key: first, expires: first === 'credits.playOneYearExpiry' };
+}
+
 export function joinStoreCreditProducts(params: {
   /**
    * Part of the loader contract this mirrors from the Kilo Pass join. The

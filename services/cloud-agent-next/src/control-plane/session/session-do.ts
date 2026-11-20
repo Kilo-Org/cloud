@@ -22,7 +22,13 @@ import {
 } from '../../cloud-agent-authority.js';
 import { getWorkspaceStub } from '../workspace/workspace-stub.js';
 import { sessionCallbackContext } from './callback-context.js';
-import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
+import {
+  createSessionListStatusOutbox,
+  deriveSessionListStatus,
+  nativeSessionTitle,
+  TRANSCRIPT_EVENT_TYPES,
+} from './list-status.js';
+import { createNativeLiveSummary, type NativeLiveSummary } from './native-live-summary.js';
 import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
 import {
   cloudAgentWorktreeIdSchema,
@@ -777,10 +783,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
   private rootStatus: RootStatus | undefined;
+  /**
+   * Latest transcript write, for the list row's activity time. Memory only:
+   * the list status snapshot keeps the last published value across eviction.
+   */
+  private transcriptActivityAt: number | undefined;
+  /** A Kilo v2 rename of the root not yet handed to the list status outbox. */
+  private pendingRootRename: string | undefined;
   private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  /** The Kilo v2 root's session card summary, published with the list status. */
+  private readonly nativeLiveSummary: NativeLiveSummary;
   private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
@@ -831,6 +846,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
     });
+    this.nativeLiveSummary = createNativeLiveSummary(ctx.storage);
     this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
       storage: ctx.storage,
       record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
@@ -2435,6 +2451,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
         }
         await this.recordRootStatus(event);
+        const rootRename = this.nativeRootRename(event);
         // A retried batch can be partially applied; commit its receipt with the row mutation.
         const stored = this.partText.transaction(() =>
           this.ctx.storage.transactionSync(() => {
@@ -2444,10 +2461,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               queries: this.eventQueries,
               partText: this.partText,
             });
+            if (persisted !== null && persisted.id !== 0 && this.registration !== null)
+              this.nativeLiveSummary.observe(event, this.registration.spec.kiloSessionId);
             if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
             return persisted;
           })
         );
+        if (stored !== null && stored.id !== 0 && TRANSCRIPT_EVENT_TYPES.has(event.type))
+          this.transcriptActivityAt = Date.now();
+        if (rootRename !== undefined) this.pendingRootRename = rootRename;
         if (stored !== null) this.broadcast(stored);
         if (event.type === 'session.created' && this.registration !== null) {
           const info = z
@@ -2620,14 +2642,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         // Registration alone is not a transition. Native work may start without
         // a Cloud message, so do not gate those updates on message admission.
         if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          const liveSummary = this.nativeLiveSummary.settled(status);
           this.listStatusOutbox.record(
             {
               sessionId: this.registration.spec.kiloSessionId,
               kiloUserId: this.metadata.identity.userId,
               cloudAgentSessionId: this.sessionId,
             },
-            status
+            status,
+            Date.now(),
+            {
+              activityAt: this.transcriptActivityAt,
+              title: this.pendingRootRename,
+              // Kilo v1 reports its summary and cost through its own ingest client.
+              transcript:
+                liveSummary === undefined
+                  ? undefined
+                  : {
+                      liveSummary,
+                      totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
+                        this.sessionId,
+                        this.registration.spec.kiloSessionId
+                      ),
+                    },
+            }
           );
+          this.pendingRootRename = undefined;
         }
         statusDueAt = this.listStatusOutbox.nextDueAt();
       }
@@ -4550,6 +4590,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!parsed.success || parsed.data.sessionID !== this.registration?.spec.kiloSessionId) return;
     this.rootStatus = { type: parsed.data.status.type, settled: false };
     await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  /** A Kilo v2 rename of the root: its title against the source stored before this event. */
+  private nativeRootRename(event: {
+    type: string;
+    properties: Record<string, unknown>;
+  }): string | undefined {
+    const rootKiloSessionId = this.registration?.spec.kiloSessionId;
+    if (
+      rootKiloSessionId === undefined ||
+      event.type !== 'conversation.source' ||
+      event.properties.sessionID !== rootKiloSessionId
+    )
+      return undefined;
+    // persistConversationEvent drops a source that names another session, so it is no rename.
+    const title = nativeSessionTitle(event.properties.source, rootKiloSessionId);
+    if (title === undefined) return undefined;
+    const stored = this.eventQueries.findByEntityId(`conversation-source/${rootKiloSessionId}`);
+    const previous =
+      stored === null
+        ? undefined
+        : nativeSessionTitle(
+            readNativeEventPayload(stored.payload)?.properties.source,
+            rootKiloSessionId
+          );
+    return title === previous ? undefined : title;
   }
 
   private async settleRootStatus(): Promise<void> {

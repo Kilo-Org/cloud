@@ -145,6 +145,35 @@ describe('PreparationGroup phase label', () => {
       renderer.unmount();
     });
   });
+
+  it('starts a step detail under the step title, past its caret and status columns', async () => {
+    const renderer = await mountGroup(
+      attemptWithStep(phaseStep({ latestDetail: 'Checking out branch' }))
+    );
+
+    const detail = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === 'Checking out branch'
+    );
+    // The details column sits after two leading slots, the caret's 14 and the
+    // status mark's 16, in the same `gap-2` row the step's title starts in.
+    const column = renderer.root.find(
+      node =>
+        node.props.className === 'flex-row gap-2' &&
+        node.findAll(child => child === detail).length > 0
+    );
+    const slots = column.children
+      .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== 'string')
+      .slice(0, 2)
+      .map(slot => (slot.props.style as { width?: number } | undefined)?.width);
+    expect(slots).toEqual([14, 16]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });
 
 const INCOMPLETE_TEXT =

@@ -1,7 +1,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { selectionHaptic } from '@/lib/haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, Info, SearchX, X } from '@/components/ui/icons';
+import { AlertCircle, Info, Plus, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { SearchField } from '@/components/ui/search-field';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
+import { providerKeyAddHref } from '@/lib/byok/provider-key-scope';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -25,6 +26,7 @@ import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/p
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body.
@@ -35,6 +37,7 @@ export function ModelPickerContent() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { favorites, favoritesError, addFavorite, removeFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
   const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
@@ -55,9 +58,19 @@ export function ModelPickerContent() {
   const selectedModelRef = useRef(selectedModel);
   const selectedVariantRef = useRef(selectedVariant);
   const selectionChangedRef = useRef(false);
+  // Set only by the closes that keep the pick: Done, and the pick's own close
+  // (a single-effort model, or an effort chip). Every other way out — Cancel,
+  // Android Back, an iOS swipe-down — leaves it unset, so the focus cleanup
+  // drops a pick still waiting for its effort and the caller keeps its model.
+  const commitOnCloseRef = useRef(false);
   const closePickerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closePicker = useCallback(() => {
+    commitOnCloseRef.current = true;
+    router.back();
+  }, [router]);
+
+  const cancelPicker = useCallback(() => {
     router.back();
   }, [router]);
 
@@ -76,6 +89,7 @@ export function ModelPickerContent() {
       selectedModelRef.current = nextModel;
       selectedVariantRef.current = nextVariant;
       selectionChangedRef.current = false;
+      commitOnCloseRef.current = false;
       setBridge(nextBridge);
       setSelectedModel(nextModel);
       setSelectedVariant(nextVariant);
@@ -89,7 +103,7 @@ export function ModelPickerContent() {
         }
 
         const activeBridge = bridgeRef.current;
-        if (activeBridge && selectionChangedRef.current) {
+        if (activeBridge && selectionChangedRef.current && commitOnCloseRef.current) {
           commitModelPickerSelection(
             activeBridge,
             selectedModelRef.current,
@@ -182,6 +196,21 @@ export function ModelPickerContent() {
     [acceptsVariant, bridge, closePicker]
   );
 
+  // A remote session whose CLI reports no models projects one row with
+  // `unavailable: true` and the session's current selection, so the sheet drew
+  // a dead row with no explanation of why it could not be picked. The state
+  // sits in the list header rather than in the zero-rows branch so the row the
+  // session is on, the search field and the sheet's height keep their places;
+  // `instance-picker`'s zero-instance state is the same shape. The state also
+  // owns the way out: an unavailable model is a missing credential, so its one
+  // action opens the provider-key form instead of leaving the sheet a dead end.
+  // It also owns the row's check: with nothing pickable, a check would claim a
+  // selection the state denies.
+  const allOptionsUnavailable =
+    bridge !== undefined &&
+    bridge.options.length > 0 &&
+    bridge.options.every(option => option.unavailable === true);
+
   // Hoisted out of the list body: the inline arrow gave the virtualized list a
   // new renderer on every render, which re-rendered every mounted row. Height
   // differs between the group header and a model row, so `getItemType` lets
@@ -204,6 +233,7 @@ export function ModelPickerContent() {
           acceptsVariant={acceptsVariant}
           isFavorite={item.isFavorite}
           showProvider={item.showsProvider}
+          suppressUnavailableCheck={allOptionsUnavailable}
           onSelectModel={handleSelectModel}
           onSelectVariant={handleSelectVariant}
           onToggleFavorite={handleToggleFavorite}
@@ -212,6 +242,7 @@ export function ModelPickerContent() {
     },
     [
       acceptsVariant,
+      allOptionsUnavailable,
       handleSelectModel,
       handleSelectVariant,
       handleToggleFavorite,
@@ -225,6 +256,7 @@ export function ModelPickerContent() {
       <PickerSheet
         title={t('agentChat.modelPicker.title')}
         onDone={closePicker}
+        onCancel={cancelPicker}
         scrollable={false}
         expired
       />
@@ -235,6 +267,7 @@ export function ModelPickerContent() {
     <PickerSheet
       title={t('agentChat.modelPicker.title')}
       onDone={closePicker}
+      onCancel={cancelPicker}
       scrollable={false}
       headerContent={
         <View>
@@ -291,8 +324,44 @@ export function ModelPickerContent() {
           nestedScrollEnabled
           ref={listRef}
           maintainVisibleContentPosition={{ disabled: true }}
-          style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
+          style={[
+            listStyle,
+            { backgroundColor: colors.background, marginBottom: bottom },
+            sideInsetMarginStyle,
+          ]}
           data={rows}
+          ListHeaderComponent={
+            allOptionsUnavailable ? (
+              <EmptyState
+                // The sheet's sections sit 21pt apart, and the state keeps
+                // one section gap on each side of itself: below the search
+                // field and above the first section header.
+                className="mt-3 mb-6"
+                icon={Info}
+                placement="top"
+                inset="gutter"
+                compact
+                title={t('agentChat.modelPicker.allUnavailableTitle')}
+                description={t('agentChat.modelPicker.allUnavailableDescription')}
+                // The state is not a dead end: the only surface that can make
+                // these models pickable again holds the provider keys.
+                action={
+                  <StateAction
+                    label={t('profile.providerKeys.add')}
+                    icon={Plus}
+                    onPress={() => {
+                      // The slot is cleared when the sheet loses focus, so
+                      // opening the key flow on top of it would come back to
+                      // an expired picker: close the sheet with no pick, then
+                      // open the provider-key flow from the chat surface.
+                      cancelPicker();
+                      router.push(providerKeyAddHref({ kind: 'personal' }));
+                    }}
+                  />
+                }
+              />
+            ) : undefined
+          }
           // FlashList stores its props during render. When React discards a
           // deferred search render, FlashList can keep that render's shorter
           // rows and then ask for a row past their end, so the row can be

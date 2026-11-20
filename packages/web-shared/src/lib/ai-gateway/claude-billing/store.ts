@@ -16,7 +16,11 @@ import {
   type DrizzleConnection,
   type DrizzleTransaction,
 } from '@kilocode/web-shared/lib/drizzle';
-import { claudeBillingOwnerMatches, type ClaudeBillingOwner } from './owner';
+import {
+  claudeBillingOwnerMatches,
+  type ClaudeBillingOwner,
+  type ClaudeBillingOwnerColumns,
+} from './owner';
 import { specificRefusalCodesFor } from './refusal';
 
 export type { ClaudeBillingOwner } from './owner';
@@ -42,19 +46,29 @@ export type UnreferencedClaudeBillingPayer = {
   userProfileId: string;
 };
 
-export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
+/**
+ * The columns of a row that belongs to an owner: a personal owner names only the
+ * person column, an organization owner only the organization column.
+ */
+function claudeBillingOwnerColumnsWhere(
+  kiloUserId: AnyPgColumn,
+  organizationId: AnyPgColumn,
+  owner: ClaudeBillingOwner
+) {
   switch (owner.kind) {
     case 'personal':
-      return and(
-        eq(claude_billing_connections.kilo_user_id, owner.kiloUserId),
-        isNull(claude_billing_connections.organization_id)
-      );
+      return and(eq(kiloUserId, owner.kiloUserId), isNull(organizationId));
     case 'organization':
-      return and(
-        eq(claude_billing_connections.organization_id, owner.organizationId),
-        isNull(claude_billing_connections.kilo_user_id)
-      );
+      return and(eq(organizationId, owner.organizationId), isNull(kiloUserId));
   }
+}
+
+export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
+  return claudeBillingOwnerColumnsWhere(
+    claude_billing_connections.kilo_user_id,
+    claude_billing_connections.organization_id,
+    owner
+  );
 }
 
 /** Rows the caller may see: their own rows, plus the organization rows of the allowed organizations. */
@@ -96,18 +110,11 @@ export async function getClaudeBillingConnection(
 }
 
 export function claudeBillingGrantOwnerWhere(owner: ClaudeBillingOwner) {
-  switch (owner.kind) {
-    case 'personal':
-      return and(
-        eq(claude_billing_connection_grants.kilo_user_id, owner.kiloUserId),
-        isNull(claude_billing_connection_grants.organization_id)
-      );
-    case 'organization':
-      return and(
-        eq(claude_billing_connection_grants.organization_id, owner.organizationId),
-        isNull(claude_billing_connection_grants.kilo_user_id)
-      );
-  }
+  return claudeBillingOwnerColumnsWhere(
+    claude_billing_connection_grants.kilo_user_id,
+    claude_billing_connection_grants.organization_id,
+    owner
+  );
 }
 
 /**
@@ -133,7 +140,7 @@ async function selectNextActiveGrant(
   onDb: DrizzleConnection,
   payerConnectionId: string,
   excludeOwner: ClaudeBillingOwner | null = null
-): Promise<{ kilo_user_id: string | null; organization_id: string | null } | null> {
+): Promise<ClaudeBillingOwnerColumns | null> {
   const excludeWhere = excludeOwner ? claudeBillingGrantOwnerWhere(excludeOwner) : undefined;
   const [grant] = await onDb
     .select({
@@ -160,10 +167,7 @@ async function selectNextActiveGrant(
  * The owner-to-columns projection for inserts: a personal row stores the user
  * id, an organization row the organization id; neither stores both.
  */
-function ownerColumns(owner: ClaudeBillingOwner): {
-  kilo_user_id: string | null;
-  organization_id: string | null;
-} {
+function ownerColumns(owner: ClaudeBillingOwner): ClaudeBillingOwnerColumns {
   return {
     kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,
     organization_id: owner.kind === 'personal' ? null : owner.organizationId,
@@ -255,10 +259,7 @@ export async function getGrantedClaudeBillingConnection(
  * `member` rows name a person and an organization together, and no current
  * owner names both.
  */
-function ownerFromColumns(columns: {
-  kilo_user_id: string | null;
-  organization_id: string | null;
-}): ClaudeBillingOwner | null {
+function ownerFromColumns(columns: ClaudeBillingOwnerColumns): ClaudeBillingOwner | null {
   if (columns.kilo_user_id && columns.organization_id) return null;
   if (columns.kilo_user_id) return { kind: 'personal', kiloUserId: columns.kilo_user_id };
   if (columns.organization_id) {
@@ -480,7 +481,7 @@ async function deletePersonalAnthropicByokKey(
 async function reassignPayerOwnerColumns(
   tx: DrizzleTransaction,
   payerConnectionId: string,
-  remaining: { kilo_user_id: string | null; organization_id: string | null }
+  remaining: ClaudeBillingOwnerColumns
 ): Promise<void> {
   const nextOwner = ownerFromColumns(remaining);
   if (nextOwner) {

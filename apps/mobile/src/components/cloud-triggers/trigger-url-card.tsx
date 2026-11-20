@@ -20,26 +20,30 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export function TriggerUrlCard({ url }: Readonly<{ url: string }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  // The copy control is a 48 dp target, so it sits beside the whole pair
-  // rather than on the value's line: a control inside that line would centre
-  // the URL in 48 dp and push it further from its label than the pairs below
-  // it. The label and the URL stay one column with the field's pair gap.
+  // The copy control is a 48 dp target. It floats over the URL's own box so its
+  // centre follows the URL block whatever the address wraps to, and it stays
+  // out of the column's flow so the pair keeps the field's label-to-value gap:
+  // a control on the value's line would centre the URL inside 48 dp and push it
+  // further from its label than the pairs below it. The URL reserves the
+  // control's width, so the address never runs under it.
   return (
-    <View className="flex-row items-center gap-2">
-      <View className="min-w-0 flex-1 gap-1.5">
-        <FormFieldLabel label={t('cloudAgent.triggers.webhookUrl')} />
-        <Text variant="mono" className="text-xs">
+    <View className="gap-1.5">
+      <FormFieldLabel label={t('cloudAgent.triggers.webhookUrl')} />
+      <View>
+        <Text variant="mono" className="pe-12 text-xs">
           {url}
         </Text>
+        <View className="absolute inset-y-0 end-0 justify-center">
+          <IconButton
+            accessibilityLabel={t('common.copyLink')}
+            onPress={() => {
+              void copyWebhookUrl(url);
+            }}
+          >
+            <Copy size={16} color={colors.mutedForeground} />
+          </IconButton>
+        </View>
       </View>
-      <IconButton
-        accessibilityLabel={t('common.copyLink')}
-        onPress={() => {
-          void copyWebhookUrl(url);
-        }}
-      >
-        <Copy size={16} color={colors.mutedForeground} />
-      </IconButton>
     </View>
   );
 }

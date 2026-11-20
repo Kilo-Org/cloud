@@ -1,5 +1,7 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { foldForSearch } from '@/i18n/fold-for-search';
+
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 /** The one model as `organizations.settings.listAvailableModels` answers it. */
@@ -300,5 +302,16 @@ export function matchesSearch(fields: readonly (string | undefined)[], query: st
   if (normalized.length === 0) {
     return true;
   }
-  return fields.some(field => field?.toLocaleLowerCase().includes(normalized) === true);
+  const folded = foldForSearch(query).trim();
+  return fields.some(field => {
+    if (field === undefined) {
+      return false;
+    }
+    if (field.toLocaleLowerCase().includes(normalized)) {
+      return true;
+    }
+    // Extra match, never a replacement: a row the locale-aware lowercase
+    // already found keeps matching, and folding adds "mistral" for "Mistrál".
+    return folded.length > 0 && foldForSearch(field).includes(folded);
+  });
 }

@@ -32,37 +32,9 @@ describe('scheduler initialization across dispatch ticks (production migrations 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-      const url = new URL(input instanceof Request ? input.url : input);
-      const headers = new Headers(init?.headers);
-      if (url.href === 'https://app.test/api/internal/bot-token') {
-        if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
-        expect(init?.method).toBe('POST');
-        expect(headers.get('authorization')).toBe(`Bearer ${'mint-test-secret'}`);
-        expect(JSON.parse(init.body)).toEqual({
-          userId: 'scheduler-user',
-          organizationId: 'scheduler-org',
-        });
-        return Response.json({
-          token: 'scheduler-test-token',
-          expiresAt: new Date(NOW + 60 * 60_000).toISOString(),
-        });
-      }
-      if (url.href === 'https://api.test/api/organizations/scheduler-org/models') {
-        expect(headers.get('authorization')).toBe(`Bearer ${'scheduler-test-token'}`);
-        expect(headers.get('X-KiloCode-OrganizationId')).toBe('scheduler-org');
-        return Response.json({
-          data: sqlite
-            .prepare('SELECT DISTINCT model FROM run_models')
-            .all()
-            .map(row => ({
-              id: row.model,
-              supported_parameters: ['tools'],
-            })),
-        });
-      }
-      throw new Error(`Unexpected fixture request: ${url.href}`);
-    });
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new Error('Scheduler initialization and dispatch make no network request.')
+    );
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
     setupDb = sqliteD1(sqlite);
@@ -82,9 +54,6 @@ describe('scheduler initialization across dispatch ticks (production migrations 
         },
       },
       BENCHMARK_SCHEDULER_CONFIG: '{}',
-      KILO_WEB_API_BASE_URL: 'https://app.test',
-      KILO_CLI_API_URL: 'https://api.test',
-      BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-test-secret' },
     } as unknown as Env;
   });
 
@@ -131,7 +100,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     insertRun(id, 'platform', 1, 3);
     await scheduleRunChunks(setupDb, {
       runId: id,
-      entries: [{ model: `${id}/model-0`, variant: null, providers: ['deepinfra'] }],
+      entries: [{ model: `${id}/model-0`, variant: null }],
       repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
@@ -172,7 +141,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     for (const id of ['settled', 'busy']) {
       await scheduleRunChunks(setupDb, {
         runId: id,
-        entries: [{ model: `${id}/model-0`, variant: null, providers: ['deepinfra'] }],
+        entries: [{ model: `${id}/model-0`, variant: null }],
         repetitions: 1,
         caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
         chunkSize: 1,
@@ -258,41 +227,6 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       expect(result.claims.some(claim => claim.runId === 'healthy')).toBe(true);
     }
   );
-
-  it('contains a temporary catalog failure while initializing and dispatching a sibling', async () => {
-    insertRun('retryable', 'platform', 1, 1);
-    insertRun('healthy', 'user', 1, 1);
-    sqlite
-      .prepare("UPDATE benchmark_runs SET benchmark_user_id = 'retry-user' WHERE id = 'retryable'")
-      .run();
-    const fetcher = vi.mocked(globalThis.fetch);
-    const base = fetcher.getMockImplementation();
-    if (!base) throw new Error('Catalog fixture was not installed.');
-    fetcher.mockImplementation(async (input, init) => {
-      const url = new URL(input instanceof Request ? input.url : input);
-      if (url.pathname === '/api/internal/bot-token' && typeof init?.body === 'string') {
-        const body: unknown = JSON.parse(init.body);
-        if (
-          typeof body === 'object' &&
-          body !== null &&
-          'userId' in body &&
-          body.userId === 'retry-user'
-        ) {
-          return new Response(null, { status: 503 });
-        }
-      }
-      return base(input, init);
-    });
-
-    const result = await tick();
-
-    expect(
-      sqlite.prepare("SELECT status FROM benchmark_runs WHERE id = 'retryable'").get()
-    ).toEqual({ status: 'running' });
-    expect(initialized('retryable')).toBe(false);
-    expect(initialized('healthy')).toBe(true);
-    expect(result.claims.some(claim => claim.runId === 'healthy')).toBe(true);
-  });
 
   it('schedules no entry of a run until every entry has reused its prior results', async () => {
     const models = Array.from(
@@ -474,7 +408,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     const caseIds = DECIDER_CASES.map(benchCase => benchCase.id);
     await scheduleRunChunks(setupDb, {
       runId: 'dead-lane',
-      entries: [dead, live].map(model => ({ model, variant: null, providers: ['deepinfra'] })),
+      entries: [dead, live].map(model => ({ model, variant: null })),
       repetitions: 1,
       caseIds,
       chunkSize: 1,

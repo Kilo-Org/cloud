@@ -87,6 +87,11 @@ falls back to the system value. Publishing reads effective values only.
   scores single requests, so session-economics and measurement-effort knobs have no measured
   basis for a daily recomputation. The Policy tab shows each value and the reason it is fixed,
   read-only. A stored config that still carries one keeps parsing, and its value is ignored.
+- Decider repetitions are fixed per router: Efficient measures every case three times, because
+  with a few dozen cases per route one repetition lets noise decide which candidates clear the
+  accuracy floor; Frontier measures once. Registry admission, run creation, profile currency,
+  publish and client eval all read the same router value, and a profile is current only at
+  its router's count.
 
 An omitted Frontier pool uses its router-specific alias preset.
 The worker benchmarks that pool before it publishes a complete Frontier table.
@@ -109,28 +114,29 @@ One-case chunks leave room for warmup, the existing empty-output retry, and grad
 the queue invocation deadline; prompts, variants, CLI timeouts, repetitions, cost accounting,
 and CLI-reported latency remain unchanged.
 
-`BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
-`modelConcurrency: 12`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
-Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
-`shares` defaults to
+`BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250` and
+`modelConcurrency: 12`. An optional `modelLimits` object overrides the model cap by exact
+model id. `shares` defaults to
 `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1,"frontier/user":1}`.
 The least-occupied weighted share receives the next eligible claim; unused shares are
 borrowed without reservations or preempting active work. Model caps span variants and runs.
-Provider identities come from the catalog's optional `inference_provider_ids`, which uses
-the existing gateway provider index. Every possible provider is conservatively counted;
-missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
-treated as serving providers. Each router has an owner queue with its own share.
+Only slots and model caps bound a claim. There is no per-provider limit: the gateway sends
+each request to one aggregator (Vercel AI Gateway, else OpenRouter), which picks one
+upstream, so the catalog's `inference_provider_ids` list says nothing about which provider a
+chunk loads. Each router has an owner queue with its own share.
 
-Admins can override `slots`, `modelConcurrency`, `providerConcurrency`, and
-`unknownProviderConcurrency` at runtime, without a deploy, from the Scheduler card on the
-admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`. Each limit resolves
-admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default. Overrides live in the
-single-row `scheduler_settings` D1 table; each dispatch pass reads it once by primary key, so
-a change applies on the next completion or one-minute tick. The PUT body replaces the whole
-override set: a missing or `null` limit clears that override. Values must be integers from 1
-to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown key, is a 400.
-`modelLimits` and `providerLimits` still come only from the env config and take precedence
-over `modelConcurrency` and `providerConcurrency` for their exact identities.
+Admins can override `slots` and `modelConcurrency` at runtime, without a deploy, from the
+Scheduler card on the admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`.
+Each limit resolves admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default.
+Overrides live in the single-row `scheduler_settings` D1 table; each dispatch pass reads it
+once by primary key, so a change applies on the next completion or one-minute tick. The PUT
+body replaces the whole override set: a missing or `null` limit clears that override. Values
+must be integers from 1 to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown
+key, is a 400. Until the web release after the provider-limit removal is promoted (ADR 0003,
+invariant 7), the PUT also accepts and ignores the retired `providerConcurrency` and
+`unknownProviderConcurrency`, and the response serves both as the container budget.
+`modelLimits` still comes only from the env config and takes precedence over
+`modelConcurrency` for its exact models.
 `GET /admin/scheduler-config` returns each limit's `effective` value, its `source`
 (`admin`, `env`, or `default`), the `override`, and the `fallback` used without one.
 
@@ -166,8 +172,9 @@ held returns immediately, because the holding pass has already read that wake's
 completions. The per-minute tick is the backstop if a lease expires without a release, and
 the `(status, run_id, model, variant, repetition, chunk)` index bounds lane reads.
 
-A provider or model throttle records a cooldown deadline rather than stamping every
-pending row, so one throttle event costs a bounded write instead of rewriting the backlog.
+A throttle cools only its own model: other models stay claimable, because a throttle names
+no upstream. The cooldown is a deadline row rather than a stamp on every pending row, so one
+throttle event costs a bounded write instead of rewriting the backlog.
 
 Materialization writes chunks in bounded batches and checks the run's status once per batch
 rather than per row. A chunk is inserted already completed when all of its cases have
@@ -237,7 +244,7 @@ its first event gets the same single retry as an empty completion; a timeout, a 
 events, or an invalid-request rejection stays a measured failure.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
-It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
+It keeps its slot, so the wait cannot oversubscribe the model or slot caps, and its
 claim is redelivered every 30 seconds to recheck. The wait ends when the output arrives,
 which the chunk then grades, or once the decider case timeout (180 seconds) plus the
 container's delivery window (7 minutes) has passed since the case's latest paid call started
@@ -982,7 +989,7 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 | Endpoint | Purpose |
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them. `PUT` saves, then syncs the platform registry and republishes the routing table before responding. A failed step does not undo the save: the response is 200 with `warnings` (`registry_sync_failed`, which skips the publish, or `routing_table_publish_failed`), each naming the retry (the daily `0 5 * * *` platform sync, or saving again) |
-| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
+| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots` and `modelConcurrency` (the retired provider limits are accepted and ignored for one web release) |
 | `GET /admin/runs` | List runs without their summaries. Read-only; the per-minute cron sweeps stale `running` runs. `hasRunningRun` reports whether any run of the router is running, whatever the `kind`/`purpose` filter. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
 | `GET /admin/runs/:runId/summaries` | One run's model summaries; 404 when the run does not exist or belongs to another router (classifier runs are shared) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`); `202` once a run row exists, with initialization left to the dispatcher |
@@ -1175,7 +1182,7 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 
 - An upload for another engine identity returns `stale_engine_identity` (409); the CLI
   requests a new plan. Unknown cases, variants outside the entry, and repetitions beyond
-  the fixed decider repetitions constant (1) return `invalid_request`.
+  the base router's fixed decider repetitions return `invalid_request`.
 - Grading matches the platform: a nonzero exit, a timeout, or empty output scores 0;
   otherwise the case's mechanical check or the System One judge grades it.
 - Judged grading cost is billed to `billing.userId` and `billing.organizationId` as usage

@@ -3295,6 +3295,9 @@
       "partialPostedStale_two": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "partialPostedStale_other": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "submitCountOfTotal": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_one": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_two": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_other": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
       "submitReview": "שליחת סקירה",
       "pendingComment_two": "תגובות ממתינות",
       "blockedRequestChanges": "הוסף סיכום או לפחות תגובה אחת כדי לבקש שינויים.",
@@ -3507,7 +3510,7 @@
       "planStatusLapsed": " · הסתיים",
       "planEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה.",
       "manageBilling": "ניהול חיובים",
-      "renamePlaceholder": "שם הארגון",
+      "renamePlaceholder": "יש להזין שם לארגון",
       "renameTitle": "שינוי שם הארגון"
     },
     "inviteMember": {

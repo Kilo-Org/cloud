@@ -49,14 +49,8 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
 export const BENCHMARK_CONTAINER_BUDGET = 250;
 
 /** Scheduler limits an admin can override at runtime, without a deploy. */
-export const BENCHMARK_SCHEDULER_SETTING_KEYS = [
-  'slots',
-  'modelConcurrency',
-  'providerConcurrency',
-  'unknownProviderConcurrency',
-] as const;
-export const BenchmarkSchedulerSettingKeySchema = z.enum(BENCHMARK_SCHEDULER_SETTING_KEYS);
-export type BenchmarkSchedulerSettingKey = z.infer<typeof BenchmarkSchedulerSettingKeySchema>;
+export const BENCHMARK_SCHEDULER_SETTING_KEYS = ['slots', 'modelConcurrency'] as const;
+export type BenchmarkSchedulerSettingKey = (typeof BENCHMARK_SCHEDULER_SETTING_KEYS)[number];
 
 export const BenchmarkSchedulerLimitSchema = z
   .number()
@@ -93,8 +87,15 @@ export const BenchmarkSchedulerSettingSchema = z.object({
 });
 export type BenchmarkSchedulerSetting = z.infer<typeof BenchmarkSchedulerSettingSchema>;
 
+/**
+ * Unknown setting keys are stripped, so a client parses a worker that still serves
+ * a retired setting.
+ */
 export const BenchmarkSchedulerConfigResponseSchema = z.object({
-  settings: z.record(BenchmarkSchedulerSettingKeySchema, BenchmarkSchedulerSettingSchema),
+  settings: z.object({
+    slots: BenchmarkSchedulerSettingSchema,
+    modelConcurrency: BenchmarkSchedulerSettingSchema,
+  } satisfies Record<BenchmarkSchedulerSettingKey, typeof BenchmarkSchedulerSettingSchema>),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });

@@ -965,6 +965,8 @@
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
       "submitReview": "Send gennemgang",
       "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er sendt. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er sendt. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Omdøb organisation",
-      "renamePlaceholder": "Organisationens navn",
+      "renamePlaceholder": "Angiv et navn til organisationen",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

@@ -296,6 +296,17 @@ describe('ProviderKeyProviderPickerScreen', () => {
     expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
   });
 
+  it('matches an accented provider name from its unaccented spelling', async () => {
+    state.providers = [{ id: 'acme-llm', name: 'Café LLM' }];
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('cafe');
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['Café LLM']);
+  });
+
   it('matches an id whose capital I was typed in a Turkish locale', async () => {
     state.providers = [{ id: 'vercel-ai-gateway', name: 'Vercel AI Gateway' }];
     await i18n.changeLanguage('tr');

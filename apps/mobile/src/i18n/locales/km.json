@@ -965,6 +965,8 @@
       "pendingComment": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "pendingComment_other": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "submitCountOfTotal": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
+      "submitCountOfTotal_one": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
+      "submitCountOfTotal_other": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
       "submitReview": "ដាក់ស្នើលទ្ធផលពិនិត្យ",
       "partialPostedFresh": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
       "partialPostedFresh_one": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "ប្តូរឈ្មោះអង្គការ",
-      "renamePlaceholder": "ឈ្មោះអង្គការ",
+      "renamePlaceholder": "បញ្ចូលឈ្មោះអង្គការ",
       "balance": "សមតុល្យ",
       "plan": "គម្រោង",
       "planTeams": "Teams",

@@ -965,6 +965,8 @@
       "pendingComment": "tsokace-tsokacen da ke jiran aikawa",
       "pendingComment_other": "tsokace-tsokacen da ke jiran aikawa",
       "submitCountOfTotal": "Aika tsokaci {{displayFreshCount}} cikin {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Aika tsokaci {{displayFreshCount}} cikin {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Aika tsokaci {{displayFreshCount}} cikin {{displayTotalCount}}",
       "submitReview": "Aika bita",
       "partialPostedFresh": "An wallafa tsokaci {{displayFreshCount}}. ",
       "partialPostedFresh_one": "An wallafa tsokaci {{displayFreshCount}}. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Canza sunan ƙungiya",
-      "renamePlaceholder": "Sunan ƙungiya",
+      "renamePlaceholder": "Shigar da sunan ƙungiya",
       "balance": "Ragowar kuɗi",
       "plan": "Tsari",
       "planTeams": "Teams",

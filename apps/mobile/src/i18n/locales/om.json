@@ -965,6 +965,8 @@
       "pendingComment": "yaadota erguu eeggatan",
       "pendingComment_other": "yaadota erguu eeggatan",
       "submitCountOfTotal": "Yaadota {{displayTotalCount}} keessaa {{displayFreshCount}} dhiheessi",
+      "submitCountOfTotal_one": "Yaadota {{displayTotalCount}} keessaa {{displayFreshCount}} dhiheessi",
+      "submitCountOfTotal_other": "Yaadota {{displayTotalCount}} keessaa {{displayFreshCount}} dhiheessi",
       "submitReview": "Sakatta'a ergi",
       "partialPostedFresh": "Yaadonni {{displayFreshCount}} maxxanfamaniiru. ",
       "partialPostedFresh_one": "Yaadonni {{displayFreshCount}} maxxanfamaniiru. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Maqaa dhaabbataa jijjiiri",
-      "renamePlaceholder": "Maqaa dhaabbataa",
+      "renamePlaceholder": "Maqaa dhaabbataa galchi",
       "balance": "Haftee",
       "plan": "Karoora",
       "planTeams": "Teams",

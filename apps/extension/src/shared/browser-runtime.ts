@@ -2884,8 +2884,16 @@ export const createBrowserRuntime = ({
       let dispatched = false;
       /** The tab this call opened for its step, if any, so a refusal after the open can close it again. */
       let stepOpenedTab: number | null = null;
-      /** The file the browser announced during this call, if it announced one: the item the settle waits for. */
+      /**
+       * The file the browser announced during this call, if it announced one: the item the settle waits for.
+       * Written by the sign watch below and read through {@link signedDownload}: the outer flow sees no
+       * assignment of its own, and would otherwise narrow the value to `null`.
+       */
       let signedFile: { readonly filename: string; readonly url: string | undefined } | null = null;
+      const signedDownload = (): {
+        readonly filename: string;
+        readonly url: string | undefined;
+      } | null => signedFile;
       /** A load the browser answered as a file, when this call's step was a navigation. */
       let navigatedToFile = false;
       /** How the hold's settle ended, when the hold decided this call's downloads. */
@@ -3588,7 +3596,7 @@ export const createBrowserRuntime = ({
             settleState =
               (await downloadHold?.settle(sessionKey, {
                 graceMs: DOWNLOAD_START_GRACE_MS,
-                sign: () => signedFile !== null || navigatedToFile,
+                sign: () => signedDownload() !== null || navigatedToFile,
                 since: callStartedAt,
                 timeoutMs: DOWNLOAD_ITEM_WAIT_MS,
               })) ?? null;
@@ -3684,13 +3692,15 @@ export const createBrowserRuntime = ({
           // A download started and nothing was decided inside the bound: the file may exist, and the model is told
           // So instead of receiving "nothing happened" for a step that may have written one.
           if (settleState === 'waiting_for_item' && ownLate.length === 0) {
+            const signed = signedDownload();
+
             return downloadRefusal(
               {
-                filename: signedFile?.filename ?? 'the downloaded file',
+                filename: signed?.filename ?? 'the downloaded file',
                 kept: true,
                 step: downloadStep,
                 tabId: runTabId,
-                ...(signedFile?.url === undefined ? {} : { url: signedFile.url }),
+                url: signed?.url,
               },
               { keptFiles: [], origin: preflight?.ok ? preflight.origin : '' },
               runTabId

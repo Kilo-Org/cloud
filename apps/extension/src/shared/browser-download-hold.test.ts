@@ -710,7 +710,7 @@ describe('a sign-gated settle', () => {
 
   it('waits for the item a sign announced, and the call decides the file it names', async () => {
     const downloads = makeDownloads();
-    const { hold, reports } = makeHold(downloads);
+    const { hold } = makeHold(downloads);
     let signed = false;
 
     hold.tab(agentTab());
@@ -732,7 +732,7 @@ describe('a sign-gated settle', () => {
     });
     await vi.advanceTimersByTimeAsync(20);
 
-    expect(await settled).toBe('decided');
+    await expect(settled).resolves.toBe('decided');
     // The item's own decision is the block path every other case covers; here the point is that the call waited
     // Past the short grace for the item its sign announced.
     expect(signed).toBe(true);
@@ -753,7 +753,7 @@ describe('a sign-gated settle', () => {
 
     await vi.advanceTimersByTimeAsync(60);
 
-    expect(await settled).toBe('no_sign');
+    await expect(settled).resolves.toBe('no_sign');
   });
 
   it('answers a signed call whose item never arrives as waiting, never as decided', async () => {
@@ -772,7 +772,7 @@ describe('a sign-gated settle', () => {
     await vi.advanceTimersByTimeAsync(1600);
 
     // Nothing was decided, and the hold invented no report: the caller decides what the file may have become.
-    expect(await settled).toBe('waiting_for_item');
+    await expect(settled).resolves.toBe('waiting_for_item');
     expect(reports).toStrictEqual([]);
   });
 });

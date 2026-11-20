@@ -11,6 +11,7 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import { kiloclaw_subscriptions, kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
 import { type KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import {
   getClawPlanForStripePriceId,
@@ -640,6 +641,7 @@ export async function ensureAutoIntroSchedule(
   stripeSubscriptionId: string,
   _userId?: string
 ): Promise<void> {
+  if (!isKiloClawPaidHostingAvailable()) return;
   const liveSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
   const priceId = liveSub.items.data[0]?.price?.id;
@@ -1518,7 +1520,11 @@ export async function handleKiloClawSubscriptionDeleted(params: {
     // is insufficient — subscription.deleted also fires for dunning/suspended rows
     // that Stripe auto-cancels, and restoring active status there would grant a
     // free grace window. See Standalone-to-Credit Conversion rule 4.
-    if (targetRow.pending_conversion && !lacksFinalCommitContinuationConsent) {
+    if (
+      isKiloClawPaidHostingAvailable() &&
+      targetRow.pending_conversion &&
+      !lacksFinalCommitContinuationConsent
+    ) {
       // Conversion path: clear Stripe subscription ID, set payment_source to
       // credits, and set credit_renewal_at to the existing period end so the
       // credit renewal sweep picks up the next renewal.

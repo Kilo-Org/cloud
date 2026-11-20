@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '@kilocode/db';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
+import type * as PaidHosting from '@kilocode/db/kiloclaw-paid-hosting';
+
+vi.mock('@kilocode/db/kiloclaw-paid-hosting', () => ({
+  isKiloClawPaidHostingAvailable: vi.fn(() => true),
+}));
 
 const {
   mockFindLatestPreCutoffUserCommitSwitchQualification,
@@ -5195,93 +5201,106 @@ describe('credit renewal sweep affiliate tracking', () => {
     }
   });
 
-  it('cancels destroyed pending pure-credit rows without charging, advancing, or rewriting price version', async () => {
-    const renewalAt = '2026-04-09T10:00:00.000Z';
-    const { db, inserts, updates, txInserts, txUpdates } = createMockDb(
-      [
+  it.each([true, false])(
+    'ends credit subscriptions without charging or advancing (hosting available: %s)',
+    async hostingAvailable => {
+      const renewalAt = '2026-04-09T10:00:00.000Z';
+      if (!hostingAvailable) {
+        const actual = await vi.importActual<typeof PaidHosting>(
+          '@kilocode/db/kiloclaw-paid-hosting'
+        );
+        vi.mocked(isKiloClawPaidHostingAvailable).mockImplementationOnce(
+          actual.isKiloClawPaidHostingAvailable
+        );
+      }
+      const { db, inserts, updates, txInserts, txUpdates } = createMockDb(
         [
-          {
-            user_id: 'cancel-user',
-            email: 'cancel-user@example.com',
-            instance_id: 'cancel-instance',
-            id: 'cancel-sub',
-            instance_row_id: 'cancel-instance',
-            organization_id: null,
-            instance_destroyed_at: '2026-04-08T10:00:00.000Z',
-            plan: 'standard',
-            status: 'active',
-            kiloclaw_price_version: '2026-05-10',
-            credit_renewal_at: renewalAt,
-            current_period_end: renewalAt,
-            cancel_at_period_end: true,
-            scheduled_plan: null,
-            commit_ends_at: null,
-            past_due_since: null,
-            suspended_at: null,
-            auto_resume_attempt_count: 0,
-            auto_top_up_triggered_for_period: null,
-            total_microdollars_acquired: 100_000_000,
-            microdollars_used: 0,
-            auto_top_up_enabled: false,
-            kilo_pass_threshold: null,
-            next_credit_expiration_at: null,
-            user_updated_at: '2026-04-09T09:00:00.000Z',
-          },
-        ],
-      ],
-      {
-        updateReturningRows: [
           [
             {
+              user_id: 'cancel-user',
+              email: 'cancel-user@example.com',
+              instance_id: 'cancel-instance',
               id: 'cancel-sub',
-              status: 'canceled',
-              cancel_at_period_end: false,
+              instance_row_id: 'cancel-instance',
+              organization_id: null,
+              instance_destroyed_at: hostingAvailable ? '2026-04-08T10:00:00.000Z' : null,
+              plan: 'standard',
+              status: 'active',
               kiloclaw_price_version: '2026-05-10',
-              current_period_end: renewalAt,
               credit_renewal_at: renewalAt,
+              current_period_end: renewalAt,
+              cancel_at_period_end: hostingAvailable,
+              scheduled_plan: null,
+              commit_ends_at: null,
+              past_due_since: null,
+              suspended_at: null,
+              auto_resume_attempt_count: 0,
+              auto_top_up_triggered_for_period: null,
+              total_microdollars_acquired: 100_000_000,
+              microdollars_used: 0,
+              auto_top_up_enabled: false,
+              kilo_pass_threshold: null,
+              next_credit_expiration_at: null,
+              user_updated_at: '2026-04-09T09:00:00.000Z',
             },
           ],
         ],
-      }
-    );
-    mockGetWorkerDb.mockReturnValue(db);
-    const fetch = vi.fn();
-    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+        {
+          updateReturningRows: [
+            [
+              {
+                id: 'cancel-sub',
+                status: 'canceled',
+                cancel_at_period_end: false,
+                kiloclaw_price_version: '2026-05-10',
+                current_period_end: renewalAt,
+                credit_renewal_at: renewalAt,
+              },
+            ],
+          ],
+        }
+      );
+      mockGetWorkerDb.mockReturnValue(db);
+      const fetch = vi.fn(async () => new Response('{}'));
+      vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
 
-    const summary = await runCreditRenewalSweepForTest(
-      db,
-      createEnv(vi.fn()),
-      'd4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4'
-    );
+      const summary = await runCreditRenewalSweepForTest(
+        db,
+        createEnv(vi.fn()),
+        'd4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4'
+      );
 
-    expect(summary.credit_renewals_canceled).toBe(1);
-    expect(summary.credit_renewals).toBe(0);
-    expect(summary.errors).toBe(0);
-    expect(fetch).not.toHaveBeenCalled();
-    expect(txInserts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          subscription_id: 'cancel-sub',
-          action: 'canceled',
-          reason: 'credit_renewal_cancel_at_period_end',
-        }),
-      ])
-    );
-    expect(txInserts.some(insert => typeof insert.credit_category === 'string')).toBe(false);
-    expect(txUpdates).toEqual([
-      {
-        status: 'canceled',
-        cancel_at_period_end: false,
-        auto_top_up_triggered_for_period: null,
-      },
-    ]);
-    expect(txUpdates[0]).not.toHaveProperty('kiloclaw_price_version');
-    expect(txUpdates[0]).not.toHaveProperty('current_period_start');
-    expect(txUpdates[0]).not.toHaveProperty('current_period_end');
-    expect(txUpdates[0]).not.toHaveProperty('credit_renewal_at');
-    expect(updates).toHaveLength(0);
-    expect(inserts).toHaveLength(0);
-  });
+      expect(summary.credit_renewals_canceled).toBe(1);
+      expect(summary.credit_renewals).toBe(0);
+      expect(summary.errors).toBe(0);
+      if (hostingAvailable) expect(fetch).not.toHaveBeenCalled();
+      expect(txInserts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            subscription_id: 'cancel-sub',
+            action: 'canceled',
+            reason: hostingAvailable
+              ? 'credit_renewal_cancel_at_period_end'
+              : 'credit_renewal_hosting_ended',
+          }),
+        ])
+      );
+      expect(txInserts.some(insert => typeof insert.credit_category === 'string')).toBe(false);
+      expect(txUpdates).toEqual([
+        {
+          status: 'canceled',
+          cancel_at_period_end: false,
+          auto_top_up_triggered_for_period: null,
+        },
+      ]);
+      expect(txUpdates[0]).not.toHaveProperty('kiloclaw_price_version');
+      expect(txUpdates[0]).not.toHaveProperty('current_period_start');
+      expect(txUpdates[0]).not.toHaveProperty('current_period_end');
+      expect(txUpdates[0]).not.toHaveProperty('credit_renewal_at');
+      expect(updates).toHaveLength(0);
+      expect(inserts).toHaveLength(0);
+    }
+  );
 
   it('recovers past-due pure-credit renewals at the versioned cost and clears retry email state', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';

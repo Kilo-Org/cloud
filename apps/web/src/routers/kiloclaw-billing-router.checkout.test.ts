@@ -26,12 +26,12 @@ import { createOrganization } from '@kilocode/web-shared/lib/organizations/organ
 import type Stripe from 'stripe';
 import { KiloPassTier, KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
-import { isKiloClawPaidHostingAvailable } from '@/lib/kiloclaw/paid-hosting';
-import type * as PaidHosting from '@/lib/kiloclaw/paid-hosting';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
+import type * as PaidHosting from '@kilocode/db/kiloclaw-paid-hosting';
 
 it('blocks all personal KiloClaw paid hosting actions at end of life', async () => {
   const { isKiloClawPaidHostingAvailable: actual } = jest.requireActual<typeof PaidHosting>(
-    '@/lib/kiloclaw/paid-hosting'
+    '@kilocode/db/kiloclaw-paid-hosting'
   );
   const { id: instanceId } = await createKiloclawInstance(user.id);
   const { kiloclaw } = await createCallerForUser(user.id);
@@ -51,8 +51,6 @@ it('blocks all personal KiloClaw paid hosting actions at end of life', async () 
     () => kiloclaw.continueCommitAsStandard({ instanceId }),
     () => kiloclaw.switchPlan({ toPlan: 'standard' }),
     () => kiloclaw.switchPlanAtInstance({ instanceId, toPlan: 'standard' }),
-    () => kiloclaw.cancelPlanSwitch(),
-    () => kiloclaw.cancelPlanSwitchAtInstance({ instanceId }),
   ];
   await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(actual, async () => {
     for (const call of routes) {

@@ -3,7 +3,7 @@ import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.se
 
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
-import { isKiloClawPaidHostingAvailable } from '@/lib/kiloclaw/paid-hosting';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
 import {
   baseProcedure,
   createTRPCRouter,
@@ -3009,6 +3009,8 @@ async function cancelKiloclawPlanSwitchForRow(params: {
     }
   }
 
+  assertKiloClawPaidHostingAvailable();
+
   if (subscription.stripe_schedule_id) {
     const released = await releaseScheduleIfActive(subscription.stripe_schedule_id);
     if (!released) {
@@ -3071,13 +3073,17 @@ async function cancelKiloclawPlanSwitchForRow(params: {
   });
 }
 
-const paidHostingProcedure = baseProcedure.use(({ next }) => {
+function assertKiloClawPaidHostingAvailable() {
   if (!isKiloClawPaidHostingAvailable()) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'KiloClaw no longer accepts new hosting purchases or renewals.',
     });
   }
+}
+
+const paidHostingProcedure = baseProcedure.use(({ next }) => {
+  assertKiloClawPaidHostingAvailable();
   return next();
 });
 
@@ -4918,7 +4924,7 @@ export const kiloclawRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  cancelPlanSwitchAtInstance: paidHostingProcedure
+  cancelPlanSwitchAtInstance: baseProcedure
     .input(KiloclawInstanceInputSchema)
     .output(KiloclawMutationResultSchema)
     .mutation(async ({ ctx, input }) => {
@@ -5857,7 +5863,7 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
-  cancelPlanSwitch: paidHostingProcedure.mutation(async ({ ctx }) => {
+  cancelPlanSwitch: baseProcedure.mutation(async ({ ctx }) => {
     const { subscription } = await getDisplayedPersonalKiloclawSubscription({
       userId: ctx.user.id,
     });

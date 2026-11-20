@@ -140,6 +140,7 @@
     "keepRunning": "Laat voortgaan",
     "newSession": "Nuwe sessie",
     "noModelsAvailable": "Geen modelle beskikbaar nie",
+    "modelRetires": "Tree af op {{date}}",
     "notFound": "Die item is nie gevind nie.",
     "online": "Aanlyn",
     "open": "Maak {{name}} oop",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
     "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
     "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar.",
-    "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer."
+    "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer.",
+    "viewOnGitHub": "Bekyk PR op GitHub"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
     "changelogAreas": {
       "signIn": "Aanmelding",
-      "profileOrganizations": "Profiel en organisasies"
+      "profileOrganizations": "Profiel & organisasies"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Kon nie meer kommentare laai nie.",
       "retryLoadingMore": "Probeer weer om meer kommentare te laai",
       "loadMoreComments": "Laai meer kommentare",
+      "conversationTruncated": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
+      "conversationTruncated_one": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
+      "conversationTruncated_other": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
       "addReaction": "Voeg reaksie by",
       "reactionPill": "{{emoji}}-reaksie, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksie",
@@ -881,7 +886,6 @@
       "noAccess": "Jy het nie toegang tot kontroles vir hierdie bewaarplek nie.",
       "couldNotLoad": "Kon nie die kontroles laai nie.",
       "retryChecks": "Probeer die kontroles weer",
-      "viewOnGitHub": "Bekyk PR op GitHub",
       "noChecksReported": "Geen kontroles gerapporteer nie",
       "passed": "{{displayCount}} geslaag",
       "passed_one": "{{displayCount}} geslaag",
@@ -965,6 +969,8 @@
       "pendingComment": "hangende kommentare",
       "pendingComment_other": "hangende kommentare",
       "submitCountOfTotal": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
+      "submitCountOfTotal_one": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
+      "submitCountOfTotal_other": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
       "submitReview": "Dien hersiening in",
       "partialPostedFresh": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
@@ -1389,7 +1395,8 @@
     "followReviewMd": "Volg REVIEW.md",
     "followReviewMdSubtitle": "Volg die REVIEW.md-instruksielêer in elke bewaarplek",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel."
+      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
+      "notConnectedReadOnlyPlan": "Die organisasie se proeftydperk het geëindig, so 'n eienaar moet die fakturering by kilo.ai opdateer."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "Hernoem organisasie",
-      "renamePlaceholder": "Organisasienaam",
+      "renamePlaceholder": "Voer 'n organisasienaam in",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

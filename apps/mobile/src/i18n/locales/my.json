@@ -140,6 +140,7 @@
     "keepRunning": "ဆက်လက်လုပ်ဆောင်ပါ",
     "newSession": "ဆက်ရှင်အသစ်",
     "noModelsAvailable": "အသုံးပြုနိုင်သော မော်ဒယ် မရှိပါ",
+    "modelRetires": "{{date}} တွင် ရုပ်သိမ်းမည်",
     "notFound": "မတွေ့ရပါ။",
     "online": "အွန်လိုင်း",
     "open": "{{name}} ကို ဖွင့်ပါ",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။ အဖွဲ့အစည်း ပိုင်ရှင်သည် kilo.ai တွင် ငွေတောင်းခံမှုကို အပ်ဒိတ်လုပ်ပြီးနောက် ထပ်မံကြိုးစားနိုင်ပါသည်။",
     "privateRepositoryA11y": "{{name}}, သီးသန့် ကုဒ်သိုလှောင်ရာ",
     "legalDocumentEnglishOnly": "ဤစာရွက်စာတမ်းသည် အင်္ဂလိပ်ဘာသာဖြင့်သာ ရရှိနိုင်ပါသည်။",
-    "organizationTrialEndedBilling": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။ သင်သည် ငွေတောင်းခံမှုကို အပ်ဒိတ်လုပ်ပြီးနောက် ထပ်မံကြိုးစားနိုင်ပါသည်။"
+    "organizationTrialEndedBilling": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။ သင်သည် ငွေတောင်းခံမှုကို အပ်ဒိတ်လုပ်ပြီးနောက် ထပ်မံကြိုးစားနိုင်ပါသည်။",
+    "viewOnGitHub": "PR ကို GitHub တွင် ကြည့်ပါ"
   },
   "language": {
     "restarting": "ရွေးထားသော ဘာသာစကားကို သုံးရန် ပြန်စတင်နေသည်",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "အက်ပ်တစ်ခုလုံးတွင် ပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ။",
     "changelogAreas": {
       "signIn": "အကောင့်ဝင်ခြင်း",
-      "profileOrganizations": "ပရိုဖိုင်နှင့် အဖွဲ့အစည်းများ"
+      "profileOrganizations": "ပရိုဖိုင် ရော အဖွဲ့အစည်းများ ရော"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "နောက်ထပ်မှတ်ချက်များကို ရယူ၍မရပါ။",
       "retryLoadingMore": "နောက်ထပ်မှတ်ချက်များကို ပြန်ရယူပါ",
       "loadMoreComments": "နောက်ထပ်မှတ်ချက်များကို ရယူပါ",
+      "conversationTruncated": "မှတ်ချက် ပထမ {{displayCount}} ခုကိုသာ ပြသထားပါသည်။",
+      "conversationTruncated_one": "မှတ်ချက် ပထမ {{displayCount}} ခုကိုသာ ပြသထားပါသည်။",
+      "conversationTruncated_other": "မှတ်ချက် ပထမ {{displayCount}} ခုကိုသာ ပြသထားပါသည်။",
       "addReaction": "တုံ့ပြန်မှုထည့်ပါ",
       "reactionPill": "{{emoji}} တုံ့ပြန်မှု၊ {{countLabel}} {{displayCount}} ခု",
       "reaction_one": "တုံ့ပြန်မှု",
@@ -881,7 +886,6 @@
       "noAccess": "ဒီကုဒ်သိုလှောင်ရာ၏ စစ်ဆေးမှုများကို ကြည့်ရှုခွင့် မရှိပါ။",
       "couldNotLoad": "စစ်ဆေးမှုများကို ရယူ၍မရပါ။",
       "retryChecks": "စစ်ဆေးမှုများကို ပြန်ရယူပါ",
-      "viewOnGitHub": "PR ကို GitHub တွင် ကြည့်ပါ",
       "noChecksReported": "စစ်ဆေးမှုများ မတင်ပြရသေးပါ",
       "passed": "{{displayCount}} ခု အောင်မြင်",
       "passed_one": "{{displayCount}} ခု အောင်မြင်",
@@ -936,9 +940,9 @@
       "checkFailedTitleGitLab": "GitLab ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "checkFailedTitleBitbucket": "Bitbucket ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "providerCheckFailedMessage": "ဝန်ဆောင်မှုပေးသူထံ ချိတ်ဆက်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
-      "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
-      "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ခြင်း",
-      "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ခြင်း",
+      "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ပါ",
+      "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ပါ",
+      "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ပါ",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။",
       "gitlabDescription": "မိုဘိုင်းတွင် ပေါင်းစပ်တောင်းဆိုချက် များကို သုံးသပ်ပါ",
       "gitlabInstanceMismatchTitle": "GitLab ချိတ်ဆက်မှုသည် အခြား instance တစ်ခုအတွက် ဖြစ်သည်",
@@ -965,6 +969,8 @@
       "pendingComment": "မတင်သွင်းရသေးသော မှတ်ချက်",
       "pendingComment_other": "မတင်သွင်းရသေးသော မှတ်ချက်",
       "submitCountOfTotal": "မှတ်ချက် {{displayTotalCount}} ခုအနက် {{displayFreshCount}} ခုကို တင်ပါ",
+      "submitCountOfTotal_one": "မှတ်ချက် {{displayTotalCount}} ခုအနက် {{displayFreshCount}} ခုကို တင်ပါ",
+      "submitCountOfTotal_other": "မှတ်ချက် {{displayTotalCount}} ခုအနက် {{displayFreshCount}} ခုကို တင်ပါ",
       "submitReview": "စစ်ဆေးမှုကို တင်သွင်းပါ",
       "partialPostedFresh": "မှတ်ချက် {{displayFreshCount}} ခု တင်ပြီးပါပြီ။ ",
       "partialPostedFresh_one": "မှတ်ချက် {{displayFreshCount}} ခု တင်ပြီးပါပြီ။ ",
@@ -1389,7 +1395,8 @@
     "followReviewMd": "REVIEW.md လိုက်နာရန်",
     "followReviewMdSubtitle": "ကုဒ်သိုလှောင်ရာတစ်ခုချင်းရှိ REVIEW.md ဖိုင်၏ ညွှန်ကြားချက်များကို လိုက်နာရန်",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ကို ချိတ်ဆက်မထားပါ။ အဖွဲ့အစည်း ပိုင်ရှင်များ၊ စီမံခန့်ခွဲသူများနှင့် ငွေတောင်းခံမှုမန်နေဂျာများသာ ချိတ်ဆက်နိုင်သည်။"
+      "notConnectedReadOnly": "Bitbucket ကို ချိတ်ဆက်မထားပါ။ အဖွဲ့အစည်း ပိုင်ရှင်များ၊ စီမံခန့်ခွဲသူများနှင့် ငွေတောင်းခံမှုမန်နေဂျာများသာ ချိတ်ဆက်နိုင်သည်။",
+      "notConnectedReadOnlyPlan": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီဖြစ်သောကြောင့် ပိုင်ရှင်သည် kilo.ai တွင် ငွေတောင်းခံမှုကို အပ်ဒိတ်လုပ်ရမည်။"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}၏ Bitbucket ချိတ်ဆက်မှုကို ကွန်ပျူတာမှတစ်ဆင့် ဝဘ်ပေါ်တွင် စီမံခန့်ခွဲရပါသည်။",
@@ -1841,7 +1848,7 @@
       "couldNotLoadMore": "နောက်ထပ် တွေ့ရှိချက်များကို ရယူ၍ မရပါ။",
       "noMatchesTitle": "စစ်ထုတ်မှုများနှင့် ကိုက်ညီသော တွေ့ရှိချက် မရှိပါ",
       "noMatchesDescription": "ရွေးထားသော စစ်ထုတ်မှုများကို ပြောင်းကြည့်ပါ သို့မဟုတ် ရှင်းလင်းကြည့်ပါ။",
-      "emptyTitle": "မဖြေရှင်းရသေးသော တွေ့ရှိချက် မရှိပါ",
+      "emptyTitle": "ဖွင့်ထားသော တွေ့ရှိချက် မရှိပါ",
       "emptyDescription": "ယခုအချိန်တွင် ကိုင်တွယ်ရန် လိုအပ်သော မဖြေရှင်းရသေးသည့် တွေ့ရှိချက် မရှိပါ။"
     },
     "findingRow": {
@@ -1983,7 +1990,7 @@
       "failedDescription": "လုံခြုံရေးအေးဂျင့်သည် ခွဲခြမ်းစိတ်ဖြာမှုကို အပြီးသတ်၍ မရပါ။",
       "extractionFailedDescription": "နည်းပညာအစီရင်ခံစာကို စနစ်တကျ ဖွဲ့စည်းထားသော ရလဒ်အဖြစ် ပြောင်း၍ မရပါ။",
       "exploitableDescription": "အက်ပ်၏ကုဒ်မှ အားနည်းချက်ရှိသော လုပ်ဆောင်ချက်ကို ခေါ်သုံးနိုင်သည်။",
-      "notExploitable": "ကုဒ်သို့ မရောက်နိုင်",
+      "notExploitable": "ရောက်ရှိနိုင်သော လမ်းကြောင်း မရှိ",
       "notExploitableDescription": "ဤကုဒ်သိုလှောင်ရာတွင် အားနည်းချက်ရှိသော လုပ်ဆောင်ချက်ကို ခေါ်သုံးနိုင်သည့် လမ်းကြောင်း မတွေ့ပါ။",
       "unknown": "စစ်ဆေးရန် လိုအပ်",
       "unknownDescription": "အားနည်းချက်ရှိသော လုပ်ဆောင်ချက်ကို ခေါ်သုံးနိုင်ခြင်း ရှိမရှိ ခွဲခြမ်းစိတ်ဖြာမှုက အတည်မပြုနိုင်ပါ။",
@@ -2032,7 +2039,7 @@
     "remediationUnavailable": {
       "findingNotFound": "လုံခြုံရေးတွေ့ရှိချက် မရှိတော့ပါ။",
       "approvalRequired": "အလိုအလျောက် ပြုပြင်မှုအတွက် အတည်ပြုချက် လိုအပ်သည်။ အတည်ပြုရန် ပြုပြင်မှုကို ကိုယ်တိုင် စတင်ပါ။",
-      "findingNotOpen": "ဤတွေ့ရှိချက်သည် မဖြေရှင်းရသေးသော အခြေအနေတွင် မရှိတော့ပါ။",
+      "findingNotOpen": "ဤတွေ့ရှိချက်သည် ဖွင့်ထားခြင်း မရှိတော့ပါ။",
       "repoNotInScope": "ဤကုဒ်သိုလှောင်ရာကို လုံခြုံရေးအေးဂျင့်အတွက် ရွေးမထားပါ။",
       "analysisRequired": "ပြင်ဆင်မှု မစတင်မီ ကုဒ်တစ်ခုလုံးကို ခွဲခြမ်းစိတ်ဖြာပါ။",
       "staleAnalysis": "ခွဲခြမ်းစိတ်ဖြာပြီးနောက် တွေ့ရှိချက် ပြောင်းလဲသွားသည်။ ပြုပြင်မှုမစတင်မီ ခွဲခြမ်းစိတ်ဖြာမှုကို ပြန်လည်လုပ်ဆောင်ပါ။",
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "အဖွဲ့အစည်းကို အမည်ပြောင်းပါ",
-      "renamePlaceholder": "အဖွဲ့အစည်းအမည်",
+      "renamePlaceholder": "အဖွဲ့အစည်းအမည် ထည့်ပါ",
       "balance": "လက်ကျန်",
       "plan": "အစီအစဉ်",
       "planTeams": "Teams",

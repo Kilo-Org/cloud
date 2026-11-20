@@ -140,6 +140,7 @@
     "keepRunning": "Weiterlaufen lassen",
     "newSession": "Neue Sitzung",
     "noModelsAvailable": "Keine Modelle verfügbar",
+    "modelRetires": "Läuft aus am {{date}}",
     "notFound": "Der Inhalt wurde nicht gefunden.",
     "online": "Verbunden",
     "open": "{{name}} öffnen",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "privateRepositoryA11y": "{{name}}, privates Repository",
     "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
-    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen."
+    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
+    "viewOnGitHub": "PR auf GitHub ansehen"
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Fehlerbehebungen und Verbesserungen in der gesamten App.",
     "changelogAreas": {
       "signIn": "Anmeldung",
-      "profileOrganizations": "Profil und Organisationen"
+      "profileOrganizations": "Profil & Organisationen"
     }
   },
   "preferences": {
@@ -697,7 +699,8 @@
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen."
+      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
+      "notConnectedReadOnlyPlan": "Die Testphase der Organisation ist beendet, daher muss ein Inhaber die Abrechnung unter kilo.ai aktualisieren."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
@@ -2783,7 +2786,6 @@
       "skipped_one": "{{displayCount}} übersprungen",
       "skipped_other": "{{displayCount}} übersprungen",
       "title": "Prüfungen",
-      "viewOnGitHub": "PR auf GitHub ansehen",
       "checkDetails": "details zur Prüfung"
     },
     "composer": {
@@ -2847,6 +2849,9 @@
       "couldNotLoad": "Die Diskussion konnte nicht geladen werden.",
       "couldNotLoadMore": "Weitere Kommentare konnten nicht geladen werden.",
       "loadMoreComments": "Weitere Kommentare laden",
+      "conversationTruncated": "Es werden nur die ersten {{displayCount}} Kommentare angezeigt.",
+      "conversationTruncated_one": "Es werden nur die ersten {{displayCount}} Kommentare angezeigt.",
+      "conversationTruncated_other": "Es werden nur die ersten {{displayCount}} Kommentare angezeigt.",
       "loading": "Diskussion wird geladen",
       "moderation": {
         "block": {
@@ -3238,6 +3243,8 @@
       "partialPostedStale_one": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "partialPostedStale_other": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "submitCountOfTotal": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitCountOfTotal_one": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitCountOfTotal_other": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
       "submitReview": "Prüfung senden",
       "blockedRequestChanges": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um Änderungen anzufordern.",
       "blockedComment": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um ein Review mit Kommentaren zu senden."
@@ -3447,7 +3454,7 @@
       "planStatusLapsed": " · Beendet",
       "planEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan.",
       "manageBilling": "Abrechnung verwalten",
-      "renamePlaceholder": "Name der Organisation",
+      "renamePlaceholder": "Gib einen Namen für die Organisation ein",
       "renameTitle": "Organisation umbenennen"
     },
     "inviteMember": {

@@ -241,6 +241,9 @@ export const schedulerChunks = sqliteTable(
       .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
     model: text('model').notNull(),
     variant: text('variant').notNull(),
+    // Retired: nothing reads it, and writers store '[]'. SQLite's DROP COLUMN rewrites
+    // every row of this large table, and the previous worker still writes it until
+    // this release is deployed, so the column stays.
     providers: text('providers').notNull(),
     rep: integer('rep').notNull(),
     chunk: integer('chunk').notNull(),
@@ -309,9 +312,11 @@ export const schedulerExecutions = sqliteTable(
 /**
  * Scheduler lease rows. Row 1 serializes dispatch passes: a pass holds the lease while
  * it reads live occupancy and claims; another dispatcher that finds the lease held
- * returns immediately and the next completion or cron wake retries. Model,
- * provider and slot caps are only exact if one pass at a time reads occupancy.
- * Row 2, created on first use, serializes run initialization passes.
+ * returns immediately and the next completion or cron wake retries. Model and slot
+ * caps are only exact if one pass at a time reads occupancy.
+ * Row 2, created on first use, serializes run initialization passes. Row 3 is a
+ * production deploy's intent: while its lease is unexpired, no new dispatch pass takes
+ * row 1, so the deploy takes row 1 when the current pass ends.
  */
 export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
   id: integer('id').primaryKey(),
@@ -320,9 +325,9 @@ export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
 });
 
 /**
- * Model- and provider-wide throttle deadlines. Cooling is stored here rather than
- * stamped onto every pending chunk so one throttle event costs a bounded write
- * instead of rewriting the whole backlog.
+ * Per-model throttle deadlines. Cooling is stored here rather than stamped onto
+ * every pending chunk so one throttle event costs a bounded write instead of
+ * rewriting the whole backlog. Rows of the retired `provider` scope only expire.
  */
 export const schedulerCooldowns = sqliteTable(
   'scheduler_cooldowns',
@@ -342,6 +347,9 @@ export const schedulerSettings = sqliteTable('scheduler_settings', {
   id: integer('id').primaryKey(),
   slots: integer('slots'),
   model_concurrency: integer('model_concurrency'),
+  // Retired provider limits, no longer read or written. The previous worker still
+  // selects them until this release is deployed, and migrations apply before the
+  // deploy, so they are dropped in a later migration.
   provider_concurrency: integer('provider_concurrency'),
   unknown_provider_concurrency: integer('unknown_provider_concurrency'),
   updated_at: text('updated_at').notNull(),

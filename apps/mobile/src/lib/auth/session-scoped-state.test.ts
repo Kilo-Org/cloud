@@ -335,12 +335,19 @@ describe('clearSessionScopedState', () => {
     });
     const comment = { id: 'c1' } as unknown as ConversationComment;
     expect(
-      retainConversationAcrossMounts(retentionKey, [{ conversation: [comment] }], true)
-    ).toEqual([comment]);
+      retainConversationAcrossMounts(
+        retentionKey,
+        [{ conversation: [comment], truncated: true }],
+        true
+      )
+    ).toEqual({ comments: [comment], truncated: true });
 
     clearSessionScopedState();
 
-    expect(retainConversationAcrossMounts(retentionKey, [{ conversation: [] }], false)).toEqual([]);
+    expect(retainConversationAcrossMounts(retentionKey, [{ conversation: [] }], false)).toEqual({
+      comments: [],
+      truncated: false,
+    });
   });
 
   it('reports a rejected recents clear instead of leaving it unhandled', async () => {

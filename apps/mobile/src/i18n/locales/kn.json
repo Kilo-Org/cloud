@@ -140,6 +140,7 @@
     "keepRunning": "ಚಾಲನೆಯಲ್ಲಿರಲಿ",
     "newSession": "ಹೊಸ ಸೆಷನ್",
     "noModelsAvailable": "ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
+    "modelRetires": "{{date}} ರಂದು ನಿವೃತ್ತಿಯಾಗುತ್ತದೆ",
     "notFound": "ಕಂಡುಬಂದಿಲ್ಲ.",
     "online": "ಆನ್‌ಲೈನ್",
     "open": "{{name}} ತೆರೆಯಿರಿ",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು kilo.ai ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "privateRepositoryA11y": "{{name}}, ಖಾಸಗಿ ರೆಪೊಸಿಟರಿ",
     "legalDocumentEnglishOnly": "ಈ ದಾಖಲೆ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮಾತ್ರ ಲಭ್ಯವಿದೆ.",
-    "organizationTrialEndedBilling": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ನೀವು ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    "organizationTrialEndedBilling": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ನೀವು ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "viewOnGitHub": "GitHubನಲ್ಲಿ PR ವೀಕ್ಷಿಸಿ"
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "ಆ್ಯಪ್‌ನಾದ್ಯಂತ ದೋಷ ಪರಿಹಾರಗಳು ಮತ್ತು ಸುಧಾರಣೆಗಳು.",
     "changelogAreas": {
       "signIn": "ಸೈನ್ ಇನ್",
-      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಮತ್ತು ಸಂಸ್ಥೆಗಳು"
+      "profileOrganizations": "ಪ್ರೊಫೈಲ್ ಹಾಗೂ ಸಂಸ್ಥೆಗಳು"
     }
   },
   "preferences": {
@@ -748,6 +750,9 @@
       "comment_one": "1 ಕಾಮೆಂಟ್",
       "comment": "{{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
       "comment_other": "{{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
+      "conversationTruncated": "ಕೇವಲ ಮೊದಲ {{displayCount}} ಟಿಪ್ಪಣಿಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
+      "conversationTruncated_one": "ಕೇವಲ ಮೊದಲ {{displayCount}} ಟಿಪ್ಪಣಿಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
+      "conversationTruncated_other": "ಕೇವಲ ಮೊದಲ {{displayCount}} ಟಿಪ್ಪಣಿಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
       "startedRelative": " · {{relative}} ಪ್ರಾರಂಭವಾಗಿದೆ",
       "couldNotLoadMore": "ಇನ್ನಷ್ಟು ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryLoadingMore": "ಇನ್ನಷ್ಟು ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
@@ -881,7 +886,6 @@
       "noAccess": "ಈ ರೆಪೊಸಿಟರಿಯ ತಪಾಸಣೆಗಳನ್ನು ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "couldNotLoad": "ತಪಾಸಣೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryChecks": "ತಪಾಸಣೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
-      "viewOnGitHub": "GitHubನಲ್ಲಿ PR ವೀಕ್ಷಿಸಿ",
       "noChecksReported": "ಯಾವುದೇ ತಪಾಸಣೆಗಳು ವರದಿಯಾಗಿಲ್ಲ",
       "passed": "{{displayCount}} ಯಶಸ್ವಿ",
       "passed_one": "{{displayCount}} ಯಶಸ್ವಿ",
@@ -965,6 +969,8 @@
       "pendingComment": "ಬಾಕಿ ಇರುವ ಟಿಪ್ಪಣಿಗಳು",
       "pendingComment_other": "ಬಾಕಿ ಇರುವ ಟಿಪ್ಪಣಿಗಳು",
       "submitCountOfTotal": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ಕಾಮೆಂಟ್‌ಗಳಲ್ಲಿ {{displayFreshCount}} ಸಲ್ಲಿಸಿ",
       "submitReview": "ಪರಿಶೀಲನೆಯನ್ನು ಸಲ್ಲಿಸಿ",
       "partialPostedFresh": "{{displayFreshCount}} ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ. ",
@@ -1389,7 +1395,8 @@
     "followReviewMd": "REVIEW.md ಅನುಸರಿಸಿ",
     "followReviewMdSubtitle": "ಪ್ರತಿ ರೆಪೊಸಿಟರಿಯ REVIEW.md ಫೈಲ್‌ನ ಸೂಚನೆಗಳನ್ನು ಪಾಲಿಸಿ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ. ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರು ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು."
+      "notConnectedReadOnly": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ. ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರು ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು.",
+      "notConnectedReadOnlyPlan": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ, ಆದ್ದರಿಂದ ಮಾಲೀಕರು kilo.ai ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬೇಕು."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} ನ Bitbucket ಸಂಪರ್ಕವನ್ನು ಕಂಪ್ಯೂಟರ್‌ನಿಂದ ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
@@ -1841,7 +1848,7 @@
       "couldNotLoadMore": "ಪತ್ತೆಯಾದ ಇನ್ನಷ್ಟು ಸಮಸ್ಯೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "noMatchesTitle": "ಫಿಲ್ಟರ್‌ಗಳಿಗೆ ಹೊಂದುವ ಸಮಸ್ಯೆಗಳಿಲ್ಲ",
       "noMatchesDescription": "ಆಯ್ಕೆ ಮಾಡಿದ ಫಿಲ್ಟರ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಿ ಅಥವಾ ತೆರವುಗೊಳಿಸಿ, ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "emptyTitle": "ಪತ್ತೆಯಾದ ಬಾಕಿ ಸಮಸ್ಯೆಗಳಿಲ್ಲ",
+      "emptyTitle": "ಓಪನ್ ಸಮಸ್ಯೆಗಳಿಲ್ಲ",
       "emptyDescription": "ಸದ್ಯ ಗಮನಹರಿಸಬೇಕಾದ ಬಾಕಿ ಸಮಸ್ಯೆಗಳಿಲ್ಲ."
     },
     "findingRow": {
@@ -1903,7 +1910,7 @@
         "findingDismissed": "ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
         "findingSeverityChanged": "ತೀವ್ರತೆ ಬದಲಾಗಿದೆ",
         "findingStatusChange": "ಸ್ಥಿತಿ ಬದಲಾಗಿದೆ",
-        "findingSuperseded": "ಬದಲಾಯಿಸಲಾಗಿದೆ",
+        "findingSuperseded": "ಪ್ರತಿಸ್ಥಾಪಿಸಲಾಗಿದೆ",
         "remediationBlocked": "ಪರಿಹಾರ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
         "remediationCancelled": "ರದ್ದುಮಾಡಲಾಗಿದೆ",
         "remediationFailed": "ಪರಿಹಾರ ವಿಫಲವಾಗಿದೆ",
@@ -2032,7 +2039,7 @@
     "remediationUnavailable": {
       "findingNotFound": "ಪತ್ತೆಯಾದ ಭದ್ರತಾ ಸಮಸ್ಯೆ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ.",
       "approvalRequired": "ಸ್ವಯಂಚಾಲಿತ ಪರಿಹಾರಕ್ಕೆ ಅನುಮೋದನೆ ಅಗತ್ಯ. ಅದನ್ನು ಅನುಮೋದಿಸಲು ಪರಿಹಾರವನ್ನು ನೀವೇ ಪ್ರಾರಂಭಿಸಿ.",
-      "findingNotOpen": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆ ಇನ್ನು ಬಾಕಿ ಸ್ಥಿತಿಯಲ್ಲಿಲ್ಲ.",
+      "findingNotOpen": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆ ಇನ್ನು ಓಪನ್ ಆಗಿಲ್ಲ.",
       "repoNotInScope": "ಭದ್ರತಾ ಏಜೆಂಟ್‌ಗಾಗಿ ಈ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿಲ್ಲ.",
       "analysisRequired": "ಸರಿಪಡಿಸಲು ಪ್ರಾರಂಭಿಸುವ ಮೊದಲು ಕೋಡ್‌ಬೇಸ್‌ನ ವಿಶ್ಲೇಷಣೆ ನಡೆಸಿ.",
       "staleAnalysis": "ವಿಶ್ಲೇಷಣೆಯ ನಂತರ ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಯ ವಿವರಗಳು ಬದಲಾಗಿವೆ. ಪರಿಹಾರವನ್ನು ಪ್ರಾರಂಭಿಸುವ ಮೊದಲು ಮತ್ತೆ ವಿಶ್ಲೇಷಿಸಿ.",
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "ಸಂಸ್ಥೆಯ ಹೆಸರು ಬದಲಾಯಿಸಿ",
-      "renamePlaceholder": "ಸಂಸ್ಥೆಯ ಹೆಸರು",
+      "renamePlaceholder": "ಸಂಸ್ಥೆಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
       "balance": "ಉಳಿಕೆ",
       "plan": "ಯೋಜನೆ",
       "planTeams": "Teams",

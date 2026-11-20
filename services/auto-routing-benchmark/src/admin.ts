@@ -11,6 +11,8 @@ import {
   DEFAULT_AUTO_ROUTER,
   DEFAULT_BENCHMARK_DECIDER_MODEL_IDS,
   BenchmarkConfigSchema,
+  BENCHMARK_CONTAINER_BUDGET,
+  BenchmarkSchedulerLimitSchema,
   BenchmarkSchedulerOverridesSchema,
   BenchmarkKindSchema,
   BenchmarkProfileStatusesRequestSchema,
@@ -33,6 +35,7 @@ import {
   type BenchmarkRunsResponse,
   type BenchmarkRunSummariesResponse,
   type BenchmarkSchedulerConfigResponse,
+  type BenchmarkSchedulerSetting,
   type BenchmarkRunProgress,
   type CustomRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
@@ -60,7 +63,6 @@ import {
   resolveRunIdentity,
   RunAlreadyActiveError,
   startRun,
-  sweepStaleRuns,
   syncPlatformRegistry,
 } from './run';
 import {
@@ -68,12 +70,12 @@ import {
   existsRunningRun,
   listCurrentPlatformProfileStatuses,
   getClassifierWinner,
-  getLatestRoutingTable,
   getRunSummariesForRouter,
   listRuns,
   requeueFailedCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
+import { loadRoutingTableResponse } from './routing-table-response';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
 import { fetchBenchmarkUserToken } from './benchmark-token';
@@ -130,6 +132,35 @@ function withLegacyAdminConfigFields(
     classifierMaxP95LatencyMs: policy.classifierMaxP95LatencyMs,
   };
 }
+
+/**
+ * The previous web release requires the retired provider limits in this response
+ * and sends them on save (ADR 0003 invariant 7). Serve them as the container
+ * budget, which no longer binds anything beyond the slots, and accept and ignore
+ * them on PUT. Remove both once that release is promoted.
+ */
+const LEGACY_PROVIDER_LIMIT_SETTING = {
+  effective: BENCHMARK_CONTAINER_BUDGET,
+  source: 'default',
+  override: null,
+  fallback: BENCHMARK_CONTAINER_BUDGET,
+} satisfies BenchmarkSchedulerSetting;
+
+function withLegacySchedulerSettings(settings: BenchmarkSchedulerConfigResponse['settings']) {
+  return {
+    ...settings,
+    providerConcurrency: LEGACY_PROVIDER_LIMIT_SETTING,
+    unknownProviderConcurrency: LEGACY_PROVIDER_LIMIT_SETTING,
+  };
+}
+
+const SchedulerOverridesRequestSchema = z
+  .strictObject({
+    ...BenchmarkSchedulerOverridesSchema.shape,
+    providerConcurrency: BenchmarkSchedulerLimitSchema.nullable().optional(),
+    unknownProviderConcurrency: BenchmarkSchedulerLimitSchema.nullable().optional(),
+  })
+  .transform(({ slots, modelConcurrency }) => ({ slots, modelConcurrency }));
 
 /**
  * The previous web release parses the run list with a contract that still
@@ -260,15 +291,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
 
   app.get('/admin/scheduler-config', async c => {
     const { overrides, ...updated } = await getSchedulerOverrides(c.env.BENCH_DB);
+    const { settings } = resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides);
     return c.json({
-      settings: resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides).settings,
+      settings: withLegacySchedulerSettings(settings),
       ...updated,
     } satisfies BenchmarkSchedulerConfigResponse);
   });
 
   app.put(
     '/admin/scheduler-config',
-    zodJsonValidator(BenchmarkSchedulerOverridesSchema, {
+    zodJsonValidator(SchedulerOverridesRequestSchema, {
       errorMessage: 'Invalid scheduler config',
     }),
     async c => {
@@ -277,17 +309,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         c.req.valid('json'),
         c.req.header('x-updated-by') ?? null
       );
+      const { settings } = resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides);
       return c.json({
-        settings: resolveSchedulerConfig(c.env.BENCHMARK_SCHEDULER_CONFIG, overrides).settings,
+        settings: withLegacySchedulerSettings(settings),
         ...updated,
       } satisfies BenchmarkSchedulerConfigResponse);
     }
   );
 
   app.get('/admin/runs', async c => {
-    // Sweep stale runs first so a dead/wedged run surfaces as 'failed' (and
-    // frees its slot) without needing a new run to be started.
-    await sweepStaleRuns(c.env);
+    // Reads only: the per-minute cron sweeps stale runs, so listing never writes.
     const limit = Math.min(Number(c.req.query('limit') ?? 20) || 20, 100);
     const kind = BenchmarkKindSchema.safeParse(c.req.query('kind'));
     const purpose = BenchmarkRunPurposeSchema.safeParse(c.req.query('purpose'));
@@ -361,15 +392,20 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
             return c.json({ error: first.message }, 400);
           throw first;
         }
-        return c.json({
-          runId: started[0]?.runId ?? null,
-          enqueuedModels: started.reduce((total, run) => total + run.entryCount, 0),
-          skippedModels: [],
-          startedRuns: started,
-          drainErrors: drainErrors.map(error =>
-            error instanceof Error ? error.message : String(error)
-          ),
-        });
+        // A started run is `running` once its row exists; the dispatcher reuses prior
+        // results and materializes its chunks after this response.
+        return c.json(
+          {
+            runId: started[0]?.runId ?? null,
+            enqueuedModels: started.reduce((total, run) => total + run.entryCount, 0),
+            skippedModels: [],
+            startedRuns: started,
+            drainErrors: drainErrors.map(error =>
+              error instanceof Error ? error.message : String(error)
+            ),
+          },
+          started.length > 0 ? 202 : 200
+        );
       }
       try {
         return c.json({ ...(await startRun(c.env, kind, { force, router })), startedRuns: [] });
@@ -477,13 +513,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  app.get('/admin/routing-table', async c => {
-    const latest = await getLatestRoutingTable(c.env.BENCH_DB, requestRouter(c));
-    return c.json({
-      table: latest?.table ?? null,
-      publishedAt: latest?.publishedAt ?? null,
-    });
-  });
+  app.get('/admin/routing-table', async c =>
+    c.body(await loadRoutingTableResponse(c.env, requestRouter(c)), 200, {
+      'Content-Type': 'application/json',
+    })
+  );
 
   app.get('/admin/classifier-winner', async c => {
     const winner = await getClassifierWinner(c.env.BENCH_DB, computeEngineIdentity('classifier'));

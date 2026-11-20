@@ -179,6 +179,22 @@ describe('filterLiveSessions', () => {
     ).toEqual(['cloud']);
   });
 
+  it('matches an accented title and PR title from an unaccented query', () => {
+    const accented = {
+      id: 'accented',
+      title: 'Revisão do fluxo',
+      gitUrl: null,
+      createdOnPlatform: 'cli',
+      associatedPr: { number: 7, title: 'Análise de desempenho' },
+    };
+    expect(
+      filterLiveSessions([accented], query({ searchQuery: 'revisao' })).map(s => s.id)
+    ).toEqual(['accented']);
+    expect(
+      filterLiveSessions([accented], query({ searchQuery: 'analise DE desempenho' })).map(s => s.id)
+    ).toEqual(['accented']);
+  });
+
   it('searches mid-string in other session metadata case-insensitively', () => {
     expect(
       filterLiveSessions(sessions, query({ searchQuery: 'SSION-SEA' })).map(s => s.id)

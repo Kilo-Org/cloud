@@ -140,6 +140,7 @@
     "keepRunning": "Продължи изпълнението",
     "newSession": "Нова сесия",
     "noModelsAvailable": "Няма налични модели",
+    "modelRetires": "Оттегля се на {{date}}",
     "notFound": "Не е намерено.",
     "online": "Онлайн",
     "open": "Отвори {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Пробният период на организацията е приключил и тя няма активен план. Собственик на организацията може да актуализира фактурирането на kilo.ai и след това да опита отново.",
     "privateRepositoryA11y": "{{name}}, частно хранилище",
     "legalDocumentEnglishOnly": "Този документ е достъпен само на английски.",
-    "organizationTrialEndedBilling": "Пробният период на организацията е приключил и тя няма активен план. Можете да актуализирате фактурирането и след това да опитате отново."
+    "organizationTrialEndedBilling": "Пробният период на организацията е приключил и тя няма активен план. Можете да актуализирате фактурирането и след това да опитате отново.",
+    "viewOnGitHub": "Прегледай PR в GitHub"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Поправки и подобрения в цялото приложение.",
     "changelogAreas": {
       "signIn": "Вход",
-      "profileOrganizations": "Профил и организации"
+      "profileOrganizations": "Профил & организации"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Не можахме да заредим още коментари.",
       "retryLoadingMore": "Опитай отново да заредиш още коментари",
       "loadMoreComments": "Зареди още коментари",
+      "conversationTruncated": "Показват се само първите {{displayCount}} коментара.",
+      "conversationTruncated_one": "Показват се само първите {{displayCount}} коментара.",
+      "conversationTruncated_other": "Показват се само първите {{displayCount}} коментара.",
       "addReaction": "Добави реакция",
       "reactionPill": "реакция {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакция",
@@ -881,7 +886,6 @@
       "noAccess": "Нямаш достъп до проверките за това хранилище.",
       "couldNotLoad": "Не можахме да заредим проверките.",
       "retryChecks": "Зареди проверките отново",
-      "viewOnGitHub": "Прегледай PR в GitHub",
       "noChecksReported": "Няма данни за проверки",
       "passed": "успешни: {{displayCount}}",
       "passed_one": "успешни: {{displayCount}}",
@@ -936,9 +940,9 @@
       "checkFailedTitleGitLab": "Не можа да се провери връзката с GitLab",
       "checkFailedTitleBitbucket": "Не можа да се провери връзката с Bitbucket",
       "providerCheckFailedMessage": "Не можахме да се свържем с доставчика. Провери връзката си и опитай отново.",
-      "reconnectTitle": "Повторно свързване с GitHub",
-      "reconnectTitleGitLab": "Повторно свързване с GitLab",
-      "reconnectTitleBitbucket": "Повторно свързване с Bitbucket",
+      "reconnectTitle": "Свържи GitHub отново",
+      "reconnectTitleGitLab": "Свържи GitLab отново",
+      "reconnectTitleBitbucket": "Свържи Bitbucket отново",
       "reconnectDescription": "Достъпът ти до GitHub е отнет.",
       "gitlabDescription": "Преглеждай merge заявки от телефона си",
       "gitlabInstanceMismatchTitle": "Връзката с GitLab е за друга инстанция",
@@ -965,6 +969,8 @@
       "pendingComment": "неизпратени коментара",
       "pendingComment_other": "неизпратени коментара",
       "submitCountOfTotal": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
+      "submitCountOfTotal_one": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
+      "submitCountOfTotal_other": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
       "submitReview": "Изпрати прегледа",
       "partialPostedFresh": "Публикувани коментари: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Публикувани коментари: {{displayFreshCount}}. ",
@@ -1389,7 +1395,8 @@
     "followReviewMd": "Следвай REVIEW.md",
     "followReviewMdSubtitle": "Спазвай инструкциите във файла REVIEW.md на всяко хранилище",
     "bitbucket": {
-      "notConnectedReadOnly": "Няма връзка с Bitbucket. Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят."
+      "notConnectedReadOnly": "Няма връзка с Bitbucket. Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят.",
+      "notConnectedReadOnlyPlan": "Пробният период на организацията е приключил, затова собственик трябва да актуализира фактурирането на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Връзката на {{organization}} с Bitbucket се управлява в уеб версията от компютър.",
@@ -1424,9 +1431,9 @@
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "Приложението за GitHub",
+      "githubApp": "приложението за GitHub",
       "githubError": "Не успяхме да отворим настройката на GitHub. Опитай отново.",
-      "gitlabAccount": "Акаунта в GitLab",
+      "gitlabAccount": "акаунта в GitLab",
       "gitlabError": "Не успяхме да отворим настройката на GitLab. Опитай отново.",
       "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане."
     },
@@ -1722,7 +1729,7 @@
       "dueThisWeekDetail_one": "От тях {{exploitable}} с потвърдена възможност за атака",
       "dueThisWeekDetail_other": "От тях {{exploitable}} с потвърдена възможност за атака",
       "noDeadline": "Няма краен срок",
-      "reviewSlaAssignment": "Прегледай зададените срокове по SLA",
+      "reviewSlaAssignment": "Прегледай задаването на срокове по SLA",
       "allOpenFindingsTracked": "Всички отворени проблеми се проследяват"
     },
     "dismiss": {
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "Преименувай организацията",
-      "renamePlaceholder": "Име на организацията",
+      "renamePlaceholder": "Въведете име на организацията",
       "balance": "Наличност",
       "plan": "План",
       "planTeams": "Teams",

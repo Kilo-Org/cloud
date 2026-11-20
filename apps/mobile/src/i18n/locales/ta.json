@@ -140,10 +140,12 @@
     "keepRunning": "தொடர்ந்து இயங்க விடவும்",
     "newSession": "புதிய அமர்வு",
     "noModelsAvailable": "மாதிரிகள் எதுவும் இல்லை",
+    "modelRetires": "{{date}} அன்று நிறுத்தப்படுகிறது",
     "notFound": "கிடைக்கவில்லை.",
     "online": "இணையத்தில்",
     "open": "{{name}} என்பதைத் திறக்கவும்",
     "openPullRequest": "PR திறப்பு",
+    "viewOnGitHub": "GitHub-இல் PR-ஐப் பார்க்கவும்",
     "completed": "முடிந்தது",
     "pending": "நிலுவையில்",
     "running": "இயங்குகிறது",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "செயலி முழுவதும் திருத்தங்களும் மேம்பாடுகளும்.",
     "changelogAreas": {
       "signIn": "உள்நுழைவு",
-      "profileOrganizations": "சுயவிவரம் மற்றும் நிறுவனங்கள்"
+      "profileOrganizations": "சுயவிவரமும் நிறுவனங்களும்"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "மேலும் கருத்துகளை ஏற்ற முடியவில்லை.",
       "retryLoadingMore": "மேலும் கருத்துகளை ஏற்ற மீண்டும் முயற்சிக்கவும்",
       "loadMoreComments": "மேலும் கருத்துகளை ஏற்றவும்",
+      "conversationTruncated": "முதல் {{displayCount}} கருத்துகள் மட்டுமே காட்டப்படுகின்றன.",
+      "conversationTruncated_one": "முதல் {{displayCount}} கருத்துகள் மட்டுமே காட்டப்படுகின்றன.",
+      "conversationTruncated_other": "முதல் {{displayCount}} கருத்துகள் மட்டுமே காட்டப்படுகின்றன.",
       "addReaction": "எதிர்வினையைச் சேர்க்கவும்",
       "reactionPill": "{{emoji}} எதிர்வினை, {{displayCount}} {{countLabel}}",
       "reaction_one": "எதிர்வினை",
@@ -881,7 +886,6 @@
       "noAccess": "இந்தக் களஞ்சியத்தின் சோதனைகளை அணுக உங்களுக்கு அனுமதி இல்லை.",
       "couldNotLoad": "சோதனைகளை ஏற்ற முடியவில்லை.",
       "retryChecks": "சோதனைகளை மீண்டும் முயற்சிக்கவும்",
-      "viewOnGitHub": "GitHub-இல் PR-ஐப் பார்க்கவும்",
       "noChecksReported": "சோதனைகள் எதுவும் பதிவாகவில்லை",
       "passed": "வெற்றி: {{displayCount}}",
       "passed_one": "வெற்றி: {{displayCount}}",
@@ -965,6 +969,8 @@
       "pendingComment": "நிலுவையிலுள்ள கருத்துகள்",
       "pendingComment_other": "நிலுவையிலுள்ள கருத்துகள்",
       "submitCountOfTotal": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
+      "submitCountOfTotal_one": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
+      "submitCountOfTotal_other": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} கருத்துகளைச் சமர்ப்பிக்கவும்",
       "submitReview": "மதிப்பாய்வைச் சமர்ப்பிக்கவும்",
       "partialPostedFresh": "இடுகையிட்ட கருத்துகள்: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "இடுகையிட்ட கருத்துகள்: {{displayFreshCount}}. ",
@@ -1389,7 +1395,8 @@
     "followReviewMd": "REVIEW.md-ஐப் பின்பற்றவும்",
     "followReviewMdSubtitle": "ஒவ்வொரு களஞ்சியத்தின் REVIEW.md கோப்பில் உள்ள வழிமுறைகளைப் பின்பற்றவும்",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket இணைக்கப்படவில்லை. நிறுவன உரிமையாளர்கள், நிர்வாகிகள் மற்றும் கட்டண மேலாளர்கள் மட்டுமே அதை இணைக்க முடியும்."
+      "notConnectedReadOnly": "Bitbucket இணைக்கப்படவில்லை. நிறுவன உரிமையாளர்கள், நிர்வாகிகள் மற்றும் கட்டண மேலாளர்கள் மட்டுமே அதை இணைக்க முடியும்.",
+      "notConnectedReadOnlyPlan": "நிறுவனத்தின் சோதனைக் காலம் முடிந்துவிட்டது, எனவே உரிமையாளர் kilo.ai இல் பில்லிங்கைப் புதுப்பிக்க வேண்டும்."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-இன் Bitbucket இணைப்பு கணினியிலிருந்து இணையத்தில் நிர்வகிக்கப்படுகிறது.",
@@ -1841,7 +1848,7 @@
       "couldNotLoadMore": "மேலும் சிக்கல்களை ஏற்ற முடியவில்லை.",
       "noMatchesTitle": "வடிப்பான்களுக்குப் பொருந்தும் சிக்கல்கள் இல்லை",
       "noMatchesDescription": "தேர்ந்தெடுத்த வடிப்பான்களை மாற்றவும் அல்லது நீக்கவும்.",
-      "emptyTitle": "நிலுவைச் சிக்கல்கள் இல்லை",
+      "emptyTitle": "திறந்த சிக்கல்கள் இல்லை",
       "emptyDescription": "இப்போது கவனம் தேவைப்படும் நிலுவைச் சிக்கல்கள் இல்லை."
     },
     "findingRow": {
@@ -1903,7 +1910,7 @@
         "findingDismissed": "நிராகரிக்கப்பட்டது",
         "findingSeverityChanged": "தீவிரத்தன்மை மாற்றப்பட்டது",
         "findingStatusChange": "நிலை மாற்றப்பட்டது",
-        "findingSuperseded": "மாற்றியமைக்கப்பட்டது",
+        "findingSuperseded": "மாற்றீடு செய்யப்பட்டது",
         "remediationBlocked": "சரிசெய்தல் தடுக்கப்பட்டது",
         "remediationCancelled": "ரத்து செய்யப்பட்டது",
         "remediationFailed": "சரிசெய்தல் தோல்வியடைந்தது",
@@ -2032,7 +2039,7 @@
     "remediationUnavailable": {
       "findingNotFound": "பாதுகாப்புச் சிக்கல் இனி இல்லை.",
       "approvalRequired": "தானியங்கி சரிசெய்தலுக்கு ஒப்புதல் தேவை. ஒப்புதல் அளிக்கச் சரிசெய்தலைக் கைமுறையாகத் தொடங்கவும்.",
-      "findingNotOpen": "இந்தச் சிக்கல் இனி நிலுவையில் இல்லை.",
+      "findingNotOpen": "இந்தச் சிக்கல் இனி திறந்ததாக இல்லை.",
       "repoNotInScope": "பாதுகாப்பு முகவருக்காக இந்தக் களஞ்சியம் தேர்ந்தெடுக்கப்படவில்லை.",
       "analysisRequired": "திருத்தத்தைத் தொடங்கும் முன் நிரல்தொகுப்பைப் பகுப்பாய்வு செய்யவும்.",
       "staleAnalysis": "பகுப்பாய்வுக்குப் பிறகு சிக்கல் மாறியுள்ளது. சரிசெய்தலைத் தொடங்கும் முன் பகுப்பாய்வை மீண்டும் இயக்கவும்.",
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "நிறுவனத்தின் பெயரை மாற்றவும்",
-      "renamePlaceholder": "நிறுவனத்தின் பெயர்",
+      "renamePlaceholder": "நிறுவனத்தின் பெயரை உள்ளிடவும்",
       "balance": "இருப்பு",
       "plan": "திட்டம்",
       "planTeams": "Teams",

@@ -140,6 +140,7 @@
     "keepRunning": "Laten doorgaan",
     "newSession": "Nieuwe sessie",
     "noModelsAvailable": "Geen modellen beschikbaar",
+    "modelRetires": "Wordt stopgezet op {{date}}",
     "notFound": "Dit item is niet gevonden.",
     "online": "Verbonden",
     "open": "{{name}} openen",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
     "privateRepositoryA11y": "{{name}}, privé repository",
     "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels.",
-    "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen."
+    "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen.",
+    "viewOnGitHub": "PR op GitHub bekijken"
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Oplossingen en verbeteringen in de hele app.",
     "changelogAreas": {
       "signIn": "Inloggen",
-      "profileOrganizations": "Profiel en organisaties"
+      "profileOrganizations": "Profiel & organisaties"
     }
   },
   "preferences": {
@@ -697,7 +699,8 @@
     },
     "autoReviews": "Automatische reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen."
+      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
+      "notConnectedReadOnlyPlan": "De proefperiode van de organisatie is afgelopen, dus een eigenaar moet de facturering bijwerken op kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",
@@ -2783,7 +2786,6 @@
       "skipped_one": "{{displayCount}} overgeslagen",
       "skipped_other": "{{displayCount}} overgeslagen",
       "title": "Controles",
-      "viewOnGitHub": "PR op GitHub bekijken",
       "checkDetails": "controledetails"
     },
     "composer": {
@@ -2844,6 +2846,9 @@
       "commentActions": "Acties voor opmerking",
       "comment": "{{displayCount}} opmerkingen",
       "comment_other": "{{displayCount}} opmerkingen",
+      "conversationTruncated": "Je ziet alleen de eerste {{displayCount}} opmerkingen.",
+      "conversationTruncated_one": "Je ziet alleen de eerste {{displayCount}} opmerkingen.",
+      "conversationTruncated_other": "Je ziet alleen de eerste {{displayCount}} opmerkingen.",
       "couldNotLoad": "De discussie kon niet worden geladen.",
       "couldNotLoadMore": "Er konden geen extra opmerkingen worden geladen.",
       "loadMoreComments": "Meer opmerkingen laden",
@@ -3238,6 +3243,8 @@
       "partialPostedStale_one": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "partialPostedStale_other": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "submitCountOfTotal": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
+      "submitCountOfTotal_one": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
+      "submitCountOfTotal_other": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
       "submitReview": "Beoordeling verzenden",
       "blockedRequestChanges": "Voeg een samenvatting of minstens één opmerking toe om wijzigingen te vragen.",
       "blockedComment": "Voeg een samenvatting of minstens één opmerking toe om een beoordeling met opmerkingen te verzenden."
@@ -3447,7 +3454,7 @@
       "planStatusLapsed": " · Afgelopen",
       "planEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement.",
       "manageBilling": "Facturering beheren",
-      "renamePlaceholder": "Naam van de organisatie",
+      "renamePlaceholder": "Voer een naam voor de organisatie in",
       "renameTitle": "Organisatie hernoemen"
     },
     "inviteMember": {

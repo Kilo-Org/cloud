@@ -156,19 +156,51 @@ import {
 } from './run';
 
 const queueSendBatch = vi.fn<(messages: { body: BenchmarkJobMessage }[]) => Promise<void>>();
-const queueSend = vi.fn();
+const queueSend =
+  vi.fn<(message: BenchmarkJobMessage, options?: { delaySeconds?: number }) => Promise<void>>();
+
+/** Decider runs inserted by the test whose chunk plan has not yet been written in full. */
+function uninitializedRunIds() {
+  const scheduled = vi.mocked(scheduleRunChunks).mock;
+  const initialized = new Set(
+    scheduled.calls.flatMap(([, run], index) => {
+      const settled = scheduled.settledResults[index];
+      return settled?.type === 'fulfilled' && settled.value ? [run.runId] : [];
+    })
+  );
+  return vi
+    .mocked(insertRun)
+    .mock.calls.map(([, run]) => run)
+    .filter(run => run.kind === 'decider' && !initialized.has(run.id))
+    .map(run => ({ id: run.id }));
+}
 
 function schedulerDatabase(): D1Database {
-  const statement = {
-    bind: vi.fn().mockReturnThis(),
-    first: vi.fn().mockResolvedValue(null),
-    all: vi.fn().mockResolvedValue({ results: [] }),
-    run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
+  const prepare = (sql: string) => {
+    const statement = {
+      bind: vi.fn(() => statement),
+      first: vi.fn(async () => (sql.includes('RETURNING token') ? { token: 'lease' } : null)),
+      all: vi.fn(async () => ({
+        results: sql.includes('NOT EXISTS (SELECT 1 FROM scheduler_runs')
+          ? uninitializedRunIds()
+          : [],
+      })),
+      run: vi.fn(async () => ({ meta: { changes: 0 } })),
+    };
+    return statement;
   };
   return {
-    prepare: vi.fn(() => statement),
+    prepare: vi.fn(prepare),
     batch: vi.fn().mockResolvedValue([]),
   } as unknown as D1Database;
+}
+
+/** Delivers the scheduler wakes that starting runs queued, as the queue consumer would. */
+async function deliverSchedulerWakes(target: Env = env) {
+  const wakes = queueSend.mock.calls
+    .map(([message]) => message)
+    .filter(message => message.schedulerWake);
+  for (const wake of wakes) await processJob(target, wake);
 }
 const kvDelete = vi.fn();
 
@@ -200,7 +232,7 @@ const env = {
   BENCH_DB: schedulerDatabase(),
   BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
-  AUTO_ROUTING_CONFIG: { delete: kvDelete },
+  AUTO_ROUTING_CONFIG: { delete: kvDelete, put: vi.fn() },
   INTERNAL_API_SECRET_PROD: { get: async () => 'secret' },
   KILO_WEB_API_BASE_URL: 'https://app.test',
   KILO_CLI_API_URL: 'https://api.test',
@@ -422,14 +454,15 @@ describe('all-effort platform scheduling', () => {
       return [...entries];
     });
     await drainQueue(env, 'platform');
+    await deliverSchedulerWakes();
     expect(pending).toEqual([]);
     const batches = vi.mocked(insertRun).mock.calls.map(call => call[2]);
     expect(batches.map(batch => batch.length)).toEqual([5]);
     expect(batches.flat().map(row => row.variant)).toEqual(variants);
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: expect.any(String),
-      entries: variants.map(variant => ({ model: 'platform/a', variant, providers: [] })),
-      repetitions: 1,
+      entries: variants.map(variant => ({ model: 'platform/a', variant })),
+      repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -452,6 +485,8 @@ describe('startRun — registry-backed decider runs', () => {
       { model: 'vendor/m', variant: 'max' },
     ];
     const result = await startRun(env, 'decider', { purpose: 'user', entries });
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    await deliverSchedulerWakes();
 
     expect(result.runId).toMatch(/^user-/);
     expect(result.enqueuedModels).toBe(2);
@@ -469,12 +504,12 @@ describe('startRun — registry-backed decider runs', () => {
       env.BENCH_DB,
       result.runId,
       entries,
-      expect.objectContaining({ repetitions: 1 })
+      expect.objectContaining({ repetitions: 3 })
     );
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result.runId,
-      entries: entries.map(entry => ({ ...entry, providers: [] })),
-      repetitions: 1,
+      entries,
+      repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -494,7 +529,7 @@ describe('startRun — registry-backed decider runs', () => {
       env.BENCH_DB,
       result.runId,
       entries,
-      expect.objectContaining({ repetitions: 1 })
+      expect.objectContaining({ repetitions: 3 })
     );
     // Dedup is the registry's job, so no run-level carry lookup happens.
     expect(getLatestSummariesByModel).not.toHaveBeenCalled();
@@ -518,9 +553,16 @@ describe('startRun — registry-backed decider runs', () => {
       entries: [{ model: 'p/a', variant: null }],
     });
     expect(result.enqueuedModels).toBe(1);
+    expect(queueSend).toHaveBeenCalledExactlyOnceWith({
+      runId: result.runId,
+      kind: 'decider',
+      model: 'p/a',
+      schedulerWake: true,
+    });
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    await deliverSchedulerWakes();
     expect(scheduleRunChunks).toHaveBeenCalledOnce();
     expect(claimScheduledChunks).toHaveBeenCalled();
-    expect(queueSend).not.toHaveBeenCalled();
   });
 
   it('plans every admitted entry without dividing free lanes between runs', async () => {
@@ -528,9 +570,10 @@ describe('startRun — registry-backed decider runs', () => {
     const entries = Array.from({ length: 6 }, (_, i) => ({ model: `p/${i}`, variant: null }));
     const result = await startRun(env, 'decider', { purpose: 'platform', entries });
     expect(result.enqueuedModels).toBe(6);
+    await deliverSchedulerWakes();
     expect(scheduleRunChunks).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({ entries: entries.map(entry => ({ ...entry, providers: [] })) })
+      expect.objectContaining({ entries })
     );
   });
 
@@ -656,7 +699,6 @@ describe('decider run completion', () => {
       run_id: runId,
       model,
       variant: variant ?? '',
-      providers: '[]',
       rep: 0,
       chunk: 0,
       case_ids: JSON.stringify([DECIDER_CASES[0].id]),
@@ -1267,12 +1309,13 @@ describe('drainQueue', () => {
     );
     const result = await drainQueue(env, 'user');
     expect(result!.entryCount).toBe(100);
+    await deliverSchedulerWakes();
     const [, , modelRows] = vi.mocked(insertRun).mock.calls[0];
     expect(modelRows).toHaveLength(100);
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result!.runId,
-      entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
-      repetitions: 1,
+      entries: modelRows.map(row => ({ model: row.model, variant: null })),
+      repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -1288,8 +1331,12 @@ describe('drainQueue', () => {
 
     await expect(drainQueue(env, 'platform')).resolves.toMatchObject({ entryCount: 1 });
     expect(insertRun).toHaveBeenCalledOnce();
+    expect(scheduleRunChunks).not.toHaveBeenCalled();
+    expect(queueSend).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: 'decider', model: 'm/pending', schedulerWake: true })
+    );
+    await deliverSchedulerWakes();
     expect(scheduleRunChunks).toHaveBeenCalledOnce();
-    expect(queueSend).not.toHaveBeenCalled();
   });
 
   it('reserves batch space for a queued re-measure ahead of a full pending backlog', async () => {
@@ -1591,6 +1638,7 @@ describe('frontier router runs', () => {
     mockConfig({ router: 'frontier', frontier_min_accuracy_delta: 0.1 });
     const entries = [{ model: 'platform/a', variant: null }];
     const result = await startRun(env, 'decider', { router: 'frontier', entries });
+    await deliverSchedulerWakes();
     expect(result.runId).toMatch(/^frontier-decider-/);
     expect(insertRun).toHaveBeenCalledWith(
       env.BENCH_DB,
@@ -1611,7 +1659,7 @@ describe('frontier router runs', () => {
     );
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: result.runId,
-      entries: [{ model: 'platform/a', variant: null, providers: [] }],
+      entries: [{ model: 'platform/a', variant: null }],
       repetitions: 1,
       caseIds: FRONTIER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
@@ -1674,7 +1722,7 @@ describe('frontier router runs', () => {
     expect(vi.mocked(insertRun).mock.calls[0][1].max_concurrency).toBe(0);
   });
 
-  it('publishes the frontier router threshold from its effective policy values', async () => {
+  function mockFrontierPublishInputs() {
     mockConfig({ router: 'frontier', min_accuracy: 0.8, frontier_min_accuracy_delta: 0.1 });
     vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
       {
@@ -1708,6 +1756,10 @@ describe('frontier router runs', () => {
         avgReasoningTokens: null,
       }))
     );
+  }
+
+  it('publishes the frontier router threshold from its effective policy values', async () => {
+    mockFrontierPublishInputs();
     await publishPlatformRoutingTable(env, catalogFetch, 'frontier');
     // frontierMinAccuracyDelta is fixed at 0, so the stored threshold applies.
     expect(saveRoutingTable).toHaveBeenCalledWith(
@@ -1718,7 +1770,29 @@ describe('frontier router runs', () => {
     );
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
     expect(kvDelete).toHaveBeenCalledWith('routing_table_frontier_v1');
+    expect(kvDelete).toHaveBeenCalledWith('benchmark_routing_table_version_v1:frontier');
     expect(kvDelete).not.toHaveBeenCalledWith('routing_table_v1');
+    expect(kvDelete).not.toHaveBeenCalledWith('benchmark_routing_table_version_v1:efficient');
+  });
+
+  it('flushes the gateway key when the version pointer cannot be written', async () => {
+    mockFrontierPublishInputs();
+    kvDelete.mockImplementation(async (key: string) => {
+      if (key === 'benchmark_routing_table_version_v1:frontier') throw new Error('KV 429');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(publishPlatformRoutingTable(env, catalogFetch, 'frontier')).resolves.toEqual({
+      version: expect.any(String),
+    });
+
+    expect(saveRoutingTable).toHaveBeenCalledOnce();
+    expect(kvDelete).toHaveBeenCalledWith('benchmark_routing_table_response_v1:frontier');
+    expect(kvDelete).toHaveBeenLastCalledWith('routing_table_frontier_v1');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('routing_table_version_pointer_failed')
+    );
+    warn.mockRestore();
   });
 
   it('publishes an admin override in place of the stored threshold', async () => {
@@ -1859,11 +1933,13 @@ describe('run insert failures', () => {
   });
 });
 
-it('reuses prior cases before delegating the complete durable chunk plan', async () => {
+it('reuses prior cases in the initialization pass before delegating the complete chunk plan', async () => {
   vi.mocked(reuseDeciderCaseResults).mockResolvedValue(4);
   const result = await startRun(env, 'decider', {
     entries: [{ model: 'platform/a', variant: null }],
   });
+  expect(reuseDeciderCaseResults).not.toHaveBeenCalled();
+  await deliverSchedulerWakes();
   expect(reuseDeciderCaseResults).toHaveBeenCalledWith(
     env.BENCH_DB,
     expect.objectContaining({
@@ -1876,23 +1952,31 @@ it('reuses prior cases before delegating the complete durable chunk plan', async
   );
   expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
     runId: result.runId,
-    entries: [{ model: 'platform/a', variant: null, providers: [] }],
-    repetitions: 1,
+    entries: [{ model: 'platform/a', variant: null }],
+    repetitions: 3,
     caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
     chunkSize: 1,
   });
   expect(queueSendBatch).not.toHaveBeenCalled();
 });
 
-it('settles a failed resume plan without dispatching or stranding registry claims', async () => {
+it('keeps a started run for the next initialization pass when its chunk plan fails', async () => {
   vi.mocked(reuseDeciderCaseResults).mockResolvedValue(1);
   vi.mocked(scheduleRunChunks).mockRejectedValueOnce(new Error('D1 read unavailable'));
-  await expect(
-    startRun(env, 'decider', { entries: [{ model: 'platform/a', variant: null }] })
-  ).rejects.toThrow('D1 read unavailable');
+  const result = await startRun(env, 'decider', {
+    entries: [{ model: 'platform/a', variant: null }],
+  });
+  await deliverSchedulerWakes();
+  expect(scheduleRunChunks).toHaveBeenCalledOnce();
+  expect(markRunFailed).not.toHaveBeenCalled();
+  expect(markProfilesFailedForRun).not.toHaveBeenCalled();
+  await deliverSchedulerWakes();
+  expect(scheduleRunChunks).toHaveBeenCalledTimes(2);
+  expect(scheduleRunChunks).toHaveBeenLastCalledWith(
+    env.BENCH_DB,
+    expect.objectContaining({ runId: result.runId })
+  );
   expect(queueSendBatch).not.toHaveBeenCalled();
-  expect(markRunFailed).toHaveBeenCalled();
-  expect(markProfilesFailedForRun).toHaveBeenCalled();
 });
 
 it('dispatches every claim of one scheduler pass and stops when a pass claims nothing', async () => {
@@ -1901,7 +1985,6 @@ it('dispatches every claim of one scheduler pass and stops when a pass claims no
     run_id: 'user-existing',
     model: 'platform/a',
     variant: 'high',
-    providers: '[]',
     rep: 2,
     chunk: 10,
     case_ids: JSON.stringify([DECIDER_CASES[10].id]),
@@ -1918,15 +2001,17 @@ it('dispatches every claim of one scheduler pass and stops when a pass claims no
     entries: [{ model: 'platform/a', variant: 'high' }],
   });
   expect(result.enqueuedModels).toBe(1);
+  await deliverSchedulerWakes({ ...env, BENCHMARK_SCHEDULER_CONFIG: '{"slots":2}' });
   expect(recoverChunks).toHaveBeenCalledWith(env.BENCH_DB, expect.any(Number));
-  expect(claimScheduledChunks).toHaveBeenCalledTimes(1);
+  // The pass claims once, then once more after it finished initializing the new run.
+  expect(claimScheduledChunks).toHaveBeenCalledTimes(2);
   expect(claimScheduledChunks).toHaveBeenCalledWith(
     env.BENCH_DB,
     expect.objectContaining({ slots: 2 }),
     expect.any(Number),
     expect.any(String)
   );
-  expect(queueSend).toHaveBeenCalledTimes(2);
+  expect(queueSend).toHaveBeenCalledTimes(3);
   expect(queueSend).toHaveBeenCalledWith({
     runId: 'user-existing',
     kind: 'decider',

@@ -7,6 +7,8 @@ vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
     ...actual,
+    copyRemeasureBaselines: vi.fn(),
+    reuseDeciderCaseResults: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     getRunWithModels: vi.fn(),
     markProfilesFailedForEntries: vi.fn(),
@@ -69,7 +71,6 @@ const claim = {
   run_id: runId,
   model: 'b/dead',
   variant: 'high',
-  providers: '["provider-b"]',
   rep: 0,
   chunk: 27,
   case_ids: JSON.stringify([DECIDER_CASES[27].id]),
@@ -268,8 +269,8 @@ describe('processDeadLetter — legacy migration', () => {
       expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
         runId,
         entries: [
-          { model: 'b/dead', variant: 'high', providers: [] },
-          { model: 'b/dead', variant: 'low', providers: [] },
+          { model: 'b/dead', variant: 'high' },
+          { model: 'b/dead', variant: 'low' },
         ],
         repetitions: 2,
         caseIds: DECIDER_CASES.map(c => c.id),

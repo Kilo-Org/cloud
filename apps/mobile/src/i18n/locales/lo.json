@@ -140,6 +140,7 @@
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "newSession": "ເຊສຊັນໃໝ່",
     "noModelsAvailable": "ບໍ່ມີໂມເດວໃຫ້ໃຊ້",
+    "modelRetires": "ຢຸດໃຊ້ວັນທີ {{date}}",
     "notFound": "ບໍ່ພົບລາຍການນີ້.",
     "online": "ອອນໄລນ໌",
     "open": "ເປີດ {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
     "privateRepositoryA11y": "{{name}}, ຄັງໂຄ້ດສ່ວນຕົວ",
     "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ.",
-    "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ."
+    "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ.",
+    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
     "changelogAreas": {
       "signIn": "ການເຂົ້າສູ່ລະບົບ",
-      "profileOrganizations": "ໂປຣໄຟລ໌ ແລະ ອົງກອນ"
+      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "ບໍ່ສາມາດໂຫຼດຄຳເຫັນເພີ່ມເຕີມໄດ້.",
       "retryLoadingMore": "ລອງໂຫຼດຄຳເຫັນເພີ່ມເຕີມອີກຄັ້ງ",
       "loadMoreComments": "ໂຫຼດຄຳເຫັນເພີ່ມເຕີມ",
+      "conversationTruncated": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
+      "conversationTruncated_one": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
+      "conversationTruncated_other": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
       "addReaction": "ເພີ່ມການຕອບສະໜອງ",
       "reactionPill": "ການຕອບສະໜອງ {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "ການຕອບສະໜອງ",
@@ -881,7 +886,6 @@
       "noAccess": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງການກວດສອບຂອງຄັງໂຄດນີ້.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການກວດສອບໄດ້.",
       "retryChecks": "ລອງໂຫຼດການກວດສອບອີກຄັ້ງ",
-      "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
       "noChecksReported": "ຍັງບໍ່ມີລາຍງານຜົນການກວດສອບ",
       "passed": "ຜ່ານ {{displayCount}}",
       "passed_one": "ຜ່ານ {{displayCount}}",
@@ -965,6 +969,8 @@
       "pendingComment": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "pendingComment_other": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "submitCountOfTotal": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
+      "submitCountOfTotal_one": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
+      "submitCountOfTotal_other": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
       "submitReview": "ສົ່ງຜົນການກວດສອບ",
       "partialPostedFresh": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
       "partialPostedFresh_one": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
@@ -1389,7 +1395,8 @@
     "followReviewMd": "ປະຕິບັດຕາມ REVIEW.md",
     "followReviewMdSubtitle": "ປະຕິບັດຕາມຄຳແນະນຳໃນໄຟລ໌ REVIEW.md ຂອງແຕ່ລະຄັງໂຄ້ດ",
     "bitbucket": {
-      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
+      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
+      "notConnectedReadOnlyPlan": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ດັ່ງນັ້ນເຈົ້າຂອງອົງກອນຕ້ອງອັບເດດການຮຽກເກັບເງິນທີ່ kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງ {{organization}} ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "ປ່ຽນຊື່ອົງກອນ",
-      "renamePlaceholder": "ຊື່ອົງກອນ",
+      "renamePlaceholder": "ໃສ່ຊື່ອົງກອນ",
       "balance": "ຍອດເງິນຄົງເຫຼືອ",
       "plan": "ແຜນ",
       "planTeams": "Teams",

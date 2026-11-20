@@ -140,6 +140,7 @@
     "keepRunning": "Jarraitu exekutatzen",
     "newSession": "Saio berria",
     "noModelsAvailable": "Ez dago eredurik eskuragarri",
+    "modelRetires": "Erretiratzea: {{date}}",
     "notFound": "Ez da aurkitu.",
     "online": "Konektatuta",
     "open": "Ireki {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
     "privateRepositoryA11y": "{{name}}, biltegi pribatua",
     "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
-    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu."
+    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu.",
+    "viewOnGitHub": "Ikusi PR-a GitHub-en"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Zuzenketak eta hobekuntzak aplikazio osoan.",
     "changelogAreas": {
       "signIn": "Saioa hastea",
-      "profileOrganizations": "Profila eta erakundeak"
+      "profileOrganizations": "Profila zein erakundeak"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Ezin izan dira iruzkin gehiago kargatu.",
       "retryLoadingMore": "Saiatu iruzkin gehiago berriro kargatzen",
       "loadMoreComments": "Kargatu iruzkin gehiago",
+      "conversationTruncated": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
+      "conversationTruncated_one": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
+      "conversationTruncated_other": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
       "addReaction": "Gehitu erreakzioa",
       "reactionPill": "{{emoji}} erreakzioa, {{displayCount}} {{countLabel}}",
       "reaction_one": "erreakzio",
@@ -881,7 +886,6 @@
       "noAccess": "Ez duzu sarbiderik biltegi honen egiaztapenetara.",
       "couldNotLoad": "Ezin izan dira egiaztapenak kargatu.",
       "retryChecks": "Saiatu egiaztapenak berriro kargatzen",
-      "viewOnGitHub": "Ikusi PR-a GitHub-en",
       "noChecksReported": "Ez da egiaztapenik jakinarazi",
       "passed": "{{displayCount}} gaindituta",
       "passed_one": "{{displayCount}} gaindituta",
@@ -965,6 +969,8 @@
       "pendingComment": "iruzkin bidaltzeko zain",
       "pendingComment_other": "iruzkin bidaltzeko zain",
       "submitCountOfTotal": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
+      "submitCountOfTotal_one": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
+      "submitCountOfTotal_other": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
       "submitReview": "Bidali berrikuspena",
       "partialPostedFresh": "{{displayFreshCount}} iruzkin argitaratu dira. ",
       "partialPostedFresh_one": "{{displayFreshCount}} iruzkin argitaratu dira. ",
@@ -1389,7 +1395,8 @@
     "followReviewMd": "Bete REVIEW.md fitxategiko jarraibideak",
     "followReviewMdSubtitle": "Bete biltegi bakoitzeko REVIEW.md fitxategiko jarraibideak",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete."
+      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+      "notConnectedReadOnlyPlan": "Erakundearen probaldia amaitu da, beraz jabe batek fakturazioa eguneratu behar du kilo.ai-n."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "Berrizendatu erakundea",
-      "renamePlaceholder": "Erakundearen izena",
+      "renamePlaceholder": "Idatzi erakundearen izen bat",
       "balance": "Saldoa",
       "plan": "Plana",
       "planTeams": "Teams",

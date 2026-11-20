@@ -182,16 +182,18 @@ const ROLLBACK_SAFE_LEGACY_LANE_BUDGETS = {
 
 // The seven fixed policy columns are legacy: nothing in this worker reads them
 // back, but they are NOT NULL and the previously deployed worker still reads
-// them, so every save writes the canonical fixed policy value.
-const ROLLBACK_SAFE_LEGACY_FIXED_POLICY = {
-  frontier_min_accuracy_delta: POLICY_SETTINGS.frontierMinAccuracyDelta.fixed,
-  switch_cost_factor: POLICY_SETTINGS.switchCostFactor.fixed,
-  best_accuracy_switch_threshold: POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed,
-  low_confidence_threshold: POLICY_SETTINGS.lowConfidenceThreshold.fixed,
-  classifier_repetitions: POLICY_SETTINGS.classifierRepetitions.fixed,
-  decider_repetitions: POLICY_SETTINGS.deciderRepetitions.fixed,
-  classifier_max_p95_latency_ms: POLICY_SETTINGS.classifierMaxP95LatencyMs.fixed,
-};
+// them, so every save writes the canonical fixed policy value for its router.
+function rollbackSafeLegacyFixedPolicy(router: AutoRouter) {
+  return {
+    frontier_min_accuracy_delta: POLICY_SETTINGS.frontierMinAccuracyDelta.fixed,
+    switch_cost_factor: POLICY_SETTINGS.switchCostFactor.fixed,
+    best_accuracy_switch_threshold: POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed,
+    low_confidence_threshold: POLICY_SETTINGS.lowConfidenceThreshold.fixed,
+    classifier_repetitions: POLICY_SETTINGS.classifierRepetitions.fixed,
+    decider_repetitions: POLICY_SETTINGS.deciderRepetitions.fixedByRouter[router],
+    classifier_max_p95_latency_ms: POLICY_SETTINGS.classifierMaxP95LatencyMs.fixed,
+  };
+}
 
 export async function replaceConfig(
   db: D1Database,
@@ -211,6 +213,7 @@ export async function replaceConfig(
   router: AutoRouter = 'efficient'
 ): Promise<void> {
   const orm = drizzle(db);
+  const legacyFixedPolicy = rollbackSafeLegacyFixedPolicy(router);
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm
       .insert(benchmarkConfig)
@@ -218,7 +221,7 @@ export async function replaceConfig(
         id: router === 'efficient' ? 1 : 2,
         ...config,
         ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
-        ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
+        ...legacyFixedPolicy,
         router,
       })
       .onConflictDoUpdate({
@@ -226,7 +229,7 @@ export async function replaceConfig(
         set: {
           ...config,
           ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
-          ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
+          ...legacyFixedPolicy,
         },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
@@ -409,6 +412,97 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
 }
 
 /**
+ * Statement {@link reuseDeciderCaseResults} runs per entry; exported for the query-plan test.
+ * D1 keeps no planner statistics, so with a plain JOIN SQLite may scan every case_results
+ * row per entry. CROSS JOIN pins the order: filter the runs, then seek each run's pair.
+ */
+export const PRIOR_CASE_RESULTS_REUSE_SQL = `
+  WITH ranked AS (
+    SELECT source.*,
+      ROW_NUMBER() OVER (
+        PARTITION BY source.case_id, source.rep
+        ORDER BY run.started_at DESC, run.id DESC
+      ) AS reuse_rank
+    FROM benchmark_runs AS run
+    CROSS JOIN case_results AS source
+    WHERE run.id = source.run_id
+      AND run.kind = 'decider' AND run.status IN ('completed', 'failed')
+      AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+      AND source.model = ? AND source.variant = ?
+      AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
+      AND NOT EXISTS (
+        SELECT 1 FROM benchmark_profiles AS profile
+        WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+          AND profile.repetitions = run.repetitions AND profile.model = source.model
+          AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+          AND run.started_at < profile.invalidated_at
+      )
+      AND NOT (source.prompt_revision < ?
+        AND source.case_id IN (SELECT value FROM json_each(?)))
+  )
+  INSERT INTO case_results (
+    run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+    input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
+    error, fallback_reason, route_hit, retried, exit_code, output_prefix,
+    event_count, last_event_types, rep, timed_out, prompt_revision
+  )
+  SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+    input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
+    error, fallback_reason, route_hit, retried, exit_code, output_prefix,
+    event_count, last_event_types, rep, timed_out, prompt_revision
+  FROM ranked WHERE reuse_rank = 1
+  ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+`;
+
+/** Pending-output twin of {@link PRIOR_CASE_RESULTS_REUSE_SQL}, with the same join order. */
+export const PRIOR_PENDING_OUTPUTS_REUSE_SQL = `
+  WITH ranked AS (
+    SELECT source.*,
+      ROW_NUMBER() OVER (
+        PARTITION BY source.case_id, source.rep
+        ORDER BY run.started_at DESC, run.id DESC
+      ) AS reuse_rank
+    FROM benchmark_runs AS run
+    CROSS JOIN pending_decider_outputs AS source
+    WHERE run.id = source.run_id
+      AND run.kind = 'decider' AND run.status IN ('completed', 'failed')
+      AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+      AND source.model = ? AND source.variant = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM benchmark_profiles AS profile
+        WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+          AND profile.repetitions = run.repetitions AND profile.model = source.model
+          AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+          AND run.started_at < profile.invalidated_at
+      )
+      AND CASE WHEN json_valid(source.payload) THEN
+        json_type(source.payload, '$.result.exitCode') = 'integer'
+        AND json_extract(source.payload, '$.result.exitCode') = 0
+        AND json_type(source.payload, '$.result.timedOut') = 'false'
+        AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
+      ELSE 0 END
+      AND NOT (source.prompt_revision < ?
+        AND source.case_id IN (SELECT value FROM json_each(?)))
+      AND NOT EXISTS (
+        SELECT 1 FROM case_results AS graded
+        WHERE graded.run_id = source.run_id AND graded.model = source.model
+          AND graded.variant = source.variant AND graded.case_id = source.case_id
+          AND graded.rep = source.rep
+      )
+  )
+  INSERT INTO pending_decider_outputs (run_id, model, variant, case_id, rep, payload,
+    prompt_revision)
+  SELECT ?, model, variant, case_id, rep, payload, prompt_revision FROM ranked
+  WHERE reuse_rank = 1 AND NOT EXISTS (
+    SELECT 1 FROM case_results AS destination
+    WHERE destination.run_id = ? AND destination.model = ranked.model
+      AND destination.variant = ranked.variant AND destination.case_id = ranked.case_id
+      AND destination.rep = ranked.rep
+  )
+  ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+`;
+
+/**
  * Copy each pair's newest compatible graded case (and recoverable pending output) from
  * earlier runs into this run. A result for one of `skipOldCaseIds` measured under an
  * older prompt transport is never copied, so those cases run again.
@@ -442,91 +536,8 @@ export async function reuseDeciderCaseResults(
         params.runId,
       ];
       statements.push(
-        db
-          .prepare(`
-          WITH ranked AS (
-            SELECT source.*,
-              ROW_NUMBER() OVER (
-                PARTITION BY source.case_id, source.rep
-                ORDER BY run.started_at DESC, run.id DESC
-              ) AS reuse_rank
-            FROM case_results AS source
-            JOIN benchmark_runs AS run ON run.id = source.run_id
-            WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
-              AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
-              AND source.model = ? AND source.variant = ?
-              AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
-              AND NOT EXISTS (
-                SELECT 1 FROM benchmark_profiles AS profile
-                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
-                  AND profile.repetitions = run.repetitions AND profile.model = source.model
-                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
-                  AND run.started_at < profile.invalidated_at
-              )
-              AND NOT (source.prompt_revision < ?
-                AND source.case_id IN (SELECT value FROM json_each(?)))
-          )
-          INSERT INTO case_results (
-            run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
-            input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
-            error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-            event_count, last_event_types, rep, timed_out, prompt_revision
-          )
-          SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
-            input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
-            error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-            event_count, last_event_types, rep, timed_out, prompt_revision
-          FROM ranked WHERE reuse_rank = 1
-          ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
-        `)
-          .bind(...bindings),
-        db
-          .prepare(`
-          WITH ranked AS (
-            SELECT source.*,
-              ROW_NUMBER() OVER (
-                PARTITION BY source.case_id, source.rep
-                ORDER BY run.started_at DESC, run.id DESC
-              ) AS reuse_rank
-            FROM pending_decider_outputs AS source
-            JOIN benchmark_runs AS run ON run.id = source.run_id
-            WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
-              AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
-              AND source.model = ? AND source.variant = ?
-              AND NOT EXISTS (
-                SELECT 1 FROM benchmark_profiles AS profile
-                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
-                  AND profile.repetitions = run.repetitions AND profile.model = source.model
-                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
-                  AND run.started_at < profile.invalidated_at
-              )
-              AND CASE WHEN json_valid(source.payload) THEN
-                json_type(source.payload, '$.result.exitCode') = 'integer'
-                AND json_extract(source.payload, '$.result.exitCode') = 0
-                AND json_type(source.payload, '$.result.timedOut') = 'false'
-                AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
-              ELSE 0 END
-              AND NOT (source.prompt_revision < ?
-                AND source.case_id IN (SELECT value FROM json_each(?)))
-              AND NOT EXISTS (
-                SELECT 1 FROM case_results AS graded
-                WHERE graded.run_id = source.run_id AND graded.model = source.model
-                  AND graded.variant = source.variant AND graded.case_id = source.case_id
-                  AND graded.rep = source.rep
-              )
-          )
-          INSERT INTO pending_decider_outputs (run_id, model, variant, case_id, rep, payload,
-            prompt_revision)
-          SELECT ?, model, variant, case_id, rep, payload, prompt_revision FROM ranked
-          WHERE reuse_rank = 1 AND NOT EXISTS (
-            SELECT 1 FROM case_results AS destination
-            WHERE destination.run_id = ? AND destination.model = ranked.model
-              AND destination.variant = ranked.variant AND destination.case_id = ranked.case_id
-              AND destination.rep = ranked.rep
-          )
-          ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
-        `)
-          .bind(...bindings, params.runId),
+        db.prepare(PRIOR_CASE_RESULTS_REUSE_SQL).bind(...bindings),
+        db.prepare(PRIOR_PENDING_OUTPUTS_REUSE_SQL).bind(...bindings, params.runId),
         db
           .prepare(`
             DELETE FROM pending_decider_outputs

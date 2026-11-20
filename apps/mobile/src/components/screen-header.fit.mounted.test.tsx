@@ -1,4 +1,5 @@
 import { createElement, type ForwardedRef, forwardRef, useImperativeHandle } from 'react';
+import { View } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -57,13 +58,18 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({ foreground: '#000' }) }));
 
+// A node slot under the narrowed contract: the header's slots take elements,
+// never bare strings, so the cluster is an empty view carrying a testID the
+// stacked-row matcher can find.
+const INLINE_ACTIONS_MARKER = 'inline-actions-marker';
+
 function stackedActionRows(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAll(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
       String(node.props.className ?? '').includes('mt-2') &&
-      node.children.includes('ACTIONS')
+      node.findAll(marker => marker.props.testID === INLINE_ACTIONS_MARKER).length > 0
   );
 }
 
@@ -75,7 +81,7 @@ function render(title: string): TestRenderer.ReactTestRenderer {
         title,
         size: 'large',
         showBackButton: false,
-        inlineActions: 'ACTIONS',
+        inlineActions: createElement(View, { testID: INLINE_ACTIONS_MARKER }),
         allowInlineActionsStacking: false,
       })
     );

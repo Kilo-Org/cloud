@@ -115,7 +115,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
         `INSERT INTO client_profiles (id, owner_type, owner_id, router, entry_kind, provider, model,
           variant, engine_identity, repetitions, status, results, accuracy, route_summaries,
           created_at, updated_at)
-         VALUES (?, 'user', ?, 'efficient', 'client', 'ollama', 'qwen3:32b', ?, ?, 1, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, 'user', ?, 'efficient', 'client', 'ollama', 'qwen3:32b', ?, ?, 3, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         row.id,
@@ -123,7 +123,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
         row.variant ?? 'low',
         row.engine ?? ENGINE,
         row.status ?? 'ready',
-        row.results ?? DECIDER_CASES.length,
+        row.results ?? DECIDER_CASES.length * 3,
         row.accuracy,
         JSON.stringify([summary(LOCAL, row.variant ?? 'low', row.accuracy)]),
         row.updatedAt,
@@ -141,7 +141,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
       .prepare(
         `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status,
           run_id, requested_at, updated_at, completed_at, platform_requested, user_requested)
-         VALUES ('efficient', 'vendor/gw', '', ?, 1, ?, ?, '2026-10-01', '2026-10-01', '2026-10-01', 0, 1)`
+         VALUES ('efficient', 'vendor/gw', '', ?, 3, ?, ?, '2026-10-01', '2026-10-01', '2026-10-01', 0, 1)`
       )
       .run(row.engine, row.status, row.runId);
     if (row.runId && row.accuracy !== undefined) {

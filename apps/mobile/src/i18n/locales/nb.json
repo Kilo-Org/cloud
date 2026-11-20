@@ -140,6 +140,7 @@
     "keepRunning": "La kjøringen fortsette",
     "newSession": "Ny økt",
     "noModelsAvailable": "Ingen modeller tilgjengelige",
+    "modelRetires": "Fases ut {{date}}",
     "notFound": "Fant ikke elementet.",
     "online": "På nett",
     "open": "Åpne {{name}}",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
-    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen."
+    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen.",
+    "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
       "signIn": "Innlogging",
-      "profileOrganizations": "Profil og organisasjoner"
+      "profileOrganizations": "Profil & organisasjoner"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Kunne ikke laste inn flere kommentarer.",
       "retryLoadingMore": "Prøv å laste inn flere kommentarer på nytt",
       "loadMoreComments": "Last inn flere kommentarer",
+      "conversationTruncated": "Viser bare de første {{displayCount}} kommentarene.",
+      "conversationTruncated_one": "Viser bare de første {{displayCount}} kommentarene.",
+      "conversationTruncated_other": "Viser bare de første {{displayCount}} kommentarene.",
       "addReaction": "Legg til reaksjon",
       "reactionPill": "{{emoji}}-reaksjon, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksjon",
@@ -881,7 +886,6 @@
       "noAccess": "Du har ikke tilgang til sjekkene for dette kodelageret.",
       "couldNotLoad": "Kunne ikke laste inn sjekkene.",
       "retryChecks": "Prøv å laste inn sjekkene på nytt",
-      "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen sjekker rapportert",
       "passed": "{{displayCount}} bestått",
       "passed_one": "{{displayCount}} bestått",
@@ -965,6 +969,8 @@
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Send gjennomgang",
       "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er publisert. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er publisert. ",
@@ -1389,7 +1395,8 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruksjonene i REVIEW.md i hvert kodelager",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen."
+      "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
+      "notConnectedReadOnlyPlan": "Organisasjonens prøveperiode er over, så en eier må oppdatere faktureringen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "Gi organisasjonen nytt navn",
-      "renamePlaceholder": "Organisasjonsnavn",
+      "renamePlaceholder": "Skriv inn et organisasjonsnavn",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

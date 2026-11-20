@@ -379,7 +379,7 @@ import { variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
 
 const ENGINE = 'v-test:engine';
-const REPS = 1;
+const REPS = 3;
 const NOW = new Date('2026-07-28T12:00:00.000Z');
 
 function entry(model: string, variant: string | null = null): BenchmarkPair {
@@ -461,6 +461,7 @@ async function applyProductionAdmissionBatch(opts: {
 }
 
 const config = {
+  router: 'efficient' as const,
   minAccuracy: 0.7,
   accuracyNoiseBand: 0.05,
   productionTokenProfile: null,
@@ -513,7 +514,7 @@ describe('isCurrentBenchmarkProfile', () => {
           model: 'm/a',
           variant: 'xhigh',
           engine_identity: ENGINE,
-          repetitions: 3,
+          repetitions: 1,
         },
         current,
         e

@@ -92,7 +92,7 @@ function defaults(
   organizationId: string,
   mode: 'all' | 'none' | 'selected',
   lists: { models?: string[]; providers?: string[] } = {}
-): OrganizationDefaultPolicyRow {
+) {
   return {
     organizationId,
     policyRevision: 3,
@@ -108,7 +108,7 @@ function defaults(
           }
         : { type: 'model_access', data: { mode } },
     ],
-  };
+  } satisfies OrganizationDefaultPolicyRow;
 }
 
 async function summarize(params: {
@@ -313,10 +313,17 @@ describe('sub-organization model policy summary', () => {
     });
   });
 
-  it('summarizes named groups without including them in default-access divergence', async () => {
+  it('summarizes model access with retired policy entries without including groups in default-access divergence', async () => {
     const baseline = await summarize({ defaultPolicyRows: [defaults(CHILD_ID, 'none')] });
+    const defaultRow = defaults(CHILD_ID, 'none');
+    const retired = {
+      type: 'client_access',
+      data: { schema_version: 1, mode: 'blocklist', clients: [] },
+    };
     const withGroup = await summarize({
-      defaultPolicyRows: [defaults(CHILD_ID, 'none')],
+      defaultPolicyRows: [
+        { ...defaultRow, defaultPolicies: [...defaultRow.defaultPolicies, retired] },
+      ],
       groupRows: [
         {
           organizationId: CHILD_ID,
@@ -331,6 +338,7 @@ describe('sub-organization model policy summary', () => {
                 provider_allow_list: ['openai'],
               },
             },
+            retired,
           ],
         },
       ],

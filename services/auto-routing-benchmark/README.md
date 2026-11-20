@@ -236,12 +236,24 @@ draining exceeds its limit. It never pauses or resumes operator-controlled queue
 
 Each deploy records a hash of the container inputs (the `containers` configuration and every
 file in each local image's build context) as the Worker version message
-`container-inputs:<sha256>`. When the active version carries the same hash, the wrapper deploys
-with `--containers-rollout none`, so running containers are not replaced. A different, missing or
+`container-inputs:<sha256>`. The rolled-out hash is the message of the Worker version that was
+live when the container application last changed, so a deploy whose image never reached the
+containers is not trusted. When the rolled-out hash matches, the wrapper deploys with
+`--containers-rollout none`, so running containers are not replaced. A different, missing or
 unreadable hash deploys with the configured rollout, and a failed deploy without a rollout is
-retried with it. After the deploy the wrapper polls `wrangler containers list --json` until the
+retried with it. After a rolling deploy the wrapper polls `wrangler containers info` until the
 application has no `active_rollout_id`, for at most `BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS`
 (15 minutes by default), and then releases the lease either way.
+
+When the rolled-out hash matches and every file in `migrations/` is recorded in
+`d1_migrations`, the wrapper deploys without the lease and without draining. In-flight
+invocations finish on the version that accepted them. Each `BenchRunnerContainer` keeps its old
+code until its deferred code update resets it (at most 5 minutes after the deploy); the reset
+drops the Durable Object's request to the container, but the container keeps the case running
+and posts the result to `/container/case-result`, and the chunk waits for that output. A drained
+deploy does not avoid that reset either: it lands after the lease is released, on work
+dispatched since. A pending or unreadable migration list, or an unknown hash, takes the full
+drained path.
 
 An operator pauses dispatch by holding `scheduler_dispatch_lock` row 1 with a token that starts
 with `operator-pause-` and an unexpired lease. The wrapper treats that row as the dispatch hold:

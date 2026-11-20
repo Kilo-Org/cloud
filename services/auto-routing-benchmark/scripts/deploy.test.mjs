@@ -36,6 +36,9 @@ function packageCopy(t) {
   cpSync(fileURLToPath(new URL('../container/', import.meta.url)), join(root, 'container'), {
     recursive: true,
   });
+  cpSync(fileURLToPath(new URL('../migrations/', import.meta.url)), join(root, 'migrations'), {
+    recursive: true,
+  });
   symlinkSync(
     fileURLToPath(new URL('../node_modules/', import.meta.url)),
     join(root, 'node_modules')
@@ -63,11 +66,15 @@ function fixture(t, overrides = {}) {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000');
   const migrations = new URL('../migrations/', import.meta.url);
-  for (const name of readdirSync(migrations)
+  const migrationNames = readdirSync(migrations)
     .filter(name => name.endsWith('.sql'))
-    .sort()) {
+    .sort();
+  for (const name of migrationNames) {
     db.exec(readFileSync(new URL(name, migrations), 'utf8'));
   }
+  db.exec('CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL)');
+  const recordMigration = db.prepare('INSERT INTO d1_migrations (name) VALUES (?)');
+  for (const name of migrationNames) recordMigration.run(name);
   db.exec(`CREATE TABLE fixture_events (kind TEXT NOT NULL, at INTEGER NOT NULL);
     CREATE TABLE fixture_deployments (version_id TEXT PRIMARY KEY, message TEXT, created_on INTEGER NOT NULL);
     CREATE TABLE fixture_app (updated_at INTEGER NOT NULL);
@@ -630,6 +637,8 @@ for (const [name, rolledOutMessage, runEnv] of [
       assert.equal(result.code, 0, result.stdout);
       assert.equal(state.count('deploy_containers_configured'), 2);
       assert.equal(state.count('deploy_containers_none'), 0);
+      assert.equal(state.count('acquire'), 2);
+      assert.equal(state.count('migrations'), 2);
       assert.ok(
         diagnostics(result).some(
           row => row.event === 'benchmark_deploy_container_inputs' && row.deployed === 'unknown'
@@ -637,6 +646,90 @@ for (const [name, rolledOutMessage, runEnv] of [
       );
     }
   );
+}
+
+test(
+  'deploys without draining or taking the dispatch lease when container inputs and migrations are unchanged',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t);
+    assert.equal((await state.start()).code, 0);
+    const acquired = state.count('acquire');
+    const drained = state.count('drain');
+    const polled = state.count('rollout_poll');
+    state.addLive();
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('acquire'), acquired);
+    assert.equal(state.count('drain'), drained);
+    assert.equal(state.count('migrations'), 1);
+    assert.equal(state.count('drainless_deploy'), 1);
+    assert.equal(state.count('unguarded_deploy'), 0);
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.equal(state.count('rollout_poll'), polled);
+    assert.deepEqual(
+      state.db
+        .prepare(
+          "SELECT status FROM scheduler_chunks WHERE id IN ('queued-chunk', 'active-chunk') ORDER BY id"
+        )
+        .all()
+        .map(row => row.status),
+      ['active', 'queued']
+    );
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_started' && row.drain === 'skipped'
+      )
+    );
+    released(state);
+  }
+);
+
+test(
+  'drains under the lease when a migration is pending even though container inputs are unchanged',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER: '3' });
+    assert.equal((await state.start()).code, 0);
+    state.db.exec('DELETE FROM d1_migrations WHERE id = (SELECT MAX(id) FROM d1_migrations)');
+    state.addLive();
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('acquire'), 2);
+    assert.equal(state.count('migrations'), 2);
+    assert.ok(state.events().lastIndexOf('migrations') > state.events().lastIndexOf('drain'));
+    assert.equal(state.count('deploy_containers_none'), 1);
+    assert.equal(state.count('drainless_deploy'), 0);
+    assert.equal(state.count('unguarded_deploy'), 0);
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_migrations_pending' && row.pending === 1
+      )
+    );
+    released(state);
+  }
+);
+
+for (const [name, runEnv] of [
+  ['cannot be read', { BENCHMARK_DEPLOY_FIXTURE_APPLIED_MIGRATIONS: 'fail' }],
+  ['are malformed', { BENCHMARK_DEPLOY_FIXTURE_BAD_JSON: 'applied_migrations' }],
+]) {
+  test(`drains under the lease when applied migrations ${name}`, { timeout: 15_000 }, async t => {
+    const state = fixture(t);
+    assert.equal((await state.start()).code, 0);
+    const result = await state.start([], runEnv);
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('acquire'), 2);
+    assert.equal(state.count('migrations'), 2);
+    assert.equal(state.count('drainless_deploy'), 0);
+    assert.equal(state.count('unguarded_deploy'), 0);
+    assert.ok(
+      diagnostics(result).some(
+        row => row.event === 'benchmark_deploy_migrations_pending' && row.pending === 'unknown'
+      )
+    );
+    released(state);
+  });
 }
 
 test(
@@ -685,7 +778,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '1000',
-      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '400',
+      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '2000',
     });
     const result = await state.start();
     assert.equal(result.code, 0, result.stdout);
@@ -703,7 +796,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_CONTAINER_INFO: 'fail',
-      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '400',
+      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '2000',
     });
     const result = await state.start();
     assert.equal(result.code, 0, result.stdout);

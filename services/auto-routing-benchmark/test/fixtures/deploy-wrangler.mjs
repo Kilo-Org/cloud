@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -37,6 +38,18 @@ const lockHeld = () => {
     .get();
   return Boolean(lock?.token) && lock.lease_until > Date.now();
 };
+const migrationNames = readdirSync(new URL('../../migrations/', import.meta.url)).filter(name =>
+  name.endsWith('.sql')
+);
+const pendingMigrations = () => {
+  const applied = new Set(
+    db
+      .prepare('SELECT name FROM d1_migrations')
+      .all()
+      .map(row => row.name)
+  );
+  return migrationNames.filter(name => !applied.has(name)).length;
+};
 const pauseAction = checkpoint => {
   if (process.env.BENCHMARK_DEPLOY_FIXTURE_PAUSE_CHANGE_AT !== checkpoint) return;
   if (count('pause_changed') > 0) return;
@@ -67,6 +80,7 @@ try {
     else if (sql.startsWith('SELECT lease_until FROM scheduler_dispatch_lock'))
       kind = 'verify_pause';
     else if (sql.includes('FROM scheduler_chunks')) kind = 'drain';
+    else if (sql === 'SELECT name FROM d1_migrations') kind = 'applied_migrations';
     else throw new Error('Unexpected fixture SQL');
     event(kind);
     if (kind === 'drain') {
@@ -117,6 +131,12 @@ try {
       }
     }
     if (process.env.BENCHMARK_DEPLOY_FIXTURE_BAD_JSON === kind) output = 'malformed';
+    if (
+      kind === 'applied_migrations' &&
+      process.env.BENCHMARK_DEPLOY_FIXTURE_APPLIED_MIGRATIONS === 'fail'
+    ) {
+      output = 'failure';
+    }
     if (output === 'failure') {
       process.stderr.write('untrusted-stderr-canary');
       process.exitCode = 1;
@@ -137,6 +157,8 @@ try {
     }
     if (!lockHeld() || liveChunks() !== 0) event('unguarded_migrations');
     event('migrations');
+    const record = db.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)');
+    for (const name of migrationNames) record.run(name);
     pauseAction('migrations');
     if (process.env.BENCHMARK_DEPLOY_FIXTURE_MIGRATION_FAIL === '1') {
       process.stderr.write('untrusted-stderr-canary');
@@ -239,8 +261,10 @@ try {
         FROM fixture_events`
       )
       .get().migrated;
-    if (!lockHeld() || liveChunks() !== 0 || !migratedSincePreviousDeploy)
-      event('unguarded_deploy');
+    const guarded = lockHeld() && liveChunks() === 0 && migratedSincePreviousDeploy;
+    if (!guarded) {
+      event(skipRollout && pendingMigrations() === 0 ? 'drainless_deploy' : 'unguarded_deploy');
+    }
     event(skipRollout ? 'deploy_containers_none' : 'deploy_containers_configured');
     if (skipRollout && process.env.BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_NONE_FAIL === '1') {
       process.stderr.write('untrusted-stderr-canary');

@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 const directory = fileURLToPath(new URL('..', import.meta.url));
 const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url));
+const migrationsDirectory = fileURLToPath(new URL('../migrations/', import.meta.url));
 const token = randomUUID();
 const abort = new AbortController();
 const startedAt = Date.now();
@@ -123,6 +124,7 @@ const occupancyRows = z
     })
   )
   .length(1);
+const appliedMigrationRows = z.array(z.object({ name: z.string() }));
 const workerConfig = z.object({
   name: z.string().min(1),
   containers: z
@@ -240,6 +242,7 @@ async function deploy() {
     throw new DeploymentError('invalid_configuration');
   }
   const inputs = containerInputs();
+  const migrationNames = readdirSync(migrationsDirectory).filter(name => name.endsWith('.sql'));
   let attempted = false;
   let deployed = false;
   let pauseToken;
@@ -407,7 +410,55 @@ async function deploy() {
       });
     }
   };
+  const pendingMigrations = async () => {
+    try {
+      const parsed = appliedMigrationRows.safeParse(
+        await execute('SELECT name FROM d1_migrations', commandTimeoutMs)
+      );
+      if (!parsed.success) return undefined;
+      const applied = new Set(parsed.data.map(row => row.name));
+      return migrationNames.filter(name => !applied.has(name)).length;
+    } catch (error) {
+      if (abort.signal.aborted) throw failure ?? error;
+      return undefined;
+    }
+  };
+  const deployArgs = ['deploy', '--message', `${CONTAINER_INPUTS_PREFIX}${inputs.hash}`];
+  const deployWithoutRollout = async () => {
+    try {
+      await runWrangler([...deployArgs, '--containers-rollout', 'none'], deployTimeoutMs);
+      return true;
+    } catch (error) {
+      if (
+        abort.signal.aborted ||
+        !(error instanceof DeploymentError) ||
+        error.code !== 'command_failed'
+      ) {
+        throw error;
+      }
+      report('rollout_skip_failed');
+      return false;
+    }
+  };
   try {
+    phase = 'plan';
+    const rolledOut = await rolledOutContainerInputs();
+    let skipRollout = rolledOut === inputs.hash;
+    report('container_inputs', {
+      inputs: inputs.hash,
+      deployed: rolledOut === undefined ? 'unknown' : skipRollout ? 'unchanged' : 'changed',
+    });
+    const pending = skipRollout ? await pendingMigrations() : undefined;
+    if (skipRollout) report('migrations_pending', { pending: pending ?? 'unknown' });
+    if (skipRollout && pending === 0) {
+      phase = 'deploy';
+      report('started', { containersRollout: 'none', drain: 'skipped' });
+      if (await deployWithoutRollout()) {
+        report('completed');
+        return;
+      }
+      skipRollout = false;
+    }
     phase = 'lock';
     report('waiting_for_lock', { timeoutMs: lockTimeoutMs });
     const lockDeadline = Date.now() + lockTimeoutMs;
@@ -486,30 +537,9 @@ async function deploy() {
     report('completed');
     await renew();
     phase = 'deploy';
-    const rolledOut = await rolledOutContainerInputs();
-    const unchanged = rolledOut === inputs.hash;
-    report('container_inputs', {
-      inputs: inputs.hash,
-      deployed: rolledOut === undefined ? 'unknown' : unchanged ? 'unchanged' : 'changed',
-    });
-    const deployArgs = ['deploy', '--message', `${CONTAINER_INPUTS_PREFIX}${inputs.hash}`];
-    report('started', { containersRollout: unchanged ? 'none' : 'configured' });
-    if (unchanged) {
-      try {
-        await runWrangler([...deployArgs, '--containers-rollout', 'none'], deployTimeoutMs);
-      } catch (error) {
-        if (
-          abort.signal.aborted ||
-          !(error instanceof DeploymentError) ||
-          error.code !== 'command_failed'
-        ) {
-          throw error;
-        }
-        report('rollout_skip_failed');
-        await renew();
-        await runWrangler(deployArgs, deployTimeoutMs);
-      }
-    } else {
+    report('started', { containersRollout: skipRollout ? 'none' : 'configured' });
+    if (!(skipRollout && (await deployWithoutRollout()))) {
+      if (skipRollout) await renew();
       await runWrangler(deployArgs, deployTimeoutMs);
     }
     report('completed');

@@ -118,7 +118,9 @@ export function buildAppReturnOutcomeView(input: {
                     ? INSTALLATION_UNAVAILABLE_MESSAGE
                     : input.error === 'install_state_user_mismatch'
                       ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-                      : 'The installation did not complete. Try again or return to the Kilo App.';
+                      : input.error === 'pending_request_unidentified'
+                        ? 'Kilo could not confirm which GitHub account this request is for. Start the GitHub setup again from the account you want to connect.'
+                        : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {

@@ -26,6 +26,20 @@ export async function exchangeGitHubOAuthCode(
   return { id: '12345', login: 'octocat', accessToken: 'mock-access-token' };
 }
 
+export type GitHubInstallationRequest = {
+  id: string;
+  accountId: string;
+  accountLogin: string;
+  requesterId: string | null;
+  requesterLogin: string | null;
+};
+
+export async function fetchGitHubInstallationRequests(
+  _appType: GitHubAppType = 'standard'
+): Promise<GitHubInstallationRequest[]> {
+  return [];
+}
+
 export async function getCollaboratorPermissionLevel(
   _installationId: string,
   _owner: string,

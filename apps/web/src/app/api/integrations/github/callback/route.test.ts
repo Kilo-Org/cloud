@@ -4,7 +4,10 @@ import { Octokit } from '@octokit/rest';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
-import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
+import {
+  exchangeGitHubOAuthCode,
+  fetchGitHubInstallationRequests,
+} from '@/lib/integrations/platforms/github/adapter';
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -33,6 +36,7 @@ import { randomUUID } from 'node:crypto';
 import type { Owner } from '@/lib/integrations/core/types';
 import type * as PlatformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import {
+  createPendingIntegration,
   findGitHubBotLinkIntegrations,
   findIntegrationByInstallationId,
   findIntegrationByInstallationIdForOwner,
@@ -111,6 +115,7 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
   lockGitHubInstallationIdentity: jest.fn(async () => undefined),
 }));
 jest.mock('@/lib/integrations/db/predicates', () => ({
+  ...jest.requireActual('@/lib/integrations/db/predicates'),
   effectiveAppTypeCondition: jest.fn(() => undefined),
 }));
 jest.mock('@kilocode/worker-utils/account-access', () => ({
@@ -130,6 +135,7 @@ jest.mock('@/lib/integrations/github/install-state', () => ({
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedVerifyGitHubBotLinkState = jest.mocked(verifyGitHubBotLinkState);
 const mockedExchangeGitHubOAuthCode = jest.mocked(exchangeGitHubOAuthCode);
+const mockedFetchGitHubInstallationRequests = jest.mocked(fetchGitHubInstallationRequests);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedBot = jest.mocked(bot);
 const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
@@ -140,6 +146,7 @@ const mockedFindIntegrationByInstallationIdForOwner = jest.mocked(
 const mockedCreateAppAuth = jest.mocked(createAppAuth);
 const mockedOctokit = jest.mocked(Octokit);
 const mockedUpsertPlatformIntegrationForOwner = jest.mocked(upsertPlatformIntegrationForOwner);
+const mockedCreatePendingIntegration = jest.mocked(createPendingIntegration);
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 const mockedConsumeInstallState = jest.mocked(consumeInstallState);
 const mockedCheckInstallState = jest.mocked(checkInstallState);
@@ -207,6 +214,8 @@ beforeEach(() => {
     login: 'octocat',
     accessToken: 'ghu_test-token',
   });
+  mockedFetchGitHubInstallationRequests.mockResolvedValue([]);
+  mockedCreatePendingIntegration.mockResolvedValue(undefined as never);
   mockedVerifyGitHubInstallationAuthorization.mockResolvedValue({
     identity: { id: GITHUB_USER_ID, login: 'octocat' },
     candidate: {
@@ -922,6 +931,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
   });
 
   test('redirects to /github-app fallback for app-initiated pending approval', async () => {
+    const accountId = `acct-${randomUUID()}`;
     mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
@@ -933,21 +943,31 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       consumed_at: null,
       created_at: new Date().toISOString(),
     });
-
-    const { createPendingIntegration } =
-      await import('@/lib/integrations/db/platform-integrations');
-    const mockedCreatePending = jest.mocked(createPendingIntegration);
-    mockedCreatePending.mockResolvedValue(undefined as never);
+    mockedFetchGitHubInstallationRequests.mockResolvedValue([
+      {
+        id: `request-${accountId}`,
+        accountId,
+        accountLogin: 'octocat',
+        requesterId: GITHUB_USER_ID,
+        requesterLogin: 'octocat',
+      },
+    ]);
 
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=request&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/github-app?fromApp=1&github_pending_approval=true');
+    expect(mockedCreatePendingIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: USER_ID,
+        githubRequest: expect.objectContaining({ accountId, accountLogin: 'octocat' }),
+      })
+    );
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
@@ -1074,7 +1094,118 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
-  test('ambiguous app-initiated pending request returns successful pending no-op', async () => {
+  test('app-initiated request with two matching accounts reports the request as unidentified', async () => {
+    mockConsumedInstallState({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedFetchGitHubInstallationRequests.mockResolvedValue([
+      {
+        id: `request-a-${randomUUID()}`,
+        accountId: `acct-a-${randomUUID()}`,
+        accountLogin: 'octocat',
+        requesterId: GITHUB_USER_ID,
+        requesterLogin: 'octocat',
+      },
+      {
+        id: `request-b-${randomUUID()}`,
+        accountId: `acct-b-${randomUUID()}`,
+        accountLogin: 'octocat-labs',
+        requesterId: GITHUB_USER_ID,
+        requesterLogin: 'octocat',
+      },
+    ]);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&error=pending_request_unidentified');
+    expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
+  });
+
+  test('another owner pending row for the same GitHub account does not change this owner result', async () => {
+    const accountId = `acct-shared-${randomUUID()}`;
+    const otherUserId = `oauth/cb-other-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: otherUserId,
+      google_user_email: `cb-other-${randomUUID()}@example.com`,
+      google_user_name: 'Other Owner',
+      google_user_image_url: '',
+      stripe_customer_id: `cus_cb_other_${randomUUID()}`,
+    });
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: otherUserId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: null,
+        platform_account_id: accountId,
+        platform_account_login: 'octocat',
+        platform_requester_account_id: GITHUB_USER_ID,
+        github_app_type: 'standard',
+        integration_status: 'pending',
+      })
+      .returning();
+    const otherPending = inserted[0];
+    if (!otherPending) throw new Error('Expected the other owner pending row');
+
+    try {
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: USER_ID,
+        owner_type: 'user',
+        owner_id: USER_ID,
+        github_app_type: 'standard',
+        return_to: '/github-app',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockedFetchGitHubInstallationRequests.mockResolvedValue([
+        {
+          id: `request-${accountId}`,
+          accountId,
+          accountLogin: 'octocat',
+          requesterId: GITHUB_USER_ID,
+          requesterLogin: 'octocat',
+        },
+      ]);
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?github_pending_approval=true');
+      expect(mockedCreatePendingIntegration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: USER_ID,
+          githubRequest: expect.objectContaining({ accountId, accountLogin: 'octocat' }),
+        })
+      );
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, otherPending.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
+    }
+  });
+
+  test('a request callback without a code does not claim pending approval', async () => {
     mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
@@ -1090,12 +1221,108 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=request&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}`
       ) as never
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/github-app?fromApp=1&github_pending_approval=true');
+    expectRedirectLocation(response, '/github-app?fromApp=1&error=pending_request_unidentified');
+    expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
+    expect(mockedFetchGitHubInstallationRequests).not.toHaveBeenCalled();
+  });
+
+  test('an org request whose code exchange fails reports the request as unidentified', async () => {
+    const ORG_ID = randomUUID();
+    mockConsumedInstallState({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: ORG_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedExchangeGitHubOAuthCode.mockRejectedValue(new Error('exchange failed'));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(
+      response,
+      `/github-app?fromApp=1&error=pending_request_unidentified&organizationId=${ORG_ID}`
+    );
+    expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
+  });
+
+  test('a repeated request callback keeps the recorded request without writing again', async () => {
+    const accountId = `acct-repeat-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: USER_ID,
+      google_user_email: `cb-repeat-${randomUUID()}@example.com`,
+      google_user_name: 'Repeat Requester',
+      google_user_image_url: '',
+      stripe_customer_id: `cus_cb_repeat_${randomUUID()}`,
+    });
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: USER_ID,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: null,
+        platform_account_id: accountId,
+        platform_account_login: 'octocat',
+        platform_requester_account_id: GITHUB_USER_ID,
+        github_app_type: 'standard',
+        integration_status: 'pending',
+      })
+      .returning();
+    const pendingRow = inserted[0];
+    if (!pendingRow) throw new Error('Expected the recorded pending row');
+
+    try {
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: USER_ID,
+        owner_type: 'user',
+        owner_id: USER_ID,
+        github_app_type: 'standard',
+        return_to: '/cloud/sessions',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockedFetchGitHubInstallationRequests.mockResolvedValue([
+        {
+          id: `request-${accountId}`,
+          accountId,
+          accountLogin: 'octocat',
+          requesterId: GITHUB_USER_ID,
+          requesterLogin: 'octocat',
+        },
+      ]);
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?fromApp=1&github_pending_approval=true');
+      expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, pendingRow.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));
+    }
   });
 
   test('app-initiated org success preserves organizationId on redirect', async () => {
@@ -1171,7 +1398,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
   });
 
   test('app-initiated org pending approval preserves organizationId', async () => {
-    const ORG_ID = 'org-pending';
+    const ORG_ID = randomUUID();
+    const accountId = `acct-org-${randomUUID()}`;
     mockConsumedInstallState({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
@@ -1183,20 +1411,20 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       consumed_at: null,
       created_at: new Date().toISOString(),
     });
-
-    const { createPendingIntegration } =
-      await import('@/lib/integrations/db/platform-integrations');
-    const mockedCreatePending = jest.mocked(createPendingIntegration);
-    mockedCreatePending.mockResolvedValue(undefined as never);
-
-    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
-    }));
+    mockedFetchGitHubInstallationRequests.mockResolvedValue([
+      {
+        id: `request-${accountId}`,
+        accountId,
+        accountLogin: 'octocat',
+        requesterId: GITHUB_USER_ID,
+        requesterLogin: 'octocat',
+      },
+    ]);
 
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=request&state=${DB_TOKEN}`
+        `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
       ) as never
     );
 
@@ -1204,6 +1432,12 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expectRedirectLocation(
       response,
       `/github-app?fromApp=1&github_pending_approval=true&organizationId=${ORG_ID}`
+    );
+    expect(mockedCreatePendingIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        githubRequest: expect.objectContaining({ accountId, accountLogin: 'octocat' }),
+      })
     );
   });
 

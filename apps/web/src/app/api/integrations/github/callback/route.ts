@@ -11,10 +11,7 @@ import { oauthCallbackRedirectPath } from '@/lib/integrations/oauth/common';
 import { platform_integrations, type GitHubInstallState, type User } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
-import {
-  exchangeGitHubOAuthCode,
-  fetchGitHubInstallationRequests,
-} from '@/lib/integrations/platforms/github/adapter';
+import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
 import {
   getGitHubAppCredentials,
   assertUserAdministersInstallation,
@@ -22,6 +19,7 @@ import {
 } from '@/lib/integrations/platforms/github/app-selector';
 import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
 import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import { recordGitHubInstallRequest } from '@/lib/integrations/github/pending-install-request';
 import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
@@ -32,7 +30,6 @@ import {
 import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
-  createPendingIntegration,
   findGitHubBotLinkIntegrations,
   findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
@@ -391,105 +388,31 @@ async function handleCoreInstallFlow(params: {
 
   // Handle pending approval - store requester info for webhook matching
   if (setupAction === 'request') {
-    const code = searchParams.get('code');
-
     try {
-      let githubRequester: { id: string; login: string } | undefined;
+      const recording = await recordGitHubInstallRequest({
+        owner,
+        githubAppType,
+        code: searchParams.get('code'),
+        kiloUser: user,
+      });
 
-      if (code) {
-        try {
-          const githubUser = await exchangeGitHubOAuthCode(code, githubAppType);
-          githubRequester = { id: githubUser.id, login: githubUser.login };
-
-          console.log('GitHub user fetched', {
-            github_user_id: githubRequester.id,
-            github_user_login: githubRequester.login,
-          });
-        } catch (error) {
-          console.error('Error fetching GitHub user:', error);
-          captureException(error);
+      if (recording.kind === 'unidentified') {
+        captureMessage('GitHub install request not recorded', {
+          level: 'info',
+          tags: {
+            endpoint: 'github/callback',
+            source: 'github_pending_request',
+            reason: recording.reason,
+          },
+          extra: { setupAction, ownerType: owner.type },
+        });
+        const unidentifiedQuery = 'error=pending_request_unidentified';
+        if (isAppInitiated) {
+          return NextResponse.redirect(new URL(appFallbackPath(unidentifiedQuery), APP_URL));
         }
-      }
-
-      let githubRequest: { id: string; accountId: string; accountLogin: string } | undefined;
-      if (githubRequester) {
-        const requests = await fetchGitHubInstallationRequests(githubAppType);
-        const requesterRequests = requests.filter(
-          request => request.requesterId === githubRequester.id
+        return NextResponse.redirect(
+          new URL(appendQueryParam(redirectPath, unidentifiedQuery), APP_URL)
         );
-        const recorded = await db
-          .select({ platformAccountId: platform_integrations.platform_account_id })
-          .from(platform_integrations)
-          .where(
-            and(
-              eq(platform_integrations.platform, 'github'),
-              eq(platform_integrations.github_app_type, githubAppType),
-              eq(platform_integrations.integration_status, 'pending'),
-              isNull(platform_integrations.platform_installation_id)
-            )
-          );
-        const recordedAccountIds = new Set(recorded.map(row => row.platformAccountId));
-        const unrecorded = requesterRequests.filter(
-          request => !recordedAccountIds.has(request.accountId)
-        );
-        if (unrecorded.length === 1) {
-          githubRequest = unrecorded[0];
-        } else if (requesterRequests.length === 1) {
-          const existing = requesterRequests[0];
-          const [existingPending] = await db
-            .select({ id: platform_integrations.id })
-            .from(platform_integrations)
-            .where(
-              and(
-                owner.type === 'org'
-                  ? eq(platform_integrations.owned_by_organization_id, owner.id)
-                  : eq(platform_integrations.owned_by_user_id, owner.id),
-                eq(platform_integrations.platform, 'github'),
-                eq(platform_integrations.github_app_type, githubAppType),
-                eq(platform_integrations.platform_account_id, existing.accountId),
-                eq(platform_integrations.integration_status, 'pending'),
-                isNull(platform_integrations.platform_installation_id)
-              )
-            )
-            .limit(1);
-          if (existingPending) {
-            githubRequest = existing;
-          }
-        }
-      }
-
-      if (githubRequest) {
-        const [existingPending] = await db
-          .select({ id: platform_integrations.id })
-          .from(platform_integrations)
-          .where(
-            and(
-              owner.type === 'org'
-                ? eq(platform_integrations.owned_by_organization_id, owner.id)
-                : eq(platform_integrations.owned_by_user_id, owner.id),
-              eq(platform_integrations.platform, 'github'),
-              eq(platform_integrations.github_app_type, githubAppType),
-              eq(platform_integrations.platform_account_id, githubRequest.accountId),
-              eq(platform_integrations.integration_status, 'pending'),
-              isNull(platform_integrations.platform_installation_id)
-            )
-          )
-          .limit(1);
-        if (!existingPending) {
-          await createPendingIntegration({
-            organizationId: owner.type === 'org' ? owner.id : undefined,
-            userId: owner.type === 'user' ? owner.id : undefined,
-            requester: {
-              kilo_user_id: user.id,
-              kilo_user_email: user.google_user_email,
-              kilo_user_name: user.google_user_name,
-              requested_at: new Date().toISOString(),
-            },
-            githubRequester,
-            githubRequest,
-            githubAppType,
-          });
-        }
       }
 
       const orgParam =

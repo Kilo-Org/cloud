@@ -147,6 +147,11 @@ function GitHubIntegrationOutcomeToasts({
       toast.error('Disconnect your current GitHub identity before connecting another account.');
     } else if (error === 'install_state_user_mismatch') {
       // Handled by the fromApp fallback card or non-app mismatch landing.
+    } else if (error === 'pending_request_unidentified') {
+      toast.error(
+        'Kilo could not confirm which GitHub account this request is for. Start the GitHub setup again from the account you want to connect.',
+        { duration: 8000 }
+      );
     } else if (error) {
       const userConnectionMessage = getGitHubUserConnectionErrorMessage(
         error,

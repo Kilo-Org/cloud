@@ -262,6 +262,11 @@ export const BenchmarkModelSummarySchema = z.object({
   p50TtftMs: z.number().nonnegative().nullable().optional(),
   p95LatencyMs: z.number().nullable(),
   cases: z.number().int(),
+  // Cases that reported a cost: the denominator of `avgCostUsd` for the route.
+  // Absent or null on a summary from a worker that predates it and on rows
+  // written before it was stored, so a reader must treat it as unknown rather
+  // than assume every case was priced.
+  costedCases: z.number().int().nonnegative().nullable().optional(),
   errors: z.number().int(),
   timeouts: z.number().int().default(0),
   // Classifier runs only: share of cases whose predicted taskType/subtaskType
@@ -287,6 +292,18 @@ export const BenchmarkRunProgressSchema = z.object({
 });
 export type BenchmarkRunProgress = z.infer<typeof BenchmarkRunProgressSchema>;
 
+/**
+ * Cost and case tallies over one run's graded cases. `totalCostUsd` is the sum of
+ * the cases whose provider reported a cost, and null when none did — a run can
+ * measure cases without anyone knowing what they cost.
+ */
+export const BenchmarkRunTotalsSchema = z.object({
+  totalCostUsd: z.number().nullable(),
+  measuredCases: z.number().int().nonnegative(),
+  erroredCases: z.number().int().nonnegative(),
+});
+export type BenchmarkRunTotals = z.infer<typeof BenchmarkRunTotalsSchema>;
+
 export const BenchmarkRunSchema = z.object({
   id: z.string(),
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
@@ -300,6 +317,12 @@ export const BenchmarkRunSchema = z.object({
   // Optional so run payloads persisted before the field existed still parse.
   // Omitted for terminal runs, whose counts are already final in their summaries.
   progress: BenchmarkRunProgressSchema.optional(),
+  // Admin run list only, and optional for the same reason: the list computes
+  // them from case_results, a stored run row has none.
+  totals: BenchmarkRunTotalsSchema.optional(),
+  // Model ids the run enqueued, so the admin can find a model's run by name
+  // without loading any run's summaries. Optional: only the list serves it.
+  models: z.array(z.string()).optional(),
 });
 export type BenchmarkRun = z.infer<typeof BenchmarkRunSchema>;
 
@@ -325,8 +348,34 @@ export const BenchmarkRunsResponseSchema = z.object({
   runningRunIds: z.array(z.string()).optional(),
 });
 export type BenchmarkRunsResponse = z.infer<typeof BenchmarkRunsResponseSchema>;
+/**
+ * One measured (model, variant) pair summed over every route of a run: the
+ * answer to "what did this model score and cost" without reading the routes.
+ * `accuracy` is the mean case score; `costPerCaseUsd` is the mean over the cases
+ * that reported a cost, so both cost fields are null when none did.
+ */
+export const BenchmarkModelTotalsSchema = z.object({
+  model: z.string(),
+  variant: VariantSchema.optional(),
+  accuracy: z.number(),
+  // Classifier runs only, as on BenchmarkModelSummarySchema.
+  routeAccuracy: z.number().min(0).max(1).nullable(),
+  costPerCaseUsd: z.number().nullable(),
+  totalCostUsd: z.number().nullable(),
+  cases: z.number().int().nonnegative(),
+  // Cases that reported no cost. They are outside the mean and the total, which
+  // only cover the cases that did, and the console states them apart.
+  uncostedCases: z.number().int().nonnegative().default(0),
+  errors: z.number().int().nonnegative(),
+  timeouts: z.number().int().nonnegative(),
+});
+export type BenchmarkModelTotals = z.infer<typeof BenchmarkModelTotalsSchema>;
+
 export const BenchmarkRunSummariesResponseSchema = z.object({
   summaries: z.array(BenchmarkModelSummarySchema),
+  // Optional: absent from workers that predate it, and the route rows still
+  // serve the run's detail.
+  modelTotals: z.array(BenchmarkModelTotalsSchema).optional(),
 });
 export type BenchmarkRunSummariesResponse = z.infer<typeof BenchmarkRunSummariesResponseSchema>;
 // A config save persists the config first, then syncs the platform registry and

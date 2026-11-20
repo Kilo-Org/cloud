@@ -346,7 +346,6 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]
-- `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. When unset, the connection string's `sslmode` parameter decides: `require`/`prefer`/`no-verify` encrypt, `verify-ca`/`verify-full` also verify the server certificate against the system trust store, `disable` or no `sslmode` keeps TLS off for local development. [SERVER]
 - `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`

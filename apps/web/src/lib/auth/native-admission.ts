@@ -19,7 +19,7 @@ import {
   countAdmissionCondition,
   reportAdmissionRefusalOnce,
   rollAdmissionWindowIfNeeded,
-} from './native-admission-telemetry';
+} from './native-admission-counters';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
 
@@ -27,7 +27,7 @@ export {
   countAdmissionCondition,
   resetAdmissionCountersForTests,
   rollAdmissionWindowIfNeeded,
-} from './native-admission-telemetry';
+} from './native-admission-counters';
 
 /**
  * Counts one cross-user attested-key collision and sends the throttled

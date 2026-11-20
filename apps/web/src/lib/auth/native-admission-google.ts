@@ -7,7 +7,7 @@ import {
   GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER,
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
 } from '@kilocode/web-shared/lib/config.server';
-import { countAdmissionCondition } from './native-admission-telemetry';
+import { countAdmissionCondition } from './native-admission-counters';
 
 /**
  * Google Play Integrity verifier.

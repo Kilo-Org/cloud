@@ -21,7 +21,7 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   countAdmissionCondition,
   resetAdmissionCountersForTests,
-} from './native-admission-telemetry';
+} from './native-admission-counters';
 
 // Values are read lazily (via getters) so tests can vary the configuration.
 const mockConfig = {

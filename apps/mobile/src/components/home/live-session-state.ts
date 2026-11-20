@@ -37,9 +37,6 @@ export function useLiveSessionContext() {
     isReady,
     isResolving,
     isError,
-    // A resolving context is only a wait while one of its reads is in flight;
-    // offline, a read that never started is the pause the surfaces name.
-    isFetching: boundary.isFetching,
     label,
     refetch: boundary.refetch,
   };
@@ -66,7 +63,13 @@ export function liveSessionContent(
   sessions: LiveSessions,
   connectivity: BannerState
 ): LiveSessionContent {
-  const offlineWaiting = connectivity === 'offline' && !sessions.isFetching && !context.isFetching;
+  // Nothing a surface can start while offline lands, so the gate asks only
+  // whether the sessions read is genuinely in flight. The boundary read runs on
+  // `networkMode: 'always'`, so counting its fetch would drop the card to a
+  // skeleton for every background organizations refetch — an app foreground, a
+  // profile focus, or the card's own Retry — and on an organization scope the
+  // failed read would then land the surface on the boundary error instead.
+  const offlineWaiting = connectivity === 'offline' && !sessions.isFetching;
   if (context.isResolving) {
     return offlineWaiting ? 'offline' : 'pending';
   }

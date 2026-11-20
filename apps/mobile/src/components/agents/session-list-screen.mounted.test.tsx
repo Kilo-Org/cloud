@@ -875,14 +875,25 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(text()).not.toContain('No internet connection');
     expect(text()).not.toContain('Nothing running right now');
 
+    // The offline card takes no pull: a refresh there could not settle, and a
+    // failed one would paint "Couldn't refresh" over the list after reconnect.
+    expect(requireNode('CenteredState').props.refreshControl).toBeUndefined();
+
     await act(async () => {
       press('Retry');
       await Promise.resolve();
     });
-    // The offline card stands for every read the surface waits on, so its Retry
-    // asks both the context and the sessions list.
+    // The card's Retry asks the boundary read, which settles by failing; the
+    // paused live read is left to React Query's reconnect refetch, so the press
+    // cannot hold the lock for the whole outage.
     expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
-    expect(state.refetch).toHaveBeenCalledTimes(1);
+    expect(state.refetch).not.toHaveBeenCalled();
+    await act(async () => {
+      press('Retry');
+      await Promise.resolve();
+    });
+    // The lock released: the second press is not dropped.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(2);
 
     // The connection returns: the paused read resumes by itself and the card
     // gives way to the confirmed list.

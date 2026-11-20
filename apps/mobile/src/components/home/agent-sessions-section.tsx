@@ -92,16 +92,12 @@ export function LiveSessionFeedback({
       try {
         // A context failure is the boundary's own read. The offline card stands
         // for everything the surface is still waiting on, so its Retry asks the
-        // boundary as well: a context read that never started is what keeps the
-        // surface unresolved there. A still-offline device re-pauses the read,
-        // and the card stays put with `isRetrying` reporting the attempt.
-        if (context.isError) {
-          await context.refetch();
-        } else if (content === 'offline') {
-          await Promise.all([context.refetch(), sessions.refetch()]);
-        } else {
-          await sessions.refetch();
-        }
+        // boundary: that read runs on `networkMode: 'always'`, so it settles by
+        // failing and the attempt ends. The live-sessions read runs on the
+        // default mode and pauses while offline, so awaiting it would hold the
+        // lock (and `isRetrying`) for the whole outage; it resumes by itself on
+        // reconnect, which is what clears the card.
+        await (context.isError || content === 'offline' ? context.refetch() : sessions.refetch());
       } finally {
         retryLock.release();
         setRetrying(false);
@@ -332,7 +328,14 @@ export function LiveSessionFeedback({
       {announcements}
       {hasVisibleContent &&
         (centered ? (
-          <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
+          // The offline card takes no pull: offline, the control would start a
+          // refresh that cannot settle (or resolves false at once while the
+          // live query is disabled) and record a failure it cannot clear, which
+          // would then paint "Couldn't refresh" over the list that just loaded
+          // after reconnect. The reconnect refetch is React Query's own.
+          <CenteredState refreshControl={content === 'offline' ? undefined : refreshControl}>
+            {feedback}
+          </CenteredState>
         ) : (
           feedback
         ))}

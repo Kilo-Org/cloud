@@ -160,7 +160,6 @@ const context: Props['context'] = {
   isReady: true,
   isResolving: false,
   isError: false,
-  isFetching: false,
   label: 'Engineering',
   refetch: vi.fn(),
 };
@@ -384,12 +383,15 @@ describe('Home live section', () => {
     expect(nodes('Skeleton')).toHaveLength(0);
     expect(node('QueryError').props.variant).toBe('offline');
 
-    // A context whose own read is in flight is resolving, not stalled.
+    // A boundary read on `networkMode: 'always'` refetches in the background
+    // (an app foreground, a profile focus) and fails: it is not a wait that can
+    // land, so the card stays instead of a skeleton stack coming back.
     await render(
       { ...settled, hasAcceptedSuccess: false },
-      { ...context, isReady: false, isResolving: true, isFetching: true }
+      { ...context, isReady: false, isResolving: true }
     );
-    expect(nodes('Skeleton').length).toBeGreaterThan(0);
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(node('QueryError').props.variant).toBe('offline');
   });
 
   it('keeps rows and confirmed-empty content through an outage', async () => {
@@ -409,7 +411,7 @@ describe('Home live section', () => {
     expect(text()).toContain('No internet connection');
   });
 
-  it('retries both reads from the offline card', async () => {
+  it('retries the boundary read from the offline card and leaves the paused one to reconnect', async () => {
     connectivity.offline = true;
     connectivity.connected = false;
     const contextRefetch = vi.fn().mockResolvedValue(undefined);
@@ -440,8 +442,19 @@ describe('Home live section', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    // The boundary read settles by failing, so the attempt ends; the live read
+    // pauses offline and is left to React Query's reconnect refetch instead of
+    // holding the lock for the whole outage.
     expect(contextRefetch).toHaveBeenCalledTimes(1);
-    expect(sessionsRefetch).toHaveBeenCalledTimes(1);
+    expect(sessionsRefetch).not.toHaveBeenCalled();
+
+    // The lock is released: a second press asks again instead of being dropped.
+    await act(async () => {
+      (card.props.onRetry as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(contextRefetch).toHaveBeenCalledTimes(2);
   });
 
   it('draws the zero state as its one message, without four zero counts', async () => {

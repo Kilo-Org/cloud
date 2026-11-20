@@ -27,7 +27,6 @@ const readyContext: LiveSessionContext = {
   isReady: true,
   isResolving: false,
   isError: false,
-  isFetching: false,
   label: undefined,
   // The context is only read by `liveSessionContent`; the refetch is never
   // invoked here, so a no-op stub is enough to satisfy the exact query type.

@@ -48,13 +48,18 @@ export function useLiveSessionHeaderNotice(
   const loadFailed = content === 'rows' && context.isReady && Boolean(sessions.terminalError);
   const connectionLost =
     content !== 'error' && context.isReady && !isConnected && reconnectExhausted;
+  // The offline card is the one statement for the outage. While it owns the
+  // surface, a header line beside it would name the same connection loss a
+  // second time — and an exhausted socket would add "Connection lost" with no
+  // action, because `canRetry` stands down offline. The notice speaks only for
+  // rows and confirmed-empty content, which stay readable through the outage.
+  if (content === 'offline') {
+    return null;
+  }
   let message: string | null = null;
   if (loadFailed) {
     message = failureLabel;
-  } else if (internet === 'offline' && content !== 'offline') {
-    // The offline card owns its own statement when the surface has nothing to
-    // show; the notice speaks only for rows and confirmed-empty content, which
-    // stay on screen through the outage.
+  } else if (internet === 'offline') {
     message = t('offline.noInternet');
   } else if (connectionLost) {
     message = t('agentChat.sessionConnection.connectionLost');

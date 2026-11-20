@@ -154,7 +154,7 @@ function GitHubIntegrationOutcomeToasts({
       );
     } else if (error === 'pending_request_exists') {
       toast.error(
-        'A pending GitHub installation request already exists for this account. Finish or cancel it, then try again.',
+        'A pending GitHub installation request already exists for this account. Finish or cancel it in GitHub, then try again.',
         { duration: 8000 }
       );
     } else if (error) {
@@ -1076,7 +1076,7 @@ function GitHubIntegrationDetailsContent({
                       {error === 'not_installation_admin'
                         ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
                         : error === 'pending_request_exists'
-                          ? 'A pending GitHub installation request already exists for this account. Finish or cancel it, then try again.'
+                          ? 'A pending GitHub installation request already exists for this account. Finish or cancel it in GitHub, then try again.'
                           : 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'}
                     </p>
                   </div>

@@ -7,7 +7,7 @@ import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
 import { createPendingIntegration } from '@/lib/integrations/db/platform-integrations';
-import { ownerCondition } from '@/lib/integrations/db/predicates';
+import { effectiveAppTypeCondition, ownerCondition } from '@/lib/integrations/db/predicates';
 import {
   exchangeGitHubOAuthCode,
   fetchGitHubInstallationRequests,
@@ -145,7 +145,7 @@ export async function recordGitHubInstallRequest(params: {
         and(
           outsideOwnerCondition(owner),
           eq(platform_integrations.platform, PLATFORM.GITHUB),
-          eq(platform_integrations.github_app_type, githubAppType),
+          effectiveAppTypeCondition(githubAppType),
           eq(platform_integrations.platform_account_id, selection.request.accountId),
           eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
           isNull(platform_integrations.platform_installation_id)

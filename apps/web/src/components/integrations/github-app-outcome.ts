@@ -122,7 +122,7 @@ export function buildAppReturnOutcomeView(input: {
                       : input.error === 'pending_request_unidentified'
                         ? 'Kilo could not confirm which GitHub account this request is for. Start the GitHub setup again from the account you want to connect.'
                         : input.error === 'pending_request_exists'
-                          ? 'A pending GitHub installation request already exists for this account. Finish or cancel it, then try again.'
+                          ? 'A pending GitHub installation request already exists for this account. Finish or cancel it in GitHub, then try again.'
                           : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 

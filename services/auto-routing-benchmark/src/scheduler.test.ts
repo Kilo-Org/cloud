@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
+import { markStaleRunsFailed } from './db';
 import {
   acquireInitializationLease,
   beginPaidCase,
@@ -30,7 +31,11 @@ import {
   SCHEDULER_MATERIALIZED_LANES_SQL,
   SCHEDULER_MAX_ATTEMPTS,
   SCHEDULER_QUEUE_LEASE_MS,
+  SCHEDULER_PRUNE_CHUNKS_SQL,
+  SCHEDULER_PRUNE_EXECUTIONS_SQL,
+  SCHEDULER_PRUNE_MARKERS_SQL,
   SCHEDULER_SETTLED_RUNS_SQL,
+  SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL,
   SCHEDULER_UNSETTLED_SQL,
 } from './scheduler';
 import type { SchedulerClaim, SchedulerConfig } from './scheduler';
@@ -1455,6 +1460,91 @@ describe('scheduler (production migrations and real SQLite)', () => {
     ]);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM case_results').get()?.n).toBe(2);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(2);
+  });
+
+  it('prunes the chunks of a terminal run that stopped before its scheduler marker', async () => {
+    const insertChunk = sqlite.prepare(`
+      INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids, status)
+      VALUES (?, ?, 'unmarked/model', '', '[]', 0, ?, '["case"]', ?)`);
+    for (const [runId, status, completedAt] of [
+      ['unmarked-old', 'failed', new Date(NOW - 2 * 86400_000).toISOString()],
+      ['unmarked-recent', 'failed', new Date(NOW - 3600_000).toISOString()],
+      ['unmarked-running', 'running', null],
+    ] as const) {
+      insertRun(sqlite, runId);
+      sqlite
+        .prepare('UPDATE benchmark_runs SET status = ?, completed_at = ? WHERE id = ?')
+        .run(status, completedAt, runId);
+      for (const [chunk, chunkStatus] of ['completed', 'failed', 'pending'].entries()) {
+        insertChunk.run(JSON.stringify([runId, chunk]), runId, chunk, chunkStatus);
+      }
+    }
+
+    await recoverChunks(db, NOW);
+
+    expect(storedChunks(sqlite).map(row => [row.run_id, row.status])).toEqual([
+      ['unmarked-recent', 'completed'],
+      ['unmarked-recent', 'failed'],
+      ['unmarked-recent', 'completed'],
+      ['unmarked-running', 'completed'],
+      ['unmarked-running', 'failed'],
+      ['unmarked-running', 'pending'],
+    ]);
+  });
+
+  it('prunes a markerless run the stale sweep failed without a completion time', async () => {
+    const insertChunk = sqlite.prepare(`
+      INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids, status)
+      VALUES (?, ?, 'stale/model', '', '[]', 0, ?, '["case"]', ?)`);
+    for (const [runId, startedAgo, purpose] of [
+      ['stale-day-old', 2 * 86400_000, 'platform'],
+      ['stale-hours-old', 7 * 3600_000, 'user'],
+    ] as const) {
+      insertRun(sqlite, runId, { purpose });
+      sqlite
+        .prepare('UPDATE benchmark_runs SET started_at = ? WHERE id = ?')
+        .run(new Date(NOW - startedAgo).toISOString(), runId);
+      for (const [chunk, chunkStatus] of ['completed', 'failed', 'pending'].entries()) {
+        insertChunk.run(JSON.stringify([runId, chunk]), runId, chunk, chunkStatus);
+      }
+    }
+    await markStaleRunsFailed(db, new Date(NOW - 6 * 3600_000).toISOString());
+    expect(
+      sqlite.prepare('SELECT id, status, completed_at FROM benchmark_runs ORDER BY id').all()
+    ).toEqual([
+      { id: 'stale-day-old', status: 'failed', completed_at: null },
+      { id: 'stale-hours-old', status: 'failed', completed_at: null },
+    ]);
+
+    await recoverChunks(db, NOW);
+
+    expect(storedChunks(sqlite).map(row => [row.run_id, row.status])).toEqual([
+      ['stale-hours-old', 'completed'],
+      ['stale-hours-old', 'failed'],
+      ['stale-hours-old', 'completed'],
+    ]);
+  });
+
+  it('reads recovery and prune state from running runs, markers and chunk owners', () => {
+    const failedPlan = explainPlan(sqlite, SCHEDULER_UNRECORDED_FAILED_CHUNKS_SQL);
+    expect(failedPlan).toContain(
+      'SEARCH chunk USING INDEX IX_scheduler_chunks_lane (status=? AND run_id=?)'
+    );
+    expect(failedPlan).toContain(
+      'SCAN run USING INDEX UQ_benchmark_runs_one_running_per_router_kind_purpose'
+    );
+    for (const sql of [SCHEDULER_PRUNE_EXECUTIONS_SQL, SCHEDULER_PRUNE_MARKERS_SQL]) {
+      const plan = explainPlan(sqlite, sql);
+      expect(plan).toContain('SCAN marker');
+      expect(plan).toContain('SEARCH run USING INDEX sqlite_autoindex_benchmark_runs_1 (id=?)');
+      expect(plan).not.toMatch(/^SCAN run$/m);
+    }
+    const chunksPlan = explainPlan(sqlite, SCHEDULER_PRUNE_CHUNKS_SQL);
+    expect(chunksPlan).toContain(
+      'SEARCH c USING COVERING INDEX IX_scheduler_chunks_run (run_id>?)'
+    );
+    expect(chunksPlan).toContain('SEARCH run USING INDEX sqlite_autoindex_benchmark_runs_1 (id=?)');
+    expect(chunksPlan).not.toMatch(/^SCAN run$/m);
   });
 
   it('completes only terminal runs when reclaiming stalled chunks', async () => {

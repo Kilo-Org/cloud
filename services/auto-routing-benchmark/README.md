@@ -188,9 +188,17 @@ materializes, and a second lease row keeps concurrent dispatchers from initializ
 same time; a pass that completes a run's initialization claims again so its chunks start at
 once.
 
+Starting a decider run writes the run row and returns; it reuses nothing and materializes
+nothing in the request. The first initialization pass copies every entry's compatible prior
+results before it writes any chunk, so a run's chunks exist only once its reuse is complete.
+A pass whose reuse fails writes no chunk, and the next pass repeats the reuse, which skips
+rows the run already holds. The reuse statement filters the prior runs first and then seeks
+each run's pair in `case_results`: D1 keeps no planner statistics, so the join order is
+pinned with `CROSS JOIN`.
+
 Initialization failures stay isolated to their run, so healthy runs can still dispatch.
 A run without its saved execution identity fails and releases its claimed profiles.
-Transient catalog failures leave the run eligible for another initialization attempt.
+Transient catalog or reuse failures leave the run eligible for another initialization attempt.
 
 Run completion accounting reads every case result of the run, so it does not run per
 completed chunk. A completion first asks whether the run still has scheduled work — an
@@ -200,8 +208,10 @@ count as unsettled, so a run with a dead lane still settles once its live lanes 
 runs with no scheduler chunks (legacy whole-run work) are always accounted. The dispatch
 sweep and the dead-letter path remain responsible for runs that settle without a train of
 completions. Chunk recovery and the 24-hour prune batches are likewise bounded: recovery
-completes only the runs that still hold unsettled chunks, and pruning is driven from the
-per-run scheduler markers instead of scanning the chunk, execution or run tables.
+completes only the runs that still hold unsettled chunks, the failed-lane check reads only
+running runs' failed chunks, execution and marker pruning start from the per-run scheduler
+markers, and chunk pruning walks the distinct run ids that still hold chunks, so a run that
+stopped before its marker was written is pruned too.
 
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger records when each paid case started and prevents automatic
@@ -1014,13 +1024,13 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them. `PUT` saves, then syncs the platform registry and republishes the routing table before responding. A failed step does not undo the save: the response is 200 with `warnings` (`registry_sync_failed`, which skips the publish, or `routing_table_publish_failed`), each naming the retry (the daily `0 5 * * *` platform sync, or saving again) |
 | `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots` and `modelConcurrency` (the retired provider limits are accepted and ignored for one web release) |
-| `GET /admin/runs` | List runs without their summaries (sweeps stale `running` runs to `failed` first). `hasRunningRun` reports whether any run of the router is running, whatever the `kind`/`purpose` filter. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
+| `GET /admin/runs` | List runs without their summaries. Read-only; the per-minute cron sweeps stale `running` runs. `hasRunningRun` reports whether any run of the router is running, whatever the `kind`/`purpose` filter. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
 | `GET /admin/runs/:runId/summaries` | One run's model summaries; 404 when the run does not exist or belongs to another router (classifier runs are shared) |
-| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
+| `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`); `202` once a run row exists, with initialization left to the dispatcher |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
 | `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
-| `GET /admin/routing-table` | Latest published **platform** routing table |
+| `GET /admin/routing-table` | Latest published **platform** routing table. Served from `AUTO_ROUTING_CONFIG` key `benchmark_routing_table_response_v1:<router>` only while its version matches the pointer `benchmark_routing_table_version_v1:<router>`. Every publish writes the pointer after its D1 write; a read that finds the pointer missing or different from D1 rewrites it. Every pointer writer re-reads D1 after its write and corrects it, and a body is cached only at the confirmed version. A publish that cannot write the pointer logs it, deletes the cached body and still flushes the gateway key, so the next read goes to D1 and repairs the pointer. The cached body expires after 10 minutes, so even a failed pointer write plus a failed body delete serves the previous table for at most that long. A location's KV edge cache can keep serving the previous pointer for up to about 60 seconds after a publish |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
 | `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of a custom router's gateway models (quota 20 models per base router per 24h) |

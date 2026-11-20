@@ -35,15 +35,60 @@ END $$;
 --> statement-breakpoint
 COMMIT;
 --> statement-breakpoint
--- Every organization created before this column existed defaults to trial_granted = true, so its
--- creator has used the offer. Stamp those creators so a later organization does not grant them a
--- second trial. This UPDATE is its own statement after the committed DDL above; inside the DO
--- block's transaction a retried ALTER would roll the backfill back.
+-- Backfill the per-user record for organizations that predate the column. `createOrganization`
+-- stamps the creator's user row in the same transaction that grants a trial, so every later
+-- creation carries its own record; this statement covers the history it cannot.
+--
+-- Which rows are a granted trial: `trial_granted` was added with default true, so every
+-- organization created before it existed kept a trial window, and one created through a path
+-- that grants no trial (a child organization, a later organization for a user who already spent
+-- the offer) records false itself.
+--
+-- Which rows have a creator: within `createOrganization`, `created_by_kilo_user_id` comes only from
+-- its `userId` argument, and the only production caller of `createOrganization` that passes one is
+-- the self-service web create. The admin create (`createOrganization(input.name)`), SCIM directory
+-- sync (`createOrganization(input.name, null, false)`) and child-organization creation write no
+-- creator. The other writers of the column are a sales demo organization (which stamps the target
+-- user itself), the development-only create route, and administrator reassignment. So a non-null
+-- creator on a granted-trial organization is a user who created it, except after an administrator
+-- reassignment: `updateCreatedBy` can point an existing organization at a user who did not create it,
+-- and this statement stamps that user. The statement deliberately prefers that outcome: a record
+-- that over-counts a used offer is a support correction, while a record that under-counts it cannot
+-- be detected later, so the statement records conservatively.
+--
+-- Not covered here: organizations the previous build creates between this migration and
+-- `promote-app`. Those rows carry a creator and a granted trial with no stamp. The same statement
+-- is exported as `stampOrganizationTrialConsumption` from
+-- `apps/web/src/scripts/db/backfill-organization-trial-consumption.ts` and is safe to repeat after
+-- the promotion.
+--
+-- Two properties keep this statement cheap on the production table. It drives the update from the
+-- set of creator ids as one array, so `kilocode_users` is probed through its primary-key index once
+-- per creator (`= ANY (ARRAY(...))`) instead of scanned end to end; the `IN (SELECT ...)` spelling
+-- of the same predicate becomes a hash semi join with a full sequential scan of `kilocode_users` as
+-- the table grows, even though only the creators' rows change. And outside the migration's implicit
+-- transaction it is its own transaction, so the row locks it takes on `kilocode_users` (the same
+-- rows `enforceOrganizationCreationLimit` locks) are released as soon as the statement finishes
+-- rather than at the end of the migration file. It locks only the users it stamps, and a concurrent
+-- creation of a *different* user's organization is unaffected.
+--
+-- The server default `statement_timeout` cancels a write of this size on the production table, and
+-- the default `lock_timeout` would fail the deploy on a transient wait for one of the creator rows a
+-- live creation transaction holds. Lift both for this statement only, as
+-- `0314_scheduled_briefing_snapshots.sql` does; the deploy job's `timeout-minutes` stays the bound.
+SET statement_timeout = 0;--> statement-breakpoint
+SET lock_timeout = 0;--> statement-breakpoint
 UPDATE "kilocode_users"
 SET "organization_trial_consumed_at" = now()
 WHERE "organization_trial_consumed_at" IS NULL
-  AND EXISTS (
-    SELECT 1 FROM "organizations"
-    WHERE "organizations"."created_by_kilo_user_id" = "kilocode_users"."id"
-      AND "organizations"."trial_granted" = true
-  );
+  AND "id" = ANY (
+    ARRAY(
+      SELECT "created_by_kilo_user_id"
+      FROM "organizations"
+      WHERE "trial_granted" = true
+        AND "created_by_kilo_user_id" IS NOT NULL
+    )
+  );--> statement-breakpoint
+RESET lock_timeout;--> statement-breakpoint
+RESET statement_timeout;--> statement-breakpoint
+BEGIN;

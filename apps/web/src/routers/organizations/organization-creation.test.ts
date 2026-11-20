@@ -14,6 +14,7 @@ import {
   createOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
+import { stampOrganizationTrialConsumption } from '@/scripts/db/backfill-organization-trial-consumption';
 import { MAX_ORGANIZATIONS_PER_USER } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
@@ -530,6 +531,86 @@ describe('organization trial eligibility', () => {
     expect(secondRead.organization_trial_consumed_at).toBe(
       firstRead.organization_trial_consumed_at
     );
+  });
+});
+
+describe('organization trial consumption backfill', () => {
+  // The statement the migration runs, and the one the post-deploy script repeats.
+  const stamp = () => db.transaction(tx => stampOrganizationTrialConsumption(tx));
+
+  async function readTrialConsumedAt(userId: string) {
+    const [row] = await db
+      .select({ organization_trial_consumed_at: kilocode_users.organization_trial_consumed_at })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId));
+    return row?.organization_trial_consumed_at ?? null;
+  }
+
+  test('stamps the creator of an organization created before the record existed', async () => {
+    const user = await insertTestUser();
+    // The organization carries a granted trial and its creator's record is unset, which is
+    // the state an organization created before the record existed leaves behind.
+    const [windowOrganization] = await db
+      .insert(organizations)
+      .values({
+        name: 'Deploy window organization',
+        created_by_kilo_user_id: user.id,
+        trial_granted: true,
+        free_trial_end_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .returning();
+    expect(windowOrganization.trial_granted).toBe(true);
+    expect(await readTrialConsumedAt(user.id)).toBeNull();
+
+    expect(await stamp()).toBeGreaterThan(0);
+    expect(await readTrialConsumedAt(user.id)).not.toBeNull();
+
+    const later = await createOrganization('After the window', user.id);
+
+    expect(later.trial_granted).toBe(false);
+    expect(later.free_trial_end_at).toBeNull();
+  });
+
+  test('stamps nothing on a repeat run', async () => {
+    const user = await insertTestUser();
+    await db.insert(organizations).values({
+      name: 'Repeat run organization',
+      created_by_kilo_user_id: user.id,
+      trial_granted: true,
+    });
+
+    expect(await stamp()).toBeGreaterThan(0);
+    const stampedAt = await readTrialConsumedAt(user.id);
+    expect(stampedAt).not.toBeNull();
+
+    expect(await stamp()).toBe(0);
+    expect(await readTrialConsumedAt(user.id)).toBe(stampedAt);
+  });
+
+  test('does not stamp a user who only joined a granted-trial organization another user created', async () => {
+    const creator = await insertTestUser();
+    const joined = await insertTestUser();
+    const organization = await createOrganization('Joined organization', creator.id);
+    expect(organization.trial_granted).toBe(true);
+    await addUserToOrganization(organization.id, joined.id, 'owner');
+
+    await stamp();
+
+    expect(await readTrialConsumedAt(creator.id)).not.toBeNull();
+    expect(await readTrialConsumedAt(joined.id)).toBeNull();
+  });
+
+  test('does not stamp a creator from an organization that carried no trial', async () => {
+    const user = await insertTestUser();
+    await db.insert(organizations).values({
+      name: 'No trial organization',
+      created_by_kilo_user_id: user.id,
+      trial_granted: false,
+    });
+
+    await stamp();
+
+    expect(await readTrialConsumedAt(user.id)).toBeNull();
   });
 });
 

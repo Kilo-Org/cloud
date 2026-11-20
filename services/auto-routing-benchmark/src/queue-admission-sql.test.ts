@@ -4,7 +4,8 @@ import { resolveEffectivePolicy, type AutoRouter } from '@kilocode/auto-routing-
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { saveBenchmarkConfig } from './config';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { MAX_RUNNING_RUNS_PER_QUEUE } from './db';
+import { insertRun as insertRunRow, MAX_RUNNING_RUNS_PER_QUEUE } from './db';
+import { ACTIVE_MEASUREMENT_REVISION, MEASUREMENT_REVISION } from './measurement-revision';
 import {
   computeEngineIdentity,
   dispatchScheduler,
@@ -237,6 +238,9 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     expect(started.entryCount).toBe(1);
     expect(runningUserRuns()).toEqual(['user-large', runId]);
     expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: runId });
+    expect(
+      sqlite.prepare('SELECT measurement_revision FROM benchmark_runs WHERE id = ?').get(runId)
+    ).toEqual({ measurement_revision: ACTIVE_MEASUREMENT_REVISION });
     // The drain writes the run row and wakes the dispatcher, which materializes
     // the run and claims its first chunk on the same wake.
     expect(sent).toContainEqual(
@@ -328,6 +332,32 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     await dispatchScheduler(env);
 
     expect(starting.filter(run => !initialized(run.id))).toEqual([]);
+  });
+
+  it('stores the measurement revision the admitted decider run was started under', async () => {
+    const run = {
+      id: 'revision-3-run',
+      router: 'efficient' as const,
+      kind: 'decider' as const,
+      startedAt: new Date(Date.now()).toISOString(),
+      min_accuracy: 0.7,
+      switch_cost_factor: 3,
+      best_accuracy_switch_threshold: 0.05,
+      max_concurrency: 0,
+      benchmark_user_id: BENCHMARK_USER,
+      benchmark_org_id: BENCHMARK_ORG,
+      repetitions: repetitionsOf('efficient'),
+      classifier_max_p95_latency_ms: null,
+      engine_identity: computeEngineIdentity('decider', 'efficient'),
+      measurement_revision: MEASUREMENT_REVISION,
+      purpose: 'user' as const,
+    };
+
+    expect(await insertRunRow(env.BENCH_DB, run, [], [])).toEqual({ admitted: true });
+
+    expect(
+      sqlite.prepare('SELECT measurement_revision FROM benchmark_runs WHERE id = ?').get(run.id)
+    ).toEqual({ measurement_revision: MEASUREMENT_REVISION });
   });
 
   it('lets exactly one of two overlapping drains start a run', async () => {

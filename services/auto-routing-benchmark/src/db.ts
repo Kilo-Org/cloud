@@ -303,14 +303,16 @@ const QUEUE_RUN_OCCUPANCY_SQL = `
 
 /**
  * Inserts a decider run only while its (router ?2, queue ?15) has no starting run
- * and fewer than ?16 active runs, so the check and the insert are one statement.
+ * and fewer than ?17 active runs, so the check and the insert are one statement.
+ * The run records the measurement revision it was started under (?16).
  */
 const ADMIT_DECIDER_RUN_SQL = `
   INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
     kind, status, started_at, min_accuracy, switch_cost_factor, best_accuracy_switch_threshold,
     max_concurrency, benchmark_user_id, benchmark_org_id, repetitions,
-    classifier_max_p95_latency_ms, engine_identity, purpose)
-  SELECT ?1, ?2, ?3, ?4, 'decider', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15
+    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision)
+  SELECT ?1, ?2, ?3, ?4, 'decider', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
+    ?16
   WHERE NOT EXISTS (
     SELECT 1 FROM benchmark_runs AS active
     WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
@@ -320,7 +322,7 @@ const ADMIT_DECIDER_RUN_SQL = `
     SELECT COUNT(*) FROM benchmark_runs AS active
     WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
       AND active.status = 'running'
-  ) < ?16
+  ) < ?17
 `;
 
 export async function getQueueRunOccupancy(
@@ -444,6 +446,7 @@ export async function insertRun(
         row.classifier_max_p95_latency_ms,
         row.engine_identity,
         row.purpose,
+        row.measurement_revision,
         MAX_RUNNING_RUNS_PER_QUEUE
       ),
     db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(row.router, row.purpose),

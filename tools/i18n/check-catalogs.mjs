@@ -938,6 +938,59 @@ function checkAgentEditorCopy(values, english, label) {
 const MISCASED_PULL_REQUEST_TERM =
   /(?<![A-Za-zÀ-ÿ])pR(?![A-Za-zÀ-ÿ])|(?<![A-Za-zÀ-ÿ])pull-Request(?![A-Za-zÀ-ÿ])/;
 
+/**
+ * The list conjunction `Intl.ListFormat` puts between two items in `tag`, read
+ * from the formatter itself rather than a hand-written table: the sentence and
+ * every catalog's own list join have to agree on one separator, and only the
+ * platform knows it. Two sentinels that no label can contain isolate the
+ * junction: the run between them is what the conjunction writes, spaces and
+ * all (" and ", " und ", " و", "和").
+ */
+const listConjunctions = new Map();
+function listConjunctionOf(tag) {
+  if (!listConjunctions.has(tag)) {
+    let conjunction = null;
+    try {
+      const joined = new Intl.ListFormat(tag, { style: 'long', type: 'conjunction' }).format([
+        '\u0001\u0001',
+        '\u0002\u0002',
+      ]);
+      conjunction = joined.split('\u0001\u0001')[1]?.split('\u0002\u0002')[0] ?? null;
+    } catch {
+      // A tag `Intl` refuses is reported once, by the catalog loop.
+      conjunction = null;
+    }
+    listConjunctions.set(tag, conjunction === '' ? null : conjunction);
+  }
+  return listConjunctions.get(tag);
+}
+
+/**
+ * The changelog screen names the areas a release's fixes touched as one
+ * `Intl.ListFormat` sentence, so each area label is one item of that list. A
+ * label that carries the catalog's own list conjunction doubles it and the
+ * reader cannot tell where one area ends: Hindi read "Cloud Agent, Security
+ * Agent और प्रोफ़ाइल और संगठन" for three areas. The label joins its two nouns
+ * with the language's own compound form instead (an ampersand, "व", "与"), and
+ * the list supplies the only conjunction in the sentence.
+ */
+function checkChangelogAreaLabels(tag, values, label) {
+  const problems = [];
+  const conjunction = listConjunctionOf(tag);
+  if (conjunction === null) {
+    return problems;
+  }
+  for (const [key, value] of values) {
+    if (!key.startsWith('profile.changelogAreas.') || !value.includes(conjunction)) {
+      continue;
+    }
+    problems.push(
+      `${label}: "${key}" contains the list conjunction "${conjunction.trim()}"; the changelog sentence joins the areas itself, so join this label's nouns another way`
+    );
+  }
+  return problems;
+}
+
 /** Reject the miscased pull-request term, in English and in every locale. */
 function checkPullRequestTerm(values, label) {
   const problems = [];
@@ -1955,6 +2008,7 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
     ...checkEnglishValues({ catalogName, english, englishValues }),
     ...checkAgentEditorCopy(english, english, label),
     ...checkPullRequestTerm(english, label),
+    ...checkChangelogAreaLabels('en', english, label),
   ];
 }
 
@@ -2464,6 +2518,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a
     // category suffix. The English `_one`/`_other` siblings of a family

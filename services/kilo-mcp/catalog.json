@@ -599,6 +599,36 @@
               },
               "isSecret": {
                 "type": "boolean"
+              },
+              "networkSecret": {
+                "type": "object",
+                "properties": {
+                  "allowedHosts": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 254,
+                      "pattern": "^[A-Za-z0-9.-]+$"
+                    }
+                  },
+                  "locations": {
+                    "default": [
+                      "header"
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "const": "header"
+                    }
+                  }
+                },
+                "required": [
+                  "allowedHosts"
+                ]
               }
             },
             "required": [

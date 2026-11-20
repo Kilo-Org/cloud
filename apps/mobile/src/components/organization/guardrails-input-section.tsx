@@ -80,86 +80,95 @@ export function InputGuardrailsSection({
         onChange(current => ({ ...current, inputEnabled: next }));
       }}
       intro={
-        <>
-          <RowGroup>
-            <SettingsValueRow
-              label={t('organizationGuardrails.applyTo')}
-              value={selectedGroupName}
-              disabled={disabled}
-              onPress={
-                groups.length > 0 || draft.groupId != null
-                  ? () => {
-                      setGroupPickerOpen(true);
-                    }
-                  : undefined
-              }
-            />
-          </RowGroup>
-          <Text variant="caption">{t('organizationGuardrails.detectorsHint')}</Text>
-        </>
+        <RowGroup>
+          <SettingsValueRow
+            label={t('organizationGuardrails.applyTo')}
+            value={selectedGroupName}
+            disabled={disabled}
+            onPress={
+              groups.length > 0 || draft.groupId != null
+                ? () => {
+                    setGroupPickerOpen(true);
+                  }
+                : undefined
+            }
+          />
+        </RowGroup>
       }
     >
-      {INPUT_DETECTOR_IDS.map(id => {
-        const copy = INPUT_DETECTOR_COPY[id];
-        return (
-          <DetectorCard
-            key={id}
-            label={t(copy.label)}
-            description={t(copy.description)}
-            choice={detectorChoice(draft.detectors[id])}
-            disabled={disabled}
-            onChoiceChange={choice => {
-              onChange(current => ({
-                ...current,
-                detectors: withInputDetectorChoice(current.detectors, id, choice),
-              }));
-            }}
-          >
-            {id === 'policy_violation' && policy.enabled ? (
-              <View key={`policy-${policyGeneration}`} className="gap-3">
-                <PolicyFormatField
-                  format={policy.format}
-                  disabled={disabled}
-                  onChange={format => {
-                    setPolicy({ format });
-                  }}
-                />
-                {policy.format === 'rules' ? (
-                  <PolicyRulesEditor
-                    rules={policy.rules}
-                    disabled={disabled}
-                    onChange={rules => {
-                      setPolicy({ rules });
-                    }}
-                  />
-                ) : (
-                  <PolicyTextField
-                    value={policy.policy_text}
-                    disabled={disabled}
-                    onChange={policy_text => {
-                      setPolicy({ policy_text });
-                    }}
-                  />
-                )}
-              </View>
-            ) : null}
-          </DetectorCard>
-        );
-      })}
-      <Button
-        variant="outline"
-        size="sm"
-        className="self-start"
-        disabled={disabled}
-        onPress={() => {
-          applyKiloDefault(() => {
-            setPolicyGeneration(generation => generation + 1);
-          });
-        }}
-      >
-        <Text>{t('organizationGuardrails.applyKiloDefault')}</Text>
-      </Button>
-      <Text variant="caption">{t('organizationGuardrails.applyKiloDefaultEnglishNote')}</Text>
+      {/* The hint explains the Off / Log only / Block choices of the cards
+          below, so it sits with them at the inner gap instead of under the
+          scope row, which it does not describe. */}
+      <View className="gap-3">
+        <Text variant="caption">{t('organizationGuardrails.detectorsHint')}</Text>
+        <View className="gap-6">
+          {INPUT_DETECTOR_IDS.map(id => {
+            const copy = INPUT_DETECTOR_COPY[id];
+            return (
+              <DetectorCard
+                key={id}
+                label={t(copy.label)}
+                description={t(copy.description)}
+                choice={detectorChoice(draft.detectors[id])}
+                disabled={disabled}
+                onChoiceChange={choice => {
+                  onChange(current => ({
+                    ...current,
+                    detectors: withInputDetectorChoice(current.detectors, id, choice),
+                  }));
+                }}
+              >
+                {id === 'policy_violation' && policy.enabled ? (
+                  <View key={`policy-${policyGeneration}`} className="gap-3">
+                    <PolicyFormatField
+                      format={policy.format}
+                      disabled={disabled}
+                      onChange={format => {
+                        setPolicy({ format });
+                      }}
+                    />
+                    {policy.format === 'rules' ? (
+                      <PolicyRulesEditor
+                        rules={policy.rules}
+                        disabled={disabled}
+                        onChange={rules => {
+                          setPolicy({ rules });
+                        }}
+                      />
+                    ) : (
+                      <PolicyTextField
+                        value={policy.policy_text}
+                        disabled={disabled}
+                        onChange={policy_text => {
+                          setPolicy({ policy_text });
+                        }}
+                      />
+                    )}
+                  </View>
+                ) : null}
+              </DetectorCard>
+            );
+          })}
+        </View>
+      </View>
+      {/* The note explains the preset the button applies, so it stays one
+          group with the button rather than floating between sections. */}
+      <View className="gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          disabled={disabled}
+          onPress={() => {
+            applyKiloDefault(() => {
+              setPolicyGeneration(generation => generation + 1);
+            });
+          }}
+        >
+          <Text>{t('organizationGuardrails.applyKiloDefault')}</Text>
+        </Button>
+        <Text variant="caption">{t('organizationGuardrails.applyKiloDefaultEnglishNote')}</Text>
+      </View>
 
       <MenuSheet
         visible={groupPickerOpen}

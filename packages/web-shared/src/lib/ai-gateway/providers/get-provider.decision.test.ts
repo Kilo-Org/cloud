@@ -1434,22 +1434,28 @@ describe('getProvider BYOK failover candidates', () => {
     expect(result.routes).toHaveLength(1);
   });
 
-  test('gives a catalog key served over another API kind no failover route', async () => {
+  test('answers a catalog key served over another API kind with the mismatch, not a route', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [{ providerId: 'synthetic', catalogMode: true }]);
     jest
       .mocked(findDirectByokCatalogModels)
       .mockResolvedValue([catalogModel('synthetic', ['chat_completions'])]);
 
-    const result = await routeProvider({
-      requestedModel: MODEL,
-      request: request('responses'),
-      user,
-      organizationId: undefined,
-    });
+    const result = await getProvider(
+      getProviderInput({
+        requestedModel: MODEL,
+        request: request('responses'),
+        user,
+        organizationId: undefined,
+      })
+    );
 
-    expect(await byokProviderIds(result)).toEqual(['synthetic']);
-    expect(result.routes).toHaveLength(1);
+    expect(result).toEqual({
+      kind: 'direct-byok-unsupported-api-kind',
+      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
+      supportedApiKinds: ['chat_completions'],
+    });
   });
 
   test('gives a provider model id served by its own key no failover route', async () => {

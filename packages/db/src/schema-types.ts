@@ -2910,20 +2910,6 @@ export const ReasoningOptionSchema = z.discriminatedUnion('type', [
 
 export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
 
-/**
- * Per-key BYOK settings. Every field is optional so new settings need no backfill.
- * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
- * ids, so organization model policies apply to it.
- * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
- * same request. Keys without one keep their default order after every prioritized key.
- */
-export const ByokApiKeySettingsSchema = z.object({
-  serve_catalog_models: z.boolean().optional(),
-  priority: z.number().int().nonnegative().optional(),
-});
-
-export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
-
 export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
@@ -3146,6 +3132,160 @@ export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
+
+/**
+ * An organization's own upstream private provider, stored as a BYOK key whose provider id is
+ * `private-` plus a random suffix. Its models are listed as `<provider id>/<model id>`, or, in
+ * catalog mode, serve the Kilo catalog ids they are named after.
+ */
+export const BYOK_PRIVATE_PROVIDER_ID_PREFIX = 'private-';
+
+export type ByokPrivateProviderId = `${typeof BYOK_PRIVATE_PROVIDER_ID_PREFIX}${string}`;
+
+const BYOK_PRIVATE_PROVIDER_ID_PATTERN = /^private-[a-z0-9]{10}$/;
+
+export function isByokPrivateProviderId(value: unknown): value is ByokPrivateProviderId {
+  return typeof value === 'string' && BYOK_PRIVATE_PROVIDER_ID_PATTERN.test(value);
+}
+
+export const ByokPrivateProviderIdSchema = z.custom<ByokPrivateProviderId>(
+  isByokPrivateProviderId,
+  { message: 'must be a private provider id such as "private-a1b2c3d4e5"' }
+);
+
+/** How the upstream returns reasoning; `reasoning-details` is OpenRouter's shape and needs no transform. */
+export const ByokPrivateProviderReasoningFormatSchema = z.enum([
+  'reasoning-details',
+  ReasoningDetailsTransform.ReasoningContent,
+  ReasoningDetailsTransform.Reasoning,
+  ReasoningDetailsTransform.GeminiThought,
+]);
+
+export type ByokPrivateProviderReasoningFormat = z.infer<
+  typeof ByokPrivateProviderReasoningFormatSchema
+>;
+
+/** Lowercase like every gateway model id, without the `:` variant and `~` alias markers. */
+export const ByokPrivateModelIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^[a-z0-9._/-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / _ -');
+
+/** Settings that the private provider sets for every model and a model may override. */
+const ByokPrivateModelOverridesSchema = z.object({
+  api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
+  client_provider: CustomLlmProviderSchema.optional(),
+  reasoning_format: ByokPrivateProviderReasoningFormatSchema.optional(),
+  /**
+   * Whether Chat Completions and Responses requests keep the `prompt_cache_key` the gateway sets.
+   * Some upstreams reject the field, so it is sent only when turned on.
+   */
+  send_prompt_cache_key: z.boolean().optional(),
+});
+
+export const ByokPrivateModelSchema = DirectByokModelSchema.pick({ flags: true })
+  .extend({
+    /** The id clients use after the provider id; in catalog mode, the Kilo catalog id it serves. */
+    id: ByokPrivateModelIdSchema,
+    /** The id the upstream knows the model by. */
+    internal_id: z.string().trim().min(1).max(500),
+    name: z.string().trim().min(1).max(200).optional(),
+    context_length: z.number().int().positive(),
+    max_completion_tokens: z.number().int().positive(),
+  })
+  .extend(ByokPrivateModelOverridesSchema.shape);
+
+export type ByokPrivateModel = z.infer<typeof ByokPrivateModelSchema>;
+
+export const BYOK_PRIVATE_PROVIDER_MAX_MODELS = 500;
+
+// Refinements still run after Zod records a URL error, so an unparsable value passes here and is
+// reported by the URL check alone.
+function hasNoUserInfo(url: string): boolean {
+  try {
+    const { username, password } = new URL(url);
+    return username === '' && password === '';
+  } catch {
+    return true;
+  }
+}
+
+export const ByokPrivateProviderDefinitionSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    /** The API root without a trailing slash. */
+    // Plain HTTP is accepted so local development can reach local servers. Deployed gateways
+    // refuse non-HTTPS and non-public upstreams at request time (`isUpstreamUrlPolicyEnforced`),
+    // as they do for every configurable upstream.
+    base_url: z
+      .url({ protocol: /^https?$/ })
+      .refine(url => !url.endsWith('/'), 'must not end with a slash')
+      .refine(url => !url.includes('?') && !url.includes('#'), 'must not have a query or fragment')
+      .refine(hasNoUserInfo, 'must not contain a username or password')
+      // Nothing substitutes URL templates such as `{model}`; the URL is used verbatim.
+      .refine(url => !/[{}]/.test(url), 'must not contain { or }'),
+    /** Gateway APIs the upstream serves. */
+    api_kinds: z.array(CustomLlmApiKindSchema).min(1),
+    /** The API clients use: `anthropic` Messages, `openai` Responses, `openrouter` Chat Completions. */
+    client_provider: CustomLlmProviderSchema,
+    reasoning_format: ByokPrivateProviderReasoningFormatSchema,
+    send_prompt_cache_key: ByokPrivateModelOverridesSchema.shape.send_prompt_cache_key,
+    models: z.array(ByokPrivateModelSchema).min(1).max(BYOK_PRIVATE_PROVIDER_MAX_MODELS),
+  })
+  .superRefine((definition, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, model] of definition.models.entries()) {
+      if (seen.has(model.id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['models', index, 'id'],
+          message: `Duplicate model id ${model.id}`,
+        });
+      }
+      seen.add(model.id);
+      const apiKinds = model.api_kinds ?? definition.api_kinds;
+      const clientApiKind = getCustomLlmClientApiKind(
+        model.client_provider ?? definition.client_provider
+      );
+      if (!apiKinds.includes(clientApiKind)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: model.api_kinds || model.client_provider ? ['models', index] : ['api_kinds'],
+          message: `The supported APIs must include ${clientApiKind}, the API clients use`,
+        });
+      }
+    }
+  });
+
+export type ByokPrivateProviderDefinition = z.infer<typeof ByokPrivateProviderDefinitionSchema>;
+
+export const ByokPrivateProviderCredentialsSchema = z.discriminatedUnion('type', [
+  CustomLlmApiKeyCredentialsSchema,
+  CustomLlmXApiKeyCredentialsSchema,
+  CustomLlmAwsBedrockCredentialsSchema,
+  GoogleServiceAccountKeySchema,
+]);
+
+export type ByokPrivateProviderCredentials = z.infer<typeof ByokPrivateProviderCredentialsSchema>;
+
+/**
+ * Per-key BYOK settings. Every field is optional so new settings need no backfill.
+ * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
+ * ids, so organization model policies apply to it.
+ * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
+ * same request. Keys without one keep their default order after every prioritized key.
+ * `private_provider`: set exactly for an organization's private provider key (`BYOK_PRIVATE_PROVIDER_ID_PREFIX`),
+ * whose encrypted envelope then holds `ByokPrivateProviderCredentials` JSON.
+ */
+export const ByokApiKeySettingsSchema = z.object({
+  serve_catalog_models: z.boolean().optional(),
+  priority: z.number().int().nonnegative().optional(),
+  private_provider: ByokPrivateProviderDefinitionSchema.optional(),
+});
+
+export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
 
 export const GatewayModelIdSchema = z
   .string()

@@ -14,12 +14,18 @@ import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-util
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   formatDirectByokModelId,
+  getByokPrivateProviders,
   getDirectByokCatalogModelId,
+  getDirectByokKeyLabel,
   getDirectByokModel,
   getDirectByokModelChatApis,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  getEnabledByokProviders,
+  type EnabledByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isByokPrivateModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KILO_AUTO_BALANCED_MODEL,
@@ -206,14 +212,22 @@ export async function validateOrganizationAutoTarget(
     return { kind: 'ok', modelId: rawModelId };
   }
 
-  const directByokTarget = await getDirectByokModel(rawModelId);
+  let enabledKeys: Promise<EnabledByokProvider[]> | undefined;
+  const loadEnabledKeys = () =>
+    (enabledKeys ??= getEnabledByokProviders(options.dbClient ?? readDb, {
+      type: 'organization',
+      id: organization.id,
+    }));
+  const isPrivateProviderTarget = isByokPrivateModelId(rawModelId);
+  // Only the organization's keys know its private providers, whose model ids nobody else can use.
+  const directByokTarget = await getDirectByokModel(
+    rawModelId,
+    isPrivateProviderTarget ? getByokPrivateProviders(await loadEnabledKeys()) : undefined
+  );
   if (directByokTarget) {
-    const key = (
-      await getEnabledByokProviders(options.dbClient ?? readDb, {
-        type: 'organization',
-        id: organization.id,
-      })
-    ).find(candidate => candidate.providerId === directByokTarget.provider.id);
+    const key = (await loadEnabledKeys()).find(
+      candidate => candidate.providerId === directByokTarget.provider.id
+    );
     if (!key) {
       return {
         kind: 'error',
@@ -233,12 +247,12 @@ export async function validateOrganizationAutoTarget(
     }
     // A catalog-mode key serves the model only under its catalog id, which organization model and
     // provider policies cover, so a stored bespoke target resolves to that id.
-    if (key.serveCatalogModels && supportsCatalogMode(directByokTarget.provider.id)) {
+    if (key.serveCatalogModels && supportsCatalogMode(directByokTarget.provider)) {
       const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
       if (!catalogModelId) {
         return {
           kind: 'error',
-          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${directByokTarget.provider.id} key uses Kilo catalog model IDs and this model has no catalog ID.`,
+          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${getDirectByokKeyLabel(directByokTarget.provider)} uses Kilo catalog model IDs and this model has no catalog ID.`,
         };
       }
       return validateOrganizationAutoTarget(organization, catalogModelId, options);
@@ -246,6 +260,12 @@ export async function validateOrganizationAutoTarget(
     return {
       kind: 'ok',
       modelId: formatDirectByokModelId(directByokTarget.provider, directByokTarget.model),
+    };
+  }
+  if (isPrivateProviderTarget) {
+    return {
+      kind: 'error',
+      message: `Organization Auto route target '${targetModelId}' is unavailable because no enabled private provider of this organization serves it.`,
     };
   }
 

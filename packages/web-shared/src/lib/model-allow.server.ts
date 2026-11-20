@@ -8,7 +8,14 @@ import {
   getPublicCustomLlmInferenceProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getByokPrivateProviders,
+  getDirectByokModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { isByokPrivateModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
+import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
@@ -32,8 +39,25 @@ export type ModelRestrictions = {
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
 /**
+ * The grantee organization's enabled private providers outside catalog mode, which serve their models
+ * under the private provider model ids. A catalog-mode private provider serves only catalog ids, which the policy
+ * covers.
+ */
+async function getBespokePrivateProviders(
+  customLlmGrantee: CustomLlmGrantee | undefined
+): Promise<DirectByokProvider[]> {
+  if (!customLlmGrantee) return [];
+  const keys = await getEnabledByokProviders(readDb, {
+    type: 'organization',
+    id: customLlmGrantee.organizationId,
+  });
+  return getByokPrivateProviders(keys.filter(key => !key.serveCatalogModels));
+}
+
+/**
  * A custom LLM is exempt only for a grantee it is granted to: a Kilo admin
  * allowlisted that organization or group, which overrides organization policy.
+ * A private provider model is exempt only for the organization whose enabled private provider lists it.
  */
 export async function isModelRestrictionExempt(
   modelId: string,
@@ -54,7 +78,12 @@ export async function isModelRestrictionExempt(
       )
     );
   }
-  const directByokModel = await getDirectByokModel(requestedModelId);
+  const directByokModel = await getDirectByokModel(
+    requestedModelId,
+    isByokPrivateModelId(requestedModelId)
+      ? await getBespokePrivateProviders(customLlmGrantee)
+      : undefined
+  );
   return directByokModel !== null;
 }
 

@@ -6,6 +6,10 @@ import type {
   OpenRouterModelsResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type {
+  DirectByokCatalogServing,
+  DirectByokCatalogServingKey,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type {
   OrganizationGroupPolicyContext,
   OrganizationPolicySubject,
 } from './organization-group-policy-context.server';
@@ -64,21 +68,30 @@ const mockInferenceProviderUserByok = jest.fn(
   async (modelId: string, _providers: readonly string[]) =>
     INFERENCE_PROVIDER_BYOK_MODELS.has(modelId)
 );
-const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
+type MockByokKey = { providerId: string; serveCatalogModels: boolean };
+const mockByok = jest.fn<Promise<OpenRouterModel[]>, [readonly MockByokKey[]]>();
 const mockCustom = jest.fn<
   Promise<OpenRouterModel[]>,
   [string, readonly string[], string | null]
 >();
-const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
+const mockEnabledKeys = jest.fn(async (_db: unknown, _owner: unknown): Promise<MockByokKey[]> => [
+  { providerId: 'openai', serveCatalogModels: false },
+]);
 /** Replica snapshot loads a test expects; anything else fails the test teardown. */
 let expectedReplicaLoads = 0;
-const mockCatalogModelIds = new Set(['provider/allowed']);
-const mockDirectByokCatalogModelIds = jest.fn(
-  async (_organizationId: string, _policy: unknown): Promise<ReadonlySet<string>> =>
-    mockCatalogModelIds
+const CHAT_COMPLETIONS_KEYS: DirectByokCatalogServingKey[] = [
+  { chatApis: ['chat_completions'], clientApi: 'chat_completions' },
+];
+function catalogServing(modelIds: string[]): DirectByokCatalogServing {
+  return new Map(modelIds.map(modelId => [modelId, CHAT_COMPLETIONS_KEYS]));
+}
+const mockCatalogServing = catalogServing(['provider/allowed']);
+const mockDirectByokCatalogServing = jest.fn(
+  async (_organizationId: string, _policy: unknown): Promise<DirectByokCatalogServing> =>
+    mockCatalogServing
 );
 const mockCatalogAvailability = jest.fn(
-  (models: OpenRouterModel[], _catalogModelIds: ReadonlySet<string>) => models
+  (models: OpenRouterModel[], _serving: DirectByokCatalogServing) => models
 );
 const mockAvailability = jest.fn(
   async (
@@ -130,11 +143,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlm
   listAvailableCustomLlms: mockCustom,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
-  getDirectByokModelsForOrganization: mockByok,
+  getDirectByokModels: mockByok,
 }));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
-  () => ({ getAllowedDirectByokCatalogModelIds: mockDirectByokCatalogModelIds })
+  () => ({ getAllowedDirectByokCatalogServing: mockDirectByokCatalogServing })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/ai-gateway/auto-model'),
@@ -146,7 +159,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-auto-model', () =
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addDirectByokCatalogAvailability: mockCatalogAvailability,
   addUserByokAvailability: mockAvailability,
-  getOrganizationByokProviderIds: mockProviderIds,
+  getEnabledByokProviders: mockEnabledKeys,
   hasInferenceProviderUserByokForModel: mockInferenceProviderUserByok,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
@@ -425,15 +438,18 @@ describe('organization model producer publication', () => {
     );
     expect(mockEvaluatePolicy).toHaveBeenCalledWith(mockContext);
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
-    expect(mockByok).toHaveBeenCalledWith('fixture-org');
-    expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
-    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
+    expect(mockByok).toHaveBeenCalledWith([{ providerId: 'openai', serveCatalogModels: false }]);
+    expect(mockEnabledKeys).toHaveBeenCalledWith(expect.anything(), {
+      type: 'organization',
+      id: 'fixture-org',
+    });
+    expect(mockDirectByokCatalogServing).toHaveBeenCalledWith('fixture-org', mockPolicy);
     expect(mockAvailability).toHaveBeenCalledWith(
       [mockCatalog.data[0], mockCatalog.data[2]],
       ['openai'],
       expect.any(Function)
     );
-    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), mockCatalogModelIds);
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), mockCatalogServing);
     const getAllowedProviders = mockAvailability.mock.calls[0][2];
     expect(getAllowedProviders?.('provider/allowed')).toEqual(ALLOWED_MODEL_ROUTES);
     expect(getAllowedProviders?.('provider/training')).toBeUndefined();
@@ -485,6 +501,19 @@ describe('organization model producer publication', () => {
       expect(mockReadRows).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('lists a private provider model with a free name for a Teams organization that denies data collection', async () => {
+    mockContext.organization.plan = 'teams';
+    mockContext.organization.settings = { data_collection: 'deny' };
+    mockByok.mockResolvedValue([
+      catalogModel('private-a1b2c3d4e5/acme/coder-free', { hasUserByokAvailable: true }),
+    ]);
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toContain('private-a1b2c3d4e5/acme/coder-free');
+    expect(result.data.some(model => model.id === 'provider/training')).toBe(false);
+  });
 
   it('reads the snapshot through the read client a gateway caller passes', async () => {
     const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
@@ -649,13 +678,16 @@ describe('organization model producer publication', () => {
   });
 
   it('lists denied models only when an inference provider key the policy admits serves them', async () => {
-    const catalogModelIds = new Set([
+    const serving = catalogServing([
       'provider/allowed',
       'provider/ceiling-catalog',
       'provider/ungranted-catalog',
     ]);
-    mockDirectByokCatalogModelIds.mockResolvedValueOnce(catalogModelIds);
-    mockProviderIds.mockResolvedValueOnce(['moonshotai', 'openrouter']);
+    mockDirectByokCatalogServing.mockResolvedValueOnce(serving);
+    mockEnabledKeys.mockResolvedValueOnce([
+      { providerId: 'moonshotai', serveCatalogModels: false },
+      { providerId: 'openrouter', serveCatalogModels: false },
+    ]);
     mockCatalog = {
       ...mockCatalog,
       data: [
@@ -679,8 +711,8 @@ describe('organization model producer publication', () => {
       'morph-byok/private',
       'kilo-internal/private',
     ]);
-    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith('fixture-org', mockPolicy);
-    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), catalogModelIds);
+    expect(mockDirectByokCatalogServing).toHaveBeenCalledWith('fixture-org', mockPolicy);
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), serving);
     expect(mockInferenceProviderUserByok).toHaveBeenCalledWith('provider/ceiling-gateway', [
       'moonshotai',
       'openrouter',
@@ -695,6 +727,29 @@ describe('organization model producer publication', () => {
     );
     const getAllowedProviders = mockAvailability.mock.calls[0][2];
     expect(getAllowedProviders?.('provider/ceiling-inference')).toBeUndefined();
+  });
+
+  it("lists the models of the organization's direct BYOK keys and private providers from its keys", async () => {
+    const keys = [
+      { providerId: 'morph-byok', serveCatalogModels: false },
+      { providerId: 'private-aaaaaaaaaa', serveCatalogModels: false },
+    ];
+    mockEnabledKeys.mockResolvedValueOnce(keys);
+    mockByok.mockResolvedValueOnce([
+      catalogModel('morph-byok/private'),
+      catalogModel('private-aaaaaaaaaa/my-model'),
+    ]);
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/training',
+      'morph-byok/private',
+      'private-aaaaaaaaaa/my-model',
+      'kilo-internal/private',
+    ]);
+    expect(mockByok).toHaveBeenCalledWith(keys);
   });
 
   it('logs one aggregated record for a catalog wider than the allowed models', async () => {

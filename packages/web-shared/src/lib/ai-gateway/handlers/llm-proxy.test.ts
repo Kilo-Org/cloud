@@ -88,6 +88,7 @@ import {
   createDirectByokReferenceResolver,
   getDirectByokModel,
   supportsCatalogMode,
+  type DirectByokPolicyTarget,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   logUnrewrittenResponse,
@@ -2279,15 +2280,16 @@ describe('POST /api/v1/chat/completions request handling', () => {
       | 'a Vercel BYOK inference provider key'
       | 'an OpenRouter key'
       | 'a Vercel AI Gateway key'
+      | 'a catalog-mode private provider'
       | 'no BYOK key';
     const byokRoutes: Record<
       ByokRoute,
-      Pick<ProviderRoute, 'provider' | 'userByok' | 'directByokPolicyProviderId'>
+      Pick<ProviderRoute, 'provider' | 'userByok' | 'directByokPolicyTarget'>
     > = {
       'a catalog-mode direct BYOK key': {
         provider: { ...provider, type: 'direct-byok' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'zai-coding' }],
-        directByokPolicyProviderId: 'z-ai',
+        directByokPolicyTarget: { kind: 'provider', providerSlug: 'z-ai' },
       },
       'a Vercel BYOK inference provider key': {
         provider: { ...provider, type: 'vercel' },
@@ -2300,6 +2302,11 @@ describe('POST /api/v1/chat/completions request handling', () => {
       'a Vercel AI Gateway key': {
         provider: { ...provider, type: 'vercel' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
+      },
+      'a catalog-mode private provider': {
+        provider: { ...provider, type: 'direct-byok', directByokKeyLabel: 'Acme private provider' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'private-a1b2c3d4e5' }],
+        directByokPolicyTarget: { kind: 'private-provider' },
       },
       'no BYOK key': { provider, userByok: null },
     };
@@ -2379,8 +2386,12 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
       const isDirectByokProviderAllowed =
         mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
-      expect(await isDirectByokProviderAllowed?.('z-ai')).toBe(true);
-      expect(await isDirectByokProviderAllowed?.('synthetic')).toBe(false);
+      expect(await isDirectByokProviderAllowed?.({ kind: 'provider', providerSlug: 'z-ai' })).toBe(
+        true
+      );
+      expect(
+        await isDirectByokProviderAllowed?.({ kind: 'provider', providerSlug: 'synthetic' })
+      ).toBe(false);
       expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
         expect.anything(),
         'moonshotai/kimi-k2.6',
@@ -2442,6 +2453,39 @@ describe('POST /api/v1/chat/completions request handling', () => {
         expect(response.status).toBe(404);
         expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it('serves a catalog-mode private provider whatever the provider allow-list says', async () => {
+      const response = await sendThrough('a catalog-mode private provider', {
+        allowed: false,
+        denialSource: 'organization_provider',
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalled();
+      const isDirectByokProviderAllowed =
+        mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
+      expect(await isDirectByokProviderAllowed?.({ kind: 'private-provider' })).toBe(true);
+    });
+
+    it.each([
+      ['the organization model deny list', 'organization_model'],
+      ['a missing group grant', 'no_grant'],
+    ] as const)(
+      'denies a catalog-mode private provider for a model excluded by %s',
+      async (_name, denialSource) => {
+        const response = await sendThrough('a catalog-mode private provider', {
+          allowed: false,
+          denialSource,
+        });
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        const isDirectByokProviderAllowed =
+          mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
+        expect(await isDirectByokProviderAllowed?.({ kind: 'private-provider' })).toBe(false);
       }
     );
 
@@ -2828,6 +2872,45 @@ describe('POST /api/v1/chat/completions request handling', () => {
       }
     }
   );
+
+  it.each([
+    { name: 'a private provider', model: 'private-a1b2c3d4e5/acme/coder-free', direct: false },
+    { name: 'a bespoke direct BYOK', model: 'synthetic/acme/coder:free', direct: true },
+  ])(
+    'keeps $name id with a free name out of the free-model rate limit',
+    async ({ model, direct }) => {
+      if (direct) {
+        mockedGetDirectByokModel.mockImplementation(async modelId =>
+          modelId === model ? { provider: { id: 'synthetic' } as never, model: {} as never } : null
+        );
+      }
+      mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+      try {
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+      } finally {
+        mockedGetDirectByokModel.mockReset().mockResolvedValue(null);
+      }
+    }
+  );
+
+  it('asks anonymous callers of a private provider id with a free name to sign in', async () => {
+    setAnonymousAuth();
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('private-a1b2c3d4e5/acme/coder-free')) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+  });
 
   it('applies free-model rate limiting to a public custom LLM with a free id', async () => {
     mockedIsCustomLlm.mockResolvedValue(true);
@@ -3355,7 +3438,8 @@ describe('organization data-collection policy on provider-policy exempt routes',
 
   // Each case returns the route its shape produces, so the assertion covers the real route: a
   // direct-BYOK route with a user key, a custom LLM route, and the local fake LLM route. A model is
-  // data-collection-required when it is free or a custom LLM, so the direct-BYOK case uses a free id.
+  // data-collection-required when it is free or a custom LLM, so the direct-BYOK case uses a free
+  // catalog id, which a catalog-mode key serves.
   const directByokRoute: ProviderRoute = {
     provider: {
       ...exemptProvider,
@@ -3388,8 +3472,8 @@ describe('organization data-collection policy on provider-policy exempt routes',
       customLlm: true,
     },
     {
-      shape: 'a bespoke direct-BYOK id with a free model',
-      model: 'acme/bespoke-model:free',
+      shape: 'a free catalog model served by a direct-BYOK key',
+      model: 'acme/catalog-model:free',
       route: directByokRoute,
       customLlm: false,
     },
@@ -3425,6 +3509,55 @@ describe('organization data-collection policy on provider-policy exempt routes',
         expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       } finally {
         localFakeEnv?.restore();
+      }
+    }
+  );
+
+  it.each([
+    {
+      name: 'a private provider',
+      model: 'private-a1b2c3d4e5/acme/coder-free',
+      providerId: 'private-a1b2c3d4e5' as const,
+      direct: false,
+    },
+    {
+      name: 'a bespoke direct-BYOK',
+      model: 'synthetic/acme/coder:free',
+      providerId: 'synthetic' as const,
+      direct: true,
+    },
+  ])(
+    'serves $name id with a free name for an organization that denies data collection',
+    async ({ model, providerId, direct }) => {
+      setOrganizationDataCollection('deny');
+      if (direct) {
+        mockedGetDirectByokModel.mockImplementation(async modelId =>
+          modelId === model ? { provider: { id: 'synthetic' } as never, model: {} as never } : null
+        );
+      }
+      mockedGetProvider.mockImplementationOnce(async () =>
+        providerResult({
+          provider: {
+            ...exemptProvider,
+            type: 'direct-byok',
+            async transformRequest(context) {
+              delete context.request.body.provider;
+            },
+          },
+          userByok: [{ decryptedAPIKey: 'test-key', providerId }],
+          isFree: false,
+          bypassAccessCheck: true,
+        })
+      );
+
+      try {
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      } finally {
+        mockedGetDirectByokModel.mockReset().mockResolvedValue(null);
       }
     }
   );
@@ -3743,10 +3876,46 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('names an Organization Auto private provider target its private provider cannot serve', async () => {
+    const target = 'private-a1b2c3d4e5/acme/coder';
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        default_model: 'kilo-auto/org',
+        org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
+      },
+      plan: 'enterprise',
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
+      request.body.model = target;
+      return { kind: 'ok', resolved: { model: target }, routingTarget: target };
+    });
+    mockedGetProvider.mockResolvedValue({ kind: 'byok-private-provider-unavailable' });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/org')) as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'organization_auto_configuration',
+      message: `Organization Auto route target '${target}' is unavailable because no enabled private provider of this organization serves it.`,
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('rejects a bespoke direct BYOK id whose key serves catalog ids, naming the catalog id', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',
-      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
       catalogModelId: 'moonshotai/kimi-k2.6',
     });
 
@@ -3764,10 +3933,77 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('answers a private provider model id the organization cannot use like an unknown model', async () => {
+    mockedGetProvider.mockResolvedValue({ kind: 'byok-private-provider-unavailable' });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('private-a1b2c3d4e5/acme/coder')) as never
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error_type: 'model_not_found' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bespoke private provider id whose private provider serves catalog ids, naming the catalog id', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-catalog-only',
+      keyLabel: 'Acme private provider',
+      catalogModelId: 'moonshotai/kimi-k2.6',
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('private-a1b2c3d4e5/moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'direct_byok_catalog_only',
+      message:
+        "'private-a1b2c3d4e5/moonshotai/kimi-k2.6' is disabled because the Acme private provider uses Kilo catalog model IDs. Use 'moonshotai/kimi-k2.6' instead.",
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('names the private provider when it cannot serve the API kind', async () => {
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: {
+          ...provider,
+          type: 'direct-byok',
+          directByokKeyLabel: 'Acme private provider',
+          supportedChatApis: ['messages'],
+        },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'private-a1b2c3d4e5' }],
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'api_kind_not_supported',
+      message:
+        'This model does not support the chat_completions API through your Acme private provider, please use any of: messages',
+    });
+  });
+
   it('names the BYOK key when it cannot serve the API kind', async () => {
     mockedGetProvider.mockResolvedValue(
       providerResult({
-        provider: { ...provider, type: 'direct-byok', supportedChatApis: ['responses'] },
+        provider: {
+          ...provider,
+          type: 'direct-byok',
+          supportedChatApis: ['responses'],
+          directByokKeyLabel: 'Synthetic key',
+        },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
         isFree: false,
         bypassAccessCheck: false,
@@ -3788,10 +4024,32 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('answers the API mismatch of a catalog-mode key routing reports without a route', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-unsupported-api-kind',
+      providerId: 'private-a1b2c3d4e5',
+      keyLabel: 'Acme private provider',
+      supportedApiKinds: ['messages'],
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'api_kind_not_supported',
+      message:
+        'This model does not support the chat_completions API through your Acme private provider, please use any of: messages',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('explains an unmapped bespoke id when the key serves catalog ids', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',
-      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
       catalogModelId: null,
     });
 
@@ -3835,7 +4093,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',
-      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
       catalogModelId: null,
     });
 
@@ -3883,7 +4141,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
         isFree: false,
         bypassAccessCheck: false,
-        directByokPolicyProviderId: 'synthetic',
+        directByokPolicyTarget: { kind: 'provider', providerSlug: 'synthetic' },
       })
     );
 
@@ -4590,6 +4848,45 @@ describe('custom routers and signed auto decisions', () => {
         auto_model: 'kilo-auto/custom/org/team',
         organizationId: 'org-1',
       });
+    });
+
+    it('checks policy on the catalog id a catalog-mode key serves a stored bespoke entry under', async () => {
+      setOrganizationAuth('org-1');
+      const bespoke = 'private-a1b2c3d4e5/acme/haiku';
+      mockedFindCustomRouter.mockResolvedValue({
+        ...personalRouter,
+        ownerType: 'org',
+        ownerId: 'org-1',
+        slug: 'team',
+        entries: [
+          { kind: 'gateway', model: bespoke },
+          { kind: 'gateway', model: 'openai/gpt-5-mini' },
+        ],
+      });
+      mockedCreateDirectByokReferenceResolver.mockResolvedValueOnce(async modelId =>
+        modelId === bespoke ? haiku : modelId
+      );
+      mockedDeniedAutoRoutingCandidates.mockImplementation(async (_policy, candidateIds) =>
+        candidateIds.filter(id => id !== haiku)
+      );
+      mockedFetchCustomRouterDecision.mockResolvedValue({
+        kind: 'ok',
+        decision: { ...haikuDecision, model: bespoke, entry: { kind: 'gateway', model: bespoke } },
+        costUsd: 0,
+      });
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('kilo-auto/custom/org/team'))
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedDeniedAutoRoutingCandidates).toHaveBeenCalledWith(expect.anything(), [
+        haiku,
+        'openai/gpt-5-mini',
+      ]);
+      expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ deniedModelIds: ['openai/gpt-5-mini'] })
+      );
     });
 
     it.each([
@@ -8240,14 +8537,14 @@ describe('BYOK failover', () => {
   function byokRoute(
     providerId: UserByokProviderId,
     routeProvider: Provider,
-    directByokPolicyProviderId?: string
+    directByokPolicyTarget?: DirectByokPolicyTarget
   ): ProviderRoute {
     return {
       provider: routeProvider,
       userByok: [{ decryptedAPIKey: routeProvider.apiKey, providerId }],
       isFree: false,
       bypassAccessCheck: false,
-      ...(directByokPolicyProviderId && { directByokPolicyProviderId }),
+      ...(directByokPolicyTarget && { directByokPolicyTarget }),
     };
   }
 
@@ -8308,7 +8605,10 @@ describe('BYOK failover', () => {
         }),
       });
       const failoverProvider = byokProvider('failover-byok-key', { type: 'direct-byok' });
-      const failoverRoute = byokRoute('zai-coding', failoverProvider, 'z-ai');
+      const failoverRoute = byokRoute('zai-coding', failoverProvider, {
+        kind: 'provider',
+        providerSlug: 'z-ai',
+      });
       const { result, failovers } = withFailover(
         byokRoute('openai', primaryProvider),
         failoverRoute

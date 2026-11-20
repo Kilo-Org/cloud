@@ -27,13 +27,16 @@ function chatRequest(
 }
 
 async function transform(provider: DirectByokProvider, request: GatewayRequest) {
-  provider.transformRequest({
-    request,
-    extraHeaders: {},
-    kilo_user_id: 'user-1',
-    session_id: 'session-1',
-    provider: { type: 'direct-byok', apiKey: 'test-api-key' },
-  } as unknown as TransformRequestContext);
+  provider.transformRequest(
+    {
+      request,
+      extraHeaders: {},
+      kilo_user_id: 'user-1',
+      session_id: 'session-1',
+      provider: { type: 'direct-byok', apiKey: 'test-api-key' },
+    } as unknown as TransformRequestContext,
+    { id: 'test', name: 'Test', context_length: 1, max_completion_tokens: 1 }
+  );
   const { responseTransforms } = await provider.resolveUpstream({
     credential: 'test-api-key',
     model: { id: 'test' },

@@ -17,7 +17,6 @@ import {
   shouldRouteToVercel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
-  getByokCredentials,
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,
   getStoredByokKeys,
@@ -40,6 +39,7 @@ import {
   findDirectByokCatalogModels,
   getDirectByokCatalogModelId,
   getDirectByokModel,
+  type DirectByokPolicyTarget,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   apiKeyUpstream,
@@ -56,11 +56,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
     '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
   );
   return {
+    ...actual,
     getDirectByokModel: jest.fn().mockResolvedValue(null),
     findDirectByokCatalogModels: jest.fn().mockResolvedValue([]),
     getDirectByokCatalogModelId: jest.fn().mockResolvedValue(null),
-    getDirectByokModelChatApis: actual.getDirectByokModelChatApis,
-    getDirectByokPolicyProviderId: actual.getDirectByokPolicyProviderId,
     supportsCatalogMode: jest.fn(() => true),
   };
 });
@@ -73,7 +72,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
     jest
       .requireActual<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok')
       .isGatewayUserByokEligibleModel(modelId),
-  getByokCredentials: jest.fn().mockResolvedValue([]),
   getStoredByokKeys: jest.fn(async () => ({
     keys: [],
     decrypt: async () => {
@@ -743,7 +741,6 @@ describe('getProvider direct BYOK routing', () => {
     jest.mocked(getDirectByokModel).mockReset().mockResolvedValue(null);
     jest.mocked(findDirectByokCatalogModels).mockReset().mockResolvedValue([]);
     jest.mocked(getDirectByokCatalogModelId).mockReset().mockResolvedValue(null);
-    jest.mocked(getByokCredentials).mockReset().mockResolvedValue([]);
     storeKeys();
   });
 
@@ -772,11 +769,11 @@ describe('getProvider direct BYOK routing', () => {
           max_completion_tokens: 1000,
         },
       });
-      jest
-        .mocked(getByokCredentials)
-        .mockResolvedValue([
-          { decryptedAPIKey: 'user-direct-key', providerId, serveCatalogModels: false },
-        ]);
+      const decrypt = storeKeys({
+        decryptedAPIKey: 'user-direct-key',
+        providerId,
+        serveCatalogModels: false,
+      });
 
       const result = await getProvider(
         getProviderInput(providerInput(`${providerId}/upstream-model`))
@@ -803,11 +800,11 @@ describe('getProvider direct BYOK routing', () => {
         session_id: null,
       });
 
-      expect(getByokCredentials).toHaveBeenCalledWith(
-        expect.anything(),
-        { type: 'user', id: user.id },
-        [providerId]
-      );
+      expect(getStoredByokKeys).toHaveBeenCalledWith(expect.anything(), {
+        type: 'user',
+        id: user.id,
+      });
+      expect(decrypt.mock.calls).toEqual([[providerId]]);
       expect(route.provider.type).toBe('direct-byok');
       expect(route.provider.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
       expect(route.userByok).toEqual([{ decryptedAPIKey: 'user-direct-key', providerId }]);
@@ -850,13 +847,11 @@ describe('getProvider direct BYOK routing', () => {
         max_completion_tokens: 1000,
       },
     });
-    jest.mocked(getByokCredentials).mockResolvedValue([
-      {
-        decryptedAPIKey: '{"stored":"credential"}',
-        providerId: 'nvidia-byok',
-        serveCatalogModels: false,
-      },
-    ]);
+    storeKeys({
+      decryptedAPIKey: '{"stored":"credential"}',
+      providerId: 'nvidia-byok',
+      serveCatalogModels: false,
+    });
 
     const input = providerInput('nvidia-byok/zai.glm-5');
     const result = await getProvider(
@@ -915,11 +910,11 @@ describe('getProvider direct BYOK routing', () => {
         model: directByokModel('hf:moonshotai/Kimi-K2.6', catalogModelId ?? undefined),
       });
       jest.mocked(getDirectByokCatalogModelId).mockResolvedValue(catalogModelId);
-      jest
-        .mocked(getByokCredentials)
-        .mockResolvedValue([
-          { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: true },
-        ]);
+      storeKeys({
+        decryptedAPIKey: 'synthetic-key',
+        providerId: 'synthetic',
+        serveCatalogModels: true,
+      });
 
       const result = await getProvider(
         getProviderInput(providerInput('synthetic/hf:moonshotai/kimi-k2.6'))
@@ -927,7 +922,7 @@ describe('getProvider direct BYOK routing', () => {
 
       expect(result).toEqual({
         kind: 'direct-byok-catalog-only',
-        providerId: 'synthetic',
+        keyLabel: 'Synthetic key',
         catalogModelId,
       });
     }
@@ -999,7 +994,8 @@ describe('getProvider direct BYOK routing', () => {
       serveCatalogModels: true,
     });
     const isDirectByokProviderAllowed = jest.fn(
-      async (policyProviderId: string) => policyProviderId === 'z-ai'
+      async (target: DirectByokPolicyTarget) =>
+        target.kind === 'provider' && target.providerSlug === 'z-ai'
     );
 
     const result = await getProvider(
@@ -1010,7 +1006,10 @@ describe('getProvider direct BYOK routing', () => {
       })
     );
 
-    expect(isDirectByokProviderAllowed.mock.calls).toEqual([['synthetic'], ['z-ai']]);
+    expect(isDirectByokProviderAllowed.mock.calls).toEqual([
+      [{ kind: 'provider', providerSlug: 'synthetic' }],
+      [{ kind: 'provider', providerSlug: 'z-ai' }],
+    ]);
     expect(getStoredByokKeys).toHaveBeenLastCalledWith(expect.anything(), {
       type: 'organization',
       id: ORG_ID,
@@ -1019,7 +1018,7 @@ describe('getProvider direct BYOK routing', () => {
     expect(await firstRoute(result)).toMatchObject({
       provider: { type: 'direct-byok', apiKey: 'zai-key' },
       bypassAccessCheck: false,
-      directByokPolicyProviderId: 'z-ai',
+      directByokPolicyTarget: { kind: 'provider', providerSlug: 'z-ai' },
     });
   });
 
@@ -1100,7 +1099,7 @@ describe('getProvider direct BYOK routing', () => {
       .mockResolvedValue([
         { provider: directByokProvider('synthetic'), model: directByokModel('hf:openai/gpt-oss') },
       ]);
-    storeKeys({
+    const decrypt = storeKeys({
       decryptedAPIKey: 'synthetic-key',
       providerId: 'synthetic',
       serveCatalogModels: true,
@@ -1112,13 +1111,13 @@ describe('getProvider direct BYOK routing', () => {
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-oss')));
 
-    const route = await firstRoute(result);
-    expect(route.provider).toMatchObject({
-      type: 'direct-byok',
-      apiKey: 'synthetic-key',
-      supportedChatApis: ['chat_completions'],
+    expect(result).toEqual({
+      kind: 'direct-byok-unsupported-api-kind',
+      providerId: 'synthetic',
+      keyLabel: 'Synthetic key',
+      supportedApiKinds: ['chat_completions'],
     });
-    expect(route.userByok).toEqual([{ decryptedAPIKey: 'synthetic-key', providerId: 'synthetic' }]);
+    expect(decrypt).not.toHaveBeenCalled();
   });
 
   test('lets another BYOK key serve an API kind the catalog-mode keys cannot', async () => {

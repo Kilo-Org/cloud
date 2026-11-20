@@ -1,4 +1,9 @@
 import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  ByokPrivateProviderCredentialsSchema,
+  ByokPrivateProviderDefinitionSchema,
+  ByokPrivateModelSchema,
+} from '@kilocode/db/schema-types';
 import * as z from 'zod';
 
 // Shared wire constraints for the BYOK procedures.
@@ -27,6 +32,10 @@ export const BYOKApiKeyResponseSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   created_by: z.string(),
+  /** The key is an organization's own private provider; its `provider_name` is the private provider name. */
+  is_private_provider: z.boolean(),
+  /** The private provider's non-secret configuration, or null for provider keys. */
+  private_provider: ByokPrivateProviderDefinitionSchema.nullable(),
 });
 
 export type BYOKApiKeyResponse = z.infer<typeof BYOKApiKeyResponseSchema>;
@@ -72,6 +81,35 @@ export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 
 export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   id: BYOKKeyIdSchema,
+  /** For private provider keys, the model to test; the first model when omitted. */
+  modelId: z.string().min(1).max(200).optional(),
+});
+
+const OrganizationIdSchema = z.object({ organizationId: z.string().uuid() });
+
+export const CreateByokPrivateProviderInputSchema = OrganizationIdSchema.extend({
+  definition: ByokPrivateProviderDefinitionSchema,
+  credentials: ByokPrivateProviderCredentialsSchema,
+});
+
+/** Omitted credentials keep the stored ones. */
+export const UpdateByokPrivateProviderInputSchema = OrganizationIdSchema.extend({
+  id: BYOKKeyIdSchema,
+  definition: ByokPrivateProviderDefinitionSchema,
+  credentials: ByokPrivateProviderCredentialsSchema.optional(),
+});
+
+/** Uses `credentials`, or the stored credentials of private provider key `id` when they are omitted. */
+export const ListByokPrivateProviderModelsInputSchema = OrganizationIdSchema.extend({
+  base_url: ByokPrivateProviderDefinitionSchema.shape.base_url,
+  credentials: ByokPrivateProviderCredentialsSchema.optional(),
+  id: BYOKKeyIdSchema.optional(),
+}).refine(input => input.credentials || input.id, 'Enter credentials to import models');
+
+export const ListByokPrivateProviderModelsResponseSchema = z.object({
+  models: z.array(ByokPrivateModelSchema),
+  /** The list may hold more models than were read: a page limit or a failed later page cut it short. */
+  truncated: z.boolean(),
 });
 
 /**

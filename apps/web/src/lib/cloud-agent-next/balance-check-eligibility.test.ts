@@ -28,6 +28,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', (
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: (...args: unknown[]) => mockGetDirectByokModel(...args),
+  findDirectByokProvider: (providerId: string) => ({ id: providerId }),
+  getByokPrivateProviders: (keys: { providerId: string; privateProvider?: unknown }[]) =>
+    keys.flatMap(key => (key.privateProvider ? [{ id: key.providerId }] : [])),
   supportsCatalogMode: (...args: unknown[]) => mockSupportsCatalogMode(...args),
   getDirectByokCatalogModelIds: (...args: unknown[]) => mockGetDirectByokCatalogModelIds(...args),
 }));
@@ -378,7 +381,9 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     beforeEach(() => {
       mockGetUserByokProviderIds.mockResolvedValue(['opencode-go']);
-      mockSupportsCatalogMode.mockImplementation(providerId => providerId === 'opencode-go');
+      mockSupportsCatalogMode.mockImplementation(
+        provider => (provider as { id: string }).id === 'opencode-go'
+      );
     });
 
     it('counts an enabled key for its bespoke model', async () => {
@@ -413,6 +418,27 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       expect(await eligibility(DIRECT_MODEL)).toEqual({
         isFree: false,
         hasUserByokAvailable: false,
+      });
+    });
+
+    it("counts a private provider model of the organization's enabled private provider", async () => {
+      const privateModel = 'private-a1b2c3d4e5/acme/coder';
+      mockGetOrganizationByokProviderIds.mockResolvedValue(['private-a1b2c3d4e5']);
+      mockGetEnabledByokProviders.mockResolvedValue([
+        { providerId: 'private-a1b2c3d4e5', serveCatalogModels: false, privateProvider: {} },
+      ]);
+      mockGetDirectByokModel.mockImplementation(
+        async (_modelId: string, providers?: { id: string }[]) =>
+          providers?.length ? { provider: providers[0], model: { id: 'acme/coder' } } : {}
+      );
+
+      expect(await eligibility(privateModel, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+      expect(mockGetEnabledByokProviders).toHaveBeenCalledWith(fakeDb, {
+        type: 'organization',
+        id: 'org-1',
       });
     });
 

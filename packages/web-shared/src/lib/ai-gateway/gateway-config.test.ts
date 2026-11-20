@@ -202,6 +202,7 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
   test('enables no feature for a configuration without organization features', () => {
     expect(GatewayOrganizationFeaturesConfigSchema.parse({}).organization_features).toEqual({
       experimental_byok: [],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
       org_permission_policy: [],
@@ -215,6 +216,7 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
       }).organization_features
     ).toEqual({
       experimental_byok: ['00000000-0000-4000-8000-000000000001'],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
       org_permission_policy: [],
@@ -226,11 +228,13 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
       GatewayOrganizationFeaturesConfigSchema.parse({
         organization_features: {
           experimental_byok: [],
+          byok_private_providers: [],
           request_logs: ['00000000-0000-4000-8000-000000000001'],
         },
       }).organization_features
     ).toEqual({
       experimental_byok: [],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
       org_permission_policy: [],
@@ -248,6 +252,7 @@ test('lowercases stored organization IDs', () => {
     }).organization_features
   ).toEqual({
     experimental_byok: [],
+    byok_private_providers: [],
     enkrypt_output_guardrail: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
     gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
     org_permission_policy: [],
@@ -262,6 +267,7 @@ describe('OrganizationFeaturesInputSchema', () => {
           '9D278969-5453-4AE3-A51F-A8D2274A7B56',
           '9d278969-5453-4ae3-a51f-a8d2274a7b56',
         ],
+        byok_private_providers: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
         enkrypt_output_guardrail: ['9D278969-5453-4AE3-A51F-A8D2274A7B56'],
         gateway_settings: [],
         org_permission_policy: [
@@ -271,6 +277,7 @@ describe('OrganizationFeaturesInputSchema', () => {
       })
     ).toEqual({
       experimental_byok: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+      byok_private_providers: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
       enkrypt_output_guardrail: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
       gateway_settings: [],
       org_permission_policy: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
@@ -281,6 +288,7 @@ describe('OrganizationFeaturesInputSchema', () => {
     expect(
       OrganizationFeaturesInputSchema.safeParse({
         experimental_byok: ['kilo'],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
         org_permission_policy: [],

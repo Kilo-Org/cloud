@@ -22,7 +22,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
-  getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
+  getDirectByokCatalogServing: jest.fn(async () => new Map()),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addDirectByokCatalogAvailability: jest.requireActual('@kilocode/web-shared/lib/ai-gateway/byok')
@@ -49,7 +49,7 @@ import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 const { getEnhancedOpenRouterModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
 );
-const { getDirectByokModelsForUser, getDirectByokCatalogModelIds } = jest.requireMock(
+const { getDirectByokModelsForUser, getDirectByokCatalogServing } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
 );
 const { addUserByokAvailability, getUserByokProviderIds } = jest.requireMock(
@@ -88,7 +88,7 @@ describe('gateway models audience authentication', () => {
     mockGetServerSession.mockResolvedValue(null);
     getEnhancedOpenRouterModels.mockResolvedValue(publicCatalog);
     getDirectByokModelsForUser.mockResolvedValue([{ id: 'private/byok' }]);
-    getDirectByokCatalogModelIds.mockResolvedValue(new Set());
+    getDirectByokCatalogServing.mockResolvedValue(new Map());
     getUserByokProviderIds.mockResolvedValue([]);
     addUserByokAvailability.mockImplementation(async (models: unknown[]) => models);
     getAvailableModelsForOrganization.mockResolvedValue({ data: [{ id: 'organization/model' }] });

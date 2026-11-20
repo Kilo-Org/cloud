@@ -55,7 +55,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => null),
   getDirectByokCatalogModelId: jest.fn(),
   getDirectByokModelChatApis: () => ['chat_completions'],
-  supportsCatalogMode: (providerId: string) => providerId === 'synthetic',
+  getDirectByokKeyLabel: (provider: { id: string }) => `${provider.id} key`,
+  getByokPrivateProviders: (keys: { providerId: string; privateProvider?: unknown }[]) =>
+    keys.flatMap(key => (key.privateProvider ? [{ id: key.providerId }] : [])),
+  supportsCatalogMode: (provider: { id: string }) => provider.id === 'synthetic',
 }));
 
 const mockedPolicyContext = jest.fn();
@@ -190,6 +193,39 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
       kind: 'error',
       message:
         "Organization Auto route target 'synthetic/hf:example/finetune' is unavailable because this organization's synthetic key uses Kilo catalog model IDs and this model has no catalog ID.",
+    });
+  });
+});
+
+describe('validateOrganizationAutoTarget with private provider targets', () => {
+  const PRIVATE_MODEL = 'private-a1b2c3d4e5/acme/coder';
+
+  beforeEach(() => {
+    mockedGetDirectByokModel.mockImplementation(async (modelId, providers) => {
+      const provider = providers?.find(candidate => modelId.startsWith(`${candidate.id}/`));
+      return provider
+        ? { provider, model: { id: modelId.slice(provider.id.length + 1) } as never }
+        : null;
+    });
+  });
+
+  test("keeps a bespoke target of the organization's private provider", async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([
+      { providerId: 'private-a1b2c3d4e5', serveCatalogModels: false, privateProvider: {} as never },
+    ]);
+
+    await expect(validateOrganizationAutoTarget(organization(), PRIVATE_MODEL)).resolves.toEqual({
+      kind: 'ok',
+      modelId: PRIVATE_MODEL,
+    });
+  });
+
+  test('rejects a target no enabled private provider of the organization serves', async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([]);
+
+    await expect(validateOrganizationAutoTarget(organization(), PRIVATE_MODEL)).resolves.toEqual({
+      kind: 'error',
+      message: `Organization Auto route target '${PRIVATE_MODEL}' is unavailable because no enabled private provider of this organization serves it.`,
     });
   });
 });

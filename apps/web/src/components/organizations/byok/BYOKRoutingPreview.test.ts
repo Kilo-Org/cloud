@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { describeRouteStep } from './BYOKRoutingPreview';
+import { describeRouteStep, isRoutingPreviewModelId } from './BYOKRoutingPreview';
 
 const NAMES: Record<string, string> = {
   'zai-coding': 'Z.ai Coding Plan',
@@ -7,6 +7,7 @@ const NAMES: Record<string, string> = {
   bedrock: 'AWS Bedrock',
   openrouter: 'OpenRouter',
   openai: 'OpenAI API key',
+  'private-a1b2c3d4e5': 'Acme',
 };
 
 function getProviderName(providerId: string) {
@@ -31,6 +32,32 @@ describe('describeRouteStep', () => {
       title: 'Z.ai Coding Plan key',
       detail: 'Skipped: the provider serves this model over Chat Completions only.',
     });
+  });
+
+  it.each([
+    [
+      'unsupported-api-kind',
+      'Skipped: the private provider serves this model over Chat Completions only.',
+    ],
+    ['disabled', 'Skipped: the private provider is disabled.'],
+    [
+      'not-catalog-mode',
+      'Skipped: the private provider uses its own model IDs. Turn on Kilo catalog model IDs to use it for this model.',
+    ],
+  ] as const)('names an organization private provider skipped as %s', (reason, detail) => {
+    expect(
+      describeRouteStep(
+        {
+          route: 'direct-byok',
+          outcome: 'skipped',
+          providerId: 'private-a1b2c3d4e5',
+          reason,
+          supportedApiKinds: ['chat_completions'],
+        },
+        getProviderName,
+        true
+      )
+    ).toEqual({ title: 'Acme private provider', detail });
   });
 
   it('names the key Vercel AI Gateway receives', () => {
@@ -104,5 +131,26 @@ describe('describeRouteStep', () => {
         false
       ).title
     ).toBe('Anthropic, OpenAI API keys via Vercel AI Gateway');
+  });
+});
+
+describe('isRoutingPreviewModelId', () => {
+  it.each(['anthropic/claude-sonnet-4.5', 'openai/gpt-5', 'kilo-auto/frontier'])(
+    'offers the catalog model %s',
+    modelId => {
+      expect(isRoutingPreviewModelId(modelId)).toBe(true);
+    }
+  );
+
+  it.each(['private-a1b2c3d4e5/my-model', 'private-a1b2c3d4e5/org/model', 'synthetic/hf:model'])(
+    'does not offer the model %s, which the preview cannot route',
+    modelId => {
+      expect(isRoutingPreviewModelId(modelId)).toBe(false);
+    }
+  );
+
+  it('offers an id that only resembles a private provider id', () => {
+    expect(isRoutingPreviewModelId('private-short/model')).toBe(true);
+    expect(isRoutingPreviewModelId('private-a1b2c3d4e5')).toBe(true);
   });
 });

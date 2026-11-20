@@ -2,18 +2,51 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getOrganizationByokProviderIds,
   hasInferenceProviderUserByokForModel,
+  type DirectByokCatalogServing,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokCatalogModelIds,
+  getDirectByokCatalogServing,
+  type DirectByokCatalogServingCheck,
+  type DirectByokPolicyTarget,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
+  allowsInferenceProviderUserByok,
+  getEffectiveModelDecision,
   isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 /**
- * The catalog ids the organization's catalog-mode direct BYOK keys serve under `policy`, as
- * `getProvider` routes them: an id counts when the policy admits it for the provider of a key that
- * serves it (see `isModelAllowedForProviderKey`), whatever it decides for Kilo's routes. An id a
+ * Whether `policy` admits `modelId` served by the organization's catalog-mode direct BYOK key with
+ * policy target `target`: checked against the key's provider alone (see
+ * `isModelAllowedForProviderKey`), or, for the organization's own private provider, which provider
+ * allow-lists cannot name, against its model policy alone (see `allowsInferenceProviderUserByok`).
+ */
+export async function isModelAllowedForDirectByokKey(
+  policy: EffectiveOrganizationModelPolicy,
+  modelId: string,
+  target: DirectByokPolicyTarget
+): Promise<boolean> {
+  return target.kind === 'provider'
+    ? isModelAllowedForProviderKey(policy, modelId, target.providerSlug)
+    : allowsInferenceProviderUserByok(await getEffectiveModelDecision(policy, modelId));
+}
+
+/** Admits a catalog-mode key as `getProvider` routes it; see `getAllowedDirectByokCatalogModelIds`. */
+function allowedCatalogServing(
+  policy: EffectiveOrganizationModelPolicy
+): DirectByokCatalogServingCheck {
+  return async (catalogModelId, target) =>
+    !(await isCustomLlm(catalogModelId)) &&
+    (await isModelAllowedForDirectByokKey(policy, catalogModelId, target));
+}
+
+/**
+ * The catalog ids the organization's catalog-mode direct BYOK keys and private providers serve under
+ * `policy`, as `getProvider` routes them: an id counts when the policy admits it for a key that
+ * serves it (see `isModelAllowedForDirectByokKey`), whatever it decides for Kilo's routes. An id a
  * custom LLM owns does not count, because `getProvider` serves the custom LLM first.
  */
 export async function getAllowedDirectByokCatalogModelIds(
@@ -22,9 +55,18 @@ export async function getAllowedDirectByokCatalogModelIds(
 ): Promise<ReadonlySet<string>> {
   return getDirectByokCatalogModelIds(
     { type: 'organization', id: organizationId },
-    async (catalogModelId, policyProviderId) =>
-      !(await isCustomLlm(catalogModelId)) &&
-      (await isModelAllowedForProviderKey(policy, catalogModelId, policyProviderId))
+    allowedCatalogServing(policy)
+  );
+}
+
+/** `getAllowedDirectByokCatalogModelIds` with the keys that serve each id. */
+export async function getAllowedDirectByokCatalogServing(
+  organizationId: string,
+  policy: EffectiveOrganizationModelPolicy
+): Promise<DirectByokCatalogServing> {
+  return getDirectByokCatalogServing(
+    { type: 'organization', id: organizationId },
+    allowedCatalogServing(policy)
   );
 }
 

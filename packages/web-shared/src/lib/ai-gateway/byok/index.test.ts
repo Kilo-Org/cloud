@@ -24,19 +24,21 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getByokCredentials,
+  getByokKeyPriority,
   getByokKeyStates,
   getEnabledByokProviders,
   getOrganizationByokProviderIds,
   getStoredByokKeys,
   getUserByokProviderIds,
   parseByokSettings,
+  readByokPrivateProviderDefinition,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { byok_api_keys, kilocode_users, organizations } from '@kilocode/db/schema';
-import type { ByokApiKeySettings } from '@kilocode/db/schema-types';
+import type { ByokApiKeySettings, ByokPrivateProviderDefinition } from '@kilocode/db/schema-types';
 import {
   testByokEnvelope,
   useFakeByokKms,
@@ -286,6 +288,59 @@ describe('parseByokSettings', () => {
       serve_catalog_models: true,
       priority: 2,
     });
+  });
+
+  test('ignores a private provider definition that no longer parses', () => {
+    const settings = {
+      serve_catalog_models: true,
+      priority: 2,
+      private_provider: { name: 'Broken' },
+    };
+    const parsed = parseByokSettings(settings);
+    expect(parsed).toEqual({ serve_catalog_models: true, priority: 2 });
+    expect(servesCatalogModels(parsed)).toBe(true);
+    expect(getByokKeyPriority(parsed)).toBe(2);
+  });
+});
+
+describe('readByokPrivateProviderDefinition', () => {
+  const definition: ByokPrivateProviderDefinition = {
+    name: 'Acme',
+    base_url: 'https://llm.acme.example/v1',
+    api_kinds: ['chat_completions'],
+    client_provider: 'openrouter',
+    reasoning_format: 'reasoning-details',
+    models: [
+      { id: 'acme/coder', internal_id: 'coder', context_length: 10, max_completion_tokens: 5 },
+    ],
+  };
+
+  test('reads the definition of an organization private provider key only', () => {
+    const row = {
+      provider_id: 'private-a1b2c3d4e5',
+      organization_id: 'org-id',
+      settings: { priority: 1, private_provider: definition },
+    };
+    expect(readByokPrivateProviderDefinition(row)).toEqual(definition);
+    expect(readByokPrivateProviderDefinition({ ...row, organization_id: null })).toBeNull();
+    expect(readByokPrivateProviderDefinition({ ...row, provider_id: 'anthropic' })).toBeNull();
+  });
+
+  test('drops a definition that no longer parses and logs it', () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const read = readByokPrivateProviderDefinition({
+      provider_id: 'private-a1b2c3d4e5',
+      organization_id: 'org-id',
+      settings: { private_provider: { name: 'Broken' } },
+    });
+
+    expect(read).toBeNull();
+    expect(error).toHaveBeenCalledWith(
+      '[byok] Ignoring a private provider key with an invalid definition',
+      expect.objectContaining({ providerId: 'private-a1b2c3d4e5' })
+    );
+    error.mockRestore();
   });
 });
 

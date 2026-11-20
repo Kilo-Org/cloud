@@ -19,7 +19,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
-  getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
+  getDirectByokCatalogServing: jest.fn(async () => new Map()),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addDirectByokCatalogAvailability: jest.requireActual('@kilocode/web-shared/lib/ai-gateway/byok')
@@ -52,7 +52,7 @@ const { getUserFromAuth } = jest.requireMock('@kilocode/web-shared/lib/user/serv
 const { getEnhancedOpenRouterModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
 );
-const { getDirectByokModelsForUser, getDirectByokCatalogModelIds } = jest.requireMock(
+const { getDirectByokModelsForUser, getDirectByokCatalogServing } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
 );
 const { addUserByokAvailability, getUserByokProviderIds } = jest.requireMock(
@@ -85,7 +85,7 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetEnkryptBenchmarks = jest.mocked(getEnkryptBenchmarks);
 const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser);
-const mockedGetDirectByokCatalogModelIds = jest.mocked(getDirectByokCatalogModelIds);
+const mockedGetDirectByokCatalogServing = jest.mocked(getDirectByokCatalogServing);
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedTagOpenAiChatGptByokModels = jest.mocked(tagOpenAiChatGptByokModels);
@@ -128,7 +128,7 @@ describe('GET /api/openrouter/models', () => {
     mockedGetEnkryptBenchmarks.mockResolvedValue(null);
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
     mockedGetUserByokProviderIds.mockResolvedValue([]);
-    mockedGetDirectByokCatalogModelIds.mockResolvedValue(new Set());
+    mockedGetDirectByokCatalogServing.mockResolvedValue(new Map());
     mockedTagOpenAiChatGptByokModels.mockImplementation(
       (_userId: string, models: OpenRouterModel[]) => models
     );
@@ -219,10 +219,15 @@ describe('GET /api/openrouter/models', () => {
       organizationId: null,
       authFailedResponse: null,
     } as never);
-    const catalogModelIds = new Set(['public/model']);
+    const catalogServing = new Map([
+      [
+        'public/model',
+        [{ chatApis: ['chat_completions' as const], clientApi: 'chat_completions' as const }],
+      ],
+    ]);
     mockedGetDirectByokModelsForUser.mockResolvedValue([directModel] as never);
     mockedGetUserByokProviderIds.mockResolvedValue(['anthropic']);
-    mockedGetDirectByokCatalogModelIds.mockResolvedValue(catalogModelIds);
+    mockedGetDirectByokCatalogServing.mockResolvedValue(catalogServing);
     mockedAddUserByokAvailability.mockResolvedValue([
       { ...publicModel, hasUserByokAvailable: true },
     ]);
@@ -235,7 +240,7 @@ describe('GET /api/openrouter/models', () => {
     await expect(response.json()).resolves.toEqual({
       data: [{ ...publicModel, hasUserByokAvailable: true, isFree: false }, directModel],
     });
-    expect(mockedGetDirectByokCatalogModelIds).toHaveBeenCalledWith({
+    expect(mockedGetDirectByokCatalogServing).toHaveBeenCalledWith({
       type: 'user',
       id: 'user-id',
     });

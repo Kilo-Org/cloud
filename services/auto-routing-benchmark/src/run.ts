@@ -2162,6 +2162,7 @@ async function processDeciderJob(
         token: claim.token,
       };
       let attemptStartedAt: number | undefined;
+      let unstartedRetryAt: number | undefined;
       const runPaidCase = async (): Promise<PendingDeciderOutput> => {
         const priorStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
         if (priorStartedAt !== null) throw new AmbiguousBenchmarkExecutionError(priorStartedAt);
@@ -2278,6 +2279,7 @@ async function processDeciderJob(
               attemptStartedAt: startedAt,
             })
           );
+          unstartedRetryAt = startedAt;
           return { result: first, retried: false, attemptStartedAt: startedAt };
         }
         addPriorAttempt(retry, first);
@@ -2313,7 +2315,15 @@ async function processDeciderJob(
           );
         }
         if (!pending) {
-          await savePendingDeciderOutput(env.BENCH_DB, pendingKey, output).catch(() => {
+          await savePendingDeciderOutput(env.BENCH_DB, pendingKey, output).catch(async () => {
+            // No callback can satisfy a retry that never reached its container, so its
+            // ledger generation must not outlive the only copy of the first output.
+            if (unstartedRetryAt !== undefined) {
+              await clearUnbilledCase(env.BENCH_DB, {
+                ...execution,
+                attemptStartedAt: unstartedRetryAt,
+              });
+            }
             throw new DeciderGraderRetryError('Pending decider output could not be saved');
           });
         }

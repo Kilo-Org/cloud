@@ -1107,6 +1107,37 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
 
+  it('clears an unstarted retry generation when the first output cannot be saved', async () => {
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce({ ...successfulCliResult, text: '', exitCode: 0, costUsd: 0.01 })
+      .mockRejectedValueOnce(
+        new Error(
+          'container /run failed: HTTP 503 container not reached: Error proxying request to container: The container just exited'
+        )
+      );
+    vi.mocked(savePendingDeciderOutput).mockRejectedValueOnce(new Error('D1 DB is overloaded'));
+
+    await processJob(env, deciderMessage());
+
+    const retryStartedAt =
+      vi.mocked(runDeciderCaseViaCli).mock.calls[1]?.[1].resultCallback?.execution.attemptStartedAt;
+    expect(retryStartedAt).toEqual(expect.any(Number));
+    expect(clearUnbilledCase).toHaveBeenCalledExactlyOnceWith(env.BENCH_DB, {
+      runId,
+      model,
+      variant: '',
+      rep: 0,
+      caseId: benchCase.id,
+      token: 'token-1',
+      attemptStartedAt: retryStartedAt,
+    });
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1', expect.any(Number));
+    expect(queueSend).not.toHaveBeenCalledWith(deciderMessage(), expect.anything());
+  });
+
   it('defers a killed-before-events case whose retry never reaches the container', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(runDeciderCaseViaCli)

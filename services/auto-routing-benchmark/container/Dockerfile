@@ -8,6 +8,7 @@
 # measures: read "CLI under test" in the README first.
 FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
 ARG KILO_CLI_VERSION=7.8.27
+ENV KILO_DISABLE_AUTOUPDATE=1
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 g++ make \
   && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/* \

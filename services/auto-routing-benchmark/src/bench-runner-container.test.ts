@@ -91,3 +91,33 @@ it.each([
   expect(isRetryableContainerAvailabilityError(error)).toBe(false);
   expect(String(error)).toContain(`HTTP 500 ${body}`);
 });
+
+it('passes a decoded 500 through without the upstream encoding and length headers', async () => {
+  const body = '{"error":"spawn failed"}';
+  vi.spyOn(Container.prototype, 'fetch').mockResolvedValue(
+    new Response(body, {
+      status: 500,
+      statusText: 'Internal Server Error',
+      headers: {
+        'content-encoding': 'gzip',
+        'content-length': '7',
+        'content-type': 'application/json',
+      },
+    })
+  );
+  const container = new BenchRunnerContainer(
+    {} as DurableObjectState<Record<string, never>>,
+    { KILO_CLI_API_URL: 'https://api.test' } as Env
+  );
+
+  const response = await container.fetch(
+    new Request('http://container/run', { method: 'POST', body: '{}' })
+  );
+
+  expect(response.status).toBe(500);
+  expect(response.statusText).toBe('Internal Server Error');
+  expect(response.headers.get('content-encoding')).toBeNull();
+  expect(response.headers.get('content-length')).toBeNull();
+  expect(response.headers.get('content-type')).toBe('application/json');
+  expect(await response.text()).toBe(body);
+});

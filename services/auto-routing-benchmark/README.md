@@ -199,11 +199,11 @@ per-run scheduler markers instead of scanning the chunk, execution or run tables
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger records when each paid case started and prevents automatic
 repetition if a worker disappears after inference may have started but before an output was
-saved. The container posts every completed case to the worker before returning its HTTP
-response, then posts `not_started` for accepted cases that provably did not spawn the CLI.
-If the first post fails, the container answers the HTTP request and keeps posting with
-backoff for up to about 5.5 minutes. Each callback carries the paid attempt's start time,
-so a stale callback cannot replace a newer empty-output retry.
+saved. The container posts every completed case to the worker, and `not_started` for accepted
+cases that provably did not spawn the CLI. A post the worker accepts on the first attempt
+precedes the HTTP response. If the first post fails, the container answers the HTTP request
+and keeps posting with backoff for up to about 5.5 minutes. Each callback carries the paid
+attempt's start time, so a stale callback cannot replace a newer empty-output retry.
 
 A request that never reached the container server is not a paid call. `BenchRunnerContainer`
 turns the `@cloudflare/containers` 500s that precede forwarding ("Failed to start container",
@@ -348,8 +348,8 @@ Use `POST /admin/registry/refresh` with explicit concrete model/variant pairs:
 - Other profiles and ordinary retry reuse remain unchanged. No global engine-version bump occurs.
 
 The refresh endpoint handles affected `ready` rows directly. The failed-only requeue endpoint cannot repair them.
-Container callbacks are bounded by three attempts. Exhausted delivery logs contain categories,
-not credentials or result contents.
+Container callbacks are bounded by ten attempts over about 5.5 minutes. Exhausted delivery logs
+contain categories, not credentials or result contents.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker admits bounded oldest-first registry batches independently of available execution slots.
@@ -1295,11 +1295,14 @@ Debian packages, and file timestamps differ between uncached builds.
 - The server handles SIGTERM and drains the CLI case it already accepted, then exits.
   A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
   paid call, after its callback records `not_started`.
-- Every completed case is posted to the worker's `/container/case-result` route before the
-  HTTP response. A Durable Object request keeps running after its caller is canceled, so
-  `BenchRunnerContainer` relays the caller's `request.signal` (enabled by the
-  `enable_request_signal` compatibility flag) to the container request. The route accepts
+- Every completed case is posted to the worker's `/container/case-result` route, before the
+  HTTP response unless the first post fails. A Durable Object request keeps running after its
+  caller is canceled, so `BenchRunnerContainer` relays the caller's `request.signal` (enabled by
+  the `enable_request_signal` compatibility flag) to the container request. The route accepts
   only the exact paid-execution generation that opened the case.
+- `sleepAfter` is 10 minutes, longer than the CLI timeout plus the whole delivery schedule.
+  Outbound posts do not count as container activity, so a shorter idle timeout could send
+  SIGTERM while a delivery is pending; the server then drains it but refuses new cases.
 - Completed or failed runs reject queued work before starting another CLI case.
 - Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an

@@ -40,7 +40,10 @@ const ENTRY_EXCERPT_CODE_POINTS = 32;
  * sentence readable on its own.
  *
  * The excerpt is sliced by code point so a surrogate pair stays whole, and the
- * ellipsis marks a value longer than the excerpt.
+ * ellipsis marks a value longer than the excerpt. `JSON.stringify` escapes the
+ * `C0` range and lone surrogates but writes `C1` as raw characters, so each
+ * remaining `Cc` code point becomes a `\u` escape. The sentence therefore holds
+ * no control character, whatever the refused entry contains.
  */
 function allowListEntryRefusalClause(issue: {
   readonly path?: readonly PropertyKey[] | undefined;
@@ -53,7 +56,10 @@ function allowListEntryRefusalClause(issue: {
   const excerpt =
     codePoints.slice(0, ENTRY_EXCERPT_CODE_POINTS).join('') +
     (codePoints.length > ENTRY_EXCERPT_CODE_POINTS ? '…' : '');
-  return ` at index ${index} (${JSON.stringify(excerpt)})`;
+  return ` at index ${index} (${JSON.stringify(excerpt).replaceAll(
+    /\p{Cc}/gu,
+    character => `\\u${character.codePointAt(0)?.toString(16).padStart(4, '0')}`
+  )})`;
 }
 
 /**

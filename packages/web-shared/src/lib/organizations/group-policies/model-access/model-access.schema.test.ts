@@ -546,6 +546,24 @@ describe('model access policy write refusal sentences', () => {
     expect(/\p{Cc}/u.test(sentence)).toBe(false);
   });
 
+  it('keeps the sentence free of control characters for a C1 code point', () => {
+    // U+0085 is `Cc` but outside the range `JSON.stringify` escapes.
+    const sentence = writeRefusal({
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: [],
+        provider_allow_list: ['p\u0085p'],
+      },
+    });
+
+    expect(sentence).toBe(
+      'A provider slug at index 0 ("p\\u0085p") must not contain control characters.'
+    );
+    expect(/\p{Cc}/u.test(sentence)).toBe(false);
+    expect(sentence).toBe(sentence.normalize('NFKC'));
+  });
+
   it('falls back to the generic refusal for a too_small issue outside the allow lists', () => {
     const result = z.string().min(1).safeParse('');
     if (result.success) throw new Error('Expected the schema to refuse the empty string');

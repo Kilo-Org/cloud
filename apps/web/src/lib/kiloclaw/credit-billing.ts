@@ -662,8 +662,9 @@ export async function applyStripeFundedKiloClawPeriod(
         subscriptionId: targetRow.id,
         stripeSubscriptionId,
         stripeEventId: params.stripeEventId,
-        summary:
-          plan === 'commit'
+        summary: providerSubscriptionEnded
+          ? 'Invoice from an ended Stripe subscription failed Commit retirement checks and cannot change the subscription.'
+          : plan === 'commit'
             ? 'Paid Commit invoice is ambiguous; paid access is preserved and renewal is blocked.'
             : 'Standard invoice lacks verified explicit retirement continuation consent.',
       });
@@ -810,7 +811,6 @@ export async function applyStripeFundedKiloClawPeriod(
       credit_renewal_at: periodEnd,
       commit_ends_at: commitEndsAt,
       ...retirementDecision.subscriptionUpdate,
-      past_due_since: null,
       auto_top_up_triggered_for_period: null,
       ...(shouldClearSchedule
         ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
@@ -821,6 +821,7 @@ export async function applyStripeFundedKiloClawPeriod(
       : {
           ...periodSet,
           status: 'active' as const,
+          past_due_since: null,
           ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
           ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
         };

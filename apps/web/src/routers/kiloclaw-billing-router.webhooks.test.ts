@@ -1472,12 +1472,15 @@ describe('handleKiloClawInvoicePaid', () => {
   });
 
   it.each([
-    { plan: 'standard', stripeStatus: 'active', expected: 'active' },
-    { plan: 'trial', stripeStatus: 'active', expected: 'active' },
-    { plan: 'standard', stripeStatus: 'canceled', expected: 'canceled' },
+    { plan: 'standard', localStatus: 'canceled', stripeStatus: 'active', expected: 'active' },
+    { plan: 'trial', localStatus: 'canceled', stripeStatus: 'active', expected: 'active' },
+    { plan: 'standard', localStatus: 'canceled', stripeStatus: 'canceled', expected: 'canceled' },
+    { plan: 'trial', localStatus: 'canceled', stripeStatus: 'canceled', expected: 'canceled' },
+    { plan: 'standard', localStatus: 'past_due', stripeStatus: 'active', expected: 'active' },
+    { plan: 'standard', localStatus: 'past_due', stripeStatus: 'canceled', expected: 'past_due' },
   ] as const)(
-    'settles a locally canceled $plan row with a $stripeStatus Stripe subscription as $expected',
-    async ({ plan, stripeStatus, expected }) => {
+    'settles a $localStatus $plan row as $expected when Stripe is $stripeStatus',
+    async ({ plan, localStatus, stripeStatus, expected }) => {
       const instance = await createKiloclawInstance(user.id);
       const stripeSubscriptionId = 'sub_invoice_paid_after_local_cancel';
       await db.insert(kiloclaw_subscriptions).values({
@@ -1486,7 +1489,8 @@ describe('handleKiloClawInvoicePaid', () => {
         stripe_subscription_id: stripeSubscriptionId,
         payment_source: 'stripe',
         plan,
-        status: 'canceled',
+        status: localStatus,
+        past_due_since: localStatus === 'past_due' ? '2026-04-16T00:00:00.000Z' : null,
       });
       stripeMock.subscriptions.retrieve.mockResolvedValue(
         makeStripeSubscription({
@@ -1525,6 +1529,7 @@ describe('handleKiloClawInvoicePaid', () => {
       ).resolves.toEqual([
         expect.objectContaining({
           status: expected,
+          past_due_since: expected === 'past_due' ? '2026-04-16 00:00:00+00' : null,
           plan: 'standard',
           payment_source: 'credits',
           current_period_end: '2026-06-01 00:00:00+00',

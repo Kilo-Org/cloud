@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type * as Sentry from '@sentry/nextjs';
 import { eq, sql } from 'drizzle-orm';
 
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
@@ -11,19 +12,26 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { applyStripeFundedKiloClawPeriod as settleStripeFundedPeriod } from '@/lib/kiloclaw/credit-billing';
+import type { applyStripeFundedKiloClawPeriod as SettleStripeFundedPeriod } from '@/lib/kiloclaw/credit-billing';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+
+const captureExceptionMock = jest.fn<typeof Sentry.captureException>();
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<typeof Sentry>('@sentry/nextjs'),
+  captureException: captureExceptionMock,
+}));
 
 const makeStripeSubscriptionNonRenewing =
   jest.fn<(stripeSubscriptionId: string) => Promise<void>>();
 const settlementDependencies = { makeStripeSubscriptionNonRenewing };
 
-type SettlementParams = Parameters<typeof settleStripeFundedPeriod>[0];
+let settleStripeFundedPeriod: typeof SettleStripeFundedPeriod;
+type SettlementParams = Parameters<typeof SettleStripeFundedPeriod>[0];
 
 function applyStripeFundedKiloClawPeriod(
   params: Omit<SettlementParams, 'stripeSubscriptionStatus'> &
     Partial<Pick<SettlementParams, 'stripeSubscriptionStatus'>>,
-  dependencies?: Parameters<typeof settleStripeFundedPeriod>[1]
+  dependencies?: Parameters<typeof SettleStripeFundedPeriod>[1]
 ) {
   return settleStripeFundedPeriod({ stripeSubscriptionStatus: 'active', ...params }, dependencies);
 }
@@ -51,8 +59,14 @@ async function readUser(id: string) {
 }
 
 describe('Stripe-funded KiloClaw settlement', () => {
+  beforeAll(async () => {
+    const creditBilling = await import('@/lib/kiloclaw/credit-billing');
+    settleStripeFundedPeriod = creditBilling.applyStripeFundedKiloClawPeriod;
+  });
+
   beforeEach(async () => {
     await cleanupDbForTest();
+    captureExceptionMock.mockClear();
     makeStripeSubscriptionNonRenewing.mockReset();
     makeStripeSubscriptionNonRenewing.mockResolvedValue();
   });
@@ -274,6 +288,17 @@ describe('Stripe-funded KiloClaw settlement', () => {
         destructionDeadline
       );
       expect(makeStripeSubscriptionNonRenewing).not.toHaveBeenCalled();
+      if (authorization === 'forbidden') {
+        expect(captureExceptionMock).toHaveBeenCalledWith(
+          new Error('kiloclaw_commit_retirement:forbidden_commit_invoice'),
+          expect.objectContaining({
+            extra: expect.objectContaining({
+              summary:
+                'Invoice from an ended Stripe subscription failed Commit retirement checks and cannot change the subscription.',
+            }),
+          })
+        );
+      }
       await expect(readUser(user.id)).resolves.toMatchObject({ total_microdollars_acquired: 0 });
       const transactions = await db
         .select()

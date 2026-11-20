@@ -437,8 +437,8 @@ rules resolve conflicts.
    successful payment: advancing the billing period, mutating the
    plan, updating the credit renewal timestamp, updating the
    commitment end date, and recovering the subscription to active
-   status. No other event or background process MAY perform these
-   operations on a hybrid row.
+   status, subject to Stripe-Funded Credit Settlement rule 11. No other
+   event or background process MAY perform these operations on a hybrid row.
 2. Subscription status-change events from the payment provider for
    hybrid rows MUST be limited to propagating cancel intent and
    dunning states. They MUST NOT overwrite the payment source,
@@ -853,18 +853,20 @@ rows renew.
    Enrollment rule 6.
 10. `$0` KiloClaw invoices MUST still run the settlement path so
     Stripe-created subscriptions can transition out of the
-    intermediate Stripe-funded state into the hybrid activated state.
+    intermediate Stripe-funded state into the hybrid activated state
+    when rule 11 permits activation.
     Revenue side effects that require a paid amount, such as revenue
     analytics or affiliate sale events, MUST apply their own
     `amount_paid > 0` guard and MUST NOT block settlement.
 11. Determine whether a provider subscription has ended from its live Stripe
     status (`canceled` or `incomplete_expired`), not from the local status.
     For an ended provider subscription, settlement MUST record the ledger
-    entries but MUST NOT reactivate the subscription, clear suspension or
-    destruction state, trigger auto-resume, send an activation email, or
-    attempt provider non-renewal. If Commit Retirement finds an ambiguity or
-    forbids the incoming term, settlement MUST leave the subscription row
-    unchanged so expiry enforcement still has the canonical boundary.
+    entries but MUST NOT reactivate the subscription, reset the past-due
+    timer, clear suspension or destruction state, trigger auto-resume, send an
+    activation email, or attempt provider non-renewal. When an invoice from
+    an ended provider subscription is ambiguous or forbidden under Commit
+    Retirement, settlement MUST leave the subscription row unchanged so
+    expiry enforcement still has the canonical boundary.
 
 ### Revenue and External Reporting
 

@@ -14,6 +14,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { and, eq, sql } from 'drizzle-orm';
 import {
   findOrganizationMemberBalanceRow,
+  findOrganizationMemberBalanceRowWithPayerFamily,
   findOrganizationMemberRole,
 } from '@kilocode/worker-utils/account-access';
 import {
@@ -113,12 +114,18 @@ describe('Organization Usage Functions', () => {
       await expect(
         findOrganizationMemberBalanceRow(db, organization.id, user.id)
       ).resolves.not.toBeNull();
+      await expect(
+        findOrganizationMemberBalanceRowWithPayerFamily(db, organization.id, user.id)
+      ).resolves.not.toBeNull();
 
       await markOrganizationAsDeleted(organization.id);
 
       await expect(findOrganizationMemberRole(db, organization.id, user.id)).resolves.toBeNull();
       await expect(
         findOrganizationMemberBalanceRow(db, organization.id, user.id)
+      ).resolves.toBeNull();
+      await expect(
+        findOrganizationMemberBalanceRowWithPayerFamily(db, organization.id, user.id)
       ).resolves.toBeNull();
     });
 

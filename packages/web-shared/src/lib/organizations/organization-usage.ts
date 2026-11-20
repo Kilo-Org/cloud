@@ -36,7 +36,7 @@ import {
 } from '@kilocode/web-shared/lib/autoTopUp';
 import {
   accountBalanceMicrodollars,
-  findOrganizationMemberBalanceRow,
+  findOrganizationMemberBalanceRowWithPayerFamily,
   organizationMemberBalance,
 } from '@kilocode/worker-utils/account-access';
 
@@ -133,7 +133,12 @@ export async function getBalanceForOrganizationUser(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
   );
 
-  const row = await findOrganizationMemberBalanceRow(fromDb, organizationId, userId, limitType);
+  const row = await findOrganizationMemberBalanceRowWithPayerFamily(
+    fromDb,
+    organizationId,
+    userId,
+    limitType
+  );
 
   if (!row) {
     const endTime = performance.now();

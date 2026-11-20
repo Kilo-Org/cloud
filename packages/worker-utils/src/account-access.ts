@@ -127,6 +127,7 @@ export async function findOrganizationPayerFamily(
   return row ?? null;
 }
 
+/** The organization's own totals and settings, with the member's limit and today's usage. */
 export type OrganizationMemberBalanceRow = Pick<
   Organization,
   | 'total_microdollars_acquired'
@@ -137,64 +138,97 @@ export type OrganizationMemberBalanceRow = Pick<
   | 'auto_top_up_enabled'
   | 'next_credit_expiration_at'
   | 'created_at'
-> &
-  OrganizationPayerFamily & {
-    microdollar_limit: number | null;
-    microdollar_usage: number | null;
+> & {
+  microdollar_limit: number | null;
+  microdollar_usage: number | null;
+};
+
+export type OrganizationMemberBalanceRowWithPayerFamily = OrganizationMemberBalanceRow &
+  OrganizationPayerFamily;
+
+const organizationMemberBalanceColumns = {
+  microdollar_limit: organization_user_limits.microdollar_limit,
+  microdollar_usage: organization_user_usage.microdollar_usage,
+  total_microdollars_acquired: organizations.total_microdollars_acquired,
+  microdollars_used: organizations.microdollars_used,
+  settings: organizations.settings,
+  require_seats: organizations.require_seats,
+  plan: organizations.plan,
+  auto_top_up_enabled: organizations.auto_top_up_enabled,
+  next_credit_expiration_at: organizations.next_credit_expiration_at,
+  created_at: organizations.created_at,
+};
+
+// Both balance-row lookups join and filter with these conditions, so they admit exactly the same
+// members and read the same limit and usage rows.
+function organizationMemberBalanceJoins(userId: string, limitType: OrganizationUserLimitType) {
+  return {
+    membership: eq(organization_memberships.organization_id, organizations.id),
+    limit: and(
+      eq(organization_user_limits.organization_id, organizations.id),
+      eq(organization_user_limits.kilo_user_id, userId),
+      eq(organization_user_limits.limit_type, limitType)
+    ),
+    usage: and(
+      eq(organization_user_usage.organization_id, organizations.id),
+      eq(organization_user_usage.kilo_user_id, userId),
+      eq(organization_user_usage.limit_type, limitType),
+      eq(organization_user_usage.usage_date, sql`CURRENT_DATE`)
+    ),
   };
+}
 
 // Billing managers manage credits but cannot spend them, so they have no member balance.
+function organizationMemberBalanceCondition(organizationId: string, userId: string) {
+  return and(
+    eq(organizations.id, organizationId),
+    eq(organization_memberships.kilo_user_id, userId),
+    isNull(organizations.deleted_at),
+    not(eq(organization_memberships.role, 'billing_manager'))
+  );
+}
+
+/**
+ * The member's balance inputs for this organization alone. Use it when only the member's
+ * balance matters; it skips the organization family aggregate.
+ */
 export async function findOrganizationMemberBalanceRow(
   db: AccountDb,
   organizationId: string,
   userId: string,
   limitType: OrganizationUserLimitType = 'daily'
 ): Promise<OrganizationMemberBalanceRow | null> {
+  const joins = organizationMemberBalanceJoins(userId, limitType);
   const [row] = await db
-    .select({
-      microdollar_limit: organization_user_limits.microdollar_limit,
-      microdollar_usage: organization_user_usage.microdollar_usage,
-      total_microdollars_acquired: organizations.total_microdollars_acquired,
-      microdollars_used: organizations.microdollars_used,
-      settings: organizations.settings,
-      require_seats: organizations.require_seats,
-      plan: organizations.plan,
-      auto_top_up_enabled: organizations.auto_top_up_enabled,
-      next_credit_expiration_at: organizations.next_credit_expiration_at,
-      created_at: organizations.created_at,
-      ...organizationPayerFamily,
-    })
+    .select(organizationMemberBalanceColumns)
+    .from(organizations)
+    .innerJoin(organization_memberships, joins.membership)
+    .leftJoin(organization_user_limits, joins.limit)
+    .leftJoin(organization_user_usage, joins.usage)
+    .where(organizationMemberBalanceCondition(organizationId, userId))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * The member's balance inputs together with the payer family bouncer judges, read in the same
+ * statement so the family totals match the organization's own totals.
+ */
+export async function findOrganizationMemberBalanceRowWithPayerFamily(
+  db: AccountDb,
+  organizationId: string,
+  userId: string,
+  limitType: OrganizationUserLimitType = 'daily'
+): Promise<OrganizationMemberBalanceRowWithPayerFamily | null> {
+  const joins = organizationMemberBalanceJoins(userId, limitType);
+  const [row] = await db
+    .select({ ...organizationMemberBalanceColumns, ...organizationPayerFamily })
     .from(organizations)
     .innerJoinLateral(organizationFamily, sql`true`)
-    .innerJoin(
-      organization_memberships,
-      eq(organization_memberships.organization_id, organizations.id)
-    )
-    .leftJoin(
-      organization_user_limits,
-      and(
-        eq(organization_user_limits.organization_id, organizations.id),
-        eq(organization_user_limits.kilo_user_id, userId),
-        eq(organization_user_limits.limit_type, limitType)
-      )
-    )
-    .leftJoin(
-      organization_user_usage,
-      and(
-        eq(organization_user_usage.organization_id, organizations.id),
-        eq(organization_user_usage.kilo_user_id, userId),
-        eq(organization_user_usage.limit_type, limitType),
-        eq(organization_user_usage.usage_date, sql`CURRENT_DATE`)
-      )
-    )
-    .where(
-      and(
-        eq(organizations.id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId),
-        isNull(organizations.deleted_at),
-        not(eq(organization_memberships.role, 'billing_manager'))
-      )
-    )
+    .innerJoin(organization_memberships, joins.membership)
+    .leftJoin(organization_user_limits, joins.limit)
+    .leftJoin(organization_user_usage, joins.usage)
+    .where(organizationMemberBalanceCondition(organizationId, userId))
     .limit(1);
   return row ?? null;
 }

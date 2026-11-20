@@ -1,4 +1,5 @@
 import type { SQL } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -7,6 +8,8 @@ import {
   createEmailDomainBlacklistCache,
   emailDomainSuffixes,
   findBlacklistedDomains,
+  findOrganizationMemberBalanceRow,
+  findOrganizationMemberBalanceRowWithPayerFamily,
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
   organizationMemberBalance,
@@ -134,6 +137,70 @@ function blacklistDb(blockedDomains: readonly string[], options: { fail?: () => 
   };
   return { db: db as never, lookups };
 }
+
+// A Drizzle client whose driver records each statement and answers with no rows.
+function recordingDb() {
+  const statements: { sql: string; params: unknown[] }[] = [];
+  const client = {
+    query: async (config: { text: string } | string, params: unknown[] = []) => {
+      statements.push({ sql: typeof config === 'string' ? config : config.text, params });
+      return { rows: [], fields: [] };
+    },
+  };
+  return { db: drizzle({ client: client as never }), statements };
+}
+
+async function memberBalanceStatement(
+  find:
+    | typeof findOrganizationMemberBalanceRow
+    | typeof findOrganizationMemberBalanceRowWithPayerFamily
+) {
+  const { db, statements } = recordingDb();
+  await expect(find(db, 'org-1', 'user-1')).resolves.toBeNull();
+  expect(statements).toHaveLength(1);
+  return statements[0]!;
+}
+
+// The joins and filters that decide which member has a balance, from the membership join on.
+function memberBalanceFilters(statement: string) {
+  return statement.slice(statement.indexOf(' inner join "organization_memberships"'));
+}
+
+describe('organization member balance rows', () => {
+  it('reads only the organization and member rows, without the organization family', async () => {
+    const lean = await memberBalanceStatement(findOrganizationMemberBalanceRow);
+
+    expect(lean.sql).not.toMatch(/organization_family|lateral|parent_organization_id/i);
+    expect(lean.sql).toMatch(
+      /^select .* from "organizations" inner join "organization_memberships"/
+    );
+    expect(lean.sql).toContain('left join "organization_user_limits"');
+    expect(lean.sql).toContain('left join "organization_user_usage"');
+    expect(lean.sql).toContain('"organization_user_usage"."usage_date" = CURRENT_DATE');
+    expect(lean.sql).toContain('"organizations"."deleted_at" is null');
+    expect(lean.sql).toContain('not "organization_memberships"."role" = $');
+    expect(lean.params).toContain('billing_manager');
+    expect(lean.params).toContain('daily');
+  });
+
+  it('keeps the organization family in the same statement for the payer lookup', async () => {
+    const full = await memberBalanceStatement(findOrganizationMemberBalanceRowWithPayerFamily);
+
+    expect(full.sql).toMatch(
+      /from "organizations" inner join lateral \(\s*select\s+root\.id as root_organization_id/
+    );
+    expect(full.sql).toContain(') as organization_family on true');
+    expect(full.sql).toContain('organization_family.total_microdollars_acquired');
+  });
+
+  it('admits the same members through both lookups', async () => {
+    const lean = await memberBalanceStatement(findOrganizationMemberBalanceRow);
+    const full = await memberBalanceStatement(findOrganizationMemberBalanceRowWithPayerFamily);
+
+    expect(memberBalanceFilters(lean.sql)).toBe(memberBalanceFilters(full.sql));
+    expect(lean.params).toEqual(full.params);
+  });
+});
 
 describe('emailDomainSuffixes', () => {
   it('lists the host and its label-boundary suffixes, longest first and lowercased', () => {

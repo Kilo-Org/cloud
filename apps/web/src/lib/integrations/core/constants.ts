@@ -177,7 +177,7 @@ export const GIT_PLATFORM = {
  * Type guard to check if a string is a valid git platform
  */
 export function isGitPlatform(platform: string): platform is GitPlatform {
-  return platform === GIT_PLATFORM.GITHUB || platform === GIT_PLATFORM.GITLAB;
+  return Object.values(GIT_PLATFORM).some((gitPlatform) => gitPlatform === platform);
 }
 
 // Type exports for use throughout the codebase

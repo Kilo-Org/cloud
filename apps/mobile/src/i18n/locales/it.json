@@ -1575,7 +1575,7 @@
       "alreadyClaimedMessage": "Questa installazione dell'app per GitHub è già connessa a un altro account Kilo. Prima disconnettila da quell'account.",
       "installationUnavailableMessage": "Questa installazione di GitHub App è sospesa o non più disponibile. Ripristinala o reinstallala in GitHub, poi ricomincia.",
       "multipleInstallationsMessage": "Questa organizzazione Kilo può attualmente connettere una sola organizzazione GitHub.",
-      "pendingRequestMessage": "Esiste già una richiesta di installazione di GitHub in sospeso per questo account. Completala o annullala in GitHub, poi riprova.",
+      "pendingRequestMessage": "Esiste già una richiesta di installazione di GitHub in sospeso per questo account. Chiedi all'account o all'organizzazione Kilo che l'ha avviata di annullarla, poi riprova.",
       "pendingRequestUnidentifiedMessage": "Kilo non è riuscito a determinare a quale account GitHub corrisponde questa richiesta. Avvia di nuovo la configurazione di GitHub dall'account che vuoi collegare.",
       "didNotCompleteTitle": "Installazione non completata",
       "didNotCompleteMessage": "L'installazione dell'app per GitHub non è stata completata. Riprova dall'app."

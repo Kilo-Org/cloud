@@ -253,7 +253,7 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
     expect(alert).toEqual({
       title: 'Cannot complete installation',
       message:
-        'A pending GitHub installation request already exists for this account. Finish or cancel it in GitHub, then try again.',
+        'A pending GitHub installation request already exists for this account. Ask the Kilo account or organization that started it to cancel it, then try again.',
       buttons: [{ text: 'Back' }],
     });
     expect(alert?.buttons[0]?.onPress).toBeUndefined();

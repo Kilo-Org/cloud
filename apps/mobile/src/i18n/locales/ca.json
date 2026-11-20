@@ -2195,7 +2195,7 @@
       "alreadyClaimedMessage": "Aquesta instal·lació de GitHub ja està connectada a un altre compte de Kilo. Primer desconnecta-la allà.",
       "installationUnavailableMessage": "Aquesta instal·lació de l'aplicació de GitHub està suspesa o ja no està disponible. Restaura-la o torna-la a instal·lar a GitHub i, després, torna-ho a provar.",
       "multipleInstallationsMessage": "Aquesta organització de Kilo actualment només pot connectar una organització de GitHub.",
-      "pendingRequestMessage": "Ja existeix una sol·licitud d'instal·lació de GitHub pendent per a aquest compte. Finalitza-la o cancel·la-la a GitHub i, després, torna-ho a provar.",
+      "pendingRequestMessage": "Ja existeix una sol·licitud d'instal·lació de GitHub pendent per a aquest compte. Demana al compte o a l'organització de Kilo que l'ha iniciat que la cancel·li i, després, torna-ho a provar.",
       "pendingRequestUnidentifiedMessage": "Kilo no ha pogut confirmar a quin compte de GitHub correspon aquesta sol·licitud. Torna a iniciar la configuració de GitHub des del compte que vols connectar.",
       "didNotCompleteTitle": "La instal·lació no s'ha completat",
       "didNotCompleteMessage": "La instal·lació de l'aplicació de GitHub no s'ha completat. Torna-ho a provar des de l'aplicació."

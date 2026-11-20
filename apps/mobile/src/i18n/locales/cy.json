@@ -2339,7 +2339,7 @@
       "alreadyClaimedMessage": "Mae'r gosodiad GitHub hwnnw eisoes wedi'i gysylltu â chyfrif Kilo arall. Datgysylltwch ef yno yn gyntaf.",
       "installationUnavailableMessage": "Mae'r gosodiad GitHub App hwn wedi'i atal neu nid yw ar gael mwyach. Adferwch neu ail-osodwch ef yn GitHub, yna dechreuwch eto.",
       "multipleInstallationsMessage": "Gall sefydliad Kilo hwn gysylltu un sefydliad GitHub yn unig ar hyn o bryd.",
-      "pendingRequestMessage": "Mae cais gosod GitHub eisoes ar y gweill ar gyfer y cyfrif hwn. Cwblhewch neu ganslo ef yn GitHub, yna rhowch gynnig eto.",
+      "pendingRequestMessage": "Mae cais gosod GitHub eisoes ar y gweill ar gyfer y cyfrif hwn. Gofynnwch i'r cyfrif Kilo neu'r sefydliad a ddechreuodd y cais ei ganslo, yna rhowch gynnig eto.",
       "pendingRequestUnidentifiedMessage": "Ni allai Kilo gadarnhau pa gyfrif GitHub y mae'r cais hwn ar ei gyfer. Dechreuwch y gosodiad GitHub eto o'r cyfrif rydych am ei gysylltu.",
       "didNotCompleteTitle": "Ni chwblhawyd y gosodiad",
       "didNotCompleteMessage": "Ni chwblhawyd gosod yr ap GitHub. Rhowch gynnig eto o'r ap."

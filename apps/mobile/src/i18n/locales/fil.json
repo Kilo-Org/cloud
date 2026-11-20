@@ -2147,7 +2147,7 @@
       "alreadyClaimedMessage": "Nakakonekta na sa ibang Kilo account ang naka-install na GitHub App na iyon. Idiskonekta muna ito roon.",
       "installationUnavailableMessage": "Ang pag-install ng GitHub App na ito ay nakasuspinde o hindi na available. I-restore o i-install muli ito sa GitHub, pagkatapos ay magsimula muli.",
       "multipleInstallationsMessage": "Sa kasalukuyan, makakakonekta lamang ng isang GitHub organization ang Kilo organization na ito.",
-      "pendingRequestMessage": "May nakabinbin nang kahilingan sa pag-install ng GitHub para sa account na ito. Tapusin o kanselahin ito sa GitHub, pagkatapos ay subukan muli.",
+      "pendingRequestMessage": "May nakabinbin nang kahilingan sa pag-install ng GitHub para sa account na ito. Hilingin sa Kilo account o Kilo organization na nagsimula nito na kanselahin ito, pagkatapos ay subukan muli.",
       "pendingRequestUnidentifiedMessage": "Hindi matukoy ng Kilo kung aling GitHub account ang para sa kahilingang ito. Simulan muli ang pag-set up ng GitHub mula sa account na gusto mong ikonekta.",
       "didNotCompleteTitle": "Hindi natapos ang pag-install",
       "didNotCompleteMessage": "Hindi natapos ang pag-install ng GitHub App. Subukan muli mula sa app."

@@ -1586,7 +1586,7 @@
       "alreadyClaimedMessage": "インストール済みのGitHub Appは、すでに別のKiloアカウントに接続されています。先にそのアカウントで接続を解除してください。",
       "installationUnavailableMessage": "このGitHub Appのインストールは停止されているか、利用できなくなっています。GitHubで復元または再インストールしてから、もう一度やり直してください。",
       "multipleInstallationsMessage": "このKilo組織は、現在接続できるGitHub組織が一つのみです。",
-      "pendingRequestMessage": "このアカウントには、保留中のGitHubインストールリクエストがすでに存在します。GitHubでそのリクエストを完了またはキャンセルしてから、もう一度やり直してください。",
+      "pendingRequestMessage": "このアカウントには、保留中のGitHubインストールリクエストがすでに存在します。このリクエストを開始したKiloアカウントまたはKilo組織に、リクエストのキャンセルを依頼してから、もう一度やり直してください。",
       "pendingRequestUnidentifiedMessage": "KiloはこのリクエストがどのGitHubアカウントのものかを確認できませんでした。接続するアカウントからGitHubのセットアップをやり直してください。",
       "didNotCompleteTitle": "インストールが完了しませんでした",
       "didNotCompleteMessage": "GitHub Appのインストールが完了しませんでした。アプリからもう一度お試しください。"

@@ -1608,7 +1608,7 @@
       "alreadyClaimedMessage": "התקנת GitHub הזו כבר מחוברת לחשבון Kilo אחר. נתק אותה שם קודם.",
       "installationUnavailableMessage": "התקנת GitHub App הזו מושהית או אינה זמינה יותר. שחזר או התקן אותה מחדש ב-GitHub, ואז התחל שוב.",
       "multipleInstallationsMessage": "ארגון Kilo זה יכול כרגע לחבר ארגון GitHub אחד בלבד.",
-      "pendingRequestMessage": "כבר קיימת בקשת התקנה ממתינה של GitHub לחשבון הזה. סיים או בטל אותה ב-GitHub, ואז נסה שוב.",
+      "pendingRequestMessage": "כבר קיימת בקשת התקנה ממתינה של GitHub לחשבון הזה. בקש מהחשבון או מהארגון של Kilo שהתחיל אותה לבטל אותה, ואז נסה שוב.",
       "pendingRequestUnidentifiedMessage": "Kilo לא הצליח לאמת לאיזה חשבון GitHub שייכת הבקשה הזו. התחל שוב את הגדרת GitHub מהחשבון שאליו אתה רוצה להתחבר.",
       "didNotCompleteTitle": "ההתקנה לא הושלמה",
       "didNotCompleteMessage": "התקנת אפליקציית GitHub לא הושלמה. נסה שוב מהאפליקציה."

@@ -2147,7 +2147,7 @@
       "alreadyClaimedMessage": "Den här GitHub-installationen är redan ansluten till ett annat Kilo-konto. Koppla från den där först.",
       "installationUnavailableMessage": "Den här installationen av GitHub App är avstängd eller inte längre tillgänglig. Återställ eller installera om den i GitHub och börja sedan om.",
       "multipleInstallationsMessage": "Den här Kilo-organisationen kan för närvarande bara ansluta en enda GitHub-organisation.",
-      "pendingRequestMessage": "Det finns redan en väntande GitHub-installationsförfrågan för det här kontot. Slutför eller avbryt den i GitHub och försök sedan igen.",
+      "pendingRequestMessage": "Det finns redan en väntande GitHub-installationsförfrågan för det här kontot. Be Kilo-kontot eller Kilo-organisationen som startade den att avbryta den och försök sedan igen.",
       "pendingRequestUnidentifiedMessage": "Kilo kunde inte bekräfta vilket GitHub-konto den här begäran gäller. Starta GitHub-konfigurationen igen från kontot du vill ansluta.",
       "didNotCompleteTitle": "Installationen slutfördes inte",
       "didNotCompleteMessage": "Installationen av GitHub-appen slutfördes inte. Försök igen från appen."

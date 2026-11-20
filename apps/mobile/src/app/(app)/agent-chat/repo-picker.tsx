@@ -17,7 +17,6 @@ import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
-import { withRtlParagraphMark } from '@/lib/rtl-text';
 import { useDetailScreenBottomPadding, useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type PickerListItem =
@@ -254,9 +253,7 @@ export default function RepoPickerScreen() {
       <Card className="mx-4 mt-3">
         {/* One sentence, which already names the product: the note carried a
             'Bitbucket' title above it and the body repeated the name. */}
-        <Text variant="muted">
-          {withRtlParagraphMark(t('agentChat.newSession.bitbucketOrganizationsOnly'))}
-        </Text>
+        <Text variant="muted">{t('agentChat.newSession.bitbucketOrganizationsOnly')}</Text>
       </Card>
     );
   }

@@ -271,14 +271,18 @@ describe('repository picker Bitbucket note', () => {
     ]);
   });
 
-  it('gives the note the interface paragraph direction in Arabic', async () => {
+  it('hands the note to the shared Text, which owns the paragraph direction', async () => {
     await i18n.changeLanguage('ar');
     onTestFinished(() => {
       void i18n.changeLanguage('en');
     });
     // The Arabic sentence starts with the Latin product name, so its own first
     // strong character would set the paragraph left to right inside a
-    // right-aligned line. The app interface is right to left in this locale.
+    // right-aligned line. `Text` adds the mark from the child tree it draws
+    // (`rtlBaseMarkedChildren`); this suite mounts the screen with that primitive
+    // stubbed to a host element, so the mark is proved in
+    // `components/ui/text.rtl-base-direction.mounted.test.tsx`, and a call-site
+    // mark here would draw a second one.
     rn.I18nManager.isRTL = true;
     onTestFinished(() => {
       rn.I18nManager.isRTL = false;
@@ -288,6 +292,6 @@ describe('repository picker Bitbucket note', () => {
 
     const sentence = i18n.t('agentChat.newSession.bitbucketOrganizationsOnly');
     expect(sentence.startsWith('Bitbucket')).toBe(true);
-    expect(noteTexts(renderer)).toEqual([`\u200F${sentence}`]);
+    expect(noteTexts(renderer)).toEqual([sentence]);
   });
 });

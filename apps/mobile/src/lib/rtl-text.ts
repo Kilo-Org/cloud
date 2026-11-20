@@ -106,33 +106,6 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
 }
 
 /**
- * Copy whose paragraph must follow the interface's direction instead of its own
- * first strong character, for the case a style cannot reach.
- *
- * Android resolves a paragraph's order from the first strong character it finds
- * and takes `writingDirection` only on iOS, so the Bitbucket note's Arabic
- * sentence — `Bitbucket متاح للمؤسسات فقط.`, which the catalogs translate for
- * every right-to-left language — drew left to right inside a right-aligned
- * line: the product name at the left end and the full stop at the right. A
- * leading right-to-left mark is a strong character with no width and no
- * pronunciation, so the paragraph reads in the interface's direction while the
- * Latin run inside it keeps its own order (`markdown-rtl-list-items.ts` names a
- * list item's start edge the same way).
- *
- * A left-to-right interface gets its copy unchanged: its first strong character
- * already names the direction the interface has.
- *
- * Copy with no right-to-left letter keeps its own order in either interface: a
- * Latin sentence already resolves left to right from its own first letter, and
- * a mark in front of it would take the paragraph the other way — the em dash or
- * the full stop that ends it would move to the other end of the line.
- */
-export function withRtlParagraphMark(text: string): string {
-  // `RTL_LETTER` carries no `g` flag, so testing it is stateless.
-  return I18nManager.isRTL && RTL_LETTER.test(text) ? `${RIGHT_TO_LEFT_MARK}${text}` : text;
-}
-
-/**
  * Base direction for code content (a diff line, a hunk header): code is written
  * left to right whatever the interface language. Inheriting the interface's
  * direction instead leaves Android resolving the paragraph's `auto` alignment

@@ -73,7 +73,9 @@ export function SectionHeader({
   // direction: only right-to-left script copy drops the capitals and tracking
   // (`keepsLatinDisplay`, shared with the eyebrow variant in `text.tsx`), so a
   // Latin "SEE ALL" keeps the look of the eyebrow beside it in an RTL screen.
-  const actionKeepsLatinDisplay = keepsLatinDisplay(hasRtlScript(actionLabel));
+  // Only an action resolves it: a header without one never reads the interface
+  // direction, which is what a mounted suite stubbing `react-native` relies on.
+  const actionKeepsLatinDisplay = hasAction && keepsLatinDisplay(hasRtlScript(actionLabel));
   // A section label is a heading: a reader navigates a long settings screen by
   // jumping between them, and the role is what makes them jump targets.
   const labelText = (

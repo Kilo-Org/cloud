@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "Vizuizi vya Akili Bandia",
-    "permissionDenied": "Wamiliki na wasimamizi wa shirika pekee wanaweza kudhibiti Vizuizi vya Akili Bandia.",
+    "permissionDenied": "Wamiliki na wasimamizi wa shirika pekee wanaweza kudhibiti Vizuizi vya Akili Bandia. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Vizuizi vya Akili Bandia havijawashwa",
     "unavailable": "Kilo huwasha Vizuizi vya Akili Bandia kwa shirika kwa ombi. Wasiliana na {{supportEmail}}, na timu ya Kilo itaziwasha kwa shirika lako.",
     "contactSupport": "Wasiliana na timu ya usaidizi",

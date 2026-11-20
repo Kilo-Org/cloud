@@ -4901,7 +4901,7 @@
   },
   "organizationGuardrails": {
     "title": "מעקות בטיחות לבינה מלאכותית",
-    "permissionDenied": "רק בעלי הארגון והמנהלים יכולים לנהל מעקות בטיחות לבינה מלאכותית.",
+    "permissionDenied": "רק בעלי הארגון והמנהלים יכולים לנהל מעקות בטיחות לבינה מלאכותית. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "מעקות בטיחות לבינה מלאכותית אינם מופעלים",
     "unavailable": "Kilo מפעילה מעקות בטיחות לבינה מלאכותית עבור ארגון לפי בקשה. צרו קשר עם {{supportEmail}}, וצוות Kilo יפעיל אותם עבור הארגון שלך.",
     "contactSupport": "פנייה לתמיכה",

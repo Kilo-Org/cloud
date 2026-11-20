@@ -4977,7 +4977,7 @@
   },
   "organizationGuardrails": {
     "title": "Proteções de IA",
-    "permissionDenied": "Apenas os proprietários e administradores da organização podem gerir as Proteções de IA.",
+    "permissionDenied": "Apenas os proprietários e administradores da organização podem gerir as Proteções de IA. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "As Proteções de IA não estão ativadas",
     "unavailable": "A Kilo ativa as Proteções de IA para uma organização a pedido. Contacte {{supportEmail}}, e a equipa do Kilo as ativa para a sua organização.",
     "contactSupport": "Contactar o suporte",

@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "Pagar Keselamatan AI",
-    "permissionDenied": "Hanya pemilik dan pentadbir organisasi boleh mengurus Pagar Keselamatan AI.",
+    "permissionDenied": "Hanya pemilik dan pentadbir organisasi boleh mengurus Pagar Keselamatan AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Pagar Keselamatan AI tidak diaktifkan",
     "unavailable": "Kilo mengaktifkan Pagar Keselamatan AI untuk sesebuah organisasi atas permintaan. Hubungi {{supportEmail}}, dan pasukan Kilo mengaktifkannya untuk organisasi anda.",
     "contactSupport": "Hubungi sokongan",

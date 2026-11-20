@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "سنوورە پارێزەرەکانی AI",
-    "permissionDenied": "تەنها خاوەن و بەڕێوەبەرانی ڕێکخراو دەتوانن سنوورە پارێزەرەکانی AI بەڕێوە ببەن.",
+    "permissionDenied": "تەنها خاوەن و بەڕێوەبەرانی ڕێکخراو دەتوانن سنوورە پارێزەرەکانی AI بەڕێوە ببەن. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "سنوورە پارێزەرەکانی AI چالاک نەکراوە",
     "unavailable": "Kilo لەسەر داواکاری سنوورە پارێزەرەکانی AI بۆ ڕێکخراوێک چالاک دەکات. پەیوەندی بە {{supportEmail}} بکە، و تیمی Kilo چالاکی دەکات بۆ ڕێکخراوەکەت.",
     "contactSupport": "پەیوەندیکردن بە پشتگیری",

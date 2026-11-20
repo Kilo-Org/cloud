@@ -17,7 +17,6 @@
 import { z } from 'zod';
 
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
-import { sessionBranchLabel } from '@/components/agents/session-provenance-subtitle';
 import {
   githubPrRef,
   providerPrNumber,
@@ -28,6 +27,7 @@ import {
 } from '@/lib/pr-review/provider-pr-ref';
 import { providerRefFromRecentPr, type RecentPrRef } from '@/lib/pr-review/recent-prs';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 import {

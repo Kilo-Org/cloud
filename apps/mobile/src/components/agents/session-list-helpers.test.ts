@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
@@ -28,10 +29,7 @@ import {
   storedSessionEyebrowState,
 } from './session-list-helpers';
 import { sectionAwareTimeMeta } from './session-row-time-meta';
-import {
-  composeSessionProvenanceSubtitle,
-  sessionBranchLabel,
-} from './session-provenance-subtitle';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 
 afterEach(async () => {
   await i18n.changeLanguage('en');
@@ -86,28 +84,6 @@ describe('composeSessionProvenanceSubtitle', () => {
     expect(composeSessionProvenanceSubtitle({ branchLabel: 'a%2520b', prNumber: null })).toBe(
       'a%2520b'
     );
-  });
-});
-
-describe('sessionBranchLabel', () => {
-  it('has no label for an absent or empty branch', () => {
-    expect(sessionBranchLabel(null)).toBeNull();
-    expect(sessionBranchLabel(undefined)).toBeNull();
-    expect(sessionBranchLabel('')).toBeNull();
-  });
-
-  it('decodes a percent-encoded branch', () => {
-    expect(sessionBranchLabel('fix/%E8%AB%8B%E6%B1%82%E6%9B%B8')).toBe('fix/請求書');
-  });
-
-  it('leaves a plain branch unchanged', () => {
-    expect(sessionBranchLabel('feature/x')).toBe('feature/x');
-  });
-
-  it('keeps a malformed escape raw and does not throw', () => {
-    expect(sessionBranchLabel('fix/100%')).toBe('fix/100%');
-    expect(sessionBranchLabel('fix/%E')).toBe('fix/%E');
-    expect(sessionBranchLabel('100%')).toBe('100%');
   });
 });
 

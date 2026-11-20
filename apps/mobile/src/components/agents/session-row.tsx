@@ -16,6 +16,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
@@ -26,10 +27,7 @@ import {
   storedSessionEyebrowLabel,
   storedSessionEyebrowState,
 } from './session-list-helpers';
-import {
-  composeSessionProvenanceSubtitle,
-  sessionBranchLabel,
-} from './session-provenance-subtitle';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 import { sectionAwareTimeMeta } from './session-row-time-meta';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';

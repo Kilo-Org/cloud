@@ -24,6 +24,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { useRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -39,10 +40,7 @@ import {
   remoteSessionEyebrowState,
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
-import {
-  composeSessionProvenanceSubtitle,
-  sessionBranchLabel,
-} from './session-provenance-subtitle';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';

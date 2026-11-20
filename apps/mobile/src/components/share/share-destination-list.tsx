@@ -18,6 +18,7 @@ import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { type ShareCliSpawnRow } from './share-cli-spawn';
@@ -134,8 +135,13 @@ export function ShareDestinationList({
     }
     return destinations.filter(row => {
       const title = (row.title ?? '').toLowerCase();
+      // The row paints `sessionBranchLabel(row.git_branch)`, so the branch
+      // appears twice on purpose: both the stored (percent-encoded) branch and
+      // the decoded branch the row shows, so a person finds the destination by
+      // typing either form.
       const branch = (row.git_branch ?? '').toLowerCase();
-      return title.includes(q) || branch.includes(q);
+      const paintedBranch = (sessionBranchLabel(row.git_branch) ?? '').toLowerCase();
+      return title.includes(q) || branch.includes(q) || paintedBranch.includes(q);
     });
   }, [destinations, search]);
 

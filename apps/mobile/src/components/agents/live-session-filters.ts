@@ -7,8 +7,8 @@ import {
   type ProjectFilterOption,
   projectOptionKey,
 } from '@/components/agents/session-list-helpers';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
-import { sessionBranchLabel } from './session-provenance-subtitle';
 
 /** The part of an active session the live filters read. */
 export type LiveFilterSession = {

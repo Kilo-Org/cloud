@@ -6,12 +6,12 @@ import { View } from 'react-native';
 import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
 
 import { SessionPreviewTranscript } from '@/components/agents/session-preview-transcript';
-import { sessionBranchLabel } from '@/components/agents/session-provenance-subtitle';
 import { QueryError } from '@/components/query-error';
 import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';

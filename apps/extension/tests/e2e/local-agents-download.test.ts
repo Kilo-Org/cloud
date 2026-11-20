@@ -1,6 +1,6 @@
 /* eslint-disable import/max-dependencies, import/no-nodejs-modules, max-lines, promise/avoid-new, vitest/no-conditional-in-test -- the spec reads a real downloads directory and drives a real hub session */
 import { expect, test } from '@playwright/test';
-import type { Download } from '@playwright/test';
+import type { Download, Page } from '@playwright/test';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -43,27 +43,16 @@ const grant = (origin: string) => [
 ];
 
 /**
- * How many tabs the browser holds, from a `browser_tabs list` answer: the same
- * count is how "no second tab" shows. An agent reads the text shape Playwright
- * MCP prints, one `- N: [title](url)` line per tab. A failed answer, a text
- * shape this reader does not know, or an empty list throws instead of counting
- * as zero, which would make a `0 === 0` comparison prove nothing.
+ * Every open tab's id, read from the extension page. `browser_tabs list` is not
+ * the surface for "no second tab": it lists only the session's inspectable
+ * tabs, and the tab a guarded `new` opens stays blank because its navigation
+ * was refused, so a correct list is empty there. A failed answer throws instead
+ * of counting as zero, which would make a `0 === 0` comparison prove nothing.
  */
-const listedTabCount = (answer: LocalAgentToolResponse): number => {
-  if (answer.kind !== 'result') {
-    throw new Error(`browser_tabs list failed: ${JSON.stringify(answer)}`);
-  }
-
-  const count = answer.text
-    .split('\n')
-    .filter(line => /^- \d+: (?:\(current\) )?\[.*\]\(.*\)$/u.test(line.trim())).length;
-
-  if (count === 0) {
-    throw new Error(`browser_tabs list reported no tabs: ${answer.text}`);
-  }
-
-  return count;
-};
+const openTabIds = (sidePanel: Page): Promise<number[]> =>
+  sidePanel.evaluate(
+    "chrome.tabs.query({}).then(tabs => tabs.map(tab => tab.id)).then(ids => { if (ids.length === 0) { throw new Error('the browser reported no tabs'); } return ids; })"
+  );
 
 const permissionItemSchema = z.object({
   class: z.string(),
@@ -651,9 +640,7 @@ test('a first browser_tabs new to an attachment asks first, and its approved rep
     await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
 
     // The refused call already opened its tab; the repeat must not open another.
-    const tabsAfterGuard = listedTabCount(
-      await session.callTool('browser_tabs', { action: 'list' }, { authorized: grants })
-    );
+    const tabsAfterGuard = await openTabIds(sidePanel);
 
     // The CLI repeats the `browser_tabs` call with the token: the runtime drives the tab that step opened.
     const approved = await session.callTool('browser_tabs', params, {
@@ -678,9 +665,7 @@ test('a first browser_tabs new to an attachment asks first, and its approved rep
       keptReport: text.includes('The file was downloaded; the page did not change.'),
       named: text.includes(basename(keptPath ?? '')),
       suggested: kept.suggestedFilename(),
-      tabs: listedTabCount(
-        await session.callTool('browser_tabs', { action: 'list' }, { authorized: grants })
-      ),
+      tabs: await openTabIds(sidePanel),
     }).toStrictEqual({
       isError: false,
       keptReport: true,

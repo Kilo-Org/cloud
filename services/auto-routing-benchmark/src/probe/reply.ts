@@ -140,6 +140,22 @@ function sseData(stream: string): string[] {
   return payloads;
 }
 
+/**
+ * One SSE payload as its event, or null. A cut or timed-out stream routinely ends mid-event,
+ * so an incomplete `data:` block is a property of the stream, not a failure of the call: the
+ * caller notes it and the reply is classified by its stream state.
+ */
+function eventOf<T>(schema: z.ZodType<T>, payload: string): T | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+  const parsed = schema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 export type ProbeUsage = {
   inputTokens: number | null;
   cachedInputTokens: number | null;
@@ -225,12 +241,11 @@ function parseChat(data: string[], reply: MutableReply): void {
       note(reply, 'done');
       continue;
     }
-    const parsed = ChatChunkSchema.safeParse(JSON.parse(payload));
-    if (!parsed.success) {
+    const chunk = eventOf(ChatChunkSchema, payload);
+    if (chunk === null) {
       note(reply, 'unparsed_chunk');
       continue;
     }
-    const chunk = parsed.data;
     note(reply, chunk.error ? 'error' : 'chunk');
     if (chunk.error) {
       reply.errorMessage = chunk.error.message ?? 'chat stream error';
@@ -301,12 +316,11 @@ function parseResponses(data: string[], reply: MutableReply): void {
       note(reply, 'done');
       continue;
     }
-    const parsed = ResponsesEventSchema.safeParse(JSON.parse(payload));
-    if (!parsed.success) {
+    const event = eventOf(ResponsesEventSchema, payload);
+    if (event === null) {
       note(reply, 'unparsed_event');
       continue;
     }
-    const event = parsed.data;
     note(reply, event.type);
     switch (event.type) {
       case 'response.output_text.delta':
@@ -360,12 +374,11 @@ function parseAnthropic(data: string[], reply: MutableReply): void {
       note(reply, 'done');
       continue;
     }
-    const parsed = AnthropicEventSchema.safeParse(JSON.parse(payload));
-    if (!parsed.success) {
+    const event = eventOf(AnthropicEventSchema, payload);
+    if (event === null) {
       note(reply, 'unparsed_event');
       continue;
     }
-    const event = parsed.data;
     note(reply, event.type);
     switch (event.type) {
       case 'message_start':

@@ -413,6 +413,24 @@ describe('probe executor — responses endpoint', () => {
     });
     await expect(run()).rejects.toThrow(/cut after the gateway billed/);
   });
+
+  it('classifies a stream that ends mid-event by its stream state, not a JSON error', async () => {
+    // Billed narration, then a payload cut mid-JSON: the reply is a cut-after-billing one.
+    replies.push({
+      status: 200,
+      body: `event: response.output_text.delta\ndata: {"type":"response.output_text.delta","item_id":"msg_1","output_index":0,"delta":"I will"}\n\nevent: response.output_text.delta\ndata: {"type":"response.output_text.delta","item_id":"msg_1","outp`,
+    });
+    await expect(run()).rejects.toThrow(/cut after the gateway billed/);
+
+    // Nothing billed and nothing produced: the same truncation is a transient failure.
+    replies.push({
+      status: 200,
+      body: `event: response.created\ndata: {"type":"response.created","response":{"id":"resp_7","crea`,
+    });
+    const unbilled = await run();
+    expect(unbilled.costUsd).toBe(0);
+    expect(isUnbilledTransientProviderResult(unbilled)).toBe(true);
+  });
 });
 
 describe('probe executor — chat endpoint', () => {

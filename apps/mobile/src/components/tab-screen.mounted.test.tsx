@@ -2,6 +2,7 @@
 import { act, createElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import {
   getEffectiveTabBarHeight,
@@ -363,21 +364,23 @@ describe('SheetScrollView', () => {
     );
     const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
 
-    expect(scroll?.props.style).toEqual([
-      { backgroundColor: '#000' },
-      {
-        marginBottom: getEffectiveTabBarHeight({
-          bottomInset: 16,
-          platform: 'android',
-          fontScale: 1.5,
-        }),
-      },
-    ]);
+    const band = getEffectiveTabBarHeight({
+      bottomInset: 16,
+      platform: 'android',
+      fontScale: 1.5,
+    });
+    expect(scroll?.props.style).toEqual([{ backgroundColor: '#000' }, { marginBottom: band }]);
     // The 16pt breathing room rides on a trailing spacer, as on a tab screen.
     const childTypes = scroll?.children.map(child =>
       typeof child === 'string' ? child : child.type
     );
     expect(childTypes).toEqual(['Content', 'View']);
+    // Once the sheet reports its own room the margin is the band clamped to it:
+    // a tall room keeps the whole band, a collapsed one gives up the overflow.
+    layoutFrame(renderer, 402, 320);
+    expect(reservedMargin(renderer)).toBe(band);
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(Math.max(0, band - MIN_BODY_VIEWPORT));
     unmount();
   });
 
@@ -397,6 +400,27 @@ describe('SheetScrollView', () => {
 
     expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
     expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    // A room tall enough for the IME and the floor keeps the whole band.
+    layoutFrame(renderer, 402, 400);
+    expect(reservedMargin(renderer)).toBe(300);
+    unmount();
+  });
+
+  it('floors the sheet viewport under a keyboard taller than the sheet frame', async () => {
+    // A half-detent sheet with the keyboard up: the sheet frame is only 88pt
+    // tall, so a band that kept its raw 300 would leave a negative viewport
+    // with nothing to scroll. The margin drops to 300 - MIN_BODY_VIEWPORT, so
+    // the 88pt floor stays on screen and the rest rides under the keyboard.
+    layout.platform = 'android';
+    layout.fontScale = 1;
+    layout.bottom = 0;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(SheetScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 402, 0);
+    layoutFrame(renderer, 402, 88);
+    expect(reservedMargin(renderer)).toBe(300 - MIN_BODY_VIEWPORT);
     unmount();
   });
 

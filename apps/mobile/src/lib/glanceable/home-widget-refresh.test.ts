@@ -37,7 +37,6 @@ const mocks = vi.hoisted(() => {
       getOperationEpoch,
       isCurrent: vi.fn().mockResolvedValue(true),
       getData: vi.fn(),
-      getWidgetPushToken: vi.fn(),
       setFixtureMode: vi.fn(),
       widgetsChanged: vi.fn(),
     },

@@ -197,11 +197,11 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     deviceSessionId,
     cloudAgentAuthority,
     authViaToken,
-    credential: deriveCredentialKind({
+    credential: deriveContextCredential({
       authViaToken,
-      tokenSource: tokenSource ?? null,
+      tokenSource,
       internalApiUse,
-      delegatedWorkload: cloudAgentAuthority !== undefined,
+      cloudAgentAuthority,
     }),
     internalApiUse,
     tokenSource: tokenSource ?? null,
@@ -369,19 +369,33 @@ export type AdminAttribution = {
   targetKind: PrivilegedTargetKind;
 };
 
+/**
+ * The one credential-provenance derivation for a tRPC context, from the same
+ * four inputs at the request boundary and at the admin guard's fallback so a
+ * delegated caller is classified identically wherever the context was built
+ * or re-read.
+ */
+function deriveContextCredential(ctx: {
+  authViaToken?: boolean;
+  tokenSource?: string | null;
+  internalApiUse?: boolean;
+  cloudAgentAuthority?: CloudAgentAuthority;
+}): PrivilegedCredentialKind {
+  return deriveCredentialKind({
+    authViaToken: ctx.authViaToken ?? false,
+    tokenSource: ctx.tokenSource ?? null,
+    internalApiUse: ctx.internalApiUse,
+    delegatedWorkload: ctx.cloudAgentAuthority !== undefined,
+  });
+}
+
 // Derives the credential and the privileged-inventory entry once per admin
 // request. The guard publishes the result on the context, so the step-up
 // enforcement that runs after it reuses it instead of deriving the same two
 // values from the same inputs.
 function resolveAdminAttribution(ctx: TRPCContext, path: string, type: string): AdminAttribution {
   if (ctx.adminAttribution) return ctx.adminAttribution;
-  const credential =
-    ctx.credential ??
-    deriveCredentialKind({
-      authViaToken: ctx.authViaToken ?? false,
-      tokenSource: ctx.tokenSource ?? null,
-      internalApiUse: ctx.internalApiUse,
-    });
+  const credential = ctx.credential ?? deriveContextCredential(ctx);
   return { credential, ...actionClassForAdminProcedure(path, type) };
 }
 

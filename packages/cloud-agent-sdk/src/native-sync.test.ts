@@ -605,6 +605,42 @@ test('unreadable pending inventory clears controls without blocking later ordere
   connection.close();
 });
 
+test('a mixed pending inventory publishes readable cards and an unreadable notice together', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame(
+    'remote.state',
+    {
+      incarnation: 'runner',
+      runID: 'run',
+      pending: {
+        permissions: [
+          { requestID: 'readable', tool: 'edit', summary: 'file' },
+          { requestID: 'unreadable', tool: 'edit', summary: 7 },
+        ],
+        questions: [
+          { requestID: 'question', fields: [{ type: 'string', key: 'q', title: 'Which?' }] },
+        ],
+      },
+    },
+    1,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.permissions.map(item => item.id)).toEqual(['readable']);
+  expect(state?.pending.unreadablePermissions).toEqual([{ requestId: 'unreadable' }]);
+  expect(state?.pending.questions.map(item => item.id)).toEqual(['question']);
+  expect(state?.connection).toBe('connected');
+  connection.close();
+});
+
 test('an unreadable live permission is published by identity until the runner replies', async () => {
   const { client } = fixture();
   let state: NativeSessionState | undefined;
@@ -2253,7 +2289,7 @@ test('session moves wait for a revision-pinned authoritative canonical message i
   expect(state?.messages).toEqual([]);
   expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
   if (!state) throw new Error('Missing native state');
-  expect(readNativeConversation(state).error).toContain('incomplete');
+  expect(readNativeConversation(state)).toMatchObject({ recoveryGaps: 1, error: undefined });
   await jest.advanceTimersByTimeAsync(250);
   await flush();
   expect(state.pendingSnapshotMessageIDs).toEqual(['msg_2']);
@@ -2471,6 +2507,76 @@ test('missing metadata recovery stops at its bound with a visible error, not a c
   if (!state) throw new Error('Missing native state');
   expect(readNativeConversation(state).error).toContain('incomplete');
   expect(readNativeConversation(state).loading).toBe(false);
+  connection.close();
+});
+
+test('requestRecovery retries missing parts over the live socket and resolves once they arrive', async () => {
+  const initial: NativeSnapshot = {
+    position: 1,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    messages: [],
+  };
+  snapshot.mockResolvedValue(initial);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  socket.frame(
+    'session.moved',
+    {
+      syncPosition: 1,
+      data: { data: { sessionID: 'ses_a', location: { directory: '/after' } } },
+    },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
+  // Let the automatic run reach its bound, so the retry below is the only recovery left.
+  await jest.advanceTimersByTimeAsync(3750);
+  await flush();
+  expect(state?.error).toContain('incomplete');
+  const sockets = FakeSocket.sockets.length;
+  const reads = snapshot.mock.calls.length;
+  snapshot.mockResolvedValue({
+    ...initial,
+    position: 2,
+    revision: 2,
+    messages: [
+      {
+        seq: 2,
+        message: {
+          id: 'msg_2',
+          type: 'location-switched',
+          time: { created: 2 },
+          location: { directory: '/after' },
+          previous: { location: { directory: '/before' } },
+        },
+      },
+    ],
+  });
+  const recovered = connection.requestRecovery();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  await recovered;
+  // The same socket carried the retry: no reconnect, no teardown.
+  expect(FakeSocket.sockets.length).toBe(sockets);
+  expect(snapshot.mock.calls.length).toBe(reads + 1);
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  expect(state?.error).toBeUndefined();
+  if (!state) throw new Error('Missing recovered state');
+  expect(readNativeConversation(state).recoveryGaps).toBe(0);
+  // Nothing is missing any more, so a later retry resolves without reading a snapshot.
+  const clean = snapshot.mock.calls.length;
+  await connection.requestRecovery();
+  expect(snapshot.mock.calls.length).toBe(clean);
   connection.close();
 });
 

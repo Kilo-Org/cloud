@@ -1,6 +1,6 @@
 import { type Href } from 'expo-router';
 
-import { ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader, type ScreenHeaderSlot } from '@/components/screen-header';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 
 /**
@@ -19,6 +19,7 @@ export function ReviewerHeader({
   subtitle,
   reserveSubtitle = false,
   subtitlePlaceholder,
+  titleAccessory,
   backFallback = CODE_REVIEWER_HOME_PATH,
   onBack,
 }: Readonly<{
@@ -40,8 +41,19 @@ export function ReviewerHeader({
    * body does not move when the read that names it lands.
    */
   reserveSubtitle?: boolean;
-  /** What the reserved subtitle line paints while its text loads. */
-  subtitlePlaceholder?: React.ReactNode;
+  /**
+   * What the reserved subtitle line paints while its text loads: an element
+   * only, for the same reason `ScreenHeader`'s slots are — the header paints
+   * this inside a `View`, so a string is a `Text` invariant violation, not a
+   * title.
+   */
+  subtitlePlaceholder?: ScreenHeaderSlot;
+  /**
+   * A badge on the title's own line, after the title. The detail screen states
+   * a settled review's outcome here, so the status carries the header's heading
+   * role instead of a hand-made label in the body.
+   */
+  titleAccessory?: ScreenHeaderSlot;
   /** Where Back lands when the screen has no history to pop. */
   backFallback?: Href;
   /** Run this instead of navigating, e.g. while a form confirms a discard. */
@@ -54,6 +66,7 @@ export function ReviewerHeader({
       subtitle={subtitle}
       reserveSubtitle={reserveSubtitle}
       subtitlePlaceholder={subtitlePlaceholder}
+      titleAccessory={titleAccessory}
       backFallback={backFallback}
       onBack={onBack}
     />

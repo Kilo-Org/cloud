@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { ModelDenyList, ProviderAllowList } from '@/components/organization/model-access-lists';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -109,10 +110,16 @@ function syncedFormState(params: {
  * The two lists the organization's routing policy is: which providers may
  * serve it, and which models it denies. Both save together, because the server
  * stores them as one policy.
+ *
+ * The web page autosaves; the phone saves on request, so the draft can sit
+ * unsaved while a person leaves. The keep-editing gate below therefore reads
+ * the draft's own dirty derivation, and Back asks Keep editing / Discard while
+ * the draft holds edits.
  */
 export function ModelAccessForm({
   organizationId,
   canEdit,
+  canManageBilling = false,
   models,
   catalog,
   catalogUnavailable,
@@ -127,6 +134,8 @@ export function ModelAccessForm({
 }: Readonly<{
   organizationId: string;
   canEdit: boolean;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   models: readonly AvailableModel[];
   /** The gateway's whole catalog; empty while it is unavailable. */
   catalog: readonly CatalogModel[];
@@ -145,7 +154,11 @@ export function ModelAccessForm({
   onRetryGateway: () => void;
 }>) {
   const { t } = useTranslation();
-  const save = useSaveOrgModelAccess(organizationId);
+  // The screen resolves the reader's role once and hands it down: this form
+  // renders no billing step beside the failure line, so a money role reads the
+  // sentence that names the destination instead of one that claims an owner
+  // must act.
+  const save = useSaveOrgModelAccess(organizationId, canManageBilling);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
   const [tab, setTab] = useState<Tab>('models');
   // A provider saved in the allow list but no longer served by any catalog model
@@ -178,6 +191,20 @@ export function ModelAccessForm({
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
+  // Back — the header arrow, Android Back and the back gesture — must not drop
+  // the draft silently, so it asks Keep editing / Discard, the way the
+  // guardrails, mode and group forms do. The dirty flag is a derivation of this
+  // form's own state, including the two rebases `syncedFormState` applies during
+  // render, so the guard recomputes it on every render instead of taking it from
+  // a change event. A save in flight owns the route: the guard drops the removal
+  // rather than offering a Discard for a request that still lands.
+  const guard = useMetadataLeaveGuard({
+    // The controls are disabled for a viewer who may not manage the
+    // organization, so the route never holds a draft of that viewer's making.
+    enabled: canEdit,
+    isDirty: () => dirty,
+    saving,
+  });
   const savePayload = modelAccessSave({
     savedAllowList: providerAllowList,
     baseline,
@@ -221,7 +248,9 @@ export function ModelAccessForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
+        message:
+          knownServerErrorMessage(error, canManageBilling, 'absent') ??
+          t('organizationGuardrails.statusFailed'),
       });
     }
   };
@@ -324,6 +353,7 @@ export function ModelAccessForm({
       {tab === 'gateways' ? (
         <GatewaySettingsSection
           organizationId={organizationId}
+          canManageBilling={canManageBilling}
           settings={gateway}
           isError={gatewayIsError}
           isFetching={gatewayIsFetching}
@@ -331,6 +361,7 @@ export function ModelAccessForm({
           onRetry={onRetryGateway}
         />
       ) : null}
+      {guard.dialog}
     </View>
   );
 }

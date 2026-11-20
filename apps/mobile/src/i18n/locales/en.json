@@ -111,7 +111,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Command delivery: {{status}}",
     "delivered": "Delivered",
-    "expired": "Expired"
+    "expired": "Expired",
+    "recoveryGaps_one": "{{displayCount}} part of this transcript is missing.",
+    "recoveryGaps_other": "{{displayCount}} parts of this transcript are missing."
   },
   "common": {
     "manageOnWeb": "Manage on the web",
@@ -231,6 +233,7 @@
     "keepRunning": "Keep running",
     "newSession": "New session",
     "noModelsAvailable": "No models available",
+    "modelRetires": "Retires {{date}}",
     "notFound": "Not found",
     "online": "Online",
     "open": "Open {{name}}",
@@ -273,7 +276,9 @@
     "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
     "privateRepositoryA11y": "{{name}}, private repository",
     "legalDocumentEnglishOnly": "This document is available in English only.",
-    "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again."
+    "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
+    "organizationTrialEndedBillingAtKiloAi": "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again.",
+    "viewOnGitHub": "View PR on GitHub"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -596,7 +601,7 @@
     "changelogFixesPolish": "Bug fixes and polish.",
     "changelogAreas": {
       "signIn": "Sign-in",
-      "profileOrganizations": "Profile and organizations"
+      "profileOrganizations": "Profile & organizations"
     },
     "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
@@ -842,6 +847,9 @@
       "couldNotLoadMore": "Could not load more comments.",
       "retryLoadingMore": "Retry loading more comments",
       "loadMoreComments": "Load more comments",
+      "conversationTruncated": "Only the first {{displayCount}} comments are shown.",
+      "conversationTruncated_one": "Only the first {{displayCount}} comment is shown.",
+      "conversationTruncated_other": "Only the first {{displayCount}} comments are shown.",
       "addReaction": "Add reaction",
       "reactionPill": "{{emoji}} reaction, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaction",
@@ -971,7 +979,6 @@
       "noAccess": "You don't have access to checks for this repository.",
       "couldNotLoad": "Couldn't load checks.",
       "retryChecks": "Retry checks",
-      "viewOnGitHub": "View PR on GitHub",
       "noChecksReported": "No checks reported",
       "passed": "{{displayCount}} passed",
       "passed_one": "{{displayCount}} passed",
@@ -1055,6 +1062,8 @@
       "pendingComment": "pending comments",
       "pendingComment_other": "pending comments",
       "submitCountOfTotal": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
+      "submitCountOfTotal_one": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
+      "submitCountOfTotal_other": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
       "submitReview": "Submit review",
       "partialPostedFresh_one": "Posted {{displayFreshCount}} comment. ",
       "partialPostedFresh": "Posted {{displayFreshCount}} comments. ",
@@ -1479,7 +1488,7 @@
     "followReviewMd": "Follow REVIEW.md",
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
+      "notConnectedReadOnlyPlan": "The organization's trial has ended, so an owner must update billing at kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
@@ -1488,7 +1497,7 @@
       "managedOnWebRepositories": "Choose repositories for {{organization}} on the web from a computer.",
       "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
       "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
-      "descriptionOverview": "Create a Workspace Access Token for {{organization}}, then paste it on the next screen.",
+      "descriptionOverview": "Create a Workspace Access Token, then paste it on the next screen.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
       "tokenPlaceholder": "Workspace access token",
       "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."
@@ -2899,6 +2908,8 @@
     "modelPicker": {
       "title": "Select model",
       "noModelsDescription": "No models are available to select.",
+      "allUnavailableTitle": "No models can be used",
+      "allUnavailableDescription": "Add a provider key, then try again.",
       "favorites": "Favorites"
     },
     "modelSelector": {
@@ -4173,7 +4184,13 @@
     "providerUnavailable": "The provider is unavailable right now. Send again shortly."
   },
   "settingsTools": {
-    "confirmTitle": "Confirm this change?"
+    "confirmTitle": "Confirm this change?",
+    "guarded": {
+      "spendAlertsOff": "Turn off spend alerts? You would stop getting notifications about spend threshold crossings and hourly spikes.",
+      "balanceAlertsOff": "Turn off balance alerts? You would stop getting notifications when your credits run low.",
+      "securityFindingsOff": "Turn off security findings? You would stop getting notifications about new security findings.",
+      "hideBalanceOn": "Hide your balances? Credit balances would no longer appear on the profile screens and the organization hub."
+    }
   },
   "appActions": {
     "start": {
@@ -4841,12 +4858,15 @@
     "inputDescription": "Check every input with Enkrypt AI, including tool results such as file reads and command output. If Enkrypt is unavailable, requests are sent unscanned rather than rejected.",
     "outputTitle": "Output guardrails",
     "outputDescription": "Check model responses with Enkrypt AI before your members receive them. Off unless you turn it on, separately from input guardrails.",
+    "outputUnavailable": "Kilo has not enabled output scanning for this organization, so responses are not checked and there is nothing to set here. Contact {{supportEmail}} to request it.",
     "detectorsHint": "Block stops a flagged request. Log only records detections without delaying the request.",
     "detectorsHintOutput": "Block replaces a flagged response with an error. Log only records detections without delaying the response.",
     "choiceLog": "Log only",
     "applyTo": "Apply to",
     "applyToAllMembers": "All members",
     "applyKiloDefault": "Apply Kilo Default",
+    "applyKiloDefaultEnglishNote": "Kilo's default policy text is in English, because the gateway applies it exactly as written.",
+    "applyKiloDefaultReplaceMessage": "Kilo's default policy is written in English and replaces what you set in Policy violation. Text you entered in the policy text field cannot be recovered.",
     "invalidSavedTitle": "Saved input detector settings can't be read",
     "invalidSavedBody": "Requests are blocked until the input detectors are saved again. Review the detectors below, which start from Kilo Default.",
     "invalidSavedOutputTitle": "Saved output detector settings can't be read",
@@ -4981,6 +5001,7 @@
     "providersDescription": "Turn a provider off to stop Kilo routing to it for this organization.",
     "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
     "providersEmpty": "No providers match this search.",
+    "providersNone": "No providers are available for this organization.",
     "allowAllShown": "Allow all shown",
     "denyAllShown": "Deny all shown",
     "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",

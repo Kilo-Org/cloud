@@ -236,6 +236,24 @@ export const NEEDS_PERMISSION_ERROR =
 export const AGENT_TAB_OUTSIDE_GROUP_ERROR =
   'This tab is not in the agent session\u2019s tab group (blocked). Share it first or pick a tab in the group.';
 
+/**
+ * The extension cannot run Playwright code: a snippet would have to be compiled
+ * in the extension, and the MV3 script policy of Chrome and Firefox forbids
+ * evaluating strings there. The bridge maps it onto `unsupported_in_browser`
+ * (-32005) before the gate runs.
+ */
+export const RUN_CODE_UNSUPPORTED_ERROR =
+  'browser_run_code_unsafe is not available: the Kilo extension cannot run Playwright code in Chrome or Firefox. Run a JavaScript function in the page with browser_evaluate instead.';
+
+/**
+ * The pinned tools no backend can run here. The vendored contract keeps them —
+ * its SHA-256 is of the upstream `tools/list` and the handshake compares that —
+ * but a listing must not offer a tool whose every call is refused above.
+ */
+export const UNSERVED_BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'browser_run_code_unsafe',
+]);
+
 /** The two tools that run model-authored page code (D11: they need the `act` grant). */
 export const isScriptTool = (toolName: string): boolean =>
   toolName === 'browser_evaluate' || toolName === 'browser_run_code_unsafe';
@@ -243,8 +261,9 @@ export const isScriptTool = (toolName: string): boolean =>
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
 
+// Callers name the snapshot tool differently (the side panel prefixes `kilo_`), so the hint names none.
 export const FRESH_SNAPSHOT_HINT =
-  'Take a fresh kilo_browser_snapshot and use a ref from that snapshot, or pass a unique CSS selector.';
+  'Take a new page snapshot and use a ref from it, or pass a unique CSS selector.';
 
 /** A ref no snapshot registered, or one whose element is gone: every backend answers it with this one error. */
 export const STALE_REF_ERROR = `The element reference is stale or unknown. ${FRESH_SNAPSHOT_HINT}`;

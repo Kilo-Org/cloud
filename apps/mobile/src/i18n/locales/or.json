@@ -19,7 +19,9 @@
     "presenceStatus": "ହୋଷ୍ଟ: {{connection}}",
     "commandStatus": "କମାଣ୍ଡ ବିତରଣ: {{status}}",
     "delivered": "ବିତରିତ",
-    "expired": "ମିଆଦ ସମାପ୍ତ"
+    "expired": "ମିଆଦ ସମାପ୍ତ",
+    "recoveryGaps_one": "ଏହି ଟ୍ରାନ୍ସକ୍ରିପ୍ଟର {{displayCount}} ଅଂଶ ନାହିଁ।",
+    "recoveryGaps_other": "ଏହି ଟ୍ରାନ୍ସକ୍ରିପ୍ଟର {{displayCount}} ଅଂଶ ନାହିଁ।"
   },
   "common": {
     "manageOnWeb": "ୱେବରେ ପରିଚାଳନା କରନ୍ତୁ",
@@ -138,6 +140,7 @@
     "keepRunning": "ଚାଲୁ ରଖନ୍ତୁ",
     "newSession": "ନୂଆ ସେସନ୍",
     "noModelsAvailable": "କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ",
+    "modelRetires": "{{date}}ରେ ଅବସର ନେବ",
     "notFound": "ମିଳିଲା ନାହିଁ।",
     "online": "ଅନଲାଇନ୍",
     "open": "{{name}} ଖୋଲନ୍ତୁ",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଜଣେ ସଂଗଠନ ମାଲିକ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
     "privateRepositoryA11y": "{{name}}, ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀ",
     "legalDocumentEnglishOnly": "ଏହି ଦସ୍ତାବେଜଟି କେବଳ ଇଂରାଜୀରେ ଉପଲବ୍ଧ।",
-    "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।"
+    "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "organizationTrialEndedBillingAtKiloAi": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -505,7 +510,7 @@
     "changelogFixesPolish": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
     "changelogAreas": {
       "signIn": "ସାଇନ୍ ଇନ୍",
-      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଓ ସଂଗଠନ"
+      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ"
     }
   },
   "preferences": {
@@ -750,6 +755,9 @@
       "couldNotLoadMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "loadMoreComments": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରନ୍ତୁ",
+      "conversationTruncated": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
+      "conversationTruncated_one": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
+      "conversationTruncated_other": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
       "addReaction": "ପ୍ରତିକ୍ରିୟା ଯୋଡ଼ନ୍ତୁ",
       "reactionPill": "{{emoji}} ପ୍ରତିକ୍ରିୟା, {{displayCount}} {{countLabel}}",
       "reaction_one": "ପ୍ରତିକ୍ରିୟା",
@@ -879,7 +887,6 @@
       "noAccess": "ଏହି ରିପୋଜିଟୋରିର ଯାଞ୍ଚ ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "couldNotLoad": "ଯାଞ୍ଚ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryChecks": "ଯାଞ୍ଚ ପାଇଁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
-      "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ",
       "noChecksReported": "କୌଣସି ଯାଞ୍ଚ ରିପୋର୍ଟ ହୋଇନାହିଁ",
       "passed": "{{displayCount}} ସଫଳ",
       "passed_one": "{{displayCount}} ସଫଳ",
@@ -934,9 +941,9 @@
       "checkFailedTitleGitLab": "GitLab ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "checkFailedTitleBitbucket": "Bitbucket ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "providerCheckFailedMessage": "ପ୍ରଦାନକାରୀ ସହ ସଂଯୋଗ ସ୍ଥାପନ କରିହେଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ",
-      "reconnectTitleGitLab": "GitLab ସହ ପୁଣି ସଂଯୋଗ",
-      "reconnectTitleBitbucket": "Bitbucket ସହ ପୁଣି ସଂଯୋଗ",
+      "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
+      "reconnectTitleGitLab": "GitLab ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
+      "reconnectTitleBitbucket": "Bitbucket ସହ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ",
       "reconnectDescription": "ଆପଣଙ୍କ GitHub ସଂଯୋଗର ଅନୁମତି ପ୍ରତ୍ୟାହାର କରାଯାଇଛି।",
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରନ୍ତୁ",
       "gitlabInstanceMismatchTitle": "GitLab ସଂଯୋଗ ଅନ୍ୟ ଏକ ଇନଷ୍ଟାନ୍ସ ପାଇଁ ଅଟେ",
@@ -963,6 +970,8 @@
       "pendingComment": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "pendingComment_other": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "submitCountOfTotal": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
       "submitReview": "ସମୀକ୍ଷା ଦାଖଲ କରନ୍ତୁ",
       "partialPostedFresh": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
       "partialPostedFresh_one": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
@@ -1387,7 +1396,7 @@
     "followReviewMd": "REVIEW.md ଅନୁସରଣ କରନ୍ତୁ",
     "followReviewMdSubtitle": "ପ୍ରତ୍ୟେକ ରିପୋଜିଟୋରୀର REVIEW.md ଫାଇଲ୍‌ରେ ଥିବା ନିର୍ଦ୍ଦେଶ ମାନନ୍ତୁ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ସଂଯୋଗ ହୋଇନାହିଁ। କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ସଂଯୋଗ କରିପାରିବେ।"
+      "notConnectedReadOnlyPlan": "ସଂଗଠନର ଟ୍ରାୟଲ୍ ଅବଧି ଶେଷ ହୋଇଛି, ତେଣୁ ମାଲିକଙ୍କୁ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିବାକୁ ହେବ।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}ର Bitbucket ସଂଯୋଗ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
@@ -1396,7 +1405,7 @@
       "managedOnWebRepositories": "{{organization}} ପାଇଁ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ରେପୋଜିଟୋରୀ ଚୟନ କରନ୍ତୁ।",
       "description": "{{organization}} ପାଇଁ ଏକ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ତଳେ ପେଷ୍ଟ କରନ୍ତୁ।",
       "descriptionReconnect": "{{organization}} ପାଇଁ ଏକ ନୂଆ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ତଳେ ପେଷ୍ଟ କରନ୍ତୁ।",
-      "descriptionOverview": "{{organization}} ପାଇଁ ଏକ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ପରବର୍ତ୍ତୀ ସ୍କ୍ରିନରେ ପେଷ୍ଟ କରନ୍ତୁ।",
+      "descriptionOverview": "ଏକ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ପରବର୍ତ୍ତୀ ସ୍କ୍ରିନରେ ପେଷ୍ଟ କରନ୍ତୁ।",
       "scopes": "ଆକାଉଣ୍ଟ: ପଢ଼ିବା · ରିପୋଜିଟୋରୀ: ପଢ଼ିବା/ଲେଖିବା · ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ: ପଢ଼ିବା · ୱେବ୍‌ହୁକ୍: ପଢ଼ିବା/ଲେଖିବା",
       "tokenPlaceholder": "କାର୍ଯ୍ୟକ୍ଷେତ୍ରର ଆକ୍ସେସ୍ ଟୋକେନ୍",
       "tokenRefused": "Bitbucket ଏହି କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍‌କୁ ଗ୍ରହଣ କରିନାହିଁ। ଏଥିରେ ଉପରେ ଦିଆଯାଇଥିବା ସ୍କୋପ୍‌ଗୁଡ଼ିକ ଅଛି କି ନାହିଁ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
@@ -1720,7 +1729,7 @@
       "dueThisWeekDetail_one": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "dueThisWeekDetail_other": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "noDeadline": "କୌଣସି ସମୟସୀମା ନାହିଁ",
-      "reviewSlaAssignment": "ଧାର୍ଯ୍ୟ SLA ସମୟସୀମା ସମୀକ୍ଷା କରନ୍ତୁ",
+      "reviewSlaAssignment": "SLA ନିର୍ଦ୍ଧାରଣ ସମୀକ୍ଷା କରନ୍ତୁ",
       "allOpenFindingsTracked": "ସମସ୍ତ ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟାର ସ୍ଥିତି ନଜରରେ ଅଛି"
     },
     "dismiss": {
@@ -1839,7 +1848,7 @@
       "couldNotLoadMore": "ଆଉ ଅଧିକ ଚିହ୍ନଟ ସମସ୍ୟା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "noMatchesTitle": "ଫିଲ୍ଟର ସହ ମେଳ ଖାଉଥିବା କୌଣସି ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
       "noMatchesDescription": "ବଛାଯାଇଥିବା ଫିଲ୍ଟରଗୁଡ଼ିକୁ ବଦଳାନ୍ତୁ କିମ୍ବା ହଟାନ୍ତୁ।",
-      "emptyTitle": "କୌଣସି ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
+      "emptyTitle": "କୌଣସି ଖୋଲା ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
       "emptyDescription": "ଏବେ ଧ୍ୟାନ ଦେବାକୁ ଥିବା କୌଣସି ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ।"
     },
     "findingRow": {
@@ -2030,7 +2039,7 @@
     "remediationUnavailable": {
       "findingNotFound": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା ଆଉ ନାହିଁ।",
       "approvalRequired": "ସ୍ୱୟଂଚାଳିତ ସମାଧାନ ପାଇଁ ଅନୁମୋଦନ ଆବଶ୍ୟକ। ଅନୁମୋଦନ ଦେବାକୁ ନିଜେ ସମାଧାନ ଆରମ୍ଭ କରନ୍ତୁ।",
-      "findingNotOpen": "ଚିହ୍ନଟ ସମସ୍ୟା ଆଉ ଅସମାପ୍ତ ସ୍ଥିତିରେ ନାହିଁ।",
+      "findingNotOpen": "ଚିହ୍ନଟ ସମସ୍ୟା ଆଉ ଖୋଲା ନାହିଁ।",
       "repoNotInScope": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ପାଇଁ ଏହି ରିପୋଜିଟୋରୀ ଚୟନ କରାଯାଇନାହିଁ।",
       "analysisRequired": "ସମାଧାନ ଆରମ୍ଭ କରିବା ପୂର୍ବରୁ କୋଡ୍‌ବେସ୍ ବିଶ୍ଳେଷଣ କରନ୍ତୁ।",
       "staleAnalysis": "ବିଶ୍ଳେଷଣ ପରେ ଚିହ୍ନଟ ସମସ୍ୟା ବଦଳିଛି। ସମାଧାନ ଆରମ୍ଭ କରିବା ପୂର୍ବରୁ ପୁଣି ବିଶ୍ଳେଷଣ କରନ୍ତୁ।",
@@ -2788,7 +2797,9 @@
     "modelPicker": {
       "title": "ମଡେଲ୍ ବାଛନ୍ତୁ",
       "favorites": "ପସନ୍ଦର ମଡେଲ୍",
-      "noModelsDescription": "ବାଛିବାକୁ କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ।"
+      "noModelsDescription": "ବାଛିବାକୁ କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ।",
+      "allUnavailableTitle": "କୌଣସି ମଡେଲ୍ ବ୍ୟବହାର କରାଯାଇପାରିବ ନାହିଁ",
+      "allUnavailableDescription": "ଏକ ପ୍ରଦାନକାରୀ କୀ ଯୋଡ଼ନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "modelSelector": {
       "provider": "ସେବା ପ୍ରଦାନକାରୀ {{id}}",
@@ -3621,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "ସଂଗଠନର ନାମ ବଦଳାନ୍ତୁ",
-      "renamePlaceholder": "ସଂଗଠନର ନାମ",
+      "renamePlaceholder": "ଏକ ସଂଗଠନର ନାମ ଲେଖନ୍ତୁ",
       "balance": "ବ୍ୟାଲାନ୍ସ",
       "plan": "ଯୋଜନା",
       "planTeams": "Teams",
@@ -4081,7 +4092,13 @@
     "providerUnavailable": "ସେବା ପ୍ରଦାନକାରୀ ବର୍ତ୍ତମାନ ଉପଲବ୍ଧ ନାହିଁ। କିଛି ସମୟ ପରେ ପୁଣି ପଠାନ୍ତୁ।"
   },
   "settingsTools": {
-    "confirmTitle": "ଏହି ପରିବର୍ତ୍ତନ ନିଶ୍ଚିତ କରିବେ?"
+    "confirmTitle": "ଏହି ପରିବର୍ତ୍ତନ ନିଶ୍ଚିତ କରିବେ?",
+    "guarded": {
+      "spendAlertsOff": "ଖର୍ଚ୍ଚ ସୂଚନା ବନ୍ଦ କରିବେ? ଆପଣ ଖର୍ଚ୍ଚ ସୀମା ଅତିକ୍ରମ ଏବଂ ଘଣ୍ଟାପ୍ରତି ବୃଦ୍ଧି ବିଷୟରେ ଆଉ ସୂଚନା ପାଇବେ ନାହିଁ।",
+      "balanceAlertsOff": "ବ୍ୟାଲାନ୍ସ ସୂଚନା ବନ୍ଦ କରିବେ? ଆପଣଙ୍କ କ୍ରେଡିଟ୍ କମ୍ ହେଲେ ଆପଣ ଆଉ ସୂଚନା ପାଇବେ ନାହିଁ।",
+      "securityFindingsOff": "ସୁରକ୍ଷା ଫଳାଫଳ ବନ୍ଦ କରିବେ? ନୂଆ ସୁରକ୍ଷା ଫଳାଫଳ ବିଷୟରେ ଆପଣ ଆଉ ସୂଚନା ପାଇବେ ନାହିଁ।",
+      "hideBalanceOn": "ଆପଣଙ୍କ ବ୍ୟାଲାନ୍ସ ଲୁଚାଇବେ? କ୍ରେଡିଟ୍ ବ୍ୟାଲାନ୍ସ ପ୍ରୋଫାଇଲ୍ ସ୍କ୍ରିନ୍ ଏବଂ ସଂଗଠନ ହବ୍‌ରେ ଆଉ ଦେଖାଯିବ ନାହିଁ।"
+    }
   },
   "appActions": {
     "start": {
@@ -4841,12 +4858,15 @@
     "inputDescription": "ପ୍ରତ୍ୟେକ ଇନପୁଟକୁ Enkrypt AI ସହିତ ସ୍କାନ କରେ, ଯେଉଁଥିରେ ଟୁଲ ଫଳାଫଳ ଅନ୍ତର୍ଭୁକ୍ତ। Enkrypt ଉପଲବ୍ଧ ନ ଥିବାବେଳେ ଅନୁରୋଧଗୁଡ଼ିକ ପ୍ରତ୍ୟାଖ୍ୟାନ ହେବା ବଦଳରେ ସ୍କାନ ନହୋଇ ପଠାଯାଏ।",
     "outputTitle": "ଆଉଟପୁଟ ଗାର୍ଡରେଲ୍ସ",
     "outputDescription": "ସଦସ୍ୟମାନେ ପ୍ରାପ୍ତ କରିବା ପୂର୍ବରୁ ପ୍ରତିକ୍ରିୟାଗୁଡ଼ିକୁ Enkrypt AI ସହିତ ସ୍କାନ କରେ। ଆପଣ ଏହାକୁ ଚାଲୁ ନ କଲେ ଏହା ବନ୍ଦ ରହେ।",
+    "outputUnavailable": "Kilo ଏହି ସଂସ୍ଥା ପାଇଁ ଆଉଟପୁଟ ସ୍କାନିଂ ସକ୍ଷମ କରିନାହିଁ, ତେଣୁ ପ୍ରତିକ୍ରିୟାଗୁଡ଼ିକ ଯାଞ୍ଚ ହେଉନାହିଁ ଏବଂ ଏଠାରେ ସେଟ୍ କରିବାକୁ କିଛି ନାହିଁ। ଏହା ଅନୁରୋଧ କରିବାକୁ {{supportEmail}} ସହିତ ଯୋଗାଯୋଗ କରନ୍ତୁ।",
     "detectorsHint": "ଅବରୋଧ ଚିହ୍ନିତ ଅନୁରୋଧକୁ ପ୍ରତ୍ୟାଖ୍ୟାନ କରେ। କେବଳ ଲଗ୍ ଏହାକୁ ରେକର୍ଡ କରେ, ଅନୁରୋଧକୁ ବିଳମ୍ବ ନ କରି।",
     "detectorsHintOutput": "ଅବରୋଧ ଚିହ୍ନିତ ପ୍ରତିକ୍ରିୟାକୁ ବିଫଳ କରେ। କେବଳ ଲଗ୍ ଏହାକୁ ରେକର୍ଡ କରେ, ପ୍ରତିକ୍ରିୟାକୁ ବିଳମ୍ବ ନ କରି।",
     "choiceLog": "କେବଳ ଲଗ୍",
     "applyTo": "ଏଥିପ୍ରତି ଲାଗୁ କରନ୍ତୁ",
     "applyToAllMembers": "ସମସ୍ତ ସଦସ୍ୟ",
     "applyKiloDefault": "Kilo ଡିଫଲ୍ଟ ଲାଗୁ କରନ୍ତୁ",
+    "applyKiloDefaultEnglishNote": "Kilo ର ଡିଫଲ୍ଟ ନୀତିର ପାଠ୍ୟ ଇଂରାଜୀରେ ଅଛି, କାରଣ Kilo Gateway ଏହାକୁ ଯେପରି ଲେଖା ଯାଇଛି ସେହିପରି ଲାଗୁ କରେ।",
+    "applyKiloDefaultReplaceMessage": "Kilo ର ଡିଫଲ୍ଟ ନୀତି ଇଂରାଜୀରେ ଲେଖା ଯାଇଛି ଏବଂ ନୀତି ଉଲ୍ଲଂଘନରେ ଆପଣ ସେଟ୍ କରିଥିବା ବିଷୟକୁ ବଦଳାଇଥାଏ। ନୀତି ପାଠ୍ୟ ଫିଲ୍ଡରେ ଆପଣ ଦାଖଲ କରିଥିବା ପାଠ୍ୟ ପୁନଃପ୍ରାପ୍ତ କରାଯାଇପାରିବ ନାହିଁ।",
     "invalidSavedTitle": "ସଞ୍ଚିତ ଇନପୁଟ ଡିଟେକ୍ଟର ସେଟିଂସମୂହ ପଢ଼ାଯାଇପାରିବ ନାହିଁ",
     "invalidSavedBody": "ଇନପୁଟ ଡିଟେକ୍ଟରଗୁଡ଼ିକ ପୁନର୍ବାର ସଞ୍ଚୟ ହେବା ପର୍ଯ୍ୟନ୍ତ ଅନୁରୋଧଗୁଡ଼ିକ ଅବରୋଧିତ ରହେ। ତଳେ ଥିବା ଡିଟେକ୍ଟରଗୁଡ଼ିକ Kilo ଡିଫଲ୍ଟରୁ ଆରମ୍ଭ ହୁଏ।",
     "invalidSavedOutputTitle": "ସଞ୍ଚିତ ଆଉଟପୁଟ ଡିଟେକ୍ଟର ସେଟିଂସମୂହ ପଢ଼ାଯାଇପାରିବ ନାହିଁ",
@@ -4981,6 +5001,7 @@
     "providersDescription": "ଏହି ସଂସ୍ଥା ପାଇଁ Kilo ଏହା ଆଡକୁ ରୁଟିଂ କରିବା ବନ୍ଦ କରିବାକୁ ଏକ ପ୍ରଦାତାକୁ ବନ୍ଦ କରନ୍ତୁ।",
     "providersNeedCatalog": "ସମ୍ପୂର୍ଣ୍ଣ ମଡେଲ କାଟାଲଗ ଲୋଡ ନହେବା ପର୍ଯ୍ୟନ୍ତ ପ୍ରଦାତା ସ୍ୱିଚଗୁଡ଼ିକ କେବଳ ପଢ଼ିବା ପାଇଁ ରହିବ। ସେଗୁଡ଼ିକୁ ସମ୍ପାଦନ କରିବାକୁ ଉପରେ ଥିବା ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ ଟାପ କରନ୍ତୁ।",
     "providersEmpty": "ଏହି ଖୋଜ ସହିତ କୌଣସି ପ୍ରଦାତା ମେଳ ଖାଉନାହିଁ।",
+    "providersNone": "ଏହି ସଂସ୍ଥା ପାଇଁ କୌଣସି ପ୍ରଦାତା ଉପଲବ୍ଧ ନାହିଁ।",
     "allowAllShown": "ଦେଖାଯାଉଥିବା ସମସ୍ତଙ୍କୁ ଅନୁମତି ଦିଅନ୍ତୁ",
     "denyAllShown": "ଦେଖାଯାଉଥିବା ସମସ୍ତଙ୍କୁ ବାରଣ କରନ୍ତୁ",
     "gatewaysDescription": "Kilo ମଡେଲ ଅନୁରୋଧଗୁଡ଼ିକୁ Vercel AI Gateway କିମ୍ବା OpenRouter ମାଧ୍ୟମରେ ରୁଟ କରେ। ନିଷ୍କ୍ରିୟ ଗେଟୱେ ସେହି ଅନୁରୋଧଗୁଡ଼ିକୁ ବିଫଳ କରେ।",

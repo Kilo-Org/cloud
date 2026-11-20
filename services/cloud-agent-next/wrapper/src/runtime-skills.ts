@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import {
-  isSafeSkillFilePath,
+  acceptedRuntimeSkillFiles,
   RuntimeSkillsSchema,
   type RuntimeSkillInput,
 } from '../../src/shared/runtime-profile.js';
@@ -122,18 +122,14 @@ export async function writeRuntimeSkills(
   options: RuntimeSkillInstallOptions = {}
 ): Promise<void> {
   if (!skills.length) return;
-  // Legacy session/ready payloads can contain unsafe companion paths. Preserve
-  // their skip behavior; the control-plane request schema rejects these earlier.
+  // Session and ready payloads can carry companion paths this writer filters;
+  // the control-plane request schema applies the same rule earlier.
   const validated = RuntimeSkillsSchema.parse(
     skills.map(skill => ({
       ...skill,
       ...(!('files' in skill) || skill.files === undefined
         ? {}
-        : {
-            files: Object.fromEntries(
-              Object.entries(skill.files).filter(([name]) => isSafeSkillFilePath(name))
-            ),
-          }),
+        : { files: acceptedRuntimeSkillFiles(skill.files).accepted }),
     }))
   );
   const baseDir = path.join(home, '.kilocode', 'skills');
@@ -170,9 +166,11 @@ export async function writeRuntimeSkills(
         continue;
       }
       await fs.mkdir(skillDir, { recursive: true });
-      await fs.writeFile(path.join(skillDir, 'SKILL.md'), skill.rawMarkdown);
+      const manifestPath = path.join(skillDir, 'SKILL.md');
+      await fs.writeFile(manifestPath, skill.rawMarkdown);
       for (const [relativePath, content] of Object.entries(skill.files ?? {})) {
         const targetPath = path.join(skillDir, relativePath);
+        if (targetPath === manifestPath) continue;
         await fs.mkdir(path.dirname(targetPath), { recursive: true });
         await fs.writeFile(targetPath, content);
       }

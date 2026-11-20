@@ -3,19 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
-import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { i18n } from '@/i18n';
 import { QueryError } from '@/components/query-error';
 import { SessionPermanentError } from './session-permanent-error';
 
-const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
-
-vi.mock('expo-router', () => ({ useRouter: () => router }));
-vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('./restored-route-fallback', () => ({ RestoredRouteFallback: 'RestoredRouteFallback' }));
-vi.mock('@/components/ui/directional-icons', () => ({
-  DirectionalArrowLeft: 'DirectionalArrowLeft',
-}));
 vi.mock('@/components/ui/icons', () => ({ RotateCcw: 'RotateCcw' }));
 vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 // The body of the shared state is another suite's; this one reads the state it
@@ -49,36 +41,30 @@ function actions(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 describe('SessionPermanentError recovery', () => {
-  it('offers the way back to the sessions and returns to the sessions index', () => {
+  it('leaves the way out to the header, with no action of its own', () => {
+    // The screen header draws the back chevron, so a terminal state that
+    // repeated it would be the second way out on one surface.
     const renderer = mountCard();
-    const [back] = actions(renderer);
-    if (!back) {
-      throw new Error('the card rendered no action');
-    }
-    expect(back.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
 
-    act(() => {
-      (back.props.onPress as () => void)();
-    });
-    expect(router.dismissTo).toHaveBeenCalledWith(AGENTS_SESSIONS_INDEX_HREF);
+    expect(renderer.root.findByType(QueryError).props.action).toBeUndefined();
+    expect(actions(renderer)).toHaveLength(0);
   });
 
-  it('offers a retry beside the way back, and spins while it runs', () => {
+  it.each([true, false])('draws one retry when the denial can clear, loading=%s', isRetrying => {
     const retry = vi.fn<() => void>();
-    const renderer = mountCard(retry, true);
-    const [attempt, back] = actions(renderer);
-    if (!attempt || !back) {
-      throw new Error('the card rendered fewer than two actions');
+    const renderer = mountCard(retry, isRetrying);
+    const [attempt, ...rest] = actions(renderer);
+    if (!attempt) {
+      throw new Error('the card rendered no retry');
     }
+    expect(rest).toHaveLength(0);
     expect(attempt.props.label).toBe(i18n.t('common.retry'));
-    expect(attempt.props.loading).toBe(true);
-    expect(back.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
+    expect(attempt.props.loading).toBe(isRetrying);
 
     act(() => {
       (attempt.props.onPress as () => void)();
     });
     expect(retry).toHaveBeenCalledTimes(1);
-    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it('keeps the error body out of the action slot', () => {

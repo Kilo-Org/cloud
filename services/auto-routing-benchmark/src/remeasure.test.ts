@@ -301,7 +301,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
 
     await scheduleRunChunks(db, {
       runId: 'remeasure',
-      entries: [{ ...entry, providers: [] }],
+      entries: [entry],
       repetitions: 1,
       caseIds: DECIDER_CASES.map(c => c.id),
       chunkSize: 1,
@@ -344,7 +344,10 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect(profileRunId('vendor/dead')).toEqual({ run_id: 'old', status: 'ready' });
 
     await markProfilesRunningForRun(db, 'failed-run', [pair('vendor/failed')], current);
-    await markProfilesFailedForRun(db, 'failed-run', 'scheduler initialization failed');
+    await markProfilesFailedForRun(db, 'failed-run', {
+      failureClass: 'run_init_failed',
+      reason: 'scheduler initialization failed',
+    });
     expect(profileRunId('vendor/failed')).toEqual({ run_id: 'old', status: 'ready' });
 
     await markProfilesRunningForRun(db, 'unwritten', [pair('vendor/released')], current);

@@ -57,6 +57,20 @@ export function deciderCliPrompt(benchCase: DeciderCase): string {
   return `${prompts.systemPrompt}\n\n${prompts.userPrompt}${FINAL_ANSWER_SUFFIX}`;
 }
 
+// @cloudflare/containers returns these 500 bodies before it forwards the request to
+// server.mjs: "Failed to start container" when starting the instance or its port checks
+// fail, and the runtime's refusal to connect to an instance that is not running or has
+// just exited. Disconnects and other proxy errors can follow a delivered request, so
+// they stay ambiguous.
+const CONTAINER_NOT_REACHED_BODY =
+  /^(?:Failed to start container: |Error proxying request to container: The container (?:just exited|is not running, consider calling start\(\)))/;
+
+export const CONTAINER_NOT_REACHED_PREFIX = 'container not reached: ';
+
+export function isContainerNotReachedBody(body: string): boolean {
+  return CONTAINER_NOT_REACHED_BODY.test(body);
+}
+
 export function isRetryableContainerAvailabilityError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();

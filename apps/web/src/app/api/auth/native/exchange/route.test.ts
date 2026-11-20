@@ -204,7 +204,6 @@ describe('POST /api/auth/native/exchange', () => {
       expiresIn: 3600,
     });
     expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
-      userId: fakeUser.id,
       userAgent: undefined,
       user: fakeUser,
       verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },

@@ -19,7 +19,11 @@
     "presenceStatus": "Hosty: {{connection}}",
     "commandStatus": "Dostarczenie polecenia: {{status}}",
     "delivered": "Dostarczono",
-    "expired": "Wygasło"
+    "expired": "Wygasło",
+    "recoveryGaps_one": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_few": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_many": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_other": "Brakuje {{displayCount}} części tego transkryptu."
   },
   "common": {
     "manageOnWeb": "Zarządzaj w przeglądarce",
@@ -138,6 +142,7 @@
     "keepRunning": "Nie przerywaj",
     "newSession": "Nowa sesja",
     "noModelsAvailable": "Brak dostępnych modeli",
+    "modelRetires": "Wycofany {{date}}",
     "notFound": "Nie znaleziono elementu.",
     "online": "W sieci",
     "open": "Otwórz {{name}}",
@@ -181,7 +186,9 @@
     "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
     "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
-    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie."
+    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
+    "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "viewOnGitHub": "Zobacz PR w serwisie GitHub"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -505,7 +512,7 @@
     "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
     "changelogAreas": {
       "signIn": "Logowanie",
-      "profileOrganizations": "Profil i organizacje"
+      "profileOrganizations": "Profil oraz organizacje"
     }
   },
   "preferences": {
@@ -695,7 +702,7 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
+      "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
@@ -704,7 +711,7 @@
       "managedOnWebRepositories": "Wybierz repozytoria dla {{organization}} w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
-      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go na następnym ekranie.",
+      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego i wklej go na następnym ekranie.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego",
       "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
@@ -746,9 +753,9 @@
     },
     "providerConnect": {
       "description": "Skonfiguruj połączenie z Kilo ({{label}}), aby automatycznie przeglądać PR.",
-      "githubApp": "Aplikacja GitHub",
+      "githubApp": "aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
-      "gitlabAccount": "Konto GitLab",
+      "gitlabAccount": "konto GitLab",
       "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie."
     },
     "reviewDetail": {
@@ -1247,7 +1254,7 @@
       "dueThisWeekDetail_many": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "dueThisWeekDetail_other": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "noDeadline": "Brak terminu",
-      "reviewSlaAssignment": "Sprawdź przypisane terminy SLA",
+      "reviewSlaAssignment": "Sprawdź przydział SLA",
       "allOpenFindingsTracked": "Wszystkie otwarte problemy są monitorowane"
     },
     "dismiss": {
@@ -2283,7 +2290,9 @@
     "modelPicker": {
       "title": "Wybór modelu",
       "favorites": "Ulubione",
-      "noModelsDescription": "Brak modeli do wyboru."
+      "noModelsDescription": "Brak modeli do wyboru.",
+      "allUnavailableTitle": "Nie można użyć żadnego modelu",
+      "allUnavailableDescription": "Dodaj klucz dostawcy, a następnie spróbuj ponownie."
     },
     "modelSelector": {
       "provider": "Dostawca {{id}}",
@@ -2857,7 +2866,6 @@
       "skipped_few": "pominięte: {{displayCount}}",
       "skipped_many": "pominięte: {{displayCount}}",
       "title": "Kontrole",
-      "viewOnGitHub": "Zobacz PR w serwisie GitHub",
       "checkDetails": "szczegóły kontroli"
     },
     "composer": {
@@ -2918,6 +2926,11 @@
       "commentActions": "Opcje komentarza",
       "comment": "{{displayCount}} komentarza",
       "comment_other": "{{displayCount}} komentarza",
+      "conversationTruncated": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_one": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_few": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_many": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_other": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
       "couldNotLoad": "Nie udało się wczytać dyskusji.",
       "couldNotLoadMore": "Nie udało się wczytać kolejnych komentarzy.",
       "loadMoreComments": "Wczytaj kolejne komentarze",
@@ -3346,6 +3359,10 @@
       "partialPostedStale_many": "Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "partialPostedStale_other": "Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "submitCountOfTotal": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_one": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_few": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_many": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_other": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
       "submitReview": "Prześlij wynik przeglądu",
       "pendingComment_few": "oczekujące komentarze",
       "pendingComment_many": "oczekujących komentarzy",
@@ -3561,7 +3578,7 @@
       "planStatusLapsed": " · Zakończony",
       "planEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu.",
       "manageBilling": "Zarządzaj rozliczeniami",
-      "renamePlaceholder": "Nazwa organizacji",
+      "renamePlaceholder": "Wpisz nazwę organizacji",
       "renameTitle": "Zmień nazwę organizacji"
     },
     "inviteMember": {
@@ -4205,7 +4222,13 @@
     "providerUnavailable": "Dostawca jest teraz niedostępny. Wyślij ponownie za chwilę."
   },
   "settingsTools": {
-    "confirmTitle": "Potwierdzić tę zmianę?"
+    "confirmTitle": "Potwierdzić tę zmianę?",
+    "guarded": {
+      "spendAlertsOff": "Wyłączyć alerty wydatków? Przestaniesz otrzymywać powiadomienia o przekroczeniu progów wydatków i skokach godzinowych.",
+      "balanceAlertsOff": "Wyłączyć alerty salda? Przestaniesz otrzymywać powiadomienia, gdy środki będą się kończyć.",
+      "securityFindingsOff": "Wyłączyć ustalenia dotyczące bezpieczeństwa? Przestaniesz otrzymywać powiadomienia o nowych ustaleniach dotyczących bezpieczeństwa.",
+      "hideBalanceOn": "Ukryć Twoje salda? Salda środków nie będą już wyświetlane na ekranach profilu i w centrum organizacji."
+    }
   },
   "appActions": {
     "start": {
@@ -4993,12 +5016,15 @@
     "inputDescription": "Skanuje wszystkie dane wejściowe za pomocą Enkrypt AI, w tym wyniki narzędzi. Gdy Enkrypt jest niedostępny, żądania są wysyłane bez skanowania zamiast być odrzucane.",
     "outputTitle": "Zabezpieczenia danych wyjściowych",
     "outputDescription": "Skanuje odpowiedzi za pomocą Enkrypt AI, zanim członkowie je otrzymają. Wyłączone, chyba że je włączysz.",
+    "outputUnavailable": "Kilo nie włączył skanowania danych wyjściowych dla tej organizacji, więc odpowiedzi nie są sprawdzane i nie ma tu nic do ustawienia. Skontaktuj się z {{supportEmail}}, aby o to poprosić.",
     "detectorsHint": "Blokuj odrzuca oznaczone żądanie. Tylko rejestruj zapisuje je bez opóźniania żądania.",
     "detectorsHintOutput": "Blokuj powoduje niepowodzenie oznaczonej odpowiedzi. Tylko rejestruj zapisuje ją bez opóźniania odpowiedzi.",
     "choiceLog": "Tylko rejestruj",
     "applyTo": "Zastosuj do",
     "applyToAllMembers": "Wszyscy członkowie",
     "applyKiloDefault": "Zastosuj domyślne ustawienia Kilo",
+    "applyKiloDefaultEnglishNote": "Tekst domyślnej polityki Kilo jest w języku angielskim, ponieważ Kilo Gateway stosuje go dokładnie tak, jak został zapisany.",
+    "applyKiloDefaultReplaceMessage": "Domyślna polityka Kilo jest napisana w języku angielskim i zastępuje to, co ustawiono w Naruszenie polityki. Tekstu wpisanego w polu tekstu polityki nie można odzyskać.",
     "invalidSavedTitle": "Nie można odczytać zapisanych ustawień detektora danych wejściowych",
     "invalidSavedBody": "Żądania są blokowane, dopóki detektory danych wejściowych nie zostaną zapisane ponownie. Poniższe detektory zaczynają od domyślnych ustawień Kilo.",
     "invalidSavedOutputTitle": "Nie można odczytać zapisanych ustawień detektora danych wyjściowych",
@@ -5133,6 +5159,7 @@
     "providersDescription": "Wyłącz dostawcę, aby Kilo przestało kierować do niego żądania w tej organizacji.",
     "providersNeedCatalog": "Przełączniki dostawców pozostają tylko do odczytu, dopóki nie wczyta się pełny katalog modeli. Aby je edytować, dotknij przycisku Spróbuj ponownie powyżej.",
     "providersEmpty": "Żaden dostawca nie pasuje do tego wyszukiwania.",
+    "providersNone": "Żaden dostawca nie jest dostępny dla tej organizacji.",
     "allowAllShown": "Zezwól na wszystkie widoczne",
     "denyAllShown": "Zablokuj wszystkie widoczne",
     "gatewaysDescription": "Kilo kieruje żądania modeli przez Vercel AI Gateway lub OpenRouter. Wyłączona brama powoduje niepowodzenie tych żądań.",

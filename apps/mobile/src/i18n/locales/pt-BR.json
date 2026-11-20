@@ -19,7 +19,11 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregue",
-    "expired": "Expirado"
+    "expired": "Expirado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrição.",
+    "recoveryGaps_many": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_other": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_zero": "Faltam {{displayCount}} partes desta transcrição."
   },
   "common": {
     "manageOnWeb": "Gerenciar na web",
@@ -138,6 +142,7 @@
     "keepRunning": "Manter em execução",
     "newSession": "Nova sessão",
     "noModelsAvailable": "Nenhum modelo disponível",
+    "modelRetires": "Descontinuado em {{date}}",
     "notFound": "O item não foi encontrado.",
     "online": "Conectado",
     "open": "Abrir {{name}}",
@@ -181,7 +186,9 @@
     "organizationTrialEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Um proprietário da organização pode atualizar o faturamento em kilo.ai e tentar novamente.",
     "privateRepositoryA11y": "{{name}}, repositório privado",
     "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês.",
-    "organizationTrialEndedBilling": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Você pode atualizar o faturamento e tentar novamente."
+    "organizationTrialEndedBilling": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Você pode atualizar o faturamento e tentar novamente.",
+    "organizationTrialEndedBillingAtKiloAi": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Você pode atualizar o faturamento em kilo.ai e tentar novamente.",
+    "viewOnGitHub": "Ver PR no GitHub"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -505,7 +512,7 @@
     "changelogFixesPolish": "Correções e melhorias em todo o app.",
     "changelogAreas": {
       "signIn": "Acesso",
-      "profileOrganizations": "Perfil e organizações"
+      "profileOrganizations": "Perfil & organizações"
     }
   },
   "notifications": {
@@ -662,7 +669,7 @@
     },
     "autoReviews": "Revisões automáticas",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está conectado. Somente proprietários, administradores e gerentes de cobrança da organização podem conectá-lo."
+      "notConnectedReadOnlyPlan": "O período de teste da organização terminou, então um proprietário precisa atualizar o faturamento em kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A conexão do Bitbucket para {{organization}} é gerenciada na web, em um computador.",
@@ -671,7 +678,7 @@
       "managedOnWebRepositories": "Escolha os repositórios de {{organization}} na web, em um computador.",
       "description": "Crie um token de acesso do espaço de trabalho para {{organization}} e cole-o abaixo.",
       "descriptionReconnect": "Crie um novo token de acesso do espaço de trabalho para {{organization}} e cole-o abaixo.",
-      "descriptionOverview": "Crie um token de acesso do espaço de trabalho para {{organization}} e cole-o na próxima tela.",
+      "descriptionOverview": "Crie um token de acesso do espaço de trabalho e cole-o na próxima tela.",
       "scopes": "Conta: leitura · Repositórios: leitura/gravação · PRs: leitura · Webhooks: leitura/gravação",
       "tokenPlaceholder": "Token de acesso do espaço de trabalho",
       "tokenRefused": "O Bitbucket não aceitou este token de acesso do espaço de trabalho. Verifique se ele tem os escopos acima e tente novamente."
@@ -713,9 +720,9 @@
     },
     "providerConnect": {
       "description": "Conecte {{label}} ao Kilo para revisar PRs automaticamente.",
-      "githubApp": "o App do GitHub",
+      "githubApp": "o app do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tente novamente.",
-      "gitlabAccount": "a Conta do GitLab",
+      "gitlabAccount": "a conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tente novamente."
     },
     "reviewDetail": {
@@ -2250,7 +2257,9 @@
     "modelPicker": {
       "title": "Modelo",
       "favorites": "Favoritos",
-      "noModelsDescription": "Não há modelos disponíveis para escolher."
+      "noModelsDescription": "Não há modelos disponíveis para escolher.",
+      "allUnavailableTitle": "Nenhum modelo pode ser usado",
+      "allUnavailableDescription": "Adicione uma chave de provedor e tente novamente."
     },
     "modelSelector": {
       "provider": "Provedor {{id}}",
@@ -2857,7 +2866,6 @@
       "skipped_zero": "{{displayCount}} ignoradas",
       "skipped_many": "{{displayCount}} ignoradas",
       "title": "Verificações",
-      "viewOnGitHub": "Ver PR no GitHub",
       "checkDetails": "detalhes da verificação"
     },
     "composer": {
@@ -2886,9 +2894,9 @@
       "checkFailedTitleGitLab": "Não foi possível verificar a conexão com o GitLab.",
       "checkFailedTitleBitbucket": "Não foi possível verificar a conexão com o Bitbucket.",
       "providerCheckFailedMessage": "Não foi possível acessar o provedor. Verifique sua conexão e tente novamente.",
-      "reconnectTitle": "Reconexão com o GitHub",
-      "reconnectTitleGitLab": "Reconexão com o GitLab",
-      "reconnectTitleBitbucket": "Reconexão com o Bitbucket",
+      "reconnectTitle": "Reconectar o GitHub",
+      "reconnectTitleGitLab": "Reconectar o GitLab",
+      "reconnectTitleBitbucket": "Reconectar o Bitbucket",
       "reconnectDescription": "Sua conexão com o GitHub foi revogada.",
       "gitlabDescription": "Revisar merge requests no celular",
       "gitlabInstanceMismatchTitle": "A conexão com o GitLab é para outra instância",
@@ -2919,6 +2927,11 @@
       "comment": "{{displayCount}} comentários",
       "comment_other": "{{displayCount}} comentários",
       "comment_zero": "{{displayCount}} comentários",
+      "conversationTruncated": "Exibindo apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_zero": "Exibindo apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_one": "Exibindo apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_many": "Exibindo apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_other": "Exibindo apenas os primeiros {{displayCount}} comentários.",
       "couldNotLoad": "Não foi possível carregar a discussão.",
       "couldNotLoadMore": "Não foi possível carregar mais comentários.",
       "loadMoreComments": "Carregar mais comentários",
@@ -3347,6 +3360,10 @@
       "partialPostedStale_other": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
       "partialPostedStale_zero": "Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
       "pendingComment_many": "comentários pendentes",
       "blockedRequestChanges": "Adicione um resumo ou pelo menos um comentário para solicitar alterações.",
@@ -3561,7 +3578,7 @@
       "planStatusLapsed": " · Expirado",
       "planEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo.",
       "manageBilling": "Gerenciar cobrança",
-      "renamePlaceholder": "Nome da organização",
+      "renamePlaceholder": "Insira um nome para a organização",
       "renameTitle": "Renomear organização"
     },
     "inviteMember": {
@@ -4205,7 +4222,13 @@
     "providerUnavailable": "O provedor está indisponível no momento. Envie novamente em instantes."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmar esta alteração?"
+    "confirmTitle": "Confirmar esta alteração?",
+    "guarded": {
+      "spendAlertsOff": "Desativar alertas de gastos? Você deixaria de receber notificações sobre ultrapassagens de limites de gastos e picos horários.",
+      "balanceAlertsOff": "Desativar alertas de saldo? Você deixaria de receber notificações quando seus créditos estiverem acabando.",
+      "securityFindingsOff": "Desativar achados de segurança? Você deixaria de receber notificações sobre novos achados de segurança.",
+      "hideBalanceOn": "Ocultar seus saldos? Os saldos de créditos não apareceriam mais nas telas de perfil e no hub da organização."
+    }
   },
   "appActions": {
     "start": {
@@ -4993,12 +5016,15 @@
     "inputDescription": "Verifica cada entrada com o Enkrypt AI, incluindo resultados de ferramentas. Quando o Enkrypt não está disponível, as solicitações são enviadas sem verificação em vez de rejeitadas.",
     "outputTitle": "Salvaguardas de saída",
     "outputDescription": "Verifica as respostas com o Enkrypt AI antes que os membros as recebam. Fica desativado a menos que você o ative.",
+    "outputUnavailable": "O Kilo não ativou a verificação de saída para esta organização, então as respostas não são verificadas e não há nada para configurar aqui. Entre em contato com {{supportEmail}} para solicitar.",
     "detectorsHint": "Bloquear rejeita uma solicitação sinalizada. A opção Somente registrar apenas registra a solicitação sem atrasá-la.",
     "detectorsHintOutput": "Bloquear faz uma resposta sinalizada falhar. A opção Somente registrar apenas registra a resposta sem atrasá-la.",
     "choiceLog": "Somente registrar",
     "applyTo": "Aplicar a",
     "applyToAllMembers": "Todos os membros",
     "applyKiloDefault": "Aplicar padrão do Kilo",
+    "applyKiloDefaultEnglishNote": "O texto da política padrão do Kilo está em inglês, porque o Kilo Gateway o aplica exatamente como escrito.",
+    "applyKiloDefaultReplaceMessage": "A política padrão do Kilo está escrita em inglês e substitui o que você definiu em Violação de política. O texto que você inseriu no campo de texto da política não pode ser recuperado.",
     "invalidSavedTitle": "Não é possível ler as configurações salvas dos detectores de entrada",
     "invalidSavedBody": "As solicitações são bloqueadas até que os detectores de entrada sejam salvos novamente. Os detectores abaixo começam com o padrão do Kilo.",
     "invalidSavedOutputTitle": "Não é possível ler as configurações salvas dos detectores de saída",
@@ -5133,6 +5159,7 @@
     "providersDescription": "Desative um provedor para impedir que o Kilo encaminhe solicitações para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos provedores ficam somente leitura até que o catálogo completo de modelos seja carregado. Toque em Tentar novamente acima para editá-los.",
     "providersEmpty": "Nenhum provedor corresponde a esta pesquisa.",
+    "providersNone": "Não há provedores disponíveis para esta organização.",
     "allowAllShown": "Permitir todos os exibidos",
     "denyAllShown": "Negar todos os exibidos",
     "gatewaysDescription": "O Kilo encaminha solicitações de modelos por meio do Vercel AI Gateway ou do OpenRouter. Um portal de acesso desativado faz essas solicitações falharem.",

@@ -619,6 +619,20 @@ async function getGitHubBranchHead(
     return head === null ? { missing: true } : head;
   };
 
+  /**
+   * One installation with no alternative to walk to, so its answer is the
+   * connection's own: a refused credential takes the reconnect state, the same
+   * class the branch list answers for one connection.
+   */
+  const callOnly = async (integration: GitHubIntegrationRow): Promise<ProviderBranchHead> => {
+    try {
+      return await call(integration);
+    } catch (error) {
+      if (refusalStatus(error) === 401) throw githubCredentialRefusedTrpcError(error);
+      throw error;
+    }
+  };
+
   if (input.githubIntegrationId) {
     const integration = await getGitHubIntegrationById(owner, input.githubIntegrationId);
     if (!integration || !isPlatformIntegrationHealthy(integration)) {
@@ -627,7 +641,7 @@ async function getGitHubBranchHead(
         message: inactiveConnectionMessage('GitHub'),
       });
     }
-    return call(integration);
+    return callOnly(integration);
   }
 
   if (owner.type === 'org') {
@@ -683,7 +697,7 @@ async function getGitHubBranchHead(
   }
 
   const integration = await requireActiveIntegration(owner, PLATFORM.GITHUB, 'GitHub');
-  return call(integration);
+  return callOnly(integration);
 }
 
 async function getGitLabBranchHead(

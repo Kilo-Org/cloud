@@ -669,6 +669,61 @@ describe('getProviderBranchHead', () => {
       })
     ).resolves.toEqual({ missing: true });
   });
+
+  it('maps a refused credential on the exact supplied integration to the reconnect state', async () => {
+    mockGetGitHubIntegrationById.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(401, 'Bad credentials'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+        githubIntegrationId: 'intg_github_exact',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Your GitHub connection is no longer valid. Reconnect GitHub and try again.',
+    });
+  });
+
+  it('maps a refused credential on a personal connection to the reconnect state', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(githubIntegration);
+    mockFetchGitHubBranchHead.mockRejectedValue(githubRefusal(401, 'Bad credentials'));
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Your GitHub connection is no longer valid. Reconnect GitHub and try again.',
+    });
+
+    expect(mockGetIntegrationForOwner).toHaveBeenCalledWith(
+      { type: 'user', id: 'user_1' },
+      'github'
+    );
+  });
+
+  it('rethrows a non-refusal failure on a personal connection unchanged', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(githubIntegration);
+    const failure = new TypeError('fetch failed');
+    mockFetchGitHubBranchHead.mockRejectedValue(failure);
+
+    await expect(
+      getProviderBranchHead({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'acme/repo',
+        branch: 'feat',
+      })
+    ).rejects.toBe(failure);
+  });
 });
 
 describe('getProviderBranchHead (organization github installations)', () => {

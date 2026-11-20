@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the screen draws the whole-body load, not-found, paused and failure states beside the three tab panels */
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { Ban } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -24,7 +25,13 @@ import {
   securityDismissFailureCopy,
   useSecurityDismissDraft,
 } from '@/lib/hooks/use-security-dismiss-draft';
-import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
+import {
+  useRetrySecurityFinding,
+  useSecurityAnalysis,
+  useSecurityFinding,
+} from '@/lib/hooks/use-security-findings';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
@@ -72,6 +79,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // remediation panels read it — the details tab never does.
   const analysisActive = tab === 'analysis' || tab === 'remediation';
   const analysisQuery = useSecurityAnalysis(scope, findingId, analysisActive);
+  const connectivity = useCommittedConnectivityStatus();
+  const findingRetry = useRetrySecurityFinding(scope, findingId);
   // Bumped once the boundary's recovery refetch settles, so the boundary
   // remounts with clean state over the recovered payload. Bumping it in the
   // same tick would mount the fresh boundary against the still-cached
@@ -215,6 +224,24 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     );
   }
 
+  // A paused first read never reaches the loading gate: name the connection and
+  // offer Retry. The retry is the deliberate one — a plain `refetch` would only
+  // join the paused promise the online manager is holding.
+  const findingPaused = isReadPausedBeforeData({ ...findingQuery, connectivity });
+  if (findingPaused) {
+    return (
+      <View className="flex-1 bg-background">
+        {pendingHeader}
+        <QueryError
+          variant="offline"
+          message={t('securityAgent.dismiss.couldNotLoad')}
+          onRetry={() => void findingRetry.retry()}
+          isRetrying={findingRetry.isRetrying}
+        />
+      </View>
+    );
+  }
+
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
@@ -326,6 +353,9 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             analysis={analysisQuery.data}
             isLoading={analysisQuery.isLoading}
             isError={analysisQuery.isError}
+            isPending={analysisQuery.isPending}
+            fetchStatus={analysisQuery.fetchStatus}
+            connectivity={connectivity}
             onRetry={() => void analysisQuery.refetch()}
           />
         </PanelErrorBoundary>
@@ -342,6 +372,9 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             analysis={analysisQuery.data}
             isLoading={analysisQuery.isLoading}
             isError={analysisQuery.isError}
+            isPending={analysisQuery.isPending}
+            fetchStatus={analysisQuery.fetchStatus}
+            connectivity={connectivity}
             onRetry={() => void analysisQuery.refetch()}
           />
         </PanelErrorBoundary>

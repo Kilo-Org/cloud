@@ -96,6 +96,15 @@ export function useRetrySecurityFinding(scope: string, id: string) {
   return usePausedReadRetry(queryKey);
 }
 
+/** Deliberate retry for the one paused analysis read, keyed exactly as below. */
+export function useRetrySecurityAnalysis(scope: string, findingId: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getAnalysis.queryKey({ findingId })
+    : trpc.organizations.securityAgent.getAnalysis.queryKey({ organizationId: scope, findingId });
+  return usePausedReadRetry(queryKey);
+}
+
 const ANALYSIS_POLL_INTERVAL_MS = 3000;
 
 // Poll only while there's something in flight: analysis still running, or a

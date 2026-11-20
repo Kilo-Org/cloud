@@ -50,6 +50,11 @@ const capacity = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+/** Records the `(scope, enabled)` each mount hands the capacity read. */
+const useSecurityAnalysisCapacity = vi.hoisted(() =>
+  vi.fn((_scope: string, _enabled?: boolean) => capacity)
+);
+
 /** A tRPC client rejection, as `readTrpcErrorField` reads it. */
 function trpcError(code: string): Error {
   return Object.assign(new Error(code), { data: { code, message: code } });
@@ -125,7 +130,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentConfig: () => ({ data: { repositorySelectionMode: 'all' } }),
   useSecurityAgentRepositories: () => repositories,
-  useSecurityAnalysisCapacity: () => capacity,
+  useSecurityAnalysisCapacity: (scope: string, enabled?: boolean) =>
+    useSecurityAnalysisCapacity(scope, enabled),
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFindings: (...args: unknown[]) => {
@@ -425,6 +431,32 @@ describe('Security Agent list surfaces', () => {
     findings.data = { pages: [{ findings: [analyzableFinding('a'), analyzableFinding('b')] }] };
     const header = await mountListHeader();
     expect(capacityCopy(header, 'capacityFull')).toHaveLength(1);
+  });
+
+  // The capacity counters poll while the owner is at the limit, and the notice
+  // they feed only appears above a row that offers an analysis action. The same
+  // row flag enables the read, so a list of already-analyzed findings keeps no
+  // read awake.
+  it('leaves the capacity read off when no row offers the action', async () => {
+    findings.data = { pages: [{ findings: [analyzedFinding('a')] }] };
+    const root = await mount();
+
+    expect(root.findByType(FlashList).props.data).toHaveLength(1);
+    expect(useSecurityAnalysisCapacity).toHaveBeenLastCalledWith('personal', false);
+  });
+
+  it('reads the capacity counters once a row offers the action', async () => {
+    capacity.state = 'full';
+    findings.data = { pages: [{ findings: [analyzedFinding('a'), analyzableFinding('b')] }] };
+    const root = await mount();
+
+    expect(useSecurityAnalysisCapacity).toHaveBeenLastCalledWith('personal', true);
+    // The notice and the read stay on the one flag: an enabled read still shows
+    // the explanation over the analyzable row.
+    const header = root.findByType(FlashList).props.ListHeaderComponent as ReactNode;
+    mounted?.unmount();
+    mounted = await renderWithProviders(createElement('Header', null, header));
+    expect(capacityCopy(mounted.renderer.root, 'capacityFull')).toHaveLength(1);
   });
 
   it.each([

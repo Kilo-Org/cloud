@@ -226,15 +226,16 @@ export const UNSUPPORTED_REJECTION_SHARE = 0.95;
 
 /**
  * Errors that are valid measurements or transient conditions, never a capability
- * rejection: content filters, throttles, empty output, timeouts, dropped connections.
+ * rejection: content filters, throttles, provider 5xx, empty output, timeouts, dropped
+ * connections. Matched against the raw error, before numbers are normalized away.
  */
 const NOT_A_REJECTION =
-  /content filter|too many requests|\b429\b|no output|time ?out|timed out|connection lost|try again|overloaded/i;
+  /content filter|too many requests|rate.?limit|throttl|\b429\b|\b(?:HTTP|status|code)\s*:?\s*5\d\d\b|internal server error|bad gateway|service unavailable|gateway timeout|temporarily unavailable|no output|time ?out|timed out|connection lost|try again|overloaded/i;
 
 /**
  * An entry whose cases nearly all failed with the same provider rejection (tool use
  * unsupported, region blocked, a fixed context limit) measured a capability the model
- * lacks, not its accuracy. Timed-out cases never count as a rejection.
+ * lacks, not its accuracy. Timed-out cases and transient errors never count as a rejection.
  */
 export function unsupportedRejection(
   rows: readonly { error: string | null; timed_out: number }[]
@@ -243,7 +244,9 @@ export function unsupportedRejection(
   const counts = new Map<string, number>();
   for (const row of rows) {
     if (row.timed_out !== 0 || row.error === null) continue;
-    const key = stripVTControlCharacters(row.error)
+    const raw = stripVTControlCharacters(row.error);
+    if (NOT_A_REJECTION.test(raw)) continue;
+    const key = raw
       .replace(/\d+/g, '#')
       .replace(/\s+/g, ' ')
       .trim()
@@ -255,7 +258,6 @@ export function unsupportedRejection(
     if (!top || count > top.count) top = { key, count };
   }
   if (!top || top.count < Math.ceil(rows.length * UNSUPPORTED_REJECTION_SHARE)) return null;
-  if (NOT_A_REJECTION.test(top.key)) return null;
   return {
     failureClass: 'unsupported',
     reason: `${top.count} of ${rows.length} measured cases failed with the same provider rejection: ${top.key}`,

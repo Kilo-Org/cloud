@@ -185,6 +185,21 @@ describe('customRouterPoolVersion', () => {
     ).not.toBe(base);
   });
 
+  test('a true client link change always moves the version', () => {
+    const gatewayEntry = definition().entries[0]!;
+    const unlinked = customRouterPoolVersion(
+      definition({ entries: [gatewayEntry, clientEntry()] })
+    );
+    const gained = customRouterPoolVersion(
+      definition({ entries: [gatewayEntry, { ...clientEntry(), measuredAs: SONNET }] })
+    );
+    const moved = customRouterPoolVersion(
+      definition({ entries: [gatewayEntry, { ...clientEntry(), measuredAs: FLASH }] })
+    );
+
+    expect(new Set([unlinked, gained, moved]).size).toBe(3);
+  });
+
   test('changes when a client entry adds a variant, because that adds cases', () => {
     const base = customRouterPoolVersion(definition());
     const variantAdded = customRouterPoolVersion(

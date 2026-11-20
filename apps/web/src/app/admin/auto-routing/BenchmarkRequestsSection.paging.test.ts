@@ -205,24 +205,47 @@ function renderedRowIds(): string[] {
     .filter((id): id is string => id !== undefined);
 }
 
-/** Waits for a rendered predicate; React Query resolves off the act queue. */
-async function waitForRows(
-  predicate: (rows: string[]) => boolean,
+/**
+ * Waits for any rendered condition. React Query settles its mutations off the act queue, so
+ * every assertion about post-click state must poll rather than read the first snapshot.
+ */
+async function waitFor(
+  predicate: () => boolean,
+  describeCondition: string,
   timeoutMs = 3_000
-): Promise<string[]> {
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const rows = renderedRowIds();
-    if (predicate(rows)) return rows;
+    if (predicate()) return;
     if (Date.now() > deadline) {
       throw new Error(
-        `rows condition not met; rendered: ${(dom.container.textContent ?? '').slice(0, 300)}`
+        `${describeCondition} not met; rendered: ${(dom.container.textContent ?? '').slice(0, 300)}`
       );
     }
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 10));
     });
   }
+}
+
+function renderedAlertText(): string {
+  return [...dom.container.querySelectorAll('[role="alert"]')]
+    .map(node => node.textContent ?? '')
+    .join(' ');
+}
+
+function renderedButtonLabels(): string[] {
+  return [...dom.container.querySelectorAll('button')]
+    .map(button => button.getAttribute('aria-label') ?? '')
+    .filter(label => label.length > 0);
+}
+
+async function waitForRows(
+  predicate: (rows: string[]) => boolean,
+  timeoutMs = 3_000
+): Promise<string[]> {
+  await waitFor(() => predicate(renderedRowIds()), 'rows condition', timeoutMs);
+  return renderedRowIds();
 }
 
 function jsonResponse(body: unknown): Response {
@@ -305,13 +328,17 @@ describe('request list paging through the real control', () => {
       await rendered.click('Load more benchmark requests');
 
       // The first page survives the failure, the alert names it, and the control offers a
-      // retry instead of vanishing with the rows.
-      const afterFailure = await waitForRows(() => true);
-      expect(afterFailure).toEqual([uuidFor('c'), uuidFor('b')]);
-      const alertText = [...dom.container.querySelectorAll('[role="alert"]')]
-        .map(node => node.textContent ?? '')
-        .join(' ');
-      expect(alertText).toContain('Older requests could not be loaded');
+      // retry instead of vanishing with the rows. Every one of those is a condition to wait
+      // for: the alert appears only after React commits the failed page.
+      await waitFor(
+        () => renderedAlertText().includes('Older requests could not be loaded'),
+        'list failure alert'
+      );
+      expect(renderedRowIds()).toEqual([uuidFor('c'), uuidFor('b')]);
+      await waitFor(
+        () => renderedButtonLabels().includes('Load more benchmark requests'),
+        'list retry control'
+      );
       expect(dom.container.textContent ?? '').toContain('Retry older requests');
 
       await rendered.click('Load more benchmark requests');
@@ -345,6 +372,130 @@ describe('request list paging through the real control', () => {
         await rendered.client.refetchQueries({ queryKey: ['auto-routing', 'benchmark-requests'] });
       });
       expect(renderedRowIds()).toEqual([uuidFor('c'), uuidFor('b'), uuidFor('a')]);
+    } finally {
+      if (root) act(() => root?.unmount());
+    }
+  });
+});
+
+describe('case paging retry', () => {
+  // The progress response is parsed with the shared contract, so its ids must be real uuids.
+  const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+  const seededPage = {
+    status: 'active' as const,
+    request: request({ id: REQUEST_ID }),
+    cases: [
+      {
+        id: 'case-one',
+        model: 'm',
+        variant: null,
+        caseId: 'case-one',
+        repetition: 0,
+        status: 'done' as const,
+        coveredByKilo: false,
+        billedModelRequests: 1,
+        chargedMicrodollars: 0,
+        reason: null,
+      },
+    ],
+    nextCursor: 'cases-2' as string | null,
+  };
+
+  function pageTwo(cases: { id: string }[], nextCursor: string | null) {
+    return {
+      status: 'active' as const,
+      request: request({ id: REQUEST_ID }),
+      cases: cases.map(entry => ({
+        id: entry.id,
+        model: 'm',
+        variant: null,
+        caseId: entry.id,
+        repetition: 0,
+        status: 'done' as const,
+        coveredByKilo: false,
+        billedModelRequests: 1,
+        chargedMicrodollars: 0,
+        reason: null,
+      })),
+      nextCursor,
+    };
+  }
+
+  it('keeps the loaded case when page 2 fails, then retries the same cursor', async () => {
+    let root: RenderRoot | undefined;
+    let failNextCasePage = true;
+    const requestedCursors: string[] = [];
+    mockAdminFetch.mockImplementation(async url => {
+      if (url.includes('cursor=cases-2')) {
+        requestedCursors.push('cases-2');
+        if (failNextCasePage) {
+          failNextCasePage = false;
+          return new Response(JSON.stringify({ error: 'D1 timed out' }), {
+            status: 503,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        return jsonResponse(pageTwo([{ id: 'case-two' }], null));
+      }
+      return jsonResponse(seededPage);
+    });
+    try {
+      const modules = await loadModules();
+      const client = new modules.QueryClient({
+        defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+      });
+      // Seeded so the first case page is already on screen; no refetch can replace it.
+      client.setQueryData(
+        ['auto-routing', 'benchmark-request-progress', REQUEST_ID],
+        { pages: [seededPage], pageParams: [null] },
+        { updatedAt: Date.now() }
+      );
+      root = modules.createRoot(dom.container);
+      await act(async () => {
+        root?.render(
+          createElement(
+            modules.QueryClientProvider,
+            { client },
+            createElement(modules.RequestDetail, { request: request({ id: REQUEST_ID }) })
+          )
+        );
+        await Promise.resolve();
+      });
+      const clickCaseControl = async () => {
+        const button = [...dom.container.querySelectorAll('button')].find(
+          candidate => candidate.getAttribute('aria-label') === 'Load more cases'
+        );
+        if (!button) throw new Error('case control missing');
+        await act(async () => {
+          button.dispatchEvent(new (dom.window.Event as typeof Event)('click', { bubbles: true }));
+          await Promise.resolve();
+        });
+      };
+
+      await waitFor(
+        () => (dom.container.textContent ?? '').includes('case-one'),
+        'first case page rendered'
+      );
+      await clickCaseControl();
+
+      // The already-loaded case stays, and the failure is announced with a retry control.
+      await waitFor(
+        () => renderedAlertText().includes('More cases could not be loaded'),
+        'case failure alert'
+      );
+      expect(dom.container.textContent ?? '').toContain('case-one');
+      expect(dom.container.textContent ?? '').not.toContain('case-two');
+      expect(dom.container.textContent ?? '').toContain('Retry more cases');
+
+      await clickCaseControl();
+      await waitFor(
+        () => (dom.container.textContent ?? '').includes('case-two'),
+        'retried case page rendered'
+      );
+      // The retry asked for the same cursor, and both cases are on screen now.
+      expect(requestedCursors).toEqual(['cases-2', 'cases-2']);
+      expect(dom.container.textContent ?? '').toContain('case-one');
+      expect(dom.container.textContent ?? '').toContain('case-two');
     } finally {
       if (root) act(() => root?.unmount());
     }

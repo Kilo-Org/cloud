@@ -76,7 +76,7 @@ describe('poolBenchmarkWarnings', () => {
     expect(warnings[0]?.message).toContain('provider returned 404');
   });
 
-  it('reports a permanent failure from the status row the API actually sends', () => {
+  it('keeps a serving permanent failure ranked instead of advising removal', () => {
     const warnings = poolBenchmarkWarnings(
       summary({
         entries: [
@@ -87,7 +87,7 @@ describe('poolBenchmarkWarnings', () => {
             variants: [
               {
                 variant: null,
-                status: 'failed',
+                status: 'ready',
                 failureReason: 'not in the catalog',
                 linked: false,
                 resolvedModel: 'vendor/a',
@@ -108,13 +108,18 @@ describe('poolBenchmarkWarnings', () => {
       })
     );
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]?.tone).toBe('destructive');
+    expect(warnings[0]?.tone).toBe('warning');
     expect(warnings[0]?.message).toContain('Benchmark permanently failed for vendor/a');
     expect(warnings[0]?.message).toContain('not in the catalog');
-    expect(warnings[0]?.message).toContain('cannot be added to a pool');
+    expect(warnings[0]?.message).toContain(
+      'Its existing usable measurement still ranks routes in this pool.'
+    );
+    expect(warnings[0]?.message).toContain('until an admin re-admits its benchmark');
+    expect(warnings[0]?.message).not.toContain('remove');
+    expect(warnings[0]?.message).not.toContain('replace');
   });
 
-  it('treats a permanent availability row without a failure object as permanent', () => {
+  it('offers replacement for a permanently failed model with no usable measurement', () => {
     const warnings = poolBenchmarkWarnings(
       summary({
         entries: [
@@ -125,9 +130,10 @@ describe('poolBenchmarkWarnings', () => {
             variants: [
               {
                 variant: null,
-                status: 'failed',
+                status: 'missing',
                 failureReason: 'the provider removed this model',
                 linked: false,
+                resolvedModel: 'vendor/a',
                 availability: 'permanent_failure',
               },
             ],
@@ -135,8 +141,11 @@ describe('poolBenchmarkWarnings', () => {
         ],
       })
     );
+    expect(warnings).toHaveLength(1);
     expect(warnings[0]?.tone).toBe('destructive');
     expect(warnings[0]?.message).toContain('the provider removed this model');
+    expect(warnings[0]?.message).toContain('It has no usable measurement');
+    expect(warnings[0]?.message).toContain('replace vendor/a or choose another model');
   });
 
   it('reports a fallback when the pinned target is gone', () => {

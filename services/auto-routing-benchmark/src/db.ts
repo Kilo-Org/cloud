@@ -1254,10 +1254,12 @@ export async function failPaidCasesForUnavailablePair(
   const at = new Date(input.now ?? Date.now()).toISOString();
   const pairPredicate = `engine_identity = ? AND model = ? AND variant = ?`;
   const pairBindings = [input.engineIdentity, input.model, input.variant];
-  // Both statements are keyed on the exact pair AND on the transition this call writes, so a
-  // request row is only failed when its own case run was failed by this very batch. Every
-  // other row of the pair (settled, completed, a later generation, another rep or case) is
-  // untouched. Rep and case are correlated through the case run itself, never by prefix.
+  // Two independent fences, both required:
+  // 1. the exact pair (`engine_identity`, `model`, `variant`) — a `rep`/`case_id` pair is
+  //    shared by every model measured on the same cases, so correlating on those alone would
+  //    fail a different model's rows;
+  // 2. the transition id this call just wrote, so only rows whose own case run was failed by
+  //    this batch move. Covered, settled, completed and later generations keep their state.
   const [runs] = await db.batch([
     db
       .prepare(
@@ -1271,11 +1273,14 @@ export async function failPaidCasesForUnavailablePair(
       .prepare(
         `UPDATE paid_benchmark_request_cases
         SET status = 'failed', reason = ?, updated_at = ?
-        WHERE status IN ('queued', 'running')
+        WHERE ${pairPredicate}
+          AND status IN ('queued', 'running')
           AND EXISTS (
             SELECT 1 FROM benchmark_case_runs AS case_run
-            WHERE case_run.engine_identity = ? AND case_run.model = ?
-              AND case_run.variant = ? AND case_run.rep = paid_benchmark_request_cases.rep
+            WHERE case_run.engine_identity = paid_benchmark_request_cases.engine_identity
+              AND case_run.model = paid_benchmark_request_cases.model
+              AND case_run.variant = paid_benchmark_request_cases.variant
+              AND case_run.rep = paid_benchmark_request_cases.rep
               AND case_run.case_id = paid_benchmark_request_cases.case_id
               AND case_run.status = 'failed'
               AND case_run.settlement_id = ?

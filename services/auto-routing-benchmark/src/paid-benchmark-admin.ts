@@ -403,9 +403,7 @@ export async function listPaidBenchmarkAdminRequests(
       .bind(...requestIds)
       .all<{ request_id: string; status: string; count: number }>(),
     db
-      .prepare(
-        `${USER_USAGE_SQL} AND u.request_id IN (${placeholders}) GROUP BY u.request_id`
-      )
+      .prepare(`${USER_USAGE_SQL} AND u.request_id IN (${placeholders}) GROUP BY u.request_id`)
       .bind(...requestIds)
       .all<UserUsageRow>(),
     db

@@ -507,7 +507,7 @@ describe('admin request reads', () => {
     expect(b?.chargedMicrodollars).toBe(0);
   });
 
-  it('never reports a reclaimed generation\'s Kilo cover on the newer user generation', async () => {
+  it("never reports a reclaimed generation's Kilo cover on the newer user generation", async () => {
     // The exact edge: Kilo covered generation 1 and its admitted call was billed to Kilo,
     // then the slot was paused and RECLAIMED as generation 2, which a user request now
     // pays exclusively. Generation 1's covered receipt must not appear as cover (or spend)
@@ -528,7 +528,9 @@ describe('admin request reads', () => {
       platformCovered: true,
       requestId: '',
     });
-    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 1 WHERE usage_id = 'usage-old'`).run();
+    sqlite
+      .prepare(`UPDATE paid_attempt_usage SET generation = 1 WHERE usage_id = 'usage-old'`)
+      .run();
     // Generation 2: this request's own billed call on the same slot.
     insertModelRequest('model-request-new', 'case-shared', { ownerId: 'u1', requestId: REQUEST });
     sqlite
@@ -539,7 +541,9 @@ describe('admin request reads', () => {
       ownerId: 'u1',
       requestId: REQUEST,
     });
-    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 2 WHERE usage_id = 'usage-new'`).run();
+    sqlite
+      .prepare(`UPDATE paid_attempt_usage SET generation = 2 WHERE usage_id = 'usage-new'`)
+      .run();
 
     const request = await readPaidBenchmarkAdminRequest(db, REQUEST);
     // Only its own generation-2 charge; the cancelled generation's Kilo spend is not cover.

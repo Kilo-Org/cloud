@@ -491,9 +491,8 @@ export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner
  *
  * It is the full saved pool, including a gateway entry's `servingPin`: the routing table and the
  * per-entry status must keep serving the pinned target. Pin publication therefore changes this
- * context, so the Worker's start-time comparison is over the pool *identity* (base router, default
- * entry, entry models/links), not this object's text. `customRouterPoolVersion` is that identity,
- * and `customRouterBenchmarkIdentity` projects it for callers that compare a context directly.
+ * context, so a paid start must compare the pool *identity* (`customRouterPoolVersion`), never this
+ * object's text.
  */
 export function customRouterBenchmarkContext(
   router: CustomRouterDefinition
@@ -528,6 +527,8 @@ function customRouterPoolIdentity(router: CustomRouterDefinition): string {
               provider: entry.provider,
               model: entry.model,
               variants: entry.variants,
+              // A client link changes which measurement serves the entry, so it is identity too.
+              measuredAs: entry.measuredAs ?? null,
             },
     }))
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
@@ -547,6 +548,9 @@ function customRouterPoolIdentity(router: CustomRouterDefinition): string {
  * model/`measuredAs` (client entries also keep their variant list). It deliberately excludes
  * `updated_at`, serving pins, pricing, and capabilities: a no-op client re-registration or a pin
  * publication must not invalidate an outstanding quote, nor reset a settlement's version.
+ *
+ * A genuine link change is identity in both directions: gaining, moving, or dropping `measuredAs`
+ * on a saved entry changes which measurement serves it, so it must invalidate the quote.
  */
 export function customRouterPoolVersion(router: CustomRouterDefinition): string {
   return createHash('sha256').update(customRouterPoolIdentity(router)).digest('hex');

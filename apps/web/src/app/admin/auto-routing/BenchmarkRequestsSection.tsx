@@ -977,6 +977,14 @@ export function RequestDetail({ request }: { request: PaidBenchmarkAdminRequest 
                 </TableBody>
               </Table>
             </div>
+            {progressQuery.isFetchNextPageError ? (
+              <p role="alert" className="text-destructive mt-2 text-xs">
+                More cases could not be loaded:{' '}
+                {progressQuery.error instanceof Error
+                  ? progressQuery.error.message
+                  : 'the request failed'}
+              </p>
+            ) : null}
             {progressQuery.hasNextPage ? (
               <Button
                 type="button"
@@ -987,7 +995,11 @@ export function RequestDetail({ request }: { request: PaidBenchmarkAdminRequest 
                 disabled={progressQuery.isFetchingNextPage}
                 onClick={loadMoreCases}
               >
-                {progressQuery.isFetchingNextPage ? 'Loading more cases' : 'Load more cases'}
+                {progressQuery.isFetchingNextPage
+                  ? 'Loading more cases'
+                  : progressQuery.isFetchNextPageError
+                    ? 'Retry more cases'
+                    : 'Load more cases'}
               </Button>
             ) : null}
           </>

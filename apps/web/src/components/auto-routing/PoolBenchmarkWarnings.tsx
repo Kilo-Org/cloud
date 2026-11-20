@@ -28,11 +28,15 @@ function failedBenchmarkWarnings(entry: CustomRouterListEntry): PoolBenchmarkWar
       permanent.failureReason ??
       permanent.failure?.failureClass ??
       'the benchmark permanently failed';
+    // A ready/stale row still ranks this pool, so removal advice would be wrong.
+    const serving = entry.variants.some(row => row.status === 'ready' || row.status === 'stale');
     return [
       {
         key: `${entry.key}:failed`,
-        tone: 'destructive',
-        message: `Benchmark permanently failed for ${failedModel}${variant}: ${reason}. This model cannot be added to a pool; remove ${label} or choose another model.`,
+        tone: serving ? 'warning' : 'destructive',
+        message: serving
+          ? `Benchmark permanently failed for ${failedModel}${variant}: ${reason}. Its existing usable measurement still ranks routes in this pool. New pools cannot add this model until an admin re-admits its benchmark.`
+          : `Benchmark permanently failed for ${failedModel}${variant}: ${reason}. It has no usable measurement, so it cannot serve this pool; replace ${label} or choose another model.`,
       },
     ];
   }

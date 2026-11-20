@@ -263,6 +263,55 @@ describe('customRouterBenchmarks', () => {
     expect(mockedQuote.mock.calls[2]?.[0]?.poolVersion).not.toBe(before.poolVersion);
   });
 
+  test('a saved client link change moves the quote identity at the tRPC boundary', async () => {
+    const local: CustomRouterEntry = {
+      kind: 'client',
+      provider: 'ollama',
+      model: 'qwen3:8b',
+      variants: [],
+      capabilities: {
+        contextLength: 32_000,
+        inputModalities: ['text'],
+        toolCall: true,
+        reasoning: false,
+      },
+      pricing: null,
+    };
+    await createRouter({ userId: user.id, entries: [local] });
+    const caller = await createCallerForUser(user.id);
+
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    const unlinked = mockedQuote.mock.calls[0]?.[0];
+    if (!unlinked) throw new Error('expected a quote request');
+
+    // Gaining a link reuses a platform measurement, so it is a different identity.
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ entries: [{ ...local, measuredAs: SONNET }] })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    expect(mockedQuote.mock.calls[1]?.[0]?.poolVersion).not.toBe(unlinked.poolVersion);
+
+    // Moving the link to another measurement is a third identity.
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ entries: [{ ...local, measuredAs: 'anthropic/claude-haiku-4' }] })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    expect(mockedQuote.mock.calls[2]?.[0]?.poolVersion).not.toBe(unlinked.poolVersion);
+    expect(mockedQuote.mock.calls[2]?.[0]?.poolVersion).not.toBe(
+      mockedQuote.mock.calls[1]?.[0]?.poolVersion
+    );
+
+    // Dropping the link returns to the unlinked identity: the same body of cases.
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ entries: [local] })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    await caller.customRouterBenchmarks.quote({ slug: 'coding' });
+    expect(mockedQuote.mock.calls[3]?.[0]?.poolVersion).toBe(unlinked.poolVersion);
+  });
+
   test('keeps one quote identity across a pin publication and a no-op re-registration', async () => {
     await createRouter({ userId: user.id });
     const caller = await createCallerForUser(user.id);

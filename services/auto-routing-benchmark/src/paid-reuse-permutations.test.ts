@@ -19,6 +19,7 @@ import { buildPaidBenchmarkPlan, planSlotCount } from './paid-benchmark-plan';
 import type { MeasuredCase } from './measurement-revision';
 import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
 import {
+  acceptPaidAttemptUsageStatements,
   admitPaidModelRequestStatements,
   claimPaidCaseStatements,
   enqueuePaidCaseStatements,
@@ -26,6 +27,7 @@ import {
   paidCaseEnqueueOutcome,
   paidModelRequestAdmission,
   readPaidCaseRun,
+  readPaidModelRequest,
   selectPaidModelRequestPayerStatements,
   type PaidCaseKey,
   type PaidCaseRunRow,
@@ -323,6 +325,25 @@ describe('paid reuse permutations (production migrations)', () => {
 
   function permits(): number {
     return countRows("SELECT COUNT(*) AS n FROM paid_model_requests WHERE state = 'admitted'");
+  }
+
+  /**
+   * Native receipts. `paid_attempt_usage` is the only financial writer for a case, so every
+   * fault assertion reads it: a crash must never add, lose or duplicate one.
+   */
+  function receipts(): number {
+    return countRows('SELECT COUNT(*) AS n FROM paid_attempt_usage');
+  }
+
+  /**
+   * Permits ever granted, from the durable attempt trail rather than the live request
+   * state: a receipt moves the row to `completed`, so `permits()` falls back to 0 while
+   * this count — the proof that exactly one provider call was authorized — stays correct.
+   */
+  function acceptedPermits(): number {
+    return countRows(
+      "SELECT COUNT(*) AS n FROM paid_model_request_attempts WHERE status = 'accepted'"
+    );
   }
 
   function seedResult(input: {
@@ -732,5 +753,255 @@ describe('paid reuse permutations (production migrations)', () => {
     seedChunk({ chunkId: 'chunk-b', runId: 'run-b', token: 'token-b', slot: 1 });
     expect((await claim('run-b', 'token-b')).outcome).toBe('reused');
     expect(permits()).toBe(0);
+  });
+
+  // --- faults at the exact boundaries a crash can land on ------------------------------
+
+  it('opens no provider work when the stage batch fails after its attempted writes', async () => {
+    seedRun('run-a');
+    seedChunk({ chunkId: 'chunk-a', runId: 'run-a', token: 'token-a', slot: 0 });
+    seedRequest('request-a');
+
+    // The stage batch writes the fence row first and the displayed request case last. Fail
+    // that last write so the batch rolls back: a partial stage must leave nothing behind,
+    // because a fence row without its funding row is exactly the state that would let a
+    // claim open paid work nobody authorized.
+    sqlite.exec(`
+      CREATE TRIGGER fail_staged_case BEFORE INSERT ON paid_benchmark_request_cases
+      BEGIN SELECT RAISE(ABORT, 'D1 fault while staging'); END;
+    `);
+    await expect(
+      db.batch(enqueuePaidCaseStatements(db, { key: key(), requestId: 'request-a', now }))
+    ).rejects.toThrow(/D1 fault while staging/);
+    sqlite.exec('DROP TRIGGER fail_staged_case');
+
+    // The stage rolled back completely: no fence row, no displayed case, so nothing the
+    // scheduler could later dispatch from.
+    expect(await caseRun()).toBeNull();
+    expect(countRows('SELECT COUNT(*) AS n FROM paid_benchmark_request_cases')).toBe(0);
+
+    // Defence in depth for a racing delivery that already holds a chunk: admission is the
+    // spend gate, so a case with no funded payer row refuses instead of opening work.
+    const raced = await claim('run-a', 'token-a');
+    expect(
+      await permit({
+        runId: 'run-a',
+        generation: generationOf(raced.row),
+        modelRequestId: MODEL_REQUEST_1,
+        assignmentId: ASSIGNMENT_1,
+        usageId: USAGE_1,
+      })
+    ).toBe(false);
+    expect(await readPaidModelRequest(db, MODEL_REQUEST_1)).toMatchObject({
+      state: 'refused',
+      reason: 'no_funded_payer',
+      owner_id: null,
+    });
+    expect(acceptedPermits()).toBe(0);
+    expect(receipts()).toBe(0);
+  });
+
+  it('rolls back a failed admit transaction and dispatches exactly once on the genuine retry', async () => {
+    await stage('request-a');
+    seedRun('run-a');
+    seedChunk({ chunkId: 'chunk-a', runId: 'run-a', token: 'token-a', slot: 0 });
+    const claimed = await claim('run-a', 'token-a');
+    expect(claimed.outcome).toBe('started');
+    const generation = generationOf(claimed.row);
+
+    // Selection already committed; the permit transaction is what fails. Fail the payer's
+    // acceptance write, the last state change in the batch, so the admit rolls back after
+    // the request update was attempted inside the same transaction.
+    await db.batch(
+      selectPaidModelRequestPayerStatements(db, {
+        key: key(),
+        generation,
+        modelRequestId: MODEL_REQUEST_1,
+        assignmentId: ASSIGNMENT_1,
+        api: 'chat/completions',
+        executorUserId: 'actor-1',
+        usageId: USAGE_1,
+        now,
+      })
+    );
+    expect((await readPaidModelRequest(db, MODEL_REQUEST_1))?.state).toBe('selecting');
+
+    sqlite.exec(`
+      CREATE TRIGGER fail_payer_acceptance BEFORE UPDATE ON benchmark_case_payers
+      WHEN NEW.status = 'accepted'
+      BEGIN SELECT RAISE(ABORT, 'D1 fault while admitting'); END;
+    `);
+    await expect(
+      db.batch(
+        admitPaidModelRequestStatements(db, {
+          key: key(),
+          generation,
+          modelRequestId: MODEL_REQUEST_1,
+          assignmentId: ASSIGNMENT_1,
+          now,
+        })
+      )
+    ).rejects.toThrow(/D1 fault while admitting/);
+    sqlite.exec('DROP TRIGGER fail_payer_acceptance');
+
+    // Nothing survived: no permit, no eligible payer acceptance, no debit. The request is
+    // still selecting, which is what makes the retry a genuine second attempt rather than a
+    // duplicate of a committed one.
+    expect(permits()).toBe(0);
+    expect(receipts()).toBe(0);
+    expect(await readPaidModelRequest(db, MODEL_REQUEST_1)).toMatchObject({
+      state: 'selecting',
+      owner_type: expect.any(String),
+    });
+    expect(
+      countRows("SELECT COUNT(*) AS n FROM benchmark_case_payers WHERE status = 'accepted'")
+    ).toBe(0);
+    // The fence itself is untouched by the failed permit: the generation is still running,
+    // so a retry is the same owner continuing, not a second generation.
+    expect((await fence()).status).toBe('running');
+    expect((await fence()).generation).toBe(generation);
+
+    // The genuine retry admits exactly once and that one permit is what a receipt settles.
+    expect(
+      await permit({
+        runId: 'run-a',
+        generation,
+        modelRequestId: MODEL_REQUEST_1,
+        assignmentId: ASSIGNMENT_1,
+        usageId: USAGE_1,
+      })
+    ).toBe(true);
+    expect(permits()).toBe(1);
+    expect(
+      countRows("SELECT COUNT(*) AS n FROM benchmark_case_payers WHERE status = 'accepted'")
+    ).toBe(1);
+
+    const admitted = await readPaidModelRequest(db, MODEL_REQUEST_1);
+    if (!admitted?.owner_id || !admitted.owner_type) throw new Error('expected an admitted payer');
+    await db.batch(
+      acceptPaidAttemptUsageStatements(db, {
+        assignmentId: ASSIGNMENT_1,
+        usageId: USAGE_1,
+        microdollars: 40,
+        expected: {
+          owner: { ownerType: admitted.owner_type, ownerId: admitted.owner_id },
+          model: MODEL,
+          variant: '',
+          caseId: CASE,
+          generation,
+          projectId: PROJECT_ID,
+        },
+        now,
+      })
+    );
+    expect(receipts()).toBe(1);
+
+    // A replayed delivery of the same permit still changes nothing.
+    expect(
+      await permit({
+        runId: 'run-a',
+        generation,
+        modelRequestId: MODEL_REQUEST_1,
+        assignmentId: ASSIGNMENT_1,
+        usageId: USAGE_1,
+      })
+    ).toBe(false);
+    expect(acceptedPermits()).toBe(1);
+    expect(receipts()).toBe(1);
+  });
+
+  it('keeps a duplicate delivery after the admit commit harmless when the reply is lost', async () => {
+    await stage('request-a');
+    seedRun('run-a');
+    seedChunk({ chunkId: 'chunk-a', runId: 'run-a', token: 'token-a', slot: 0 });
+    const claimed = await claim('run-a', 'token-a');
+    expect(claimed.outcome).toBe('started');
+    const generation = generationOf(claimed.row);
+
+    // The admit committed but the reply never reached the caller: the gateway retries the
+    // same delivery. The permit is already consumed, so the duplicate cannot take another.
+    expect(
+      await permit({
+        runId: 'run-a',
+        generation,
+        modelRequestId: MODEL_REQUEST_1,
+        assignmentId: ASSIGNMENT_1,
+        usageId: USAGE_1,
+      })
+    ).toBe(true);
+    expect(permits()).toBe(1);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      expect(
+        await permit({
+          runId: 'run-a',
+          generation,
+          modelRequestId: MODEL_REQUEST_1,
+          assignmentId: ASSIGNMENT_1,
+          usageId: USAGE_1,
+        })
+      ).toBe(false);
+    }
+    expect(permits()).toBe(1);
+    expect(receipts()).toBe(0);
+    // The caller re-fetches the committed row instead of re-executing: same assignment,
+    // still admitted, and the case fence never advanced.
+    expect(await readPaidModelRequest(db, MODEL_REQUEST_1)).toMatchObject({
+      state: 'admitted',
+      assignment_id: ASSIGNMENT_1,
+      generation,
+    });
+    expect((await fence()).generation).toBe(generation);
+    expect((await fence()).status).toBe('running');
+
+    // The native receipt and the late output both land afterwards, each exactly once.
+    const payer = await readPaidModelRequest(db, MODEL_REQUEST_1);
+    const owner =
+      payer?.owner_type && payer.owner_id
+        ? { ownerType: payer.owner_type, ownerId: payer.owner_id }
+        : null;
+    if (owner === null) throw new Error('expected an admitted payer');
+    const receipt = () =>
+      db.batch(
+        acceptPaidAttemptUsageStatements(db, {
+          assignmentId: ASSIGNMENT_1,
+          usageId: USAGE_1,
+          microdollars: 40,
+          expected: {
+            owner,
+            model: MODEL,
+            variant: '',
+            caseId: CASE,
+            generation,
+            projectId: PROJECT_ID,
+          },
+          now,
+        })
+      );
+    await receipt();
+    await receipt();
+    expect(receipts()).toBe(1);
+
+    const settle = (resultUsable: boolean, settlementId: string) =>
+      db.batch(
+        completePaidCaseStatements(db, {
+          key: key(),
+          generation: { runId: 'run-a', token: 'token-a', generation },
+          resultUsable,
+          settlementId,
+          now,
+        })
+      );
+    await settle(true, 'settle-commit');
+    await settle(true, 'settle-commit');
+    expect(await fence()).toMatchObject({
+      status: 'settled',
+      result_usable: 1,
+      settlement_id: 'settle-commit',
+      generation,
+    });
+    // One measured outcome, one charge, and no second generation to pay for it.
+    expect(receipts()).toBe(1);
+    expect(acceptedPermits()).toBe(1);
   });
 });

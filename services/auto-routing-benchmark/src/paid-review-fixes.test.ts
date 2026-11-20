@@ -125,6 +125,89 @@ describe('paid-benchmark review fixes (production migrations and real SQLite)', 
     ).toEqual({ settlement_id: 'old' });
   });
 
+  it('fails only the target pair when another pair shares case_id and rep', async () => {
+    // Two models, two variants and two engines, all with the SAME case_id and rep: a
+    // rep/case correlation alone would fail every one of them.
+    const pairs = [
+      { engine: ENGINE, model: 'vendor/a', variant: 'low', requestId: 'req-a' },
+      { engine: ENGINE, model: 'vendor/a', variant: 'high', requestId: 'req-a-high' },
+      { engine: ENGINE, model: 'vendor/b', variant: 'low', requestId: 'req-b' },
+      { engine: OTHER_ENGINE, model: 'vendor/a', variant: 'low', requestId: 'req-other' },
+    ];
+    for (const pair of pairs) {
+      sqlite
+        .prepare(
+          `INSERT INTO benchmark_case_runs (engine_identity, model, variant, rep, case_id,
+            status, generation, platform_covered, result_usable, created_at, updated_at)
+          VALUES (?, ?, ?, 0, 'shared-case', 'running', 1, 0, 0, ?, ?)`
+        )
+        .run(
+          pair.engine,
+          pair.model,
+          pair.variant,
+          new Date(NOW).toISOString(),
+          new Date(NOW).toISOString()
+        );
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_requests (id, owner_type, owner_id, router, router_id,
+            pool_version, engine_identity, status, quote_id, estimate_microdollars,
+            maximum_microdollars, actor_user_id, context, created_at, updated_at)
+          VALUES (?, 'user', 'u', 'efficient', ?, 'v', ?, 'active', 'q', 0, 0, 'u', '{}', ?, ?)`
+        )
+        .run(
+          pair.requestId,
+          `router-${pair.requestId}`,
+          pair.engine,
+          new Date(NOW).toISOString(),
+          new Date(NOW).toISOString()
+        );
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_request_cases (request_id, engine_identity, model, variant,
+            rep, case_id, status, covered_by_kilo, charged_microdollars, updated_at)
+          VALUES (?, ?, ?, ?, 0, 'shared-case', 'running', 0, 0, ?)`
+        )
+        .run(pair.requestId, pair.engine, pair.model, pair.variant, new Date(NOW).toISOString());
+    }
+
+    const failed = await failPaidCasesForUnavailablePair(db, {
+      engineIdentity: ENGINE,
+      model: 'vendor/a',
+      variant: 'low',
+      reason: 'unavailable',
+      transitionId: 'transition-pair',
+      now: NOW,
+    });
+    expect(failed).toBe(1);
+
+    // Only the target pair's case run failed; the exact same rep/case on every other pair
+    // (other variant, other model, other engine) is untouched.
+    expect(
+      sqlite
+        .prepare(
+          `SELECT model, variant, engine_identity, status FROM benchmark_case_runs
+          ORDER BY engine_identity, model, variant`
+        )
+        .all()
+    ).toEqual([
+      { model: 'vendor/a', variant: 'low', engine_identity: OTHER_ENGINE, status: 'running' },
+      { model: 'vendor/a', variant: 'high', engine_identity: ENGINE, status: 'running' },
+      { model: 'vendor/a', variant: 'low', engine_identity: ENGINE, status: 'failed' },
+      { model: 'vendor/b', variant: 'low', engine_identity: ENGINE, status: 'running' },
+    ]);
+    expect(
+      sqlite
+        .prepare(`SELECT request_id, status FROM paid_benchmark_request_cases ORDER BY request_id`)
+        .all()
+    ).toEqual([
+      { request_id: 'req-a', status: 'failed' },
+      { request_id: 'req-a-high', status: 'running' },
+      { request_id: 'req-b', status: 'running' },
+      { request_id: 'req-other', status: 'running' },
+    ]);
+  });
+
   it('compares created_at as an integer epoch and excludes older intents', async () => {
     const insert = sqlite.prepare(
       `INSERT INTO paid_benchmark_cancellations (engine_identity, model, variant, rep, case_id,

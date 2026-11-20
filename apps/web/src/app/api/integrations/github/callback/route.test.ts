@@ -1135,7 +1135,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
   });
 
-  test('another owner pending row for the same GitHub account does not change this owner result', async () => {
+  test('a request for an account that is already claimed reports it as claimed', async () => {
     const accountId = `acct-shared-${randomUUID()}`;
     const otherUserId = `oauth/cb-other-${randomUUID()}`;
     await db.insert(kilocode_users).values({
@@ -1160,7 +1160,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       })
       .returning();
     const otherPending = inserted[0];
-    if (!otherPending) throw new Error('Expected the other owner pending row');
+    if (!otherPending) throw new Error('Expected the peer pending row');
 
     try {
       mockConsumedInstallState({
@@ -1192,13 +1192,113 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       );
 
       expect(response.status).toBe(307);
-      expectRedirectLocation(response, '/github-app?github_pending_approval=true');
-      expect(mockedCreatePendingIntegration).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: USER_ID,
-          githubRequest: expect.objectContaining({ accountId, accountLogin: 'octocat' }),
-        })
+      expectRedirectLocation(response, '/github-app?error=installation_already_claimed');
+      expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, otherPending.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
+    }
+  });
+
+  test('a request for a free account is recorded for this owner', async () => {
+    const accountId = `acct-free-${randomUUID()}`;
+    mockConsumedInstallState({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/github-app',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedFetchGitHubInstallationRequests.mockResolvedValue([
+      {
+        id: `request-${accountId}`,
+        accountId,
+        accountLogin: 'octocat',
+        requesterId: GITHUB_USER_ID,
+        requesterLogin: 'octocat',
+      },
+    ]);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?github_pending_approval=true');
+    expect(mockedCreatePendingIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: USER_ID,
+        githubRequest: expect.objectContaining({ accountId, accountLogin: 'octocat' }),
+      })
+    );
+  });
+
+  test('an app-initiated request for an account that is already claimed reports it as claimed', async () => {
+    const accountId = `acct-shared-app-${randomUUID()}`;
+    const otherUserId = `oauth/cb-other-app-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: otherUserId,
+      google_user_email: `cb-other-app-${randomUUID()}@example.com`,
+      google_user_name: 'Other Owner',
+      google_user_image_url: '',
+      stripe_customer_id: `cus_cb_other_app_${randomUUID()}`,
+    });
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: otherUserId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: null,
+        platform_account_id: accountId,
+        platform_account_login: 'octocat',
+        platform_requester_account_id: GITHUB_USER_ID,
+        github_app_type: 'standard',
+        integration_status: 'pending',
+      })
+      .returning();
+    const otherPending = inserted[0];
+    if (!otherPending) throw new Error('Expected the peer pending row');
+
+    try {
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: USER_ID,
+        owner_type: 'user',
+        owner_id: USER_ID,
+        github_app_type: 'standard',
+        return_to: '/cloud/sessions',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockedFetchGitHubInstallationRequests.mockResolvedValue([
+        {
+          id: `request-${accountId}`,
+          accountId,
+          accountLogin: 'octocat',
+          requesterId: GITHUB_USER_ID,
+          requesterLogin: 'octocat',
+        },
+      ]);
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
+        ) as never
       );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?fromApp=1&error=installation_already_claimed');
+      expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
     } finally {
       await db.delete(platform_integrations).where(eq(platform_integrations.id, otherPending.id));
       await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));

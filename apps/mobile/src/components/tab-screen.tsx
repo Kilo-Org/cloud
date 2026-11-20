@@ -109,17 +109,22 @@ export function SheetScrollView({ children, style, onLayout, ...props }: ScrollV
   const tabBarHeight = useTabBarHeight();
   const keyboardOcclusion = useKeyboardState(state => state.height);
   const sideInsetMarginStyle = useSideInsetMarginStyle();
-  const androidBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
-  const reservedBand = Platform.OS === 'android' ? androidBand : 0;
-  const { frameMargin, measureFrame } = useClampedFrameMargin(reservedBand);
+  let frameMargin = 0;
+  if (Platform.OS === 'android') {
+    frameMargin = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
+  }
+  // Clamped against the sheet frame's own measured room, so a short sheet gives
+  // up part of the band instead of collapsing its scroll viewport. The iOS band
+  // above is 0, and clamping 0 keeps 0.
+  const clamped = useClampedFrameMargin(frameMargin);
   return (
     <ScrollView
       {...props}
       onLayout={event => {
-        measureFrame(event);
+        clamped.measureFrame(event);
         onLayout?.(event);
       }}
-      style={[style, { marginBottom: frameMargin, ...sideInsetMarginStyle }]}
+      style={[style, { marginBottom: clamped.frameMargin, ...sideInsetMarginStyle }]}
     >
       {children}
       <View style={{ height: TAB_SCREEN_TRAILING_GAP }} pointerEvents="none" />

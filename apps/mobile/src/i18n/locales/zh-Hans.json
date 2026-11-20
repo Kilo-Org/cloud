@@ -140,10 +140,12 @@
     "keepRunning": "继续运行",
     "newSession": "新建会话",
     "noModelsAvailable": "暂无可用模型",
+    "modelRetires": "{{date}} 退役",
     "notFound": "未找到此内容",
     "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "打开拉取请求",
+    "viewOnGitHub": "在 GitHub 上查看 PR",
     "completed": "已完成",
     "pending": "待处理",
     "running": "运行中",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "全应用范围的修复与改进。",
     "changelogAreas": {
       "signIn": "登录",
-      "profileOrganizations": "个人资料和组织"
+      "profileOrganizations": "个人资料与组织"
     }
   },
   "preferences": {
@@ -2784,7 +2786,6 @@
       "skipped_one": "{{displayCount}} 项已跳过",
       "skipped_other": "{{displayCount}} 项已跳过",
       "title": "检查",
-      "viewOnGitHub": "在 GitHub 上查看 PR",
       "checkDetails": "检查详情"
     },
     "composer": {
@@ -2848,6 +2849,9 @@
       "couldNotLoad": "无法加载讨论",
       "couldNotLoadMore": "无法加载更多评论。",
       "loadMoreComments": "加载更多评论",
+      "conversationTruncated": "仅显示前 {{displayCount}} 条评论。",
+      "conversationTruncated_one": "仅显示前 {{displayCount}} 条评论。",
+      "conversationTruncated_other": "仅显示前 {{displayCount}} 条评论。",
       "loading": "正在加载讨论",
       "moderation": {
         "block": {

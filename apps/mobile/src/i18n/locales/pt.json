@@ -142,10 +142,12 @@
     "keepRunning": "Continuar em execução",
     "newSession": "Nova sessão",
     "noModelsAvailable": "Sem modelos disponíveis",
+    "modelRetires": "Descontinuado em {{date}}",
     "notFound": "Conteúdo não encontrado.",
     "online": "Em linha",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
+    "viewOnGitHub": "Ver PR no GitHub",
     "completed": "Concluída",
     "pending": "Pendente",
     "running": "Em execução",
@@ -509,7 +511,7 @@
     "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
     "changelogAreas": {
       "signIn": "Início de sessão",
-      "profileOrganizations": "Perfil e organizações"
+      "profileOrganizations": "Perfil & organizações"
     }
   },
   "preferences": {
@@ -775,6 +777,11 @@
       "couldNotLoadMore": "Não foi possível carregar mais comentários.",
       "retryLoadingMore": "Tentar carregar mais comentários novamente",
       "loadMoreComments": "Carregar mais comentários",
+      "conversationTruncated": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_zero": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_one": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_other": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_many": "São apresentados apenas os primeiros {{displayCount}} comentários.",
       "addReaction": "Adicionar reação",
       "reactionPill": "reação {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reação",
@@ -909,7 +916,6 @@
       "noAccess": "Não tens acesso às verificações deste repositório.",
       "couldNotLoad": "Não foi possível carregar as verificações.",
       "retryChecks": "Tentar carregar as verificações novamente",
-      "viewOnGitHub": "Ver PR no GitHub",
       "noChecksReported": "Nenhuma verificação comunicada",
       "passed": "{{displayCount}} com êxito",
       "passed_one": "{{displayCount}} com êxito",

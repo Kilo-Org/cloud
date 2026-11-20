@@ -140,10 +140,12 @@
     "keepRunning": "Tiếp tục chạy",
     "newSession": "Phiên mới",
     "noModelsAvailable": "Không có mô hình khả dụng",
+    "modelRetires": "Ngừng hoạt động vào {{date}}",
     "notFound": "Không tìm thấy.",
     "online": "Trực tuyến",
     "open": "Mở {{name}}",
     "openPullRequest": "Mở yêu cầu hợp nhất",
+    "viewOnGitHub": "Xem PR trên GitHub",
     "completed": "Đã hoàn tất",
     "pending": "Đang chờ",
     "running": "Đang chạy",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
     "changelogAreas": {
       "signIn": "Đăng nhập",
-      "profileOrganizations": "Hồ sơ và tổ chức"
+      "profileOrganizations": "Hồ sơ & tổ chức"
     }
   },
   "preferences": {
@@ -2784,7 +2786,6 @@
       "skipped_one": "{{displayCount}} đã bỏ qua",
       "skipped_other": "{{displayCount}} đã bỏ qua",
       "title": "Các bước kiểm tra",
-      "viewOnGitHub": "Xem PR trên GitHub",
       "checkDetails": "chi tiết bước kiểm tra"
     },
     "composer": {
@@ -2848,6 +2849,9 @@
       "couldNotLoad": "Không thể tải phần thảo luận.",
       "couldNotLoadMore": "Không thể tải thêm bình luận.",
       "loadMoreComments": "Tải thêm bình luận",
+      "conversationTruncated": "Chỉ hiển thị {{displayCount}} bình luận đầu tiên.",
+      "conversationTruncated_one": "Chỉ hiển thị {{displayCount}} bình luận đầu tiên.",
+      "conversationTruncated_other": "Chỉ hiển thị {{displayCount}} bình luận đầu tiên.",
       "loading": "Đang tải thảo luận",
       "moderation": {
         "block": {

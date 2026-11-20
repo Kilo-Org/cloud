@@ -140,10 +140,12 @@
     "keepRunning": "Jẹ́ kí ó máa ṣiṣẹ́ nìṣó",
     "newSession": "Ìgbà iṣẹ́ tuntun",
     "noModelsAvailable": "Kò sí àwòṣe kankan",
+    "modelRetires": "Yóò dópin ní {{date}}",
     "notFound": "A kò rí i.",
     "online": "Lórí ayélujára",
     "open": "Ṣí {{name}}",
     "openPullRequest": "Ṣí ìbéèrè àkópọ̀",
+    "viewOnGitHub": "Wo PR lórí GitHub",
     "completed": "A ti parí",
     "pending": "Ń dúró",
     "running": "Ń ṣiṣẹ́",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Àtúnṣe àti ìlọsíwájú jákèjádò áàpù.",
     "changelogAreas": {
       "signIn": "Wíwọlé",
-      "profileOrganizations": "Àkọsílẹ̀ ara ẹni àti àwọn àjọ"
+      "profileOrganizations": "Àkọsílẹ̀ ara ẹni pẹ̀lú àwọn àjọ"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "A kò lè ṣàkójọ àwọn àsọyé sí i.",
       "retryLoadingMore": "Tún gbìyànjú láti ṣàkójọ àwọn àsọyé sí i",
       "loadMoreComments": "Ṣàkójọ àwọn àsọyé sí i",
+      "conversationTruncated": "À ń fi àsọyé {{displayCount}} àkọ́kọ́ nìkan hàn.",
+      "conversationTruncated_one": "À ń fi àsọyé {{displayCount}} àkọ́kọ́ nìkan hàn.",
+      "conversationTruncated_other": "À ń fi àsọyé {{displayCount}} àkọ́kọ́ nìkan hàn.",
       "addReaction": "Fi ìfèsì kún un",
       "reactionPill": "ìfèsì {{emoji}}, {{countLabel}} {{displayCount}}",
       "reaction_one": "ìfèsì",
@@ -881,7 +886,6 @@
       "noAccess": "O kò ní àṣẹ láti wo àwọn àyẹ̀wò fún ibi ìpamọ́ yìí.",
       "couldNotLoad": "A kò lè ṣàkójọ àwọn àyẹ̀wò.",
       "retryChecks": "Tún gbìyànjú àwọn àyẹ̀wò",
-      "viewOnGitHub": "Wo PR lórí GitHub",
       "noChecksReported": "Kò sí àyẹ̀wò tí a ròyìn",
       "passed": "{{displayCount}} yọrí sí rere",
       "passed_one": "{{displayCount}} yọrí sí rere",
@@ -936,9 +940,9 @@
       "checkFailedTitleGitLab": "A kò lè ṣàyẹ̀wò àsopọ̀ GitLab.",
       "checkFailedTitleBitbucket": "A kò lè ṣàyẹ̀wò àsopọ̀ Bitbucket.",
       "providerCheckFailedMessage": "A kò lè sopọ̀ mọ́ olùpèsè náà. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
-      "reconnectTitle": "Àtúnsopọ̀ GitHub",
-      "reconnectTitleGitLab": "Àtúnsopọ̀ GitLab",
-      "reconnectTitleBitbucket": "Àtúnsopọ̀ Bitbucket",
+      "reconnectTitle": "Tún sopọ̀ mọ́ GitHub",
+      "reconnectTitleGitLab": "Tún sopọ̀ mọ́ GitLab",
+      "reconnectTitleBitbucket": "Tún sopọ̀ mọ́ Bitbucket",
       "reconnectDescription": "A ti fagilé àsopọ̀ GitHub rẹ.",
       "gitlabDescription": "Ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù",
       "gitlabInstanceMismatchTitle": "Ìsopọ̀ GitLab jẹ́ fún ẹ̀yà mìíràn",

@@ -141,10 +141,12 @@
     "keepRunning": "Continuă rularea",
     "newSession": "Sesiune nouă",
     "noModelsAvailable": "Niciun model disponibil",
+    "modelRetires": "Se retrage la {{date}}",
     "notFound": "Elementul nu a fost găsit.",
     "online": "Conectat",
     "open": "Deschide {{name}}",
     "openPullRequest": "Deschidere PR",
+    "viewOnGitHub": "Vezi PR-ul pe GitHub",
     "completed": "Finalizat",
     "pending": "În așteptare",
     "running": "Rulează",
@@ -508,7 +510,7 @@
     "changelogFixesPolish": "Remedieri și îmbunătățiri în întreaga aplicație.",
     "changelogAreas": {
       "signIn": "Autentificare",
-      "profileOrganizations": "Profil și organizații"
+      "profileOrganizations": "Profil & organizații"
     }
   },
   "preferences": {
@@ -763,6 +765,10 @@
       "couldNotLoadMore": "Nu s-au putut încărca mai multe comentarii.",
       "retryLoadingMore": "Încearcă din nou să încarci mai multe comentarii",
       "loadMoreComments": "Încarcă mai multe comentarii",
+      "conversationTruncated": "Se afișează doar primele {{displayCount}} comentarii.",
+      "conversationTruncated_one": "Se afișează doar primele {{displayCount}} comentarii.",
+      "conversationTruncated_other": "Se afișează doar primele {{displayCount}} comentarii.",
+      "conversationTruncated_few": "Se afișează doar primele {{displayCount}} comentarii.",
       "addReaction": "Adaugă o reacție",
       "reactionPill": "reacție {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacție",
@@ -895,7 +901,6 @@
       "noAccess": "Nu ai acces la verificările acestui depozit.",
       "couldNotLoad": "Nu s-au putut încărca verificările.",
       "retryChecks": "Reîncearcă verificările",
-      "viewOnGitHub": "Vezi PR-ul pe GitHub",
       "noChecksReported": "Nicio verificare raportată",
       "passed": "{{displayCount}} reușite",
       "passed_one": "{{displayCount}} reușite",
@@ -954,9 +959,9 @@
       "checkFailedTitleGitLab": "Nu s-a putut verifica conexiunea la GitLab.",
       "checkFailedTitleBitbucket": "Nu s-a putut verifica conexiunea la Bitbucket.",
       "providerCheckFailedMessage": "Nu s-a putut contacta furnizorul. Verifică conexiunea și încearcă din nou.",
-      "reconnectTitle": "Reconectare la GitHub",
-      "reconnectTitleGitLab": "Reconectare la GitLab",
-      "reconnectTitleBitbucket": "Reconectare la Bitbucket",
+      "reconnectTitle": "Reconectează GitHub",
+      "reconnectTitleGitLab": "Reconectează GitLab",
+      "reconnectTitleBitbucket": "Reconectează Bitbucket",
       "reconnectDescription": "Accesul la contul tău GitHub a fost revocat.",
       "gitlabDescription": "Revizuiește merge requesturi pe mobil",
       "gitlabInstanceMismatchTitle": "Conexiunea la GitLab este pentru o altă instanță",

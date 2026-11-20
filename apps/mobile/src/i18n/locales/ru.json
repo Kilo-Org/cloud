@@ -142,10 +142,12 @@
     "keepRunning": "Продолжить выполнение",
     "newSession": "Новый сеанс",
     "noModelsAvailable": "Нет доступных моделей",
+    "modelRetires": "Снимается {{date}}",
     "notFound": "Не найдено.",
     "online": "В сети",
     "open": "Открыть {{name}}",
     "openPullRequest": "Открыть pull request",
+    "viewOnGitHub": "Открыть PR на GitHub",
     "completed": "Завершено",
     "pending": "Ожидание",
     "running": "В работе",
@@ -509,7 +511,7 @@
     "changelogFixesPolish": "Исправления и улучшения во всём приложении.",
     "changelogAreas": {
       "signIn": "Вход",
-      "profileOrganizations": "Профиль и организации"
+      "profileOrganizations": "Профиль & организации"
     }
   },
   "preferences": {
@@ -2864,7 +2866,6 @@
       "skipped_few": "пропущено: {{displayCount}}",
       "skipped_many": "пропущено: {{displayCount}}",
       "title": "Проверки",
-      "viewOnGitHub": "Открыть PR на GitHub",
       "checkDetails": "сведения о проверке"
     },
     "composer": {
@@ -2928,6 +2929,11 @@
       "couldNotLoad": "Не удалось загрузить обсуждение.",
       "couldNotLoadMore": "Не удалось загрузить остальные комментарии.",
       "loadMoreComments": "Загрузить ещё комментарии",
+      "conversationTruncated": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_one": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_other": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_few": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_many": "Показаны только первые {{displayCount}} комментариев.",
       "loading": "Загрузка обсуждения",
       "moderation": {
         "block": {

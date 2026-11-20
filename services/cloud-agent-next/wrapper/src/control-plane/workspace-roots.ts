@@ -131,6 +131,32 @@ export function routeRoots(spec: Pick<ControlPlaneRouteSpec, 'directory' | 'root
   }));
 }
 
+/** Whether two root lists name the same checkout, repository and requested branch in each position. */
+export function sameRoots(a: readonly RouteRoot[], b: readonly RouteRoot[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((root, index) => {
+    const other = b[index];
+    return (
+      other !== undefined &&
+      root.directory === other.directory &&
+      root.repoFullName === other.repoFullName &&
+      root.requestedBranch === other.requestedBranch
+    );
+  });
+}
+
+/**
+ * Whether a re-prepare keeps the repositories the prepared route checked out.
+ * A root the route never prepared is not on disk, so the route is prepared
+ * again and each root is inspected, adopted or cloned.
+ */
+export function sameRouteRoots(
+  stored: Pick<ControlPlaneRouteSpec, 'directory' | 'roots'>,
+  incoming: Pick<ControlPlaneRouteSpec, 'directory' | 'roots'>
+): boolean {
+  return sameRoots(routeRoots(stored), routeRoots(incoming));
+}
+
 /**
  * The one test that tells a V2 root from a V1 one: a V2 root names its repository,
  * the one root of a V1 or no-environment route does not (`routeRoots`).

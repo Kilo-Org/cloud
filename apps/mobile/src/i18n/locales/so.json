@@ -140,10 +140,12 @@
     "keepRunning": "Sii wad socodsiinta",
     "newSession": "Kalfadhi cusub",
     "noModelsAvailable": "Ma jiraan moodeello la heli karo",
+    "modelRetires": "Wuu hawlgabayaa {{date}}",
     "notFound": "Lama helin.",
     "online": "Khadka ku jira",
     "open": "Fur {{name}}",
     "openPullRequest": "Codsi isku-darid oo furan",
+    "viewOnGitHub": "Ka eeg GitHub PR-ka",
     "completed": "La dhammeeyay",
     "pending": "Sugaya",
     "running": "Socda",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "Hagaajinno iyo horumarin lagu sameeyay barnaamijka oo dhan.",
     "changelogAreas": {
       "signIn": "Gelitaanka",
-      "profileOrganizations": "Xogta shakhsiga iyo ururada"
+      "profileOrganizations": "Xogta shakhsiga & ururada"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "Faallooyin dheeraad ah lama soo rari karin.",
       "retryLoadingMore": "Mar kale isku day soo rarista faallooyin dheeraad ah",
       "loadMoreComments": "Soo rar faallooyin dheeraad ah",
+      "conversationTruncated": "Waxaa la muujinayaa {{displayCount}}-ka ugu horreeya ee faallo.",
+      "conversationTruncated_one": "Waxaa la muujinayaa {{displayCount}}-ka ugu horreeya ee faallo.",
+      "conversationTruncated_other": "Waxaa la muujinayaa {{displayCount}}-ka ugu horreeya ee faallo.",
       "addReaction": "Ku dar falcelin",
       "reactionPill": "falcelinta {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "falcelin",
@@ -881,7 +886,6 @@
       "noAccess": "Ma haysatid oggolaansho aad ku aragto hubinnada kaydkan.",
       "couldNotLoad": "Hubinnada lama soo rari karin.",
       "retryChecks": "Mar kale isku day hubinnada",
-      "viewOnGitHub": "Ka eeg GitHub PR-ka",
       "noChecksReported": "Wax hubinno ah lama soo sheegin",
       "passed": "{{displayCount}} ayaa gudbay",
       "passed_one": "{{displayCount}} ayaa gudbay",

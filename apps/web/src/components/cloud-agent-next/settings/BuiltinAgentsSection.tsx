@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, Lock, RotateCcw } from 'lucide-react';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -39,7 +40,7 @@ export function BuiltinAgentsSection({ organizationId, settings }: BuiltinAgents
     () =>
       (modelsData?.data ?? []).map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,

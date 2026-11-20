@@ -140,6 +140,7 @@
     "keepRunning": "ဆက်လက်လုပ်ဆောင်ပါ",
     "newSession": "ဆက်ရှင်အသစ်",
     "noModelsAvailable": "အသုံးပြုနိုင်သော မော်ဒယ် မရှိပါ",
+    "modelRetires": "{{date}} တွင် ရုပ်သိမ်းမည်",
     "notFound": "မတွေ့ရပါ။",
     "online": "အွန်လိုင်း",
     "open": "{{name}} ကို ဖွင့်ပါ",
@@ -183,7 +184,8 @@
     "organizationTrialEnded": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။ အဖွဲ့အစည်း ပိုင်ရှင်သည် kilo.ai တွင် ငွေတောင်းခံမှုကို အပ်ဒိတ်လုပ်ပြီးနောက် ထပ်မံကြိုးစားနိုင်ပါသည်။",
     "privateRepositoryA11y": "{{name}}, သီးသန့် ကုဒ်သိုလှောင်ရာ",
     "legalDocumentEnglishOnly": "ဤစာရွက်စာတမ်းသည် အင်္ဂလိပ်ဘာသာဖြင့်သာ ရရှိနိုင်ပါသည်။",
-    "organizationTrialEndedBilling": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။ သင်သည် ငွေတောင်းခံမှုကို အပ်ဒိတ်လုပ်ပြီးနောက် ထပ်မံကြိုးစားနိုင်ပါသည်။"
+    "organizationTrialEndedBilling": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။ သင်သည် ငွေတောင်းခံမှုကို အပ်ဒိတ်လုပ်ပြီးနောက် ထပ်မံကြိုးစားနိုင်ပါသည်။",
+    "viewOnGitHub": "PR ကို GitHub တွင် ကြည့်ပါ"
   },
   "language": {
     "restarting": "ရွေးထားသော ဘာသာစကားကို သုံးရန် ပြန်စတင်နေသည်",
@@ -507,7 +509,7 @@
     "changelogFixesPolish": "အက်ပ်တစ်ခုလုံးတွင် ပြင်ဆင်မှုများနှင့် တိုးတက်မှုများ။",
     "changelogAreas": {
       "signIn": "အကောင့်ဝင်ခြင်း",
-      "profileOrganizations": "ပရိုဖိုင်နှင့် အဖွဲ့အစည်းများ"
+      "profileOrganizations": "ပရိုဖိုင် ရော အဖွဲ့အစည်းများ ရော"
     }
   },
   "preferences": {
@@ -752,6 +754,9 @@
       "couldNotLoadMore": "နောက်ထပ်မှတ်ချက်များကို ရယူ၍မရပါ။",
       "retryLoadingMore": "နောက်ထပ်မှတ်ချက်များကို ပြန်ရယူပါ",
       "loadMoreComments": "နောက်ထပ်မှတ်ချက်များကို ရယူပါ",
+      "conversationTruncated": "မှတ်ချက် ပထမ {{displayCount}} ခုကိုသာ ပြသထားပါသည်။",
+      "conversationTruncated_one": "မှတ်ချက် ပထမ {{displayCount}} ခုကိုသာ ပြသထားပါသည်။",
+      "conversationTruncated_other": "မှတ်ချက် ပထမ {{displayCount}} ခုကိုသာ ပြသထားပါသည်။",
       "addReaction": "တုံ့ပြန်မှုထည့်ပါ",
       "reactionPill": "{{emoji}} တုံ့ပြန်မှု၊ {{countLabel}} {{displayCount}} ခု",
       "reaction_one": "တုံ့ပြန်မှု",
@@ -881,7 +886,6 @@
       "noAccess": "ဒီကုဒ်သိုလှောင်ရာ၏ စစ်ဆေးမှုများကို ကြည့်ရှုခွင့် မရှိပါ။",
       "couldNotLoad": "စစ်ဆေးမှုများကို ရယူ၍မရပါ။",
       "retryChecks": "စစ်ဆေးမှုများကို ပြန်ရယူပါ",
-      "viewOnGitHub": "PR ကို GitHub တွင် ကြည့်ပါ",
       "noChecksReported": "စစ်ဆေးမှုများ မတင်ပြရသေးပါ",
       "passed": "{{displayCount}} ခု အောင်မြင်",
       "passed_one": "{{displayCount}} ခု အောင်မြင်",
@@ -936,9 +940,9 @@
       "checkFailedTitleGitLab": "GitLab ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "checkFailedTitleBitbucket": "Bitbucket ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "providerCheckFailedMessage": "ဝန်ဆောင်မှုပေးသူထံ ချိတ်ဆက်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
-      "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
-      "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ခြင်း",
-      "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ခြင်း",
+      "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ပါ",
+      "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ပါ",
+      "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ပါ",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။",
       "gitlabDescription": "မိုဘိုင်းတွင် ပေါင်းစပ်တောင်းဆိုချက် များကို သုံးသပ်ပါ",
       "gitlabInstanceMismatchTitle": "GitLab ချိတ်ဆက်မှုသည် အခြား instance တစ်ခုအတွက် ဖြစ်သည်",

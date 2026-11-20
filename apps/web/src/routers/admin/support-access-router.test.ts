@@ -1216,23 +1216,60 @@ describe('admin.supportAccess list display names', () => {
   });
 });
 
-describe('admin.supportAccess listing status follows the grant window', () => {
+describe('admin.supportAccess listings answer with the grant window still ahead', () => {
   function secondsFromNow(seconds: number): string {
     return new Date(Date.now() + seconds * 1000).toISOString();
   }
 
-  test('a listed grant reflects its own deadline', async () => {
+  test('the pending queue answers with requests whose window is still ahead', async () => {
     const viewer = await insertRequester();
-    const liveHolder = await insertRequester();
-    const endedHolder = await insertRequester();
-    const lapsedRequester = await insertRequester();
+    const currentRequester = await insertRequester();
+    const elapsedRequester = await insertRequester();
     const { organization } = await orgWithOwner();
 
-    const [live, ended, lapsed] = await db
+    const [current, elapsed] = await db
       .insert(support_access_grants)
       .values([
         {
-          actor_kilo_user_id: liveHolder.id,
+          actor_kilo_user_id: currentRequester.id,
+          organization_id: organization.id,
+          action_class: 'support_write',
+          reason: 'fixing a broken organization setting',
+          requested_duration_seconds: 900,
+          status: 'pending',
+          request_expires_at: secondsFromNow(600),
+        },
+        {
+          actor_kilo_user_id: elapsedRequester.id,
+          organization_id: organization.id,
+          action_class: 'support_write',
+          reason: 'fixing a second organization setting',
+          requested_duration_seconds: 900,
+          status: 'pending',
+          request_expires_at: secondsFromNow(-60),
+        },
+      ])
+      .returning();
+
+    const caller = await stepUpCaller(viewer.id);
+    const pending = await caller.admin.supportAccess.listPending();
+    const pendingIds = pending.map(item => item.id);
+
+    expect(pendingIds).toContain(current.id);
+    expect(pendingIds).not.toContain(elapsed.id);
+  });
+
+  test('the active queue answers with grants whose window is still ahead', async () => {
+    const viewer = await insertRequester();
+    const currentHolder = await insertRequester();
+    const elapsedHolder = await insertRequester();
+    const { organization } = await orgWithOwner();
+
+    const [current, elapsed] = await db
+      .insert(support_access_grants)
+      .values([
+        {
+          actor_kilo_user_id: currentHolder.id,
           organization_id: organization.id,
           action_class: 'support_read',
           reason: 'investigating a customer report',
@@ -1242,7 +1279,7 @@ describe('admin.supportAccess listing status follows the grant window', () => {
           expires_at: secondsFromNow(1800),
         },
         {
-          actor_kilo_user_id: endedHolder.id,
+          actor_kilo_user_id: elapsedHolder.id,
           organization_id: organization.id,
           action_class: 'support_read',
           reason: 'investigating a second customer report',
@@ -1251,33 +1288,169 @@ describe('admin.supportAccess listing status follows the grant window', () => {
           issued_at: secondsFromNow(-600),
           expires_at: secondsFromNow(-60),
         },
+      ])
+      .returning();
+
+    const caller = await stepUpCaller(viewer.id);
+    const active = await caller.admin.supportAccess.listActive();
+    const activeIds = active.map(item => item.id);
+
+    expect(activeIds).toContain(current.id);
+    expect(activeIds).not.toContain(elapsed.id);
+  });
+
+  test('the active queue keeps ascending expiry order', async () => {
+    const viewer = await insertRequester();
+    const nearHolder = await insertRequester();
+    const farHolder = await insertRequester();
+    const { organization } = await orgWithOwner();
+
+    const [far, near] = await db
+      .insert(support_access_grants)
+      .values([
         {
-          actor_kilo_user_id: lapsedRequester.id,
+          actor_kilo_user_id: farHolder.id,
           organization_id: organization.id,
-          action_class: 'support_write',
-          reason: 'fixing a broken organization setting',
-          requested_duration_seconds: 900,
-          status: 'pending',
-          request_expires_at: secondsFromNow(-60),
+          action_class: 'support_read',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: secondsFromNow(-60),
+          expires_at: secondsFromNow(1800),
+        },
+        {
+          actor_kilo_user_id: nearHolder.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          reason: 'investigating a second customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: secondsFromNow(-60),
+          expires_at: secondsFromNow(600),
         },
       ])
       .returning();
 
     const caller = await stepUpCaller(viewer.id);
+    const seeded = (await caller.admin.supportAccess.listActive()).filter(item =>
+      [far.id, near.id].includes(item.id)
+    );
 
-    const active = await caller.admin.supportAccess.listActive();
-    expect(active.find(item => item.id === live.id)?.status).toBe('active');
-    expect(active.find(item => item.id === ended.id)?.status).toBe('expired');
+    expect(seeded.map(item => item.id)).toEqual([near.id, far.id]);
+    const expiries = seeded.map(item => Date.parse(item.expiresAt!));
+    expect(expiries).toEqual([...expiries].sort((left, right) => left - right));
+  });
 
-    const pending = await caller.admin.supportAccess.listPending();
-    expect(pending.find(item => item.id === lapsed.id)?.status).toBe('expired');
+  test('the pending queue keeps ascending request order', async () => {
+    const viewer = await insertRequester();
+    const earlierRequester = await insertRequester();
+    const laterRequester = await insertRequester();
+    const { organization } = await orgWithOwner();
+
+    const [later, earlier] = await db
+      .insert(support_access_grants)
+      .values([
+        {
+          actor_kilo_user_id: laterRequester.id,
+          organization_id: organization.id,
+          action_class: 'support_write',
+          reason: 'fixing a broken organization setting',
+          requested_duration_seconds: 900,
+          status: 'pending',
+          requested_at: secondsFromNow(-60),
+          request_expires_at: secondsFromNow(900),
+        },
+        {
+          actor_kilo_user_id: earlierRequester.id,
+          organization_id: organization.id,
+          action_class: 'support_write',
+          reason: 'fixing a second organization setting',
+          requested_duration_seconds: 900,
+          status: 'pending',
+          requested_at: secondsFromNow(-120),
+          request_expires_at: secondsFromNow(600),
+        },
+      ])
+      .returning();
+
+    const caller = await stepUpCaller(viewer.id);
+    const seeded = (await caller.admin.supportAccess.listPending()).filter(item =>
+      [later.id, earlier.id].includes(item.id)
+    );
+
+    expect(seeded.map(item => item.id)).toEqual([earlier.id, later.id]);
+    const requestedTimes = seeded.map(item => Date.parse(item.requestedAt));
+    expect(requestedTimes).toEqual([...requestedTimes].sort((left, right) => left - right));
+  });
+
+  test('the listings apply the window at read time and leave the stored rows as written', async () => {
+    const viewer = await insertRequester();
+    const currentRequester = await insertRequester();
+    const elapsedRequester = await insertRequester();
+    const currentHolder = await insertRequester();
+    const elapsedHolder = await insertRequester();
+    const { organization } = await orgWithOwner();
+
+    const rows = await db
+      .insert(support_access_grants)
+      .values([
+        {
+          actor_kilo_user_id: currentRequester.id,
+          organization_id: organization.id,
+          action_class: 'support_write',
+          reason: 'fixing a broken organization setting',
+          requested_duration_seconds: 900,
+          status: 'pending',
+          request_expires_at: secondsFromNow(600),
+        },
+        {
+          actor_kilo_user_id: elapsedRequester.id,
+          organization_id: organization.id,
+          action_class: 'support_write',
+          reason: 'fixing a second organization setting',
+          requested_duration_seconds: 900,
+          status: 'pending',
+          request_expires_at: secondsFromNow(-60),
+        },
+        {
+          actor_kilo_user_id: currentHolder.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: secondsFromNow(-60),
+          expires_at: secondsFromNow(1800),
+        },
+        {
+          actor_kilo_user_id: elapsedHolder.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          reason: 'investigating a second customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: secondsFromNow(-600),
+          expires_at: secondsFromNow(-60),
+        },
+      ])
+      .returning();
+
+    const caller = await stepUpCaller(viewer.id);
+    await caller.admin.supportAccess.listPending();
+    await caller.admin.supportAccess.listActive();
 
     const stored = await db.query.support_access_grants.findMany({
-      where: inArray(support_access_grants.id, [live.id, ended.id, lapsed.id]),
+      where: inArray(
+        support_access_grants.id,
+        rows.map(row => row.id)
+      ),
     });
     const storedStatuses = new Map(stored.map(row => [row.id, row.status]));
-    expect(storedStatuses.get(live.id)).toBe('active');
-    expect(storedStatuses.get(ended.id)).toBe('active');
-    expect(storedStatuses.get(lapsed.id)).toBe('pending');
+    expect(rows.map(row => row.id).map(id => storedStatuses.get(id))).toEqual([
+      'pending',
+      'pending',
+      'active',
+      'active',
+    ]);
   });
 });

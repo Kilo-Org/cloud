@@ -693,19 +693,39 @@ export async function listMySupportGrants(actorKiloUserId: string): Promise<Supp
     .orderBy(desc(support_access_grants.requested_at));
 }
 
+/**
+ * The pending queue answers with the requests whose window is still ahead: a
+ * row counts as pending only while `request_expires_at` is still ahead, the
+ * same rule `deriveGrantStatus` applies when a grant is presented.
+ */
 export async function listPendingSupportGrants(): Promise<SupportAccessGrant[]> {
   return db
     .select()
     .from(support_access_grants)
-    .where(eq(support_access_grants.status, 'pending'))
+    .where(
+      and(
+        eq(support_access_grants.status, 'pending'),
+        sql`${support_access_grants.request_expires_at} > now()`
+      )
+    )
     .orderBy(asc(support_access_grants.requested_at));
 }
 
+/**
+ * The active queue answers with the grants whose window is still ahead: a row
+ * counts as active only while `expires_at` is still ahead, the same rule
+ * `deriveGrantStatus` applies when a grant is presented.
+ */
 export async function listActiveSupportGrants(): Promise<SupportAccessGrant[]> {
   return db
     .select()
     .from(support_access_grants)
-    .where(eq(support_access_grants.status, 'active'))
+    .where(
+      and(
+        eq(support_access_grants.status, 'active'),
+        sql`${support_access_grants.expires_at} > now()`
+      )
+    )
     .orderBy(asc(support_access_grants.expires_at));
 }
 

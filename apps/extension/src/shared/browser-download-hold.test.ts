@@ -286,11 +286,12 @@ afterEach(() => {
 
 describe('the listener', () => {
   /**
-   * The defect this covers: `registered` was set before `addListener`, so a browser that threw from the registration
-   * left the flag set and no later call ever retried — the `permissions.onAdded` install included — and the profile
-   * stayed unguarded for the rest of the worker's life.
+   * The defect this covers: a throw needs `onDeterminingFilename` to exist, and in Chrome the event exists only after
+   * `downloads` is granted — the state in which `permissions.onAdded` never fires again. A refused startup registration
+   * therefore had no edge to retry on, and the profile stayed unguarded. The call about to start a download asks for
+   * the install again, and that is the case this drives: no grant afterwards, only a call.
    */
-  it('retries the registration after one the browser refused', async () => {
+  it('retries the registration from the call that is about to start a download', async () => {
     // The install flag lives in the module, and every other case in this file has already set it, so only a fresh
     // Copy of the module starts uninstalled. A static import is the one instance the whole file shares, so this case
     // Cannot use it: it exercises the module-loading boundary itself.
@@ -300,8 +301,9 @@ describe('the listener', () => {
     const downloads = makeDownloads();
     let handled = 0;
 
+    // The grant is already in place, which is the only way the event exists for the registration to throw from.
     downloads.refuseRegistrationOnce();
-    installFresh({
+    const retry = installFresh({
       downloads: downloads.globals.downloads,
       handle: () => {
         handled += 1;
@@ -311,13 +313,18 @@ describe('the listener', () => {
       permissions: downloads.globals.permissions(),
     });
 
-    // The refused registration installed nothing, and the grant is what tries again.
     expect(downloads.listenerCount()).toBe(0);
-    downloads.grant(['downloads']);
+
+    // No grant follows: the call itself is the only thing left before the file.
+    retry();
     expect(downloads.listenerCount()).toBe(1);
 
     downloads.run({ id: 1 });
     expect(handled).toBe(1);
+
+    // And the retry stays a no-op once the listener is in: one download, one registration.
+    retry();
+    expect(downloads.listenerCount()).toBe(1);
   });
 
   it('registers exactly one listener, even after the download grant fires twice', () => {
@@ -912,6 +919,39 @@ describe('the recorded state', () => {
         sessionStorage: () => makeStorage({}),
       })
     ).toBeUndefined();
+  });
+
+  /**
+   * The defect this covers, at the layer that reaches the browser: the host ignored `installDownloadHoldOnGrant`'s
+   * result, so a registration the browser refused at startup was never tried again — and in Chrome no grant edge can
+   * follow, because the refusal needs the event and the event needs the grant. The runtime sends `tab()` before every
+   * download-capable call, so the host must retry there.
+   */
+  it('retries a refused registration when a call registers its tab', async () => {
+    const downloads = makeDownloads();
+    const storage = makeStorage({});
+    // The install flag lives in the listener module and this file's other cases have set it, so this case needs fresh
+    // Copies of both modules. A static import is the one instance the whole file shares, so it cannot serve here.
+    vi.resetModules();
+    const { startDownloadHold: startFresh } = await import('./browser-download-hold-host');
+
+    downloads.refuseRegistrationOnce();
+
+    const hold = startFresh({
+      downloads: downloads.globals.downloads,
+      extensionOrigin: () => 'chrome-extension://kilo-test-extension-id/',
+      permissions: downloads.globals.permissions,
+      sessionStorage: () => storage,
+    });
+
+    // The startup install was refused and installed nothing.
+    expect(hold).toBeDefined();
+    expect(downloads.listenerCount()).toBe(0);
+
+    // The call that is about to start a download registers its tab, and that is what installs the listener.
+    hold?.tab(agentTab());
+
+    expect(downloads.listenerCount()).toBe(1);
   });
 
   it('rehydrates needs and reports from storage.session after a worker restart', async () => {

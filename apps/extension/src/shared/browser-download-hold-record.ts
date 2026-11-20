@@ -8,7 +8,7 @@
  * session still owes its model.
  */
 import { z } from 'zod';
-import type { DownloadHold } from './browser-download-hold';
+import type { DownloadHold, DownloadHoldReport } from './browser-download-hold';
 
 /** Where the record lives, under one key, so a reader sees one whole value. The prefix selects `storage.session`. */
 export const DOWNLOAD_HOLD_STATE_KEY = 'session:kiloDownloadHoldState' as const;
@@ -155,6 +155,24 @@ export const restoreSessions = ({
       }
     }
   }
+};
+
+/**
+ * One session's reports as the model reads them: the ones the live hold drained, then the mirror's, each file named
+ * once — the same download is queued by whichever side saw it, and a session that reads its reports needs it once.
+ */
+export const mergeReports = (
+  live: readonly DownloadHoldReport[],
+  owed: HoldState[string]['owed']
+): HoldState[string]['owed'] => {
+  const seen = [...owed, ...live];
+
+  return seen.filter(
+    (report, index) =>
+      seen.findIndex(
+        candidate => candidate.filename === report.filename && candidate.tabId === report.tabId
+      ) === index
+  );
 };
 
 /** The `storage.session` slice the record needs: the same area the tab leases live in. */

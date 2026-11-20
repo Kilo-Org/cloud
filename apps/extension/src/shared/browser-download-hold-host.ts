@@ -16,18 +16,18 @@
  * browser session, which is exactly the lifetime of every fact in it.
  */
 import { createDownloadHold } from './browser-download-hold';
-import type {
-  DownloadHold,
-  DownloadHoldItem,
-  DownloadHoldReport,
-  SuggestFilename,
-} from './browser-download-hold';
+import type { DownloadHold, DownloadHoldItem, SuggestFilename } from './browser-download-hold';
 import { installDownloadHoldOnGrant } from './browser-download-hold-listener';
 import type {
   DeterminingFilenameDownloadsApi,
   DownloadHoldPermissionsApi,
 } from './browser-download-hold-listener';
-import { readState, restoreSessions, writeState } from './browser-download-hold-record';
+import {
+  mergeReports,
+  readState,
+  restoreSessions,
+  writeState,
+} from './browser-download-hold-record';
 import type { HoldState, SessionStorageApi } from './browser-download-hold-record';
 
 export { DOWNLOAD_HOLD_STATE_KEY } from './browser-download-hold-record';
@@ -173,7 +173,10 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
     return true;
   };
 
-  installDownloadHoldOnGrant({
+  // The install again for the call about to start a download: a refused registration has no grant edge to lean on (a
+  // Throw needs the event, and the event needs the grant), so `tab()` — sent before the tool runs — is the last place
+  // A guard can land before the file. A no-op once the listener has registered.
+  const install = installDownloadHoldOnGrant({
     downloads: globals.downloads,
     handle: decide,
     permissions: globals.permissions?.(),
@@ -226,16 +229,7 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
     },
     drain: session => {
       const record = state[session];
-      const seen: (DownloadHoldReport | HoldState[string]['owed'][number])[] = [
-        ...(record?.owed ?? []),
-        ...hold.drain(session),
-      ];
-      const reports = seen.filter(
-        (report, index) =>
-          seen.findIndex(
-            candidate => candidate.filename === report.filename && candidate.tabId === report.tabId
-          ) === index
-      );
+      const reports = mergeReports(hold.drain(session), record?.owed ?? []);
 
       if (record !== undefined) {
         record.owed = [];
@@ -278,12 +272,14 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
         return;
       }
 
-      // The hold learns the tab now: a download is attributed by it the moment the tool runs. Its mirror waits for
-      // The record only when the record has not been read, so the session's other tabs are never replaced by this one.
+      // The hold learns the tab now, and the install runs again: a download is attributed the moment the tool runs,
+      // And a registration the browser refused earlier has no other edge before this file. The mirror waits for the
+      // Record only when the record has not been read, so the session's other tabs are never replaced by this one.
       if (!closed.has(input.session)) {
         hold.tab(input);
       }
 
+      install();
       register(
         input.session,
         () => {

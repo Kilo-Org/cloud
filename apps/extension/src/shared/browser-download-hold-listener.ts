@@ -75,9 +75,10 @@ export const installDownloadHoldListener = ({
 };
 
 /**
- * Installs the listener now, and again the moment `downloads` is granted: the
- * grant is what makes the event exist, and the worker that sees the grant is
- * the one that has to register before the next download is created.
+ * Installs the listener now, again the moment `downloads` is granted, and once more whenever the caller asks: the
+ * grant is what makes the event exist, and a browser that refuses the registration has no other edge to lean on —
+ * a throw needs the event, the event needs the grant, and Chrome never repeats it. The call about to start a
+ * download is then the last place a guard can land before the file, so this returns the retry for it to run.
  */
 export const installDownloadHoldOnGrant = ({
   downloads,
@@ -90,20 +91,27 @@ export const installDownloadHoldOnGrant = ({
     suggest: (override?: { readonly filename?: string }) => void
   ) => boolean;
   readonly permissions: DownloadHoldPermissionsApi | undefined;
-}): void => {
-  installDownloadHoldListener({ downloads: downloads(), handle });
+}): (() => void) => {
+  // One attempt, and the one a caller may repeat: `registered` makes every later pass a no-op once it has landed.
+  const retry = (): void => {
+    installDownloadHoldListener({ downloads: downloads(), handle });
+  };
 
-  // A browser without `permissions.onAdded` never changes the grant while it runs, so the install
+  retry();
+
+  // A browser without `permissions.onAdded` never changes the grant while it runs, so the attempt
   // Above is final there; one that does have it can still refuse the registration, and a hold that
   // Cannot listen for the grant is still the one the current grant gave it.
   try {
     permissions?.onAdded?.addListener(added => {
       // One event, one install: a grant of anything else leaves the listener exactly where it is.
       if (added.permissions?.includes('downloads') === true) {
-        installDownloadHoldListener({ downloads: downloads(), handle });
+        retry();
       }
     });
   } catch {
     // The listener is installed already; nothing else can reach this extension's grant.
   }
+
+  return retry;
 };

@@ -39,6 +39,10 @@ vi.mock('./scheduler', async importOriginal => {
   };
 });
 vi.mock('./decider-judge', () => ({ createDeciderJudge: vi.fn() }));
+vi.mock('./probe/executor', () => ({
+  BenchmarkProbeFamilyError: class BenchmarkProbeFamilyError extends Error {},
+  runProbeCaseViaGateway: vi.fn(),
+}));
 vi.mock('./openrouter', () => ({ createSystemOneClient: vi.fn() }));
 vi.mock('./config', async importOriginal => {
   const actual = await importOriginal<typeof ConfigModule>();
@@ -152,6 +156,8 @@ import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
 import type { DeciderJudge } from './grading';
 import { deciderCasesForRouter, MEASUREMENT_REVISION } from './measurement-revision';
+import { isProbeCase } from './datasets/probe-cases';
+import { runProbeCaseViaGateway } from './probe/executor';
 import {
   beginPaidCase,
   getPaidCasePromptRevision,
@@ -542,16 +548,17 @@ describe('processJob — scheduler-owned execution', () => {
   });
 
   describe('tool-required cases', () => {
-    const printfCase = deciderCasesForRouter('efficient', MEASUREMENT_REVISION).find(
-      candidate => candidate.id === 'supp2-agent-term-printf'
+    // Only `supp-agent-term-pwd-base` still requires a tool call at revision 3.
+    const pwdBaseCase = deciderCasesForRouter('efficient', MEASUREMENT_REVISION).find(
+      candidate => candidate.id === 'supp-agent-term-pwd-base'
     );
-    if (!printfCase) throw new Error('dataset lacks supp2-agent-term-printf');
+    if (!pwdBaseCase) throw new Error('dataset lacks supp-agent-term-pwd-base');
 
     it('scores a correct answer 0 when the turn narrated and stopped without a tool call', async () => {
-      mockClaim({ case_ids: JSON.stringify([printfCase.id]) });
+      mockClaim({ case_ids: JSON.stringify([pwdBaseCase.id]) });
       vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
         ...successfulCliResult,
-        text: 'kilo',
+        text: 'other',
         tools: { calls: 0, names: [], steps: 1, finalFinishReason: 'stop' },
       });
 
@@ -560,7 +567,7 @@ describe('processJob — scheduler-owned execution', () => {
       expect(upsertCaseResult).toHaveBeenCalledWith(
         env.BENCH_DB,
         expect.objectContaining({
-          case_id: printfCase.id,
+          case_id: pwdBaseCase.id,
           score: 0,
           tool_calls: 0,
           tool_names: '[]',
@@ -572,10 +579,10 @@ describe('processJob — scheduler-owned execution', () => {
     });
 
     it('grades the answer once the run made the required tool call', async () => {
-      mockClaim({ case_ids: JSON.stringify([printfCase.id]) });
+      mockClaim({ case_ids: JSON.stringify([pwdBaseCase.id]) });
       vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
         ...successfulCliResult,
-        text: 'kilo',
+        text: 'other',
         tools: { calls: 1, names: ['bash'], steps: 2, finalFinishReason: 'stop' },
       });
 
@@ -583,23 +590,79 @@ describe('processJob — scheduler-owned execution', () => {
 
       expect(upsertCaseResult).toHaveBeenCalledWith(
         env.BENCH_DB,
-        expect.objectContaining({ case_id: printfCase.id, score: 1, tool_names: '["bash"]' })
+        expect.objectContaining({ case_id: pwdBaseCase.id, score: 1, tool_names: '["bash"]' })
       );
     });
 
     it('keeps revision-2 grading for a run that started before revision 3', async () => {
       mockRunSnapshot(undefined, 2);
-      mockClaim({ case_ids: JSON.stringify([printfCase.id]) });
+      mockClaim({ case_ids: JSON.stringify([pwdBaseCase.id]) });
       vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
         ...successfulCliResult,
-        text: 'kilo',
+        text: 'other',
       });
 
       await processJob(env, deciderMessage());
 
       expect(upsertCaseResult).toHaveBeenCalledWith(
         env.BENCH_DB,
-        expect.objectContaining({ case_id: printfCase.id, score: 1, prompt_revision: 2 })
+        expect.objectContaining({ case_id: pwdBaseCase.id, score: 1, prompt_revision: 2 })
+      );
+    });
+  });
+
+  describe('probe cases', () => {
+    const probeCase = deciderCasesForRouter('efficient', MEASUREMENT_REVISION).find(candidate =>
+      isProbeCase(candidate)
+    );
+    if (!probeCase) throw new Error('dataset lacks probe cases');
+
+    it('sends the probe through the gateway without the container and scores a tool call as continuing', async () => {
+      mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
+      vi.mocked(runProbeCaseViaGateway).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: '',
+        costUsd: 0.0011,
+        tools: { calls: 1, names: ['bash'], steps: 1, finalFinishReason: 'tool-calls' },
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(runProbeCaseViaGateway).toHaveBeenCalledTimes(1);
+      expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+      expect(warmUpCliContainer).not.toHaveBeenCalled();
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({
+          case_id: probeCase.id,
+          score: 1,
+          cost_usd: 0.0011,
+          tool_calls: 1,
+          tool_names: '["bash"]',
+          final_finish_reason: 'tool-calls',
+          prompt_revision: MEASUREMENT_REVISION,
+        })
+      );
+    });
+
+    it('scores a probe that narrates and stops without a tool call as zero', async () => {
+      mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
+      vi.mocked(runProbeCaseViaGateway).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: 'I will inspect the next file.',
+        tools: { calls: 0, names: [], steps: 1, finalFinishReason: 'stop' },
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({
+          case_id: probeCase.id,
+          score: 0,
+          tool_calls: 0,
+          final_finish_reason: 'stop',
+        })
       );
     });
   });

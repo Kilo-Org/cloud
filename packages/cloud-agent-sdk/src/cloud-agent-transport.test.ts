@@ -1855,8 +1855,8 @@ describe('CloudAgentTransport page-seam', () => {
             timestamp: 120,
           },
         },
-        // A settled command and a turn that is only queued carry no event of
-        // their own, exactly as the stream's own snapshot reports them.
+        // A settled turn replays as completed; a pending one replays as the
+        // queued prompt row the stream's own snapshot sends for it.
         { messageId: 'msg-done', content: '', timestamp: 60, completedAt: 70 },
         { messageId: 'msg-pending', content: 'Next prompt', timestamp: 80 },
       ],
@@ -1903,8 +1903,112 @@ describe('CloudAgentTransport page-seam', () => {
       expect.objectContaining({ type: 'text', text: 'Fix the build' }),
     ]);
     expect(state.getPendingMessages().has('msg-done')).toBe(false);
-    expect(state.getPendingMessages().has('msg-pending')).toBe(false);
-    expect(storage.getMessageInfo('msg-pending')).toBeUndefined();
+    expect(state.getPendingMessages().get('msg-pending')).toEqual({ status: 'queued' });
+    expect(storage.getMessageInfo('msg-pending')).toMatchObject({ role: 'user', synthetic: true });
+    expect(storage.getParts('msg-pending')).toEqual([
+      expect.objectContaining({ type: 'text', text: 'Next prompt' }),
+    ]);
+
+    transport.destroy();
+  });
+
+  it('replays every pending row of the page as the connected snapshot does', async () => {
+    const storage = createMemoryStorage();
+    const processor = createChatProcessor(storage);
+    const state = createServiceState({ rootSessionId: 'ses-1' });
+    const page = {
+      kind: 'success' as const,
+      ...makeSnapshot({ id: 'ses-1' }),
+      nextCursor: null,
+      omittedItemCount: 0,
+      queuedMessages: [
+        {
+          messageId: 'msg-queued',
+          content: 'Queued prompt',
+          timestamp: 10,
+          delivery: 'queued' as const,
+        },
+        {
+          messageId: 'msg-accepted',
+          content: 'Accepted prompt',
+          timestamp: 20,
+          delivery: 'sent' as const,
+        },
+        {
+          messageId: 'msg-command',
+          content: '/review main',
+          timestamp: 30,
+          delivery: 'sent' as const,
+          turnType: 'command' as const,
+        },
+      ],
+    };
+    const serviceEvents: ServiceEvent[] = [];
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot: () => Promise.reject(new Error('should not be called')),
+      fetchSnapshotPage: () => Promise.resolve(page),
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+    const transport = factory({
+      onChatEvent: () => undefined,
+      onServiceEvent: event => {
+        serviceEvents.push(event);
+        state.process(event);
+        if (event.type === 'cloud.message.queued') {
+          processor.synthesizeQueuedUserMessage({
+            messageId: event.messageId,
+            sessionId: 'ses-1',
+            content: event.content,
+            createdAt: event.createdAt,
+          });
+        }
+      },
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    // The page alone emits the pending sequence the connected snapshot sends:
+    // queued, then sent for an accepted turn, with the command marker only on
+    // that turn's sent event.
+    expect(serviceEvents.filter(event => event.type.startsWith('cloud.message.'))).toEqual([
+      {
+        type: 'cloud.message.queued',
+        messageId: 'msg-queued',
+        content: 'Queued prompt',
+        createdAt: 10,
+      },
+      {
+        type: 'cloud.message.queued',
+        messageId: 'msg-accepted',
+        content: 'Accepted prompt',
+        createdAt: 20,
+      },
+      { type: 'cloud.message.sent', messageId: 'msg-accepted' },
+      {
+        type: 'cloud.message.queued',
+        messageId: 'msg-command',
+        content: '/review main',
+        createdAt: 30,
+      },
+      { type: 'cloud.message.sent', messageId: 'msg-command', turnType: 'command' },
+    ]);
+    expect(state.getPendingMessages().get('msg-queued')).toEqual({ status: 'queued' });
+    // A sent row is the active turn, so its queued entry gives way to it.
+    expect(state.getPendingMessages().has('msg-accepted')).toBe(false);
+    expect(state.getActiveMessageId()).toBe('msg-command');
+    expect(storage.getMessageInfo('msg-queued')).toMatchObject({ role: 'user', synthetic: true });
+    expect(storage.getParts('msg-queued')).toEqual([
+      expect.objectContaining({ type: 'text', text: 'Queued prompt' }),
+    ]);
+    expect(storage.getMessageInfo('msg-command')).toMatchObject({ role: 'user', synthetic: true });
+    expect(storage.getParts('msg-command')).toEqual([
+      expect.objectContaining({ type: 'text', text: '/review main' }),
+    ]);
 
     transport.destroy();
   });

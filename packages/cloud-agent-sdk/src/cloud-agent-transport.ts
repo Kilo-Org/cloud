@@ -220,6 +220,25 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         board?.stop();
       },
     };
+    // True while the connection is live and the route permits background
+    // reads. `backgroundEnabled` alone cannot express it: the readers also
+    // have to stay down while the socket is disconnected and while the route
+    // is preparing or errored, and a v2 page can land long after the connect
+    // hooks ran.
+    let liveReadsShouldRun = false;
+
+    /** The one place "this session is v2" is recorded. */
+    function enableBackgroundActivity(): void {
+      if (backgroundEnabled) return;
+      backgroundEnabled = true;
+      applyLiveReadState();
+    }
+
+    function applyLiveReadState(): void {
+      if (!backgroundEnabled) return; // v1 sessions never publish activity
+      if (liveReadsShouldRun) liveReads.start();
+      else liveReads.stop();
+    }
 
     /**
      * Supersede the pending snapshot catch-up: clear the retry timer and
@@ -263,12 +282,13 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       )
         background?.invalidate();
       if (event.type === 'cloud.status') {
-        if (
-          backgroundEnabled &&
-          (event.cloudStatus.type === 'preparing' || event.cloudStatus.type === 'error')
-        )
-          liveReads.stop();
-        else if (event.cloudStatus.type === 'ready' && backgroundEnabled) liveReads.start();
+        if (event.cloudStatus.type === 'preparing' || event.cloudStatus.type === 'error') {
+          liveReadsShouldRun = false;
+          applyLiveReadState();
+        } else if (event.cloudStatus.type === 'ready') {
+          liveReadsShouldRun = true;
+          applyLiveReadState();
+        }
       }
       if (
         event.type === 'message.part.updated' &&
@@ -412,9 +432,13 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     }
 
     /**
-     * Emit the page's queued and failed turns through the service sink exactly
-     * as the `connected` snapshot does, so a client that never reaches the
-     * socket builds the same pending entries and synthetic rows. A page
+     * Emit the page's completed, failed and pending turns through the service
+     * sink exactly as the `connected` snapshot does, so a client that never
+     * reaches the socket builds the same pending entries and synthetic rows
+     * from the page alone. A socket client's own `connected` snapshot re-sends
+     * the same entries, and that duplicate is harmless: `processMessageQueued`
+     * and `synthesizeQueuedUserMessage` are idempotent, and `processConnected`
+     * clears the non-failed entries before its snapshot re-adds them. A page
      * snapshot carries no retry attempt count, so a failure that is not an
      * interrupt replays as a terminal execution failure.
      */
@@ -427,9 +451,24 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           continue;
         }
         const failure = queued.terminalFailure;
-        // A turn that is merely queued or already accepted carries no event of
-        // its own: the stream reports it only as the active message.
-        if (failure === undefined) continue;
+        if (failure === undefined) {
+          sink.onServiceEvent({
+            type: 'cloud.message.queued',
+            messageId: queued.messageId,
+            content: queued.content,
+            createdAt: queued.timestamp,
+          });
+          // An accepted turn is also the active one; the stream reports the
+          // same pair, and the sent event carries the command marker alone.
+          if (queued.delivery === 'sent') {
+            sink.onServiceEvent({
+              type: 'cloud.message.sent',
+              messageId: queued.messageId,
+              ...(queued.turnType === 'command' ? { turnType: 'command' as const } : {}),
+            });
+          }
+          continue;
+        }
         sink.onServiceEvent({
           type: 'cloud.message.queued',
           messageId: queued.messageId,
@@ -462,7 +501,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
      * record of it with its queued and failed turns.
      */
     function seedPageState(page: SessionSnapshotPage): void {
-      backgroundEnabled = backgroundEnabled || page.sourceVersion === 'v2';
+      if (page.sourceVersion === 'v2') enableBackgroundActivity();
       // Seed lastEventId from the page's event-log watermark. A present
       // watermark sets the cursor to 0 so the WebSocket connect uses
       // `fromId=0` — the DO replays every stored event, closing the gap when
@@ -759,16 +798,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           }
 
           const batch = sources.read(raw);
-          if (batch.source.version === 'v2' && !backgroundEnabled) {
-            backgroundEnabled = true;
-            liveReads.start();
-          }
+          if (batch.source.version === 'v2') enableBackgroundActivity();
           for (const event of batch.events) deliverEvent(raw, event, batch.source.version);
         },
         onConnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
+          liveReadsShouldRun = true;
           startReplay();
-          if (backgroundEnabled) liveReads.start();
+          applyLiveReadState();
         },
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
@@ -779,7 +816,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           // is already in flight is dropped by the epoch bump.
           const hadPendingCatchUp = cancelSnapshotRetry();
           startReplay();
-          if (backgroundEnabled) liveReads.start();
+          liveReadsShouldRun = true;
+          applyLiveReadState();
           // The lost page seed applies to workspace sessions too, with the
           // same row-replay best-effort skip (dispatchRetryRead).
           const usesCursorOnlyReplay = workspaceSession || lastEventId !== null;
@@ -800,7 +838,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         },
         onDisconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
-          if (backgroundEnabled) liveReads.stop();
+          liveReadsShouldRun = false;
+          applyLiveReadState();
           if (!replaying) return;
           sink.onServiceEvent(stoppedEvent);
           cancelReplay();
@@ -808,7 +847,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         },
         onUnexpectedDisconnect: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
-          if (backgroundEnabled) liveReads.stop();
+          liveReadsShouldRun = false;
+          applyLiveReadState();
           if (stoppedReceived && !replaying) return;
           sink.onServiceEvent(stoppedEvent);
           cancelReplay();
@@ -848,7 +888,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
 
     return {
       connect() {
-        if (backgroundEnabled) liveReads.stop();
+        liveReadsShouldRun = false;
+        applyLiveReadState();
         closeConnection('destroy');
         cancelSnapshotRetry();
         lifecycleGeneration += 1;
@@ -869,7 +910,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       },
 
       disconnect() {
-        if (backgroundEnabled) liveReads.stop();
+        liveReadsShouldRun = false;
+        applyLiveReadState();
         cancelReplay();
         cancelSnapshotRetry();
         lifecycleGeneration += 1;
@@ -877,7 +919,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       },
 
       destroy() {
-        if (backgroundEnabled) liveReads.stop();
+        liveReadsShouldRun = false;
+        applyLiveReadState();
         cancelReplay();
         cancelSnapshotRetry();
         lifecycleGeneration += 1;

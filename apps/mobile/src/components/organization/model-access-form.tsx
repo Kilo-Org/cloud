@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { ModelDenyList, ProviderAllowList } from '@/components/organization/model-access-lists';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -109,6 +110,11 @@ function syncedFormState(params: {
  * The two lists the organization's routing policy is: which providers may
  * serve it, and which models it denies. Both save together, because the server
  * stores them as one policy.
+ *
+ * The web page autosaves; the phone saves on request, so the draft can sit
+ * unsaved while a person leaves. The keep-editing gate below therefore reads
+ * the draft's own dirty derivation, and Back asks Keep editing / Discard while
+ * the draft holds edits.
  */
 export function ModelAccessForm({
   organizationId,
@@ -178,6 +184,19 @@ export function ModelAccessForm({
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
+  // Back — the header arrow, Android Back and the back gesture — must not drop
+  // the draft silently, so it asks Keep editing / Discard, the way the
+  // guardrails, mode and group forms do. The dirty flag is a derivation of this
+  // form's own state, including the two rebases `syncedFormState` applies during
+  // render, so the guard recomputes it on every render instead of taking it from
+  // a change event. A read-only viewer cannot have edited the form. A save in
+  // flight owns the route: the guard drops the removal rather than offering a
+  // Discard for a request that still lands.
+  const guard = useMetadataLeaveGuard({
+    enabled: canEdit,
+    isDirty: () => dirty,
+    saving,
+  });
   const savePayload = modelAccessSave({
     savedAllowList: providerAllowList,
     baseline,
@@ -331,6 +350,7 @@ export function ModelAccessForm({
           onRetry={onRetryGateway}
         />
       ) : null}
+      {guard.dialog}
     </View>
   );
 }

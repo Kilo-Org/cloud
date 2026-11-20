@@ -51,9 +51,7 @@ const SourcePath = z
  * manifest and never reaches the component as one.
  */
 const SAVE_ELEMENT = 'save-cluster' as const;
-const ElementDescriptorSchema = z
-  .object({ $element: z.literal(SAVE_ELEMENT) })
-  .strict();
+const ElementDescriptorSchema = z.object({ $element: z.literal(SAVE_ELEMENT) }).strict();
 /**
  * The slots that render inside a `View` and therefore refuse a string: React
  * Native's `Text strings must be rendered within a <Text> component.` invariant
@@ -133,9 +131,7 @@ const SAVE_CLUSTER_BINDING = 'saveCluster';
  * app constant, and `Text` is the shared component, not the RN primitive, so
  * the copy carries the script handling every header text gets.
  */
-const SAVE_CLUSTER_SOURCE = `const ${
-  SAVE_CLUSTER_BINDING
-} = React.createElement(
+const SAVE_CLUSTER_SOURCE = `const ${SAVE_CLUSTER_BINDING} = React.createElement(
   View,
   { className: 'flex-row items-center' },
   React.createElement(
@@ -229,11 +225,7 @@ export const ProofManifestSchema = z
     for (const [index, target] of manifest.targets.entries()) {
       const diagnostic = target.diagnostic;
       if (diagnostic === undefined) continue;
-      checkNodeSlotProps(
-        diagnostic.props,
-        ctx,
-        ['targets', String(index), 'diagnostic', 'props']
-      );
+      checkNodeSlotProps(diagnostic.props, ctx, ['targets', String(index), 'diagnostic', 'props']);
       // The cluster expansion only wires the imports the bare card route
       // writes; a sheet route would render the binding undefined, so the
       // descriptor is refused where the author sees it, at prepare.

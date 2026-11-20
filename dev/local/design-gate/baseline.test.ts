@@ -37,7 +37,6 @@ const TARGET = {
 };
 const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
 
-
 const SLOT_TARGET = { ...TARGET, diagnostic: { component: PRODUCT, props: {} } };
 
 test('a bare string in a node slot is refused with the descriptor guidance', () => {
@@ -79,7 +78,10 @@ test('a save-cluster descriptor prepares and the generated route splices the ele
       targets: [
         {
           ...TARGET,
-          diagnostic: { component: PRODUCT, props: { title: 'Review', headerRight: { $element: 'save-cluster' } } },
+          diagnostic: {
+            component: PRODUCT,
+            props: { title: 'Review', headerRight: { $element: 'save-cluster' } },
+          },
         },
       ],
     })
@@ -99,10 +101,7 @@ test('a save-cluster descriptor prepares and the generated route splices the ele
   assert.doesNotMatch(route, /"headerRight":"Save"/u);
   assert.match(route, /import \{ Pressable, View \} from 'react-native';/u);
   assert.match(route, /import \{ Text \} from '@\/components\/ui\/text';/u);
-  const intent = fs.readFileSync(
-    path.join(preparation.base.directory, INTENT),
-    'utf8'
-  );
+  const intent = fs.readFileSync(path.join(preparation.base.directory, INTENT), 'utf8');
   assert.match(intent, /design-proof-card/u);
 });
 
@@ -140,9 +139,7 @@ test('an element descriptor in a picker-sheet diagnostic is refused at the schem
     ],
   });
   assert.equal(result.success, false);
-  const issue = result.error.issues.find(
-    candidate => !candidate.message.includes('Invalid input')
-  );
+  const issue = result.error.issues.find(candidate => !candidate.message.includes('Invalid input'));
   assert.ok(issue !== undefined);
   assert.match(
     issue.message,
@@ -180,7 +177,10 @@ test('a nested string in a node slot names its full path', () => {
     ],
   });
   assert.equal(result.success, false);
-  assert.equal(result.error.issues[0]?.path.join('/'), 'targets/0/diagnostic/props/headerRight/row/0');
+  assert.equal(
+    result.error.issues[0]?.path.join('/'),
+    'targets/0/diagnostic/props/headerRight/row/0'
+  );
   assert.match(result.error.issues[0]?.message ?? '', /"headerRight" must be/u);
 });
 

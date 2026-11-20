@@ -4205,7 +4205,13 @@
     "providerUnavailable": "Poskytovateľ je teraz nedostupný. O chvíľu skúste odoslať znova."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrdiť túto zmenu?"
+    "confirmTitle": "Potvrdiť túto zmenu?",
+    "guarded": {
+      "spendAlertsOff": "Vypnúť upozornenia na výdavky? Prestanete dostávať oznámenia o prekročení prahov výdavkov a o hodinových špičkách.",
+      "balanceAlertsOff": "Vypnúť upozornenia na zostatok? Prestanete dostávať oznámenia, keď budete mať málo kreditov.",
+      "securityFindingsOff": "Vypnúť bezpečnostné zistenia? Prestanete dostávať oznámenia o nových bezpečnostných zisteniach.",
+      "hideBalanceOn": "Skryť zostatky? Zostatky kreditov sa už nebudú zobrazovať na obrazovkách profilu a v centre organizácie."
+    }
   },
   "appActions": {
     "start": {

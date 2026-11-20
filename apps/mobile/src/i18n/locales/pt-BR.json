@@ -4205,7 +4205,13 @@
     "providerUnavailable": "O provedor está indisponível no momento. Envie novamente em instantes."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmar esta alteração?"
+    "confirmTitle": "Confirmar esta alteração?",
+    "guarded": {
+      "spendAlertsOff": "Desativar alertas de gastos? Você deixaria de receber notificações sobre ultrapassagens de limites de gastos e picos horários.",
+      "balanceAlertsOff": "Desativar alertas de saldo? Você deixaria de receber notificações quando seus créditos estiverem acabando.",
+      "securityFindingsOff": "Desativar achados de segurança? Você deixaria de receber notificações sobre novos achados de segurança.",
+      "hideBalanceOn": "Ocultar seus saldos? Os saldos de créditos não apareceriam mais nas telas de perfil e no hub da organização."
+    }
   },
   "appActions": {
     "start": {

@@ -135,7 +135,8 @@ describe('model access policy catalog limits', () => {
     const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
 
     expect(result.success).toBe(false);
-    if (result.success) throw new Error('Expected a provider slug above the documented maximum to fail');
+    if (result.success)
+      throw new Error('Expected a provider slug above the documented maximum to fail');
     expect(result.error.issues).toEqual([
       expect.objectContaining({ code: 'too_big', path: ['data', 'provider_allow_list', 0] }),
     ]);

@@ -21,6 +21,7 @@ const workos = new WorkOS(WORKOS_API_KEY);
 
 async function processSSOInternal(
   args: CreateOrUpdateUserArgs,
+  profileOrganizationId: string | null,
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
@@ -43,6 +44,13 @@ async function processSSOInternal(
     throw new Error(`Multiple organizations found for domain: ${userDomain}`);
   }
   const workOSOrg = orgs.data[0];
+  // The SSO profile must be issued for the WorkOS organization that owns the
+  // email's domain. A missing organization fails closed.
+  if (!profileOrganizationId || profileOrganizationId !== workOSOrg.id) {
+    throw new Error(
+      `SSO profile organization ${profileOrganizationId ?? '(missing)'} does not match WorkOS organization ${workOSOrg.id} for ${userDomain}`
+    );
+  }
   const orgExternalId = workOSOrg.externalId;
 
   if (!orgExternalId) {
@@ -138,8 +146,14 @@ async function processSSOInternal(
   return true;
 }
 
+/**
+ * Settles a WorkOS SSO sign-in. `profileOrganizationId` is the
+ * `organization_id` from the WorkOS profile; the sign-in fails unless it is
+ * the WorkOS organization for the email's domain.
+ */
 export async function processSSOUserLogin(
   args: CreateOrUpdateUserArgs,
+  profileOrganizationId: string | null,
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
@@ -148,6 +162,7 @@ export async function processSSOUserLogin(
   try {
     return await processSSOInternal(
       args,
+      profileOrganizationId,
       requestHeaders,
       affiliateTrackingId,
       trackingContext,
@@ -157,7 +172,7 @@ export async function processSSOUserLogin(
     console.error('Error processing SSO login:', error);
     captureException(error, {
       tags: { source: 'sso-user' },
-      extra: { args },
+      extra: { args, profileOrganizationId },
     });
     return `${SSO_SIGNIN_PATH}?error=OAUTH_ERROR`;
   }

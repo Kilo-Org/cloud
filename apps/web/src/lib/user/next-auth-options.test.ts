@@ -42,6 +42,7 @@ import {
   parseSignInRedirectContext,
   getInvitationTokenFromCallbackPath,
   preserveSignInRedirectContext,
+  workOSProfileOrganizationId,
 } from '@/lib/user/next-auth-options';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
@@ -684,7 +685,11 @@ describe('WorkOS sign-in callback', () => {
   const signInArgs = {
     user: { id: 'workos-user', email: 'user@example.com', name: 'Test User', image: null },
     account: { provider: 'workos', providerAccountId: 'workos-user', type: 'oauth' as const },
-    profile: undefined,
+    profile: {
+      email: 'user@example.com',
+      organization_id: 'workos-org',
+      connection_id: 'workos-connection',
+    },
   };
 
   beforeEach(() => {
@@ -718,6 +723,7 @@ describe('WorkOS sign-in callback', () => {
     expect(processSSOUserLogin).toHaveBeenCalledTimes(1);
     expect(processSSOUserLogin).toHaveBeenCalledWith(
       expect.objectContaining({ provider: 'workos', google_user_email: 'user@example.com' }),
+      'workos-org',
       requestHeaders,
       'impact-click',
       expect.objectContaining({ locale: 'en-US', countryCode: 'US' }),
@@ -753,11 +759,24 @@ describe('WorkOS sign-in callback', () => {
     expect(processSSOUserLogin).toHaveBeenCalledTimes(1);
     expect(processSSOUserLogin).toHaveBeenCalledWith(
       expect.objectContaining({ provider: 'workos' }),
+      'workos-org',
       requestHeaders,
       null,
       {},
       undefined
     );
+  });
+});
+
+describe('workOSProfileOrganizationId', () => {
+  test.each([
+    [{ organization_id: 'workos-org' }, 'workos-org'],
+    [{ organization_id: '' }, null],
+    [{ organization_id: 42 }, null],
+    [{}, null],
+    [undefined, null],
+  ])('reads %p as %p', (profile, expected) => {
+    expect(workOSProfileOrganizationId(profile)).toBe(expected);
   });
 });
 

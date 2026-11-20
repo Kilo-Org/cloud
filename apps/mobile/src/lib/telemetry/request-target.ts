@@ -37,6 +37,12 @@ export function stripQueryString(url: string): string {
     // A delimiter ends the authority once the userinfo is terminated, or when
     // the run since the scheme cannot be userinfo (it holds no ':'); otherwise
     // the delimiter sits inside the userinfo and the authority continues.
+    //
+    // One reading covers both shapes by design: a run before a delimiter that
+    // already holds a ':' is read as userinfo, so a path after such a run
+    // reduces to the text following its last `@`. This is the intended form of
+    // the origin-and-path contract, not a reading to narrow toward a stricter
+    // authority grammar.
     let lastAt = -1;
     let runHoldsColon = false;
     for (let i = schemeEnd; i < url.length; i += 1) {

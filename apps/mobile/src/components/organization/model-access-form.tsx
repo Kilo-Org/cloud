@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one form owns the draft, both list policies and the leave guard; the Providers tab's display names add a prop to that whole, and splitting it would duplicate the shared state. */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -66,6 +67,7 @@ export function ModelAccessForm({
   onRetryCatalog,
   providerAllowList,
   modelDenyList,
+  providerNames,
   gateway,
   gatewayIsError,
   gatewayIsFetching,
@@ -87,6 +89,7 @@ export function ModelAccessForm({
   onRetryCatalog: () => void;
   providerAllowList: readonly string[] | undefined;
   modelDenyList: readonly string[] | undefined;
+  providerNames: Readonly<Record<string, string>>;
   gateway: OrgGatewaySettings | undefined;
   gatewayIsError: boolean;
   gatewayIsFetching: boolean;
@@ -352,6 +355,7 @@ export function ModelAccessForm({
           ) : null}
           <ProviderAllowList
             providers={providers}
+            names={providerNames}
             draft={draft}
             onChange={onDraftChange}
             disabled={!canEdit || saving || catalogUnavailable}

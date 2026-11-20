@@ -52,10 +52,11 @@ const DRAFT = { providerAllowList: [], modelDenyList: [] };
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
-async function mount(providers: readonly string[]) {
+async function mount(providers: readonly string[], names: Readonly<Record<string, string>> = {}) {
   const view = await renderWithProviders(
     createElement(ProviderAllowList, {
       providers,
+      names,
       draft: DRAFT,
       onChange: () => undefined,
       disabled: false,
@@ -81,6 +82,16 @@ function emptyLabel(root: ReactTestRenderer['root']): unknown {
   return state?.props.title;
 }
 
+/** Each rendered row's title and subtitle, in order. */
+function rows(root: ReactTestRenderer['root']) {
+  return root
+    .findAll(node => Object.is(node.type, 'PreferenceRow'))
+    .map(node => ({
+      title: node.props.title as unknown,
+      subtitle: node.props.subtitle as unknown,
+    }));
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
@@ -91,53 +102,88 @@ afterEach(() => {
 });
 
 describe('ProviderAllowList empty state', () => {
-  it('says the organization has no providers when the catalog is empty', async () => {
+  it('shows the intro line and the no-providers state, with nothing to search or act on', async () => {
     const root = await mount([]);
+    const copy = root
+      .findAll(node => Object.is(node.type, 'Text'))
+      .map(node => node.props.children);
 
     expect(emptyLabel(root)).toBe('No providers are available for this organization.');
+    // The intro line stays: it says what the tab's list would be.
+    expect(copy).toContain(i18n.t('organizationModelAccess.providersDescription'));
+    expect(root.findAll(node => Object.is(node.type, 'SearchField'))).toHaveLength(0);
+    expect(copy).not.toContain(i18n.t('organizationModelAccess.allowAllShown'));
+    expect(copy).not.toContain(i18n.t('organizationModelAccess.denyAllShown'));
   });
 
-  it('keeps the no-providers copy for a query of only whitespace', async () => {
-    const root = await mount([]);
+  it('keeps every row for a query of only whitespace', async () => {
+    const root = await mount(['anthropic', 'openai']);
 
     typeQuery(root, '   ');
 
-    expect(emptyLabel(root)).toBe('No providers are available for this organization.');
+    expect(emptyLabel(root)).toBeUndefined();
+    expect(rows(root)).toHaveLength(2);
   });
 
-  it('says the search matched nothing when a query filters the catalog out', async () => {
-    const root = await mount([]);
-
-    typeQuery(root, 'zzz');
-
-    expect(emptyLabel(root)).toBe('No providers match this search.');
-  });
-
-  it('says the search matched nothing when a query filters every row out', async () => {
+  it('says the search matched nothing while keeping the search field and both bulk actions', async () => {
     const root = await mount(['anthropic']);
 
     typeQuery(root, 'zzz');
 
     expect(emptyLabel(root)).toBe('No providers match this search.');
+    expect(root.findAll(node => Object.is(node.type, 'SearchField'))).toHaveLength(1);
+    // The no-match state keeps its way out: clearing the query brings the rows
+    // back, and the bulk actions still apply to whatever the query keeps.
+    const copy = root
+      .findAll(node => Object.is(node.type, 'Text'))
+      .map(node => node.props.children);
+    expect(copy).toContain(i18n.t('organizationModelAccess.allowAllShown'));
+    expect(copy).toContain(i18n.t('organizationModelAccess.denyAllShown'));
+  });
+
+  it('brings the rows back when the query is cleared', async () => {
+    const root = await mount(['anthropic', 'openai']);
+    expect(emptyLabel(root)).toBeUndefined();
+
+    typeQuery(root, 'zzz');
+    expect(emptyLabel(root)).toBe('No providers match this search.');
+
+    typeQuery(root, '');
+    expect(emptyLabel(root)).toBeUndefined();
+    expect(rows(root)).toHaveLength(2);
   });
 
   it('renders the provider rows, not an empty state, when providers are available', async () => {
     const root = await mount(['anthropic']);
 
     expect(emptyLabel(root)).toBeUndefined();
-    expect(
-      root.findAll(node => Object.is(node.type, 'PreferenceRow')).map(node => node.props.title)
-    ).toEqual(['anthropic']);
+    expect(rows(root)).toEqual([{ title: 'anthropic', subtitle: undefined }]);
+  });
+});
+
+describe('ProviderAllowList rows', () => {
+  it('titles a named row with its display name and puts the slug under it', async () => {
+    const root = await mount(['anthropic', 'openrouter'], { openrouter: 'OpenRouter Gateway' });
+
+    expect(rows(root)).toEqual([
+      { title: 'anthropic', subtitle: undefined },
+      { title: 'OpenRouter Gateway', subtitle: 'openrouter' },
+    ]);
   });
 
-  it('renders the catalog copy, then the search copy once a query is typed', async () => {
-    const root = await mount([]);
-    expect(emptyLabel(root)).toBe(i18n.t('organizationModelAccess.providersNone'));
+  it('finds a row by its display name', async () => {
+    const root = await mount(['anthropic', 'openrouter'], { openrouter: 'Aggregator' });
 
-    typeQuery(root, 'zzz');
-    expect(emptyLabel(root)).toBe('No providers match this search.');
+    typeQuery(root, 'aggreg');
 
-    typeQuery(root, '');
-    expect(emptyLabel(root)).toBe('No providers are available for this organization.');
+    expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: 'openrouter' }]);
+  });
+
+  it('still finds a row by its slug', async () => {
+    const root = await mount(['anthropic', 'openrouter'], { openrouter: 'Aggregator' });
+
+    typeQuery(root, 'router');
+
+    expect(rows(root)).toEqual([{ title: 'Aggregator', subtitle: 'openrouter' }]);
   });
 });

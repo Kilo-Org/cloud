@@ -19,7 +19,9 @@
     "presenceStatus": "Hostet: {{connection}}",
     "commandStatus": "Dorëzimi i komandës: {{status}}",
     "delivered": "Dorëzuar",
-    "expired": "Skaduar"
+    "expired": "Skaduar",
+    "recoveryGaps_one": "Mungon {{displayCount}} pjesë e këtij transkripti.",
+    "recoveryGaps_other": "Mungojnë {{displayCount}} pjesë të këtij transkripti."
   },
   "common": {
     "manageOnWeb": "Menaxho në ueb",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Lidhja me Bitbucket e {{organization}} menaxhohet në ueb nga një kompjuter.",
+      "managedOnWebTitle": "Menaxhohet në ueb",
+      "managedOnWebShort": "Kjo lidhje menaxhohet në ueb nga një kompjuter.",
+      "managedOnWebRepositories": "Zgjidh repositorët për {{organization}} në ueb nga një kompjuter.",
       "description": "Krijo një token qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
       "descriptionReconnect": "Krijo një token të ri qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
       "descriptionOverview": "Krijo një token qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite në ekranin tjetër.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "Duke kontrolluar…",
       "statusUnavailable": "Statusi i padisponueshëm",
+      "needsAttention": "Kërkon vëmendje",
       "platforms": "Platformat",
       "activity": "Aktiviteti"
     },
@@ -2784,6 +2790,8 @@
     "modelPicker": {
       "title": "Zgjidh modelin",
       "noModelsDescription": "Nuk ka modele të disponueshme për të zgjedhur.",
+      "allUnavailableTitle": "Asnjë model nuk mund të përdoret",
+      "allUnavailableDescription": "Shto një çelës ofruesi, pastaj provo përsëri.",
       "favorites": "Të preferuarat"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Ofruesi nuk është i disponueshëm tani. Dërgo sërish pas pak."
   },
   "settingsTools": {
-    "confirmTitle": "Të konfirmohet ky ndryshim?"
+    "confirmTitle": "Të konfirmohet ky ndryshim?",
+    "guarded": {
+      "spendAlertsOff": "Të çaktivizohen njoftimet për shpenzimet? Nuk do të merrni më njoftime për kalimin e pragut të shpenzimeve dhe për rritjet e papritura brenda orës.",
+      "balanceAlertsOff": "Të çaktivizohen njoftimet për balancën? Nuk do të merrni më njoftime kur kreditë tuaja bien në nivel të ulët.",
+      "securityFindingsOff": "Të çaktivizohen gjetjet e sigurisë? Nuk do të merrni më njoftime për gjetje të reja sigurie.",
+      "hideBalanceOn": "Të fshihen balancat tuaja? Balancat e kredive nuk do të shfaqen më në ekranet e profilit dhe në qendrën e organizatës."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "Mbrojtëset e IA-së",
-    "permissionDenied": "Vetëm pronarët dhe administratorët e organizatës mund të menaxhojnë Mbrojtëset e IA-së.",
+    "permissionDenied": "Vetëm pronarët dhe administratorët e organizatës mund të menaxhojnë Mbrojtëset e IA-së. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Mbrojtëset e IA-së nuk janë aktivizuar",
     "unavailable": "Kilo aktivizon Mbrojtëset e IA-së për një organizatë sipas kërkesës. Kontakto {{supportEmail}}, dhe ekipi i Kilo i aktivizon për organizatën tuaj.",
     "contactSupport": "Kontakto mbështetjen",
@@ -4977,6 +4991,7 @@
     "providersDescription": "Fikni një ofrues për të ndaluar Kilo që të rrugëzojë drejt tij për këtë organizatë.",
     "providersNeedCatalog": "Çelësat e ofruesve mbeten vetëm për lexim derisa të ngarkohet i gjithë katalogu i modeleve. Për t'i ndryshuar, prekni Riprovo më lart.",
     "providersEmpty": "Nuk ka ofrues që përputhen me këtë kërkim.",
+    "providersNone": "Nuk ka ofrues të disponueshëm për këtë organizatë.",
     "allowAllShown": "Lejo çdo gjë të shfaqur",
     "denyAllShown": "Ndal çdo gjë të shfaqur",
     "gatewaysDescription": "Kilo i rrugëzon kërkesat e modeleve përmes Vercel AI Gateway ose OpenRouter. Një portë e çaktivizuar i bën ato kërkesa të dështojnë.",

@@ -19,7 +19,9 @@
     "presenceStatus": "Vélar: {{connection}}",
     "commandStatus": "Afhending skipunar: {{status}}",
     "delivered": "Afhent",
-    "expired": "Útrunnið"
+    "expired": "Útrunnið",
+    "recoveryGaps_one": "{{displayCount}} hluti af þessari umritun vantar.",
+    "recoveryGaps_other": "{{displayCount}} hlutar af þessari umritun vantar."
   },
   "common": {
     "manageOnWeb": "Stjórna á vefnum",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
+      "managedOnWebTitle": "Stjórnað á vefnum",
+      "managedOnWebShort": "Þessari tengingu er stjórnað á vefnum í tölvu.",
+      "managedOnWebRepositories": "Veldu geymslur fyrir {{organization}} á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionOverview": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann á næsta skjá.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "Athuga…",
       "statusUnavailable": "Staða ekki tiltæk",
+      "needsAttention": "Þarfnast athygli",
       "platforms": "Vettvangar",
       "activity": "Virkni"
     },
@@ -2784,6 +2790,8 @@
     "modelPicker": {
       "title": "Val á líkani",
       "noModelsDescription": "Engin líkön eru í boði.",
+      "allUnavailableTitle": "Engin líkön er hægt að nota",
+      "allUnavailableDescription": "Bættu við lykli þjónustuveitanda og reyndu síðan aftur.",
       "favorites": "Eftirlæti"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Þjónustuveitandinn er ekki í boði núna. Sendu aftur eftir smástund."
   },
   "settingsTools": {
-    "confirmTitle": "Staðfesta þessa breytingu?"
+    "confirmTitle": "Staðfesta þessa breytingu?",
+    "guarded": {
+      "spendAlertsOff": "Slökkva á útgjaldaaðvörunum? Þú myndir hætta að fá tilkynningar þegar farið er yfir útgjaldamörk og um skyndilegar aukningar á klukkustundar fresti.",
+      "balanceAlertsOff": "Slökkva á inneignaraðvörunum? Þú myndir hætta að fá tilkynningar þegar inneign þín er farin að verða lítil.",
+      "securityFindingsOff": "Slökkva á öryggisniðurstöðum? Þú myndir hætta að fá tilkynningar um nýjar öryggisniðurstöður.",
+      "hideBalanceOn": "Fela inneignir þínar? Inneignir munu ekki lengur birtast á prófílskjáum og miðstöð stofnunarinnar."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "Gervigreindarvarnir",
-    "permissionDenied": "Aðeins eigendur og stjórnendur samtaka geta stýrt Gervigreindarvörnum.",
+    "permissionDenied": "Aðeins eigendur og stjórnendur samtaka geta stýrt Gervigreindarvörnum. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Gervigreindarvarnir eru ekki virkjaðar",
     "unavailable": "Kilo virkjar Gervigreindarvarnir fyrir samtök að beiðni. Hafðu samband við {{supportEmail}}, og Kilo teymið virkjar þær fyrir félagið þitt.",
     "contactSupport": "Hafa samband við þjónustuver",
@@ -4977,6 +4991,7 @@
     "providersDescription": "Slökktu á veitanda til að koma í veg fyrir að Kilo beini beiðnum til hans fyrir þessi samtök.",
     "providersNeedCatalog": "Rofar veitenda verða skrifvarðir þar til öll líkanaskráin hefur hlaðist inn. Ýttu á Reyna aftur hér að ofan til að breyta þeim.",
     "providersEmpty": "Engir veitendur passa við þessa leit.",
+    "providersNone": "Engir veitendur eru í boði fyrir þessi samtök.",
     "allowAllShown": "Leyfa allt sem sýnt er",
     "denyAllShown": "Hafna öllu sem sýnt er",
     "gatewaysDescription": "Kilo beinir beiðnum um líkön í gegnum Vercel AI Gateway eða OpenRouter. Óvirk gátt lætur þessar beiðnir mistakast.",

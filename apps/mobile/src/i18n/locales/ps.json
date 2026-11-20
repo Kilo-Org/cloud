@@ -7,7 +7,7 @@
     "directory": "کاري پوښۍ",
     "createSession": "نېټیو ناسته جوړه کړئ",
     "queueIfOffline": "که کوربه آفلاین وي، لارښوونه په کتار کې واچوئ",
-    "prompt": "لارښوونه یا /command",
+    "prompt": "لارښوونه یا \u2066/command\u2069",
     "localClear": "ځايي لید پاک کړئ",
     "abort": "روان وار ودروئ",
     "failed": "د نېټیو لرې کنټرول کړنه ناکامه شوه",
@@ -19,7 +19,9 @@
     "presenceStatus": "کوربه‌ګان: {{connection}}",
     "commandStatus": "د قوماندې رسول: {{status}}",
     "delivered": "ورسول شو",
-    "expired": "مهلت یې تېر شو"
+    "expired": "مهلت یې تېر شو",
+    "recoveryGaps_one": "{{displayCount}} برخه د دې لیکنې ورکه ده.",
+    "recoveryGaps_other": "{{displayCount}} برخې د دې لیکنې ورکې دي."
   },
   "common": {
     "manageOnWeb": "په ویب کې یې اداره کړئ",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "د {{organization}} د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
+      "managedOnWebTitle": "په وېب کې اداره کېږي",
+      "managedOnWebShort": "دا اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
+      "managedOnWebRepositories": "له کمپیوټر څخه په وېب کې د {{organization}} لپاره مخزنونه وټاکئ.",
       "description": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
       "descriptionReconnect": "د کاري چاپېریال د لاسرسي یو نوی ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
       "descriptionOverview": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او بیا یې په راتلونکې پاڼه کې پیسټ کړئ.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "کتل کېږي…",
       "statusUnavailable": "حالت نه دی معلوم",
+      "needsAttention": "پاملرنې ته اړتیا",
       "platforms": "پلیټ فارمونه",
       "activity": "فعالیت"
     },
@@ -2784,7 +2790,9 @@
     "modelPicker": {
       "title": "د ماډل ټاکنه",
       "favorites": "د خوښې ماډلونه",
-      "noModelsDescription": "د غوره کولو لپاره هېڅ ماډل نشته."
+      "noModelsDescription": "د غوره کولو لپاره هېڅ ماډل نشته.",
+      "allUnavailableTitle": "هېڅ ماډل د کارولو وړ نه دی",
+      "allUnavailableDescription": "د چمتو کوونکي کیلي زیاته کړئ او بیا هڅه وکړئ."
     },
     "modelSelector": {
       "provider": "چمتو کوونکی {{id}}",
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "خدمت وړاندې کوونکی اوس مهال شتون نه لري. لږ وروسته بیا ولېږئ."
   },
   "settingsTools": {
-    "confirmTitle": "دا بدلون تایید شي؟"
+    "confirmTitle": "دا بدلون تایید شي؟",
+    "guarded": {
+      "spendAlertsOff": "د لګښت خبرداریونه بند کړئ؟ تاسو به د لګښت د حد له تېرېدو او د هر ساعت د ناڅاپي زیاتوالي په اړه نورې خبرتیاوې نه ترلاسه کوئ.",
+      "balanceAlertsOff": "د بیلانس خبرداریونه بند کړئ؟ کله چې ستاسو کریډیټونه کم شي، تاسو به نورې خبرتیاوې نه ترلاسه کوئ.",
+      "securityFindingsOff": "د امنیتي موندنو خبرداریونه بند کړئ؟ تاسو به د نویو امنیتي موندنو په اړه نورې خبرتیاوې نه ترلاسه کوئ.",
+      "hideBalanceOn": "خپل بیلانسونه پټ کړئ؟ د کریډیټ بیلانسونه به نور د پروفایل په سکرینونو او د سازمان په مرکز کې نه ښکاره کېږي."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "د مصنوعي ځیرکتیا ساتونکي",
-    "permissionDenied": "یوازې د سازمان مالکین او مدیران کولی شي د مصنوعي ځیرکتیا ساتونکي مدیریت کړي.",
+    "permissionDenied": "یوازې د سازمان مالکین او مدیران کولی شي د مصنوعي ځیرکتیا ساتونکي مدیریت کړي. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "د مصنوعي ځیرکتیا ساتونکي فعال نه دي",
     "unavailable": "Kilo د غوښتنې پر بنسټ یو سازمان لپاره د مصنوعي ځیرکتیا ساتونکي فعالوي. له {{supportEmail}} سره اړیکه ونیسئ، او د Kilo ټیم به یې ستاسو د سازمان لپاره فعال کړي.",
     "contactSupport": "له ملاتړ سره اړیکه ونیسئ",
@@ -4977,6 +4991,7 @@
     "providersDescription": "یو عرضه کوونکی غیر فعال کړئ تر څو Kilo دې سازمان لپاره هغه ته د غوښتنو لېږل ودروي.",
     "providersNeedCatalog": "تر هغه چې د ماډلونو بشپړ کتلاګ بار نه شي، د عرضه کوونکو سویچونه یوازې د لوستلو لپاره پاتې کېږي. د هغوی د سمولو لپاره پورته د بیا هڅه وکړئ تڼۍ کېکاږئ.",
     "providersEmpty": "هیڅ عرضه کوونکی دې پلټنې سره سمون نه لري.",
+    "providersNone": "د دې سازمان لپاره هیڅ عرضه کوونکي شتون نه لري.",
     "allowAllShown": "ټولو ښودل شوو ته اجازه ورکړه",
     "denyAllShown": "ټول ښودل شوي منع کړه",
     "gatewaysDescription": "Kilo د ماډل غوښتنې د Vercel AI Gateway یا OpenRouter له لارې لېږي. یوه غیر فعاله دروازه هغه غوښتنې ناکاموي.",

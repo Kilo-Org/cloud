@@ -12,6 +12,7 @@ import {
   acceptContainerCaseResult,
   processJob,
   drainQueues,
+  PLATFORM_SYNC_CRON,
   publishPlatformRoutingTable,
   sweepStaleRuns,
   syncPlatformRegistry,
@@ -22,8 +23,6 @@ import { dailyReconcileSubscriptions } from './subscriptions';
 
 // Queue name of the dead-letter queue, matched against batch.queue.
 const DLQ_NAME = 'auto-routing-benchmark-dlq';
-
-const PLATFORM_SYNC_CRON = '0 5 * * *';
 
 // Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
 export { BenchRunnerContainer } from './bench-runner-container';

@@ -296,12 +296,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         ) : null}
         {/* The three views are the app's one view switch: the shared segmented
             control, which owns the track, the selected pill, the 48pt floor and
-            the selection tick. Its accessible name is the screen's own, so a
-            reader hears the finding's views, not an unnamed radio group. */}
+            the selection tick. Each view swaps the body below it, so the strip
+            reads as tabs. Its accessible name is the screen's own, so a reader
+            hears the finding's views, not an unnamed tab list. */}
         <View className="px-4 pb-2 pt-1">
           <SegmentedControl
             options={viewOptions}
             value={tab}
+            semantics="tabs"
             accessibilityLabel={t('securityAgent.findingDetail.title')}
             onChange={setTab}
           />

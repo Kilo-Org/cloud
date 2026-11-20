@@ -19,7 +19,9 @@
     "presenceStatus": "होस्ट: {{connection}}",
     "commandStatus": "कमांड वितरण: {{status}}",
     "delivered": "वितरित",
-    "expired": "कालबाह्य"
+    "expired": "कालबाह्य",
+    "recoveryGaps_one": "या प्रतिलेखाचा {{displayCount}} भाग गहाळ आहे.",
+    "recoveryGaps_other": "या प्रतिलेखाचे {{displayCount}} भाग गहाळ आहेत."
   },
   "common": {
     "manageOnWeb": "वेबवर व्यवस्थापित करा",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
+      "managedOnWebTitle": "वेबवर व्यवस्थापित",
+      "managedOnWebShort": "हे कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
+      "managedOnWebRepositories": "{{organization}} साठीच्या रेपॉजिटरीज संगणकावरून वेबवर निवडा.",
       "description": "{{organization}} साठी वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
       "descriptionReconnect": "{{organization}} साठी नवीन वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
       "descriptionOverview": "{{organization}} साठी वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते पुढील स्क्रीनवर पेस्ट करा.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "तपासत आहे…",
       "statusUnavailable": "स्थिती अनुपलब्ध",
+      "needsAttention": "लक्ष आवश्यक",
       "platforms": "प्लॅटफॉर्म",
       "activity": "क्रियाकलाप"
     },
@@ -2784,6 +2790,8 @@
     "modelPicker": {
       "title": "मॉडेल निवडा",
       "noModelsDescription": "निवडण्यासाठी कोणतेही मॉडेल उपलब्ध नाही.",
+      "allUnavailableTitle": "कोणतेही मॉडेल वापरता येत नाही",
+      "allUnavailableDescription": "प्रदाता की जोडा, नंतर पुन्हा प्रयत्न करा.",
       "favorites": "आवडते"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "प्रदाता सध्या उपलब्ध नाही. थोड्या वेळाने पुन्हा पाठवा."
   },
   "settingsTools": {
-    "confirmTitle": "हा बदल निश्चित करायचा?"
+    "confirmTitle": "हा बदल निश्चित करायचा?",
+    "guarded": {
+      "spendAlertsOff": "खर्च सूचना बंद करायच्या? खर्च मर्यादा ओलांडल्याच्या आणि तासाभरातील वाढीच्या सूचना तुम्हाला मिळणे थांबेल.",
+      "balanceAlertsOff": "शिल्लक सूचना बंद करायच्या? तुमची क्रेडिट्स कमी झाल्यावर तुम्हाला सूचना मिळणे थांबेल.",
+      "securityFindingsOff": "सुरक्षा निष्कर्ष बंद करायचे? नवीन सुरक्षा निष्कर्षांबद्दलच्या सूचना तुम्हाला मिळणे थांबेल.",
+      "hideBalanceOn": "तुमची शिल्लक लपवायची? क्रेडिट शिल्लक आता प्रोफाइल स्क्रीन आणि संस्था हबवर दिसणार नाही."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "कृत्रिम बुद्धिमत्ता गार्डरेल्स",
-    "permissionDenied": "केवळ संस्थेचे मालक आणि प्रशासक कृत्रिम बुद्धिमत्ता गार्डरेल्स व्यवस्थापित करू शकतात.",
+    "permissionDenied": "केवळ संस्थेचे मालक आणि प्रशासक कृत्रिम बुद्धिमत्ता गार्डरेल्स व्यवस्थापित करू शकतात. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "कृत्रिम बुद्धिमत्ता गार्डरेल्स सक्षम केलेले नाहीत",
     "unavailable": "Kilo विनंतीनुसार संस्थेसाठी कृत्रिम बुद्धिमत्ता गार्डरेल्स सक्षम करते. {{supportEmail}} वर संपर्क साधा, आणि Kilo टीम तुमच्या संस्थेसाठी ते सुरू करेल.",
     "contactSupport": "मदत पथकाशी संपर्क साधा",
@@ -4977,6 +4991,7 @@
     "providersDescription": "या संस्थेसाठी Kilo त्याकडे राउटिंग करणे थांबवण्यासाठी प्रदाता बंद करा.",
     "providersNeedCatalog": "संपूर्ण मॉडेल कॅटलॉग लोड होईपर्यंत प्रदाता स्विच केवळ-वाचनीय राहतात. ते संपादित करण्यासाठी वरील पुन्हा प्रयत्न करा वर टॅप करा.",
     "providersEmpty": "या शोधाशी कोणताही प्रदाता जुळत नाही.",
+    "providersNone": "या संस्थेसाठी कोणताही प्रदाता उपलब्ध नाही.",
     "allowAllShown": "दाखवलेले सर्व अनुमत करा",
     "denyAllShown": "दाखवलेले सर्व नाकारा",
     "gatewaysDescription": "Kilo मॉडेल विनंत्या Vercel AI Gateway किंवा OpenRouter मार्फत राउट करते. बंद केलेला गेटवे त्या विनंत्या अयशस्वी करतो.",

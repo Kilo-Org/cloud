@@ -62,6 +62,9 @@ function sessionConnection() {
     getCommandStatus: vi
       .fn<NativeSessionConnection['getCommandStatus']>()
       .mockResolvedValue('delivered'),
+    requestRecovery: vi
+      .fn<NativeSessionConnection['requestRecovery']>()
+      .mockResolvedValue(undefined),
     clear: vi.fn(),
     refresh: vi.fn(),
     close: vi.fn(),

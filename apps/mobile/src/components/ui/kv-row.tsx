@@ -5,6 +5,7 @@ import { type LucideProps } from '@/components/ui/icons';
 import { RowFrame } from '@/components/ui/row-frame';
 import { type RowEllipsizeMode, RowValue, type RowValueTone } from '@/components/ui/row-value';
 import { Text } from '@/components/ui/text';
+import { useIsLargeFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -105,7 +106,7 @@ const DOT_TONE = {
  */
 type KvStatus = Readonly<{ label: string; tone: KvTone }>;
 
-/** Label-left / value-right row. */
+/** Label-left / value-right row; at a large font scale the value sits under the label. */
 export function KvRow({
   icon: Icon,
   label,
@@ -131,15 +132,21 @@ export function KvRow({
   hitSlop,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
+  // At a large font scale the label and the value no longer share one line:
+  // the label held its natural width and the value was cut to a few letters
+  // ("$50.00" and "None yet" at the largest Android font). The value moves
+  // under the label, where both have the row's full width.
+  const stacked = useIsLargeFontScale();
+  const labelShrinks = stacked || labelShrink;
   const labelNode = (
     <View
-      className={cn('flex-row items-center gap-2', labelShrink ? 'min-w-0 shrink' : 'shrink-0')}
+      className={cn('flex-row items-center gap-2', labelShrinks ? 'min-w-0 shrink' : 'shrink-0')}
     >
       {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
       {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
       <Text
-        className={cn('text-sm text-muted-foreground', labelShrink && 'min-w-0 shrink')}
-        numberOfLines={1}
+        className={cn('text-sm text-muted-foreground', labelShrinks && 'min-w-0 shrink')}
+        numberOfLines={stacked ? 2 : 1}
       >
         {label}
       </Text>
@@ -162,8 +169,27 @@ export function KvRow({
       accessibilityLabel={valueAccessibilityLabel}
       className={valueClassName}
       status={valueStatus}
+      placement={stacked ? 'below' : 'trailing'}
     />
   );
+
+  if (stacked) {
+    return (
+      <RowFrame
+        trailing={trailing === undefined ? undefined : { kind: 'node', node: trailing }}
+        testID={testID}
+        className={className}
+        onPress={onPress}
+        accessibilityRole={accessibilityRole}
+        accessibilityLabel={accessibilityLabel}
+        disabled={disabled}
+        hitSlop={hitSlop}
+      >
+        {labelNode}
+        <View className="mt-0.5 items-start">{valueNode}</View>
+      </RowFrame>
+    );
+  }
 
   return (
     <RowFrame

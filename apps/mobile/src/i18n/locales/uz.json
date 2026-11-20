@@ -19,7 +19,9 @@
     "presenceStatus": "Xostlar: {{connection}}",
     "commandStatus": "Buyruq yetkazilishi: {{status}}",
     "delivered": "Yetkazildi",
-    "expired": "Muddati tugagan"
+    "expired": "Muddati tugagan",
+    "recoveryGaps_one": "Ushbu transkriptning {{displayCount}} qismi yo'q.",
+    "recoveryGaps_other": "Ushbu transkriptning {{displayCount}} qismi yo'q."
   },
   "common": {
     "manageOnWeb": "Vebda boshqarish",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
+      "managedOnWebTitle": "Veb orqali boshqariladi",
+      "managedOnWebShort": "Bu ulanish kompyuterdan veb orqali boshqariladi.",
+      "managedOnWebRepositories": "{{organization}} uchun repozitoriylarni kompyuterdan veb orqali tanlang.",
       "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionOverview": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni keyingi ekranda joylashtiring.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "Tekshirilmoqda…",
       "statusUnavailable": "Holatni aniqlab bo'lmadi",
+      "needsAttention": "E’tibor talab qiladi",
       "platforms": "Platformalar",
       "activity": "Faoliyat"
     },
@@ -2784,6 +2790,8 @@
     "modelPicker": {
       "title": "Modelni tanlash",
       "noModelsDescription": "Tanlash uchun modellar mavjud emas.",
+      "allUnavailableTitle": "Hech qanday modeldan foydalanib bo'lmaydi",
+      "allUnavailableDescription": "Provayder kalitini qo'shing, so'ng qayta urinib ko'ring.",
       "favorites": "Sevimlilar"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Xizmat koʻrsatuvchi hozir mavjud emas. Birozdan soʻng qaytadan yuboring."
   },
   "settingsTools": {
-    "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?"
+    "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?",
+    "guarded": {
+      "spendAlertsOff": "Xarajat ogohlantirishlarini o'chirasizmi? Xarajat chegarasidan o'tishlar va soatlik keskin ko'tarilishlar haqida bildirishnomalar olishni to'xtatasiz.",
+      "balanceAlertsOff": "Balans ogohlantirishlarini o'chirasizmi? Kreditlaringiz kam qolganda bildirishnomalar olishni to'xtatasiz.",
+      "securityFindingsOff": "Xavfsizlik topilmalarini o'chirasizmi? Yangi xavfsizlik topilmalari haqida bildirishnomalar olishni to'xtatasiz.",
+      "hideBalanceOn": "Balanslaringizni yashirasizmi? Kredit balanslari endi profil ekranlarida va tashkilot markazida ko'rinmaydi."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "AI himoya to'siqlari",
-    "permissionDenied": "Faqat tashkilot egalari va administratorlari AI himoya to'siqlarini boshqara oladi.",
+    "permissionDenied": "Faqat tashkilot egalari va administratorlari AI himoya to'siqlarini boshqara oladi. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI himoya to'siqlari yoqilmagan",
     "unavailable": "Kilo so'rov bo'yicha tashkilot uchun AI himoya to'siqlarini yoqadi. {{supportEmail}} bilan bog'laning, Kilo jamoasi ularni tashkilotingiz uchun yoqadi.",
     "contactSupport": "Yordam xizmatiga murojaat qilish",
@@ -4977,6 +4991,7 @@
     "providersDescription": "Provayderni o'chirish orqali Kilo bu tashkilot uchun unga yo'naltirishni to'xtatadi.",
     "providersNeedCatalog": "To'liq modellar katalogi yuklanmaguncha provayder kalitlari faqat o'qish uchun bo'ladi. Ularni tahrirlash uchun yuqoridagi Qayta urinish tugmasini bosing.",
     "providersEmpty": "Bu qidiruvga mos provayder topilmadi.",
+    "providersNone": "Bu tashkilot uchun hech qanday provayder mavjud emas.",
     "allowAllShown": "Ko'rsatilganlarning barchasiga ruxsat berish",
     "denyAllShown": "Ko'rsatilganlarning barchasini taqiqlash",
     "gatewaysDescription": "Kilo model so'rovlarini Vercel AI Gateway yoki OpenRouter orqali yo'naltiradi. O'chirilgan shlyuz bu so'rovlarni muvaffaqiyatsiz qiladi.",

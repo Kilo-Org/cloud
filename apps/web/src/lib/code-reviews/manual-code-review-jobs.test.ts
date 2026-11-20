@@ -564,4 +564,60 @@ describe('createManualCodeReviewJob happy path', () => {
     });
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith(OWNER);
   });
+
+  it('reads the provider and creates the job from a pull request link copied from a sub-page', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+      providerResponse(200, {
+        number: 123,
+        html_url: GITHUB_PR_URL,
+        title: 'Fix the thing',
+        state: 'open',
+        draft: false,
+        user: { login: 'octocat', id: 1 },
+        base: { ref: 'main', repo: { full_name: 'owner/repo' } },
+        head: { ref: 'feature', sha: 'abc123' },
+      })
+    );
+    mockCreateCodeReview.mockResolvedValue('review-sub-page');
+
+    await expect(
+      createManualCodeReviewJob({
+        owner: OWNER,
+        input: taskInput({ url: `${GITHUB_PR_URL}/files` }),
+      })
+    ).resolves.toEqual({ reviewId: 'review-sub-page', outputMode: 'kilo' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/repos/owner/repo/pulls/123',
+      expect.anything()
+    );
+  });
+
+  it('reads the provider and creates the job from a merge request link copied from a sub-page', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+      providerResponse(200, {
+        iid: 123,
+        title: 'Fix the thing',
+        state: 'opened',
+        draft: false,
+        source_branch: 'feature',
+        target_branch: 'main',
+        sha: 'abc123',
+        web_url: GITLAB_MR_URL,
+        author: { username: 'octocat' },
+        target_project_id: 1,
+      })
+    );
+    mockCreateCodeReview.mockResolvedValue('review-gitlab-sub-page');
+
+    await expect(
+      createManualCodeReviewJob({
+        owner: OWNER,
+        input: taskInput({ platform: 'gitlab', url: `${GITLAB_MR_URL}/diffs` }),
+      })
+    ).resolves.toEqual({ reviewId: 'review-gitlab-sub-page', outputMode: 'kilo' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/group%2Fproject/merge_requests/123',
+      expect.anything()
+    );
+  });
 });

@@ -1,5 +1,6 @@
+/* eslint-disable max-lines -- one contract suite for the App Intents surface: the Swift intents, their copy, and the app-target source set share fixtures that only read correctly together */
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app
 import { tmpdir } from 'node:os';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app

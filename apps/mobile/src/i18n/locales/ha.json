@@ -19,7 +19,9 @@
     "presenceStatus": "Na'urorin masauki: {{connection}}",
     "commandStatus": "Isar da umarni: {{status}}",
     "delivered": "An isar",
-    "expired": "Lokaci ya ƙare"
+    "expired": "Lokaci ya ƙare",
+    "recoveryGaps_one": "{{displayCount}} sashe na wannan rubutun ya ɓace.",
+    "recoveryGaps_other": "{{displayCount}} sassa na wannan rubutun sun ɓace."
   },
   "common": {
     "manageOnWeb": "Sarrafa a yanar gizo",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",
+      "managedOnWebTitle": "Ana sarrafa a yanar gizo",
+      "managedOnWebShort": "Ana sarrafa wannan haɗin a yanar gizo daga kwamfuta.",
+      "managedOnWebRepositories": "Zaɓi ma'ajiyoyi don {{organization}} a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionReconnect": "Ƙirƙiri sabuwar lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionOverview": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a shafi na gaba.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "Ana duba…",
       "statusUnavailable": "Ba a iya samun halin da ake ciki",
+      "needsAttention": "Buƙatar kulawa",
       "platforms": "Dandalai",
       "activity": "Aiki"
     },
@@ -2784,6 +2790,8 @@
     "modelPicker": {
       "title": "Zaɓi samfuri",
       "noModelsDescription": "Babu samfuran da za a zaɓa.",
+      "allUnavailableTitle": "Babu wani samfuri da za a iya amfani da shi",
+      "allUnavailableDescription": "Ƙara maɓallin mai samarwa ka sake gwadawa.",
       "favorites": "Waɗanda ka fi so"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Mai bayar da sabis ba ya samuwa a yanzu. Sake aikawa nan ba da daɗewa ba."
   },
   "settingsTools": {
-    "confirmTitle": "A tabbatar da wannan canji?"
+    "confirmTitle": "A tabbatar da wannan canji?",
+    "guarded": {
+      "spendAlertsOff": "Kashe faɗakarwar kashe kuɗi? Za ka daina samun sanarwa game da ƙetare iyakar kashe kuɗi da kuma haɓakar kashe kuɗi na kowace sa'a.",
+      "balanceAlertsOff": "Kashe faɗakarwar ma'auni? Za ka daina samun sanarwa lokacin da kuɗinka ya ragu.",
+      "securityFindingsOff": "Kashe abubuwan da aka gano na tsaro? Za ka daina samun sanarwa game da sabbin abubuwan da aka gano na tsaro.",
+      "hideBalanceOn": "Ɓoye ma'auninka? Ba za a ƙara nuna ma'aunin kuɗi a shafukan bayanan martaba da cibiyar ƙungiya ba."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "Shingayen Tsaro na Basirar Wucin Gadi",
-    "permissionDenied": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi.",
+    "permissionDenied": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Ba a kunna Shingayen Tsaro na Basirar Wucin Gadi ba",
     "unavailable": "Kilo na kunna Shingayen Tsaro na Basirar Wucin Gadi ga ƙungiya bisa buƙata. Tuntuɓi {{supportEmail}}, sannan ƙungiyar Kilo za ta kunna ta ga kungiyarka.",
     "contactSupport": "Tuntuɓi masu tallafi",
@@ -4977,6 +4991,7 @@
     "providersDescription": "Kashe mai bayarwa don hana Kilo tura buƙatu zuwa gare shi ga wannan ƙungiya.",
     "providersNeedCatalog": "Maɓallan masu bayarwa za su kasance na karatu kawai har sai cikakken kundin samfura ya loda. Danna Sake gwadawa a sama don gyara su.",
     "providersEmpty": "Babu masu bayarwa da suka dace da wannan bincike.",
+    "providersNone": "Babu masu bayarwa da ke samuwa ga wannan ƙungiya.",
     "allowAllShown": "Ba da izini ga duk waɗanda aka nuna",
     "denyAllShown": "Hana duk waɗanda aka nuna",
     "gatewaysDescription": "Kilo yana tura buƙatun samfuri ta Vercel AI Gateway ko OpenRouter. Ƙofar shiga da aka kashe tana sa waɗannan buƙatun su gaza.",

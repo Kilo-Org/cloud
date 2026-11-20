@@ -19,7 +19,11 @@
     "presenceStatus": "Gostitelji: {{connection}}",
     "commandStatus": "Dostava ukaza: {{status}}",
     "delivered": "Dostavljeno",
-    "expired": "Poteklo"
+    "expired": "Poteklo",
+    "recoveryGaps_one": "Manjka {{displayCount}} del tega prepisa.",
+    "recoveryGaps_two": "Manjkata {{displayCount}} dela tega prepisa.",
+    "recoveryGaps_few": "Manjkajo {{displayCount}} deli tega prepisa.",
+    "recoveryGaps_other": "Manjka {{displayCount}} delov tega prepisa."
   },
   "common": {
     "manageOnWeb": "Upravljaj v spletu",
@@ -1439,6 +1443,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
+      "managedOnWebTitle": "Upravlja se v spletu",
+      "managedOnWebShort": "Ta povezava se upravlja v spletu z računalnika.",
+      "managedOnWebRepositories": "Izberite repozitorije za {{organization}} v spletu z računalnika.",
       "description": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
       "descriptionReconnect": "Ustvari nov žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
       "descriptionOverview": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi na naslednjem zaslonu.",
@@ -1462,6 +1469,7 @@
     "platformList": {
       "checking": "Preverjanje…",
       "statusUnavailable": "Stanje ni na voljo",
+      "needsAttention": "Potrebno ukrepanje",
       "platforms": "Platforme",
       "activity": "Dejavnost"
     },
@@ -2884,6 +2892,8 @@
     "modelPicker": {
       "title": "Izbira modela",
       "noModelsDescription": "Na voljo ni nobenega modela.",
+      "allUnavailableTitle": "Nobenega modela ni mogoče uporabiti",
+      "allUnavailableDescription": "Dodaj ključ ponudnika in poskusi znova.",
       "favorites": "Priljubljeni"
     },
     "modelSelector": {
@@ -4201,7 +4211,13 @@
     "providerUnavailable": "Ponudnik trenutno ni na voljo. Znova pošlji kmalu."
   },
   "settingsTools": {
-    "confirmTitle": "Potrdim to spremembo?"
+    "confirmTitle": "Potrdim to spremembo?",
+    "guarded": {
+      "spendAlertsOff": "Izklopiti opozorila o porabi? Prenehali boste prejemati obvestila o preseganju pragov porabe in urnih skokih.",
+      "balanceAlertsOff": "Izklopiti opozorila o stanju? Prenehali boste prejemati obvestila, ko vam bo zmanjkalo kreditov.",
+      "securityFindingsOff": "Izklopiti varnostne ugotovitve? Prenehali boste prejemati obvestila o novih varnostnih ugotovitvah.",
+      "hideBalanceOn": "Skriti svoje stanje? Kreditna stanja se ne bodo več prikazovala na zaslonih profila in v središču organizacije."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,7 +4993,7 @@
   },
   "organizationGuardrails": {
     "title": "AI varovala",
-    "permissionDenied": "Samo lastniki in skrbniki organizacije lahko upravljajo AI varovala.",
+    "permissionDenied": "Samo lastniki in skrbniki organizacije lahko upravljajo AI varovala. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI varovala niso omogočena",
     "unavailable": "Kilo na zahtevo omogoči AI varovala za organizacijo. Obrnite se na {{supportEmail}}, skupaj Kilo jih vklopi za vašo organizacijo.",
     "contactSupport": "Obrni se na podporo",
@@ -5129,6 +5145,7 @@
     "providersDescription": "Izklopite ponudnika, da Kilo za to organizacijo preneha usmerjati vanj.",
     "providersNeedCatalog": "Stikala ponudnikov ostanejo samo za branje, dokler se ne naloži celoten katalog modelov. Če jih želite urejati, zgoraj tapnite Poskusi znova.",
     "providersEmpty": "Noben ponudnik ne ustreza temu iskanju.",
+    "providersNone": "Za to organizacijo ni na voljo nobenega ponudnika.",
     "allowAllShown": "Dovoli vse prikazane",
     "denyAllShown": "Zavrni vse prikazane",
     "gatewaysDescription": "Kilo usmerja zahteve modelov prek Vercel AI Gateway ali OpenRouter. Če je prehod onemogočen, te zahteve ne uspejo.",

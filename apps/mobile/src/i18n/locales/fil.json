@@ -19,7 +19,9 @@
     "presenceStatus": "Mga host: {{connection}}",
     "commandStatus": "Paghahatid ng command: {{status}}",
     "delivered": "Naihatid",
-    "expired": "Nag-expire"
+    "expired": "Nag-expire",
+    "recoveryGaps_one": "Kulang ang {{displayCount}} bahagi ng transcript na ito.",
+    "recoveryGaps_other": "Kulang ang {{displayCount}} bahagi ng transcript na ito."
   },
   "common": {
     "manageOnWeb": "Pamahalaan sa web",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng {{organization}}.",
+      "managedOnWebTitle": "Pinamamahalaan sa web",
+      "managedOnWebShort": "Ang koneksyong ito ay pinamamahalaan sa web gamit ang computer.",
+      "managedOnWebRepositories": "Pumili ng mga repository para sa {{organization}} sa web gamit ang computer.",
       "description": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "descriptionReconnect": "Gumawa ng bagong token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "descriptionOverview": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa susunod na screen.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "Sinusuri…",
       "statusUnavailable": "Hindi makuha ang katayuan",
+      "needsAttention": "Kailangan ng atensyon",
       "platforms": "Mga platform",
       "activity": "Aktibidad"
     },
@@ -2784,6 +2790,8 @@
     "modelPicker": {
       "title": "Pumili ng modelo",
       "noModelsDescription": "Walang modelong mapipili.",
+      "allUnavailableTitle": "Walang modelong magagamit",
+      "allUnavailableDescription": "Magdagdag ng key ng provider, pagkatapos ay subukang muli.",
       "favorites": "Mga paborito"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Hindi available ang provider sa ngayon. Muling ipadala sa ilang sandali."
   },
   "settingsTools": {
-    "confirmTitle": "Kumpirmahin ang pagbabagong ito?"
+    "confirmTitle": "Kumpirmahin ang pagbabagong ito?",
+    "guarded": {
+      "spendAlertsOff": "I-off ang mga alerto sa gastos? Hindi ka na makakatanggap ng mga notification tungkol sa paglampas sa hangganan ng gastos at sa mga hourly spike.",
+      "balanceAlertsOff": "I-off ang mga alerto sa balanse? Hindi ka na makakatanggap ng mga notification kapag paubos na ang iyong mga credit.",
+      "securityFindingsOff": "I-off ang mga security finding? Hindi ka na makakatanggap ng mga notification tungkol sa mga bagong security finding.",
+      "hideBalanceOn": "Itago ang iyong mga balanse? Hindi na lalabas ang mga balanse ng credit sa mga profile screen at sa organization hub."
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "Mga AI Guardrail",
-    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail.",
+    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Hindi naka-enable ang Mga AI Guardrail",
     "unavailable": "Ini-enable ng Kilo ang Mga AI Guardrail para sa isang organisasyon kapag hiniling. Makipag-ugnayan sa {{supportEmail}}, at i-on ito ng Kilo team para sa iyong organisasyon.",
     "contactSupport": "Makipag-ugnayan sa suporta",
@@ -4977,6 +4991,7 @@
     "providersDescription": "I-off ang isang provider para itigil ng Kilo ang pag-route dito para sa organisasyong ito.",
     "providersNeedCatalog": "Read-only ang mga switch ng provider hangga't hindi pa nalo-load ang buong catalog ng model. I-tap ang Subukan muli sa itaas para ma-edit ang mga ito.",
     "providersEmpty": "Walang provider na tumutugma sa paghahanap na ito.",
+    "providersNone": "Walang mga provider na magagamit para sa organisasyong ito.",
     "allowAllShown": "Payagan lahat ng nakikita",
     "denyAllShown": "Tanggihan lahat ng nakikita",
     "gatewaysDescription": "Ina-route ng Kilo ang mga request sa modelo sa pamamagitan ng Vercel AI Gateway o OpenRouter. Papalya ang mga request na iyon kapag naka-disable ang gateway.",

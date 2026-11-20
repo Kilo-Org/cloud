@@ -199,10 +199,23 @@ per-run scheduler markers instead of scanning the chunk, execution or run tables
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger records when each paid case started and prevents automatic
 repetition if a worker disappears after inference may have started but before an output was
-saved. The container posts every completed case to the worker before returning its HTTP
-response, then posts `not_started` for accepted cases that provably did not spawn the CLI.
-Each callback carries the paid attempt's start time, so a stale callback cannot replace a
-newer empty-output retry.
+saved. The container posts every completed case to the worker, and `not_started` for accepted
+cases that provably did not spawn the CLI. A post the worker accepts on the first attempt
+precedes the HTTP response. If the first post fails, the container answers the HTTP request
+and keeps posting with backoff for up to about 5.5 minutes. Each callback carries the paid
+attempt's start time, so a stale callback cannot replace a newer empty-output retry.
+
+A request that never reached the container server is not a paid call. `BenchRunnerContainer`
+turns the `@cloudflare/containers` 500s that precede forwarding ("Failed to start container",
+and the runtime's "The container just exited" or "The container is not running" refusals)
+into a 503 with `errorCategory` `container_not_reached`, which takes the container-capacity
+path: the unbilled ledger row is cleared and the chunk is deferred. Other proxy failures
+("Container suddenly disconnected", a closed port connection) can follow a delivered request
+and stay ambiguous. When a retry cannot reach its container, an empty-output first attempt is
+graded as it is, while a first attempt killed before any event is cleared and deferred the same
+way. A case the ledger refuses to open because the chunk lost its lease, its lane already failed
+or its run stopped is not ambiguous either: the chunk is released (`claim_lost`) without
+recording a lane failure.
 
 Output that arrives after its lane failed or its run became terminal is graded later by a
 single-case recovery message. Recovery never starts inference. A per-case grading lease
@@ -217,7 +230,7 @@ A chunk that finds a ledgered case without output waits for it instead of failin
 It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
 claim is redelivered every 30 seconds to recheck. The wait ends when the output arrives,
 which the chunk then grades, or once the decider case timeout (180 seconds) plus the
-container's delivery window (90 seconds) has passed since the case's latest paid call started
+container's delivery window (7 minutes) has passed since the case's latest paid call started
 (an empty-output retry restarts it in the ledger). Only then does the case count as genuinely
 ambiguous (a container hard-killed mid-flight, or a lost delivery): it fails its measurement
 lane as infrastructure uncertainty instead of inventing a score or issuing another paid call.
@@ -358,8 +371,8 @@ Use `POST /admin/registry/refresh` with explicit concrete model/variant pairs:
 - Other profiles and ordinary retry reuse remain unchanged. No global engine-version bump occurs.
 
 The refresh endpoint handles affected `ready` rows directly. The failed-only requeue endpoint cannot repair them.
-Container callbacks are bounded by three attempts. Exhausted delivery logs contain categories,
-not credentials or result contents.
+Container callbacks are bounded by ten attempts over about 5.5 minutes. Exhausted delivery logs
+contain categories, not credentials or result contents.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker admits bounded oldest-first registry batches independently of available execution slots.
@@ -981,9 +994,10 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them |
+| `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them. `PUT` saves, then syncs the platform registry and republishes the routing table before responding. A failed step does not undo the save: the response is 200 with `warnings` (`registry_sync_failed`, which skips the publish, or `routing_table_publish_failed`), each naming the retry (the daily `0 5 * * *` platform sync, or saving again) |
 | `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
-| `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
+| `GET /admin/runs` | List runs without their summaries (sweeps stale `running` runs to `failed` first). `hasRunningRun` reports whether any run of the router is running, whatever the `kind`/`purpose` filter. Each run carries an empty `summaries` array because the web release promoted after a worker deploy still requires it (ADR 0003, invariant 7) |
+| `GET /admin/runs/:runId/summaries` | One run's model summaries; 404 when the run does not exist or belongs to another router (classifier runs are shared) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
@@ -1275,6 +1289,22 @@ cp .wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite* /tmp/
 sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 ```
 
+## CLI under test
+
+`container/Dockerfile` pins the base image digest and `KILO_CLI_VERSION` (7.8.27, the version
+production ran when it was pinned). Before the pin, every image build installed
+`@kilocode/cli@latest`, so the measured CLI could change under an unchanged engine identity
+whenever the dist-tag moved.
+
+The CLI version is not part of the engine identity and runs do not record it: the image
+pin is the record. A new engine identity makes every stored measurement ineligible, so a full
+pool re-measure follows. A `KILO_CLI_VERSION` bump is therefore a measurement change that
+needs a planned, budgeted re-measure: bump `BENCHMARK_ENGINE_VERSION` in `src/run.ts` in the
+same change once that re-measure is approved.
+
+The pin does not make the image byte-for-byte reproducible: `apt-get` installs the current
+Debian packages, and file timestamps differ between uncached builds.
+
 ## Debugging container (decider) failures
 
 - Reusable `benchmark-slot:<n>` containers handle dynamically assigned chunks from any run.
@@ -1289,11 +1319,14 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 - The server handles SIGTERM and drains the CLI case it already accepted, then exits.
   A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
   paid call, after its callback records `not_started`.
-- Every completed case is posted to the worker's `/container/case-result` route before the
-  HTTP response. A Durable Object request keeps running after its caller is canceled, so
-  `BenchRunnerContainer` relays the caller's `request.signal` (enabled by the
-  `enable_request_signal` compatibility flag) to the container request. The route accepts
+- Every completed case is posted to the worker's `/container/case-result` route, before the
+  HTTP response unless the first post fails. A Durable Object request keeps running after its
+  caller is canceled, so `BenchRunnerContainer` relays the caller's `request.signal` (enabled by
+  the `enable_request_signal` compatibility flag) to the container request. The route accepts
   only the exact paid-execution generation that opened the case.
+- `sleepAfter` is 10 minutes, longer than the CLI timeout plus the whole delivery schedule.
+  Outbound posts do not count as container activity, so a shorter idle timeout could send
+  SIGTERM while a delivery is pending; the server then drains it but refuses new cases.
 - Completed or failed runs reject queued work before starting another CLI case.
 - Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an

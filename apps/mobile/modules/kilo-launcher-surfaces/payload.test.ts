@@ -1,34 +1,24 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 
 import { expect, it } from 'vitest';
 
-type SwiftToolchain = readonly [command: string, ...prefix: string[]];
-
-function swiftToolchain(): SwiftToolchain | undefined {
-  if (process.platform === 'darwin') return ['xcrun', 'swiftc'];
-  try {
-    const swiftcPath = execFileSync('which', ['swiftc'], { encoding: 'utf8' }).trim();
-    return swiftcPath.length > 0 && existsSync(swiftcPath) ? ['swiftc'] : undefined;
-  } catch {
-    return undefined;
-  }
-}
+import { swiftToolchain, type SwiftToolchain } from '../../src/test/swift-toolchain';
 
 const toolchain = swiftToolchain();
 
-function runSwiftPayloadChecks([command, ...prefix]: SwiftToolchain): void {
+function runSwiftPayloadChecks([command, ...compilerArgs]: SwiftToolchain): void {
   const directory = mkdtempSync(join(tmpdir(), 'launcher-surfaces-payload-'));
   const binary = join(directory, 'payload-tests');
   try {
     execFileSync(command, [
-      ...prefix,
+      ...compilerArgs,
       '-parse-as-library',
-      fileURLToPath(new URL('./ios/KiloLauncherSurfacesPayload.swift', import.meta.url)),
-      fileURLToPath(new URL('./tests/LauncherSurfacesPayloadTests.swift', import.meta.url)),
+      fileURLToPath(new URL('ios/KiloLauncherSurfacesPayload.swift', import.meta.url)),
+      fileURLToPath(new URL('tests/LauncherSurfacesPayloadTests.swift', import.meta.url)),
       '-o',
       binary,
     ]);
@@ -38,7 +28,12 @@ function runSwiftPayloadChecks([command, ...prefix]: SwiftToolchain): void {
   }
 }
 
-it.runIf(toolchain !== undefined)('executes the native launcher payload checks', () => {
-  if (toolchain === undefined) throw new Error('checked only with a Swift toolchain on PATH');
-  runSwiftPayloadChecks(toolchain);
-});
+// The skip decision and the compiler the body receives come from the one probe
+// result, so a host with no usable toolchain skips instead of throwing.
+if (toolchain === undefined) {
+  it.skip('executes the native launcher payload checks');
+} else {
+  it('executes the native launcher payload checks', () => {
+    runSwiftPayloadChecks(toolchain);
+  });
+}

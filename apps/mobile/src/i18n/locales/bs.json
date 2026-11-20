@@ -19,7 +19,10 @@
     "presenceStatus": "Hostovi: {{connection}}",
     "commandStatus": "Isporuka naredbe: {{status}}",
     "delivered": "Isporučeno",
-    "expired": "Isteklo"
+    "expired": "Isteklo",
+    "recoveryGaps_one": "Nedostaje {{displayCount}} dio ovog transkripta.",
+    "recoveryGaps_few": "Nedostaju {{displayCount}} dijela ovog transkripta.",
+    "recoveryGaps_other": "Nedostaje {{displayCount}} dijelova ovog transkripta."
   },
   "common": {
     "manageOnWeb": "Upravljaj na webu",
@@ -1415,6 +1418,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računara.",
+      "managedOnWebTitle": "Upravlja se na webu",
+      "managedOnWebShort": "Ova veza se upravlja na webu s računara.",
+      "managedOnWebRepositories": "Odaberi repozitorije za {{organization}} na webu s računara.",
       "description": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "descriptionReconnect": "Kreiraj novi token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "descriptionOverview": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem ekranu.",
@@ -1438,6 +1444,7 @@
     "platformList": {
       "checking": "Provjera…",
       "statusUnavailable": "Status nedostupan",
+      "needsAttention": "Zahtijeva pažnju",
       "platforms": "Platforme",
       "activity": "Aktivnost"
     },
@@ -2834,7 +2841,9 @@
     "modelPicker": {
       "title": "Odabir modela",
       "favorites": "Omiljeni",
-      "noModelsDescription": "Nijedan model nije dostupan za odabir."
+      "noModelsDescription": "Nijedan model nije dostupan za odabir.",
+      "allUnavailableTitle": "Nijedan model se ne može koristiti",
+      "allUnavailableDescription": "Dodaj ključ pružaoca i pokušaj ponovo."
     },
     "modelSelector": {
       "provider": "Pružalac usluge {{id}}",
@@ -4139,7 +4148,13 @@
     "providerUnavailable": "Pružalac usluge trenutno nije dostupan. Pošalji ponovo uskoro."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrditi ovu promjenu?"
+    "confirmTitle": "Potvrditi ovu promjenu?",
+    "guarded": {
+      "spendAlertsOff": "Isključiti upozorenja o potrošnji? Prestali biste dobijati obavještenja o prekoračenjima pragova potrošnje i satnim skokovima.",
+      "balanceAlertsOff": "Isključiti upozorenja o stanju? Prestali biste dobijati obavještenja kada vam krediti budu pri kraju.",
+      "securityFindingsOff": "Isključiti sigurnosne nalaze? Prestali biste dobijati obavještenja o novim sigurnosnim nalazima.",
+      "hideBalanceOn": "Sakriti vaša stanja? Stanja kredita više se ne bi prikazivala na ekranima profila i u organizacijskom centru."
+    }
   },
   "appActions": {
     "start": {
@@ -4901,7 +4916,7 @@
   },
   "organizationGuardrails": {
     "title": "AI zaštitna ograničenja",
-    "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati AI zaštitnim ograničenjima.",
+    "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati AI zaštitnim ograničenjima. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI zaštitna ograničenja nisu omogućena",
     "unavailable": "Kilo omogućava AI zaštitna ograničenja za organizaciju na zahtjev. Kontaktirajte {{supportEmail}}, a Kilo tim ih uključuje za vašu organizaciju.",
     "contactSupport": "Kontaktiraj podršku",
@@ -5053,6 +5068,7 @@
     "providersDescription": "Isključite pružaoca da Kilo prestane usmjeravati zahtjeve prema njemu za ovu organizaciju.",
     "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita kompletan katalog modela. Dodirnite Pokušaj ponovo iznad da ih uredite.",
     "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",
+    "providersNone": "Nijedan pružalac nije dostupan za ovu organizaciju.",
     "allowAllShown": "Dozvoli sve prikazane",
     "denyAllShown": "Zabrani sve prikazane",
     "gatewaysDescription": "Kilo usmjerava zahtjeve modelima putem Vercel AI Gatewaya ili OpenRoutera. Ako je gateway onemogućen, ti zahtjevi neće uspjeti.",

@@ -19,7 +19,9 @@
     "presenceStatus": "主机：{{connection}}",
     "commandStatus": "命令送达状态：{{status}}",
     "delivered": "已送达",
-    "expired": "已过期"
+    "expired": "已过期",
+    "recoveryGaps_one": "此对话记录缺少 {{displayCount}} 个部分。",
+    "recoveryGaps_other": "此对话记录缺少 {{displayCount}} 个部分。"
   },
   "common": {
     "manageOnWeb": "在网页上管理",
@@ -699,6 +701,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
+      "managedOnWebTitle": "在网页版管理",
+      "managedOnWebShort": "此连接需在电脑上通过网页版进行管理。",
+      "managedOnWebRepositories": "请在电脑上通过网页版为 {{organization}} 选择仓库。",
       "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
       "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
       "descriptionOverview": "为 {{organization}} 创建工作区访问令牌，然后在下一个页面中粘贴。",
@@ -737,6 +742,7 @@
     "platformList": {
       "activity": "活动",
       "checking": "正在检查…",
+      "needsAttention": "需要处理",
       "platforms": "平台",
       "statusUnavailable": "无法获取状态"
     },
@@ -2227,6 +2233,8 @@
     "modelPicker": {
       "title": "选择模型",
       "noModelsDescription": "没有可选择的模型。",
+      "allUnavailableTitle": "无法使用任何模型",
+      "allUnavailableDescription": "添加提供商密钥，然后重试。",
       "favorites": "收藏"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "提供商当前不可用。请稍后重新发送。"
   },
   "settingsTools": {
-    "confirmTitle": "确认此更改？"
+    "confirmTitle": "确认此更改？",
+    "guarded": {
+      "spendAlertsOff": "关闭支出提醒？你将不再收到有关支出阈值超限和每小时峰值的通知。",
+      "balanceAlertsOff": "关闭余额提醒？当你的额度不足时，你将不再收到通知。",
+      "securityFindingsOff": "关闭安全发现提醒？你将不再收到有关新安全发现的通知。",
+      "hideBalanceOn": "隐藏你的余额？额度余额将不再显示在个人资料页面和组织中心。"
+    }
   },
   "appActions": {
     "start": {
@@ -4825,7 +4839,7 @@
   },
   "organizationGuardrails": {
     "title": "人工智能护栏",
-    "permissionDenied": "只有组织所有者和管理员可以管理人工智能护栏。",
+    "permissionDenied": "只有组织所有者和管理员可以管理人工智能护栏。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "未启用人工智能护栏",
     "unavailable": "Kilo 可根据请求为组织启用人工智能护栏。请联系 {{supportEmail}}，Kilo 团队会为你的组织开启。",
     "contactSupport": "联系技术支持",
@@ -4977,6 +4991,7 @@
     "providersDescription": "关闭某个提供商即可阻止 Kilo 为此组织路由到该提供商。",
     "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
     "providersEmpty": "没有匹配此搜索的提供商。",
+    "providersNone": "此组织没有可用的提供商。",
     "allowAllShown": "允许所有显示的项",
     "denyAllShown": "拒绝所有显示的项",
     "gatewaysDescription": "Kilo 通过 Vercel AI Gateway 或 OpenRouter 路由模型请求。已禁用的网关会使这些请求失败。",

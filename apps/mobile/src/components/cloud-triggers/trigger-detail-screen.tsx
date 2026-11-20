@@ -9,6 +9,7 @@
 
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { type Href, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -19,6 +20,7 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type CloudTriggerDetail } from '@/lib/cloud-triggers/trigger-draft';
+import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useCloudTrigger } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -73,6 +75,7 @@ export function TriggerDetailScreen({
   organizationId,
 }: Readonly<{ triggerId: string; organizationId?: string }>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const boundary = useOrgBoundary(organizationId);
   const isOrgScope = organizationId !== undefined;
   const scopeResolved = !isOrgScope || (!boundary.isResolving && boundary.org != null);
@@ -140,7 +143,18 @@ export function TriggerDetailScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={triggerId} />
+      <ScreenHeader
+        title={triggerId}
+        showBackButton
+        onBack={() => {
+          // POP_TO puts the list under this screen whether or not it is already
+          // beneath (the create flow retires the form after the transition, a
+          // deep link may have none), so Back always returns to the list the
+          // trigger is a row of. `showBackButton` keeps the control painted on
+          // a restored stack where the router reports no history to pop.
+          router.dismissTo(triggersListHref(organizationId) as Href);
+        }}
+      />
       {notFound ? (
         body
       ) : (

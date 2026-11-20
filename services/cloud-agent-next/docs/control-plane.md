@@ -797,7 +797,7 @@ keep environment snapshots and existing history/worktree recovery.
   additions, deletions and status. The import body cannot carry the record's own `metadata`, `agent`,
   `model`, `path`, `cost` or `tokens`: it accepts those keys and silently drops them. A re-point
   therefore clears the stored value of each. The record's own `slug` is carried: the import body has
-  a `slug` field, so a rename keeps a share URL naming the old slug.
+  a `slug` field, so a re-point keeps the share URL naming the record's own slug.
   The wrapper restores `metadata` with an update right after the import and before it applies the
   ruleset, because it holds the session goal a user sees: a ruleset that cannot be applied throws,
   and the next prepare settles that obligation without running the create path again, so a restore

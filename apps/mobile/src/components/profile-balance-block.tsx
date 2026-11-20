@@ -19,7 +19,7 @@ export type BalanceBlockState =
   | { readonly kind: 'failed'; readonly failure: BalanceFailure };
 
 /** The one-line failure the slot paints, and whether it can be retried. */
-export type BalanceFailure = Readonly<{
+type BalanceFailure = Readonly<{
   readonly label: string;
   /** Absent when the failure cannot be fixed by asking again. */
   readonly retry?: { readonly handleRetry: () => void; readonly actionLabel: string };

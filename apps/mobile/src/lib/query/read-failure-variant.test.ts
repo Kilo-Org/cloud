@@ -164,8 +164,21 @@ describe('classifyReadFailureKind', () => {
     expect(kindFor({ errors: [serverError('UNAUTHORIZED')] })).toBe('permission');
   });
 
-  it('names a removed read as terminal', () => {
-    expect(kindFor({ errors: [serverError('NOT_FOUND')] })).toBe('terminal');
+  it('names a removed read as not-found, its own copy', () => {
+    expect(kindFor({ errors: [serverError('NOT_FOUND')] })).toBe('not-found');
+  });
+
+  it('keeps the server copy for the terminal codes that are not a missing item', () => {
+    // The read was answered, so neither the connection nor "this item may have
+    // been removed" describes a contract failure. The retry stays withheld.
+    expect(kindFor({ errors: [serverError('BAD_REQUEST')] })).toBe('terminal');
+    expect(kindFor({ errors: [serverError('UNPROCESSABLE_CONTENT')] })).toBe('terminal');
+  });
+
+  it('names a client-side deadline as a timeout, not the connection', () => {
+    // The app's control-plane deadline rejects with no tRPC code and no HTTP
+    // status; the server was reachable and slow, so the copy must say so.
+    expect(kindFor({ errors: [{ name: 'RequestDeadlineError' }] })).toBe('timeout');
   });
 
   it('names a 5xx as retryable', () => {
@@ -197,14 +210,18 @@ describe('classifyReadFailureKind', () => {
   it('offers a retry only for the kinds a second attempt can fix', () => {
     expect(readFailureKindIsRetryable('retryable')).toBe(true);
     expect(readFailureKindIsRetryable('offline')).toBe(true);
+    expect(readFailureKindIsRetryable('timeout')).toBe(true);
     expect(readFailureKindIsRetryable('permission')).toBe(false);
+    expect(readFailureKindIsRetryable('not-found')).toBe(false);
     expect(readFailureKindIsRetryable('terminal')).toBe(false);
   });
 
   it('maps each kind to the variant that carries its copy', () => {
     expect(readFailureKindVariant('offline')).toBe('offline');
+    expect(readFailureKindVariant('timeout')).toBe('timeout');
     expect(readFailureKindVariant('permission')).toBe('permission');
-    expect(readFailureKindVariant('terminal')).toBe('not-found');
+    expect(readFailureKindVariant('not-found')).toBe('not-found');
+    expect(readFailureKindVariant('terminal')).toBe('server');
     expect(readFailureKindVariant('retryable')).toBe('server');
   });
 });

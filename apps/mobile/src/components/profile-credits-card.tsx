@@ -49,11 +49,15 @@ const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
 
 /**
  * The sentence each failure kind paints: the connection's own wording, the
- * refusal, the terminal read, or the transient failure beside its Retry.
+ * retryable line a deadline shares (the card has no separate sentence for a
+ * wait that ended, and the server was reachable), the refusal, the terminal
+ * read, or the transient failure beside its Retry.
  */
 const BALANCE_FAILURE_COPY = {
   offline: 'profile.balanceUnreachable',
+  timeout: 'profile.balanceLoadFailed',
   permission: 'profile.balanceAccessDenied',
+  'not-found': 'profile.balanceUnavailable',
   terminal: 'profile.balanceUnavailable',
   retryable: 'profile.balanceLoadFailed',
 } as const;
@@ -295,7 +299,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // The retry line's spoken label names the action ("Tap to retry"), which the
   // visible sentence cannot carry in one line; the other kinds are statements.
   const balanceFailureAccessibilityLabel =
-    balanceFailureKind === 'retryable'
+    balanceFailureKind === 'retryable' || balanceFailureKind === 'timeout'
       ? t('profile.failedToLoadBalance')
       : balanceFailureLabel;
 

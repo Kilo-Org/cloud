@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
+      "managedOnWebTitle": "በድር ላይ ይተዳደራል",
+      "managedOnWebShort": "ይህ ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
+      "managedOnWebRepositories": "ለ{{organization}} ማከማቻዎችን ከኮምፒውተር በድር ላይ ይምረጡ።",
       "description": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "descriptionReconnect": "ለ{{organization}} አዲስ የሥራ ቦታ መዳረሻ ቶከን እንደገና ይፍጠሩና ከታች ይለጥፉት።",
       "descriptionOverview": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና በሚቀጥለው ማያ ገጽ ላይ ይለጥፉት።",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "በመፈተሽ ላይ…",
       "statusUnavailable": "ሁኔታ አይገኝም",
+      "needsAttention": "ትኩረት ይፈልጋል",
       "platforms": "መድረኮች",
       "activity": "እንቅስቃሴ"
     },

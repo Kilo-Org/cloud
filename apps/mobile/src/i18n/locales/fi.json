@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
+      "managedOnWebTitle": "Hallitaan verkossa",
+      "managedOnWebShort": "Tätä yhteyttä hallitaan verkossa tietokoneella.",
+      "managedOnWebRepositories": "Valitse {{organization}}-organisaation repositoriot verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "descriptionReconnect": "Luo uusi työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "descriptionOverview": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se seuraavalla näytöllä.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Tarkistetaan…",
       "statusUnavailable": "Tilaa ei ole saatavilla",
+      "needsAttention": "Vaatii huomiota",
       "platforms": "Alustat",
       "activity": "Tapahtumat"
     },

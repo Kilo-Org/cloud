@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",
+      "managedOnWebTitle": "Hallatakse veebis",
+      "managedOnWebShort": "Seda ühendust hallatakse arvutis veebi kaudu.",
+      "managedOnWebRepositories": "Vali {{organization}} jaoks hoidlaid veebi kaudu arvutis.",
       "description": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
       "descriptionReconnect": "Loo uus tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
       "descriptionOverview": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see järgmisel ekraanil.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Kontrollimine…",
       "statusUnavailable": "Olek pole saadaval",
+      "needsAttention": "Vajab tähelepanu",
       "platforms": "Platvormid",
       "activity": "Tegevus"
     },

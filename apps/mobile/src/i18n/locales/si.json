@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "managedOnWebTitle": "වෙබය හරහා කළමනාකරණය කෙරේ",
+      "managedOnWebShort": "මෙම සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "managedOnWebRepositories": "{{organization}} සඳහා පරිගණකයකින් වෙබය හරහා රෙපොසිටරි තෝරන්න.",
       "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionOverview": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා ඊළඟ තිරයේ අලවන්න.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "පරීක්ෂා කරමින්…",
       "statusUnavailable": "තත්ත්වය ලබා ගත නොහැක",
+      "needsAttention": "අවධානය අවශ්‍යයි",
       "platforms": "වේදිකා",
       "activity": "ක්‍රියාකාරකම්"
     },

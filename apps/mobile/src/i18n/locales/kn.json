@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} ನ Bitbucket ಸಂಪರ್ಕವನ್ನು ಕಂಪ್ಯೂಟರ್‌ನಿಂದ ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
+      "managedOnWebTitle": "ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ",
+      "managedOnWebShort": "ಈ ಸಂಪರ್ಕವನ್ನು ಕಂಪ್ಯೂಟರ್‌ನಿಂದ ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
+      "managedOnWebRepositories": "{{organization}} ಗಾಗಿ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಕಂಪ್ಯೂಟರ್‌ನಿಂದ ವೆಬ್‌ನಲ್ಲಿ ಆಯ್ಕೆಮಾಡಿ.",
       "description": "{{organization}} ಗಾಗಿ ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್ ರಚಿಸಿ, ಅದನ್ನು ಕೆಳಗೆ ಅಂಟಿಸಿ.",
       "descriptionReconnect": "{{organization}} ಗಾಗಿ ಹೊಸ ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್ ರಚಿಸಿ, ಅದನ್ನು ಕೆಳಗೆ ಅಂಟಿಸಿ.",
       "descriptionOverview": "{{organization}} ಗಾಗಿ ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್ ರಚಿಸಿ, ಅದನ್ನು ಮುಂದಿನ ಪರದೆಯಲ್ಲಿ ಅಂಟಿಸಿ.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
       "statusUnavailable": "ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ",
+      "needsAttention": "ಗಮನ ಅಗತ್ಯವಿದೆ",
       "platforms": "ವೇದಿಕೆಗಳು",
       "activity": "ಚಟುವಟಿಕೆ"
     },

@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Η σύνδεση του Bitbucket για {{organization}} γίνεται από τον ιστότοπο, σε υπολογιστή.",
+      "managedOnWebTitle": "Γίνεται από τον ιστότοπο",
+      "managedOnWebShort": "Αυτή η σύνδεση γίνεται από τον ιστότοπο, σε υπολογιστή.",
+      "managedOnWebRepositories": "Επίλεξε τα αποθετήρια για {{organization}} στον ιστότοπο, σε υπολογιστή.",
       "description": "Δημιούργησε ένα διακριτικό πρόσβασης στον χώρο εργασίας για {{organization}} και επικόλλησέ το παρακάτω.",
       "descriptionReconnect": "Δημιούργησε ένα νέο διακριτικό πρόσβασης στον χώρο εργασίας για {{organization}} και επικόλλησέ το παρακάτω.",
       "descriptionOverview": "Δημιούργησε ένα διακριτικό πρόσβασης στον χώρο εργασίας για {{organization}} και επικόλλησέ το στην επόμενη οθόνη.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Έλεγχος…",
       "statusUnavailable": "Η κατάσταση δεν είναι διαθέσιμη",
+      "needsAttention": "Χρειάζεται προσοχή",
       "platforms": "Πλατφόρμες",
       "activity": "Δραστηριότητα"
     },

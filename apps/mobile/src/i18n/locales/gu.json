@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} નું Bitbucket કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
+      "managedOnWebTitle": "વેબ પર મેનેજ કરવામાં આવે છે",
+      "managedOnWebShort": "આ કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
+      "managedOnWebRepositories": "કમ્પ્યુટર પરથી વેબ પર {{organization}} માટે રિપોઝિટરીઝ પસંદ કરો.",
       "description": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
       "descriptionReconnect": "{{organization}} માટે નવો વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
       "descriptionOverview": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને પછીની સ્ક્રીન પર પેસ્ટ કરો.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "તપાસ થઈ રહી છે…",
       "statusUnavailable": "સ્થિતિ ઉપલબ્ધ નથી",
+      "needsAttention": "ધ્યાન જરૂરી",
       "platforms": "પ્લેટફોર્મ્સ",
       "activity": "પ્રવૃત્તિ"
     },

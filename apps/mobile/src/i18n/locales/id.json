@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
+      "managedOnWebTitle": "Dikelola di web",
+      "managedOnWebShort": "Koneksi ini dikelola di web melalui komputer.",
+      "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web dari komputer.",
       "description": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionReconnect": "Buat token akses ruang kerja baru untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionOverview": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di layar berikutnya.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "Aktivitas",
       "checking": "Memeriksa…",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "statusUnavailable": "Status tidak tersedia"
     },

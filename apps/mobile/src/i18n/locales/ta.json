@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-இன் Bitbucket இணைப்பு கணினியிலிருந்து இணையத்தில் நிர்வகிக்கப்படுகிறது.",
+      "managedOnWebTitle": "இணையத்தில் நிர்வகிக்கப்படுகிறது",
+      "managedOnWebShort": "இந்த இணைப்பு கணினியிலிருந்து இணையத்தில் நிர்வகிக்கப்படுகிறது.",
+      "managedOnWebRepositories": "{{organization}}-க்கான ரெப்பாசிட்டரிகளைக் கணினியிலிருந்து இணையத்தில் தேர்ந்தெடுக்கவும்.",
       "description": "{{organization}}-க்கான பணியிட அணுகல் டோக்கனை உருவாக்கிக் கீழே ஒட்டவும்.",
       "descriptionReconnect": "{{organization}}-க்கான புதிய பணியிட அணுகல் டோக்கனை உருவாக்கிக் கீழே ஒட்டவும்.",
       "descriptionOverview": "{{organization}}-க்கான பணியிட அணுகல் டோக்கனை உருவாக்கி, அடுத்த திரையில் ஒட்டவும்.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "சரிபார்க்கிறது…",
       "statusUnavailable": "நிலை கிடைக்கவில்லை",
+      "needsAttention": "கவனம் தேவை",
       "platforms": "தளங்கள்",
       "activity": "செயல்பாடு"
     },

@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "managedOnWebTitle": "Inasimamiwa kwenye wavuti",
+      "managedOnWebShort": "Muunganisho huu unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "managedOnWebRepositories": "Chagua hazina za {{organization}} kwenye wavuti ukitumia kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike kwenye skrini inayofuata.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Inaangalia…",
       "statusUnavailable": "Hali haipatikani",
+      "needsAttention": "Inahitaji uangalizi",
       "platforms": "Majukwaa",
       "activity": "Shughuli"
     },

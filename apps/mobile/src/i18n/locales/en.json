@@ -1483,6 +1483,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
+      "managedOnWebTitle": "Managed on the web",
+      "managedOnWebShort": "This connection is managed on the web from a computer.",
+      "managedOnWebRepositories": "Choose repositories for {{organization}} on the web from a computer.",
       "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
       "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
       "descriptionOverview": "Create a Workspace Access Token for {{organization}}, then paste it on the next screen.",
@@ -1506,6 +1509,7 @@
     "platformList": {
       "checking": "Checking…",
       "statusUnavailable": "Status unavailable",
+      "needsAttention": "Needs attention",
       "platforms": "Platforms",
       "activity": "Activity"
     },

@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
+      "managedOnWebTitle": "A ń ṣàkóso lórí wẹ́ẹ̀bù",
+      "managedOnWebShort": "A ń ṣàkóso ìsopọ̀ yìí lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútá.",
+      "managedOnWebRepositories": "Yan àwọn ibi ìpamọ́ kóòdù fún {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
       "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "descriptionReconnect": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ tuntun fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "descriptionOverview": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ ojú-ìwé tó kàn.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "A ń ṣàyẹ̀wò…",
       "statusUnavailable": "A kò lè rí ipò",
+      "needsAttention": "Nílò àfiyèsí",
       "platforms": "Àwọn pẹpẹ",
       "activity": "Ìgbòkègbodò"
     },

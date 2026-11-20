@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
+      "managedOnWebTitle": "웹에서 관리됨",
+      "managedOnWebShort": "이 연결은 컴퓨터에서 웹으로 관리됩니다.",
+      "managedOnWebRepositories": "컴퓨터에서 웹에 접속해 {{organization}}의 리포지토리를 선택하세요.",
       "description": "{{organization}}용 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "descriptionReconnect": "{{organization}}용 새 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "descriptionOverview": "{{organization}}용 작업 영역 액세스 토큰을 생성한 다음 다음 화면에서 붙여넣으세요.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "활동",
       "checking": "확인 중…",
+      "needsAttention": "조치 필요",
       "platforms": "플랫폼",
       "statusUnavailable": "상태 확인 불가"
     },

@@ -802,7 +802,11 @@ keep environment snapshots and existing history/worktree recovery.
   cannot be cleared is therefore not a failure, since the next prepare finds the stored rules and
   does not repeat them. A record that still names another directory never satisfies the obligation,
   because the rules it carries belong to that directory; the marker waits for the record the import
-  re-points.
+  re-points. The remembered ruleset and a record's own permission are parsed as rulesets before use:
+  a value that is not a ruleset is never applied and never becomes the record's grants, because a
+  ruleset widens what the agent may do. A marker that is present but not a ruleset fails the prepare
+  with a permanent session-import reason instead of reading as nothing owed, since reading it as
+  nothing owed would drop rules the record never received.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

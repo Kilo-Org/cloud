@@ -2,7 +2,11 @@ import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Text } from '@/components/ui/text';
-import { hostText, mountTextTree, unmountTextTree } from '@/components/ui/text.mounted.test-helpers';
+import {
+  hostText,
+  mountTextTree,
+  unmountTextTree,
+} from '@/components/ui/text.mounted.test-helpers';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('react-native', () => ({

@@ -7,12 +7,13 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as sleep } from 'node:timers/promises';
 import test from 'node:test';
@@ -57,6 +58,10 @@ function packageCopy(t) {
       const after = change(before);
       assert.notEqual(after, before);
       writeFileSync(path, after);
+    },
+    move(from, to) {
+      mkdirSync(dirname(join(root, to)), { recursive: true });
+      renameSync(join(root, from), join(root, to));
     },
   };
 }
@@ -707,6 +712,35 @@ test(
     const configChanged = await deploy();
     assert.notEqual(configChanged, serverChanged);
     assert.equal(state.count('deploy_containers_configured'), 3);
+    assert.equal(state.count('deploy_containers_none'), 1);
+  }
+);
+
+test(
+  'container inputs follow a Dockerfile that sits outside its build context',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t);
+    const copy = packageCopy(t);
+    copy.move('container/Dockerfile', 'docker/Dockerfile');
+    copy.edit('wrangler.jsonc', text =>
+      text.replace(
+        '"image": "./container/Dockerfile",',
+        '"image": "./docker/Dockerfile",\n      "image_build_context": "./container",'
+      )
+    );
+    const deploy = async () => {
+      const result = await state.start([], {}, copy.script);
+      assert.equal(result.code, 0, result.stdout);
+      return state.deployedMessages().at(-1);
+    };
+    const original = await deploy();
+    assert.equal(await deploy(), original);
+    assert.equal(state.count('deploy_containers_none'), 1);
+
+    copy.edit('docker/Dockerfile', text => `${text}\n# changed\n`);
+    assert.notEqual(await deploy(), original);
+    assert.equal(state.count('deploy_containers_configured'), 2);
     assert.equal(state.count('deploy_containers_none'), 1);
   }
 );

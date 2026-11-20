@@ -182,7 +182,8 @@ function filesUnder(root) {
 
 /**
  * Hashes everything `wrangler deploy` turns into the container application: the
- * `containers` configuration and every file in each local image's build context.
+ * `containers` configuration, each local image's Dockerfile (which may sit outside
+ * its build context) and every file in that build context.
  */
 function containerInputs() {
   const errors = [];
@@ -192,16 +193,18 @@ function containerInputs() {
   if (errors.length > 0 || !parsed.success) throw new DeploymentError('invalid_configuration');
   const hash = createHash('sha256').update(canonicalJson(parsed.data.containers));
   const base = dirname(config);
+  const addFile = (role, file) => {
+    const content = readFileSync(file);
+    hash.update(`\0${role}\0${relative(base, file)}\0${content.length}\0`).update(content);
+  };
   for (const container of parsed.data.containers) {
     const image = resolve(base, container.image);
     if (!existsSync(image)) continue;
+    addFile('image', image);
     const context = container.image_build_context
       ? resolve(base, container.image_build_context)
       : dirname(image);
-    for (const file of filesUnder(context)) {
-      const content = readFileSync(file);
-      hash.update(`\0${relative(base, file)}\0${content.length}\0`).update(content);
-    }
+    for (const file of filesUnder(context)) addFile('context', file);
   }
   return {
     hash: hash.digest('hex'),

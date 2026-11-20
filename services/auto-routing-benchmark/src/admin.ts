@@ -23,6 +23,7 @@ import {
   SyncBenchmarkSubscriptionsRequestSchema,
   type BenchmarkConfig,
   type BenchmarkConfigAdminResponseConfig,
+  type BenchmarkConfigSaveDrain,
   type BenchmarkConfigSaveWarning,
   type BenchmarkRegistryQueue,
   type BenchmarkIdentity,
@@ -228,6 +229,63 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * How long a save waits for its platform-queue drain to start a run. The drain
+ * is one `startRun` plus its claim; the per-minute scheduler is the backstop, so
+ * a slow drain is deferred rather than allowed to extend the save.
+ */
+const CONFIG_SAVE_DRAIN_DEADLINE_MS = 5_000;
+
+/**
+ * Start the platform queue after a save has persisted its config, registry sync
+ * and publish, so an admin who adds a model gets a run without pressing Run or
+ * waiting for the cron. Best-effort by design: a queue that already holds a run
+ * is left to it, and a drain that is slow or throws is reported in `drain`, never
+ * in `warnings` — the save itself succeeded, and the per-minute scheduler is the
+ * backstop for everything this misses.
+ */
+async function drainPlatformAfterConfigSave(
+  env: Env,
+  router: AutoRouter
+): Promise<BenchmarkConfigSaveDrain> {
+  const timedOut = Promise.withResolvers<'timeout'>();
+  const timer = setTimeout(() => timedOut.resolve('timeout'), CONFIG_SAVE_DRAIN_DEADLINE_MS);
+  try {
+    const started = await Promise.race([
+      drainQueues(env, 'platform', undefined, router),
+      timedOut.promise,
+    ]);
+    if (started === 'timeout') {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_config_save_drain_deferred',
+          afterConfigSave: true,
+          router,
+          reason: 'timeout',
+        })
+      );
+      return { runId: null, entryCount: 0, skipped: 'timeout' };
+    }
+    const [run] = started;
+    return run
+      ? { runId: run.runId, entryCount: run.entryCount, skipped: null }
+      : { runId: null, entryCount: 0, skipped: 'active_run' };
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_config_save_drain_deferred',
+        afterConfigSave: true,
+        router,
+        reason: 'failed',
+        ...formatError(error),
+      })
+    );
+    return { runId: null, entryCount: 0, skipped: 'failed' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   // Every /admin/* route below requires the worker-wide authMiddleware
   // (./auth), which src/index.ts mounts with app.use('*', ...) before it calls
@@ -282,10 +340,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         updatedBy
       );
       const warnings = await syncRegistryAfterConfigSave(c.env, router);
+      // Only a save whose registry sync and publish both landed has new pending
+      // rows to start; a failed sync has no rows and a failed publish is already
+      // reported, so the cron owns that case.
+      const drain =
+        warnings.length === 0 ? await drainPlatformAfterConfigSave(c.env, router) : undefined;
       return c.json({
         config: withLegacyAdminConfigFields(saved),
         policySettings: resolvePolicySettings(saved),
         warnings,
+        ...(drain ? { drain } : {}),
       });
     }
   );

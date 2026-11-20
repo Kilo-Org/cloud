@@ -23,7 +23,7 @@ import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './schedu
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { computeEngineIdentity, publishPlatformRoutingTable } from './run';
+import { computeEngineIdentity, publishPlatformRoutingTable, sweepStaleRunsAndDrain } from './run';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
@@ -750,6 +750,104 @@ describe('PUT /admin/config', () => {
     await expect(retried.json()).resolves.toMatchObject({ warnings: [] });
     expect(kvDelete).toHaveBeenCalledExactlyOnceWith(routingTableKvKey('efficient'));
     expect(saveRoutingTable).toHaveBeenCalledOnce();
+  });
+
+  it('drains the platform queue in the save request when the sync and publish land', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      config: { minAccuracy: number };
+      warnings: unknown[];
+      drain: { runId: string | null; entryCount: number; skipped: string | null };
+    };
+    // The same save response contract, plus the drain outcome.
+    expect(body.config.minAccuracy).toBe(TEST_CONFIG.minAccuracy);
+    expect(body.warnings).toEqual([]);
+    const [, runArg] = vi.mocked(insertRun).mock.calls[0];
+    expect(body.drain).toEqual({ runId: runArg.id, entryCount: 1, skipped: null });
+    expect(runArg.purpose).toBe('platform');
+  });
+
+  it('reports an occupied platform queue without starting a second run or warning', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    vi.mocked(getRunningRun).mockResolvedValue({
+      id: 'run-active',
+      kind: 'decider',
+      purpose: 'platform',
+      router: 'efficient',
+    } as never);
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      warnings: [],
+      drain: { runId: null, entryCount: 0, skipped: 'active_run' },
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+  });
+
+  it('returns the saved config and a drain warning when the drain throws', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+    // A drain failure is not a save failure: the row was claimed, then the run write threw.
+    vi.mocked(insertRun).mockRejectedValueOnce(new Error('D1 overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      config: { minAccuracy: number };
+      warnings: unknown[];
+      drain: { runId: string | null; entryCount: number; skipped: string | null };
+    };
+    expect(body.config.minAccuracy).toBe(TEST_CONFIG.minAccuracy);
+    expect(body.warnings).toEqual([]);
+    expect(body.drain).toEqual({ runId: null, entryCount: 0, skipped: 'failed' });
+
+    // The per-minute scheduler still starts it on the next tick.
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    await sweepStaleRunsAndDrain(env, 'efficient');
+    expect(insertRun).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(insertRun).mock.calls[1][1].purpose).toBe('platform');
+  });
+
+  it('returns the saved config and defers a drain that outlives its deadline', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    // The drain never answers, so only the save's own deadline can end the request.
+    vi.mocked(listPendingCurrentProfiles).mockImplementation(() => new Promise(() => {}));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.useFakeTimers();
+
+    try {
+      const pending = authedPut('/admin/config', TEST_CONFIG);
+      await vi.advanceTimersByTimeAsync(5_001);
+      const res = await pending;
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        config: { minAccuracy: number };
+        warnings: unknown[];
+        drain: { runId: string | null; entryCount: number; skipped: string | null };
+      };
+      expect(body.config.minAccuracy).toBe(TEST_CONFIG.minAccuracy);
+      expect(body.warnings).toEqual([]);
+      expect(body.drain).toEqual({ runId: null, entryCount: 0, skipped: 'timeout' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the previous release’s admin config fields on the resolved policy values', async () => {

@@ -103,10 +103,15 @@ export function deepStrict<T extends z.ZodType>(schema: T): z.ZodType<z.infer<T>
     }
     case 'record': {
       const rec = anySchema as z.ZodRecord;
-      return z.record(
-        rec.keyType as z.core.$ZodRecordKey,
-        deepStrict(rec.valueType as z.ZodTypeAny)
-      ) as unknown as z.ZodType<z.infer<T>>;
+      const keyType = rec.keyType as z.core.$ZodRecordKey;
+      const valueType = deepStrict(rec.valueType as z.ZodTypeAny);
+      // An enum-keyed `z.record` requires every key, so partial and loose records keep their mode.
+      const strictRecord = rec.def.partial
+        ? z.partialRecord(keyType, valueType)
+        : rec.def.mode === 'loose'
+          ? z.looseRecord(keyType, valueType)
+          : z.record(keyType, valueType);
+      return strictRecord as unknown as z.ZodType<z.infer<T>>;
     }
     case 'union': {
       const options = (anySchema as z.ZodUnion).options as readonly z.ZodTypeAny[];

@@ -78,6 +78,8 @@ type ProviderPolicyInput = {
   organizationId: string | undefined;
   botId: string | undefined;
   countryCode: string | null;
+  /** The `x-kilocode-taskid` header. */
+  taskId: string | null;
   boundedSpending: boolean;
   providerMetadataCapture: AiProviderMetadataCapture | undefined;
   effectivePrivacy: ReturnType<typeof getEffectiveProviderPrivacy>;
@@ -205,6 +207,7 @@ export async function resolveProviderAndPolicy(
     botId: input.botId,
     boundedSpending: input.boundedSpending,
     countryCode: input.countryCode,
+    taskId: input.taskId,
     getRoutingProviderConfig: async () =>
       (isAnonymous ? undefined : (await getAccessCheck()).effectiveProviderConfig) ??
       request.body.provider,

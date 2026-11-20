@@ -533,7 +533,8 @@ const runHandleDialog = async (
     ...(promptText === undefined ? {} : { promptText }),
   });
 
-  return done({ accepted: accept, message: dialog.message, type: dialog.type });
+  // The message was shown with the modal state, to a caller allowed to read it; echoing it here would show it to all.
+  return done({ accepted: accept, type: dialog.type });
 };
 
 const runFileUpload = async (

@@ -9,6 +9,7 @@ import type { IsolatedAgentProbe, IsolatedFrameTree } from './browser-agent-isol
 import type { AgentFrameInventory } from './browser-agent-frames';
 import { spliceScriptingFrames } from './browser-tool-scripting-frames';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
+import { BROWSER_TOOL_DIALOG_OPEN_ERROR, BrowserToolDialogOpenError } from './browser-tool-dialog';
 import {
   redactSensitiveBody,
   redactSensitiveHeaders,
@@ -157,6 +158,14 @@ const DETACH_REASON_TARGET_CLOSED = 'target_closed';
  * Evidence: https://github.com/BrowserMCP/mcp/blob/main/packages/mcp/spikes/hidden-tabs/RESULTS.md
  */
 const INPUT_COMMAND_TIMEOUT_MS = 5000;
+/** The one command a session sends while a JavaScript dialog blocks the page: the dialog's own answer. */
+const DIALOG_ANSWER_METHOD = 'Page.handleJavaScriptDialog';
+/**
+ * Commands that carry no page work and answer while a dialog is open: the
+ * download interceptor is armed and released around the answer, and its
+ * `Fetch.*` calls are the tab's, not the blocked renderer's.
+ */
+const DIALOG_SAFE_COMMAND_PREFIX = 'Fetch.';
 /**
  * Bound on the frame a background tab's screencast is asked for. Chrome makes
  * that frame on the request in about 11 ms (measured on the click-then-
@@ -315,7 +324,15 @@ export interface BrowserToolDownload {
 
 export interface BrowserToolDialog {
   readonly defaultValue?: string;
+  /**
+   * The frame that opened the dialog. The browser reports it with the event, and
+   * its `Page.getFrameTree` entry carries the origin the browser computed for
+   * that frame — including an inherited one — so the answer is judged there.
+   */
+  readonly frameId?: string;
   readonly message: string;
+  /** That frame's security origin, read from the frame tree while the dialog opened. */
+  readonly origin?: string;
   readonly type: string;
   readonly url?: string;
 }
@@ -554,10 +571,27 @@ export interface BrowserToolSession {
     params?: Record<string, unknown>,
     sessionId?: string
   ) => Promise<Record<string, unknown> | undefined>;
+  /** The dialog open on the page right now, without answering it; `undefined` when none is open. */
+  readonly pendingDialog: () => BrowserToolDialog | undefined;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
+  /**
+   * Calls `listener` each time the page opens a dialog, and returns the
+   * function that stops it. A call races its page action against this: the
+   * action that opened a dialog is not answered until the dialog is.
+   */
+  readonly watchDialogs: (listener: (dialog: BrowserToolDialog) => void) => () => void;
   /** Returns the downloads seen since the last call and clears them. */
   readonly takeDownloads: () => readonly BrowserToolDownload[];
+  /**
+   * Calls `listener` for every `Fetch.requestPaused` the tab reports, and
+   * returns the function that stops it. A response-stage interceptor arms the
+   * pause and answers every one it receives: a pause nobody answers holds the
+   * page forever, so this is the only door to the event.
+   */
+  readonly watchFetchPauses: (
+    listener: (params: Record<string, unknown> | undefined) => void
+  ) => () => void;
   /**
    * Calls `listener` for every download the tab announces as it arrives, and
    * returns the function that stops it. A guard that keeps listening for a late
@@ -640,14 +674,33 @@ const loadingFailedParamsSchema = z.object({
 });
 const javascriptDialogOpeningParamsSchema = z.object({
   defaultPrompt: z.string().optional(),
+  frameId: z.string().optional(),
   message: z.string().optional(),
   type: z.string().optional(),
   url: z.string().optional(),
 });
+/** One frame of a `Page.getFrameTree` answer: the browser reports its own computed origin. */
+const frameTreeFrameSchema = z.object({
+  id: z.string(),
+  securityOrigin: z.string().optional(),
+});
+/** One level of `Page.getFrameTree`; children stay unknown here and are parsed a level at a time as the walk descends. */
+const frameTreeLevelSchema = z.object({
+  childFrames: z.array(z.unknown()).optional(),
+  frame: frameTreeFrameSchema,
+});
+const frameTreeResponseSchema = z.object({ frameTree: frameTreeLevelSchema });
+/** The one frame-list read whose answer also records each frame's origin. */
+const FRAME_TREE_METHOD = 'Page.getFrameTree';
+/** A frame that left the tree, so its recorded origin can go with it. */
+const FRAME_DETACHED_METHOD = 'Page.frameDetached';
+const frameDetachedParamsSchema = z.object({ frameId: z.string() });
+
 const frameNavigatedParamsSchema = z.object({
   frame: z.object({
     id: z.string().optional(),
     parentId: z.string().optional(),
+    securityOrigin: z.string().optional(),
     url: z.string().optional(),
   }),
 });
@@ -1611,6 +1664,8 @@ export const createBrowserToolSession = ({
   const downloadBuffer: BrowserToolDownload[] = [];
   // Listeners a still-armed guard registered for the announcement itself, not the buffer it drains.
   const downloadListeners = new Set<(download: BrowserToolDownload) => void>();
+  // Listeners a live response interceptor registered for the pauses it must answer, one per armed interceptor.
+  const fetchPauseListeners = new Set<(params: Record<string, unknown> | undefined) => void>();
   const networkById = new Map<string, MutableNetworkRequest>();
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
@@ -1634,6 +1689,8 @@ export const createBrowserToolSession = ({
   let detachCount = 0;
   let documentNodeId: number | undefined = undefined;
   let dialog: BrowserToolDialog | undefined = undefined;
+  // Calls racing their page action against a dialog: the action that opened one is not answered until it is closed.
+  const dialogListeners = new Set<(opened: BrowserToolDialog) => void>();
   // Monotonic ref numbering for scripting snapshots, so refs stay e1, e2, ... rather than restarting per snapshot.
   let scriptingRefCount = 0;
   // Console messages pushed since the last main-frame navigation, for `all: false`.
@@ -1642,6 +1699,8 @@ export const createBrowserToolSession = ({
   const frameIdByExecutionContext = new Map<number, string>();
   // Out-of-process iframes auto-attached under this tab, keyed by frame id (for an OOPIF the frame id is the target id). `Page.getFrameTree` omits them, so this map is the tab's only record of them.
   const childFrames = new Map<string, BrowserToolChildFrame>();
+  /** Each frame's security origin, as `Page.frameNavigated` reports it: the browser's own inheritance. */
+  const frameOrigins = new Map<string, string>();
   // The tab's main frame id, learned from `Page.frameNavigated`. A `Document` request in this frame is a page load.
   let mainFrameId: string | undefined = undefined;
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
@@ -1691,6 +1750,7 @@ export const createBrowserToolSession = ({
     networkById.clear();
     mainFrameId = undefined;
     childFrames.clear();
+    frameOrigins.clear();
     clearRefs();
     documentNodeId = undefined;
     dialog = undefined;
@@ -1918,6 +1978,30 @@ export const createBrowserToolSession = ({
     return requests.slice(startIndex);
   };
 
+  /** One frame of a `Page.getFrameTree` answer: its id, its origin, and the frames it holds. */
+  const recordFrameTree = (tree: z.infer<typeof frameTreeLevelSchema>): void => {
+    if (tree.frame.securityOrigin !== undefined) {
+      frameOrigins.set(tree.frame.id, tree.frame.securityOrigin);
+    }
+
+    for (const child of tree.childFrames ?? []) {
+      const nested = frameTreeLevelSchema.safeParse(child);
+
+      if (nested.success) {
+        recordFrameTree(nested.data);
+      }
+    }
+  };
+
+  /** Records every frame's security origin from one `Page.getFrameTree` answer, at any depth. */
+  const recordFrameOrigins = (answer: Record<string, unknown> | undefined): void => {
+    const parsed = frameTreeResponseSchema.safeParse(answer);
+
+    if (parsed.success) {
+      recordFrameTree(parsed.data.frameTree);
+    }
+  };
+
   const handleDialogOpening = (params: Record<string, unknown> | undefined): void => {
     const parsed = javascriptDialogOpeningParamsSchema.safeParse(params);
 
@@ -1925,26 +2009,54 @@ export const createBrowserToolSession = ({
       return;
     }
 
-    const { defaultPrompt, message, type, url } = parsed.data;
+    const { defaultPrompt, frameId, message, type, url } = parsed.data;
+    const origin = frameId === undefined ? undefined : frameOrigins.get(frameId);
 
-    dialog = {
-      message: message ?? '',
+    const opened: BrowserToolDialog = {
+      // The page writes this text and every other bounded page text has the same cap: a dialog cannot flood the model.
+      message: truncateText(message ?? ''),
       type: type ?? 'alert',
-      ...(defaultPrompt === undefined ? {} : { defaultValue: defaultPrompt }),
+      ...(defaultPrompt === undefined ? {} : { defaultValue: truncateText(defaultPrompt) }),
+      ...(frameId === undefined ? {} : { frameId }),
+      ...(origin === undefined ? {} : { origin }),
       ...(url === undefined ? {} : { url }),
     };
+
+    dialog = opened;
+
+    for (const listener of dialogListeners) {
+      listener(opened);
+    }
   };
 
   // Only a main-frame navigation replaces the document; a subframe navigation leaves the main document's node ids valid and its network boundary untouched.
   const handleFrameNavigated = (params: Record<string, unknown> | undefined): void => {
     const parsed = frameNavigatedParamsSchema.safeParse(params);
 
-    if (!parsed.success || parsed.data.frame.parentId !== undefined) {
+    if (!parsed.success) {
       return;
     }
 
-    if (parsed.data.frame.id !== undefined) {
-      mainFrameId = parsed.data.frame.id;
+    const { frame } = parsed.data;
+
+    if (frame.id !== undefined && frame.securityOrigin !== undefined) {
+      // The browser computes a frame's origin — an `about:blank` child of a cross-origin frame inherits that frame's — and reports it here.
+      frameOrigins.set(frame.id, frame.securityOrigin);
+    }
+
+    if (frame.parentId !== undefined) {
+      return;
+    }
+
+    if (frame.id !== undefined) {
+      mainFrameId = frame.id;
+    }
+
+    // A new top-level document replaces every frame the old one held: only its own origin is still known.
+    frameOrigins.clear();
+
+    if (frame.id !== undefined && frame.securityOrigin !== undefined) {
+      frameOrigins.set(frame.id, frame.securityOrigin);
     }
 
     invalidateDocument();
@@ -1973,6 +2085,7 @@ export const createBrowserToolSession = ({
 
     if (parsed.data.targetId !== undefined) {
       childFrames.delete(parsed.data.targetId);
+      frameOrigins.delete(parsed.data.targetId);
       return;
     }
 
@@ -1980,6 +2093,7 @@ export const createBrowserToolSession = ({
     for (const [frameId, frame] of childFrames) {
       if (frame.sessionId === parsed.data.sessionId) {
         childFrames.delete(frameId);
+        frameOrigins.delete(frameId);
         return;
       }
     }
@@ -2051,6 +2165,15 @@ export const createBrowserToolSession = ({
       return;
     }
 
+    if (method === 'Fetch.requestPaused') {
+      // One interceptor at a time per tab: every listener answers, and an armed interceptor owns the tab's pauses.
+      for (const listener of fetchPauseListeners) {
+        listener(params);
+      }
+
+      return;
+    }
+
     if (method === 'Page.frameNavigated') {
       handleFrameNavigated(params);
       return;
@@ -2063,6 +2186,17 @@ export const createBrowserToolSession = ({
 
     if (method === 'Target.detachedFromTarget') {
       handleDetachedFromTarget(params);
+      return;
+    }
+
+    if (method === FRAME_DETACHED_METHOD) {
+      // A same-process frame that went away: its id and origin are not reused, and keeping them would grow with every iframe the page loads.
+      const detached = frameDetachedParamsSchema.safeParse(params);
+
+      if (detached.success) {
+        frameOrigins.delete(detached.data.frameId);
+      }
+
       return;
     }
 
@@ -2252,12 +2386,48 @@ export const createBrowserToolSession = ({
     attachPromise = undefined;
   };
 
+  /**
+   * One command the page's renderer answers. It answers none while a
+   * JavaScript dialog is open (see `browser-tool-dialog.ts`), so a command is
+   * refused at once while one is open, and stops waiting when one opens before
+   * it answered: its late answer is dropped.
+   */
+  const pageCommand = async (
+    method: string,
+    params?: Record<string, unknown>,
+    commandTarget: ChromeDebuggerTarget = target
+  ): Promise<Record<string, unknown> | undefined> => {
+    if (debuggerApi === undefined) {
+      throw new Error(`${method} is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`);
+    }
+
+    if (dialog !== undefined) {
+      throw new BrowserToolDialogOpenError();
+    }
+
+    const { promise: dialogOpened, reject } = Promise.withResolvers<never>();
+    const refuse = (): void => {
+      reject(new BrowserToolDialogOpenError());
+    };
+
+    dialogListeners.add(refuse);
+
+    try {
+      return await Promise.race([
+        Promise.resolve(debuggerApi.sendCommand(commandTarget, method, params)),
+        dialogOpened,
+      ]);
+    } finally {
+      dialogListeners.delete(refuse);
+    }
+  };
+
   const applyFocusEmulation = async (): Promise<void> => {
     if (debuggerApi === undefined) {
       return;
     }
 
-    await debuggerApi.sendCommand(target, FOCUS_EMULATION_METHOD, { enabled: true });
+    await pageCommand(FOCUS_EMULATION_METHOD, { enabled: true });
     focusEmulated = true;
   };
 
@@ -2266,7 +2436,7 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const response = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
+    const response = await pageCommand('Runtime.evaluate', {
       expression: 'document.visibilityState',
       returnByValue: true,
     });
@@ -2462,6 +2632,12 @@ export const createBrowserToolSession = ({
     }
   };
 
+  /**
+   * Every command but the dialog's own answer goes through the dialog guard. An
+   * input command is refused while a dialog is open but left to finish once
+   * sent, because abandoning a press would leave its release unsent; the call
+   * that sent it races the dialog itself.
+   */
   const send = async (
     method: string,
     params?: Record<string, unknown>,
@@ -2480,14 +2656,37 @@ export const createBrowserToolSession = ({
 
     await attach();
 
+    if (method === DIALOG_ANSWER_METHOD) {
+      return debuggerApi.sendCommand(target, method, params);
+    }
+
+    // Arming or releasing the download interceptor is not page work: it answers with a dialog open, and the answer's own file must be held by it.
+    if (method.startsWith(DIALOG_SAFE_COMMAND_PREFIX)) {
+      return debuggerApi.sendCommand(target, method, params);
+    }
+
     if (method.startsWith('Input.')) {
+      // Checked after the attach: a dialog can open while it is awaited.
+      if (dialog !== undefined) {
+        throw new BrowserToolDialogOpenError();
+      }
+
       return sendInputCommand(method, params);
     }
 
     // A child session runs in its own process, so the tab's input timing rules do not apply to it.
-    return sessionId === undefined
-      ? debuggerApi.sendCommand(target, method, params)
-      : debuggerApi.sendCommand({ ...target, sessionId }, method, params);
+    const answer = await pageCommand(
+      method,
+      params,
+      sessionId === undefined ? target : { ...target, sessionId }
+    );
+
+    if (method === FRAME_TREE_METHOD) {
+      // Every frame read also refreshes the origins a dialog is judged by: the page cannot be asked again while one is open.
+      recordFrameOrigins(answer);
+    }
+
+    return answer;
   };
 
   const getDocumentNodeId = async (): Promise<number | undefined> => {
@@ -2499,7 +2698,7 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const response = await debuggerApi.sendCommand(target, 'DOM.getDocument', { depth: 0 });
+    const response = await pageCommand('DOM.getDocument', { depth: 0 });
     const parsed = domGetDocumentResponseSchema.safeParse(response);
 
     if (!parsed.success || parsed.data.root === undefined) {
@@ -2586,7 +2785,7 @@ export const createBrowserToolSession = ({
     }
 
     // A selector must name exactly one element: querySelector would silently take the first match, so an ambiguous selector would type into an arbitrary field.
-    const response = await debuggerApi.sendCommand(target, 'DOM.querySelectorAll', {
+    const response = await pageCommand('DOM.querySelectorAll', {
       nodeId: rootNodeId,
       selector,
     });
@@ -2715,6 +2914,16 @@ export const createBrowserToolSession = ({
     };
   };
 
+  const watchFetchPauses = (
+    listener: (params: Record<string, unknown> | undefined) => void
+  ): (() => void) => {
+    fetchPauseListeners.add(listener);
+
+    return () => {
+      fetchPauseListeners.delete(listener);
+    };
+  };
+
   const takeDownloads = (): readonly BrowserToolDownload[] => {
     const seen = [...downloadBuffer];
 
@@ -2729,6 +2938,14 @@ export const createBrowserToolSession = ({
     dialog = undefined;
 
     return pending;
+  };
+
+  const watchDialogs = (listener: (opened: BrowserToolDialog) => void): (() => void) => {
+    dialogListeners.add(listener);
+
+    return () => {
+      dialogListeners.delete(listener);
+    };
   };
 
   const runPageTool = async (
@@ -3682,6 +3899,11 @@ export const createBrowserToolSession = ({
       return { error: BROWSER_TOOL_SESSION_DISPOSED_ERROR, ok: false };
     }
 
+    // Page code answers nothing while a dialog is open: refusing here fails at once instead of sitting out the eval's timeout.
+    if (dialog !== undefined) {
+      return { error: BROWSER_TOOL_DIALOG_OPEN_ERROR, ok: false };
+    }
+
     try {
       await attach();
     } catch (error) {
@@ -3782,6 +4004,7 @@ export const createBrowserToolSession = ({
       isAttached: () => attached,
       networkRequests: () => [...networkById.values()],
       networkRequestsSinceLoad,
+      pendingDialog: () => dialog,
       registerRefs: (entries, options) => {
         registerRefs(refs, entries, options);
       },
@@ -3796,7 +4019,9 @@ export const createBrowserToolSession = ({
       takeDialog,
       takeDownloads,
       viewportState,
+      watchDialogs,
       watchDownloads,
+      watchFetchPauses,
     };
   };
 
@@ -3835,6 +4060,7 @@ export const createBrowserToolSession = ({
     isAttached: () => attached,
     networkRequests: () => [...networkById.values()],
     networkRequestsSinceLoad,
+    pendingDialog: () => dialog,
     registerRefs: (entries, options) => {
       registerRefs(defaultRefs, entries, options);
     },
@@ -3843,6 +4069,8 @@ export const createBrowserToolSession = ({
     takeDialog,
     takeDownloads,
     viewportState,
+    watchDialogs,
     watchDownloads,
+    watchFetchPauses,
   };
 };

@@ -61,6 +61,7 @@ import type dayjsType from 'dayjs';
 import type utcType from 'dayjs/plugin/utc';
 import type * as Sentry from '@sentry/nextjs';
 import type { CreatePersonalKiloPassCheckoutSession } from '@/routers/kilo-pass-router';
+import type * as PaidHosting from '@kilocode/db/kiloclaw-paid-hosting';
 import type {
   ServiceFeeAssessmentRecord,
   ServiceFeeAssessmentStore,
@@ -85,6 +86,10 @@ type ChargeVerdict = { enforced: boolean; code?: 'charge_blocked'; flags: unknow
 const mockChargeDecide = jest
   .fn<(request: unknown) => Promise<ChargeVerdict | null>>()
   .mockResolvedValue(null);
+jest.mock('@kilocode/db/kiloclaw-paid-hosting', () => ({
+  isKiloClawPaidHostingAvailable: jest.fn(() => true),
+}));
+
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
   const actual = jest.requireActual<typeof BouncerClient>(
     '@kilocode/web-shared/lib/bouncer/client'
@@ -228,6 +233,7 @@ type KiloPassCaller = {
           | 'destroyed_instance'
           | 'requires_reprovision'
           | 'signup_unavailable'
+          | 'hosting_ended'
           | 'insufficient_credits'
           | 'expired_commit'
           | 'unexpected_error';
@@ -2619,6 +2625,75 @@ describe('kiloPassRouter', () => {
   });
 
   describe('activateCheckoutHosting', () => {
+    it.each(['trialing', 'active'] as const)(
+      'blocks new hosting but preserves replay after end of life (%s)',
+      async status => {
+        const { isKiloClawPaidHostingAvailable } =
+          await import('@kilocode/db/kiloclaw-paid-hosting');
+        const { isKiloClawPaidHostingAvailable: actual } = jest.requireActual<typeof PaidHosting>(
+          '@kilocode/db/kiloclaw-paid-hosting'
+        );
+        const user = await insertTestUser({ total_microdollars_acquired: 199_000_000 });
+        const instanceId = crypto.randomUUID();
+        const stripeSubscriptionId = `sub_paid_hosting_${status}`;
+        await db
+          .insert(kiloclaw_instances)
+          .values({ id: instanceId, user_id: user.id, sandbox_id: `test-${instanceId}` });
+        await db.insert(kiloclaw_subscriptions).values({
+          instance_id: instanceId,
+          user_id: user.id,
+          status,
+          plan: status === 'active' ? 'standard' : 'trial',
+          payment_source: 'credits',
+          kiloclaw_price_version: '2026-05-10',
+        });
+        const { id: subscriptionId } = await insertSubscription({
+          kiloUserId: user.id,
+          stripeSubscriptionId,
+          tier: KiloPassTier.Tier199,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+        });
+        await insertBaseCreditsIssuance({ subscriptionId, kiloUserId: user.id });
+        const stripeMock = getStripeMock();
+        stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+          status: 'complete',
+          subscription: stripeSubscriptionId,
+          metadata: {
+            type: 'kilo-pass',
+            kiloUserId: user.id,
+            kiloclawHostingPlan: 'standard',
+            kiloclawInstanceId: instanceId,
+            kiloclawPriceVersion: '2026-05-10',
+          },
+        });
+        stripeMock.subscriptions.retrieve.mockResolvedValue({
+          id: stripeSubscriptionId,
+          created: Math.floor(Date.parse('2026-11-20T00:00:00Z') / 1000),
+        });
+        const caller = await createCallerForUser(user.id);
+
+        await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(actual, async () => {
+          await expect(
+            caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_paid_hosting' })
+          ).resolves.toEqual(
+            status === 'active'
+              ? { outcome: 'activated', hostingIntent: 'standard' }
+              : { outcome: 'action_required', hostingIntent: 'standard', reason: 'hosting_ended' }
+          );
+        });
+        const [hosting] = await db
+          .select()
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.instance_id, instanceId));
+        expect(hosting?.status).toBe(status);
+        const [updatedUser] = await db
+          .select({ used: kilocode_users.microdollars_used })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, user.id));
+        expect(updatedUser?.used).toBe(0);
+      }
+    );
     it('does not let a completed stale checkout create a first KiloClaw subscription', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-stale-first-kiloclaw@example.com',

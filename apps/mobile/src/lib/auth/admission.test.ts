@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one admission suite: the challenge request, both platform providers, the provider replacement, and the sentinel fallback share one module-mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as AppIntegrity from '@expo/app-integrity';
@@ -7,6 +8,7 @@ import { Platform } from 'react-native';
 
 import {
   ADMISSION_CHALLENGE_FAILED,
+  ADMISSION_CHALLENGE_TIMEOUT_MS,
   AdmissionChallengeResponseSchema,
   clearAttestKeyOnRefusal,
   hasAttestationCapability,
@@ -60,6 +62,12 @@ vi.mock('expo-secure-store', () => ({
   deleteItemAsync: vi.fn(),
 }));
 
+// `client-metadata` builds the app `User-Agent` from `expo-application`, whose
+// expo root needs `__DEV__` and cannot load in the node test environment.
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
+}));
+
 vi.mock('expo-crypto', () => ({
   CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
   CryptoEncoding: { BASE64: 'base64' },
@@ -72,14 +80,10 @@ const originalFetch = globalThis.fetch;
  * Answer the challenge endpoint with a fixed challenge, a fresh `Response` per
  * call so a test may exercise the sentinel fallback after a failed attempt.
  */
-function setupChallengeFetch(challenge = 'server-challenge') {
+function setupChallengeFetch() {
   const fn = vi
     .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-    .mockImplementation(async () => {
-      // A fresh Response per call: a body can be read only once.
-      await Promise.resolve();
-      return Response.json({ challenge });
-    });
+    .mockImplementation(() => Promise.resolve(Response.json({ challenge: 'server-challenge' })));
   globalThis.fetch = fn;
   return fn;
 }
@@ -90,25 +94,58 @@ function invalidKeyError() {
   });
 }
 
+/** What the Expo module rejects with when Play Integrity invalidates its prepared provider. */
+function providerInvalidError() {
+  return Object.assign(new Error('Integrity token provider invalid'), {
+    code: 'ERR_APP_INTEGRITY_PROVIDER_INVALID',
+  });
+}
+
+/** A challenge that stalls until the request aborts: no answer, or headers then no body. */
+function setupHangingFetch(headersArrive: boolean) {
+  const signals: AbortSignal[] = [];
+  globalThis.fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+    (_input, init) => {
+      const signal = init?.signal;
+      const stalled = Promise.withResolvers<never>();
+      signal?.addEventListener('abort', () => {
+        stalled.reject(new DOMException('Aborted', 'AbortError'));
+      });
+      if (signal) {
+        signals.push(signal);
+      }
+      if (!headersArrive) {
+        return stalled.promise;
+      }
+      const response = new Response(null);
+      vi.spyOn(response, 'json').mockReturnValue(stalled.promise);
+      return Promise.resolve(response);
+    }
+  );
+  return signals;
+}
+
+/** Android with a configured project number, a challenge endpoint, and a fresh module. */
+function loadAndroidAdmission() {
+  vi.mocked(Platform).OS = 'android';
+  config.playIntegrityProjectNumber = '1234567890';
+  config.nativeAdmissionDevSentinel = false;
+  setupChallengeFetch();
+  return loadGetAdmission();
+}
+
 describe('AdmissionChallengeResponseSchema', () => {
-  it('parses a valid challenge body', () => {
-    expect(AdmissionChallengeResponseSchema.parse({ challenge: 'server-challenge' })).toEqual({
+  it('parses a valid challenge body and ignores extra fields', () => {
+    expect(
+      AdmissionChallengeResponseSchema.parse({ challenge: 'server-challenge', extra: true })
+    ).toEqual({
       challenge: 'server-challenge',
     });
   });
 
-  it('rejects a missing challenge field', () => {
-    expect(() => AdmissionChallengeResponseSchema.parse({})).toThrow();
-  });
-
-  it('rejects an empty challenge string', () => {
-    expect(() => AdmissionChallengeResponseSchema.parse({ challenge: '' })).toThrow();
-  });
-
-  it('ignores extra fields', () => {
-    expect(
-      AdmissionChallengeResponseSchema.parse({ challenge: 'server-challenge', extra: true })
-    ).toEqual({ challenge: 'server-challenge' });
+  // A body that cannot carry a challenge is unusable, not an empty challenge.
+  it.each([{}, { challenge: '' }])('rejects %o', body => {
+    expect(() => AdmissionChallengeResponseSchema.parse(body)).toThrow();
   });
 });
 
@@ -146,6 +183,7 @@ describe('getAdmission', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   // ── Platform cannot attest ─────────────────────────────────────────────
@@ -162,7 +200,7 @@ describe('getAdmission', () => {
   // ── iOS ────────────────────────────────────────────────────────────────
 
   it('attests a fresh key on the first call and stores the key id', async () => {
-    setupChallengeFetch();
+    const fetchSpy = setupChallengeFetch();
     const getAdmission = await loadGetAdmission();
 
     await expect(getAdmission()).resolves.toEqual({
@@ -174,6 +212,17 @@ describe('getAdmission', () => {
     });
     expect(AppIntegrity.attestKeyAsync).toHaveBeenCalledWith('key-1', 'server-challenge');
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(ATTEST_KEY_ID_KEY, 'key-1');
+    // The challenge names the requesting build, and the body stays the
+    // platform the server validates.
+    const init = fetchSpy.mock.calls[0]?.[1];
+    expect(init?.headers).toMatchObject({
+      'Content-Type': 'application/json',
+      'User-Agent': 'Kilo-Code/1.0.4 (ios)',
+      'x-kilo-client': 'mobile',
+      'x-kilo-app-platform': 'ios',
+      'x-kilo-app-version': '1.0.4',
+    });
+    expect(init?.body).toBe(JSON.stringify({ platform: 'ios' }));
   });
 
   it('does not store the key id when attestation fails', async () => {
@@ -229,10 +278,7 @@ describe('getAdmission', () => {
   // ── Android ────────────────────────────────────────────────────────────
 
   it('binds a standard Play Integrity request to the hashed challenge', async () => {
-    vi.mocked(Platform).OS = 'android';
-    config.playIntegrityProjectNumber = '1234567890';
-    setupChallengeFetch();
-    const getAdmission = await loadGetAdmission();
+    const getAdmission = await loadAndroidAdmission();
 
     await expect(getAdmission()).resolves.toEqual({
       platform: 'android',
@@ -250,20 +296,60 @@ describe('getAdmission', () => {
     expect(AppIntegrity.requestIntegrityCheckAsync).toHaveBeenCalledWith('challenge-digest');
   });
 
-  // ── Failure handling ───────────────────────────────────────────────────
+  it('replaces an invalidated provider once and uses the new one', async () => {
+    const getAdmission = await loadAndroidAdmission();
+    vi.mocked(AppIntegrity.requestIntegrityCheckAsync)
+      .mockRejectedValueOnce(providerInvalidError())
+      .mockResolvedValueOnce('replacement-token');
 
-  it('throws when the integrity provider refuses the device so the retry is offered', async () => {
+    await expect(getAdmission()).resolves.toMatchObject({ payload: 'replacement-token' });
+    // The Expo module keeps the provider it prepared, so a new one is prepared
+    // rather than reusing the stale one.
+    expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledTimes(2);
+    expect(AppIntegrity.requestIntegrityCheckAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not prepare a replacement when the request fails for another reason', async () => {
     // A rooted device or one without Play Services cannot pass Play Integrity.
     // The failure must be retryable, not a silent "device unsupported".
-    vi.mocked(Platform).OS = 'android';
-    config.playIntegrityProjectNumber = '1234567890';
-    setupChallengeFetch();
+    const getAdmission = await loadAndroidAdmission();
     vi.mocked(AppIntegrity.requestIntegrityCheckAsync).mockRejectedValue(
       new Error('ERR_APP_INTEGRITY_API_NOT_AVAILABLE')
     );
-    const getAdmission = await loadGetAdmission();
 
     await expect(getAdmission()).rejects.toThrow('ERR_APP_INTEGRITY_API_NOT_AVAILABLE');
+    expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledTimes(1);
+    expect(AppIntegrity.requestIntegrityCheckAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a second invalidated provider and makes the next attempt retry', async () => {
+    const getAdmission = await loadAndroidAdmission();
+    // One replacement is the bound: the second invalid answer is the retryable
+    // failure the caller shows, not another prepare inside the same attempt.
+    const failure = providerInvalidError();
+    vi.mocked(AppIntegrity.requestIntegrityCheckAsync).mockRejectedValue(failure);
+    await expect(getAdmission()).rejects.toBe(failure);
+    expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledTimes(2);
+
+    // The stale provider is not remembered: the next user attempt prepares one.
+    vi.mocked(AppIntegrity.requestIntegrityCheckAsync).mockResolvedValue('integrity-token');
+    await expect(getAdmission()).resolves.toMatchObject({ payload: 'integrity-token' });
+    expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledTimes(3);
+  });
+
+  it('clears only the provider it captured, so a peer replacement survives', async () => {
+    const getAdmission = await loadAndroidAdmission();
+    // Both callers share the first provider and both get the invalid answer.
+    // The first caller installs its replacement before the second handles that
+    // answer, so an unconditional clear would drop it and prepare a third.
+    vi.mocked(AppIntegrity.requestIntegrityCheckAsync)
+      .mockRejectedValueOnce(providerInvalidError())
+      .mockRejectedValueOnce(providerInvalidError())
+      .mockResolvedValue('integrity-token');
+
+    await expect(Promise.all([getAdmission(), getAdmission()])).resolves.toHaveLength(2);
+
+    expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledTimes(2);
   });
 
   // ── Non-production sentinel ────────────────────────────────────────────
@@ -315,6 +401,23 @@ describe('getAdmission', () => {
 
     await expect(getAdmission()).rejects.toThrow(ADMISSION_CHALLENGE_FAILED);
   });
+
+  // No answer at all, and headers followed by a body that never completes: both
+  // hold the caller's busy guard, so both must end at the deadline.
+  it.each([{ headersArrive: false }, { headersArrive: true }])(
+    'aborts a stalled challenge (headers: $headersArrive) so sign-in can retry',
+    async ({ headersArrive }) => {
+      const signals = setupHangingFetch(headersArrive);
+      const getAdmission = await loadGetAdmission();
+      vi.useFakeTimers();
+
+      const settled = expect(getAdmission()).rejects.toThrow(ADMISSION_CHALLENGE_FAILED);
+      await vi.advanceTimersByTimeAsync(ADMISSION_CHALLENGE_TIMEOUT_MS);
+      await settled;
+
+      expect(signals.map(signal => signal.aborted)).toEqual([true]);
+    }
+  );
 
   describe('clearAttestKeyOnRefusal', () => {
     it('drops the stored key id so the next attempt re-attests', async () => {

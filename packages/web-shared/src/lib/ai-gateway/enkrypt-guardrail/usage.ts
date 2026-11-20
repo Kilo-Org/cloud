@@ -194,7 +194,8 @@ async function detectorIds(
  * Runs on the primary; gateway code calls `recordEnkryptUsage` instead.
  */
 export async function recordEnkryptUsageLocally(
-  usageWrite: EnkryptUsageWrite
+  usageWrite: EnkryptUsageWrite,
+  fromDb: typeof db = db
 ): Promise<EnkryptUsageWriteResponse['status']> {
   const { id, occurredAt } = usageWrite;
   // A benchmark case's policy scans run before the signed permit callback, so the payer is not
@@ -205,7 +206,7 @@ export async function recordEnkryptUsageLocally(
     ? 0
     : enkryptCreditsToMicrodollars(usageWrite.creditsCost);
 
-  const outcome = await db.transaction(async tx => {
+  const outcome = await fromDb.transaction(async tx => {
     const apiKindId = await lookupId(
       () =>
         tx

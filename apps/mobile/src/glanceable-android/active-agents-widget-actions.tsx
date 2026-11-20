@@ -17,9 +17,9 @@ import {
   textAlign,
 } from './active-agents-widget-parts';
 
-/** Android's minimum touch target; a target keeps it wherever the split leaves room. */
+/** Android's minimum touch target: both trailing actions reach it on every class. */
 const ACTION_TARGET = 48;
-/** The visible gap between the Approve control and `+`, on every class. */
+/** The smallest visible gap between the Approve control and `+`, on every class. */
 const ACTION_GAP = 4;
 
 /** The Small/Medium/Large header's round glyphs: 24dp, their tops on the cards' padding line. */
@@ -49,14 +49,23 @@ function band(f: Frame, cy: number) {
 }
 
 /**
- * The trailing action slots for a `+` glyph of radius `r`: `+` ends on the
- * class's padding line and the Approve control ends 4dp before it. The two
- * targets split at the middle of that gap, so they never overlap: `+` owns the
- * rest of the trailing edge, Approve the room before the split.
+ * The trailing action slots for a `+` glyph of radius `r`. `+` never moves: it
+ * ends on the class's padding line, so its target owns the trailing edge and the
+ * split can never sit right of `width - ACTION_TARGET` without that target
+ * falling under Android's minimum. The Approve control ends at the split (or a
+ * full {@link ACTION_GAP} before `+`, whichever is further left), so the two
+ * targets meet there: each reaches {@link ACTION_TARGET} and they never overlap.
+ *
+ * On the 24dp header glyphs the `+` glyph plus the padding is narrower than a
+ * 48dp target, so the split moves in by `ACTION_TARGET - pad - 2r` and the
+ * visible gap grows from {@link ACTION_GAP} by that much: 4dp more on the
+ * 16dp-pad cards (8dp) and 6dp more on the 14dp-pad Narrow cell (10dp). Row and
+ * Landscape already clear 48dp with their larger glyphs, so nothing moves there.
  */
 function slots(f: Frame, r: number, pad: number) {
   const plusX = f.width - pad - 2 * r;
-  return { plusX, approveEnd: plusX - ACTION_GAP, split: plusX - ACTION_GAP / 2 };
+  const split = Math.min(plusX - ACTION_GAP / 2, f.width - ACTION_TARGET);
+  return { plusX, split, approveEnd: Math.min(plusX - ACTION_GAP, split) };
 }
 
 /** What the Approve slot shows: nothing, a ready Approve, or the in-flight state. */
@@ -103,8 +112,7 @@ export function roundActions(
     nodes.push(glyph(f, slot, { cx: approveEnd - r, cy, r }));
   }
   if (slot === 'approve') {
-    const width = Math.max(ACTION_TARGET, 2 * r + ACTION_GAP / 2);
-    nodes.push(target(f, 'approve', { x: split - width, y, width, height }));
+    nodes.push(target(f, 'approve', { x: split - ACTION_TARGET, y, width: ACTION_TARGET, height }));
   }
   if (spec.create) {
     nodes.push(

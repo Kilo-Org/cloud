@@ -1,8 +1,9 @@
+import { taggedWriterDb } from '@kilocode/web-shared/lib/drizzle';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
-import { queueWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
+import { taggedWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 import { recordEnkryptUsageLocally } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
   USAGE_CLASS_LIMIT_HEADER,
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const admission =
     request.headers.get('x-usage-write-source') === 'queue'
-      ? await queueWriterAdmission.acquire('queue', usageId, {
+      ? await taggedWriterAdmission.acquire('queue', usageId, {
           maxWaitMs: QUEUE_ADMISSION_MAX_WAIT_MS,
           signal: request.signal,
           writerClass: 'non_llm',
@@ -61,7 +62,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const status = await recordEnkryptUsageLocally(parsed.data);
+    const status = await recordEnkryptUsageLocally(
+      parsed.data,
+      admission ? taggedWriterDb : undefined
+    );
     return NextResponse.json({ status, usageId } satisfies EnkryptUsageWriteResponse);
   } catch (error) {
     console.error('[enkrypt-guardrail] failed to record usage in the primary region', {

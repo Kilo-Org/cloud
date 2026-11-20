@@ -2532,7 +2532,7 @@ describe('coverage generation participation', () => {
     await markPaidCaseCancellationDelivered(db, { key: key(), generation });
   }
 
-  it('never reports a reclaimed generation\'s Kilo cover on the old paused request', async () => {
+  it("never reports a reclaimed generation's Kilo cover on the old paused request", async () => {
     // A measures generation 2 and is paused unfunded. B reclaims the slot, Kilo joins the
     // new generation and pays for a call on it. A must not report that cover.
     await db.batch(enqueuePaidCaseStatements(db, { key: key(), requestId: 'request-a' }));
@@ -2621,7 +2621,7 @@ describe('coverage generation participation', () => {
     expect(bravo.chargedMicrodollars).toBe(0);
   });
 
-  it('freezes a closed parent\'s stale child during a live claim', async () => {
+  it("freezes a closed parent's stale child during a live claim", async () => {
     // A live request claims the case while a closed request still holds a `queued` child row
     // (a crash or an older write path left it behind). The claim joins the live request to
     // the new generation and must leave the closed history byte-identical.
@@ -2809,9 +2809,7 @@ describe('shared case progress attribution', () => {
         '2026-01-01T00:00:00.000Z',
         '2026-01-01T00:00:00.000Z'
       );
-    await db.batch(
-      enqueuePaidCaseStatements(db, { key: secondKey, requestId: 'request-a' })
-    );
+    await db.batch(enqueuePaidCaseStatements(db, { key: secondKey, requestId: 'request-a' }));
 
     // The owner pays 40 for case-1 and 7 for case-2, each through the real selection,
     // admission and receipt path keyed by its own case.

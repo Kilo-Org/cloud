@@ -1458,7 +1458,8 @@ describe('terminal unusable measurement', () => {
         FROM benchmark_case_runs`
       )
       .run(error);
-    const rows = sqlite.prepare('SELECT model, variant, rep, case_id FROM benchmark_case_runs')
+    const rows = sqlite
+      .prepare('SELECT model, variant, rep, case_id FROM benchmark_case_runs')
       .all() as Array<{ model: string; variant: string; rep: number; case_id: string }>;
     const named = only
       ? new Set(only.map(row => JSON.stringify([row.model, row.variant, row.rep, row.case_id])))
@@ -1500,15 +1501,7 @@ describe('terminal unusable measurement', () => {
         ) VALUES ('usage-prior', 'mr-prior', ?, ?, ?, ?, ?, ?, 1, 'user', 'user-1', ?, 0,
           '2026-01-01T00:00:00.000Z')`
       )
-      .run(
-        requestId,
-        ENGINE,
-        run.model,
-        run.variant,
-        run.rep,
-        run.case_id,
-        microdollars
-      );
+      .run(requestId, ENGINE, run.model, run.variant, run.rep, run.case_id, microdollars);
     // The store's receipt batch also raises the request total; mirror it.
     sqlite
       .prepare('UPDATE paid_benchmark_requests SET charged_microdollars = ? WHERE id = ?')
@@ -1541,7 +1534,9 @@ describe('terminal unusable measurement', () => {
     // the controlled reason.
     expect(
       sqlite
-        .prepare('SELECT DISTINCT status, reason FROM paid_benchmark_request_cases WHERE request_id = ?')
+        .prepare(
+          'SELECT DISTINCT status, reason FROM paid_benchmark_request_cases WHERE request_id = ?'
+        )
         .all(requestId)
     ).toEqual([{ status: 'failed', reason: 'The measurement finished without a usable result.' }]);
     expect(
@@ -1550,9 +1545,9 @@ describe('terminal unusable measurement', () => {
       )
     ).toBe(0);
     // The prior billed call is untouched: no retro refund, no new spend, no new run.
-    expect(
-      sqlite.prepare('SELECT COUNT(*) AS count FROM paid_attempt_usage').get()
-    ).toEqual({ count: 1 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM paid_attempt_usage').get()).toEqual({
+      count: 1,
+    });
     const runs = countRows('SELECT COUNT(*) AS count FROM benchmark_runs');
     const caseRuns = countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs');
 
@@ -1601,7 +1596,9 @@ describe('terminal unusable measurement', () => {
     // either: an unusable slot with no controlled reason shows one fixed safe note.
     const { requestId } = await activeRequest();
     const rows = sqlite
-      .prepare('SELECT model, variant, rep, case_id FROM benchmark_case_runs ORDER BY case_id LIMIT 2')
+      .prepare(
+        'SELECT model, variant, rep, case_id FROM benchmark_case_runs ORDER BY case_id LIMIT 2'
+      )
       .all() as Array<{ model: string; variant: string; rep: number; case_id: string }>;
     const raw = [
       'HTTP 502 from upstream: org=acme key=sk-live-abc customer=someone@example.com',
@@ -1646,7 +1643,9 @@ describe('terminal unusable measurement', () => {
     expect(leaked).toEqual({ count: 0 });
 
     // The raw diagnostics are still in `case_results`, where an operator can read them.
-    expect(countRows("SELECT COUNT(*) AS count FROM case_results WHERE error LIKE '%sk-live%'")).toBe(1);
+    expect(
+      countRows("SELECT COUNT(*) AS count FROM case_results WHERE error LIKE '%sk-live%'")
+    ).toBe(1);
   });
 
   it('reports a controlled canonical reason when the run recorded one', async () => {
@@ -1654,7 +1653,9 @@ describe('terminal unusable measurement', () => {
     // worker-authored copy is the one an owner may see.
     const { requestId } = await activeRequest();
     const row = sqlite
-      .prepare('SELECT model, variant, rep, case_id FROM benchmark_case_runs ORDER BY case_id LIMIT 1')
+      .prepare(
+        'SELECT model, variant, rep, case_id FROM benchmark_case_runs ORDER BY case_id LIMIT 1'
+      )
       .get() as { model: string; variant: string; rep: number; case_id: string };
     sqlite
       .prepare(
@@ -1682,7 +1683,9 @@ describe('terminal unusable measurement', () => {
     // the last slot is terminal.
     const { requestId } = await activeRequest();
     const [first] = sqlite
-      .prepare('SELECT model, variant, rep, case_id FROM benchmark_case_runs ORDER BY case_id LIMIT 1')
+      .prepare(
+        'SELECT model, variant, rep, case_id FROM benchmark_case_runs ORDER BY case_id LIMIT 1'
+      )
       .all() as Array<{ model: string; variant: string; rep: number; case_id: string }>;
     settleUnusable('admission_unavailable: retry.', [first]);
 

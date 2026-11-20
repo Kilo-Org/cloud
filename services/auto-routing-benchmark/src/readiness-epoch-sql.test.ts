@@ -164,7 +164,7 @@ describe('benchmark readiness epoch trigger (real migrations)', () => {
     expect(epoch('efficient')).toBe(efficientBefore + 1);
     expect(epoch('frontier')).toBe(frontierBefore + 1);
     expect(
-      sqlite.prepare("SELECT router FROM benchmark_config").get() as { router: string }
+      sqlite.prepare('SELECT router FROM benchmark_config').get() as { router: string }
     ).toEqual({ router: 'frontier' });
   });
 

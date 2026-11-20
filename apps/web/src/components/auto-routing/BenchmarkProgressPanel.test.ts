@@ -170,6 +170,61 @@ describe('BenchmarkProgressPanel', () => {
     expect(html).not.toContain('Pause benchmark');
   });
 
+  it('marks only reuse free and shows a ledger amount for billed calls', () => {
+    const cases: PaidBenchmarkCase[] = [
+      {
+        ...CASE,
+        id: 'reused-1',
+        caseId: 'case-reused',
+        status: 'reused',
+        billedModelRequests: 0,
+        kiloCoveredModelRequests: 0,
+        kiloCoveredMicrodollars: 0,
+        chargedMicrodollars: 0,
+        coveredByKilo: false,
+      },
+      {
+        ...CASE,
+        id: 'queued-1',
+        caseId: 'case-queued',
+        status: 'queued',
+        billedModelRequests: 0,
+        kiloCoveredModelRequests: 0,
+        kiloCoveredMicrodollars: 0,
+        chargedMicrodollars: 0,
+        coveredByKilo: false,
+      },
+      {
+        ...CASE,
+        id: 'paused-1',
+        caseId: 'case-paused',
+        status: 'paused',
+        billedModelRequests: 0,
+        kiloCoveredModelRequests: 0,
+        kiloCoveredMicrodollars: 0,
+        chargedMicrodollars: 0,
+        coveredByKilo: false,
+      },
+      {
+        ...CASE,
+        id: 'billed-zero-1',
+        caseId: 'case-billed-zero',
+        billedModelRequests: 2,
+        chargedMicrodollars: 0,
+      },
+    ];
+    const html = render(progress('active'), { cases });
+
+    // Reuse is the only guaranteed free state.
+    expect(html.match(/>Free</g)).toHaveLength(1);
+    // Queued and paused-without-receipt are neutral, never "Free".
+    expect(html.match(/No charge recorded/g)).toHaveLength(2);
+    // A known billed call shows its ledger amount even when that amount is zero.
+    expect(html).toContain('$0 · 2 billed');
+    expect(html).toContain('Case case-queued');
+    expect(html).toContain('Case case-paused');
+  });
+
   it('lists each case with its state, model, and charge', () => {
     const html = render(progress('active'));
     expect(html).toContain('vendor/a');

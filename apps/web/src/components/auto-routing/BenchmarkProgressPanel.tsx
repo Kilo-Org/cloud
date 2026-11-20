@@ -47,6 +47,19 @@ const STATUS_TITLE: Record<Exclude<PaidBenchmarkProgress['status'], 'empty'>, st
   failed: 'Benchmark failed',
 };
 
+/**
+ * Only a reused case is guaranteed free. A case with billed model requests shows
+ * the ledger amount, including a known zero. Anything else has no receipt yet, so
+ * it must not claim a future charge is impossible.
+ */
+function caseChargeLabel(item: PaidBenchmarkCase): string {
+  if (item.status === 'reused') return 'Free';
+  if (item.billedModelRequests > 0 || item.chargedMicrodollars > 0) {
+    return `${formatBenchmarkMicrodollars(item.chargedMicrodollars)} · ${item.billedModelRequests} billed`;
+  }
+  return 'No charge recorded';
+}
+
 export function BenchmarkProgressPanel({
   progress,
   cases,
@@ -259,11 +272,7 @@ export function BenchmarkProgressPanel({
                     </span>
                   ) : null}
                   <span className="text-muted-foreground ml-auto text-xs tabular-nums">
-                    {item.chargedMicrodollars > 0
-                      ? `${formatBenchmarkMicrodollars(
-                          item.chargedMicrodollars
-                        )} · ${item.billedModelRequests} billed`
-                      : 'Free'}
+                    {caseChargeLabel(item)}
                   </span>
                 </div>
                 <p className="text-muted-foreground text-xs">

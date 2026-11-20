@@ -597,7 +597,7 @@ describe('admin request reads', () => {
     expect(b?.chargedMicrodollars).toBe(0);
   });
 
-  it('never reports a reclaimed generation\'s Kilo cover on the old paused request', async () => {
+  it("never reports a reclaimed generation's Kilo cover on the old paused request", async () => {
     // The exact reclaim shape: A's row joined generation 1 and paused there; the run moved
     // on and generation 3 is Kilo covered. The old request must not show that cover, while
     // the request that joined generation 3 must.
@@ -617,7 +617,9 @@ describe('admin request reads', () => {
       platformCovered: true,
       requestId: '',
     });
-    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 3 WHERE usage_id = 'usage-cov'`).run();
+    sqlite
+      .prepare(`UPDATE paid_attempt_usage SET generation = 3 WHERE usage_id = 'usage-cov'`)
+      .run();
 
     const a = await readPaidBenchmarkAdminRequest(db, REQUEST);
     const b = await readPaidBenchmarkAdminRequest(db, 'request-b');
@@ -647,7 +649,9 @@ describe('admin request reads', () => {
       platformCovered: true,
       requestId: '',
     });
-    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 1 WHERE usage_id = 'usage-cov'`).run();
+    sqlite
+      .prepare(`UPDATE paid_attempt_usage SET generation = 1 WHERE usage_id = 'usage-cov'`)
+      .run();
 
     const request = await readPaidBenchmarkAdminRequest(db, REQUEST);
     expect(request?.kiloCoveredModelRequests).toBe(0);
@@ -676,7 +680,9 @@ describe('admin request reads', () => {
       platformCovered: true,
       requestId: '',
     });
-    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 2 WHERE usage_id = 'usage-cov'`).run();
+    sqlite
+      .prepare(`UPDATE paid_attempt_usage SET generation = 2 WHERE usage_id = 'usage-cov'`)
+      .run();
 
     for (const id of [REQUEST, 'request-b']) {
       const request = await readPaidBenchmarkAdminRequest(db, id);

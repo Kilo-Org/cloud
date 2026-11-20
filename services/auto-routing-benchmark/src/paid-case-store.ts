@@ -754,7 +754,7 @@ export function claimPaidCaseStatements(
               AND executor_run_id = ? AND executor_token = ?
           )`
       )
-      .bind(...key, at, ...key, ...key, input.executor.runId, input.executor.token),
+      .bind(...key, at, ...key, ...key, input.executor.runId, input.executor.token)
   );
   statements.push(
     db.prepare(`SELECT * FROM benchmark_case_runs WHERE ${caseKeyPredicate()}`).bind(...key)

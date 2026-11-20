@@ -7,10 +7,12 @@
 # time), so each deploy pins whatever version was `latest` then. Re-deploy to
 # pick up a newer stable CLI.
 FROM node:22-slim
+# The capture script pins the same version the benchmark measures (scripts/capture-probe-templates.ts).
+ARG CLI_VERSION=latest
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 g++ make \
   && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install -g @kilocode/cli@latest
+  && npm install -g @kilocode/cli@${CLI_VERSION}
 WORKDIR /app
 COPY server.mjs ./
 EXPOSE 3000

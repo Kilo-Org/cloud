@@ -2,7 +2,7 @@ import { stripVTControlCharacters } from 'node:util';
 import type { PaidExecutionKey } from './scheduler';
 import { parseKiloRunEvents, type ToolEvidence } from './kilo-events';
 import type { DeciderCase } from './datasets/decider-cases';
-import { materializeLongContext } from './datasets/long-context';
+import { taskPrompt } from './decider-prompt';
 
 export type CliRunResult = {
   text: string;
@@ -39,28 +39,16 @@ export function addPriorAttempt(result: CliRunResult, prior: AttemptUsage): void
 
 export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 
-// Appended to every decider prompt: the agent harness tends to wrap answers
-// in prose ("The output is: ..."), which strict mechanical checks reject.
-// One uniform instruction across all candidate models keeps grading fair.
-const FINAL_ANSWER_SUFFIX =
-  '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
-
-function taskPrompt(benchCase: DeciderCase): string {
-  const prompts = materializeLongContext(benchCase);
-  return `${prompts.systemPrompt}\n\n${prompts.userPrompt}${FINAL_ANSWER_SUFFIX}`;
-}
-
 /**
  * The exact text `kilo run` sends to the model for a decider case: the container writes it
  * to the CLI's stdin, which the CLI uses verbatim. Long-context cases carry their generated
  * workspace snapshot, as the offline sweep and candidate screen send them. The CLI has no
  * system-prompt flag, so the system prompt is folded in. The platform container and client
  * evals (ADR 0005) both send this string, so their measurements in one custom router share
- * byte-identical prompts. A continuation case already carries the task in its seeded
- * session, so its run sends only the message that resumes that session.
+ * byte-identical prompts.
  */
 export function deciderCliPrompt(benchCase: DeciderCase): string {
-  return benchCase.continuation ? benchCase.continuation.message : taskPrompt(benchCase);
+  return taskPrompt(benchCase);
 }
 
 export function isRetryableContainerAvailabilityError(error: unknown): boolean {
@@ -176,161 +164,6 @@ export type ContainerRunResponse = {
   timedOut?: boolean;
 };
 
-// The default primary agent of the pinned CLI (@kilocode/cli 7.8.27).
-const CLI_AGENT = 'code';
-const CLI_VERSION = '7.8.27';
-const SEED_TOKENS = { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } };
-// `kilo run` creates its headless sessions with these rules; an imported session needs them too.
-const HEADLESS_RUN_PERMISSIONS = ['question', 'suggest', 'plan_enter', 'plan_exit'].map(
-  permission => ({ permission, action: 'deny', pattern: '*' })
-);
-
-// CLI ids are `<prefix>_`, 12 hex digits of (milliseconds * 0x1000 + counter), then 14 base62
-// characters, and the CLI orders a session's messages and parts by id. Ticks in the first
-// seconds of the epoch sort the seeded history before everything the resumed run creates; the
-// run key keeps ids unique in the container's shared CLI database.
-function seedId(prefix: 'ses' | 'msg' | 'prt', tick: number, runKey: string): string {
-  return `${prefix}_${(tick * 0x1000).toString(16).padStart(12, '0')}${runKey}`;
-}
-
-type SeedPart = { id: string; sessionID: string; messageID: string } & (
-  | { type: 'text'; text: string; time?: { start: number; end: number } }
-  | { type: 'step-start' }
-  | {
-      type: 'tool';
-      callID: string;
-      tool: 'bash';
-      state: {
-        status: 'completed';
-        input: { command: string; description: string };
-        output: string;
-        title: string;
-        metadata: { output: string; description: string; truncated: false };
-        time: { start: number; end: number };
-      };
-    }
-  | {
-      type: 'step-finish';
-      reason: 'tool-calls';
-      cost: number;
-      tokens: typeof SEED_TOKENS;
-    }
-);
-
-/**
- * The workspace files and the `kilo export` document of a continuation case's session in
- * progress: the task's user message, then one assistant message per step that already ran.
- * The container imports the session in the case workspace and resumes it with
- * {@link deciderCliPrompt}. Null for an ordinary case.
- */
-export function continuationSeed(
-  benchCase: DeciderCase,
-  model: string,
-  variant: string | null,
-  runKey: string
-) {
-  const { continuation } = benchCase;
-  if (!continuation) return null;
-  let tick = 0;
-  const next = (prefix: 'msg' | 'prt') => {
-    tick += 1;
-    return { id: seedId(prefix, tick, runKey), time: tick };
-  };
-  const sessionID = seedId('ses', 0, runKey);
-  const variantField = variant ? { variant } : {};
-  const user = next('msg');
-  const messages: { info: Record<string, unknown>; parts: SeedPart[] }[] = [
-    {
-      info: {
-        id: user.id,
-        sessionID,
-        role: 'user',
-        time: { created: user.time },
-        agent: CLI_AGENT,
-        model: { providerID: 'kilo', modelID: model, ...variantField },
-      },
-      parts: [
-        {
-          id: next('prt').id,
-          sessionID,
-          messageID: user.id,
-          type: 'text',
-          text: taskPrompt(benchCase),
-        },
-      ],
-    },
-  ];
-  continuation.steps.forEach((step, stepIndex) => {
-    const message = next('msg');
-    const ids = () => ({ id: next('prt').id, sessionID, messageID: message.id });
-    const parts: SeedPart[] = [{ ...ids(), type: 'step-start' }];
-    if (step.text !== undefined) {
-      parts.push({
-        ...ids(),
-        type: 'text',
-        text: step.text,
-        time: { start: message.time, end: message.time },
-      });
-    }
-    step.calls.forEach((call, callIndex) => {
-      parts.push({
-        ...ids(),
-        type: 'tool',
-        callID: `call_seed_${stepIndex}_${callIndex}`,
-        tool: call.tool,
-        state: {
-          status: 'completed',
-          input: { command: call.command, description: call.description },
-          output: call.output,
-          title: call.description,
-          metadata: { output: call.output, description: call.description, truncated: false },
-          time: { start: message.time, end: message.time },
-        },
-      });
-    });
-    parts.push({
-      ...ids(),
-      type: 'step-finish',
-      reason: 'tool-calls',
-      cost: 0,
-      tokens: SEED_TOKENS,
-    });
-    messages.push({
-      info: {
-        id: message.id,
-        sessionID,
-        role: 'assistant',
-        time: { created: message.time, completed: message.time },
-        parentID: user.id,
-        modelID: model,
-        providerID: 'kilo',
-        mode: CLI_AGENT,
-        agent: CLI_AGENT,
-        path: { cwd: '.', root: '.' },
-        cost: 0,
-        tokens: SEED_TOKENS,
-        finish: 'tool-calls',
-        ...variantField,
-      },
-      parts,
-    });
-  });
-  return {
-    files: continuation.files,
-    session: {
-      info: {
-        id: sessionID,
-        slug: 'benchmark-continuation',
-        title: 'Benchmark continuation',
-        version: CLI_VERSION,
-        time: { created: tick, updated: tick },
-        permission: HEADLESS_RUN_PERMISSIONS,
-      },
-      messages,
-    },
-  };
-}
-
 type ContainerRunRequest = {
   model: string;
   benchCase: DeciderCase;
@@ -350,14 +183,12 @@ type ContainerRunRequest = {
 
 /**
  * The container `/run` body for one decider case. A case graded on its tool calls runs
- * isolated in its own workspace, and a continuation case also carries its `seed`; every other
- * case keeps the body, and so the environment, its stored results were measured with.
+ * isolated in its own workspace; every other case keeps the body, and so the environment,
+ * its stored results were measured with.
  */
 export function containerRunBody(request: ContainerRunRequest) {
   const { model, benchCase, kiloToken, kiloApiUrl } = request;
   const variant = request.variant ?? null;
-  const runKey = crypto.randomUUID().replaceAll('-', '').slice(0, 14);
-  const seed = continuationSeed(benchCase, model, variant, runKey);
   return {
     model,
     prompt: deciderCliPrompt(benchCase),
@@ -368,7 +199,6 @@ export function containerRunBody(request: ContainerRunRequest) {
     variant,
     resultCallback: request.resultCallback ?? null,
     ...(benchCase.requiredToolCalls !== undefined ? { isolated: true } : {}),
-    ...(seed ? { seed } : {}),
   };
 }
 

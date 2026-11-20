@@ -9,9 +9,9 @@
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 const PORT = 3000;
 const DEFAULT_TIMEOUT_MS = 180_000;
@@ -203,50 +203,6 @@ async function withWorkspace(run) {
   }
 }
 
-function isWorkspacePath(path) {
-  if (path.length === 0 || path.startsWith('/') || path.includes('\\') || path.includes('\0')) {
-    return false;
-  }
-  return path.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..');
-}
-
-// The session id becomes a CLI argument, so it must be a plain CLI session id, never a flag.
-const SESSION_ID = /^ses_[0-9A-Za-z]+$/;
-
-function seedProblem(seed) {
-  if (seed === undefined || seed === null) return null;
-  const files = seed?.files;
-  if (typeof files !== 'object' || files === null || Array.isArray(files)) {
-    return 'seed.files must be an object of workspace paths to file contents';
-  }
-  for (const [path, content] of Object.entries(files)) {
-    if (!isWorkspacePath(path)) {
-      return `seed file ${JSON.stringify(path)} must be a relative POSIX path inside the workspace`;
-    }
-    if (typeof content !== 'string') return `seed file ${JSON.stringify(path)} must be a string`;
-  }
-  const session = seed.session;
-  if (
-    typeof session !== 'object' ||
-    session === null ||
-    typeof session.info?.id !== 'string' ||
-    !SESSION_ID.test(session.info.id) ||
-    !Array.isArray(session.messages)
-  ) {
-    return 'seed.session must be a CLI session export with a ses_ info.id and messages';
-  }
-  return null;
-}
-
-async function writeSeed(workspace, sessionFile, seed) {
-  for (const [path, content] of Object.entries(seed.files)) {
-    const target = join(workspace, path);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, content);
-  }
-  await writeFile(sessionFile, JSON.stringify(seed.session));
-}
-
 // The prompt goes to the CLI on stdin, never argv: Linux caps one argv string at
 // 128 KiB (MAX_ARG_STRLEN), which a long-context case exceeds, and `kilo run` re-quotes
 // argv messages that contain spaces. With no positional message it reads stdin to EOF
@@ -257,14 +213,9 @@ async function writeSeed(workspace, sessionFile, seed) {
 // case runs in its own workspace instead; ordinary cases keep /app so their prompts and
 // tool results stay identical to the results already measured.
 //
-// A seeded case resumes a session already in progress: its files go into the workspace,
-// `kilo import` loads the exported session into this workspace's project, and the run
-// continues it with the prompt as the next user message. The session file stays outside
-// the workspace so the model's tools never see it. A seeded case is always isolated.
 function runCase({
   model,
   prompt,
-  seed,
   isolated,
   kiloToken,
   kiloApiUrl,
@@ -291,48 +242,8 @@ function runCase({
     NO_COLOR: '1',
   };
   return withWorkspace(async cwd => {
-    const env = isolated || seed ? { ...runEnv, PWD: cwd } : runEnv;
-    if (!seed) return runCli({ args, cwd, stdin: prompt, env, timeoutMs, kiloToken, context });
-    const sessionFile = `${cwd}.session.json`;
-    try {
-      try {
-        await writeSeed(cwd, sessionFile, seed);
-      } catch (error) {
-        throw new NotStartedError(
-          error instanceof Error ? error.message : 'case seed failed',
-          'seed_error'
-        );
-      }
-      const imported = await runCli({
-        args: ['import', sessionFile],
-        cwd,
-        env,
-        timeoutMs,
-        kiloToken,
-      });
-      // A failed import is a defect of the seed or the CLI, not of the model, and it fails the
-      // same way on every retry: it completes the case with the import's own exit code and
-      // diagnostic, so it records one visible failed result instead of rerunning forever.
-      if (imported.exitCode !== 0 || imported.timedOut) {
-        const prefix = `kilo import failed with exit code ${imported.exitCode}\n`;
-        return {
-          ...imported,
-          stderrTail: prefix + imported.stderrTail.slice(-(STDERR_CAP_BYTES - prefix.length)),
-        };
-      }
-      const run = await runCli({
-        args: [...args, '--session', seed.session.info.id],
-        cwd,
-        stdin: prompt,
-        env,
-        timeoutMs: Math.max(1, timeoutMs - imported.durationMs),
-        kiloToken,
-        context,
-      });
-      return { ...run, durationMs: imported.durationMs + run.durationMs };
-    } finally {
-      await rm(sessionFile, { force: true }).catch(() => {});
-    }
+    const env = isolated ? { ...runEnv, PWD: cwd } : runEnv;
+    return runCli({ args, cwd, stdin: prompt, env, timeoutMs, kiloToken, context });
   });
 }
 
@@ -479,17 +390,8 @@ const server = createServer(
           return;
         }
 
-        const {
-          model,
-          prompt,
-          kiloToken,
-          kiloApiUrl,
-          orgId,
-          variant,
-          resultCallback,
-          seed,
-          isolated,
-        } = parsed ?? {};
+        const { model, prompt, kiloToken, kiloApiUrl, orgId, variant, resultCallback, isolated } =
+          parsed ?? {};
         const timeoutMs =
           typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
             ? parsed.timeoutMs
@@ -519,11 +421,6 @@ const server = createServer(
           sendResponse(400, { error: 'isolated must be a boolean when provided' });
           return;
         }
-        const invalidSeed = seedProblem(seed);
-        if (invalidSeed) {
-          sendResponse(400, { error: invalidSeed });
-          return;
-        }
         const callback = isResultCallback(resultCallback) ? resultCallback : null;
         const context = executionContext(callback, model, variant);
         logCaseEvent('benchmark_container_case_accepted', context, {
@@ -542,7 +439,6 @@ const server = createServer(
               response: await runCaseSerialized({
                 model,
                 prompt,
-                seed: seed ?? null,
                 isolated: isolated === true,
                 kiloToken,
                 kiloApiUrl,

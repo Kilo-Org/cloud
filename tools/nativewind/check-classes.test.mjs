@@ -1346,7 +1346,7 @@ test('does not accept a nested sheet header drawn through a local component', ()
       '}'
   );
   assert.equal(found.length, 1);
-  assert.match(found[0], /\[L11\] "<Sheet>"/);
+  assert.match(found[0], /screen\.tsx:7: \[L11\] "<Sheet>"/);
 });
 
 test('flags horizontal padding on a CenteredState content container', () => {

@@ -33,7 +33,7 @@ function deduction(overrides: Partial<CreditDeduction>): CreditDeduction {
   };
 }
 
-function grant(overrides: Partial<CreditGrant>): CreditGrant {
+function creditGrant(overrides: Partial<CreditGrant>): CreditGrant {
   return {
     id: 'grant-1',
     date: '2026-02-03T00:00:00.000Z',
@@ -202,13 +202,13 @@ describe('buildCreditHistoryItems', () => {
   });
 
   it('lists the grant that funds a balance with no purchases', () => {
-    const items = buildCreditHistoryItems([], [], [grant({ id: 'welcome' })]);
+    const items = buildCreditHistoryItems([], [], [creditGrant({ id: 'welcome' })]);
 
     expect(items).toEqual([
       {
         kind: 'grant',
         key: 'grant:welcome',
-        grant: grant({ id: 'welcome' }),
+        grant: creditGrant({ id: 'welcome' }),
         sortDate: '2026-02-03T00:00:00.000Z',
       },
     ]);
@@ -232,7 +232,7 @@ describe('buildCreditHistoryItems', () => {
           },
         }),
       ],
-      [grant({ id: 'welcome' })]
+      [creditGrant({ id: 'welcome' })]
     );
 
     expect(items.map(item => item.key)).toEqual(['ledger:expiry']);
@@ -242,7 +242,7 @@ describe('buildCreditHistoryItems', () => {
     const items = buildCreditHistoryItems(
       [purchase({ id: 'p1', date: '2026-01-10T00:00:00.000Z' })],
       [deduction({ id: 'd1', date: '2026-04-10T00:00:00.000Z' })],
-      [grant({ id: 'g1', date: '2026-03-10T00:00:00.000Z' })]
+      [creditGrant({ id: 'g1', date: '2026-03-10T00:00:00.000Z' })]
     );
 
     expect(items.map(item => item.key)).toEqual(['ledger:d1', 'grant:g1', 'purchase:p1']);

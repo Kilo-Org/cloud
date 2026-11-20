@@ -19,7 +19,9 @@
     "presenceStatus": "Ostalariak: {{connection}}",
     "commandStatus": "Komandoen bidalketa: {{status}}",
     "delivered": "Entregatuta",
-    "expired": "Iraungita"
+    "expired": "Iraungita",
+    "recoveryGaps_one": "{{displayCount}} zati falta da transkripzio honetatik.",
+    "recoveryGaps_other": "{{displayCount}} zati falta dira transkripzio honetatik."
   },
   "common": {
     "manageOnWeb": "Kudeatu webean",
@@ -963,6 +965,8 @@
       "pendingComment": "iruzkin bidaltzeko zain",
       "pendingComment_other": "iruzkin bidaltzeko zain",
       "submitCountOfTotal": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
+      "submitCountOfTotal_one": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
+      "submitCountOfTotal_other": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
       "submitReview": "Bidali berrikuspena",
       "partialPostedFresh": "{{displayFreshCount}} iruzkin argitaratu dira. ",
       "partialPostedFresh_one": "{{displayFreshCount}} iruzkin argitaratu dira. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "Bete REVIEW.md fitxategiko jarraibideak",
     "followReviewMdSubtitle": "Bete biltegi bakoitzeko REVIEW.md fitxategiko jarraibideak",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete."
+      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+      "notConnectedReadOnlyPlan": "Erakundearen probaldia amaitu da, beraz jabe batek fakturazioa eguneratu behar du kilo.ai-n."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "Hautatu modeloa",
       "noModelsDescription": "Ez dago hautatzeko moduko modelorik.",
+      "allUnavailableTitle": "Ezin da modelorik erabili",
+      "allUnavailableDescription": "Gehitu hornitzailearen gako bat eta saiatu berriro.",
       "favorites": "Gogokoak"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Berrizendatu erakundea",
-      "renamePlaceholder": "Erakundearen izena",
+      "renamePlaceholder": "Idatzi erakundearen izen bat",
       "balance": "Saldoa",
       "plan": "Plana",
       "planTeams": "Teams",
@@ -4081,7 +4088,13 @@
     "providerUnavailable": "Hornitzailea ez dago erabilgarri une honetan. Bidali berriro laster."
   },
   "settingsTools": {
-    "confirmTitle": "Aldaketa hau berretsi?"
+    "confirmTitle": "Aldaketa hau berretsi?",
+    "guarded": {
+      "spendAlertsOff": "Desaktibatu gastu-alertak? Gastu-atalaseak gainditzean eta orduko gorakadetan ez zenuke jakinarazpenik jasoko.",
+      "balanceAlertsOff": "Desaktibatu saldo-alertak? Zure kredituak gutxitzen direnean ez zenuke jakinarazpenik jasoko.",
+      "securityFindingsOff": "Desaktibatu segurtasun-aurkikuntzak? Segurtasun-aurkikuntza berriei buruzko jakinarazpenik ez zenuke jasoko.",
+      "hideBalanceOn": "Ezkutatu zure saldoak? Kreditu-saldoak jada ez lirateke agertuko profileko pantailetan eta erakundearen atarian."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4994,7 @@
     "providersDescription": "Desaktibatu hornitzaile bat, Kilok erakunde honen eskaerak harengana bidera ez ditzan.",
     "providersNeedCatalog": "Hornitzaileen etengailuak irakurtzeko soilik egongo dira ereduen katalogo osoa kargatu arte. Editatzeko, sakatu goiko Saiatu berriro.",
     "providersEmpty": "Ez dago bilaketa honekin bat datorren hornitzailerik.",
+    "providersNone": "Ez dago erakunde honetarako hornitzailerik eskuragarri.",
     "allowAllShown": "Baimendu erakutsitako guztiak",
     "denyAllShown": "Ukatu erakutsitako guztiak",
     "gatewaysDescription": "Kilok ereduen eskaerak Vercel AI Gateway edo OpenRouter bidez bideratzen ditu. Atebide bat desgaituta badago, eskaera horiek huts egiten dute.",

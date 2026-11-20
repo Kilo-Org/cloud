@@ -19,7 +19,9 @@
     "presenceStatus": "Хостууд: {{connection}}",
     "commandStatus": "Командын хүргэлт: {{status}}",
     "delivered": "Хүргэгдсэн",
-    "expired": "Хугацаа нь дууссан"
+    "expired": "Хугацаа нь дууссан",
+    "recoveryGaps_one": "Энэ тэмдэглэлийн {{displayCount}} хэсэг дутуу байна.",
+    "recoveryGaps_other": "Энэ тэмдэглэлийн {{displayCount}} хэсэг дутуу байна."
   },
   "common": {
     "manageOnWeb": "Вэб дээр удирдах",
@@ -963,6 +965,8 @@
       "pendingComment": "илгээгээгүй сэтгэгдэл",
       "pendingComment_other": "илгээгээгүй сэтгэгдэл",
       "submitCountOfTotal": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
+      "submitCountOfTotal_one": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
+      "submitCountOfTotal_other": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
       "submitReview": "Шалгалтын дүнг илгээх",
       "partialPostedFresh": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
       "partialPostedFresh_one": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "REVIEW.md зааврыг дагах",
     "followReviewMdSubtitle": "Репозитори бүрийн REVIEW.md файл дахь зааврыг дагах",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй."
+      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
+      "notConnectedReadOnlyPlan": "Байгууллагын туршилтын хугацаа дууссан тул эзэн нь kilo.ai дээр төлбөрийн мэдээллээ шинэчлэх ёстой."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ийн Bitbucket холболтыг компьютерээс вэб дээр удирддаг.",
@@ -1720,7 +1725,7 @@
       "dueThisWeekDetail_one": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "dueThisWeekDetail_other": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "noDeadline": "Хугацаагүй",
-      "reviewSlaAssignment": "Тогтоосон SLA хугацааг шалгах",
+      "reviewSlaAssignment": "SLA оноолтыг шалгах",
       "allOpenFindingsTracked": "Бүх шийдээгүй асуудлыг хянаж байна"
     },
     "dismiss": {
@@ -1839,7 +1844,7 @@
       "couldNotLoadMore": "Дараагийн асуудлуудыг ачаалж чадсангүй.",
       "noMatchesTitle": "Шүүлтүүрт тохирох асуудал байхгүй",
       "noMatchesDescription": "Сонгосон шүүлтүүрүүдийг өөрчлөх эсвэл арилгахыг оролдоно уу.",
-      "emptyTitle": "Шийдээгүй асуудал байхгүй",
+      "emptyTitle": "Нээлттэй асуудал байхгүй",
       "emptyDescription": "Одоогоор анхаарах шаардлагатай шийдээгүй асуудал байхгүй."
     },
     "findingRow": {
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "Загвар сонгох",
       "noModelsDescription": "Сонгох боломжтой загвар алга.",
+      "allUnavailableTitle": "Ямар ч загварыг ашиглах боломжгүй",
+      "allUnavailableDescription": "Үйлчилгээ үзүүлэгчийн түлхүүр нэмээд дахин оролдоно уу.",
       "favorites": "Дуртай загварууд"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Байгууллагын нэрийг өөрчлөх",
-      "renamePlaceholder": "Байгууллагын нэр",
+      "renamePlaceholder": "Байгууллагын нэрийг оруулна уу",
       "balance": "Үлдэгдэл",
       "plan": "Төлөвлөгөө",
       "planTeams": "Teams",
@@ -4081,7 +4088,13 @@
     "providerUnavailable": "Үйлчилгээ үзүүлэгч одоогоор боломжгүй байна. Хэсэг хугацааны дараа дахин илгээнэ үү."
   },
   "settingsTools": {
-    "confirmTitle": "Энэ өөрчлөлтийг баталгаажуулах уу?"
+    "confirmTitle": "Энэ өөрчлөлтийг баталгаажуулах уу?",
+    "guarded": {
+      "spendAlertsOff": "Зарцуулалтын анхааруулгыг унтраах уу? Зарцуулалтын босго давсны болон цагийн доторх огцом өсөлтийн талаарх мэдэгдэл танд ирэхээ болино.",
+      "balanceAlertsOff": "Үлдэгдлийн анхааруулгыг унтраах уу? Таны кредит багасах үед мэдэгдэл ирэхээ болино.",
+      "securityFindingsOff": "Аюулгүй байдлын илрүүлэлтийг унтраах уу? Шинэ аюулгүй байдлын илрүүлэлтийн талаарх мэдэгдэл ирэхээ болино.",
+      "hideBalanceOn": "Үлдэгдлээ нуух уу? Кредитийн үлдэгдэл профайлын дэлгэцүүд болон байгууллагын төвд цаашид харагдахгүй болно."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4994,7 @@
     "providersDescription": "Нийлүүлэгчийг унтраавал энэ байгууллагын хувьд Kilo түүн рүү чиглүүлэхээ болино.",
     "providersNeedCatalog": "Загварын бүрэн каталог ачаалагдах хүртэл нийлүүлэгчийн унтраалгууд зөвхөн унших горимд байна. Тэдгээрийг засахын тулд дээрх Дахин оролдох товчийг дарна уу.",
     "providersEmpty": "Энэ хайлтад тохирох нийлүүлэгч байхгүй.",
+    "providersNone": "Энэ байгууллагад ашиглах боломжтой нийлүүлэгч байхгүй.",
     "allowAllShown": "Харагдаж буй бүгдийг зөвшөөрөх",
     "denyAllShown": "Харагдаж буй бүгдийг хориглох",
     "gatewaysDescription": "Kilo загварын хүсэлтүүдийг Vercel AI Gateway эсвэл OpenRouter-оор дамжуулна. Идэвхгүй гарц эдгээр хүсэлтийг амжилтгүй болгоно.",

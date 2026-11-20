@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createContractFailures } from './contract-failures.mjs';
+
 import { ENV_KEYS } from '../src/lib/env-keys.js';
 import {
   CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS,
@@ -157,13 +159,7 @@ try {
   process.exit(1);
 }
 
-const failures = [];
-
-function check(condition, message) {
-  if (!condition) {
-    failures.push(message);
-  }
-}
+const { check, report } = createContractFailures();
 
 /** True when `actual` holds exactly the members of `expected`, in any order. */
 const sameMembers = (actual, expected) =>
@@ -430,12 +426,7 @@ if (process.env.EAS_BUILD_PROFILE === 'production') {
   );
 }
 
-if (failures.length > 0) {
-  console.error('Expo config contract violations:');
-  for (const failure of failures) {
-    console.error(`  - ${failure}`);
-  }
-  process.exit(1);
-}
+const exitCode = report('Expo config contract violations');
+if (exitCode !== 0) process.exit(exitCode);
 
 console.log('Expo config contract OK');

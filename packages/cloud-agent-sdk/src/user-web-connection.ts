@@ -3,6 +3,7 @@ import {
   MAX_RECONNECT_ATTEMPTS,
   type Connection,
   type ConnectionLifecycleHooks,
+  type SocketPhase,
 } from './base-connection';
 import { cloudAgentSdkRuntime } from './runtime';
 import {
@@ -88,6 +89,12 @@ type UserWebConnection = {
    * after a final release or `destroy()`.
    */
   isConnected: () => boolean;
+  /**
+   * Reports the phase of the current viewer socket. Independent of
+   * `isConnected`, which only turns true after the first parsed inbound
+   * message.
+   */
+  socketPhase: () => SocketPhase;
   /**
    * Subscribes to transport-readiness transitions. The listener fires only
    * when the boolean value actually changes. The returned function
@@ -760,6 +767,7 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
       exhaustionSignal.clear();
     },
     isConnected: connectionSignal.get,
+    socketPhase: () => baseConnection?.socketPhase() ?? 'absent',
     onConnectionChange(listener) {
       if (destroyed) return () => {};
       return connectionSignal.subscribe(listener);

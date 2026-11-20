@@ -19,7 +19,9 @@
     "presenceStatus": "Milina: {{connection}}",
     "commandStatus": "Fanaterana baiko: {{status}}",
     "delivered": "Voatolotra",
-    "expired": "Lany fe-potoana"
+    "expired": "Lany fe-potoana",
+    "recoveryGaps_one": "Misy ampahany {{displayCount}} amin'ity fandikana ity tsy hita.",
+    "recoveryGaps_other": "Misy ampahany {{displayCount}} amin'ity fandikana ity tsy hita."
   },
   "common": {
     "manageOnWeb": "Tantano amin'ny tranonkala",
@@ -963,6 +965,8 @@
       "pendingComment": "fanehoan-kevitra miandry",
       "pendingComment_other": "fanehoan-kevitra miandry",
       "submitCountOfTotal": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Alefaso ny hevitra {{displayFreshCount}} amin'ny {{displayTotalCount}}",
       "submitReview": "Alefaso ny fandinihana",
       "partialPostedFresh": "Hevitra {{displayFreshCount}} no navoaka. ",
       "partialPostedFresh_one": "Hevitra {{displayFreshCount}} no navoaka. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "Araho ny REVIEW.md",
     "followReviewMdSubtitle": "Araho ny torolalana ao amin'ny rakitra REVIEW.md isaky ny tahirin-kaody",
     "bitbucket": {
-      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy."
+      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+      "notConnectedReadOnlyPlan": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana, ka tsy maintsy manavao ny faktiora ao amin'ny kilo.ai ny tompony."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ny fifandraisana Bitbucket amin'ny {{organization}} dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "Safidio ny modely",
       "noModelsDescription": "Tsy misy modely azo fidina.",
+      "allUnavailableTitle": "Tsy misy modely azo ampiasaina",
+      "allUnavailableDescription": "Ampio lakilen'ny mpamatsy ary andramo indray.",
       "favorites": "Ankafizinao"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Ovao ny anaran'ny fikambanana",
-      "renamePlaceholder": "Anaran'ny fikambanana",
+      "renamePlaceholder": "Ampidiro ny anaran'ny fikambanana",
       "balance": "Ambim-bola",
       "plan": "Drafitra",
       "planTeams": "Teams",
@@ -4081,7 +4088,13 @@
     "providerUnavailable": "Tsy misy amin'izao fotoana izao ny mpamatsy. Alefaso indray rahoway kely."
   },
   "settingsTools": {
-    "confirmTitle": "Hamafiso ity fanovana ity?"
+    "confirmTitle": "Hamafiso ity fanovana ity?",
+    "guarded": {
+      "spendAlertsOff": "Hamono ny fampitandremana momba ny fandaniana? Tsy handray fampandrenesana intsony ianao momba ny fihoaran'ny fetra fandaniana sy ny fisondrotana isan'ora.",
+      "balanceAlertsOff": "Hamono ny fampitandremana momba ny fifandanjana? Tsy handray fampandrenesana intsony ianao rehefa kely ny kreditrao.",
+      "securityFindingsOff": "Hamono ny fahitana momba ny fiarovana? Tsy handray fampandrenesana intsony ianao momba ny fahitana vaovao momba ny fiarovana.",
+      "hideBalanceOn": "Hanafina ny fifandanjanao? Tsy hiseho intsony eo amin'ny efijery mombamomba sy ny foiben'ny fikambanana ny fifandanjana kreditrao."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4994,7 @@
     "providersDescription": "Vonoy ny mpamatsy iray mba hampitsahatra ny fandefasan'ny Kilo ny fangatahana ho azy ho an'ity fikambanana ity.",
     "providersNeedCatalog": "Tsy azo ovaina ny bokotra famonoana sy fandrehitra ny mpamatsy mandra-pahavitan'ny fampidirana ny katalaogin'ny modely feno. Tsindrio ny Andramo indray etsy ambony mba hanovana azy ireo.",
     "providersEmpty": "Tsy misy mpamatsy mifanaraka amin'ity fikarohana ity.",
+    "providersNone": "Tsy misy mpamatsy azo ampiasaina ho an'ity fikambanana ity.",
     "allowAllShown": "Avelao daholo izay aseho",
     "denyAllShown": "Lavina daholo izay aseho",
     "gatewaysDescription": "Ny Kilo dia mandefa fangatahana modely amin'ny alalan'ny Vercel AI Gateway na OpenRouter. Ny vavahady voavono dia mahatonga ireo fangatahana ireo tsy hahomby.",

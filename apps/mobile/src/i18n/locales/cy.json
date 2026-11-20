@@ -19,7 +19,13 @@
     "presenceStatus": "Gwesteiwyr: {{connection}}",
     "commandStatus": "Danfon y gorchymyn: {{status}}",
     "delivered": "Wedi'i ddanfon",
-    "expired": "Wedi dod i ben"
+    "expired": "Wedi dod i ben",
+    "recoveryGaps_zero": "Does dim rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_one": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_two": "Mae {{displayCount}} ran o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_few": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_many": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_other": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll."
   },
   "common": {
     "manageOnWeb": "Rheoli ar y we",
@@ -1031,6 +1037,12 @@
       "pendingComment": "sylwadau heb eu cyflwyno",
       "pendingComment_other": "sylwadau heb eu cyflwyno",
       "submitCountOfTotal": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_zero": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_one": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_two": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_few": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_many": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_other": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
       "submitReview": "Cyflwyno adolygiad",
       "partialPostedFresh": "Postiwyd {{displayFreshCount}} o sylwadau. ",
       "partialPostedFresh_zero": "Postiwyd {{displayFreshCount}} o sylwadau. ",
@@ -1483,7 +1495,8 @@
     "followReviewMd": "Dilyn REVIEW.md",
     "followReviewMdSubtitle": "Dilyn y cyfarwyddiadau yn ffeil REVIEW.md pob ystorfa",
     "bitbucket": {
-      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu."
+      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
+      "notConnectedReadOnlyPlan": "Mae treial y sefydliad wedi dod i ben, felly rhaid i berchnogydd ddiweddaru bilio ar kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
@@ -1868,7 +1881,7 @@
       "dueThisWeekDetail_many": "{{exploitable}} o'r rhain y cadarnhawyd y gellir manteisio arnynt",
       "dueThisWeekDetail_other": "{{exploitable}} o'r rhain y cadarnhawyd y gellir manteisio arnynt",
       "noDeadline": "Dim dyddiad terfyn",
-      "reviewSlaAssignment": "Adolygu'r dyddiadau terfyn SLA a bennwyd",
+      "reviewSlaAssignment": "Adolygu aseinio'r SLA",
       "allOpenFindingsTracked": "Pob canfyddiad agored yn cael ei olrhain"
     },
     "dismiss": {
@@ -2988,6 +3001,8 @@
     "modelPicker": {
       "title": "Dewis model",
       "noModelsDescription": "Does dim modelau ar gael i'w dewis.",
+      "allUnavailableTitle": "Ni ellir defnyddio unrhyw fodel",
+      "allUnavailableDescription": "Ychwanegwch allwedd darparwr, yna rhowch gynnig arall arni.",
       "favorites": "Ffefrynnau"
     },
     "modelSelector": {
@@ -3861,7 +3876,7 @@
     },
     "hub": {
       "renameTitle": "Ailenwi'r sefydliad",
-      "renamePlaceholder": "Enw'r sefydliad",
+      "renamePlaceholder": "Rhowch enw ar gyfer y sefydliad",
       "balance": "Balans",
       "plan": "Cynllun",
       "planTeams": "Teams",
@@ -4329,7 +4344,13 @@
     "providerUnavailable": "Nid yw'r darparwr ar gael ar hyn o bryd. Anfonwch eto cyn bo hir."
   },
   "settingsTools": {
-    "confirmTitle": "Cadarnhau'r newid hwn?"
+    "confirmTitle": "Cadarnhau'r newid hwn?",
+    "guarded": {
+      "spendAlertsOff": "Diffodd hysbysiadau gwariant? Byddech yn rhoi'r gorau i gael hysbysiadau am groesi trothwyon gwariant a sbigau bob awr.",
+      "balanceAlertsOff": "Diffodd hysbysiadau balans? Byddech yn rhoi'r gorau i gael hysbysiadau pan fydd eich credydau'n brin.",
+      "securityFindingsOff": "Diffodd canfyddiadau diogelwch? Byddech yn rhoi'r gorau i gael hysbysiadau am ganfyddiadau diogelwch newydd.",
+      "hideBalanceOn": "Cuddio eich balansau? Ni fydd balansau credyd yn ymddangos mwyach ar sgriniau'r proffil a chanolfan y sefydliad."
+    }
   },
   "appActions": {
     "start": {
@@ -5285,6 +5306,7 @@
     "providersDescription": "Diffoddwch ddarparwr i atal Kilo rhag anfon ceisiadau ato ar gyfer y sefydliad hwn.",
     "providersNeedCatalog": "Bydd switshis darparwyr yn aros yn ddarllen-yn-unig nes i'r catalog modelau llawn lwytho. Tapiwch Rhoi cynnig eto uchod i'w golygu.",
     "providersEmpty": "Does dim darparwyr yn cyfateb i'r chwiliad hwn.",
+    "providersNone": "Nid oes darparwyr ar gael ar gyfer y sefydliad hwn.",
     "allowAllShown": "Caniatáu pob un a ddangosir",
     "denyAllShown": "Gwrthod pob un a ddangosir",
     "gatewaysDescription": "Mae Kilo yn anfon ceisiadau model drwy Vercel AI Gateway neu OpenRouter. Bydd y ceisiadau hynny'n methu os yw'r porth wedi'i analluogi.",

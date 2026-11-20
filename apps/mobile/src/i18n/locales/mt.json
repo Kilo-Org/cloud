@@ -19,7 +19,12 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Twassil tal-kmand: {{status}}",
     "delivered": "Imwassal",
-    "expired": "Skada"
+    "expired": "Skada",
+    "recoveryGaps_one": "Nieqes {{displayCount}} parti min dan traskrizzjoni.",
+    "recoveryGaps_two": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni.",
+    "recoveryGaps_few": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni.",
+    "recoveryGaps_many": "Nieqes {{displayCount}} parti min dan traskrizzjoni.",
+    "recoveryGaps_other": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni."
   },
   "common": {
     "manageOnWeb": "Immaniġġja fuq il-web",
@@ -1014,6 +1019,11 @@
       "pendingComment": "kummenti pendenti",
       "pendingComment_other": "kummenti pendenti",
       "submitCountOfTotal": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_one": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_two": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_few": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_many": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_other": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
       "submitReview": "Ibgħat ir-reviżjoni",
       "partialPostedFresh": "Kummenti ppubblikati: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Kummenti ppubblikati: {{displayFreshCount}}. ",
@@ -1459,7 +1469,8 @@
     "followReviewMd": "Segwi REVIEW.md",
     "followReviewMdSubtitle": "Segwi l-fajls tal-istruzzjonijiet REVIEW.md ta' kull repożitorju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh."
+      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
+      "notConnectedReadOnlyPlan": "Il-prova tal-organizzazzjoni ntemmet, għalhekk is-sid irid jaġġorna l-fatturazzjoni fuq kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' {{organization}} tiġi ġestita fuq il-web minn kompjuter.",
@@ -2938,6 +2949,8 @@
     "modelPicker": {
       "title": "Agħżel il-mudell",
       "noModelsDescription": "M'hemm l-ebda mudell disponibbli biex tagħżel.",
+      "allUnavailableTitle": "L-ebda mudell ma jista' jintuża",
+      "allUnavailableDescription": "Żid ċavetta tal-fornitur, imbagħad erġa' pprova.",
       "favorites": "Favoriti"
     },
     "modelSelector": {
@@ -3801,7 +3814,7 @@
     },
     "hub": {
       "renameTitle": "Ibdel l-isem tal-organizzazzjoni",
-      "renamePlaceholder": "Isem l-organizzazzjoni",
+      "renamePlaceholder": "Daħħal isem għall-organizzazzjoni",
       "balance": "Bilanċ",
       "plan": "Pjan",
       "planTeams": "Teams",
@@ -4267,7 +4280,13 @@
     "providerUnavailable": "Il-fornitur mhux disponibbli bħalissa. Erġa' ibgħat fi ftit ħin."
   },
   "settingsTools": {
-    "confirmTitle": "Tikkonferma din il-bidla?"
+    "confirmTitle": "Tikkonferma din il-bidla?",
+    "guarded": {
+      "spendAlertsOff": "Titfi l-avviżi dwar in-nefqa? Ma tibqax tirċievi notifiki dwar qbiż tal-limiti tan-nefqa u żidiet fis-siegħa.",
+      "balanceAlertsOff": "Titfi l-avviżi dwar il-bilanċ? Ma tibqax tirċievi notifiki meta l-krediti tiegħek jonqsu.",
+      "securityFindingsOff": "Titfi s-sejbiet tas-sigurtà? Ma tibqax tirċievi notifiki dwar sejbiet ġodda tas-sigurtà.",
+      "hideBalanceOn": "Taħbi l-bilanċi tiegħek? Il-bilanċi tal-krediti ma jibqgħux jidhru fl-iskrins tal-profil u fl-hub tal-organizzazzjoni."
+    }
   },
   "appActions": {
     "start": {
@@ -5209,6 +5228,7 @@
     "providersDescription": "Itfi fornitur biex twaqqaf lil Kilo milli jidderieġi lejh għal din l-organizzazzjoni.",
     "providersNeedCatalog": "Is-swiċċijiet tal-fornituri jibqgħu biss għall-qari sakemm jitgħabba l-katalgu sħiħ tal-mudelli. Agħfas Erġa' pprova hawn fuq biex teditjahom.",
     "providersEmpty": "Ebda fornitur ma jaqbel ma' din it-tfittxija.",
+    "providersNone": "M'hemm l-ebda fornitur disponibbli għal din l-organizzazzjoni.",
     "allowAllShown": "Ippermetti kollha li jidhru",
     "denyAllShown": "Irrifjuta kollha li jidhru",
     "gatewaysDescription": "Kilo jidderieġi t-talbiet tal-mudelli permezz ta' Vercel AI Gateway jew OpenRouter. Portal mitfi jfalli dawk it-talbiet.",

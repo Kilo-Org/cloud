@@ -104,7 +104,11 @@ vi.mock('expo-router', () => ({
       createElement(
         'NestedNavigator',
         null,
-        screenLayout({ navigation: scenes.makeScene(), children: createElement('SceneBody') })
+        screenLayout({
+          navigation: scenes.makeScene(),
+          options: {},
+          children: createElement('SceneBody'),
+        })
       ),
     { Screen: ({ name }: { name: string }) => createElement('RegisteredScreen', { name }) }
   ),

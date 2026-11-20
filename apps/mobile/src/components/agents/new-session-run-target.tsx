@@ -11,6 +11,7 @@ import { InstanceSelector } from '@/components/agents/instance-selector';
 import { formatInstanceTarget } from '@/lib/instance-target-label';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { Button } from '@/components/ui/button';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { RefreshCw } from '@/components/ui/icons';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { Text } from '@/components/ui/text';
@@ -74,10 +75,8 @@ export function NewSessionRunTarget({
   const targetLabel = runOnInstance !== null ? formatInstanceTarget(runOnInstance) : null;
   if (showRunOnSelector) {
     return (
-      <View>
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">
-          {t('agentChat.instancePicker.runOn')}
-        </Text>
+      <View className="gap-2">
+        <FormFieldLabel label={t('agentChat.instancePicker.runOn')} />
         <View className="flex-row items-center gap-2">
           <View className="flex-1">
             <InstanceSelector

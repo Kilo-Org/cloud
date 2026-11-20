@@ -19,7 +19,9 @@
     "presenceStatus": "Isännät: {{connection}}",
     "commandStatus": "Komennon toimitus: {{status}}",
     "delivered": "Toimitettu",
-    "expired": "Vanhentunut"
+    "expired": "Vanhentunut",
+    "recoveryGaps_one": "{{displayCount}} osa tästä litteroinnista puuttuu.",
+    "recoveryGaps_other": "{{displayCount}} osaa tästä litteroinnista puuttuu."
   },
   "common": {
     "manageOnWeb": "Hallinnoi verkossa",
@@ -963,6 +965,8 @@
       "pendingComment": "lähettämätöntä kommenttia",
       "pendingComment_other": "lähettämätöntä kommenttia",
       "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
+      "submitCountOfTotal_one": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
+      "submitCountOfTotal_other": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
       "submitReview": "Lähetä katselmointi",
       "partialPostedFresh": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Julkaistuja kommentteja: {{displayFreshCount}}. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "Noudata REVIEW.md-ohjeita",
     "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen."
+      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
+      "notConnectedReadOnlyPlan": "Organisaation kokeilujakso on päättynyt, joten omistajan on päivitettävä laskutus osoitteessa kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "Valitse malli",
       "noModelsDescription": "Valittavissa ei ole malleja.",
+      "allUnavailableTitle": "Yhtään mallia ei voi käyttää",
+      "allUnavailableDescription": "Lisää palveluntarjoajan avain ja yritä uudelleen.",
       "favorites": "Suosikit"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Nimeä organisaatio uudelleen",
-      "renamePlaceholder": "Organisaation nimi",
+      "renamePlaceholder": "Anna organisaation nimi",
       "balance": "Saldo",
       "plan": "Paketti",
       "planTeams": "Teams",
@@ -4081,7 +4088,13 @@
     "providerUnavailable": "Palveluntarjoaja ei ole juuri nyt käytettävissä. Lähetä uudelleen pian."
   },
   "settingsTools": {
-    "confirmTitle": "Vahvistetaanko tämä muutos?"
+    "confirmTitle": "Vahvistetaanko tämä muutos?",
+    "guarded": {
+      "spendAlertsOff": "Poistetaanko kuluhälytykset käytöstä? Et enää saisi ilmoituksia kulutusrajojen ylityksistä etkä tunneittaisista piikeistä.",
+      "balanceAlertsOff": "Poistetaanko saldohälytykset käytöstä? Et enää saisi ilmoituksia, kun kredittisi käyvät vähiin.",
+      "securityFindingsOff": "Poistetaanko tietoturvahavainnot käytöstä? Et enää saisi ilmoituksia uusista tietoturvahavainnoista.",
+      "hideBalanceOn": "Piilotetaanko saldosi? Kredittisaldot eivät enää näkyisi profiilinäytöillä ja organisaation keskusnäkymässä."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4994,7 @@
     "providersDescription": "Poista palveluntarjoaja käytöstä, niin Kilo ei enää reititä pyyntöjä sille tässä organisaatiossa.",
     "providersNeedCatalog": "Palveluntarjoajien kytkimet ovat vain luku -tilassa, kunnes koko mallikatalogi on ladattu. Muokkaa niitä napauttamalla yllä Yritä uudelleen.",
     "providersEmpty": "Haulla ei löytynyt palveluntarjoajia.",
+    "providersNone": "Tälle organisaatiolle ei ole saatavilla palveluntarjoajia.",
     "allowAllShown": "Salli kaikki näytetyt",
     "denyAllShown": "Estä kaikki näytetyt",
     "gatewaysDescription": "Kilo reitittää mallipyynnöt Vercel AI Gatewayn tai OpenRouterin kautta. Jos yhdyskäytävä on poistettu käytöstä, sen kautta kulkevat pyynnöt epäonnistuvat.",

@@ -19,7 +19,11 @@
     "presenceStatus": "Hostitelia: {{connection}}",
     "commandStatus": "Doručenie príkazu: {{status}}",
     "delivered": "Doručené",
-    "expired": "Platnosť vypršala"
+    "expired": "Platnosť vypršala",
+    "recoveryGaps_one": "Chýba {{displayCount}} časť tohto prepisu.",
+    "recoveryGaps_few": "Chýbajú {{displayCount}} časti tohto prepisu.",
+    "recoveryGaps_many": "Chýba {{displayCount}} časti tohto prepisu.",
+    "recoveryGaps_other": "Chýba {{displayCount}} častí tohto prepisu."
   },
   "common": {
     "manageOnWeb": "Spravovať na webe",
@@ -997,6 +1001,10 @@
       "pendingComment": "neodoslaných komentárov",
       "pendingComment_other": "neodoslaných komentárov",
       "submitCountOfTotal": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_one": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_few": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_many": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
+      "submitCountOfTotal_other": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
       "submitReview": "Odoslať kontrolu",
       "partialPostedFresh": "Počet odoslaných komentárov: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Počet odoslaných komentárov: {{displayFreshCount}}. ",
@@ -1435,7 +1443,8 @@
     "followReviewMd": "Riadiť sa pokynmi v REVIEW.md",
     "followReviewMdSubtitle": "Dodržiavať pokyny v súbore REVIEW.md každého repozitára",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie."
+      "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
+      "notConnectedReadOnlyPlan": "Skúšobné obdobie organizácie sa skončilo, preto vlastník musí aktualizovať fakturáciu na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
@@ -2888,6 +2897,8 @@
     "modelPicker": {
       "title": "Vybrať model",
       "noModelsDescription": "Na výber nie sú žiadne modely.",
+      "allUnavailableTitle": "Nedá sa použiť žiadny model",
+      "allUnavailableDescription": "Pridaj kľúč poskytovateľa a skús to znova.",
       "favorites": "Obľúbené"
     },
     "modelSelector": {
@@ -3741,7 +3752,7 @@
     },
     "hub": {
       "renameTitle": "Premenovať organizáciu",
-      "renamePlaceholder": "Názov organizácie",
+      "renamePlaceholder": "Zadajte názov organizácie",
       "balance": "Zostatok",
       "plan": "Plán",
       "planTeams": "Teams",
@@ -4205,7 +4216,13 @@
     "providerUnavailable": "Poskytovateľ je teraz nedostupný. O chvíľu skúste odoslať znova."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrdiť túto zmenu?"
+    "confirmTitle": "Potvrdiť túto zmenu?",
+    "guarded": {
+      "spendAlertsOff": "Vypnúť upozornenia na výdavky? Prestanete dostávať oznámenia o prekročení prahov výdavkov a o hodinových špičkách.",
+      "balanceAlertsOff": "Vypnúť upozornenia na zostatok? Prestanete dostávať oznámenia, keď budete mať málo kreditov.",
+      "securityFindingsOff": "Vypnúť bezpečnostné zistenia? Prestanete dostávať oznámenia o nových bezpečnostných zisteniach.",
+      "hideBalanceOn": "Skryť zostatky? Zostatky kreditov sa už nebudú zobrazovať na obrazovkách profilu a v centre organizácie."
+    }
   },
   "appActions": {
     "start": {
@@ -5133,6 +5150,7 @@
     "providersDescription": "Vypnutím poskytovateľa zastavíte smerovanie Kilo naň pre túto organizáciu.",
     "providersNeedCatalog": "Prepínače poskytovateľov zostanú iba na čítanie, kým sa nenačíta celý katalóg modelov. Ak ich chcete upraviť, ťuknite vyššie na Skúsiť znova.",
     "providersEmpty": "Tomuto hľadaniu nezodpovedajú žiadni poskytovatelia.",
+    "providersNone": "Pre túto organizáciu nie sú k dispozícii žiadni poskytovatelia.",
     "allowAllShown": "Povoliť všetky zobrazené",
     "denyAllShown": "Zamietnuť všetky zobrazené",
     "gatewaysDescription": "Kilo smeruje požiadavky na modely cez Vercel AI Gateway alebo OpenRouter. Vypnutá brána spôsobí zlyhanie týchto požiadaviek.",

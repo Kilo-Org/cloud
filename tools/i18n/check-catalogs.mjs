@@ -202,6 +202,7 @@ const WORDED_COUNTS = new Set([
   'agentChat.contextUsage.stepsCount:one:ar',
   'agentChat.contextUsage.stepsCount:two:ar',
   'agentChat.contextUsage.modelsCount:two:ar',
+  'nativeRemote.recoveryGaps:two:ar',
   'prReview.discussion.comment:two:ar',
   'prReview.tabs.discussionAccessibility:two:ar',
   'prReview.hunkRows.fileLoadedCount:two:ar',

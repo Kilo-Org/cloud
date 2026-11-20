@@ -78,7 +78,6 @@ describe('router contracts and database isolation', () => {
         startedAt: 'now',
         completedAt: 'later',
         error: null,
-        summaries: [],
       }).router
     ).toBe('efficient');
     expect(AutoRouterSchema.safeParse('unknown').success).toBe(false);
@@ -157,7 +156,7 @@ describe('router contracts and database isolation', () => {
         best_accuracy_switch_threshold: 0.05,
         low_confidence_threshold: null,
         classifier_repetitions: 1,
-        decider_repetitions: 1,
+        decider_repetitions: router === 'efficient' ? 3 : 1,
         classifier_max_p95_latency_ms: null,
         max_concurrency: 80,
         user_max_concurrency: 40,

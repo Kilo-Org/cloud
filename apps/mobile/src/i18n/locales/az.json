@@ -19,7 +19,9 @@
     "presenceStatus": "Hostlar: {{connection}}",
     "commandStatus": "Əmrin çatdırılması: {{status}}",
     "delivered": "Çatdırılıb",
-    "expired": "Müddəti bitib"
+    "expired": "Müddəti bitib",
+    "recoveryGaps_one": "Bu transkriptin {{displayCount}} hissəsi itib.",
+    "recoveryGaps_other": "Bu transkriptin {{displayCount}} hissəsi itib."
   },
   "common": {
     "manageOnWeb": "Vebdə idarə et",
@@ -963,6 +965,8 @@
       "pendingComment": "göndərilməmiş şərh",
       "pendingComment_other": "göndərilməmiş şərh",
       "submitCountOfTotal": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
       "submitReview": "Yoxlamanı göndər",
       "partialPostedFresh": "{{displayFreshCount}} şərh göndərildi. ",
       "partialPostedFresh_one": "{{displayFreshCount}} şərh göndərildi. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər."
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
+      "notConnectedReadOnlyPlan": "Təşkilatın sınaq müddəti başa çıxıb, ona görə də sahib kilo.ai ünvanında billinqi yeniləməlidir."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
@@ -2788,7 +2793,9 @@
     "modelPicker": {
       "title": "Model seç",
       "favorites": "Sevimlilər",
-      "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil."
+      "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil.",
+      "allUnavailableTitle": "Heç bir model istifadə edilə bilməz",
+      "allUnavailableDescription": "Provayder açarı əlavə et, sonra yenidən cəhd et."
     },
     "modelSelector": {
       "provider": "Təminatçı {{id}}",
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Təşkilatın adını dəyiş",
-      "renamePlaceholder": "Təşkilatın adı",
+      "renamePlaceholder": "Təşkilatın adını daxil edin",
       "balance": "Balans",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4081,7 +4088,13 @@
     "providerUnavailable": "Provayder hazırda əlçatan deyil. Bir az sonra yenidən göndərin."
   },
   "settingsTools": {
-    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"
+    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?",
+    "guarded": {
+      "spendAlertsOff": "Xərc bildirişlərini söndürəsiniz? Xərc həddinin aşılması və saatlıq kəskin artımlar barədə bildirişlər almağı dayandırardınız.",
+      "balanceAlertsOff": "Balans bildirişlərini söndürəsiniz? Kreditləriniz azaldıqda bildirişlər almağı dayandırardınız.",
+      "securityFindingsOff": "Təhlükəsizlik tapıntılarını söndürəsiniz? Yeni təhlükəsizlik tapıntıları barədə bildirişlər almağı dayandırardınız.",
+      "hideBalanceOn": "Balanslarınızı gizlədirsiniz? Kredit balansları artıq profil ekranlarında və təşkilat mərkəzində görünməyəcək."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4994,7 @@
     "providersDescription": "Kilo-nun bu təşkilat üçün sorğuları provayderə yönləndirməsini dayandırmaq üçün onu söndürün.",
     "providersNeedCatalog": "Provayder açarları tam model kataloqu yüklənənə qədər yalnız oxunuş rejimində qalır. Onları redaktə etmək üçün yuxarıdakı Yenidən cəhd et düyməsinə toxunun.",
     "providersEmpty": "Bu axtarışa uyğun provayder yoxdur.",
+    "providersNone": "Bu təşkilat üçün heç bir provayder mövcud deyil.",
     "allowAllShown": "Göstərilənlərin hamısına icazə ver",
     "denyAllShown": "Göstərilənlərin hamısını qadağan et",
     "gatewaysDescription": "Kilo model sorğularını Vercel AI Gateway və ya OpenRouter vasitəsilə yönləndirir. Şlüz deaktiv edilərsə, həmin sorğular uğursuz olur.",

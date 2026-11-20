@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregado",
-    "expired": "Caducado"
+    "expired": "Caducado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrición.",
+    "recoveryGaps_other": "Faltan {{displayCount}} partes desta transcrición."
   },
   "common": {
     "manageOnWeb": "Xestionar na web",
@@ -963,6 +965,8 @@
       "pendingComment": "comentarios pendentes",
       "pendingComment_other": "comentarios pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
       "submitReview": "Enviar a revisión",
       "partialPostedFresh": "Comentarios publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentarios publicados: {{displayFreshCount}}. ",
@@ -1387,7 +1391,8 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respecta as instrucións do ficheiro REVIEW.md de cada repositorio",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo."
+      "notConnectedReadOnly": "Bitbucket non está conectado. Só os propietarios da organización, os administradores e os xestores de facturación poden conectalo.",
+      "notConnectedReadOnlyPlan": "O período de proba da organización rematou, polo que un propietario debe actualizar a facturación en kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A conexión de Bitbucket con {{organization}} xestiónase na web desde un ordenador.",
@@ -2788,6 +2793,8 @@
     "modelPicker": {
       "title": "Seleccionar modelo",
       "noModelsDescription": "Non hai modelos dispoñibles para seleccionar.",
+      "allUnavailableTitle": "Non se pode usar ningún modelo",
+      "allUnavailableDescription": "Engade unha clave de provedor e téntao de novo.",
       "favorites": "Favoritos"
     },
     "modelSelector": {
@@ -3621,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Renomear organización",
-      "renamePlaceholder": "Nome da organización",
+      "renamePlaceholder": "Introduce un nome para a organización",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4081,7 +4088,13 @@
     "providerUnavailable": "O provedor non está dispoñible agora mesmo. Envía de novo en breve."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmar este cambio?"
+    "confirmTitle": "Confirmar este cambio?",
+    "guarded": {
+      "spendAlertsOff": "Desactivar as alertas de gasto? Deixarías de recibir notificacións sobre superacións dos limiares de gasto e picos horarios.",
+      "balanceAlertsOff": "Desactivar as alertas de saldo? Deixarías de recibir notificacións cando os teus créditos estean baixos.",
+      "securityFindingsOff": "Desactivar os achados de seguridade? Deixarías de recibir notificacións sobre novos achados de seguridade.",
+      "hideBalanceOn": "Ocultar os teus saldos? Os saldos de créditos xa non aparecerían nas pantallas de perfil e no centro da organización."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4994,7 @@
     "providersDescription": "Desactiva un provedor para impedir que Kilo encamiñe solicitudes cara a el para esta organización.",
     "providersNeedCatalog": "Os interruptores dos provedores permanecen en modo só lectura ata que se cargue o catálogo completo de modelos. Toca en Tentar de novo arriba para editalos.",
     "providersEmpty": "Ningún provedor coincide con esta busca.",
+    "providersNone": "Non hai ningún provedor dispoñible para esta organización.",
     "allowAllShown": "Permitir todos os mostrados",
     "denyAllShown": "Denegar todos os mostrados",
     "gatewaysDescription": "Kilo encamiña as solicitudes dos modelos a través de Vercel AI Gateway ou OpenRouter. Unha pasarela desactivada fai fallar esas solicitudes.",

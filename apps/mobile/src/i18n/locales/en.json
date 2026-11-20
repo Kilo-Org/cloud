@@ -111,7 +111,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Command delivery: {{status}}",
     "delivered": "Delivered",
-    "expired": "Expired"
+    "expired": "Expired",
+    "recoveryGaps_one": "{{displayCount}} part of this transcript is missing.",
+    "recoveryGaps_other": "{{displayCount}} parts of this transcript are missing."
   },
   "common": {
     "manageOnWeb": "Manage on the web",
@@ -1055,6 +1057,8 @@
       "pendingComment": "pending comments",
       "pendingComment_other": "pending comments",
       "submitCountOfTotal": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
+      "submitCountOfTotal_one": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
+      "submitCountOfTotal_other": "Submit {{displayFreshCount}} of {{displayTotalCount}} comments",
       "submitReview": "Submit review",
       "partialPostedFresh_one": "Posted {{displayFreshCount}} comment. ",
       "partialPostedFresh": "Posted {{displayFreshCount}} comments. ",
@@ -1479,7 +1483,8 @@
     "followReviewMd": "Follow REVIEW.md",
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
+      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it.",
+      "notConnectedReadOnlyPlan": "The organization's trial has ended, so an owner must update billing at kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
@@ -2899,6 +2904,8 @@
     "modelPicker": {
       "title": "Select model",
       "noModelsDescription": "No models are available to select.",
+      "allUnavailableTitle": "No models can be used",
+      "allUnavailableDescription": "Add a provider key, then try again.",
       "favorites": "Favorites"
     },
     "modelSelector": {
@@ -4173,7 +4180,13 @@
     "providerUnavailable": "The provider is unavailable right now. Send again shortly."
   },
   "settingsTools": {
-    "confirmTitle": "Confirm this change?"
+    "confirmTitle": "Confirm this change?",
+    "guarded": {
+      "spendAlertsOff": "Turn off spend alerts? You would stop getting notifications about spend threshold crossings and hourly spikes.",
+      "balanceAlertsOff": "Turn off balance alerts? You would stop getting notifications when your credits run low.",
+      "securityFindingsOff": "Turn off security findings? You would stop getting notifications about new security findings.",
+      "hideBalanceOn": "Hide your balances? Credit balances would no longer appear on the profile screens and the organization hub."
+    }
   },
   "appActions": {
     "start": {
@@ -4981,6 +4994,7 @@
     "providersDescription": "Turn a provider off to stop Kilo routing to it for this organization.",
     "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
     "providersEmpty": "No providers match this search.",
+    "providersNone": "No providers are available for this organization.",
     "allowAllShown": "Allow all shown",
     "denyAllShown": "Deny all shown",
     "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",

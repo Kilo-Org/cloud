@@ -247,6 +247,32 @@ describe('share navigation durable persistence', () => {
     expect(takePendingShareNavigation()).toBeNull();
   });
 
+  it('resumes the account draft beside a destination staged before an account resolved', async () => {
+    setSharePersistUserId('userA');
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=owned', shareId: 'owned' });
+    await persistShareNavigationNow();
+
+    // Sign-out: the account boundary drops its destination, draft stays.
+    clearAccountStagedShareNavigation();
+    setSharePersistUserId(null);
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+
+    // Same-process sign-in as A restores A's draft for the cold start.
+    setSharePersistUserId('userA');
+    await restoreShareNavigation('userA');
+
+    // The capture keeps its place; taking it must never drop A's destination.
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/agent-chat/new?shareId=out',
+      shareId: 'out',
+    });
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/agent-chat/new?shareId=owned',
+      shareId: 'owned',
+    });
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+
   it('stops restoring when the account changes during the read', async () => {
     setSharePersistUserId('userA');
     saveDraft('userA', SHARE_NAV_DRAFT_KEY, [

@@ -136,14 +136,6 @@ function sharePayloadsDraftSnapshot(userId: string) {
 }
 
 /**
- * True when `id` is staged under `userId`, so a flush for that account keeps it
- * and a durable draft for the account holds it.
- */
-export function isSharePayloadStagedUnder(id: ShareId, userId: string): boolean {
-  return payloads.get(id)?.stagedUserId === userId;
-}
-
-/**
  * Persists the payloads staged under the signed-in account (debounced + flushed)
  * so they survive process death. No-ops while signed out, and never writes a
  * capture that the account did not stage (DEC-01 account scope).
@@ -304,12 +296,14 @@ export function clearSharePayload(id: ShareId): void {
 }
 
 /**
- * Restores the payloads map from the durable draft for `userId`. Fills the
- * store first (in recorded order), then reconciles each file against the
- * filesystem: a missing cache copy moves its name into `failedFiles` and is
- * dropped from `files`. Fills ONLY an empty store, so a live share staged in
- * this process (cold-start share-to-app, or a signed-out share then
- * same-process login) is never clobbered by a stale or empty draft.
+ * Restores the payloads map from the durable draft for `userId`. Merges the
+ * draft in beside whatever the store already holds: an entry this process
+ * staged for `userId` wins over the draft, and a capture staged before an
+ * account resolved (null stamp) keeps its memory-only place while the account's
+ * own draft resumes next to it, so the next snapshot can never erase the
+ * account's retained draft. Each restored entry's files are reconciled against
+ * the filesystem: a missing cache copy moves its name into `failedFiles` and is
+ * dropped from `files`. A restored id that is already staged is left alone.
  */
 export async function restoreSharePayloads(userId: string): Promise<void> {
   if (!userId) {
@@ -325,37 +319,36 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
     return;
   }
 
-  // Fill only an empty store. The check runs after the read settles so a put
-  // that lands during the read also wins, and it must not be replaced with an
-  // early "no draft" return: a take/clear persists a truthy empty draft
-  // (`{ order: [], entries: {} }`) that must not wipe live in-memory shares.
-  if (payloads.size > 0) {
+  // Fill only when this account owns no in-memory entry. The check runs after
+  // the read settles so a put that lands during the read also wins, and it must
+  // not be replaced with an early "no draft" return: a take/clear persists a
+  // truthy empty draft (`{ order: [], entries: {} }`) that must not wipe live
+  // in-memory shares.
+  if ([...payloads.values()].some(entry => entry.stagedUserId === userId)) {
     return;
   }
   if (!draft) {
     return;
   }
 
-  // Fill first, keeping every recorded id in order.
-  payloads.clear();
-  insertionOrder.length = 0;
+  // Merge in recorded order, never clearing an entry staged by another owner.
+  const restored: SharePayload[] = [];
   for (const id of draft.order) {
     const entry = draft.entries[id];
-    if (entry) {
-      payloads.set(id, {
-        payload: {
-          text: entry.text,
-          files: entry.files.map(file => ({ name: file.name, uri: file.uri })),
-          failedFiles: [...entry.failedFiles],
-        },
-        stagedUserId: userId,
-      });
+    if (entry && !payloads.has(id)) {
+      const payload: SharePayload = {
+        text: entry.text,
+        files: entry.files.map(file => ({ name: file.name, uri: file.uri })),
+        failedFiles: [...entry.failedFiles],
+      };
+      payloads.set(id, { payload, stagedUserId: userId });
       insertionOrder.push(id);
+      restored.push(payload);
     }
   }
 
-  // Then reconcile each file against the filesystem.
-  for (const { payload } of payloads.values()) {
+  // Then reconcile each restored payload's files against the filesystem.
+  for (const payload of restored) {
     const kept: AgentAttachmentCandidate[] = [];
     const failed = [...payload.failedFiles];
     for (const file of payload.files) {

@@ -11,7 +11,6 @@ import {
   clearSharePayload,
   composeShareText,
   discardUnstoredSharePayload,
-  isSharePayloadStagedUnder,
   loadPendingShareIdDraft,
   normalizeShareIntent,
   peekSharePayload,
@@ -571,6 +570,30 @@ describe('share payload durable persistence', () => {
     expect(peekSharePayload(owned)?.text).toBe('by-u1');
   });
 
+  it('resumes the account draft beside a capture staged before an account resolved', async () => {
+    setSharePersistUserId('userA');
+    const owned = putSharePayload({ text: 'staged-by-a', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+
+    // Sign-out: the account boundary drops its staged payload, draft stays.
+    clearAccountStagedSharePayloads();
+    setSharePersistUserId(null);
+    const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+
+    // Same-process sign-in as A restores A's draft for the cold start.
+    setSharePersistUserId('userA');
+    await restoreSharePayloads('userA');
+
+    expect(peekSharePayload(owned)?.text).toBe('staged-by-a');
+    expect(peekSharePayload(stagedOut)?.text).toBe('captured-out');
+
+    // Consuming the capture snapshots the store; A's own entry must survive it.
+    takeSharePayload(stagedOut);
+    await drainAsync();
+    const draft = await loadDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, isSharePayloadsDraft);
+    expect(draft?.entries[owned]?.text).toBe('staged-by-a');
+  });
+
   it('never restores one capture under a second account', async () => {
     const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
 
@@ -808,17 +831,6 @@ describe('share payload account boundary', () => {
     } finally {
       unsubscribe();
     }
-  });
-
-  it('reports which staged id belongs to the account', () => {
-    const signedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
-    setSharePersistUserId('userA');
-    const owned = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
-
-    expect(isSharePayloadStagedUnder(owned, 'userA')).toBe(true);
-    expect(isSharePayloadStagedUnder(owned, 'userB')).toBe(false);
-    expect(isSharePayloadStagedUnder(signedOut, 'userA')).toBe(false);
-    expect(isSharePayloadStagedUnder('missing', 'userA')).toBe(false);
   });
 
   it('stops notifying after the subscriber leaves', () => {

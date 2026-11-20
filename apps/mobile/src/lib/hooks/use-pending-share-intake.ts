@@ -11,19 +11,17 @@ import {
 import {
   clearSharePayload,
   discardUnstoredSharePayload,
-  isSharePayloadStagedUnder,
   loadPendingShareIdDraft,
   normalizeShareIntent,
   peekSharePayload,
   persistPendingShareIdDraft,
-  persistSharePayloadsNow,
   putSharePayload,
   restoreSharePayloads,
   type ShareId,
   type SharePayload,
   subscribeAccountStagedShareClear,
 } from '@/lib/share-payload';
-import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import { restoreShareNavigation } from '@/lib/share-navigation';
 
 /**
  * Owns the pending-share slot: the in-memory id the share gate opens on, and
@@ -81,27 +79,6 @@ export function usePendingShareIntake(input: {
       }),
     []
   );
-
-  // Flush a share staged while the account id was still loading: the ingest
-  // effect persisted nothing (userId was falsy), so once userId resolves the
-  // staged payload map, navigation queue, and pending id are written to durable
-  // drafts. A signed-out share never reaches this branch (userId stays null),
-  // so it remains in-memory only. Declared after `pendingShareIdRef` so the
-  // closure references an already-declared const.
-  useEffect(() => {
-    const pendingId = pendingShareIdRef.current;
-    if (!userId || pendingId === null) {
-      return;
-    }
-    void persistSharePayloadsNow();
-    void persistShareNavigationNow();
-    // Only this account's staged share reaches its durable pending-id hint: a
-    // capture from before an account resolved stays in memory (DEC-01).
-    if (!isSharePayloadStagedUnder(pendingId, userId)) {
-      return;
-    }
-    void persistPendingShareIdDraft(userId, pendingId);
-  }, [userId]);
 
   // Cold-start share restore. Order matters: payloads first, then the
   // navigation queue (deliveries point at restored payloads), then the pending

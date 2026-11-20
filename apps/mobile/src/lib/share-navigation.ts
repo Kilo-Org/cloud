@@ -85,9 +85,12 @@ export function takePendingShareNavigation(): PendingShareNavigation | null {
 /**
  * Restores the pending navigation queue from the durable draft for `userId`.
  * Call only after payloads have been restored, so a restored delivery can
- * point at a payload that is already in the in-memory map. Fills only an empty
- * queue: a navigation committed in this process wins over a stale or empty
- * draft. No-op while signed out, or when no draft exists.
+ * point at a payload that is already in the in-memory map. Merges the draft in:
+ * a destination this process staged for `userId` wins over the draft, and a
+ * destination staged before an account resolved (null stamp) keeps its
+ * memory-only place while the account's own draft resumes beside it, so the
+ * next snapshot can never erase the account's retained draft. No-op while
+ * signed out, or when no draft exists.
  */
 export async function restoreShareNavigation(userId: string): Promise<void> {
   if (!userId) {
@@ -101,13 +104,12 @@ export async function restoreShareNavigation(userId: string): Promise<void> {
   if (getSharePersistUserId() !== userId) {
     return;
   }
-  if (pendingQueue.length > 0) {
+  if (pendingQueue.some(entry => entry.stagedUserId === userId)) {
     return;
   }
   if (!draft) {
     return;
   }
-  pendingQueue.length = 0;
   for (const entry of draft) {
     pendingQueue.push({
       pending: { href: entry.href, shareId: entry.shareId },

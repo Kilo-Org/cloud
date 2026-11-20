@@ -184,7 +184,8 @@
     "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
     "privateRepositoryA11y": "{{name}}, repository privato",
     "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese.",
-    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova."
+    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova.",
+    "organizationTrialEndedBillingAtKiloAi": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione su kilo.ai, poi riprova."
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",

@@ -236,13 +236,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
   // A money role whose platform may open the billing page gets the state
   // alone, because the banner's action is the next step. A money role the
-  // storefront rule keeps from linking gets the sentence the rest of the app
-  // shows, which names where billing is changed, exactly as a role that cannot
-  // change the plan does: with no action, the sentence has to carry the step.
-  const planMessage =
-    showMoney && canLinkBilling
+  // storefront rule keeps from linking has no action under the sentence, so the
+  // sentence carries the step and names where billing is changed. A role that
+  // cannot change the plan is told who can.
+  let planMessage = t('common.organizationTrialEnded');
+  if (showMoney) {
+    planMessage = canLinkBilling
       ? t('organization.hub.planEnded')
-      : t('common.organizationTrialEnded');
+      : t('common.organizationTrialEndedBillingAtKiloAi');
+  }
 
   // The rename control's two states. `organizations.update` runs on the
   // organization billing mutation procedure, which refuses every mutation once

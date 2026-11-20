@@ -183,7 +183,8 @@
     "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi.",
     "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo",
     "legalDocumentEnglishOnly": "Leli dokhumenti litholakala ngesiNgisi kuphela.",
-    "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi."
+    "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi.",
+    "organizationTrialEndedBillingAtKiloAi": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela ku-kilo.ai, bese uzama futhi."
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",

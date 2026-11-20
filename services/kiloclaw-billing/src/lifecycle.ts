@@ -1889,18 +1889,34 @@ async function processCreditRenewalRow(
 
     const userId = current.user_id;
     const hostingEnded = !isKiloClawPaidHostingAvailable();
-    if (
-      hostingEnded &&
-      (!current.current_period_end || Date.parse(current.current_period_end) > Date.now())
-    ) {
-      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    if (hostingEnded) {
+      const paidPeriodEnd = Date.parse(current.current_period_end ?? '');
+      if (!Number.isFinite(paidPeriodEnd)) {
+        logSkippedSubscriptionRow(
+          'Skipping credit expiry without a valid paid period end',
+          current,
+          {
+            reason: 'invalid_current_period_end',
+            currentPeriodEnd: current.current_period_end,
+            renewalBoundary: renewalAt,
+          }
+        );
+        return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+      }
+      if (paidPeriodEnd > Date.now()) {
+        return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+      }
     }
     const pendingSwitchQualification =
       !hostingEnded && current.plan === 'standard' && current.scheduled_plan === 'commit'
         ? await findLatestPreCutoffUserCommitSwitchQualification(tx, current.id)
         : null;
+    const hasAmbiguousCommitEnd =
+      hostingEnded &&
+      current.plan === 'commit' &&
+      current.commit_ends_at !== current.current_period_end;
     const retirementDecision: CommitRetirementRenewalDecision = hostingEnded
-      ? { kind: 'ordinary' }
+      ? { kind: hasAmbiguousCommitEnd ? 'ambiguous' : 'ordinary' }
       : decideCommitRetirementCreditRenewal(current, pendingSwitchQualification !== null);
     if (retirementDecision.kind === 'ambiguous') {
       log('error', 'Skipping ambiguous Commit credit renewal', {
@@ -1933,6 +1949,7 @@ async function processCreditRenewalRow(
           status: 'canceled',
           cancel_at_period_end: false,
           auto_top_up_triggered_for_period: null,
+          ...(hostingEnded ? { scheduled_plan: null, scheduled_by: null } : {}),
           ...(cancelAtFinalCommitBoundary
             ? { commit_ends_at: current.commit_ends_at ?? current.current_period_end }
             : {}),

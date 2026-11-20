@@ -3009,9 +3009,8 @@ async function cancelKiloclawPlanSwitchForRow(params: {
     }
   }
 
-  assertKiloClawPaidHostingAvailable();
-
   if (subscription.stripe_schedule_id) {
+    assertKiloClawPaidHostingAvailable();
     const released = await releaseScheduleIfActive(subscription.stripe_schedule_id);
     if (!released) {
       throw new TRPCError({

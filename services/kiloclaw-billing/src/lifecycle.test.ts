@@ -5201,9 +5201,13 @@ describe('credit renewal sweep affiliate tracking', () => {
     }
   });
 
-  it.each([true, false])(
-    'ends credit subscriptions without charging or advancing (hosting available: %s)',
-    async hostingAvailable => {
+  it.each([
+    { hostingAvailable: true, plan: 'standard', scheduledPlan: null, scheduledBy: null },
+    { hostingAvailable: false, plan: 'standard', scheduledPlan: 'commit', scheduledBy: 'user' },
+    { hostingAvailable: false, plan: 'commit', scheduledPlan: 'standard', scheduledBy: 'auto' },
+  ])(
+    'ends $plan credit subscriptions without charging or advancing (hosting available: $hostingAvailable)',
+    async ({ hostingAvailable, plan, scheduledPlan, scheduledBy }) => {
       const renewalAt = '2026-04-09T10:00:00.000Z';
       if (!hostingAvailable) {
         const actual = await vi.importActual<typeof PaidHosting>(
@@ -5224,14 +5228,15 @@ describe('credit renewal sweep affiliate tracking', () => {
               instance_row_id: 'cancel-instance',
               organization_id: null,
               instance_destroyed_at: hostingAvailable ? '2026-04-08T10:00:00.000Z' : null,
-              plan: 'standard',
+              plan,
               status: 'active',
               kiloclaw_price_version: '2026-05-10',
               credit_renewal_at: renewalAt,
               current_period_end: renewalAt,
               cancel_at_period_end: hostingAvailable,
-              scheduled_plan: null,
-              commit_ends_at: null,
+              scheduled_plan: scheduledPlan,
+              scheduled_by: scheduledBy,
+              commit_ends_at: plan === 'commit' ? renewalAt : null,
               past_due_since: null,
               suspended_at: null,
               auto_resume_attempt_count: 0,
@@ -5273,7 +5278,7 @@ describe('credit renewal sweep affiliate tracking', () => {
       expect(summary.credit_renewals_canceled).toBe(1);
       expect(summary.credit_renewals).toBe(0);
       expect(summary.errors).toBe(0);
-      if (hostingAvailable) expect(fetch).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
       expect(txInserts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -5291,14 +5296,73 @@ describe('credit renewal sweep affiliate tracking', () => {
           status: 'canceled',
           cancel_at_period_end: false,
           auto_top_up_triggered_for_period: null,
+          ...(hostingAvailable ? {} : { scheduled_plan: null, scheduled_by: null }),
         },
       ]);
       expect(txUpdates[0]).not.toHaveProperty('kiloclaw_price_version');
       expect(txUpdates[0]).not.toHaveProperty('current_period_start');
       expect(txUpdates[0]).not.toHaveProperty('current_period_end');
       expect(txUpdates[0]).not.toHaveProperty('credit_renewal_at');
+      expect(txUpdates[0]).not.toHaveProperty('commit_ends_at');
       expect(updates).toHaveLength(0);
       expect(inserts).toHaveLength(0);
+    }
+  );
+
+  it.each([
+    {
+      currentPeriodEnd: '2099-07-01T00:00:00.000Z',
+      commitEnd: '2099-07-01T00:00:00.000Z',
+      alerts: false,
+    },
+    { currentPeriodEnd: null, commitEnd: null, alerts: false },
+    { currentPeriodEnd: '2026-06-01T00:00:00.000Z', commitEnd: null, alerts: true },
+    {
+      currentPeriodEnd: '2026-06-01T00:00:00.000Z',
+      commitEnd: '2026-07-01T00:00:00.000Z',
+      alerts: true,
+    },
+  ])(
+    'does not cancel or charge an unexpired or unverified Commit term at end of life ($currentPeriodEnd, $commitEnd)',
+    async ({ currentPeriodEnd, commitEnd, alerts }) => {
+      vi.mocked(isKiloClawPaidHostingAvailable).mockReturnValueOnce(false);
+      const row = creditRenewalRow({
+        plan: 'commit',
+        current_period_end: currentPeriodEnd,
+        commit_ends_at: commitEnd,
+        total_microdollars_acquired: 200_000_000,
+        auto_top_up_enabled: true,
+      });
+      const { db, txUpdates, txInserts } = createMockDb([[row]]);
+      const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({}));
+
+      const summary = await runCreditRenewalSweepForTest(
+        db,
+        createEnv(vi.fn()),
+        'd4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4'
+      );
+
+      expect(summary).toMatchObject({ credit_renewals_canceled: 0, credit_renewals: 0, errors: 0 });
+      expect(txUpdates).toEqual([]);
+      expect(txInserts).toEqual([]);
+      if (alerts) {
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/internal/kiloclaw/billing-side-effects'),
+          expect.objectContaining({
+            body: JSON.stringify({
+              action: 'report_commit_retirement_anomaly',
+              input: {
+                reason: 'boundary_mismatch',
+                summary: 'Credit renewal skipped because final Commit evidence is ambiguous.',
+                subscriptionId: row.id,
+              },
+            }),
+          })
+        );
+      } else {
+        expect(fetch).not.toHaveBeenCalled();
+      }
     }
   );
 

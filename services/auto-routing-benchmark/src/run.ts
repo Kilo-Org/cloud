@@ -423,6 +423,10 @@ export async function drainQueues(
   return started;
 }
 
+// Must match the daily entry of `triggers.crons` in wrangler.jsonc.
+export const PLATFORM_SYNC_CRON = '0 5 * * *';
+export const PLATFORM_SYNC_SCHEDULE = 'daily at 05:00 UTC';
+
 /**
  * Reconcile the platform queue with the saved decider model list. Every
  * configured exact pair ends up with a current-engine registry row; pairs that

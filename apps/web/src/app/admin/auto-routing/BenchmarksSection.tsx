@@ -7,6 +7,7 @@ import {
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
   BenchmarkConfigResponseSchema,
+  type BenchmarkConfigSaveWarning,
   BenchmarkRegistryResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkRunsResponseSchema,
@@ -602,6 +603,9 @@ function BenchmarkConfigEditor({
   // polls; the query also refetches on focus) must not silently overwrite
   // in-progress edits, so the sync effect only resets the form while pristine.
   const [dirty, setDirty] = useState(false);
+  // What the last save could not do after persisting the config; replaced by
+  // the next save.
+  const [saveWarnings, setSaveWarnings] = useState<BenchmarkConfigSaveWarning[]>([]);
 
   // Any user edit goes through this so it marks the form dirty.
   const updateForm = useCallback(
@@ -635,7 +639,10 @@ function BenchmarkConfigEditor({
       setForm(configToFormState(data.config, router));
       setDirty(false);
       onSaved(data);
-      toast.success('Benchmark config saved');
+      const warnings = data.warnings ?? [];
+      setSaveWarnings(warnings);
+      if (warnings.length === 0) toast.success('Benchmark config saved');
+      else toast.warning('Benchmark config saved with warnings');
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to save benchmark config');
@@ -1111,6 +1118,7 @@ function BenchmarkConfigEditor({
             </>
           ) : null}
         </div>
+        <ConfigSaveWarnings warnings={saveWarnings} />
         {config === null ? (
           <p className="text-muted-foreground text-xs">
             No config saved yet — runs cannot start until one is saved.
@@ -1123,6 +1131,28 @@ function BenchmarkConfigEditor({
         ) : null}
       </div>
     </Card>
+  );
+}
+
+const CONFIG_SAVE_WARNING_TITLES: Record<BenchmarkConfigSaveWarning['kind'], string> = {
+  registry_sync_failed: 'Platform registry not synced',
+  routing_table_publish_failed: 'Routing table not republished',
+};
+
+export function ConfigSaveWarnings({ warnings }: { warnings: BenchmarkConfigSaveWarning[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div role="alert" className="flex flex-col gap-2">
+      {warnings.map(warning => (
+        <div
+          key={warning.kind}
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500"
+        >
+          <p className="font-medium">{CONFIG_SAVE_WARNING_TITLES[warning.kind]}</p>
+          <p className="whitespace-pre-wrap break-words">{warning.message}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 

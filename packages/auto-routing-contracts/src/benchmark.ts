@@ -315,6 +315,14 @@ export const BenchmarkRunSummariesResponseSchema = z.object({
   summaries: z.array(BenchmarkModelSummarySchema),
 });
 export type BenchmarkRunSummariesResponse = z.infer<typeof BenchmarkRunSummariesResponseSchema>;
+// A config save persists the config first, then syncs the platform registry and
+// republishes the routing table. Either step can fail after the save; the save
+// still succeeds and reports what did not happen.
+export const BenchmarkConfigSaveWarningSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('registry_sync_failed'), message: z.string() }),
+  z.object({ kind: z.literal('routing_table_publish_failed'), message: z.string() }),
+]);
+export type BenchmarkConfigSaveWarning = z.infer<typeof BenchmarkConfigSaveWarningSchema>;
 // config is null until an admin saves one — the worker never fabricates a
 // default config, and runs cannot start without a saved one.
 export const BenchmarkConfigResponseSchema = z.object({
@@ -322,6 +330,8 @@ export const BenchmarkConfigResponseSchema = z.object({
   // Per-setting effective/computed/override resolution. Null when no config is
   // saved; optional so PUT responses from an older worker still parse.
   policySettings: PolicySettingsStateSchema.nullable().optional(),
+  // PUT only. Optional so GET responses and older workers still parse.
+  warnings: z.array(BenchmarkConfigSaveWarningSchema).optional(),
 });
 export const StartBenchmarkRunRequestSchema = z.object({
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),

@@ -212,13 +212,8 @@ const env = {
   KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
 
-// Background work a route hands to waitUntil; settled before the database closes.
-const backgroundTasks: Promise<unknown>[] = [];
-
 const executionCtx = {
-  waitUntil: (task: Promise<unknown>) => {
-    backgroundTasks.push(task);
-  },
+  waitUntil: () => {},
   passThroughOnException: () => {},
 } as unknown as ExecutionContext;
 
@@ -250,8 +245,7 @@ function authedPut(path: string, body: unknown, extraHeaders: Record<string, str
   });
 }
 
-afterEach(async () => {
-  await Promise.allSettled(backgroundTasks.splice(0));
+afterEach(() => {
   vi.unstubAllGlobals();
   sqlite.close();
 });
@@ -637,33 +631,54 @@ describe('PUT /admin/config', () => {
     expect(router).toBe('efficient');
   });
 
-  it('responds before the registry sync finishes and finishes it in the background', async () => {
+  it('syncs the registry and publishes before responding, with no warnings', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
-    const sync = Promise.withResolvers<void>();
-    vi.mocked(syncPlatformRegistryRows).mockReturnValue(sync.promise);
 
     const res = await authedPut('/admin/config', TEST_CONFIG);
 
     expect(res.status).toBe(200);
-    expect(backgroundTasks).toHaveLength(1);
-    sync.resolve();
-    await Promise.all(backgroundTasks);
+    await expect(res.json()).resolves.toMatchObject({ warnings: [] });
     expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
+    // The publish reads the ready registry rows.
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalled();
   });
 
-  it('keeps a saved config when the background registry sync fails, and logs it', async () => {
+  it('returns the saved config with a registry warning and skips the publish when the sync fails', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(syncPlatformRegistryRows).mockRejectedValue(new Error('D1 overloaded'));
-    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(listReadyCurrentProfilesForEntries).mockRejectedValue(new Error('unreachable'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const res = await authedPut('/admin/config', TEST_CONFIG);
-    await Promise.all(backgroundTasks);
+    const res = await authedPut('/admin/config', { ...TEST_CONFIG, minAccuracy: 0.85 });
 
     expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      config: { minAccuracy: number };
+      warnings: { kind: string; message: string }[];
+    };
+    expect(body.config.minAccuracy).toBe(0.85);
+    expect(body.warnings).toEqual([
+      { kind: 'registry_sync_failed', message: expect.stringContaining('D1 overloaded') },
+    ]);
+    expect(body.warnings[0].message).toContain('daily at 05:00 UTC');
     expect(replaceConfig).toHaveBeenCalledOnce();
-    expect(logged.mock.calls.map(([line]) => JSON.parse(String(line)).event)).toContain(
-      'platform_registry_sync_failed'
-    );
+    expect(listReadyCurrentProfilesForEntries).not.toHaveBeenCalled();
+  });
+
+  it('returns the saved config with a publish warning when the routing table publish fails', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockRejectedValue(new Error('D1 overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { warnings: { kind: string; message: string }[] };
+    expect(body.warnings).toEqual([
+      { kind: 'routing_table_publish_failed', message: expect.stringContaining('D1 overloaded') },
+    ]);
+    expect(body.warnings[0].message).toContain('save again to retry now');
+    expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
   });
 
   it('keeps the previous release’s admin config fields on the resolved policy values', async () => {

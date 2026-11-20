@@ -91,6 +91,18 @@ describe('auto routing benchmark admin client', () => {
     );
   });
 
+  it('keeps the save warnings the worker returns with the saved config', async () => {
+    const saved = {
+      ...configResponse,
+      warnings: [{ kind: 'routing_table_publish_failed', message: 'publish failed' }],
+    };
+    mockFetch.mockResolvedValue({ status: 200, ok: true, json: () => Promise.resolve(saved) });
+
+    await expect(
+      updateBenchmarkConfig(configResponse.config, 'admin@kilocode.ai')
+    ).resolves.toMatchObject({ status: 200, body: { warnings: saved.warnings } });
+  });
+
   it('lists benchmark runs', async () => {
     mockFetch.mockResolvedValue({
       status: 200,

@@ -21,6 +21,7 @@ import {
   SyncBenchmarkSubscriptionsRequestSchema,
   type BenchmarkConfig,
   type BenchmarkConfigAdminResponseConfig,
+  type BenchmarkConfigSaveWarning,
   type BenchmarkRegistryQueue,
   type BenchmarkIdentity,
   resolveBenchmarkIdentity,
@@ -52,6 +53,7 @@ import {
   BenchmarkRunConfigError,
   computeEngineIdentity,
   drainQueues,
+  PLATFORM_SYNC_SCHEDULE,
   publishPlatformRoutingTable,
   resolveRunIdentity,
   RunAlreadyActiveError,
@@ -127,7 +129,17 @@ function withLegacyAdminConfigFields(
   };
 }
 
-async function syncRegistryAfterConfigSave(env: Env, router: AutoRouter): Promise<void> {
+const RETRY_AFTER_SAVE = `The scheduled platform sync (${PLATFORM_SYNC_SCHEDULE}) retries it; save again to retry now.`;
+
+/**
+ * Registry sync, then routing-table publish, for a config that is already
+ * saved. A failed step does not undo the save; it comes back as a warning so
+ * the admin learns what did not happen. A failed sync skips the publish.
+ */
+async function syncRegistryAfterConfigSave(
+  env: Env,
+  router: AutoRouter
+): Promise<BenchmarkConfigSaveWarning[]> {
   try {
     await syncPlatformRegistry(env, fetch, router);
   } catch (error) {
@@ -139,17 +151,35 @@ async function syncRegistryAfterConfigSave(env: Env, router: AutoRouter): Promis
         ...formatError(error),
       })
     );
-    return;
+    return [
+      {
+        kind: 'registry_sync_failed',
+        message: `Platform registry sync failed (${errorMessage(error)}), so newly added decider models have no pending benchmark entries and the routing table was not republished. ${RETRY_AFTER_SAVE}`,
+      },
+    ];
   }
-  await publishPlatformRoutingTable(env, fetch, router).catch(error => {
+  try {
+    await publishPlatformRoutingTable(env, fetch, router);
+  } catch (error) {
     console.warn(
       JSON.stringify({
         event: 'routing_table_publish_skipped',
         afterConfigSave: true,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage(error),
       })
     );
-  });
+    return [
+      {
+        kind: 'routing_table_publish_failed',
+        message: `Routing table publish failed (${errorMessage(error)}), so the gateway keeps serving the previous table. ${RETRY_AFTER_SAVE}`,
+      },
+    ];
+  }
+  return [];
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
@@ -205,13 +235,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         { ...body, router, deciderModels },
         updatedBy
       );
-      // Respond once the config is saved: the registry sync and table publish
-      // call the catalog and subscription services for seconds, and the
-      // scheduled platform sync converges the registry if this one fails.
-      c.executionCtx.waitUntil(syncRegistryAfterConfigSave(c.env, router));
+      const warnings = await syncRegistryAfterConfigSave(c.env, router);
       return c.json({
         config: withLegacyAdminConfigFields(saved),
         policySettings: resolvePolicySettings(saved),
+        warnings,
       });
     }
   );

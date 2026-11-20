@@ -441,4 +441,24 @@ describe('decider queue admission (production migrations and real SQLite)', () =
       failure_reason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
     });
   });
+
+  it('deletes a queued re-measure of a non-enrollable model so the queue clears', async () => {
+    const blocked = 'openai/gpt-6.2-astra-fast';
+    insertProfile(blocked, 'running', 'blocked-run');
+    sqlite.prepare("UPDATE benchmark_profiles SET status = 'ready' WHERE model = ?").run(blocked);
+    sqlite
+      .prepare(
+        `INSERT INTO profile_remeasures (router, model, variant, engine_identity, repetitions, run_id, requested_at)
+         VALUES ('efficient', ?, '', ?, ?, NULL, '2026-11-20T00:00:00.000Z')`
+      )
+      .run(blocked, computeEngineIdentity('decider', 'efficient'), repetitionsOf('efficient'));
+
+    // Nothing else is pending: the drain clears the refused row and reports nothing to do.
+    expect(await drainQueue(env, 'user')).toBeNull();
+    expect(sqlite.prepare('SELECT model FROM profile_remeasures').all()).toEqual([]);
+    // The ready measurement is untouched and stays readable.
+    expect(
+      sqlite.prepare('SELECT status, run_id FROM benchmark_profiles WHERE model = ?').get(blocked)
+    ).toEqual({ status: 'ready', run_id: 'blocked-run' });
+  });
 });

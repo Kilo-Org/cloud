@@ -1701,6 +1701,31 @@ export async function listPendingCurrentProfiles(
     );
 }
 
+/**
+ * Drop unclaimed re-measures of specific models, so a queue whose work a policy refuses
+ * does not keep re-reading the same rows forever. A claimed row (run_id set) is left to
+ * the run that owns it.
+ */
+export async function deleteQueuedRemeasuresForModels(
+  db: D1Database,
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
+  models: readonly string[]
+): Promise<number> {
+  if (models.length === 0) return 0;
+  const result = await drizzle(db)
+    .delete(profileRemeasures)
+    .where(
+      and(
+        isNull(profileRemeasures.run_id),
+        eq(profileRemeasures.router, current.router ?? 'efficient'),
+        eq(profileRemeasures.engine_identity, current.engineIdentity),
+        eq(profileRemeasures.repetitions, current.repetitions),
+        inArray(profileRemeasures.model, [...models])
+      )
+    );
+  return result.meta.changes ?? 0;
+}
+
 /** Queued, unclaimed re-measures of ready current-engine rows wanted by one queue. */
 export async function listQueuedRemeasures(
   db: D1Database,

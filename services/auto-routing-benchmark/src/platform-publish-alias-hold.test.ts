@@ -344,6 +344,72 @@ describe('publishPlatformRoutingTable — an alias move holds the live table, th
     warn.mockRestore();
   });
 
+  it('drops a non-enrollable alias target without holding the publish', async () => {
+    const blockedAlias = '~openai/astra-fast-latest';
+    const blocked = 'openai/gpt-6.2-astra-fast';
+    const steadyAlias = '~vendor/steady-latest';
+    const steady = 'vendor/steady';
+    targets = { [steadyAlias]: steady };
+    await replaceConfig(
+      env.BENCH_DB,
+      {
+        min_accuracy: 0.7,
+        benchmark_user_id: null,
+        benchmark_org_id: null,
+        updated_at: '2026-11-20',
+        updated_by: null,
+      },
+      ['classifier/a'],
+      [
+        { model: blockedAlias, variant: null, reasoning_effort: null },
+        { model: steadyAlias, variant: null, reasoning_effort: null },
+      ],
+      router
+    );
+    // The alias was resolved before the target joined the list: it still names and serves
+    // the blocked concrete model, which is exactly the state that used to freeze publish.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_subscriptions (router, owner_type, owner_id, revision, snapshot, updated_at)
+         VALUES (?, 'platform', '', 'rev-1', ?, '2026-11-20T00:00:00.000Z')`
+      )
+      .run(
+        router,
+        JSON.stringify({
+          entries: [
+            {
+              model: blockedAlias,
+              pairs: [{ model: blocked, variant: null }],
+              servingPairs: [{ model: blocked, variant: null }],
+              resolutionError: null,
+            },
+            {
+              model: steadyAlias,
+              pairs: [{ model: steady, variant: null }],
+              servingPairs: [{ model: steady, variant: null }],
+              resolutionError: null,
+            },
+          ],
+          previousEntries: [],
+        })
+      );
+    seedReady(blocked, 'run-blocked', 0.9);
+    seedReady(steady, 'run-steady', 0.9);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const published = await publishPlatformRoutingTable(env, catalogFetch, router);
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
+
+    // Nothing is coming for a blocked target, so it is a settled exclusion, not a hold.
+    expect(events.map(entry => entry.event)).not.toContain(
+      'routing_table_publish_skipped_serving_target_pending'
+    );
+    expect(published).not.toBeNull();
+    const live = await getLatestRoutingTable(env.BENCH_DB, router);
+    expect((live?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([steady]);
+  });
+
   it('names the reason when the serving set has no ready entry', async () => {
     await configure();
     seedSubscription(LIVE, LIVE);

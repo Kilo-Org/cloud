@@ -1386,6 +1386,18 @@ describe('drainQueue', () => {
     expect(skipped).toEqual(['nothing_pending']);
   });
 
+  it('refuses a classifier run whose whole model list is non-enrollable', async () => {
+    mockConfig();
+    const base = vi.mocked(getConfigRows).getMockImplementation();
+    if (!base) throw new Error('missing config mock');
+    vi.mocked(getConfigRows).mockImplementation(async (db, router = 'efficient') => {
+      const loaded = await base(db, router);
+      return { ...loaded, classifierModels: ['openai/gpt-6.2-astra-fast'] };
+    });
+    await expect(startRun(env, 'classifier')).rejects.toThrow(/non-empty model list/);
+    expect(insertRun).not.toHaveBeenCalled();
+  });
+
   it('starts the oldest pending batch of the requested queue', async () => {
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/old', variant: 'a', requested_at: '2026-06-01T00:00:00.000Z' },

@@ -80,6 +80,8 @@ export type ResolvedCustomRouterEntry =
       entry: CustomRouterEntry;
       variants: (string | null)[];
       linkedVariants?: Map<string | null, BenchmarkPair>;
+      /** Set when the entry's `measuredAs` link names a non-enrollable model. */
+      linkRefusal?: { model: string; reason: string };
     }
   | {
       measuredBy: 'platform';
@@ -115,13 +117,15 @@ export async function resolveCustomRouterEntries(
       }
       const concrete =
         entry.kind === 'gateway' && catalog ? catalogModelVariants(catalog, entry.model) : null;
-      if (entry.kind === 'gateway' && !clientMeasured && concrete === null && catalog !== null) {
+      if (
+        entry.kind === 'gateway' &&
+        !clientMeasured &&
+        concrete &&
+        isBenchmarkEnrollmentBlocked(concrete.model)
+      ) {
         // An alias whose concrete target is blocked resolves to no pairs.
-        const target = catalog.data.find(model => model.id === entry.model)?.alias_target;
-        if (target && isBenchmarkEnrollmentBlocked(target)) {
-          logBlockedBenchmarkEnrollment({ model: target, variant: null }, 'custom_router');
-          return { measuredBy: 'platform', entry, pairs: null, blocked: true };
-        }
+        logBlockedBenchmarkEnrollment({ model: concrete.model, variant: null }, 'custom_router');
+        return { measuredBy: 'platform', entry, pairs: null, blocked: true };
       }
       if (clientMeasured) {
         const variants =
@@ -132,10 +136,16 @@ export async function resolveCustomRouterEntries(
             : (concrete?.variants ?? [null]);
         const measuredAs = entry.measuredAs;
         if (!measuredAs) return { measuredBy: 'client', entry, variants };
-        // A blocked model is never linked: the entry stays on the owner's client eval.
+        // A blocked model is never linked: the entry stays on the owner's client eval, and
+        // the status reports why the link was refused instead of dropping it silently.
         if (isBenchmarkEnrollmentBlocked(measuredAs)) {
           logBlockedBenchmarkEnrollment({ model: measuredAs, variant: null }, 'custom_router_link');
-          return { measuredBy: 'client', entry, variants };
+          return {
+            measuredBy: 'client',
+            entry,
+            variants,
+            linkRefusal: { model: measuredAs, reason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON },
+          };
         }
         // Same-name variants link only when the platform has measured them: the catalog lists
         // variants it has not benchmarked yet, and those stay on the owner's client eval.
@@ -534,22 +544,25 @@ export async function lookupCustomRouterStatuses(
           key,
           variants: item.variants.map(variant => {
             const linked = item.linkedVariants?.get(variant);
-            return {
-              variant,
-              linked: Boolean(linked),
-              ...(linked
-                ? measurementStatus(
-                    platformRows.get(benchmarkPairKey(linked)) ?? [],
-                    row => isCurrentLinkedProfile(row, current, linked, loaded.catalog),
-                    platformMeasuredAt
-                  )
-                : measurementStatus(
-                    clientRows.get(clientPairKey(ref, variant)) ?? [],
-                    row => isCurrentClientProfile(row, current),
-                    clientMeasuredAt,
-                    clientProfileComplete(context.baseRouter, current.repetitions)
-                  )),
-            };
+            const status = linked
+              ? measurementStatus(
+                  platformRows.get(benchmarkPairKey(linked)) ?? [],
+                  row => isCurrentLinkedProfile(row, current, linked, loaded.catalog),
+                  platformMeasuredAt
+                )
+              : measurementStatus(
+                  clientRows.get(clientPairKey(ref, variant)) ?? [],
+                  row => isCurrentClientProfile(row, current),
+                  clientMeasuredAt,
+                  clientProfileComplete(context.baseRouter, current.repetitions)
+                );
+            // A blocked link is surfaced on a variant that has no ready measurement of its
+            // own, so the owner learns why it did not reuse the platform's result.
+            const refusal =
+              item.linkRefusal && status.status !== 'ready' && status.status !== 'stale'
+                ? { failureReason: item.linkRefusal.reason }
+                : {};
+            return { variant, linked: Boolean(linked), ...status, ...refusal };
           }),
         };
       }

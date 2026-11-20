@@ -12,7 +12,11 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import { logBlockedBenchmarkEnrollment } from './enrollment-block';
-import { platformRegistryEntries, type BenchmarkModelCatalogSchema } from './platform-models';
+import {
+  blockedEnrollmentTarget,
+  platformRegistryEntries,
+  type BenchmarkModelCatalogSchema,
+} from './platform-models';
 import { getBenchmarkConfig } from './config';
 import { listReadyCurrentProfilesForEntries } from './db';
 import { computeEngineIdentity } from './run';
@@ -101,16 +105,24 @@ export function resolveSubscriptionSnapshot(
   const oldByModel = new Map(previous.map(entry => [entry.model, entry]));
   return models.map(({ model }) => {
     const old = oldByModel.get(model);
-    // A blocked model keeps its measured rows readable and keeps serving the result it
-    // already has; it only stops taking new work. This runs before the unchanged-target
-    // short circuit, so an already saved snapshot for a model added to the list stops
-    // following it on the next sync. Removing the ID restores enrollment from scratch.
-    if (isBenchmarkEnrollmentBlocked(model)) {
-      logBlockedBenchmarkEnrollment({ model, variant: null }, 'subscription');
+    // A blocked model is a settled exclusion: it keeps its measured rows readable but
+    // enters no target and stops serving, so the routing table drops it instead of holding
+    // the publish on a replacement that never comes. The alias target is resolved first, so
+    // an alias (`~...`) cannot smuggle a blocked concrete model past this check. This runs
+    // before the unchanged-target short circuit, so an already saved snapshot for a model
+    // added to the list stops following it on the next sync. Removing the ID restores
+    // enrollment from scratch.
+    const blockedTarget = isBenchmarkEnrollmentBlocked(model)
+      ? model
+      : catalog
+        ? blockedEnrollmentTarget(catalog, model)
+        : null;
+    if (blockedTarget) {
+      logBlockedBenchmarkEnrollment({ model: blockedTarget, variant: null }, 'subscription');
       return {
         model,
         pairs: [],
-        servingPairs: old?.servingPairs ?? [],
+        servingPairs: [],
         resolutionError: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
       };
     }

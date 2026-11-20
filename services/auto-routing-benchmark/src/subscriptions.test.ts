@@ -828,13 +828,16 @@ describe('saved daily benchmark subscriptions', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const reconciled = await syncSubscriptionSnapshot(env, config, owner, [{ model: blocked }], {
       daily: true,
-      catalog: catalog('vendor/M'),
+      catalog: BenchmarkModelCatalogSchema.parse({
+        data: [{ id: blocked, supported_parameters: ['tools'] }, { id: 'vendor/M' }],
+      }),
     });
-    // No target follows it; the measured row and the served pair stay readable.
+    // No target follows it and it stops serving, so the publish is not held on a
+    // replacement that never comes; the measured row stays readable.
     expect(reconciled[0]).toEqual({
       model: blocked,
       pairs: [],
-      servingPairs: [{ model: blocked, variant: null }],
+      servingPairs: [],
       resolutionError: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
     });
     expect(
@@ -844,5 +847,25 @@ describe('saved daily benchmark subscriptions', () => {
       'benchmark_model_enrollment_blocked'
     );
     warn.mockRestore();
+  });
+
+  it('excludes an alias whose concrete target is blocked instead of leaving it unresolved', async () => {
+    const alias = '~openai/astra-latest';
+    const blocked = 'openai/gpt-6.2-astra-fast';
+    const resolved = await syncSubscriptionSnapshot(env, config, owner, [{ model: alias }], {
+      catalog: BenchmarkModelCatalogSchema.parse({
+        data: [
+          { id: alias, alias_target: blocked },
+          { id: blocked, supported_parameters: ['tools'] },
+        ],
+      }),
+    });
+    // Not the generic catalog-unavailable error: a settled exclusion the publish can drop.
+    expect(resolved[0]).toEqual({
+      model: alias,
+      pairs: [],
+      servingPairs: [],
+      resolutionError: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+    });
   });
 });

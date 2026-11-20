@@ -181,9 +181,22 @@ export function catalogModelVariants(
   modelId: string
 ): { model: string; variants: (string | null)[] } | null {
   const model = resolveCatalogModel(modelId, new Map(catalog.data.map(m => [m.id, m])));
-  if (!model || isBenchmarkEnrollmentBlocked(model.id)) return null;
+  if (!model) return null;
   const variants = getReasoningVariantKeys(model.opencode?.variants);
   return { model: model.id, variants: variants.length > 0 ? variants : [null] };
+}
+
+/**
+ * The concrete model `modelId` names, its own id or the concrete target behind an alias,
+ * when that model is non-enrollable. Null when it is enrollable or absent. Callers use it
+ * so an alias cannot smuggle a blocked target past `isBenchmarkEnrollmentBlocked`.
+ */
+export function blockedEnrollmentTarget(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
+  modelId: string
+): string | null {
+  const model = resolveCatalogModel(modelId, new Map(catalog.data.map(m => [m.id, m])));
+  return model && isBenchmarkEnrollmentBlocked(model.id) ? model.id : null;
 }
 
 export function catalogCandidatePrices(

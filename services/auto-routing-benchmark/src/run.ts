@@ -12,6 +12,7 @@ import {
   BenchmarkIdentityError,
   type BenchmarkIdentityOverrides,
   isBenchmarkEnrollmentBlocked,
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
   resolveBenchmarkIdentity,
   resolveEffectivePolicy,
   ComplexityLabelsSchema,
@@ -30,6 +31,7 @@ import caseComplexity from './datasets/case-complexity.json';
 import type { RunModelRow, RunRow } from './db';
 import {
   countCaseResultsByLane,
+  deleteQueuedRemeasuresForModels,
   exactPairKey,
   existsNewerCompletedRun,
   getCaseResults,
@@ -574,6 +576,10 @@ export async function publishPlatformRoutingTable(
   const staleServing: StaleServing[] = [];
   for (const entry of snapshot) {
     if (!entry.model.startsWith('~') || entry.servingPairs.length === 0) continue;
+    // A blocked target is a settled exclusion: nothing is coming to replace it, so the
+    // publish must not wait on it. The pair leaves the table (filtered from `desired`
+    // below); holding here froze every other table change until an operator intervened.
+    if (entry.resolutionError === NON_ENROLLABLE_BENCHMARK_MODEL_REASON) continue;
     if (entry.resolutionError) {
       staleServing.push({
         model: entry.model,
@@ -601,9 +607,14 @@ export async function publishPlatformRoutingTable(
     );
     return null;
   }
-  const desired = snapshotPairs(snapshot, true);
+  // A blocked pair never enters the table, even from a snapshot a daily sync has not
+  // reconciled yet, and never counts as a target still owed a measurement.
+  const enrollable = (pair: { model: string }) => !isBenchmarkEnrollmentBlocked(pair.model);
+  const desired = snapshotPairs(snapshot, true).filter(enrollable);
   const targets = new Set(
-    snapshotPairs(snapshot, false).map(pair => exactPairKey(pair.model, pair.variant))
+    snapshotPairs(snapshot, false)
+      .filter(enrollable)
+      .map(pair => exactPairKey(pair.model, pair.variant))
   );
   const prices = catalogCandidatePrices(catalog);
 
@@ -989,8 +1000,12 @@ export async function startRun(
     logBlockedBenchmarkEnrollment(entry, 'run_start');
     return false;
   });
-  if (kind === 'decider' && modelEntries.length === 0) {
-    throw new BenchmarkRunConfigError('decider runs require a non-empty registry entry snapshot');
+  if (modelEntries.length === 0) {
+    throw new BenchmarkRunConfigError(
+      kind === 'decider'
+        ? 'decider runs require a non-empty registry entry snapshot'
+        : 'classifier runs require a non-empty model list'
+    );
   }
 
   const engineIdentity = computeEngineIdentity(kind, router);
@@ -1280,15 +1295,21 @@ export async function drainQueue(
   const pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
   const queuedRemeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
   // A queued re-measure of a blocked model must not be scheduled either; its ready
-  // measurement stays readable. The pair is dropped here, before any claim or paid call.
+  // measurement stays readable. The pair is dropped here, before any claim or paid call,
+  // and its unclaimed queue row is deleted so the queue actually clears instead of
+  // re-reading the same refused row on every tick.
+  const blockedRemeasureModels = new Set<string>();
   const remeasures = queuedRemeasures.filter(row => {
     if (!isBenchmarkEnrollmentBlocked(row.model)) return true;
+    blockedRemeasureModels.add(row.model);
     logBlockedBenchmarkEnrollment(
       { model: row.model, variant: variantFromStorage(row.variant) },
       'queue_remeasure'
     );
     return false;
   });
+  if (blockedRemeasureModels.size > 0)
+    await deleteQueuedRemeasuresForModels(env.BENCH_DB, current, [...blockedRemeasureModels]);
   if (pending.length === 0 && remeasures.length === 0) {
     options.skipped?.push('nothing_pending');
     return null;

@@ -4,6 +4,7 @@ import { NON_ENROLLABLE_BENCHMARK_MODEL_REASON } from '@kilocode/auto-routing-co
 import {
   BenchmarkModelCatalogSchema,
   benchmarkPairUnavailability,
+  blockedEnrollmentTarget,
   CATALOG_CONTEXT_TOO_SMALL_REASON,
   CATALOG_PAIR_UNAVAILABLE_REASON,
   MIN_BENCHMARK_INPUT_TOKENS,
@@ -320,12 +321,24 @@ describe('platform catalog expansion', () => {
     expect(
       benchmarkPairUnavailability(executable, { model: 'openai/gpt-6.2-astra', variant: null })
     ).toBeNull();
-    // The concrete variant lookup used by custom routers resolves no pair for it.
-    expect(catalogModelVariants(executable, 'openai/gpt-6.2-astra-fast')).toBeNull();
+    // The variant lookup stays a pure catalog read, so an owner client eval of the same
+    // id is untouched; blocking is applied at the platform call sites instead.
+    expect(catalogModelVariants(executable, 'openai/gpt-6.2-astra-fast')).toEqual({
+      model: 'openai/gpt-6.2-astra-fast',
+      variants: [null],
+    });
     expect(catalogModelVariants(executable, 'openai/gpt-6.2-astra')).toEqual({
       model: 'openai/gpt-6.2-astra',
       variants: [null],
     });
+    // An alias cannot smuggle a blocked concrete target past the check.
+    expect(blockedEnrollmentTarget(executable, '~openai/astra-latest')).toBe(
+      'openai/gpt-6.2-astra-fast'
+    );
+    expect(blockedEnrollmentTarget(executable, 'openai/gpt-6.2-astra-fast')).toBe(
+      'openai/gpt-6.2-astra-fast'
+    );
+    expect(blockedEnrollmentTarget(executable, 'openai/gpt-6.2-astra')).toBeNull();
   });
 
   it('validates catalog reasoning control values at runtime', () => {

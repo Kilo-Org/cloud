@@ -445,6 +445,45 @@ describe('custom router tables and statuses (real SQLite)', () => {
     });
   });
 
+  it('surfaces why a blocked measuredAs link was refused instead of linking silently', async () => {
+    const blockedModel = 'openai/gpt-6.2-astra-fast';
+    const blockedSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [{ id: blockedModel, supported_parameters: ['tools'] }],
+        })) satisfies typeof fetch,
+    };
+    const context: CustomRouterBenchmarkContext = {
+      ...clientOnly,
+      entries: [
+        {
+          ...localModel,
+          measuredAs: blockedModel,
+          // Keep the client entry on the client-eval path so the link is the only change.
+          capabilities: { ...localModel.capabilities },
+        },
+      ],
+      clientEvalEntryKeys: [LOCAL],
+    };
+    // No client measurement exists yet: the variant reports the refusal reason, not silence.
+    const statuses = await lookupCustomRouterStatuses(db, CONFIG, context, blockedSource);
+    expect(statuses.entries[0]?.variants).toEqual([
+      {
+        variant: 'low',
+        linked: false,
+        status: 'missing',
+        failureReason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+      },
+    ]);
+    // A ready measurement of its own keeps its own status, so the refusal does not mask it.
+    clientProfile({ id: 'current', accuracy: 0.9, updatedAt: '2026-10-10' });
+    const measured = await lookupCustomRouterStatuses(db, CONFIG, context, blockedSource);
+    expect(measured.entries[0]?.variants).toEqual([
+      { variant: 'low', linked: false, status: 'ready', failureReason: null },
+    ]);
+  });
+
   it('resolves no platform pairs for a non-enrollable gateway entry and reports why', async () => {
     const blockedModel = 'openai/gpt-6.2-astra-fast';
     const blockedSource = {

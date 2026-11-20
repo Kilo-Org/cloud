@@ -18,13 +18,14 @@ import type { ClawBillingStatus, ClawLockReason } from './billing-types';
 type AccessLockedDialogProps = {
   reason: ClawLockReason;
   billing: ClawBillingStatus;
-  onSubscribeClick: () => void;
   onReprovisionCreditsClick: () => void;
   onUpdatePaymentClick: () => void;
   onDestroyClick: () => void;
   isDestroying?: boolean;
   isReprovisioning?: boolean;
 };
+
+const HOSTING_CLOSED_MESSAGE = 'KiloClaw hosting can no longer be started or renewed.';
 
 function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
   const isCreditFunded =
@@ -36,34 +37,33 @@ function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
     case 'trial_expired_instance_alive':
       return {
         title: 'Your Trial Has Ended',
-        description: 'Your KiloClaw has been stopped. Subscribe to resume.',
-        cta: 'Subscribe to Resume',
-        action: 'subscribe' as const,
+        description: `Your KiloClaw has been stopped. ${HOSTING_CLOSED_MESSAGE}`,
+        cta: null,
+        action: null,
         icon: Lock,
       };
     case 'trial_expired_instance_destroyed':
       return {
         title: 'Your Trial Has Ended',
-        description: 'Your KiloClaw has been destroyed. Subscribe to start fresh with a new one.',
-        cta: 'Subscribe',
-        action: 'subscribe' as const,
+        description: `Your KiloClaw has been destroyed. ${HOSTING_CLOSED_MESSAGE}`,
+        cta: null,
+        action: null,
         icon: Lock,
       };
     case 'earlybird_expired':
       return {
         title: 'Earlybird Hosting Expired',
-        description:
-          'Your earlybird hosting period has ended. Subscribe to continue using KiloClaw.',
-        cta: 'Subscribe to Continue',
-        action: 'subscribe' as const,
+        description: `Your earlybird hosting period has ended. ${HOSTING_CLOSED_MESSAGE}`,
+        cta: null,
+        action: null,
         icon: Lock,
       };
     case 'subscription_expired_instance_alive':
       return {
         title: 'Subscription Ended',
-        description: 'Your KiloClaw has been stopped. Subscribe to resume.',
-        cta: 'Subscribe to Resume',
-        action: 'subscribe' as const,
+        description: `Your KiloClaw has been stopped. ${HOSTING_CLOSED_MESSAGE}`,
+        cta: null,
+        action: null,
         icon: Lock,
       };
     case 'subscription_expired_instance_destroyed':
@@ -79,9 +79,9 @@ function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
       }
       return {
         title: 'Subscription Ended',
-        description: 'Your KiloClaw has been destroyed. Subscribe to provision a new one.',
-        cta: 'Subscribe',
-        action: 'subscribe' as const,
+        description: `Your KiloClaw has been destroyed. ${HOSTING_CLOSED_MESSAGE}`,
+        cta: null,
+        action: null,
         icon: Lock,
       };
     case 'past_due_grace_exceeded':
@@ -93,11 +93,8 @@ function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
           title: 'Insufficient Credits',
           description:
             'Your subscription is suspended because your credit balance was insufficient for renewal.',
-          cta: canAffordRenewal ? 'Reactivate with Credits' : 'Add Credits',
-          action: (canAffordRenewal ? 'subscribe' : 'add_credits') as
-            | 'subscribe'
-            | 'add_credits'
-            | 'update_payment',
+          cta: canAffordRenewal ? null : 'Add Credits',
+          action: canAffordRenewal ? null : ('add_credits' as const),
           icon: Coins,
         };
       }
@@ -112,10 +109,9 @@ function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
     case 'no_access':
       return {
         title: 'KiloClaw Subscription Required',
-        description:
-          'A KiloClaw subscription is required to continue. Subscribe to keep your instance running.',
-        cta: 'Subscribe',
-        action: 'subscribe' as const,
+        description: `A KiloClaw subscription is required to continue. ${HOSTING_CLOSED_MESSAGE}`,
+        cta: null,
+        action: null,
         icon: Lock,
       };
     default:
@@ -123,18 +119,12 @@ function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
   }
 }
 
-function getInfoBoxMessage(reason: ClawLockReason, billing: ClawBillingStatus): string {
+function getInfoBoxMessage(reason: ClawLockReason, billing: ClawBillingStatus): string | null {
   if (
-    reason === 'trial_expired_instance_destroyed' ||
-    reason === 'subscription_expired_instance_destroyed'
+    reason === 'subscription_expired_instance_destroyed' &&
+    billing.creditReprovisionRecovery.eligible
   ) {
-    if (
-      reason === 'subscription_expired_instance_destroyed' &&
-      billing.creditReprovisionRecovery.eligible
-    ) {
-      return 'Your current credits cover Standard hosting once your projected Kilo Pass bonus is included.';
-    }
-    return "You'll need to provision a new KiloClaw after subscribing.";
+    return 'Your current credits cover Standard hosting once your projected Kilo Pass bonus is included.';
   }
   if (reason === 'past_due_grace_exceeded') {
     const isCreditFunded =
@@ -146,10 +136,7 @@ function getInfoBoxMessage(reason: ClawLockReason, billing: ClawBillingStatus): 
     }
     return 'Your KiloClaw will resume automatically once payment is resolved.';
   }
-  if (reason === 'no_access') {
-    return 'Subscribe to unlock full access to KiloClaw.';
-  }
-  return 'Your KiloClaw will resume automatically once you subscribe.';
+  return null;
 }
 
 const INSTANCE_ALIVE_REASONS = new Set<ClawLockReason>([
@@ -160,7 +147,6 @@ const INSTANCE_ALIVE_REASONS = new Set<ClawLockReason>([
 export function AccessLockedDialog({
   reason,
   billing,
-  onSubscribeClick,
   onReprovisionCreditsClick,
   onUpdatePaymentClick,
   onDestroyClick,
@@ -174,6 +160,7 @@ export function AccessLockedDialog({
 
   const content = getLockContent(reason, billing);
   if (!content) return null;
+  const infoBoxMessage = getInfoBoxMessage(reason, billing);
 
   const Icon = content.icon;
   const canDestroy = INSTANCE_ALIVE_REASONS.has(reason);
@@ -185,8 +172,6 @@ export function AccessLockedDialog({
       onReprovisionCreditsClick();
     } else if (content?.action === 'add_credits') {
       router.push('/credits');
-    } else {
-      onSubscribeClick();
     }
   }
 
@@ -217,32 +202,34 @@ export function AccessLockedDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="my-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-          <p className="text-muted-foreground text-center text-sm">
-            {getInfoBoxMessage(reason, billing)}
-          </p>
-        </div>
+        {infoBoxMessage ? (
+          <div className="my-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+            <p className="text-muted-foreground text-center text-sm">{infoBoxMessage}</p>
+          </div>
+        ) : null}
 
         <DialogFooter className="flex-col gap-3 sm:flex-col">
-          <Button
-            onClick={handleCta}
-            variant="primary"
-            className="w-full py-3 font-semibold"
-            disabled={content.action === 'reprovision_credits' && isReprovisioning}
-          >
-            {content.action === 'reprovision_credits' && isReprovisioning
-              ? 'Activating...'
-              : content.cta}
-          </Button>
-          <p className="text-muted-foreground text-center text-xs">
-            {content.action === 'add_credits'
-              ? "You'll be redirected to the credits page to top up your balance"
-              : content.action === 'reprovision_credits'
-                ? 'A new KiloClaw will be provisioned before credits are charged'
-                : reason === 'past_due_grace_exceeded' && !isCreditFunded
-                  ? "You'll be redirected to Stripe to update your payment method"
-                  : "You'll be redirected to complete your purchase"}
-          </p>
+          {content.cta ? (
+            <>
+              <Button
+                onClick={handleCta}
+                variant="primary"
+                className="w-full py-3 font-semibold"
+                disabled={content.action === 'reprovision_credits' && isReprovisioning}
+              >
+                {content.action === 'reprovision_credits' && isReprovisioning
+                  ? 'Activating...'
+                  : content.cta}
+              </Button>
+              <p className="text-muted-foreground text-center text-xs">
+                {content.action === 'add_credits'
+                  ? "You'll be redirected to the credits page to top up your balance"
+                  : content.action === 'reprovision_credits'
+                    ? 'A new KiloClaw will be provisioned before credits are charged'
+                    : "You'll be redirected to Stripe to update your payment method"}
+              </p>
+            </>
+          ) : null}
 
           {/* Secondary CTA: for credit-funded past-due, offer Kilo Pass as primary upgrade path */}
           {reason === 'past_due_grace_exceeded' && isCreditFunded && (

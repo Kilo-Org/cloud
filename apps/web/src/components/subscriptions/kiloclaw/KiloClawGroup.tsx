@@ -22,7 +22,6 @@ import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
 import { KiloClawSignupUnavailable } from './KiloClawSignupUnavailable';
-import { KiloClawSubscribeCard } from './KiloClawSubscribeCard';
 import {
   formatDateLabel,
   formatKiloclawPrice,
@@ -51,17 +50,9 @@ export function KiloClawGroup({
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const [continuationInstanceId, setContinuationInstanceId] = useState<string | null>(null);
-  const [continuationAction, setContinuationAction] = useState<'schedule' | 'cancel' | null>(null);
   const [pendingContinuation, setPendingContinuation] = useState(false);
   const query = useQuery(trpc.kiloclaw.listPersonalSubscriptions.queryOptions());
-  const summaryQuery = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
   const subscriptions = query.data?.subscriptions ?? [];
-  const commitPlanAvailable =
-    query.data?.commitPlanAvailable ?? summaryQuery.data?.commitPlanAvailable ?? false;
-  const hasCurrentPersonalSubscription = summaryQuery.data?.hasCurrentPersonalSubscription === true;
-  const isLoading = query.isLoading || summaryQuery.isLoading;
-  const isError = query.isError || summaryQuery.isError;
-  const error = query.error ?? summaryQuery.error;
 
   const visibleSubscriptions = subscriptions.filter(
     subscription => !isKiloclawTerminal(subscription.status) || showTerminal
@@ -71,27 +62,15 @@ export function KiloClawGroup({
   );
   const invalidateContinuation = useInvalidateKiloClawBilling(continuationInstanceId);
 
-  function updateMonthToMonthContinuation() {
-    if (!continuationInstanceId || !continuationAction) return;
+  function cancelMonthToMonthContinuation() {
+    if (!continuationInstanceId) return;
     setPendingContinuation(true);
-    const action =
-      continuationAction === 'schedule'
-        ? trpcClient.kiloclaw.continueCommitAsStandard.mutate({
-            instanceId: continuationInstanceId,
-          })
-        : trpcClient.kiloclaw.cancelPlanSwitchAtInstance.mutate({
-            instanceId: continuationInstanceId,
-          });
-    void action
+    void trpcClient.kiloclaw.cancelPlanSwitchAtInstance
+      .mutate({ instanceId: continuationInstanceId })
       .then(async () => {
-        toast.success(
-          continuationAction === 'schedule'
-            ? 'Month-to-month continuation scheduled'
-            : 'Month-to-month continuation canceled'
-        );
+        toast.success('Month-to-month continuation canceled');
         await invalidateContinuation();
         setContinuationInstanceId(null);
-        setContinuationAction(null);
       })
       .catch(error => {
         toast.error(error instanceof Error ? error.message : 'Unable to update continuation');
@@ -104,11 +83,11 @@ export function KiloClawGroup({
       title="KiloClaw"
       description="View hosting subscriptions for your personal KiloClaw instances."
       headerIcon={<KiloCrabIcon className="size-5" />}
-      isLoading={isLoading}
-      isError={isError}
-      error={error}
+      isLoading={query.isLoading}
+      isError={query.isError}
+      error={query.error}
       onRetry={() => {
-        void Promise.all([query.refetch(), summaryQuery.refetch()]);
+        void query.refetch();
       }}
       accordionValue={accordionValue}
       hideHeader={hideHeader}
@@ -124,7 +103,7 @@ export function KiloClawGroup({
               : retirement.isFinalCommitTerm
                 ? retirement.standardContinuationScheduled
                   ? `Standard starts ${finalDate} at ${formatStandardContinuationPrice(retirement.standardContinuationPriceMicrodollars)} using ${formatKiloClawFundingSource(retirement.futureFundingSource)}.`
-                  : `Final Commit term ends ${finalDate}. Hosting ends unless you continue month-to-month at ${formatStandardContinuationPrice(retirement.standardContinuationPriceMicrodollars)} using ${formatKiloClawFundingSource(retirement.futureFundingSource)}.`
+                  : `Final Commit term ends ${finalDate}. Hosting ends then.`
                 : getKiloclawStatusNote(subscription);
 
             return (
@@ -180,20 +159,15 @@ export function KiloClawGroup({
                             : undefined
                   }
                   action={
-                    retirement.isFinalCommitTerm && !retirement.needsSupportReview ? (
+                    retirement.isFinalCommitTerm &&
+                    !retirement.needsSupportReview &&
+                    retirement.standardContinuationScheduled ? (
                       <Button
                         size="sm"
-                        variant={retirement.standardContinuationScheduled ? 'outline' : 'default'}
-                        onClick={() => {
-                          setContinuationInstanceId(subscription.instanceId);
-                          setContinuationAction(
-                            retirement.standardContinuationScheduled ? 'cancel' : 'schedule'
-                          );
-                        }}
+                        variant="outline"
+                        onClick={() => setContinuationInstanceId(subscription.instanceId)}
                       >
-                        {retirement.standardContinuationScheduled
-                          ? 'Cancel month-to-month continuation'
-                          : 'Continue month-to-month'}
+                        Cancel month-to-month continuation
                       </Button>
                     ) : undefined
                   }
@@ -202,40 +176,21 @@ export function KiloClawGroup({
             );
           })}
         </div>
-      ) : subscriptions.length === 0 && !hasCurrentPersonalSubscription ? (
+      ) : nonTerminalSubscriptions.length === 0 ? (
         <KiloClawSignupUnavailable />
-      ) : subscriptions.length === 0 || nonTerminalSubscriptions.length === 0 ? (
-        <KiloClawSubscribeCard
-          standardCostMicrodollars={
-            summaryQuery.data?.creditEnrollmentPreview.standard.costMicrodollars
-          }
-          commitCostMicrodollars={
-            summaryQuery.data?.creditEnrollmentPreview.commit.costMicrodollars
-          }
-          hasActiveKiloPass={summaryQuery.data?.hasActiveKiloPass ?? false}
-          commitPlanAvailable={commitPlanAvailable}
-        />
       ) : null}
       <AlertDialog
-        open={continuationInstanceId !== null && continuationAction !== null}
+        open={continuationInstanceId !== null}
         onOpenChange={open => {
-          if (!open && !pendingContinuation) {
-            setContinuationInstanceId(null);
-            setContinuationAction(null);
-          }
+          if (!open && !pendingContinuation) setContinuationInstanceId(null);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {continuationAction === 'cancel'
-                ? 'Cancel month-to-month continuation?'
-                : 'Continue month-to-month?'}
-            </AlertDialogTitle>
+            <AlertDialogTitle>Cancel month-to-month continuation?</AlertDialogTitle>
             <AlertDialogDescription>
-              {continuationAction === 'cancel'
-                ? 'Standard will no longer start when your final Commit term ends. Hosting ends at the final boundary.'
-                : 'Standard starts when your final Commit term ends. Your current funding source and lineage price are preserved.'}
+              Standard will no longer start when your final Commit term ends. Hosting ends at the
+              final boundary.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -243,18 +198,14 @@ export function KiloClawGroup({
               Keep current choice
             </AlertDialogCancel>
             <AlertDialogAction
-              variant={continuationAction === 'cancel' ? 'outline' : 'default'}
-              onClick={updateMonthToMonthContinuation}
+              variant="outline"
+              onClick={cancelMonthToMonthContinuation}
               disabled={pendingContinuation}
               aria-busy={pendingContinuation}
             >
               {pendingContinuation
-                ? continuationAction === 'cancel'
-                  ? 'Canceling continuation'
-                  : 'Scheduling continuation'
-                : continuationAction === 'cancel'
-                  ? 'Cancel month-to-month continuation'
-                  : 'Continue month-to-month'}
+                ? 'Canceling continuation'
+                : 'Cancel month-to-month continuation'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

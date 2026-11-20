@@ -294,6 +294,7 @@ export type KiloPassHostingRecoveryReason =
   | 'enrollment_failed'
   | 'requires_reprovision'
   | 'signup_unavailable'
+  | 'hosting_closed'
   | 'missing_instance'
   | 'destroyed_instance'
   | 'stale_intent'
@@ -340,6 +341,16 @@ export function getKiloPassHostingRecoveryCopy(reason: KiloPassHostingRecoveryRe
         destinationLabel: null,
         canRetry: false,
         showSupport: true,
+      };
+    case 'hosting_closed':
+      return {
+        title: 'KiloClaw hosting is closed',
+        description:
+          'Your Kilo Pass credits are ready. KiloClaw hosting was not activated, and no credits were deducted for hosting.',
+        destination: '/profile',
+        destinationLabel: 'Go to profile',
+        canRetry: false,
+        showSupport: false,
       };
     case 'signup_unavailable':
       return {

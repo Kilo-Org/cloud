@@ -33,6 +33,7 @@ Updated 2026-05-18 -- organization hard-expiry suspension and recovery contract.
 Updated 2026-05-28 -- exceptional personal Stripe EFW cancellation and suspension contract.
 Updated 2026-06-05 -- retirement of new and renewing Commit subscriptions.
 Updated 2026-08-05 -- closed fresh KiloClaw instance provisioning.
+Updated 2026-11-16 -- closed user-initiated hosting start, reactivation, and extension.
 
 ## Conventions
 
@@ -222,14 +223,39 @@ lapses, with email notifications at each stage.
    surfaces MUST omit KiloClaw entirely for those contexts; a directly opened
    KiloClaw route MAY show the unavailable state.
 4. Existing live instances and current subscriptions MUST retain their access,
-   conversion, renewal, reactivation, cancellation, management, and
-   configuration-update behavior.
+   cancellation, management, and configuration-update behavior through the
+   end of their paid period. Conversion, reactivation, and other
+   user-initiated continuation are governed by Hosting Renewal Closure.
 5. Provisioning services and post-checkout fulfillment paths MUST enforce the
    same current-subscription boundary before creating infrastructure or
    subscription state, including stale or already-completed checkout sessions.
 6. Provisioning MUST preserve the existing current subscription context; it
    MUST NOT create a new trial or managed-active subscription from canceled or
    historical rows.
+
+### Hosting Renewal Closure
+
+KiloClaw is being retired. These rules override any other rule in this spec
+that permits a user to start, reactivate, or extend paid hosting.
+
+1. The system MUST reject every user-initiated request that starts paid
+   hosting: Stripe checkout, credit enrollment, and Kilo Pass hosting
+   activation. A canceled subscription with a live instance MUST NOT be
+   re-enrolled.
+2. The system MUST reject every user-initiated request that extends paid
+   hosting beyond its current period: reactivation of a pending cancellation,
+   plan switches, Commit-to-Standard continuation, and Stripe-to-credit
+   conversion.
+3. Rejections MUST happen before any payment-provider call, credit deduction,
+   or subscription state change.
+4. Cancellation, cancellation of a scheduled plan switch or continuation,
+   payment-method management, and access through the end of the paid period
+   MUST remain available.
+5. KiloClaw billing surfaces MUST NOT show plan cards, subscribe,
+   reactivate, plan-switch, continuation, or conversion actions.
+6. This closure does not itself stop automatic renewal of subscriptions that
+   are still set to renew. Operators stop those through the admin
+   stop-renewal controls.
 
 ### Pricing Versions and Legacy Lineages
 
@@ -1530,6 +1556,11 @@ rows renew.
    requirements on credit transaction records.
 
 ### Changelog
+
+#### 2026-11-16 -- Close user-initiated hosting start, reactivation, and extension
+
+- Blocked checkout, credit enrollment, Kilo Pass hosting activation, reactivation, plan switches, Commit-to-Standard continuation, and Stripe-to-credit conversion.
+- Removed the matching actions and plan cards from KiloClaw billing surfaces while preserving cancellation and current-period access.
 
 #### 2026-08-05 -- Close fresh KiloClaw instance provisioning
 

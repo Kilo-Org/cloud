@@ -678,6 +678,11 @@ function capture(
     skipped?: SkippedTarget[];
     /** Model a cell the runner applied but never started: no CellRun at all. */
     omitCell?: boolean;
+    /**
+     * A second matrix cell: its own dump bytes, so a per-cell block (a head
+     * overlay) can be proven to leave this one comparable.
+     */
+    extraCell?: { id: string };
   } = {}
 ) {
   fs.mkdirSync(dir);
@@ -685,6 +690,22 @@ function capture(
   fs.writeFileSync(path.join(dir, 'screen.json'), JSON.stringify(dump));
   // Deliberately synthetic bytes: these tests exercise receipt binding, not visual claims.
   fs.writeFileSync(path.join(dir, 'screen.png'), 'synthetic-image');
+  const extra = options.extraCell;
+  if (extra !== undefined) {
+    fs.mkdirSync(path.join(dir, extra.id), { recursive: true });
+    fs.writeFileSync(path.join(dir, extra.id, 'screen.json'), JSON.stringify(probeDump(options)));
+    fs.writeFileSync(path.join(dir, extra.id, 'screen.png'), 'synthetic-image-extra');
+  }
+  const screens = (prefix: string) => [
+    {
+      target: (options.target ?? TARGET).id,
+      link: (options.target ?? TARGET).link,
+      dump: `${prefix}screen.json`,
+      screenshot: `${prefix}screen.png`,
+      annotated: `${prefix}annotated.png`,
+      env: dump.env,
+    },
+  ];
   const outcome: RunOutcome = {
     cells:
       options.omitCell === true
@@ -700,17 +721,24 @@ function capture(
                 landscape: false,
                 fontMax: false,
               },
-              screens: [
-                {
-                  target: (options.target ?? TARGET).id,
-                  link: (options.target ?? TARGET).link,
-                  dump: 'screen.json',
-                  screenshot: 'screen.png',
-                  annotated: 'annotated.png',
-                  env: dump.env,
-                },
-              ],
+              screens: screens(''),
             },
+            ...(extra === undefined
+              ? []
+              : [
+                  {
+                    id: extra.id,
+                    config: {
+                      id: 'base',
+                      dark: true,
+                      rtl: false,
+                      compact: false,
+                      landscape: false,
+                      fontMax: false,
+                    },
+                    screens: screens(`${extra.id}/`),
+                  },
+                ]),
           ],
     findings: options.findings ?? [],
     skipped: options.skipped ?? [],
@@ -1904,3 +1932,155 @@ test('a manifest above the document bound is still refused', t => {
   fs.writeFileSync(file, JSON.stringify({ version: 1, padding: BIG_TEXT }));
   assert.throws(() => readProofManifest(file), /Proof JSON exceeds 1048576 bytes/u);
 });
+
+test('an opted-in pixel diff leaves the comparison status, findings and exit semantics', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  capture(preparation, 'base', baseRun);
+  capture(preparation, 'head', headRun, { findings: [error] });
+  const plain = await compareProof(preparation, baseRun, headRun, path.join(fixture.root, 'plain'));
+  const withPixelDiff = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'pixel'),
+    undefined,
+    { explainShift: false }
+  );
+  // The verdict the gate publishes is identical either way.
+  assert.equal(withPixelDiff.status, plain.status);
+  assert.deepEqual(withPixelDiff.introduced, plain.introduced);
+  assert.deepEqual(withPixelDiff.reasons, plain.reasons);
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(fixture.root, 'plain', 'comparison.json'), 'utf8')),
+    JSON.parse(fs.readFileSync(path.join(fixture.root, 'pixel', 'comparison.json'), 'utf8'))
+  );
+  // The advisory report is a sibling artifact; the comparison itself carries none.
+  const written = JSON.parse(
+    fs.readFileSync(path.join(fixture.root, 'pixel', 'pixel-diff.json'), 'utf8')
+  );
+  assert.equal(written.advisory, true);
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(fixture.root, 'plain', 'comparison.json'), 'utf8'))
+      .pixelDiff,
+    undefined
+  );
+  // These fixtures write synthetic non-PNG screenshot bytes, so the advisory pass
+  // must say so explicitly instead of reporting a clean zero.
+  assert.equal(written.status, 'inconclusive');
+  assert.equal(written.cells[0].status, 'inconclusive');
+  assert.match(written.cells[0].reason, /not a PNG/);
+  assert.equal(withPixelDiff.pixelDiff?.status, 'inconclusive');
+  assert.equal(withPixelDiff.pixelDiff?.report, 'pixel-diff.json');
+});
+
+test('a comparison without the flag writes no pixel-diff evidence at all', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  capture(preparation, 'base', baseRun);
+  capture(preparation, 'head', headRun);
+  const out = path.join(fixture.root, 'plain');
+  const result = await compareProof(preparation, baseRun, headRun, out);
+  assert.equal(result.pixelDiff, undefined);
+  assert.equal(fs.existsSync(path.join(out, 'pixel-diff.json')), false);
+  assert.equal(fs.existsSync(path.join(out, 'pixel-diff')), false);
+});
+
+test('a head LogBox overlay reaches the advisory pass as a per-cell block, not a pair block', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'overlay-base');
+  const headRun = path.join(fixture.root, 'overlay-head');
+  capture(preparation, 'base', baseRun, { extraCell: { id: 'dark' } });
+  capture(preparation, 'head', headRun, {
+    extraCell: { id: 'dark' },
+    // The head captured the `dark` cell with a LogBox toast painted over it.
+    findings: [
+      {
+        ...error,
+        cell: 'dark',
+        rule: 'dev-overlay',
+        message: 'Synthetic LogBox toast',
+        element: { ...error.element, text: 'Invariant Violation: synthetic' },
+      },
+    ],
+  });
+  const out = path.join(fixture.root, 'overlay-comparison');
+  const result = await compareProof(preparation, baseRun, headRun, out, undefined, {
+    explainShift: false,
+  });
+  // The shared gate result keeps its existing shape: the head overlay still
+  // makes the pair inconclusive, and that did not change.
+  assert.equal(result.status, 'inconclusive');
+  assert.ok(
+    result.reasons.some(reason => /LogBox error painted over dark\/card/.test(reason)),
+    JSON.stringify(result.reasons)
+  );
+  const written = JSON.parse(fs.readFileSync(path.join(out, 'pixel-diff.json'), 'utf8'));
+  const byCell = new Map(
+    written.cells.map((cell: { cell: string; target: string; status: string; reason?: string }) => [
+      cell.cell,
+      cell,
+    ])
+  );
+  // The overlaid cell is named for the overlay itself.
+  const overlayCell = byCell.get('dark');
+  assert.equal(overlayCell.status, 'inconclusive');
+  assert.match(overlayCell.reason, /a LogBox overlay painted this screen/);
+  // The clean sibling is NOT blocked by the pair: had the overlay travelled as a
+  // pair-wide reason, this cell would carry "the comparison already called this
+  // pair inconclusive". It gets its own per-cell reason instead.
+  const sibling = byCell.get('base');
+  assert.equal(sibling.status, 'inconclusive');
+  assert.doesNotMatch(sibling.reason, /comparison already called this pair inconclusive/);
+  assert.match(sibling.reason, /not a PNG/);
+});
+
+test(
+  'the real compare CLI writes the advisory report and keeps the gate exit code',
+  { timeout: 40_000 },
+  async t => {
+    const fixture = syntheticRepo(t);
+    const preparation = await prepareProof(fixture);
+    const baseRun = path.join(fixture.root, 'base-run');
+    const headRun = path.join(fixture.root, 'head-run');
+    // One introduced error, so a correct gate exits 1 with --pixel-diff set.
+    capture(preparation, 'base', baseRun);
+    capture(preparation, 'head', headRun, { findings: [error] });
+    const out = path.join(fixture.root, 'comparison');
+    const invocation = startProofCli(t, fixture.repo, [
+      'compare',
+      '--preparation',
+      path.join(fixture.out, 'preparation.json'),
+      '--base-run',
+      baseRun,
+      '--head-run',
+      headRun,
+      '--out',
+      out,
+      '--pixel-diff',
+      '--pixel-diff-explain-shift',
+    ]);
+    const exited = await invocation.completed;
+    assert.equal(exited.code, 1, invocation.output());
+    assert.match(
+      invocation.output(),
+      /advisory pixel diff inconclusive: 0 changed, 0 unchanged, 1 inconclusive/
+    );
+    const written = JSON.parse(fs.readFileSync(path.join(out, 'pixel-diff.json'), 'utf8'));
+    assert.equal(written.advisory, true);
+    assert.equal(written.explainShift, true);
+    // Synthetic non-PNG fixtures: the advisory pass says so instead of a clean zero.
+    assert.equal(written.cells[0].status, 'inconclusive');
+    assert.match(written.cells[0].reason, /not a PNG/);
+    // The gate's own result is untouched by the advisory pass.
+    const comparison = JSON.parse(fs.readFileSync(path.join(out, 'comparison.json'), 'utf8'));
+    assert.equal(comparison.status, 'comparable');
+    assert.equal(comparison.introduced.length, 1);
+    assert.equal(comparison.pixelDiff, undefined);
+  }
+);

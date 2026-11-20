@@ -123,6 +123,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `codingPlans`
 - `computeBilling`
 - `credits`
+- `customRouterBenchmarks`
 - `debug`
 - `discord`
 - `dolthub`

@@ -455,9 +455,7 @@ async function launchPaidRun(
         () => false
       );
       if (!written) {
-        console.warn(
-          JSON.stringify({ event: 'benchmark_paid_plan_refusal_unsaved', requestId })
-        );
+        console.warn(JSON.stringify({ event: 'benchmark_paid_plan_refusal_unsaved', requestId }));
         return 'retryable';
       }
       return 'failed';

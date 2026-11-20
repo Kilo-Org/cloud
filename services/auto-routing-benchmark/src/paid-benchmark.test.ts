@@ -891,7 +891,9 @@ describe('receipt reconciliation', () => {
     const summary = await reconcilePaidUsageReceipts(paidBindings(db), { fetchImpl });
     expect(summary).toMatchObject({ recorded: 1, mismatched: 0, pending: 0 });
     const usage = sqlite
-      .prepare('SELECT usage_id, request_id, platform_covered, microdollars FROM paid_attempt_usage')
+      .prepare(
+        'SELECT usage_id, request_id, platform_covered, microdollars FROM paid_attempt_usage'
+      )
       .all() as Array<Record<string, unknown>>;
     expect(usage).toEqual([
       {
@@ -1083,16 +1085,12 @@ describe('permanent launch refusal', () => {
 
     // The sibling is untouched: still active, no charge, and it got its own run.
     const sibling = sqlite
-      .prepare(
-        'SELECT status, charged_microdollars FROM paid_benchmark_requests WHERE id = ?'
-      )
+      .prepare('SELECT status, charged_microdollars FROM paid_benchmark_requests WHERE id = ?')
       .get(siblingId) as { status: string; charged_microdollars: number };
     expect(sibling).toEqual({ status: 'active', charged_microdollars: 0 });
     expect(countRows('SELECT COUNT(*) AS count FROM paid_attempt_usage')).toBe(0);
     expect(
-      sqlite
-        .prepare('SELECT COUNT(*) AS count FROM benchmark_runs WHERE purpose = ?')
-        .get('user')
+      sqlite.prepare('SELECT COUNT(*) AS count FROM benchmark_runs WHERE purpose = ?').get('user')
     ).not.toEqual({ count: 0 });
   });
 

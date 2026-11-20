@@ -9,14 +9,13 @@ import {
   PaidBenchmarkAdminRoutingTableResponseSchema,
   type AutoRouter,
   type PaidBenchmarkAdminPayer,
-  type PaidBenchmarkAdminProgressResponse,
   type PaidBenchmarkAdminRequest,
   type PaidBenchmarkAdminRequestStatus,
   type PaidBenchmarkCaseStatus,
   type BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, PauseCircle, Route, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -89,6 +88,28 @@ export const REQUESTS_FILTER_STATUSES: Record<
   failed: ['failed'],
   completed: ['completed'],
 };
+
+/** The list and progress readers share one trunk per row: a page never repeats an id. */
+function dedupeById<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const item of items) {
+    const key = keyOf(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+  }
+  return unique;
+}
+
+async function fetchRequestsPage(router: AutoRouter, filter: RequestsFilter, cursor?: string) {
+  const query = new URLSearchParams({ router });
+  const statuses = REQUESTS_FILTER_STATUSES[filter];
+  if (statuses !== null) query.set('status', statuses.join(','));
+  if (cursor) query.set('cursor', cursor);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-requests?${query}`);
+  return parseAdminResponse(response, PaidBenchmarkAdminListResponseSchema);
+}
 
 /** Microdollars are millionths of a dollar; the console reads dollars like the runs list. */
 export function formatMicrodollars(value: number): string {
@@ -242,25 +263,40 @@ export function BenchmarkRequestsSection({
 }) {
   const [filter, setFilter] = useState<RequestsFilter>('all');
 
-  const requestsQuery = useQuery({
+  // One query owns the whole list: its identity is the router and the filter, so a filter
+  // change is a different cache entry and a response still in flight for the old one can
+  // never write into the new list.
+  const requestsQuery = useInfiniteQuery({
     queryKey: ['auto-routing', 'benchmark-requests', router, filter],
-    queryFn: async () => {
-      const query = new URLSearchParams({ router });
-      const statuses = REQUESTS_FILTER_STATUSES[filter];
-      if (statuses !== null) query.set('status', statuses.join(','));
-      const response = await adminFetch(
-        `/admin/api/auto-routing/benchmark-requests?${query.toString()}`
-      );
-      return parseAdminResponse(response, PaidBenchmarkAdminListResponseSchema);
-    },
+    queryFn: ({ pageParam }) => fetchRequestsPage(router, filter, pageParam ?? undefined),
+    initialPageParam: null as string | null,
+    getNextPageParam: page => page.nextCursor ?? undefined,
+    // Live refresh is bounded to the situation where it is useful and cheap: the first page
+    // is all the operator is looking at, and it holds a request that is still spending. Once
+    // they page back through history, polling stops instead of re-scanning every page.
     refetchInterval: query => {
       const data = query.state.data;
-      return data &&
-        data.requests.some(request => request.status === 'active' || request.status === 'preparing')
+      if (!data || data.pages.length !== 1) return false;
+      const page = data.pages[0];
+      return page.requests.some(
+        request => request.status === 'active' || request.status === 'preparing'
+      )
         ? REQUESTS_POLL_INTERVAL_MS
         : false;
     },
   });
+
+  const requests = useMemo(
+    () => dedupeById(requestsQuery.data?.pages.flatMap(page => page.requests) ?? [], r => r.id),
+    [requestsQuery.data]
+  );
+
+  const loadMoreRequests = useCallback(() => {
+    // TanStack already refuses a second page fetch while one is in flight, and cancelling
+    // it would admit a duplicate cursor fetch for a rapid double click.
+    if (!requestsQuery.hasNextPage || requestsQuery.isFetchingNextPage) return;
+    void requestsQuery.fetchNextPage({ cancelRefetch: false });
+  }, [requestsQuery]);
 
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -339,17 +375,44 @@ export function BenchmarkRequestsSection({
         />
         {requestsQuery.isLoading ? (
           <Skeleton className="h-24 w-full" />
-        ) : requestsQuery.error ? (
+        ) : requestsQuery.isError && requests.length === 0 ? (
+          // Only a failed FIRST page replaces the list. A failed next page keeps every row
+          // already on screen and offers the same control again, so a transient error never
+          // collapses work the operator was reading.
           <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
             {requestsQuery.error instanceof Error
               ? requestsQuery.error.message
               : 'Failed to load benchmark requests'}
           </div>
         ) : (
-          <BenchmarkRequestsList
-            requests={requestsQuery.data?.requests ?? []}
-            emptyFilter={filter}
-          />
+          <>
+            <BenchmarkRequestsList requests={requests} emptyFilter={filter} />
+            {requestsQuery.isFetchNextPageError ? (
+              <p role="alert" className="text-destructive text-xs">
+                Older requests could not be loaded:{' '}
+                {requestsQuery.error instanceof Error
+                  ? requestsQuery.error.message
+                  : 'the request failed'}
+              </p>
+            ) : null}
+            {requestsQuery.hasNextPage ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-11 self-start"
+                aria-label="Load more benchmark requests"
+                disabled={requestsQuery.isFetchingNextPage}
+                onClick={loadMoreRequests}
+              >
+                {requestsQuery.isFetchingNextPage
+                  ? 'Loading more requests'
+                  : requestsQuery.isFetchNextPageError
+                    ? 'Retry older requests'
+                    : 'Load older requests'}
+              </Button>
+            ) : null}
+          </>
         )}
       </CardContent>
     </Card>
@@ -770,21 +833,28 @@ function PauseButton({
  * row is expanded, so a list of requests costs one request each, on demand.
  */
 export function RequestDetail({ request }: { request: PaidBenchmarkAdminRequest }) {
-  const [extraCases, setExtraCases] = useState<PaidBenchmarkAdminProgressResponse['cases']>([]);
-  const [cursors, setCursors] = useState<readonly string[]>([]);
   const [showRouting, setShowRouting] = useState(false);
-  const cursor = cursors.length > 0 ? cursors[cursors.length - 1] : undefined;
 
-  const progressQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-request-progress', request.id, cursor],
-    queryFn: async () => {
-      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  // Keyed by the request id: another request's expansion is a different cache entry, so its
+  // in-flight page can never land in this one's list.
+  const progressQuery = useInfiniteQuery({
+    queryKey: ['auto-routing', 'benchmark-request-progress', request.id],
+    queryFn: async ({ pageParam }) => {
+      const cursor = pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : '';
       const response = await adminFetch(
-        `/admin/api/auto-routing/benchmark-requests/${encodeURIComponent(request.id)}/progress${query}`
+        `/admin/api/auto-routing/benchmark-requests/${encodeURIComponent(request.id)}/progress${cursor}`
       );
       return parseAdminResponse(response, PaidBenchmarkAdminProgressResponseSchema);
     },
+    initialPageParam: null as string | null,
+    getNextPageParam: page =>
+      page.status === 'empty' ? undefined : (page.nextCursor ?? undefined),
   });
+
+  const loadMoreCases = useCallback(() => {
+    if (!progressQuery.hasNextPage || progressQuery.isFetchingNextPage) return;
+    void progressQuery.fetchNextPage({ cancelRefetch: false });
+  }, [progressQuery]);
 
   const routingQuery = useQuery({
     queryKey: ['auto-routing', 'benchmark-request-routing-table', request.id],
@@ -798,8 +868,15 @@ export function RequestDetail({ request }: { request: PaidBenchmarkAdminRequest 
     },
   });
 
-  const cases = [...(progressQuery.data?.cases ?? []), ...extraCases];
-
+  const cases = useMemo(
+    () =>
+      dedupeById(
+        progressQuery.data?.pages.flatMap(page => (page.status === 'empty' ? [] : page.cases)) ??
+          [],
+        entry => entry.id
+      ),
+    [progressQuery.data]
+  );
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs tabular-nums">{requestSpendLine(request)}</p>
@@ -829,7 +906,7 @@ export function RequestDetail({ request }: { request: PaidBenchmarkAdminRequest 
         <h4 className="mb-1 text-xs font-medium">Cases</h4>
         {progressQuery.isLoading ? (
           <Skeleton className="h-16 w-full" />
-        ) : progressQuery.error ? (
+        ) : progressQuery.isError && cases.length === 0 ? (
           <p className="text-destructive text-xs">
             {progressQuery.error instanceof Error
               ? progressQuery.error.message
@@ -900,20 +977,17 @@ export function RequestDetail({ request }: { request: PaidBenchmarkAdminRequest 
                 </TableBody>
               </Table>
             </div>
-            {progressQuery.data?.nextCursor ? (
+            {progressQuery.hasNextPage ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="mt-2 min-h-11"
-                onClick={() => {
-                  const next = progressQuery.data?.nextCursor;
-                  if (!next) return;
-                  setExtraCases(previous => [...previous, ...(progressQuery.data?.cases ?? [])]);
-                  setCursors(previous => [...previous, next]);
-                }}
+                aria-label="Load more cases"
+                disabled={progressQuery.isFetchingNextPage}
+                onClick={loadMoreCases}
               >
-                Load more cases
+                {progressQuery.isFetchingNextPage ? 'Loading more cases' : 'Load more cases'}
               </Button>
             ) : null}
           </>

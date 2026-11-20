@@ -14,6 +14,7 @@ import {
 } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
+import { useCanManageBilling } from '@/lib/trial-refusal';
 import {
   type AvailableModel,
   type CatalogModel,
@@ -146,6 +147,10 @@ export function ModelAccessForm({
 }>) {
   const { t } = useTranslation();
   const save = useSaveOrgModelAccess(organizationId);
+  // The refusal copy names this reader's destination: the form renders no
+  // billing step beside the failure line, so a money role reads the sentence
+  // that points at kilo.ai instead of one that claims an owner must act.
+  const canManageBilling = useCanManageBilling(organizationId);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
   const [tab, setTab] = useState<Tab>('models');
   // A provider saved in the allow list but no longer served by any catalog model
@@ -221,7 +226,9 @@ export function ModelAccessForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
+        message:
+          knownServerErrorMessage(error, canManageBilling, 'absent') ??
+          t('organizationGuardrails.statusFailed'),
       });
     }
   };

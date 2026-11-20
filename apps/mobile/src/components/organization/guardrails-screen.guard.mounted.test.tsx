@@ -67,6 +67,12 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgGuardrails: () => ({ mutateAsync: h.mutateAsync, isPending: false }),
 }));
+// The form reads the reader's role through the trial-refusal barrel, whose
+// hooks reach expo-router and the organization query chain this harness does
+// not mount (they pull `expo-application`, a native module). The suite's
+// subject is the leave guard, not the refusal copy, so the stub's role is
+// arbitrary; a member reader keeps the harness minimal.
+vi.mock('@/lib/trial-refusal', () => ({ useCanManageBilling: () => false }));
 vi.mock('@/components/organization/guardrails-input-section', () => ({
   InputGuardrailsSection: (props: {
     onChange: (update: (current: GuardrailsDraft) => GuardrailsDraft) => void;

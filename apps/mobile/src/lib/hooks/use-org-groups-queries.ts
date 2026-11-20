@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
+import { useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -52,15 +53,18 @@ export function useOrgGroups(organizationId: string | null, enabled: boolean) {
 /**
  * Create, update and delete for the organization's groups. Every one of these is
  * `organizationAdminMutationProcedure`, so the screens show them to an owner or
- * admin only and the server refuses anyone else.
+ * admin only and the server refuses anyone else. The toast carries no billing
+ * step of its own, so a money role reads the refusal copy that names the
+ * destination instead of one that claims an owner must act.
  */
 export function useOrgGroupMutations(organizationId: string) {
   const trpc = useTRPC();
+  const canManageBilling = useCanManageBilling(organizationId);
   const queryClient = useQueryClient();
   const groupsFilter = trpc.organizations.groups.pathFilter();
   const scope = { id: `organization-groups:${organizationId}` };
   const onError = (error: unknown) => {
-    announcingToast.error(organizationErrorMessage(error));
+    announcingToast.error(organizationErrorMessage(error, canManageBilling, 'absent'));
   };
   const onSuccess = () => {
     void queryClient.invalidateQueries(groupsFilter);

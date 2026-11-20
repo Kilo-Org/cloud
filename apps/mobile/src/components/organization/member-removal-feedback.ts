@@ -37,7 +37,15 @@ export function useMemberRemovalFeedback(): MemberRemovalStore {
   };
 }
 
-/** The localized explanation for a removal the server refused. */
-export function removalRefusalMessage(error: unknown): MemberRemovalFailure['message'] {
-  return organizationErrorMessage(error);
+/**
+ * The localized explanation for a removal the server refused. The caller's role
+ * picks the sentence, and this surface renders no billing step, so a money role
+ * reads the sentence that names the destination instead of one that claims an
+ * owner must act.
+ */
+export function removalRefusalMessage(
+  error: unknown,
+  canManageBilling: boolean
+): MemberRemovalFailure['message'] {
+  return organizationErrorMessage(error, canManageBilling, 'absent');
 }

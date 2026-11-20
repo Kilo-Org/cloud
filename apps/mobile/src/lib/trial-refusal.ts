@@ -19,8 +19,10 @@ import { useTranslation } from 'react-i18next';
 import { isMoneyRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 export {
+  TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY,
   TRIAL_ENDED_BILLING_COPY_KEY,
   TRIAL_ENDED_COPY_KEY,
+  type TrialRefusalBillingStep,
   trialRefusalCopyKey,
   trialRefusalMessage,
 } from '@/lib/trial-refusal-copy';

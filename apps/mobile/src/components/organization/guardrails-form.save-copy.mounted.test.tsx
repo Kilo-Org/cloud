@@ -48,6 +48,11 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgGuardrails: () => ({ mutateAsync: h.mutateAsync, isPending: false }),
 }));
+// The form reads the reader's role through the trial-refusal barrel, whose
+// hooks reach expo-router and the organization query chain this harness does
+// not mount. The stub pins the money role: this surface's subject is the
+// refusal copy a billing role reads, and no billing step is rendered here.
+vi.mock('@/lib/trial-refusal', () => ({ useCanManageBilling: () => true }));
 vi.mock('@/components/organization/guardrails-input-section', () => ({
   InputGuardrailsSection: (props: {
     onChange: (update: (current: GuardrailsDraft) => GuardrailsDraft) => void;
@@ -235,7 +240,12 @@ describe('GuardrailsForm save copy', () => {
     const renderer = await mountForm(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
     await pressSave(renderer);
 
-    expect(statusText(renderer.root)).toBe(i18n.t('common.organizationTrialEnded'));
+    // The form renders no billing step beside the failure line, so even the
+    // role that can change the plan reads the sentence that names the
+    // destination instead of one that claims an owner must act.
+    expect(statusText(renderer.root)).toBe(
+      i18n.t('common.organizationTrialEndedBillingAtKiloAi')
+    );
   });
 
   it('falls back to the status-failed line for an unrecognized refusal', async () => {

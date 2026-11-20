@@ -1,4 +1,4 @@
-// The trial refusal's copy, free of the role read that picks between the two
+// The trial refusal's copy, free of the role read that picks among the three
 // sentences.
 //
 // `server-error-copy.ts` resolves the trial refusal for every consumer that maps
@@ -18,12 +18,44 @@ export const TRIAL_ENDED_COPY_KEY = 'common.organizationTrialEnded';
 /** The copy a reader who can change the plan sees: it offers the step. */
 export const TRIAL_ENDED_BILLING_COPY_KEY = 'common.organizationTrialEndedBilling';
 
-/** The catalog key for the trial refusal this reader can act on. */
-export function trialRefusalCopyKey(canManageBilling: boolean): string {
-  return canManageBilling ? TRIAL_ENDED_BILLING_COPY_KEY : TRIAL_ENDED_COPY_KEY;
+/**
+ * The copy a reader who can change the plan sees when the surface renders no
+ * billing step of its own: it names the destination instead, so the refusal
+ * never leaves the money role a dead end.
+ */
+export const TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY =
+  'common.organizationTrialEndedBillingAtKiloAi';
+
+/** Which reader the refusal copy serves, and what the surface can offer under it. */
+export type TrialRefusalBillingStep =
+  /** The surface renders the billing step under the sentence. */
+  | 'offered'
+  /** The surface renders no billing step, so the sentence names the destination. */
+  | 'absent';
+
+/**
+ * The catalog key for the trial refusal this reader can act on. A reader who
+ * cannot change the plan always reads the owner-naming copy. A reader who can
+ * reads the step-offering copy when the surface pairs the sentence with its
+ * billing step and the destination copy when it cannot.
+ */
+export function trialRefusalCopyKey(
+  canManageBilling: boolean,
+  billingStep: TrialRefusalBillingStep = 'offered'
+): string {
+  if (!canManageBilling) {
+    return TRIAL_ENDED_COPY_KEY;
+  }
+  return billingStep === 'offered'
+    ? TRIAL_ENDED_BILLING_COPY_KEY
+    : TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY;
 }
 
 /** The translated trial refusal for this reader. */
-export function trialRefusalMessage(canManageBilling: boolean): string {
-  return i18n.t(trialRefusalCopyKey(canManageBilling));
+export function trialRefusalMessage(
+  canManageBilling: boolean,
+  billingStep: TrialRefusalBillingStep = 'offered'
+): string {
+  return i18n.t(trialRefusalCopyKey(canManageBilling, billingStep));
 }
+

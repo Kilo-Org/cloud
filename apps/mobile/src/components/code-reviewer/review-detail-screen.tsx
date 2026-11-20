@@ -167,9 +167,7 @@ export function ReviewDetailScreen({
       }
       // The outcome word rides the title line, the way the list row and the web
       // detail page both state it, so no block in the body has to label it.
-      titleAccessory={
-        loadedReview ? <ReviewStatusBadge status={loadedReview.status} /> : undefined
-      }
+      titleAccessory={loadedReview ? <ReviewStatusBadge status={loadedReview.status} /> : undefined}
     />
   );
 

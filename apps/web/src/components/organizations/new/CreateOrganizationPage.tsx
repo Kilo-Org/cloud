@@ -149,8 +149,15 @@ export function CreateOrganizationPage({
         <h1 className="mb-2 text-3xl font-bold lg:text-4xl">
           Create an organization for Kilo Enterprise
         </h1>
-        {showFirstOrganizationTrialOffer && (
+        {showFirstOrganizationTrialOffer ? (
           <p className="text-muted-foreground mb-2">{FIRST_ORGANIZATION_TRIAL_OFFER}</p>
+        ) : (
+          // The account already received the offer, so the creation grant is
+          // spent: name the state and the next step instead of staying silent.
+          <p className="text-muted-foreground mb-2">
+            Your new organization will not include a free trial. You can add a plan after it is
+            created.
+          </p>
         )}
         <Link
           href="/get-started/personal"

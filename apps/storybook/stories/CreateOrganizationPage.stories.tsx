@@ -34,3 +34,10 @@ export const Default: Story = {
     mockSelectedOrgName: 'Acme Corp',
   },
 };
+
+export const OfferAlreadyUsed: Story = {
+  args: {
+    showFirstOrganizationTrialOffer: false,
+    mockSelectedOrgName: 'Acme Corp',
+  },
+};

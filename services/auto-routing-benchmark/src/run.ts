@@ -16,6 +16,7 @@ import {
   type BenchmarkDeciderModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
+  type BenchmarkProfileFailureClass,
   taxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
@@ -54,6 +55,7 @@ import {
   listPendingCurrentProfiles,
   listReadyCurrentProfilesForEntries,
   listStaleRunningDeciderRuns,
+  failPendingProfiles,
   markProfilesFailedForEntries,
   markProfilesFailedForRun,
   markProfilesReadyForRun,
@@ -73,6 +75,7 @@ import {
   upsertCaseResult,
   type BenchmarkRunPurpose,
   type CaseResultRow,
+  type RunLaneFailureRow,
   type PendingDeciderOutput,
   type PriorModelResult,
 } from './db';
@@ -110,9 +113,15 @@ import {
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import {
   catalogCandidatePrices,
-  benchmarkPairUnavailableReason,
+  benchmarkPairUnavailability,
   fetchBenchmarkModelCatalog,
 } from './platform-models';
+import {
+  mostSevereFailureClass,
+  parseFailureClass,
+  unsupportedRejection,
+  type ProfileFailure,
+} from './profile-failure';
 import { pickClassifierWinner } from './winner';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import { fetchBenchmarkUserToken } from './benchmark-token';
@@ -128,7 +137,9 @@ import {
   claimScheduledChunks,
   clearUnbilledCase,
   getPaidCasePromptRevision,
+  cooldownCatalog,
   cooldownModel,
+  deferCatalogChunk,
   deferChunk,
   deferThrottledChunk,
   failChunk,
@@ -148,6 +159,7 @@ import {
   schedulerBackoffSeconds,
   startChunk,
   SCHEDULER_MAX_ATTEMPTS,
+  SCHEDULER_MAX_CATALOG_DEFERRALS,
   SCHEDULER_MAX_THROTTLE_DEFERRALS,
   type SchedulerClaim,
   type SchedulerConfig,
@@ -242,7 +254,9 @@ async function enqueueRunMessages(
       await env.BENCH_QUEUE.sendBatch(messages.slice(i, i + QUEUE_SEND_BATCH_LIMIT));
     } catch (error) {
       const reason = `enqueue failed after ${i} of ${messages.length} messages: ${formatError(error).error}`;
-      await failRunAndDrain(env, runId, reason).catch(() => {});
+      await failRunAndDrain(env, runId, { failureClass: 'run_init_failed', reason }).catch(
+        () => {}
+      );
       throw error;
     }
   }
@@ -252,10 +266,14 @@ async function enqueueRunMessages(
  * Mark a running run failed, fail the registry rows it claimed, then try to
  * drain both queues into whatever slot just freed up.
  */
-export async function failRunAndDrain(env: Env, runId: string, error: string): Promise<void> {
-  await markRunFailed(env.BENCH_DB, runId, error);
+export async function failRunAndDrain(
+  env: Env,
+  runId: string,
+  failure: ProfileFailure
+): Promise<void> {
+  await markRunFailed(env.BENCH_DB, runId, failure.reason);
   try {
-    await markProfilesFailedForRun(env.BENCH_DB, runId, error);
+    await markProfilesFailedForRun(env.BENCH_DB, runId, failure);
   } catch (profileError) {
     console.warn(
       JSON.stringify({
@@ -312,7 +330,10 @@ export async function sweepStaleRuns(env: Env): Promise<string[]> {
   );
   for (const run of stale) {
     // No-ops for a salvaged run: its rows are already ready/failed.
-    await markProfilesFailedForRun(db, run.id, 'timed out').catch(() => {});
+    await markProfilesFailedForRun(db, run.id, {
+      failureClass: 'run_timed_out',
+      reason: 'timed out',
+    }).catch(() => {});
   }
   return stale.map(run => run.id);
 }
@@ -335,7 +356,13 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
   );
   for (const lane of unfinished) {
     if (deadLaneKeys.has(laneKey(lane.model, lane.variant, lane.rep))) continue;
-    await recordLaneFailure(env.BENCH_DB, { runId, ...lane, chunk: 0, shard: 0 });
+    await recordLaneFailure(env.BENCH_DB, {
+      runId,
+      ...lane,
+      chunk: 0,
+      shard: 0,
+      failureClass: 'run_timed_out',
+    });
   }
   console.warn(
     JSON.stringify({
@@ -1050,32 +1077,19 @@ export async function drainQueue(
   const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveRunIdentity(config));
   const checked = pending.map(row => ({
     row,
-    reason: benchmarkPairUnavailableReason(catalog, {
+    failure: benchmarkPairUnavailability(catalog, {
       model: row.model,
       variant: variantFromStorage(row.variant),
     }),
   }));
-  const unavailable = checked.flatMap(({ row, reason }) =>
-    reason === null ? [] : [{ row, reason }]
+  await failPendingProfiles(
+    env.BENCH_DB,
+    current,
+    checked.flatMap(({ row, failure }) =>
+      failure === null ? [] : [{ model: row.model, variant: row.variant, failure }]
+    )
   );
-  if (unavailable.length > 0) {
-    await env.BENCH_DB.batch(
-      unavailable.map(({ row, reason }) =>
-        env.BENCH_DB.prepare(
-          "UPDATE benchmark_profiles SET status = 'failed', failure_reason = ?, updated_at = ? WHERE router = ? AND model = ? AND variant = ? AND engine_identity = ? AND repetitions = ? AND status = 'pending'"
-        ).bind(
-          reason,
-          new Date().toISOString(),
-          router,
-          row.model,
-          row.variant,
-          engineIdentity,
-          repetitions
-        )
-      )
-    );
-  }
-  const available = checked.flatMap(({ row, reason }) => (reason === null ? [row] : []));
+  const available = checked.flatMap(({ row, failure }) => (failure === null ? [row] : []));
   // Queued re-measures of ready rows are reserved ahead of the pending backlog, so an
   // operator's repair starts on the next drain instead of waiting for the backlog.
   const queued = [
@@ -1138,7 +1152,10 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   // the org snapshot existed lack one.
   if (!run.benchmark_user_id || !run.benchmark_org_id) {
     const reason = 'Benchmark run is missing its execution identity.';
-    await markProfilesFailedForRun(env.BENCH_DB, runId, reason);
+    await markProfilesFailedForRun(env.BENCH_DB, runId, {
+      failureClass: 'run_init_failed',
+      reason,
+    });
     await markRunFailed(env.BENCH_DB, runId, reason);
     return false;
   }
@@ -1150,20 +1167,28 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   // skip rows the run already holds, so repeating a failed pass is safe.
   if (!(await hasScheduledChunks(env.BENCH_DB, runId))) {
     const skipOldCaseIds = argvAffectedCases(run.router).map(benchCase => benchCase.id);
-    await copyRemeasureBaselines(env.BENCH_DB, {
-      runId,
-      skipOldCaseIds,
-      promptRevision: PROMPT_TRANSPORT_REVISION,
-    });
-    await reuseDeciderCaseResults(env.BENCH_DB, {
-      runId,
-      router: run.router,
-      engineIdentity: run.engine_identity,
-      repetitions: run.repetitions,
-      entries,
-      skipOldCaseIds,
-      promptRevision: PROMPT_TRANSPORT_REVISION,
-    });
+    try {
+      await copyRemeasureBaselines(env.BENCH_DB, {
+        runId,
+        skipOldCaseIds,
+        promptRevision: PROMPT_TRANSPORT_REVISION,
+      });
+      await reuseDeciderCaseResults(env.BENCH_DB, {
+        runId,
+        router: run.router,
+        engineIdentity: run.engine_identity,
+        repetitions: run.repetitions,
+        entries,
+        skipOldCaseIds,
+        promptRevision: PROMPT_TRANSPORT_REVISION,
+      });
+    } catch (error) {
+      await markProfilesFailedForRun(env.BENCH_DB, runId, {
+        failureClass: 'run_init_failed',
+        reason: `case reuse failed: ${formatError(error).error}`,
+      });
+      throw error;
+    }
   }
   return scheduleRunChunks(env.BENCH_DB, {
     runId,
@@ -1247,6 +1272,7 @@ export async function dispatchScheduler(env: Env): Promise<void> {
       rep: claim.rep,
       chunk: claim.chunk,
       shard: 0,
+      failureClass: 'unknown',
     });
     for (const caseId of z.array(z.string()).parse(JSON.parse(claim.case_ids))) {
       await queueOutputRecovery(env, {
@@ -1316,6 +1342,20 @@ class BenchmarkCatalogLoadError extends Error {
 }
 
 class BenchmarkModelUnavailableError extends Error {}
+
+/** The profile failure class a lane killed by a chunk failure records, by wait reason. */
+const LANE_FAILURE_CLASS_BY_WAIT_REASON = {
+  model_unavailable: 'model_not_found',
+  awaiting_output: 'ambiguous_execution',
+  ambiguous_execution: 'ambiguous_execution',
+  catalog_load: 'catalog_load',
+  model_resolution: 'model_resolution',
+  grading: 'grader',
+  container_capacity: 'container_capacity',
+  provider_throttle: 'provider_unavailable',
+  infrastructure: 'unknown',
+  claim_lost: 'unknown',
+} as const satisfies Record<string, BenchmarkProfileFailureClass>;
 
 export const PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON =
   'Exact benchmark model or variant is unavailable to the benchmark CLI; retry after availability is restored.';
@@ -1684,14 +1724,32 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
     const outputDeadline =
       error instanceof AmbiguousBenchmarkExecutionError ? error.outputDeadline : null;
     const awaitingOutput = outputDeadline !== null && Date.now() < outputDeadline;
+    const reason =
+      error instanceof BenchmarkModelUnavailableError
+        ? 'model_unavailable'
+        : error instanceof ChunkClaimLostError
+          ? 'claim_lost'
+          : awaitingOutput
+            ? 'awaiting_output'
+            : error instanceof AmbiguousBenchmarkExecutionError
+              ? 'ambiguous_execution'
+              : error instanceof BenchmarkCatalogLoadError
+                ? error.category
+                : error instanceof DeciderGraderRetryError
+                  ? 'grading'
+                  : isRetryableContainerAvailabilityError(error)
+                    ? 'container_capacity'
+                    : error instanceof BenchmarkThrottleError
+                      ? 'provider_throttle'
+                      : 'infrastructure';
     if (error instanceof BenchmarkModelUnavailableError) {
       await markProfilesFailedForEntries(
         env.BENCH_DB,
         claim.run_id,
         [{ model: claim.model, variant: claim.variant }],
-        PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON
+        { failureClass: 'model_not_found', reason: PROFILE_MODEL_UNAVAILABLE_FAILURE_REASON }
       );
-      await failScheduledEntry(env.BENCH_DB, claim);
+      await failScheduledEntry(env.BENCH_DB, claim, 'model_not_found');
     } else if (error instanceof ChunkClaimLostError) {
       await deferChunk(env.BENCH_DB, id, token, Date.now());
     } else if (awaitingOutput) {
@@ -1721,6 +1779,18 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         { delaySeconds }
       );
     } else if (
+      error instanceof BenchmarkCatalogLoadError &&
+      error.category === 'catalog_load' &&
+      claim.catalog_deferrals < SCHEDULER_MAX_CATALOG_DEFERRALS
+    ) {
+      const delaySeconds = schedulerBackoffSeconds(claim.catalog_deferrals + 1);
+      await deferCatalogChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
+      await cooldownCatalog(env.BENCH_DB, Date.now() + delaySeconds * 1000);
+      await env.BENCH_QUEUE.send(
+        { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
+        { delaySeconds }
+      );
+    } else if (
       error instanceof AmbiguousBenchmarkExecutionError ||
       claim.attempts >= SCHEDULER_MAX_ATTEMPTS
     ) {
@@ -1732,6 +1802,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         rep: claim.rep,
         chunk: claim.chunk,
         shard: 0,
+        failureClass: LANE_FAILURE_CLASS_BY_WAIT_REASON[reason],
       });
       for (const caseId of z.array(z.string()).parse(JSON.parse(claim.case_ids))) {
         await queueOutputRecovery(env, {
@@ -1771,24 +1842,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         paidOutputDeadline: outputDeadline,
         waitingForOutput: awaitingOutput,
         attempt: claim.attempts,
-        reason:
-          error instanceof BenchmarkModelUnavailableError
-            ? 'model_unavailable'
-            : error instanceof ChunkClaimLostError
-              ? 'claim_lost'
-              : awaitingOutput
-                ? 'awaiting_output'
-                : error instanceof AmbiguousBenchmarkExecutionError
-                  ? 'ambiguous_execution'
-                  : error instanceof BenchmarkCatalogLoadError
-                    ? error.category
-                    : error instanceof DeciderGraderRetryError
-                      ? 'grading'
-                      : isRetryableContainerAvailabilityError(error)
-                        ? 'container_capacity'
-                        : error instanceof BenchmarkThrottleError
-                          ? 'provider_throttle'
-                          : 'infrastructure',
+        reason,
         errorType: error instanceof Error ? error.name : 'unknown',
         errorCategory: benchmarkErrorCategory(error),
       })
@@ -1992,6 +2046,7 @@ export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<
     rep: message.rep ?? 0,
     chunk: message.chunk ?? 0,
     shard: message.shard ?? 0,
+    failureClass: 'unknown',
   });
   console.warn(
     JSON.stringify({
@@ -2455,9 +2510,8 @@ function laneKey(model: string, variant: string, rep: number): string {
 export const PROFILE_ORPHANED_CLAIM_FAILURE_REASON =
   'Benchmark run ended without settling this entry; requeue to re-measure.';
 
-/** Failure reason written to profile entries whose lane never finished. */
-export const PROFILE_LANE_DEAD_FAILURE_REASON =
-  'Benchmark lane did not finish (queue retries exhausted or run timed out); retry to re-measure.';
+/** Failure reason written to profile entries whose lane never finished; the class names the cause. */
+export const PROFILE_LANE_DEAD_FAILURE_REASON = 'Benchmark lane did not finish.';
 
 type Lane = { model: string; variant: string; rep: number };
 
@@ -2472,7 +2526,7 @@ async function loadLaneAccounting(
   runId: string,
   state: RunState,
   caseCount: number
-): Promise<{ unfinished: Lane[]; deadLaneKeys: Set<string> }> {
+): Promise<{ unfinished: Lane[]; deadLaneKeys: Set<string>; laneFailures: RunLaneFailureRow[] }> {
   const [laneCounts, laneFailures] = await Promise.all([
     countCaseResultsByLane(db, runId),
     listLaneFailures(db, runId),
@@ -2492,7 +2546,47 @@ async function loadLaneAccounting(
       lane => (countByLane.get(laneKey(lane.model, lane.variant, lane.rep)) ?? 0) < caseCount
     ),
     deadLaneKeys: new Set(laneFailures.map(f => laneKey(f.model, f.variant, f.rep))),
+    laneFailures,
   };
+}
+
+/**
+ * Profile failures a settled decider run records: an entry with a dead lane fails with the
+ * most severe cause its lanes recorded, and an entry whose cases nearly all hit one
+ * provider rejection is `unsupported` instead of ready at zero accuracy.
+ */
+function settledEntryFailures(
+  entries: readonly { model: string; variant: string }[],
+  deadLanes: readonly Lane[],
+  laneFailures: readonly RunLaneFailureRow[],
+  rows: readonly CaseResultRow[]
+): Array<{ entry: { model: string; variant: string }; failure: ProfileFailure }> {
+  const entryKey = (model: string, variant: string) => JSON.stringify([model, variant]);
+  const deadEntryKeys = new Set(deadLanes.map(lane => entryKey(lane.model, lane.variant)));
+  const laneClasses = new Map<string, BenchmarkProfileFailureClass[]>();
+  for (const failure of laneFailures) {
+    const key = entryKey(failure.model, failure.variant);
+    laneClasses.set(key, [
+      ...(laneClasses.get(key) ?? []),
+      parseFailureClass(failure.failure_class),
+    ]);
+  }
+  const rowsByEntry = new Map<string, CaseResultRow[]>();
+  for (const row of rows) {
+    const key = entryKey(row.model, row.variant);
+    const entryRows = rowsByEntry.get(key);
+    if (entryRows) entryRows.push(row);
+    else rowsByEntry.set(key, [row]);
+  }
+  return entries.flatMap(entry => {
+    const key = entryKey(entry.model, entry.variant);
+    if (deadEntryKeys.has(key)) {
+      const failureClass = mostSevereFailureClass(laneClasses.get(key) ?? []);
+      return [{ entry, failure: { failureClass, reason: PROFILE_LANE_DEAD_FAILURE_REASON } }];
+    }
+    const failure = unsupportedRejection(rowsByEntry.get(key) ?? []);
+    return failure ? [{ entry, failure }] : [];
+  });
 }
 
 async function finalizeRunIfComplete(
@@ -2507,12 +2601,11 @@ async function finalizeRunIfComplete(
 
   // The run finalizes once every lane is accounted for, so one dead lane no
   // longer wedges the run until the stale sweep.
-  const { unfinished: deadLanes, deadLaneKeys } = await loadLaneAccounting(
-    env.BENCH_DB,
-    runId,
-    state,
-    caseCount
-  );
+  const {
+    unfinished: deadLanes,
+    deadLaneKeys,
+    laneFailures,
+  } = await loadLaneAccounting(env.BENCH_DB, runId, state, caseCount);
   if (deadLanes.some(lane => !deadLaneKeys.has(laneKey(lane.model, lane.variant, lane.rep)))) {
     return;
   }
@@ -2522,12 +2615,12 @@ async function finalizeRunIfComplete(
   // runs settle per entry below — one dead model never discards the rest.
   if (deadLanes.length > 0 && kind === 'classifier') {
     const [first, ...rest] = deadLanes;
-    await failRunAndDrain(
-      env,
-      runId,
-      `lane dead-lettered: ${first.model} variant ${variantFromStorage(first.variant) ?? 'default'} rep ${first.rep}` +
-        (rest.length > 0 ? ` (+${rest.length} more)` : '')
-    );
+    await failRunAndDrain(env, runId, {
+      failureClass: 'unknown',
+      reason:
+        `lane dead-lettered: ${first.model} variant ${variantFromStorage(first.variant) ?? 'default'} rep ${first.rep}` +
+        (rest.length > 0 ? ` (+${rest.length} more)` : ''),
+    });
     return;
   }
 
@@ -2545,14 +2638,26 @@ async function finalizeRunIfComplete(
   // and every owner's custom table are assembled from it, so no decider run
   // publishes an artifact of its own.
   if (kind === 'decider') {
-    // Entries whose lanes all completed become ready; entries with a dead lane
-    // fail (a requeue re-admits them) without taking down the rest of the batch.
-    // Fail first so the ready sweep only catches survivors; both statements keep
-    // the run_id + status='running' no-clobber guard.
-    const failedEntryKeys = new Set(deadLanes.map(l => JSON.stringify([l.model, l.variant])));
-    const failedEntries = enqueuedModels
-      .filter(m => failedEntryKeys.has(JSON.stringify([m.model, m.variant])))
-      .map(m => ({ model: m.model, variant: m.variant }));
+    // Entries whose lanes all completed become ready unless nearly every case hit one
+    // provider rejection; entries with a dead lane fail with their lanes' cause, without
+    // taking down the rest of the batch. Fail first so the ready sweep only catches
+    // survivors; both statements keep the run_id + status='running' no-clobber guard.
+    const entryFailures = settledEntryFailures(
+      enqueuedModels.map(m => ({ model: m.model, variant: m.variant })),
+      deadLanes,
+      laneFailures,
+      rows
+    );
+    const failuresByCause = new Map<
+      string,
+      { failure: ProfileFailure; entries: { model: string; variant: string }[] }
+    >();
+    for (const { entry, failure } of entryFailures) {
+      const key = JSON.stringify([failure.failureClass, failure.reason]);
+      const group = failuresByCause.get(key);
+      if (group) group.entries.push(entry);
+      else failuresByCause.set(key, { failure, entries: [entry] });
+    }
     // One try block, fail-first. `markProfilesReadyForRun` has no entry filter —
     // it readies every row still `running` under this run — so it must not run
     // when the per-entry failure did not complete, or a dead lane's partial
@@ -2565,15 +2670,14 @@ async function finalizeRunIfComplete(
     // carry claim-time `updated_at`, so the age guard does not cover them — and
     // a sweep landing in between would fail entries that are fully measured.
     try {
-      if (failedEntries.length > 0) {
-        await markProfilesFailedForEntries(
-          env.BENCH_DB,
-          runId,
-          failedEntries,
-          PROFILE_LANE_DEAD_FAILURE_REASON
-        );
+      for (const { failure, entries } of failuresByCause.values()) {
+        await markProfilesFailedForEntries(env.BENCH_DB, runId, entries, failure);
       }
-      await settleRemeasuresForRun(env.BENCH_DB, runId, failedEntries);
+      await settleRemeasuresForRun(
+        env.BENCH_DB,
+        runId,
+        entryFailures.map(({ entry }) => entry)
+      );
       await markProfilesReadyForRun(env.BENCH_DB, runId);
     } catch (error) {
       console.warn(
@@ -2590,8 +2694,8 @@ async function finalizeRunIfComplete(
         event: 'benchmark_decider_run_completed',
         runId,
         purpose: state.purpose,
-        readyEntries: enqueuedModels.length - failedEntries.length,
-        failedEntries: failedEntries.length,
+        readyEntries: enqueuedModels.length - entryFailures.length,
+        failedEntries: entryFailures.length,
         expectedCases: enqueuedModels.length * state.repetitions * caseCount,
         measuredCases: rows.length,
         missingCases: Math.max(

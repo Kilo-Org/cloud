@@ -155,10 +155,15 @@ function cli(root) {
   return result;
 }
 
+/** A streamed read has no built-in deadline, so the helper sets one. */
+const CHILD_TIMEOUT_MS = 60_000;
+
 /**
  * The command with its stderr read while it runs, as a pipeline consumer reads
  * it. `spawnSync` drains every write as it blocks, so only this shape shows a
  * report that the command abandons when it exits: the pipe holds one buffer.
+ * The reader owns the wait, so the child needs its own limit: a command that
+ * never exits would otherwise hold the test run open forever.
  */
 function cliStreamed(root, options = {}) {
   return new Promise((resolve, reject) => {
@@ -173,8 +178,15 @@ function cliStreamed(root, options = {}) {
     child.stderr.on('data', chunk => {
       stderr += chunk;
     });
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`the command did not exit within ${CHILD_TIMEOUT_MS} ms`));
+    }, CHILD_TIMEOUT_MS);
     child.on('error', reject);
-    child.on('close', status => resolve({ status, stderr }));
+    child.on('close', status => {
+      clearTimeout(timer);
+      resolve({ status, stderr });
+    });
   });
 }
 
@@ -2299,7 +2311,9 @@ test('writes the whole report before it sets the failing exit status', async () 
     env: { ...process.env, I18N_CHECK_LIMIT: '100000' },
   });
   assert.equal(result.status, 1);
-  assert.ok(result.stderr.length > 1_000_000, `stderr was ${result.stderr.length} bytes`);
+  // The floor asks for several pipe buffers, not for this fixture's exact size:
+  // the case is about the tail of a report that no single buffer can hold.
+  assert.ok(result.stderr.length > 256 * 1024, `stderr was ${result.stderr.length} bytes`);
   assert.match(result.stderr, /mobile\/ru: missing key "problem9999"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)\n$/);
 });

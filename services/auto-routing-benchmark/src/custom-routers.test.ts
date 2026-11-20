@@ -569,6 +569,33 @@ describe('custom router tables and statuses (real SQLite)', () => {
     ]);
   });
 
+  it('answers a changed saved policy on the first read without enqueueing work', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.8 });
+
+    // Only the saved policy moves: the ready contributor and every profile row stay untouched.
+    const strict: BenchmarkConfig = { ...CONFIG, minAccuracy: 0.95 };
+    const lenient: BenchmarkConfig = { ...CONFIG, minAccuracy: 0.7 };
+    const before = await assembleCustomRouterTable(db, strict, withGateway, source);
+    expect(before.table?.routes[ROUTE] ?? []).toEqual([
+      expect.objectContaining({ model: 'vendor/gw', meetsThreshold: false }),
+    ]);
+
+    const rowsBefore = sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get();
+
+    const after = await assembleCustomRouterTable(db, lenient, withGateway, source);
+    expect(after.table?.routes[ROUTE] ?? []).toEqual([
+      expect.objectContaining({ model: 'vendor/gw', meetsThreshold: true }),
+    ]);
+
+    // Neither read enqueued or re-measured anything: the policy change alone re-ranked the route.
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual(
+      rowsBefore
+    );
+    expect(
+      sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_profiles WHERE status = 'pending'").get()
+    ).toEqual({ n: 0 });
+  });
+
   it('keeps the readiness fingerprint stable while adding a non-ready profile', async () => {
     platformProfile({ engine: ENGINE, status: 'ready', runId: 'run-gw', accuracy: 0.95 });
     const before = await computeCustomRouterReadinessVersion(db, CONFIG, withGateway, source);

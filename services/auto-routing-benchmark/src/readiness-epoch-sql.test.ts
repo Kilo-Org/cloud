@@ -121,6 +121,48 @@ describe('benchmark readiness epoch trigger (real migrations)', () => {
     expect(epoch()).toBe(2);
   });
 
+  const insertConfig = () => {
+    sqlite.exec(
+      `INSERT INTO benchmark_config (id, router, min_accuracy, switch_cost_factor,
+        max_concurrency, updated_at, updated_by, accuracy_noise_band)
+       VALUES (1, 'efficient', 0.7, 3, 4, '2026-01-01', 'admin-a', 0.05)`
+    );
+  };
+
+  it('bumps on a saved policy change without touching any profile', () => {
+    insertConfig();
+    const before = epoch();
+    sqlite.exec(
+      `UPDATE benchmark_config SET policy_overrides = '{"minAccuracy":0.8}'
+       WHERE router = 'efficient'`
+    );
+    expect(epoch()).toBe(before + 1);
+
+    // The daily system-optimal computation changes the same effective policy.
+    sqlite.exec(
+      `UPDATE benchmark_config SET policy_computed = '{"minAccuracy":{"value":0.85}}'
+       WHERE router = 'efficient'`
+    );
+    expect(epoch()).toBe(before + 2);
+  });
+
+  it('leaves the epoch alone for an audit-only or identical policy save', () => {
+    insertConfig();
+    sqlite.exec(
+      `UPDATE benchmark_config SET policy_overrides = '{"minAccuracy":0.8}'
+       WHERE router = 'efficient'`
+    );
+    const afterPolicy = epoch();
+
+    // Re-saving with only the audit columns different, or with the identical value, is a no-op for
+    // serving: nothing about which candidate wins a route changed.
+    sqlite.exec(
+      `UPDATE benchmark_config SET updated_at = '2026-02-01', updated_by = 'admin-b',
+        policy_overrides = '{"minAccuracy":0.8}' WHERE router = 'efficient'`
+    );
+    expect(epoch()).toBe(afterPolicy);
+  });
+
   it('bumps both routers when a serving row is re-keyed', () => {
     insertProfile({ model: 'vendor/moved', status: 'ready', runId: 'run-moved' });
     expect(epoch('efficient')).toBe(1);

@@ -469,7 +469,10 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
 
     await sendUpstreamAttemptWithByokFailover(
       input({ ...route('primary-key'), onUpstreamFailure: onPrimaryFailure }),
-      failoverTo({ ...route('failover-key', 'anthropic'), onUpstreamFailure: onFailoverFailure }, null)
+      failoverTo(
+        { ...route('failover-key', 'anthropic'), onUpstreamFailure: onFailoverFailure },
+        null
+      )
     );
 
     expect(onPrimaryFailure).toHaveBeenCalledTimes(1);

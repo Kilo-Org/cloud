@@ -1,4 +1,7 @@
 import { CharacterBoundedCache } from './character-bounded-cache';
+import { sanitizeHtmlRemovals } from './markdown-html-removal-run';
+
+export { htmlRemovalPassesForTests, htmlSanitizedForTests } from './markdown-html-removal-run';
 
 export const REMOVED_HTML_TAGS = [
   'script',
@@ -39,35 +42,15 @@ export const REMOVED_HTML_TAGS = [
 ] as const;
 
 const REMOVED_TAG_SET: ReadonlySet<string> = new Set(REMOVED_HTML_TAGS);
-const REMOVED_TAG_NAMES = REMOVED_HTML_TAGS.join('|');
-// The end tag of a removed container, or the start tag of any removed element
-// (a void element such as `input` included).
-const REMOVED_TAG_RE = new RegExp(`<\\/?(?:${REMOVED_TAG_NAMES})\\b[^>]*>`, 'gi');
-// A container emptied by the removals above draws no ink either: the HTML
-// engine renders `<div></div>` as an empty box. Stripping emptied containers
-// keeps the predicate aligned with what the renderer actually paints. Only the
-// innermost emptied element matches in one pass, so `n` levels of nesting
-// collapse over `n` passes — hence the bound below.
-const EMPTY_CONTAINER_RE = /<([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>\s*<\/\1\s*>/g;
 
 /** A tag name run, matching the `\b` the old `<(?:names)\b` alternation implied. */
 const TAG_NAME_RUN_RE = /[a-zA-Z_][a-zA-Z0-9_]*/y;
 /** The `\s*>` tail of an end tag. */
 const END_TAG_TAIL_RE = /\s*>/y;
-
-/**
- * Passes the removals may take over one value.
- *
- * Each pass is two whole-value replaces beside the two linear scans, so an
- * unbounded fixpoint made the cost of one value grow with its nesting depth
- * times its length — and this predicate is asked again for every streamed
- * publish and every transcript rebuild. Seven levels of all-empty nesting still
- * collapse exactly as before; past the bound the value is reported as having
- * visible content, so the part renders (an empty bubble in the pathological
- * case) instead of being skipped. Nothing that renders is ever hidden by the
- * bound.
- */
-const HTML_SANITIZE_MAX_PASSES = 8;
+/** A container name run: the `[a-zA-Z][a-zA-Z0-9-]*` of an emptied element. */
+export const CONTAINER_NAME_RUN_RE = /[a-zA-Z][a-zA-Z0-9-]*/y;
+/** The whitespace run inside an emptied container's `<name …>…</name>` tail. */
+const WHITESPACE_RUN_RE = /\s*/y;
 
 // Callers ask about the same part value on every transcript rebuild and on every
 // remount, and the answer is pure, so it is memoized. The key is the value, so
@@ -87,24 +70,12 @@ export function htmlSanitizesToEmpty(value: string): boolean {
   if (cached !== undefined) {
     return cached;
   }
-  const sanitizesToEmpty = sanitizesToEmptyAfterRemovals(value);
+  const run = sanitizeHtmlRemovals(value);
+  // A value that still changes on its last allowed pass is reported as visible,
+  // as it always was: the loop never proved the removals reached a fixpoint.
+  const sanitizesToEmpty = run.outcome === 'converged' && run.sanitized.trim() === '';
   emptinessCache.set(value, sanitizesToEmpty);
   return sanitizesToEmpty;
-}
-
-/** The removals, iterated while they still change the value, up to the bound. */
-function sanitizesToEmptyAfterRemovals(value: string): boolean {
-  let sanitized = value;
-  for (let pass = 0; pass < HTML_SANITIZE_MAX_PASSES; pass += 1) {
-    const next = removeRemovedContainers(removeHtmlComments(sanitized))
-      .replace(REMOVED_TAG_RE, '')
-      .replace(EMPTY_CONTAINER_RE, '');
-    if (next === sanitized) {
-      return next.trim() === '';
-    }
-    sanitized = next;
-  }
-  return false;
 }
 
 /**
@@ -116,7 +87,7 @@ function sanitizesToEmptyAfterRemovals(value: string): boolean {
  * what `markdown-html.tsx` and `markdown-html-tree.ts` use for HTML tag names,
  * and the case guard lists this file for that reason.
  */
-function removedTagNameAt(value: string, at: number): string | undefined {
+export function removedTagNameAt(value: string, at: number): string | undefined {
   TAG_NAME_RUN_RE.lastIndex = at;
   const match = TAG_NAME_RUN_RE.exec(value);
   if (match === null) {
@@ -127,7 +98,7 @@ function removedTagNameAt(value: string, at: number): string | undefined {
 }
 
 /** The end of an end tag's `\s*>` tail at `at`, or `-1` when there is none. */
-function endTagTailAt(value: string, at: number): number {
+export function endTagTailAt(value: string, at: number): number {
   END_TAG_TAIL_RE.lastIndex = at;
   return END_TAG_TAIL_RE.exec(value) === null ? -1 : END_TAG_TAIL_RE.lastIndex;
 }
@@ -137,7 +108,7 @@ function endTagTailAt(value: string, at: number): number {
  * that name (`</name\s*>`). One forward scan over the value builds the whole
  * index, so a start tag looks its closer up instead of walking the tail.
  */
-function indexRemovedEndTags(value: string): Map<string, number[]> {
+export function indexRemovedEndTags(value: string): Map<string, number[]> {
   const endTags = new Map<string, number[]>();
   let at = 0;
   while (at < value.length) {
@@ -160,7 +131,7 @@ function indexRemovedEndTags(value: string): Map<string, number[]> {
 }
 
 /** The first offset in an ascending list that is at or after `from`, if any. */
-function endTagAtOrAfter(offsets: readonly number[], from: number): number | undefined {
+export function endTagAtOrAfter(offsets: readonly number[], from: number): number | undefined {
   let low = 0;
   let high = offsets.length;
   while (low < high) {
@@ -175,87 +146,58 @@ function endTagAtOrAfter(offsets: readonly number[], from: number): number | und
 }
 
 /**
- * Remove a removed element and everything up to its own end tag: the `<name>`
- * start tag, the content, and the `</name>` closer. A start tag whose closer
- * never appears stays, so a value that names a removed element without closing
- * it is rendered as text, exactly as the pattern this replaces answered.
- *
- * The offsets come from {@link indexRemovedEndTags}, so the cost is one pass to
- * build the index plus one pass over the start tags: a void removed element
- * (`<input>`, `<source>`, `<link>`) that can never close costs its own length
- * instead of a scan to the end of the value, which is what a streamed publish
- * with many of them used to pay on every frame.
- *
- * Known divergence from the renderer, left as it was: `<input>hello</input>`
- * answers "empty" here because the container removal takes `hello` with the
- * element, while the HTML renderer draws it. Changing that answer is a
- * separate fix; this function keeps the predicate's answers unchanged.
+ * The end of a `</name\s*>` closer for the open tag whose name run starts at
+ * `nameAt`, or `-1`. `tailAt` is just past the open tag's `>`. The pattern's
+ * name group backtracks, so a prefix of the run that ends at a `\b` matches too.
  */
-function removeRemovedContainers(value: string): string {
-  const endTags = indexRemovedEndTags(value);
-  // Every start tag ends at a `>` at or after its name, so one reverse lookup
-  // answers "can any start tag at or after this point complete?". Without it a
-  // value that never completes a start tag pays the tail walk once per tag.
-  const lastTagEnd = value.lastIndexOf('>');
-  let kept = 0;
-  let result = '';
-  let at = 0;
-  while (at < value.length) {
-    const start = value.indexOf('<', at);
-    if (start === -1) {
-      break;
-    }
-    const name = removedTagNameAt(value, start + 1);
-    let closerEnd = -1;
-    if (name !== undefined) {
-      const nameEnd = start + 1 + name.length;
-      const tagEnd = lastTagEnd < nameEnd ? -1 : value.indexOf('>', nameEnd);
-      if (tagEnd === -1) {
-        // No `>` at or after this point means no start tag later in the value
-        // can complete either, so one truncated tag ends the scan.
-        break;
+export function emptyContainerEnd(value: string, nameAt: number, tailAt: number): number {
+  CONTAINER_NAME_RUN_RE.lastIndex = nameAt;
+  const run = CONTAINER_NAME_RUN_RE.exec(value);
+  if (run === null) {
+    return -1;
+  }
+  const runLength = run[0].length;
+  WHITESPACE_RUN_RE.lastIndex = tailAt;
+  WHITESPACE_RUN_RE.exec(value);
+  const closerAt = WHITESPACE_RUN_RE.lastIndex;
+  if (!value.startsWith('</', closerAt)) {
+    return -1;
+  }
+  const closerNameAt = closerAt + 2;
+  // The longest name the backreference can satisfy is the common prefix of the
+  // run and the closer's text; the search walks down from there to the shortest
+  // prefix that still ends at a `\b`.
+  let prefix = 0;
+  while (
+    prefix < runLength &&
+    value.codePointAt(nameAt + prefix) === value.codePointAt(closerNameAt + prefix)
+  ) {
+    prefix += 1;
+  }
+  for (let length = prefix; length >= 1; length -= 1) {
+    const before = isWordCode(value.codePointAt(nameAt + length - 1));
+    const after = isWordCode(value.codePointAt(nameAt + length));
+    if (before !== after) {
+      const closerEnd = endTagTailAt(value, closerNameAt + length);
+      if (closerEnd !== -1) {
+        return closerEnd;
       }
-      const offsets = endTags.get(name);
-      const closer = offsets === undefined ? undefined : endTagAtOrAfter(offsets, tagEnd + 1);
-      if (closer !== undefined) {
-        closerEnd = endTagTailAt(value, closer + 2 + name.length);
-      }
-    }
-    if (closerEnd === -1) {
-      at = start + 1;
-    } else {
-      // The start tag, its content and its closer form one removed element.
-      result += value.slice(kept, start);
-      kept = closerEnd;
-      at = closerEnd;
     }
   }
-  return result + value.slice(kept);
+  return -1;
 }
 
-/**
- * Drop every `<!-- ... -->` comment. An unterminated `<!--` matches nothing
- * and stays, as the pattern it replaces answered; that case is recognised once
- * and ends the scan instead of walking to the end of the value per occurrence.
- */
-function removeHtmlComments(value: string): string {
-  let kept = 0;
-  let result = '';
-  let at = 0;
-  while (at < value.length) {
-    const open = value.indexOf('<!--', at);
-    if (open === -1) {
-      break;
-    }
-    const close = value.indexOf('-->', open + 4);
-    if (close === -1) {
-      break;
-    }
-    result += value.slice(kept, open);
-    kept = close + 3;
-    at = kept;
+/** True for the ASCII characters a `\b` treats as word characters. */
+function isWordCode(code: number | undefined): boolean {
+  if (code === undefined) {
+    return false;
   }
-  return result + value.slice(kept);
+  return (
+    code === 95 ||
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122)
+  );
 }
 
 /** For tests: drop the memoized answers so a suite starts cold. */

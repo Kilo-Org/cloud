@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   clearHtmlEmptinessCacheForTests,
+  htmlRemovalPassesForTests,
+  htmlSanitizedForTests,
   htmlSanitizesToEmpty,
 } from './markdown-html-sanitization';
 
@@ -10,44 +12,71 @@ function nestedEmptyContainers(depth: number): string {
   return `${'<div>'.repeat(depth)}   ${'</div>'.repeat(depth)}`;
 }
 
-const replacesOf = (value: string) => {
-  const spy = vi.spyOn(String.prototype, 'replace');
-  htmlSanitizesToEmpty(value);
-  const calls = spy.mock.calls.length;
-  spy.mockRestore();
-  return calls;
-};
-
 /**
- * The characters the emptiness scan reads through `String.prototype.indexOf`:
- * the distance each lookup travels, whether or not it finds its needle. A tail
- * walk is one lookup that reads the whole remainder, so this separates a scan
- * that re-reads the tail per tag from one that reads each region once; the call
- * count alone cannot, because either version makes about one call per tag.
+ * The characters the emptiness scan reads through `String.prototype.indexOf`
+ * and through a sticky or global regex `exec`: the distance each lookup
+ * travels, whether or not it finds its needle, plus the length of every sticky
+ * or global match. A tail walk is one lookup that reads the whole remainder, so
+ * this separates a scan that re-reads the tail per tag from one that reads each
+ * region once; the call count alone cannot, because either version makes about
+ * one call per tag.
  */
-// The native lookup, captured before the spy replaces it. `Reflect.get` reads
-// the function value without forming an unbound method reference.
+// The natives, captured before the spies replace them. `Reflect.get` reads the
+// function value without forming an unbound method reference.
 const nativeIndexOf = Reflect.get(String.prototype, 'indexOf') as (
   this: string,
   search: string,
   from?: number
 ) => number;
+const nativeExec = Reflect.get(RegExp.prototype, 'exec') as (
+  this: RegExp,
+  value: string
+) => RegExpExecArray | null;
 
-function charactersRead(value: string): number {
+/** Runs `run` with both scans counted, returning the characters they read. */
+function countReads(run: () => void): number {
   let read = 0;
-  const spy = vi.spyOn(String.prototype, 'indexOf');
-  spy.mockImplementation(function countScan(this: string, search: string, from = 0): number {
+  const indexSpy = vi.spyOn(String.prototype, 'indexOf');
+  indexSpy.mockImplementation(function countScan(this: string, search: string, from = 0): number {
     const found = nativeIndexOf.call(this, search, from);
     read += found === -1 ? this.length - from : found - from + 1;
     return found;
   } as never);
+  const execSpy = vi.spyOn(RegExp.prototype, 'exec');
+  execSpy.mockImplementation(function countMatch(this: RegExp, value: string) {
+    // Only a sticky or global pattern starts from `lastIndex`, so only those
+    // read forward; the distance to the match, or to the end on a miss, is what
+    // the engine scanned.
+    const start = this.lastIndex;
+    const match = nativeExec.call(this, value);
+    if (this.sticky || this.global) {
+      read +=
+        match === null ? Math.max(value.length - start, 0) : match.index - start + match[0].length;
+    }
+    return match;
+  } as never);
   try {
-    clearHtmlEmptinessCacheForTests();
-    htmlSanitizesToEmpty(value);
+    run();
   } finally {
-    spy.mockRestore();
+    indexSpy.mockRestore();
+    execSpy.mockRestore();
   }
   return read;
+}
+
+/** The characters one cold scan of `value` reads. */
+function charactersRead(value: string): number {
+  return countReads(() => {
+    clearHtmlEmptinessCacheForTests();
+    htmlSanitizesToEmpty(value);
+  });
+}
+
+/** The characters a warm ask about `value` reads: zero once it is memoized. */
+function readsOnWarmCache(value: string): number {
+  return countReads(() => {
+    htmlSanitizesToEmpty(value);
+  });
 }
 
 beforeEach(() => {
@@ -88,17 +117,29 @@ describe('htmlSanitizesToEmpty', () => {
     expect(htmlSanitizesToEmpty(nestedEmptyContainers(200))).toBe(false);
   });
 
+  it('does not call a value empty when the bound ran out before it settled', () => {
+    // The exact boundary: eight levels still change on the eighth pass, so the
+    // loop never proved a fixpoint and the value must report visible content
+    // even though that last pass left an empty string. Seven levels converge on
+    // the eighth pass and stay empty. Reading the last pass's string as an
+    // answer instead of its outcome would flip eight levels to "empty" and
+    // silently drop a part the renderer draws.
+    expect(htmlSanitizedForTests(nestedEmptyContainers(8))).toBeUndefined();
+    expect(htmlSanitizesToEmpty(nestedEmptyContainers(8))).toBe(false);
+    expect(htmlSanitizedForTests(nestedEmptyContainers(7))).toBe('');
+    expect(htmlSanitizesToEmpty(nestedEmptyContainers(7))).toBe(true);
+  });
+
   it('bounds the passes over one value independently of its nesting depth', () => {
-    // Regression: the loop ran to a fixpoint, so each pass re-replaced the whole
+    // Regression: the loop ran to a fixpoint, so each pass re-scanned the whole
     // value and a deeply nested one cost depth × length on the JS thread — on
-    // every streamed publish. The bound is eight passes, and a pass is two
-    // whole-value replaces beside the two linear removals, so the count does not
-    // grow with the nesting depth past that bound.
-    const shallow = replacesOf(nestedEmptyContainers(1));
-    const deep = replacesOf(nestedEmptyContainers(200));
-    expect(shallow).toBeLessThanOrEqual(16);
-    expect(deep).toBeLessThanOrEqual(16);
-    expect(deep).toBeGreaterThan(0);
+    // every streamed publish. The bound is eight passes.
+    // One level of nesting converges on the second pass: one collapse, then a
+    // pass that changes nothing (2 passes). Two hundred levels still change on
+    // the eighth pass and spend the whole bound (8 passes). Both counts are
+    // exact, so a raised bound or a lost removal step fails here.
+    expect(htmlRemovalPassesForTests(nestedEmptyContainers(1))).toBe(2);
+    expect(htmlRemovalPassesForTests(nestedEmptyContainers(200))).toBe(8);
   });
 
   it('answers a repeated value from the memo', () => {
@@ -106,13 +147,13 @@ describe('htmlSanitizesToEmpty', () => {
     // publish; the answer is pure, so only the first ask pays for the removals.
     const value = '<div><span></span></div>';
     expect(htmlSanitizesToEmpty(value)).toBe(true);
-    expect(replacesOf(value)).toBe(0);
+    expect(readsOnWarmCache(value)).toBe(0);
   });
 
   it('memoizes the visible answer too', () => {
     const value = '<b>bold</b>';
     expect(htmlSanitizesToEmpty(value)).toBe(false);
-    expect(replacesOf(value)).toBe(0);
+    expect(readsOnWarmCache(value)).toBe(0);
   });
 
   it('agrees with the slow path across mixed streamed chunks', () => {
@@ -146,26 +187,20 @@ describe('htmlSanitizesToEmpty', () => {
     // closer that a void element cannot have, so every occurrence walked the
     // rest of the value on every streamed publish. Measured on the Android
     // emulator with the app's own bundle: 20,000 such tags took 14.2 s before
-    // and 35 ms after, growing quadratically against linearly. Time the same
-    // scaling here; the ratio is wide enough (about 15× for quadratic, about 4×
-    // for linear) that a noisy runner cannot flip it, and the absolute bound
-    // fails outright on the quadratic shape.
-    const timeOf = (tags: number): number => {
-      const value = `${'<input><source><link><meta>'.repeat(tags / 4)}visible`;
-      clearHtmlEmptinessCacheForTests();
-      const start = performance.now();
-      expect(htmlSanitizesToEmpty(value)).toBe(false);
-      return performance.now() - start;
-    };
-    // Warm the JIT so the first measurement is not the slow one.
-    timeOf(4_000);
-    const small = timeOf(5_000);
-    const large = timeOf(20_000);
-    // Four times the input: linear work stays under about 10×, the quadratic
-    // shape lands near 16× and its absolute cost reaches hundreds of
-    // milliseconds. Both assertions fail if the tail walk returns.
-    expect(large).toBeLessThan(Math.max(small, 0.5) * 10);
-    expect(large).toBeLessThan(400);
+    // and 35 ms after.
+    // The corpus is the four void removed elements repeated, then visible text,
+    // so no tag can ever close. Characters read through `String.prototype.indexOf`
+    // is the quantity that separates the shapes: a scan that re-reads the tail
+    // per tag reads occurrences × length, while one that reads each region once
+    // reads the value about twice. A wall-clock sample on a shared runner cannot
+    // tell those apart reliably.
+    const readsOf = (tags: number): number =>
+      charactersRead(`${'<input><source><link><meta>'.repeat(tags / 4)}visible`);
+    const small = readsOf(5_000);
+    const large = readsOf(20_000);
+    // Four times the input: the linear scan reads about 4×, the per-tag tail
+    // walk about 16×.
+    expect(large).toBeLessThan(small * 5);
   });
 
   it('scans a value whose start tags never complete in one pass', () => {
@@ -175,8 +210,27 @@ describe('htmlSanitizesToEmpty', () => {
     // occurrences × length.
     const readsOf = (tags: number): number => charactersRead('<input><source>'.repeat(tags / 2));
     const small = readsOf(1_000);
-    const large = readsOf(5_000);
-    expect(large).toBeLessThan(small * 10);
+    const large = readsOf(4_000);
+    // Four times the input: the linear scan reads about 4×, a per-tag tail walk
+    // about 16×.
+    expect(large).toBeLessThan(small * 5);
+  });
+
+  it('scans a value with unterminated start tags in linear cost', () => {
+    // The shape a streamed frame produces mid-tag: `n` unterminated `<input`
+    // start tags, then a single `>`, then `n` more `<input` tags with no `>` of
+    // their own. Both old whole-value patterns walked the remainder at every
+    // candidate `<`, so this read n² characters. The `>` belongs to none of the
+    // leading tags, so a lookup started at each tag's own name end reads the run
+    // once per tag; one forwarding cursor reads it once, and the first tag past
+    // the `>` finds no terminator at all and ends the scan.
+    const readsOf = (n: number): number =>
+      charactersRead(`${'<input'.repeat(n)}>${'<input'.repeat(n)}`);
+    const small = readsOf(1_000);
+    const large = readsOf(4_000);
+    // Four times the input: the forwarding cursor reads about 4×, the per-tag
+    // rescan about 16×.
+    expect(large).toBeLessThan(small * 5);
   });
 
   it('folds a removed tag name without consulting the device locale', () => {
@@ -224,11 +278,14 @@ describe('htmlSanitizesToEmpty', () => {
       for (let pass = 0; pass < 8; pass += 1) {
         const next = oracleStep(sanitized);
         if (next === sanitized) {
-          return next.trim() === '';
+          return { empty: next.trim() === '', settled: sanitized };
         }
         sanitized = next;
       }
-      return false;
+      // The bound ran out while the value still changed, so the pipeline never
+      // proved a fixpoint: it reports visible content, and no settled string
+      // exists to compare.
+      return { empty: false, settled: undefined };
     };
 
     const pieces = [
@@ -284,7 +341,18 @@ describe('htmlSanitizesToEmpty', () => {
       corpus.push(value);
     }
 
-    const disagreements = corpus.filter(value => htmlSanitizesToEmpty(value) !== oracle(value));
-    expect(disagreements).toEqual([]);
+    const expected = corpus.map(value => oracle(value));
+    const booleanDisagreements = corpus.filter(
+      (value, index) => htmlSanitizesToEmpty(value) !== expected[index]?.empty
+    );
+    expect(booleanDisagreements).toEqual([]);
+    // Identical emptiness alone would hide a scan that keeps a different
+    // substring: where the pipeline proved a fixpoint, the settled string must
+    // match the pattern pipeline's. A value that exhausted the bound has no
+    // settled string on either side, and its answer is already compared above.
+    const stringDisagreements = corpus.filter(
+      (value, index) => htmlSanitizedForTests(value) !== expected[index]?.settled
+    );
+    expect(stringDisagreements).toEqual([]);
   });
 });

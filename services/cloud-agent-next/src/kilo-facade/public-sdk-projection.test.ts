@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   projectKnownCloudAgentPath,
   projectPrivateWorktreePaths,
@@ -234,6 +234,9 @@ describe('projectKnownCloudAgentPath', () => {
   });
 });
 
+const generatedUuid = (index: number) =>
+  `00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`;
+
 describe('projectPrivateWorktreePaths', () => {
   const privateDirectory =
     '/workspace/private/worktrees/worktree_12345678-1234-4234-8234-123456789abc';
@@ -292,6 +295,125 @@ describe('projectPrivateWorktreePaths', () => {
     { role: 'assistant', path: privateDirectory },
   ])('does not infer a checkout from invalid metadata or free text: %j', info => {
     expect(projectPrivateWorktreePaths(value, [info], publicDirectory)).toEqual(value);
+  });
+
+  let restoreReplace: () => void = () => {};
+
+  afterEach(() => {
+    restoreReplace();
+    restoreReplace = () => {};
+  });
+
+  // String.prototype.replace is overloaded, so the counter reads the recorded
+  // call tuples and returns how many used the combined case-insensitive pattern
+  // since the previous read, instead of matching one overload signature.
+  const trackCombinedPatternPasses = () => {
+    const spy = vi.spyOn(String.prototype, 'replace');
+    restoreReplace = () => spy.mockRestore();
+    return () => {
+      const passes = spy.mock.calls.filter(
+        call => call[0] instanceof RegExp && call[0].flags === 'gi'
+      ).length;
+      spy.mockClear();
+      return passes;
+    };
+  };
+
+  it('projects 64 collected directories across a nested value', () => {
+    const directories = Array.from(
+      { length: 64 },
+      (_, index) => `/workspace/agent-${index}/worktrees/worktree_${generatedUuid(index)}`
+    );
+    const metadata = [
+      ...directories.map(directory => ({ directory })),
+      { role: 'assistant', path: { cwd: directories[0], root: directories[1] } },
+      { role: 'assistant', path: { cwd: directories[2], root: directories[3] } },
+    ];
+    const manyDirectories = {
+      first: `Read ${directories[0]}/file.txt`,
+      mixedCase: `Read ${directories[7].toUpperCase()}/file.txt`,
+      nested: { output: `Created ${directories[1]}/other.txt` },
+      list: directories.slice(2).map(directory => `${directory}/src/file.ts`),
+    };
+
+    const projected = projectPrivateWorktreePaths(manyDirectories, metadata, publicDirectory);
+
+    expect(projected).toEqual({
+      first: `Read ${publicDirectory}/file.txt`,
+      mixedCase: `Read ${publicDirectory}/file.txt`,
+      nested: { output: `Created ${publicDirectory}/other.txt` },
+      list: directories.slice(2).map(() => `${publicDirectory}/src/file.ts`),
+    });
+    expect(JSON.stringify(projected)).not.toContain('worktrees/worktree_');
+  });
+
+  it('projects a nested private directory to the public directory', () => {
+    const outer = `/workspace/agent/worktrees/worktree_${generatedUuid(0)}`;
+    const inner = `${outer}/sub/worktrees/worktree_${generatedUuid(1)}`;
+    const nested = {
+      file: `${inner}/file.txt`,
+      source: `${outer}/src/file.ts`,
+    };
+
+    const projected = projectPrivateWorktreePaths(
+      nested,
+      [{ directory: outer }, { directory: inner }],
+      publicDirectory
+    );
+
+    expect(projected).toEqual({
+      file: `${publicDirectory}/file.txt`,
+      source: `${publicDirectory}/src/file.ts`,
+    });
+    expect(JSON.stringify(projected)).not.toContain('worktrees/worktree_');
+  });
+
+  it('runs one pattern pass per string property for any directory count', () => {
+    const passes = trackCombinedPatternPasses();
+    const plain = {
+      text: 'plain text',
+      nested: { output: 'plain output' },
+      list: ['plain list'],
+    };
+    const countProjected = (directories: string[]) => {
+      projectPrivateWorktreePaths(
+        plain,
+        directories.map(directory => ({ directory })),
+        publicDirectory
+      );
+      return passes();
+    };
+    const manyDirectories = Array.from(
+      { length: 64 },
+      (_, index) => `/workspace/agent-${index}/worktrees/worktree_${generatedUuid(index)}`
+    );
+
+    expect(countProjected(manyDirectories.slice(0, 2))).toBe(3);
+    expect(countProjected(manyDirectories)).toBe(3);
+  });
+
+  it('returns the input unchanged when no directory is collected', () => {
+    const passes = trackCombinedPatternPasses();
+    const sample = {
+      text: `Read ${privateDirectory}/file.txt`,
+      nested: [{ output: 'plain' }],
+    };
+    const original = structuredClone(sample);
+
+    const empty = projectPrivateWorktreePaths(sample, [], publicDirectory);
+    const emptyPasses = passes();
+    const invalid = projectPrivateWorktreePaths(
+      sample,
+      [{ directory: '/legacy/checkout' }, { role: 'user', path: { cwd: privateDirectory } }],
+      publicDirectory
+    );
+    const invalidPasses = passes();
+
+    expect(empty).toEqual(sample);
+    expect(invalid).toEqual(sample);
+    expect(sample).toEqual(original);
+    expect(emptyPasses).toBe(0);
+    expect(invalidPasses).toBe(0);
   });
 });
 

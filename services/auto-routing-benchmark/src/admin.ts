@@ -858,7 +858,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       const config = await getBenchmarkConfig(c.env.BENCH_DB, context.baseRouter);
       if (!config) return c.json({ table: null } satisfies CustomRoutingTableResponse);
       return c.json(
-        await assembleCustomRouterTable(c.env.BENCH_DB, config, context, { catalogEnv: c.env })
+        await assembleCustomRouterTable(c.env.BENCH_DB, config, context, {
+          catalogEnv: c.env,
+          cacheEnv: c.env,
+        })
       );
     }
   );

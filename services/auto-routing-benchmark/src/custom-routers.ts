@@ -67,6 +67,12 @@ type ModelCatalog = z.infer<typeof BenchmarkModelCatalogSchema>;
 export type CatalogSource = {
   catalogEnv: { KILO_WEB_API_BASE_URL: string };
   fetchImpl?: typeof fetch;
+  /**
+   * Optional KV binding: with it, the probe-eligibility answer is read from the cache the
+   * platform publish maintains instead of scanning `case_results` for every custom-router
+   * request. Read-only here — this path sees one owner's pairs, never the router's full set.
+   */
+  cacheEnv?: { AUTO_ROUTING_CONFIG: KVNamespace };
 };
 
 export const CATALOG_UNAVAILABLE_FAILURE_REASON = 'Model is unavailable in the current catalog.';
@@ -351,6 +357,8 @@ export async function assembleCustomRouterTable(
     ? await pairsMissingProbeResults(db, {
         entries: [...platformReady, ...linkedReady],
         revision: PROBE_REVISION,
+        router: context.baseRouter,
+        ...(source.cacheEnv ? { env: source.cacheEnv } : {}),
       })
     : new Set<string>();
   const platformSummaries = dropIneligibleAgenticSummaries(allPlatformSummaries, ineligible);

@@ -132,6 +132,12 @@ export const benchmarkRuns = sqliteTable(
     index('IX_benchmark_runs_running')
       .on(table.router, table.kind, table.purpose)
       .where(sql`${table.status} = 'running'`),
+    // The per-minute stale sweep fails every running run older than the stale age; this
+    // partial index is the only one it can seek (`IX_benchmark_runs_running` does not
+    // constrain the same columns). Partial on the running set, which stays small.
+    index('IX_benchmark_runs_stale')
+      .on(table.started_at)
+      .where(sql`${table.status} = 'running'`),
   ]
 );
 

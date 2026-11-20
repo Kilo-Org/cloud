@@ -8,6 +8,7 @@ import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-util
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
 import { registerClientEvalRoutes } from './client-eval';
+import { d1ErrorCause } from './d1-error-cause';
 import type { HonoEnv } from './hono-env';
 import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
 import { isRetryableContainerAvailabilityError } from './cli-runner';
@@ -191,6 +192,7 @@ export default {
             cron: controller.cron,
             router,
             error: error instanceof Error ? error.message : String(error),
+            ...d1ErrorCause(error),
           })
         );
       }

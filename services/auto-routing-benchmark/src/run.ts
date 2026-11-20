@@ -686,6 +686,9 @@ export async function publishPlatformRoutingTable(
     ? await pairsMissingProbeResults(env.BENCH_DB, {
         entries: readyEntries,
         revision: PROBE_REVISION,
+        router,
+        env,
+        cacheFullSet: true,
       })
     : new Set<string>();
   if (ineligible.size > 0) {

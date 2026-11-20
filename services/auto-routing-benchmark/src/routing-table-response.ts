@@ -1,18 +1,15 @@
 import type { AutoRouter, RoutingTable } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import { getLatestRoutingTable } from './db';
+import {
+  probeEligibilityKvKey,
+  routingTableResponseKvKey,
+  routingTableVersionKvKey,
+} from './routing-table-cache-keys';
 
 type RoutingTableResponseEnv = Pick<Env, 'AUTO_ROUTING_CONFIG' | 'BENCH_DB'>;
 
-/** KV key for the serialized GET /admin/routing-table body of one router. */
-export function routingTableResponseKvKey(router: AutoRouter): string {
-  return `benchmark_routing_table_response_v1:${router}`;
-}
-
-/** KV key naming the publication a cached body must match before it is served. */
-export function routingTableVersionKvKey(router: AutoRouter): string {
-  return `benchmark_routing_table_version_v1:${router}`;
-}
+export { routingTableResponseKvKey, routingTableVersionKvKey } from './routing-table-cache-keys';
 
 type LatestRoutingTable = { table: RoutingTable; publishedAt: string } | null;
 
@@ -62,6 +59,12 @@ async function confirmPointer(
  * write. A failure is logged rather than thrown, so the publish still flushes the
  * gateway key. The cached body is then deleted, because the pointer may still name it;
  * the next read finds no body, reads D1 and repairs the pointer.
+ *
+ * The publication also decides the probe-eligibility answer. That answer is stamped with the
+ * pointer, so moving the pointer is what invalidates it: an entry written for the previous
+ * publication can never be served. The entry is then deleted as well, so a reader cannot
+ * keep re-scanning against a superseded key — done after the pointer write, because the
+ * pointer is the authority and a failed delete must not affect it.
  */
 export async function syncRoutingTableVersionPointer(
   env: RoutingTableResponseEnv,
@@ -87,6 +90,24 @@ export async function syncRoutingTableVersionPointer(
           })
         );
       }
+    );
+  }
+  await deleteProbeEligibilityCache(env, router);
+}
+
+async function deleteProbeEligibilityCache(
+  env: RoutingTableResponseEnv,
+  router: AutoRouter
+): Promise<void> {
+  try {
+    await env.AUTO_ROUTING_CONFIG.delete(probeEligibilityKvKey(router));
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'probe_eligibility_cache_delete_failed',
+        router,
+        ...formatError(error),
+      })
     );
   }
 }

@@ -10,6 +10,7 @@ import {
   PROBE_REVISION,
 } from '../measurement-revision';
 import type { OfflineSweep } from '../scoreboard/schema';
+import { probeEligibilityKvKey, routingTableVersionKvKey } from '../routing-table-cache-keys';
 import {
   PROBE_ROUTE_KEYS,
   agenticRoutesWithoutCandidates,
@@ -168,11 +169,59 @@ describe('probe eligibility (real SQLite)', () => {
     insertCase(sqlite, 'rev2', first!.id, { promptRevision: 2 });
     insertCase(sqlite, 'rev2', second!.id, { promptRevision: 3 });
     const rows = await countProbeCaseResults(db, {
-      runIds: ['rev2'],
+      pairs: [{ runId: 'rev2', model: MODEL, variant: VARIANT }],
       caseIds: PROBE_CASES.map(probeCase => probeCase.id),
       revision: PROBE_REVISION,
     });
     expect(rows).toEqual([{ run_id: 'rev2', model: MODEL, variant: VARIANT, probes: 1 }]);
+  });
+
+  it('counts each pair separately and never another pair of the same run', async () => {
+    // A second pair measured in the same run must not contribute to the first pair's count,
+    // and a pair with no results must still come back (LEFT JOIN) with zero.
+    const [first, second] = PROBE_CASES;
+    insertCase(sqlite, 'rev2', first!.id, { promptRevision: 3 });
+    sqlite
+      .prepare(
+        `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+          cost_usd, error, exit_code, tool_calls, tool_names, step_count, final_finish_reason,
+          rep, timed_out, prompt_revision)
+         VALUES ('rev2', 'vendor/other', 'low', ?, 'implementation/code_generation', 1, 100, 0.01,
+           NULL, 0, 1, '["bash"]', 1, 'tool-calls', 0, 0, 3)`
+      )
+      .run(second!.id);
+    const rows = await countProbeCaseResults(db, {
+      pairs: [
+        { runId: 'rev2', model: MODEL, variant: VARIANT },
+        { runId: 'rev2', model: 'vendor/other', variant: 'low' },
+        { runId: 'rev2', model: 'vendor/absent', variant: '' },
+      ],
+      caseIds: PROBE_CASES.map(probeCase => probeCase.id),
+      revision: PROBE_REVISION,
+    });
+    expect(
+      rows.toSorted((a, b) => a.model.localeCompare(b.model)).map(row => [row.model, row.probes])
+    ).toEqual([
+      ['meta/muse-ember', 1],
+      ['vendor/absent', 0],
+      ['vendor/other', 1],
+    ]);
+  });
+
+  it('counts across more pairs than one batch holds', async () => {
+    // 31 pairs crosses PROBE_CASE_PAIR_BATCH_SIZE (30); every pair must still be reported.
+    const pairs = Array.from({ length: 31 }, (_, index) => ({
+      runId: 'rev2',
+      model: `vendor/model-${index}`,
+      variant: 'low',
+    }));
+    const rows = await countProbeCaseResults(db, {
+      pairs,
+      caseIds: PROBE_CASES.map(probeCase => probeCase.id),
+      revision: PROBE_REVISION,
+    });
+    expect(rows).toHaveLength(31);
+    expect(rows.every(row => row.probes === 0)).toBe(true);
   });
 
   it('declares a pair probe-complete only with every probe case, and re-admits it once measured', async () => {
@@ -187,6 +236,100 @@ describe('probe eligibility (real SQLite)', () => {
     expect(await pairsMissingProbeResults(db, { entries, revision: PROBE_REVISION })).toEqual(
       new Set()
     );
+  });
+
+  function fakeKv(initial: Record<string, string> = {}) {
+    const store = new Map(Object.entries(initial));
+    const kv = {
+      async get(key: string) {
+        return store.get(key) ?? null;
+      },
+      async put(key: string, value: string) {
+        store.set(key, value);
+      },
+      async delete(key: string) {
+        store.delete(key);
+      },
+    } as unknown as KVNamespace;
+    return { store, kv };
+  }
+
+  const entries = [{ entry: { model: MODEL, variant: VARIANT }, runId: 'rev2' }];
+  const pairKey = benchmarkPairKey({ model: MODEL, variant: VARIANT });
+
+  it('serves the cached answer without scanning, and only for the publication it was stored under', async () => {
+    for (const probeCase of PROBE_CASES) {
+      insertCase(sqlite, 'rev2', probeCase.id, { promptRevision: 3 });
+    }
+    const { store, kv } = fakeKv({ [routingTableVersionKvKey('efficient')]: 'v1 t1' });
+    // Exit the scan entirely: a cache hit must not reach D1.
+    let scanned = 0;
+    const counting = binding(sqlite);
+    const spy = {
+      prepare(sqlText: string) {
+        scanned += 1;
+        return counting.prepare(sqlText);
+      },
+    } as unknown as D1Database;
+    const params = {
+      entries,
+      revision: PROBE_REVISION,
+      router: 'efficient' as const,
+      env: { AUTO_ROUTING_CONFIG: kv },
+      cacheFullSet: true,
+    };
+    expect(await pairsMissingProbeResults(spy, params)).toEqual(new Set());
+    const afterScan = scanned;
+    expect(afterScan).toBeGreaterThan(0);
+    expect(JSON.parse(store.get(probeEligibilityKvKey('efficient'))!)).toEqual({
+      token: 'v1 t1',
+      ineligible: [],
+    });
+    // Second call: cached, so no statement is prepared.
+    expect(await pairsMissingProbeResults(spy, params)).toEqual(new Set());
+    expect(scanned).toBe(afterScan);
+    // A newer publication invalidates it and forces a fresh scan.
+    store.set(routingTableVersionKvKey('efficient'), 'v2 t2');
+    expect(await pairsMissingProbeResults(spy, params)).toEqual(new Set());
+    expect(scanned).toBeGreaterThan(afterScan);
+  });
+
+  it('never stores an answer computed over a subset of pairs', async () => {
+    const { store, kv } = fakeKv({ [routingTableVersionKvKey('efficient')]: 'v1 t1' });
+    // Not probe-complete, and read by the single-owner custom-router path.
+    expect(
+      await pairsMissingProbeResults(db, {
+        entries,
+        revision: PROBE_REVISION,
+        router: 'efficient',
+        env: { AUTO_ROUTING_CONFIG: kv },
+      })
+    ).toEqual(new Set([pairKey]));
+    // No entry was written, so a later full-set reader cannot inherit a subset answer.
+    expect(store.has(probeEligibilityKvKey('efficient'))).toBe(false);
+  });
+
+  it('scans when the cache is unavailable instead of failing the request', async () => {
+    for (const probeCase of PROBE_CASES) {
+      insertCase(sqlite, 'rev2', probeCase.id, { promptRevision: 3 });
+    }
+    const broken = {
+      async get() {
+        throw new Error('kv unavailable');
+      },
+      async put() {
+        throw new Error('kv unavailable');
+      },
+    } as unknown as KVNamespace;
+    expect(
+      await pairsMissingProbeResults(db, {
+        entries,
+        revision: PROBE_REVISION,
+        router: 'efficient',
+        env: { AUTO_ROUTING_CONFIG: broken },
+        cacheFullSet: true,
+      })
+    ).toEqual(new Set());
   });
 });
 

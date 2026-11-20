@@ -1576,7 +1576,9 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(failedPlan).toContain(
       'SEARCH chunk USING INDEX IX_scheduler_chunks_lane (status=? AND run_id=?)'
     );
-    expect(failedPlan).toContain('SCAN run USING INDEX IX_benchmark_runs_running');
+    // `IX_benchmark_runs_stale` is partial on `status = 'running'` alone, so it is narrower
+    // than `IX_benchmark_runs_running` for a read that only constrains the status.
+    expect(failedPlan).toContain('SCAN run USING INDEX IX_benchmark_runs_stale');
     for (const sql of [SCHEDULER_PRUNE_EXECUTIONS_SQL, SCHEDULER_PRUNE_MARKERS_SQL]) {
       const plan = explainPlan(sqlite, sql);
       expect(plan).toContain('SCAN marker');

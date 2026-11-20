@@ -21,12 +21,19 @@ describe('applyDefaultProfile', () => {
     const defaultIds = state.profileRows.filter(row => row.isDefault).map(row => row.id);
     expect(defaultIds).toEqual(['profile-next']);
 
-    // Both statements must name the owner as well as the profile: a set-true
-    // that matches on the id alone can claim a row the caller does not own.
+    // Both statements name the owner as well as the profile, so the pair moves
+    // the flag only between rows this owner holds.
     const setTrue = state.defaultWrites.filter(write => write.isDefault);
     expect(setTrue).toHaveLength(1);
     expect(setTrue[0].conditionColumns).toEqual(expect.arrayContaining(['id', 'owned_by_user_id']));
     expect(setTrue[0].matchedProfileIds).toEqual(['profile-next']);
+
+    const clear = state.defaultWrites.filter(write => !write.isDefault);
+    expect(clear).toHaveLength(1);
+    expect(clear[0].conditionColumns).toEqual(
+      expect.arrayContaining(['owned_by_user_id', 'is_default'])
+    );
+    expect(clear[0].matchedProfileIds).toEqual(['profile-current']);
   });
 
   test('never flips a profile the owner does not hold', async () => {

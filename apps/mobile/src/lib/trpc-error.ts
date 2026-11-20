@@ -15,6 +15,7 @@ const DirectErrorSchema = z.looseObject({
     message: z.string().optional(),
     upstreamCode: z.string().optional(),
     zodError: z.unknown().optional(),
+    authRequired: z.boolean().optional(),
   }),
 });
 const ShapedErrorSchema = z.looseObject({
@@ -24,6 +25,7 @@ const ShapedErrorSchema = z.looseObject({
       message: z.string().optional(),
       upstreamCode: z.string().optional(),
       zodError: z.unknown().optional(),
+      authRequired: z.boolean().optional(),
     }),
   }),
 });
@@ -88,13 +90,19 @@ export function readTrpcErrorField(
  *   for the person, so the caller shows it.
  * - `INTERNAL_SERVER_ERROR` carries diagnostic text, so the caller states its
  *   own neutral line and gives the next step instead.
+ * - A context auth failure carries the session's diagnostic text and signs the
+ *   person out, so it yields no sentence either.
  * - A non-null `zodError` names an input contract failure, which has no
  *   reading for the person, so the caller states the neutral line too.
  *
  * An envelope without a code is not a server answer, so it yields no sentence.
  */
-function isAuthoredRefusal(code: string | undefined, zodError: unknown): boolean {
-  if (code === undefined || code === 'INTERNAL_SERVER_ERROR') {
+function isAuthoredRefusal(
+  code: string | undefined,
+  zodError: unknown,
+  authRequired: boolean | undefined
+): boolean {
+  if (code === undefined || code === 'INTERNAL_SERVER_ERROR' || authRequired === true) {
     return false;
   }
   return zodError === undefined || zodError === null;
@@ -115,16 +123,16 @@ function isAuthoredRefusal(code: string | undefined, zodError: unknown): boolean
 export function readTrpcServerMessage(error: unknown): string | undefined {
   const direct = DirectErrorSchema.safeParse(error);
   if (direct.success) {
-    const { code, zodError } = direct.data.data;
-    if (!isAuthoredRefusal(code, zodError)) {
+    const { code, zodError, authRequired } = direct.data.data;
+    if (!isAuthoredRefusal(code, zodError, authRequired)) {
       return undefined;
     }
     return error instanceof Error ? error.message : undefined;
   }
   const shaped = ShapedErrorSchema.safeParse(error);
   if (shaped.success) {
-    const { code, message, zodError } = shaped.data.shape.data;
-    return isAuthoredRefusal(code, zodError) ? message : undefined;
+    const { code, message, zodError, authRequired } = shaped.data.shape.data;
+    return isAuthoredRefusal(code, zodError, authRequired) ? message : undefined;
   }
   return undefined;
 }

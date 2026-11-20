@@ -134,6 +134,24 @@ describe('readTrpcServerMessage', () => {
     expect(readTrpcServerMessage(unconfigured)).toBeUndefined();
   });
 
+  it('yields no sentence for a context auth failure', () => {
+    // The session failure carries the server's diagnostic text and is handled
+    // by the sign-out path, so it is not a sentence for this sheet.
+    const signedOut = Object.assign(
+      new Error('User not authenticated - no user to set on context'),
+      {
+        name: 'TRPCClientError',
+        data: {
+          code: 'UNAUTHORIZED',
+          httpStatus: 401,
+          path: 'agentProfiles.create',
+          authRequired: true,
+        },
+      }
+    );
+    expect(readTrpcServerMessage(signedOut)).toBeUndefined();
+  });
+
   it('yields no sentence for a validation payload', () => {
     const invalid = Object.assign(new Error('Input validation failed'), {
       name: 'TRPCClientError',

@@ -1,5 +1,7 @@
-import { createElement } from 'react';
+import { createElement, Fragment } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { flattenStyle } from '@/test/style-sheet-mock';
 
 import {
   codeFieldTextStyle,
@@ -7,15 +9,20 @@ import {
   contentTextDirection,
   hasRtlScript,
   ltrValueTextStyle,
+  pinsTextDirection,
+  rtlBaseMarkedChildren,
   withoutMonoFamily,
 } from './rtl-text';
 
-// `rtl-text` imports `I18nManager` for its direction helpers; the real module
-// is Flow-syntax source this node project cannot load. Hoisted so a test can
-// flip the interface direction between calls.
+// `rtl-text` imports `I18nManager` and `StyleSheet` from `react-native`; the
+// real module is Flow-syntax source this node project cannot load. Hoisted so a
+// test can flip the interface direction between calls.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
-vi.mock('react-native', () => ({ I18nManager: i18nManager }));
+vi.mock('react-native', () => ({
+  I18nManager: i18nManager,
+  StyleSheet: { flatten: flattenStyle },
+}));
 
 // U+0870 and U+089F are the first and last characters of Arabic Extended-B,
 // the block between Arabic Supplement (ends U+077F) and Arabic Extended-A
@@ -124,6 +131,25 @@ describe('containsJoinedScript', () => {
   );
 
   it.each([
+    ['Hindi (Devanagari)', 'अभी'],
+    ['Bengali', 'এখন'],
+    ['Punjabi (Gurmukhi)', 'ਹੁਣ'],
+    ['Gujarati', 'હવે'],
+    ['Odia', 'ବର୍ତ୍ତମାନ'],
+    ['Tamil', 'இப்போது'],
+    ['Telugu', 'ఇప్పుడు'],
+    ['Kannada', 'ಈಗ'],
+    ['Malayalam', 'ഇപ്പോൾ'],
+    ['Sinhala', 'දැන්'],
+    ['Thai', 'ตอนนี้'],
+    ['Lao', 'ດຽວນີ້'],
+    ['Myanmar', 'ယခု'],
+    ['Khmer', 'ឥឡូវនេះ'],
+  ])('reads a combining cluster script in %s', (_name, text) => {
+    expect(containsJoinedScript(text)).toBe(true);
+  });
+
+  it.each([
     ['English', 'Preferences'],
     ['Hebrew (right-to-left, not joined)', 'הגדרות'],
     ['Greek', 'Ρυθμίσεις'],
@@ -229,6 +255,94 @@ describe('contentTextDirection', () => {
 
   it('leaves copy with no letter to the interface', () => {
     expect(contentTextDirection(['42 · ', 7])).toBeUndefined();
+  });
+});
+
+describe('rtlBaseMarkedChildren', () => {
+  afterEach(() => {
+    i18nManager.isRTL = false;
+  });
+
+  // The Bitbucket denial sentence: it opens on a Latin product name and then
+  // holds Arabic words.
+  const MIXED = 'Bitbucket غير متصل. يمكن لمالكي المؤسسة ربطه.';
+
+  it('prefixes a Latin-first label that holds Arabic copy in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren(MIXED, true)).toBe(`\u200F${MIXED}`);
+  });
+
+  it('prefixes a Latin-first label that holds Hebrew copy', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('Bitbucket לא מחובר.', true)).toBe('\u200FBitbucket לא מחובר.');
+  });
+
+  it('leaves a label that already opens right to left alone', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('استكشف', true)).toBe('استكشف');
+  });
+
+  it('leaves Latin-only copy alone, so its full stop stays on the word', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('Sentry.', hasRtlScript('Sentry.'))).toBe('Sentry.');
+  });
+
+  it('leaves the copy alone in a left-to-right interface', () => {
+    expect(i18nManager.isRTL).toBe(false);
+    expect(rtlBaseMarkedChildren(MIXED, true)).toBe(MIXED);
+  });
+
+  // The caller's script scan decides whether the tree holds an Arabic or Hebrew
+  // letter: with no such letter there is no interface direction to name.
+  it('leaves the copy alone when the caller scanned no right-to-left script', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren(MIXED, false)).toBe(MIXED);
+  });
+
+  it('puts the mark in front of a child tree that is not one string', () => {
+    i18nManager.isRTL = true;
+    const child = createElement('Text', null, 'Kilo غير متصل');
+    expect(rtlBaseMarkedChildren(child, true)).toEqual(
+      createElement(Fragment, null, '\u200F', child)
+    );
+  });
+});
+
+describe('pinsTextDirection', () => {
+  it('reports a left-to-right pin', () => {
+    expect(pinsTextDirection({ direction: 'ltr', writingDirection: 'ltr' })).toBe(true);
+  });
+
+  it('reports a right-to-left pin', () => {
+    expect(pinsTextDirection({ direction: 'rtl', writingDirection: 'rtl' })).toBe(true);
+  });
+
+  // A caller that names only the iOS spelling has still named the direction.
+  it('reports a pin that names only the writing direction', () => {
+    expect(pinsTextDirection({ writingDirection: 'rtl' })).toBe(true);
+  });
+
+  it('reports no pin for a style that names neither', () => {
+    expect(pinsTextDirection({ textAlign: 'right', letterSpacing: 0 })).toBe(false);
+  });
+
+  // Neither value names a direction: `inherit` follows the parent's layout and
+  // `auto` resolves from the first strong character, which is what the mark
+  // decides. A shared style carrying either must not suppress the mark.
+  it('reports no pin for a value that leaves the direction open', () => {
+    expect(pinsTextDirection({ direction: 'inherit' })).toBe(false);
+    expect(pinsTextDirection({ writingDirection: 'auto' })).toBe(false);
+  });
+
+  // A style array is flattened before the read, so a pin in any entry counts.
+  it('reads a pin inside a style array', () => {
+    expect(pinsTextDirection([{ letterSpacing: 0 }, [{ direction: 'ltr' }]])).toBe(true);
+    expect(pinsTextDirection([{ letterSpacing: 0 }, undefined, false])).toBe(false);
+  });
+
+  it('reports no pin for an absent or empty style', () => {
+    expect(pinsTextDirection(undefined)).toBe(false);
+    expect(pinsTextDirection({})).toBe(false);
   });
 });
 

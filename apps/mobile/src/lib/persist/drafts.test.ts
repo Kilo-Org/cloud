@@ -30,6 +30,7 @@ import {
   DRAFT_MAX_BYTES,
   DRAFT_MAX_ENTRIES,
   draftScope,
+  flushAllDrafts,
   flushDraft,
   isStringDraft,
   loadDraft,
@@ -400,6 +401,46 @@ describe('debounce', () => {
     expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'k', '"forced"');
     vi.advanceTimersByTime(DRAFT_DEBOUNCE_MS * 2);
     expect(kvMock.setItem).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('flushAllDrafts', () => {
+  it('writes every pending draft once and leaves no timer behind', async () => {
+    vi.useFakeTimers();
+    saveDraft('u1', 'A', 'va');
+    saveDraft('u1', 'B', { nested: true });
+
+    await expect(flushAllDrafts()).resolves.toBeUndefined();
+
+    expect(kvMock.setItem).toHaveBeenCalledTimes(2);
+    expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'A', '"va"');
+    expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'B', '{"nested":true}');
+
+    // The map was drained, so no debounced timer fires the same write again and
+    // a second flush has nothing left to force.
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
+    expect(kvMock.setItem).toHaveBeenCalledTimes(2);
+    await expect(flushAllDrafts()).resolves.toBeUndefined();
+    expect(kvMock.setItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not write back a key cleared before the flush', async () => {
+    vi.useFakeTimers();
+    saveDraft('u1', 'A', 'va');
+    saveDraft('u1', 'B', 'vb');
+
+    // Discard robs the pending entry of its timer, so the flush must not find
+    // it and resurrect the text the person dropped.
+    await clearDraft('u1', 'A');
+    await flushAllDrafts();
+
+    expect(kvMock.setItem).toHaveBeenCalledTimes(1);
+    expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'B', '"vb"');
+    expect(kvMock.setItem).not.toHaveBeenCalledWith('draft:u1', 'A', expect.anything());
+
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
+    await expect(loadDraft('u1', 'A', isStringDraft)).resolves.toBeNull();
+    await expect(loadDraft('u1', 'B', isStringDraft)).resolves.toBe('vb');
   });
 });
 

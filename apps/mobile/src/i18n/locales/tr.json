@@ -140,10 +140,12 @@
     "keepRunning": "Çalıştırmaya devam et",
     "newSession": "Yeni oturum",
     "noModelsAvailable": "Kullanılabilir model yok",
+    "modelRetires": "Kullanımdan kalkıyor: {{date}}",
     "notFound": "Bulunamadı.",
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "viewOnGitHub": "PR'ı GitHub'da görüntüle",
     "completed": "Tamamlandı",
     "pending": "Bekliyor",
     "running": "Çalışıyor",
@@ -183,7 +185,8 @@
     "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
     "privateRepositoryA11y": "{{name}}, özel depo",
     "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur.",
-    "organizationTrialEndedBilling": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Faturalandırmayı güncelleyip ardından tekrar deneyebilirsin."
+    "organizationTrialEndedBilling": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
+    "organizationTrialEndedBillingAtKiloAi": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilirsin."
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
     "changelogAreas": {
       "signIn": "Oturum açma",
-      "profileOrganizations": "Profil ve kuruluşlar"
+      "profileOrganizations": "Profil & kuruluşlar"
     }
   },
   "preferences": {
@@ -697,7 +700,7 @@
     },
     "autoReviews": "Otomatik incelemeler",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
+      "notConnectedReadOnlyPlan": "Kuruluşun deneme süresi sona erdi, bu yüzden sahibin kilo.ai adresinden faturalandırmayı güncellemesi gerekiyor."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
@@ -706,7 +709,7 @@
       "managedOnWebRepositories": "{{organization}} için depoları bir bilgisayardan web üzerinden seç.",
       "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
-      "descriptionOverview": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve sonraki ekranda yapıştır.",
+      "descriptionOverview": "Bir çalışma alanı erişim belirteci oluştur ve sonraki ekranda yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
       "tokenPlaceholder": "Çalışma alanı erişim belirteci",
       "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
@@ -2783,7 +2786,6 @@
       "skipped_one": "{{displayCount}} atlandı",
       "skipped_other": "{{displayCount}} atlandı",
       "title": "Kontroller",
-      "viewOnGitHub": "PR'ı GitHub'da görüntüle",
       "checkDetails": "kontrol ayrıntıları"
     },
     "composer": {
@@ -2847,6 +2849,9 @@
       "couldNotLoad": "Tartışma yüklenemedi.",
       "couldNotLoadMore": "Daha fazla yorum yüklenemedi.",
       "loadMoreComments": "Daha fazla yorum yükle",
+      "conversationTruncated": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_one": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_other": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
       "loading": "Tartışma yükleniyor",
       "moderation": {
         "block": {
@@ -3238,6 +3243,8 @@
       "partialPostedStale_one": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "partialPostedStale_other": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_one": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_other": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
       "submitReview": "İncelemeyi gönder",
       "blockedRequestChanges": "Değişiklik istemek için bir özet veya en az bir yorum ekle.",
       "blockedComment": "İncelemeni yorum olarak göndermek için bir özet veya en az bir yorum ekle."
@@ -3447,7 +3454,7 @@
       "planStatusLapsed": " · Sona erdi",
       "planEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok.",
       "manageBilling": "Faturalandırmayı yönet",
-      "renamePlaceholder": "Kuruluş adı",
+      "renamePlaceholder": "Bir kuruluş adı girin",
       "renameTitle": "Kuruluşu yeniden adlandır"
     },
     "inviteMember": {
@@ -4851,12 +4858,15 @@
     "inputDescription": "Araç sonuçları dahil her girdiyi Enkrypt AI ile tarar. Enkrypt kullanılamadığında istekler reddedilmek yerine taranmadan gönderilir.",
     "outputTitle": "Çıktı korkulukları",
     "outputDescription": "Yanıtları, üyeler almadan önce Enkrypt AI ile tarar. Siz açmadıkça kapalıdır.",
+    "outputUnavailable": "Kilo bu kuruluş için çıktı taramasını etkinleştirmedi, bu yüzden yanıtlar denetlenmiyor ve burada ayarlanacak bir şey yok. Bunu talep etmek için {{supportEmail}} ile iletişime geçin.",
     "detectorsHint": "Engelle, işaretlenen isteği reddeder. Yalnızca günlüğe kaydet seçeneği ise isteği geciktirmeden kaydeder.",
     "detectorsHintOutput": "Engelle, işaretlenen yanıtı başarısız kılar. Yalnızca günlüğe kaydet seçeneği ise yanıtı geciktirmeden kaydeder.",
     "choiceLog": "Yalnızca günlüğe kaydet",
     "applyTo": "Şunlara uygula",
     "applyToAllMembers": "Tüm üyeler",
     "applyKiloDefault": "Kilo Varsayılanını Uygula",
+    "applyKiloDefaultEnglishNote": "Kilo varsayılan ilke metni İngilizcedir, çünkü Kilo Gateway onu yazıldığı gibi aynen uygular.",
+    "applyKiloDefaultReplaceMessage": "Kilo varsayılan ilkesi İngilizce yazılmıştır ve İlke ihlali altında ayarladığınızı değiştirir. İlke metni alanına girdiğiniz metin geri getirilemez.",
     "invalidSavedTitle": "Kaydedilen girdi algılayıcı ayarları okunamıyor",
     "invalidSavedBody": "Girdi algılayıcıları yeniden kaydedilene kadar istekler engellenir. Aşağıdaki algılayıcılar Kilo Varsayılanından başlar.",
     "invalidSavedOutputTitle": "Kaydedilen çıktı algılayıcı ayarları okunamıyor",

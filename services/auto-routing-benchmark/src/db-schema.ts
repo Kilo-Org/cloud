@@ -26,6 +26,9 @@ import type {
 
 export type ClientProfileStatus = 'pending' | 'ready' | 'failed';
 
+/** Storage status: `failed` is retryable, `unavailable` is permanently failed. */
+export type BenchmarkProfileRowStatus = BenchmarkProfileStatus | 'unavailable';
+
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
 // via wrangler d1 migrations apply.
 
@@ -241,6 +244,9 @@ export const schedulerChunks = sqliteTable(
       .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
     model: text('model').notNull(),
     variant: text('variant').notNull(),
+    // Retired: nothing reads it, and writers store '[]'. SQLite's DROP COLUMN rewrites
+    // every row of this large table, and the previous worker still writes it until
+    // this release is deployed, so the column stays.
     providers: text('providers').notNull(),
     rep: integer('rep').notNull(),
     chunk: integer('chunk').notNull(),
@@ -255,6 +261,7 @@ export const schedulerChunks = sqliteTable(
     available_at: integer('available_at').notNull().default(0),
     attempts: integer('attempts').notNull().default(0),
     throttle_deferrals: integer('throttle_deferrals').notNull().default(0),
+    catalog_deferrals: integer('catalog_deferrals').notNull().default(0),
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
@@ -309,9 +316,11 @@ export const schedulerExecutions = sqliteTable(
 /**
  * Scheduler lease rows. Row 1 serializes dispatch passes: a pass holds the lease while
  * it reads live occupancy and claims; another dispatcher that finds the lease held
- * returns immediately and the next completion or cron wake retries. Model,
- * provider and slot caps are only exact if one pass at a time reads occupancy.
- * Row 2, created on first use, serializes run initialization passes.
+ * returns immediately and the next completion or cron wake retries. Model and slot
+ * caps are only exact if one pass at a time reads occupancy.
+ * Row 2, created on first use, serializes run initialization passes. Row 3 is a
+ * production deploy's intent: while its lease is unexpired, no new dispatch pass takes
+ * row 1, so the deploy takes row 1 when the current pass ends.
  */
 export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
   id: integer('id').primaryKey(),
@@ -320,14 +329,14 @@ export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
 });
 
 /**
- * Model- and provider-wide throttle deadlines. Cooling is stored here rather than
- * stamped onto every pending chunk so one throttle event costs a bounded write
- * instead of rewriting the whole backlog.
+ * Per-model throttle deadlines. Cooling is stored here rather than stamped onto
+ * every pending chunk so one throttle event costs a bounded write instead of
+ * rewriting the whole backlog. Rows of the retired `provider` scope only expire.
  */
 export const schedulerCooldowns = sqliteTable(
   'scheduler_cooldowns',
   {
-    scope: text('scope').$type<'model' | 'provider'>().notNull(),
+    scope: text('scope').$type<'model' | 'provider' | 'catalog'>().notNull(),
     key: text('key').notNull(),
     until: integer('until').notNull(),
   },
@@ -342,6 +351,9 @@ export const schedulerSettings = sqliteTable('scheduler_settings', {
   id: integer('id').primaryKey(),
   slots: integer('slots'),
   model_concurrency: integer('model_concurrency'),
+  // Retired provider limits, no longer read or written. The previous worker still
+  // selects them until this release is deployed, and migrations apply before the
+  // deploy, so they are dropped in a later migration.
   provider_concurrency: integer('provider_concurrency'),
   unknown_provider_concurrency: integer('unknown_provider_concurrency'),
   updated_at: text('updated_at').notNull(),
@@ -406,10 +418,17 @@ export const benchmarkProfiles = sqliteTable(
     variant: text('variant').notNull().default(''),
     engine_identity: text('engine_identity').notNull(),
     repetitions: integer('repetitions').notNull(),
-    status: text('status').$type<BenchmarkProfileStatus>().notNull(),
+    status: text('status').$type<BenchmarkProfileRowStatus>().notNull(),
     // Provenance of the run that measured / is measuring this profile.
     run_id: text('run_id'),
     failure_reason: text('failure_reason'),
+    // Failure history since the last ready measurement, kept through requeue and re-run
+    // so the retry budgets count consecutive failed runs. Read through parseProfileState.
+    failure_class: text('failure_class'),
+    failure_attempts: integer('failure_attempts').notNull().default(0),
+    model_failure_attempts: integer('model_failure_attempts').notNull().default(0),
+    first_failed_at: text('first_failed_at'),
+    retry_after: text('retry_after'),
     invalidated_at: text('invalidated_at'),
     requested_at: text('requested_at').notNull(),
     updated_at: text('updated_at').notNull(),
@@ -442,6 +461,28 @@ export const benchmarkSubscriptions = sqliteTable(
   },
   table => [primaryKey({ columns: [table.router, table.owner_type, table.owner_id] })]
 );
+
+/**
+ * Progress of one day's alias sync, per router. The daily cron starts it and the minute
+ * cron resumes it while the row says work is left: whether the platform aliases were
+ * re-resolved, and a keyset cursor over owner subscriptions. `attempts` bounds how much
+ * the day may repeat after a failure.
+ */
+export const benchmarkDailyAliasSync = sqliteTable('benchmark_daily_alias_sync', {
+  router: text('router').$type<AutoRouter>().primaryKey(),
+  day: text('day').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  platform_status: text('platform_status')
+    .$type<'pending' | 'ok' | 'failed'>()
+    .notNull()
+    .default('pending'),
+  platform_error: text('platform_error'),
+  owner_cursor_type: text('owner_cursor_type').$type<'user' | 'org'>(),
+  owner_cursor_id: text('owner_cursor_id'),
+  owner_pages: integer('owner_pages').notNull().default(0),
+  owner_done: integer('owner_done').notNull().default(0),
+  updated_at: text('updated_at').notNull(),
+});
 
 /**
  * Ready registry rows queued to re-measure the cases the revision-1 prompt transport
@@ -619,6 +660,8 @@ export const runLaneFailures = sqliteTable(
     chunk: integer('chunk').notNull().default(0),
     shard: integer('shard').notNull().default(0),
     failed_at: text('failed_at').notNull(),
+    // Null on rows written before lane causes were recorded.
+    failure_class: text('failure_class'),
   },
   table => [
     primaryKey({

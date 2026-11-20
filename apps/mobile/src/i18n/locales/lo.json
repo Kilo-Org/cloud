@@ -140,6 +140,7 @@
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "newSession": "ເຊສຊັນໃໝ່",
     "noModelsAvailable": "ບໍ່ມີໂມເດວໃຫ້ໃຊ້",
+    "modelRetires": "ຢຸດໃຊ້ວັນທີ {{date}}",
     "notFound": "ບໍ່ພົບລາຍການນີ້.",
     "online": "ອອນໄລນ໌",
     "open": "ເປີດ {{name}}",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
     "privateRepositoryA11y": "{{name}}, ຄັງໂຄ້ດສ່ວນຕົວ",
     "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ.",
-    "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ."
+    "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ.",
+    "organizationTrialEndedBillingAtKiloAi": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
+    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
     "changelogAreas": {
       "signIn": "ການເຂົ້າສູ່ລະບົບ",
-      "profileOrganizations": "ໂປຣໄຟລ໌ ແລະ ອົງກອນ"
+      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "ບໍ່ສາມາດໂຫຼດຄຳເຫັນເພີ່ມເຕີມໄດ້.",
       "retryLoadingMore": "ລອງໂຫຼດຄຳເຫັນເພີ່ມເຕີມອີກຄັ້ງ",
       "loadMoreComments": "ໂຫຼດຄຳເຫັນເພີ່ມເຕີມ",
+      "conversationTruncated": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
+      "conversationTruncated_one": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
+      "conversationTruncated_other": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
       "addReaction": "ເພີ່ມການຕອບສະໜອງ",
       "reactionPill": "ການຕອບສະໜອງ {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "ການຕອບສະໜອງ",
@@ -881,7 +887,6 @@
       "noAccess": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງການກວດສອບຂອງຄັງໂຄດນີ້.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການກວດສອບໄດ້.",
       "retryChecks": "ລອງໂຫຼດການກວດສອບອີກຄັ້ງ",
-      "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
       "noChecksReported": "ຍັງບໍ່ມີລາຍງານຜົນການກວດສອບ",
       "passed": "ຜ່ານ {{displayCount}}",
       "passed_one": "ຜ່ານ {{displayCount}}",
@@ -965,6 +970,8 @@
       "pendingComment": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "pendingComment_other": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "submitCountOfTotal": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
+      "submitCountOfTotal_one": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
+      "submitCountOfTotal_other": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
       "submitReview": "ສົ່ງຜົນການກວດສອບ",
       "partialPostedFresh": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
       "partialPostedFresh_one": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
@@ -1389,7 +1396,7 @@
     "followReviewMd": "ປະຕິບັດຕາມ REVIEW.md",
     "followReviewMdSubtitle": "ປະຕິບັດຕາມຄຳແນະນຳໃນໄຟລ໌ REVIEW.md ຂອງແຕ່ລະຄັງໂຄ້ດ",
     "bitbucket": {
-      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
+      "notConnectedReadOnlyPlan": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ດັ່ງນັ້ນເຈົ້າຂອງອົງກອນຕ້ອງອັບເດດການຮຽກເກັບເງິນທີ່ kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງ {{organization}} ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
@@ -1398,7 +1405,7 @@
       "managedOnWebRepositories": "ເລືອກບ່ອນເກັບໂຄດສຳລັບ {{organization}} ຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
       "description": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກສຳລັບ {{organization}} ແລ້ວວາງລົງດ້ານລຸ່ມ.",
       "descriptionReconnect": "ສ້າງໂທເຄັນໃໝ່ເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກສຳລັບ {{organization}} ແລ້ວວາງລົງດ້ານລຸ່ມ.",
-      "descriptionOverview": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກສຳລັບ {{organization}} ແລ້ວວາງມັນໃນໜ້າຈໍຖັດໄປ.",
+      "descriptionOverview": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກ ແລ້ວວາງມັນໃນໜ້າຈໍຖັດໄປ.",
       "scopes": "ບັນຊີ: ອ່ານ · ຄັງໂຄ້ດ: ອ່ານ/ຂຽນ · ຄຳຂໍລວມໂຄ້ດ: ອ່ານ · ເວັບຮຸກ: ອ່ານ/ຂຽນ",
       "tokenPlaceholder": "ໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກ",
       "tokenRefused": "Bitbucket ບໍ່ຍອມຮັບໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກນີ້. ກວດສອບວ່າມັນມີສິດຕາມທີ່ກ່າວມາຂ້າງເທິງ ແລ້ວລອງອີກຄັ້ງ."
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "ປ່ຽນຊື່ອົງກອນ",
-      "renamePlaceholder": "ຊື່ອົງກອນ",
+      "renamePlaceholder": "ໃສ່ຊື່ອົງກອນ",
       "balance": "ຍອດເງິນຄົງເຫຼືອ",
       "plan": "ແຜນ",
       "planTeams": "Teams",
@@ -4851,12 +4858,15 @@
     "inputDescription": "ສະແກນທຸກຂາເຂົ້າດ້ວຍ Enkrypt AI ລວມທັງຜົນຂອງເຄື່ອງມື. ເມື່ອ Enkrypt ບໍ່ພ້ອມໃຊ້, ຄຳຮ້ອງຂໍຈະຖືກສົ່ງໂດຍບໍ່ສະແກນ ແທນທີ່ຈະຖືກປະຕິເສດ.",
     "outputTitle": "ລະບົບປ້ອງກັນຂາອອກ",
     "outputDescription": "ສະແກນການຕອບສະໜອງດ້ວຍ Enkrypt AI ກ່ອນສະມາຊິກຈະໄດ້ຮັບ. ປິດຢູ່ເວັ້ນແຕ່ທ່ານເປີດໃຊ້ງານ.",
+    "outputUnavailable": "Kilo ຍັງບໍ່ໄດ້ເປີດການສະແກນຂາອອກສຳລັບອົງກອນນີ້ ດັ່ງນັ້ນການຕອບສະໜອງຈະບໍ່ຖືກກວດສອບ ແລະ ບໍ່ມີຫຍັງໃຫ້ຕັ້ງຢູ່ນີ້. ຕິດຕໍ່ {{supportEmail}} ເພື່ອຮ້ອງຂໍ.",
     "detectorsHint": "ບລັອກຈະປະຕິເສດຄຳຮ້ອງຂໍທີ່ຖືກກວດພົບ. ບັນທຶກເທົ່ານັ້ນຈະບັນທຶກໄວ້ໂດຍບໍ່ຊັກຊ້າຄຳຮ້ອງຂໍ.",
     "detectorsHintOutput": "ບລັອກຈະເຮັດໃຫ້ການຕອບສະໜອງທີ່ຖືກກວດພົບລົ້ມເຫຼວ. ບັນທຶກເທົ່ານັ້ນຈະບັນທຶກໄວ້ໂດຍບໍ່ຊັກຊ້າການຕອບສະໜອງ.",
     "choiceLog": "ບັນທຶກເທົ່ານັ້ນ",
     "applyTo": "ນຳໃຊ້ກັບ",
     "applyToAllMembers": "ສະມາຊິກທັງໝົດ",
     "applyKiloDefault": "ນຳໃຊ້ຄ່າເລີ່ມຕົ້ນຂອງ Kilo",
+    "applyKiloDefaultEnglishNote": "ຂໍ້ຄວາມນະໂຍບາຍເລີ່ມຕົ້ນຂອງ Kilo ເປັນພາສາອັງກິດ ເພາະ Kilo Gateway ນຳໃຊ້ມັນຄືກັບທີ່ຂຽນໄວ້ແທ້ໆ.",
+    "applyKiloDefaultReplaceMessage": "ນະໂຍບາຍເລີ່ມຕົ້ນຂອງ Kilo ຖືກຂຽນເປັນພາສາອັງກິດ ແລະ ປ່ຽນແທນສິ່ງທີ່ທ່ານຕັ້ງໄວ້ໃນການລະເມີດນະໂຍບາຍ. ຂໍ້ຄວາມທີ່ທ່ານປ້ອນໃນຊ່ອງຂໍ້ຄວາມນະໂຍບາຍບໍ່ສາມາດກູ້ຄືນໄດ້.",
     "invalidSavedTitle": "ບໍ່ສາມາດອ່ານການຕັ້ງຄ່າຕົວກວດຈັບຂາເຂົ້າທີ່ບັນທຶກໄວ້ໄດ້",
     "invalidSavedBody": "ຄຳຮ້ອງຂໍຈະຖືກບລັອກຈົນກວ່າຕົວກວດຈັບຂາເຂົ້າຈະຖືກບັນທຶກອີກຄັ້ງ. ຕົວກວດຈັບຂ້າງລຸ່ມເລີ່ມຈາກຄ່າເລີ່ມຕົ້ນຂອງ Kilo.",
     "invalidSavedOutputTitle": "ບໍ່ສາມາດອ່ານການຕັ້ງຄ່າຕົວກວດຈັບຂາອອກທີ່ບັນທຶກໄວ້ໄດ້",

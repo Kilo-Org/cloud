@@ -18,6 +18,16 @@ catalog:
   # the Workers runtime forbids. Pinned exactly.
   '@cfworker/json-schema': 4.1.6
   '@octokit/auth-app': 8.2.0
+  # The logs API and the logs SDK move together: the SDK declares the API at its
+  # own 0.x release, so a pair one minor apart installs a second copy of the
+  # interface the SDK implements. One catalog line per side keeps them on one
+  # release line.
+  # The pair is capped by the '@opentelemetry/core' override below at 2.8.0:
+  # sdk-logs declares core at its own release line, so a newer pair would run the
+  # SDK against a core below what it asks for. 0.219.0 is the newest release whose
+  # core is exactly 2.8.0. Move this pair together with any future core bump.
+  '@opentelemetry/api-logs': 0.219.0
+  '@opentelemetry/sdk-logs': 0.219.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
   # @sentry/cli through its Node API, which v3 broke. See the note in `overrides`.
@@ -40,9 +50,18 @@ catalog:
   dotenv: 18.0.10
   drizzle-kit: 0.31.11
   drizzle-orm: 0.45.4
+  # Named in both the web manifests and the `overrides` block below, and the
+  # overrides note there requires one reviewed version per literal: the catalog
+  # pin is that one place, so both readers take it from here.
+  form-data: 4.0.6
+  google-auth-library: 10.6.2
   hono: 4.13.16
   jose: 6.2.17
   jsonwebtoken: 9.0.3
+  # One Next release for the three apps and web-shared. web-shared must resolve
+  # the same `next` instance as apps/web for request-scoped APIs, and the
+  # `overrides` entry below forces this version tree-wide, so both read it here.
+  next: 16.4.5
   p-limit: 7.3.0
   # apps/web builds its CSS with this and the workspace override below forces one
   # copy across the tree, so both read the pin from here.
@@ -146,7 +165,9 @@ overrides:
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.6.2
-  next: 16.4.5
+  # Read the catalog pin: web-shared must resolve the same `next` instance as
+  # apps/web, and one literal for three apps and the shared package is the point.
+  next: 'catalog:'
   preact: 10.28.4
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20
@@ -159,18 +180,19 @@ overrides:
   # esbuild also states its upper bound; its own note says why that bound is a
   # whole minor version rather than a deeper pin.
   glob: 13.0.6
-  google-auth-library: 10.6.2
+  google-auth-library: 'catalog:'
   # The vite/vitest/storybook graph picks up this copy, so the bound names the
-  # whole current minor line. The allowBuilds entry below permits the install
-  # script, and a 0.29 release resolves only through a reviewed change here, in
-  # the lockfile, and in that entry.
+  # whole current minor line. A 0.29 release resolves only through a reviewed
+  # change here and in the lockfile. The allowBuilds entry below is a separate,
+  # version-independent decision: it permits the install script for every
+  # resolved version at once, so re-check it when this minor line moves.
   esbuild: '>=0.28.1 <0.29'
   lodash: 4.18.1
   diff: 8.0.3
   fflate@^0.4.8: 0.4.9
   fflate@^0.8.2: 0.8.3
   vite: '>=8.1.6 <8.2.0'
-  form-data: 4.0.6
+  form-data: 'catalog:'
   follow-redirects: 1.16.2
   ws@^7: 7.5.11
   ws@^8: 8.21.0
@@ -357,6 +379,13 @@ patchedDependencies:
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@58.0.31: patches/expo-router@58.0.31.patch
   expo-widgets@58.0.28: patches/expo-widgets@58.0.28.patch
+  # Android: a shared content URI whose provider answers with no resolver, an
+  # empty cursor (a deleted media row, a revoked grant), no permission or no
+  # mime type threw on the main thread inside onNewIntent and crashed the app —
+  # or published a file entry with no path. The module now reports such a share
+  # through its onError event, which the app shows as the "Couldn't read the
+  # shared content" toast.
+  expo-share-intent@9.0.0: patches/expo-share-intent@9.0.0.patch
   # Typed-routes generation must skip colocated tests, exactly like the Metro
   # blockList in apps/mobile/metro.config.js already does for the runtime
   # bundle. A `*.test.tsx` next to a route registers as a route, and a
@@ -480,6 +509,11 @@ allowBuilds:
   # Downloads the vendored tree-sitter grammar sources and the iOS math xcframework
   # from their upstream releases; a missing manifest is a no-op.
   react-native-enriched-markdown: true
+  # Each `false` below is an explicit decision, not a default: the package's
+  # install script does not run. An entry moves to `true` only with its own
+  # note stating why running the script is safe or necessary, as the permitted
+  # entries above and below carry, and a denial is removed when nothing in the
+  # tree depends on that package.
   '@sentry/cli': false
   bufferutil: false
   core-js: false

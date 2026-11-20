@@ -139,6 +139,32 @@ describe('SheetHeader settled top clearance', () => {
     keyboardMotion.value = 0;
   });
 
+  it('keeps a never-inset header at the surface edge whatever the sheet measures', async () => {
+    // A surface that can never reach the window top reserves no inset, and the
+    // settled read must not top one up: it measures the header inside its own
+    // surface, so a surface that places its content at its own origin reads as
+    // the window top and would push the title down by the whole inset.
+    vi.useFakeTimers();
+    try {
+      surface.top = 0;
+      const renderer = await mount({
+        title: 'Discard changes?',
+        onDone: () => undefined,
+        topInset: 'never',
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(800);
+        await Promise.resolve();
+      });
+
+      expect(topClearance(renderer)).toBe(0);
+
+      renderer.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('covers the inset the presented sheet left above the header', async () => {
     vi.useFakeTimers();
     try {

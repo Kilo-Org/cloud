@@ -155,7 +155,16 @@ const isTrustedPanelSender = (sender: unknown, runtimeId: string | undefined): b
   return url.startsWith('chrome-extension://') || url.startsWith('moz-extension://');
 };
 
-const errorResponse = (id: string | number, error: unknown) => {
+/** Enough of an unexpected error's own text to say what failed, without a page's worth of it. */
+const UNEXPECTED_DETAIL_LIMIT = 300;
+
+/**
+ * The methods whose failure can leave a page step half done. Only a tool call runs one: `tools.list` is an
+ * in-memory contract read, and every other method's own failure is compensated before it answers.
+ */
+const PAGE_STEP_METHOD = 'tools.call';
+
+const errorResponse = (id: string | number, error: unknown, method: string) => {
   if (error instanceof LocalAgentRpcError) {
     const frame = buildErrorMessage({
       code: error.code,
@@ -169,10 +178,21 @@ const errorResponse = (id: string | number, error: unknown) => {
       : { ...frame, error: { ...frame.error, data: error.data } };
   }
 
+  // The model reads this text: it names what failed, never the transport, and says what to do next (SPEC).
+  const detail =
+    error instanceof Error && error.message.trim() !== ''
+      ? error.message.trim().slice(0, UNEXPECTED_DETAIL_LIMIT).replace(/\.$/u, '')
+      : 'an unexpected error';
+  // Only a call that ran a page step may have changed the page; advice to re-read it elsewhere is a wasted turn.
+  const advice =
+    method === PAGE_STEP_METHOD
+      ? 'Part of it may have run; take a new page snapshot before retrying.'
+      : 'Nothing on the page changed; retrying the call is safe.';
+
   return buildErrorMessage({
     code: LOCAL_AGENT_ERROR_CODES.internalError,
     id,
-    message: 'Local agent request failed.',
+    message: `The browser could not finish the call: ${detail}. ${advice}`,
   });
 };
 
@@ -342,7 +362,7 @@ export const startLocalAgentsHost = (
 
       connection.send(controllerId, buildResultMessage(message.id, result));
     } catch (error) {
-      connection.send(controllerId, errorResponse(message.id, error));
+      connection.send(controllerId, errorResponse(message.id, error, message.method));
     }
   };
 
@@ -438,6 +458,8 @@ export const startLocalAgentsHost = (
         if (next.kind === 'connected' && endpoint.transport === 'loopback') {
           consumeIfConnected(connection);
         }
+
+        noteUnreachablePairing(connection, next);
 
         // Entering or leaving `connected` proves the hub was reachable just now.
         if (endpoint.transport === 'loopback' && wasConnected !== (next.kind === 'connected')) {
@@ -610,6 +632,20 @@ export const startLocalAgentsHost = (
     `${endpoint.hubId}|${endpoint.token}|${endpoint.ws}`;
 
   /**
+   * A fragment whose token was redeemed but whose socket keeps failing would
+   * otherwise leave the panel on "waiting" with no hint; the dial backing off
+   * means the hub was not reachable on the socket the CLI handed out.
+   */
+  const noteUnreachablePairing = (
+    connection: LocalAgentConnection,
+    state: LocalAgentConnectionState
+  ): void => {
+    if (state.kind === 'backoff' && pairingKeysByConnection.has(connection)) {
+      void savePairingNotice(storage, 'unreachable');
+    }
+  };
+
+  /**
    * Marks a fragment used once the connection whose key came from that fragment
    * reports `connected`. Another connection for the same hub proves only its own
    * key, so it must not consume a fragment it never proved. A fragment seen while
@@ -624,6 +660,7 @@ export const startLocalAgentsHost = (
 
     consumedPairings.add(key);
     pairingKeysByConnection.delete(connection);
+    void savePairingNotice(storage, null);
   };
 
   const acceptPairing = async (
@@ -671,6 +708,7 @@ export const startLocalAgentsHost = (
       ) {
         pairingKeysByConnection.set(connection, fragmentKey);
         consumeIfConnected(connection);
+        noteUnreachablePairing(connection, connection.state());
       }
     } finally {
       inFlightPairings.delete(fragmentKey);

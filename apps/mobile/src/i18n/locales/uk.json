@@ -142,10 +142,12 @@
     "keepRunning": "Продовжити виконання",
     "newSession": "Новий сеанс",
     "noModelsAvailable": "Немає доступних моделей",
+    "modelRetires": "Виводиться {{date}}",
     "notFound": "Не знайдено.",
     "online": "У мережі",
     "open": "Відкрити {{name}}",
     "openPullRequest": "Відкрити запит на злиття",
+    "viewOnGitHub": "Переглянути PR на GitHub",
     "completed": "Завершено",
     "pending": "Очікує",
     "running": "Виконується",
@@ -185,7 +187,8 @@
     "organizationTrialEnded": "Пробний період організації завершився, і вона не має активного плану. Власник організації може оновити платіжні дані на kilo.ai, а потім спробувати ще раз.",
     "privateRepositoryA11y": "{{name}}, приватний репозиторій",
     "legalDocumentEnglishOnly": "Цей документ доступний лише англійською мовою.",
-    "organizationTrialEndedBilling": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити оплату, а потім спробувати ще раз."
+    "organizationTrialEndedBilling": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити оплату, а потім спробувати ще раз.",
+    "organizationTrialEndedBillingAtKiloAi": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити платіжні дані на kilo.ai, а потім спробувати ще раз."
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -509,7 +512,7 @@
     "changelogFixesPolish": "Виправлення та покращення в усьому застосунку.",
     "changelogAreas": {
       "signIn": "Вхід",
-      "profileOrganizations": "Профіль і організації"
+      "profileOrganizations": "Профіль та організації"
     }
   },
   "preferences": {
@@ -699,7 +702,7 @@
     },
     "autoReviews": "Автоматичні перевірки",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не підключено. Підключити його можуть лише власники організації, адміністратори та менеджери з оплати."
+      "notConnectedReadOnlyPlan": "Пробний період організації завершився, тож власник має оновити платіжні дані на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Підключенням Bitbucket для {{organization}} можна керувати лише у вебверсії з комп'ютера.",
@@ -708,7 +711,7 @@
       "managedOnWebRepositories": "Виберіть репозиторії для {{organization}} у вебверсії з комп'ютера.",
       "description": "Створіть токен доступу до робочого простору для {{organization}} та вставте його нижче.",
       "descriptionReconnect": "Створіть новий токен доступу до робочого простору для {{organization}} та вставте його нижче.",
-      "descriptionOverview": "Створіть токен доступу до робочого простору для {{organization}} та вставте його на наступному екрані.",
+      "descriptionOverview": "Створіть токен доступу до робочого простору та вставте його на наступному екрані.",
       "scopes": "Обліковий запис: читання · Репозиторії: читання/запис · Запити на злиття: читання · Вебхуки: читання/запис",
       "tokenPlaceholder": "Токен доступу до робочого простору",
       "tokenRefused": "Bitbucket не прийняв цей токен доступу до робочого простору. Перевірте, чи він має наведені вище дозволи, а потім спробуйте ще раз."
@@ -750,9 +753,9 @@
     },
     "providerConnect": {
       "description": "Підключіть {{label}} до Kilo, щоб автоматично перевіряти запити на злиття.",
-      "githubApp": "Застосунок GitHub",
+      "githubApp": "застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
-      "gitlabAccount": "Обліковий запис GitLab",
+      "gitlabAccount": "обліковий запис GitLab",
       "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз."
     },
     "reviewDetail": {
@@ -1251,7 +1254,7 @@
       "dueThisWeekDetail_many": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "dueThisWeekDetail_other": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",
-      "reviewSlaAssignment": "Перевірити встановлені терміни за SLA",
+      "reviewSlaAssignment": "Перевірити призначення термінів за SLA",
       "allOpenFindingsTracked": "Усі відкриті проблеми відстежуються"
     },
     "dismiss": {
@@ -1460,7 +1463,7 @@
       "failedDescription": "Агент безпеки не зміг завершити аналіз.",
       "extractionFailedDescription": "Технічний звіт не вдалося перетворити на структурований результат.",
       "exploitableDescription": "У коді застосунку є шлях до вразливої функції.",
-      "notExploitable": "Недосяжний код",
+      "notExploitable": "Недосяжний шлях",
       "notExploitableDescription": "У цьому репозиторії не знайдено шляху виконання до вразливої функції.",
       "unknown": "Потребує перевірки",
       "unknownDescription": "Не вдалося підтвердити, чи є в коді шлях до вразливої функції.",
@@ -2863,7 +2866,6 @@
       "skipped_few": "пропущено: {{displayCount}}",
       "skipped_many": "пропущено: {{displayCount}}",
       "title": "Перевірки",
-      "viewOnGitHub": "Переглянути PR на GitHub",
       "checkDetails": "відомості про перевірку"
     },
     "composer": {
@@ -2927,6 +2929,11 @@
       "couldNotLoad": "Не вдалося завантажити обговорення.",
       "couldNotLoadMore": "Не вдалося завантажити наступні коментарі.",
       "loadMoreComments": "Завантажити ще коментарі",
+      "conversationTruncated": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_one": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_other": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_few": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_many": "Показано лише перші {{displayCount}} коментарів.",
       "loading": "Завантаження обговорення",
       "moderation": {
         "block": {
@@ -3352,6 +3359,10 @@
       "partialPostedStale_many": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "partialPostedStale_other": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "submitCountOfTotal": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_one": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_few": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_many": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_other": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
       "submitReview": "Надіслати результати перевірки",
       "pendingComment_few": "ненадіслані коментарі",
       "pendingComment_many": "ненадісланих коментарів",
@@ -3567,7 +3578,7 @@
       "planStatusLapsed": " · Завершився",
       "planEnded": "Пробний період організації завершився, і вона не має активного плану.",
       "manageBilling": "Керувати оплатою",
-      "renamePlaceholder": "Назва організації",
+      "renamePlaceholder": "Введіть назву організації",
       "renameTitle": "Перейменувати організацію"
     },
     "inviteMember": {
@@ -5005,12 +5016,15 @@
     "inputDescription": "Сканує кожні вхідні дані за допомогою Enkrypt AI, включно з результатами роботи інструментів. Якщо Enkrypt недоступний, запити надсилаються без сканування, а не відхиляються.",
     "outputTitle": "Захисні механізми вихідних даних",
     "outputDescription": "Сканує відповіді за допомогою Enkrypt AI, перш ніж учасники їх отримають. Вимкнено, доки ви не ввімкнете.",
+    "outputUnavailable": "Kilo не ввімкнув сканування вихідних даних для цієї організації, тому відповіді не перевіряються і тут нема чого налаштовувати. Зв'яжіться з {{supportEmail}}, щоб подати запит.",
     "detectorsHint": "Блокування відхиляє позначений запит. Лише журналювання фіксує його, не затримуючи запит.",
     "detectorsHintOutput": "Блокування відхиляє позначену відповідь. Лише журналювання фіксує її, не затримуючи відповідь.",
     "choiceLog": "Лише журналювання",
     "applyTo": "Застосувати до",
     "applyToAllMembers": "Усі учасники",
     "applyKiloDefault": "Застосувати стандартні налаштування Kilo",
+    "applyKiloDefaultEnglishNote": "Текст стандартної політики Kilo — англійською, бо Kilo Gateway застосовує його точно так, як він написаний.",
+    "applyKiloDefaultReplaceMessage": "Стандартна політика Kilo написана англійською і замінює те, що задано в розділі Порушення політики. Текст, введений у полі тексту політики, відновити неможливо.",
     "invalidSavedTitle": "Не вдалося прочитати збережені налаштування детекторів вхідних даних",
     "invalidSavedBody": "Запити блокуються, доки детектори вхідних даних не буде збережено знову. Наведені нижче детектори починають зі стандартних налаштувань Kilo.",
     "invalidSavedOutputTitle": "Не вдалося прочитати збережені налаштування детекторів вихідних даних",

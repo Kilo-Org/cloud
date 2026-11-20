@@ -6,6 +6,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 import { exactPairKey } from './db';
+import type { ProfileFailure } from './profile-failure';
 import type { RunModelEntry } from './run';
 
 const CatalogTokenPriceSchema = z
@@ -20,7 +21,6 @@ export const BenchmarkModelCatalogSchema = z.object({
     z.object({
       id: z.string().trim().min(1),
       alias_target: z.string().trim().min(1).optional(),
-      inference_provider_ids: z.array(z.string()).optional(),
       supported_parameters: z.array(z.string()).optional(),
       context_length: z.number().nullable().catch(null).optional(),
       max_completion_tokens: z.number().nullable().catch(null).optional(),
@@ -65,6 +65,8 @@ export const MIN_BENCHMARK_INPUT_TOKENS = 20_000;
 export const CATALOG_PAIR_UNAVAILABLE_REASON =
   'Model or variant is unavailable in the executable benchmark catalog.';
 export const CATALOG_CONTEXT_TOO_SMALL_REASON = `Model context window leaves fewer than ${MIN_BENCHMARK_INPUT_TOKENS} input tokens after the CLI completion reservation.`;
+export const CATALOG_NO_TOOL_SUPPORT_REASON =
+  'Model does not support tool calls, which the benchmark CLI requires.';
 
 /**
  * Input room after the completion budget the CLI reserves on every request, derived
@@ -93,15 +95,27 @@ export function catalogSupportsBenchmarkPair(
  * Why the drain cannot benchmark this exact pair, or null when it can. Registration
  * admits a pair whose window is too small, so its profile fails here with that reason.
  */
-export function benchmarkPairUnavailableReason(
+export function benchmarkPairUnavailability(
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   pair: { model: string; variant: string | null }
-): string | null {
-  if (!catalogSupportsBenchmarkPair(catalog, pair)) return CATALOG_PAIR_UNAVAILABLE_REASON;
+): ProfileFailure | null {
   const model = catalog.data.find(model => model.id === pair.model);
-  const room = model ? catalogModelInputRoom(model) : null;
+  if (!model || model.id.startsWith('~')) {
+    return { failureClass: 'catalog_absent', reason: CATALOG_PAIR_UNAVAILABLE_REASON };
+  }
+  if (!catalogModelSupportsTools(model)) {
+    return { failureClass: 'catalog_absent', reason: CATALOG_NO_TOOL_SUPPORT_REASON };
+  }
+  if (!catalogSupportsBenchmarkPair(catalog, pair)) {
+    const requested = (pair.variant ?? 'default').slice(0, 60);
+    return {
+      failureClass: 'catalog_absent',
+      reason: `Variant ${requested} is not offered for this model in the executable benchmark catalog.`,
+    };
+  }
+  const room = catalogModelInputRoom(model);
   return room !== null && room < MIN_BENCHMARK_INPUT_TOKENS
-    ? CATALOG_CONTEXT_TOO_SMALL_REASON
+    ? { failureClass: 'context_too_small', reason: CATALOG_CONTEXT_TOO_SMALL_REASON }
     : null;
 }
 
@@ -113,14 +127,6 @@ function resolveCatalogModel(
   return model?.id.startsWith('~') && model.alias_target
     ? (modelsById.get(model.alias_target) ?? model)
     : model;
-}
-
-export function catalogModelProviders(
-  catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
-  modelId: string
-): string[] {
-  const modelsById = new Map(catalog.data.map(model => [model.id, model]));
-  return [...new Set(resolveCatalogModel(modelId, modelsById)?.inference_provider_ids ?? [])];
 }
 
 /** Expand only current catalog-supported reasoning controls, never saved effort aliases. */

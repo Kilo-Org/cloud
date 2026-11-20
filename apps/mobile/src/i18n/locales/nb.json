@@ -140,6 +140,7 @@
     "keepRunning": "La kjøringen fortsette",
     "newSession": "Ny økt",
     "noModelsAvailable": "Ingen modeller tilgjengelige",
+    "modelRetires": "Fases ut {{date}}",
     "notFound": "Fant ikke elementet.",
     "online": "På nett",
     "open": "Åpne {{name}}",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
-    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen."
+    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
+    "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
       "signIn": "Innlogging",
-      "profileOrganizations": "Profil og organisasjoner"
+      "profileOrganizations": "Profil & organisasjoner"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "Kunne ikke laste inn flere kommentarer.",
       "retryLoadingMore": "Prøv å laste inn flere kommentarer på nytt",
       "loadMoreComments": "Last inn flere kommentarer",
+      "conversationTruncated": "Viser bare de første {{displayCount}} kommentarene.",
+      "conversationTruncated_one": "Viser bare de første {{displayCount}} kommentarene.",
+      "conversationTruncated_other": "Viser bare de første {{displayCount}} kommentarene.",
       "addReaction": "Legg til reaksjon",
       "reactionPill": "{{emoji}}-reaksjon, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksjon",
@@ -881,7 +887,6 @@
       "noAccess": "Du har ikke tilgang til sjekkene for dette kodelageret.",
       "couldNotLoad": "Kunne ikke laste inn sjekkene.",
       "retryChecks": "Prøv å laste inn sjekkene på nytt",
-      "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen sjekker rapportert",
       "passed": "{{displayCount}} bestått",
       "passed_one": "{{displayCount}} bestått",
@@ -965,6 +970,8 @@
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Send gjennomgang",
       "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er publisert. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er publisert. ",
@@ -1389,7 +1396,7 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruksjonene i REVIEW.md i hvert kodelager",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen."
+      "notConnectedReadOnlyPlan": "Organisasjonens prøveperiode er over, så en eier må oppdatere faktureringen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
@@ -1398,7 +1405,7 @@
       "managedOnWebRepositories": "Velg repositorier for {{organization}} på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "descriptionReconnect": "Opprett et nytt tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
-      "descriptionOverview": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn på neste skjerm.",
+      "descriptionOverview": "Opprett et tilgangstoken for arbeidsområdet, og lim det inn på neste skjerm.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
       "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
       "tokenRefused": "Bitbucket godtok ikke dette tilgangstokenet for arbeidsområdet. Kontroller at det har tillatelsene ovenfor, og prøv deretter på nytt."
@@ -3625,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "Gi organisasjonen nytt navn",
-      "renamePlaceholder": "Organisasjonsnavn",
+      "renamePlaceholder": "Skriv inn et organisasjonsnavn",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4851,12 +4858,15 @@
     "inputDescription": "Skanner alle inndata med Enkrypt AI, inkludert verktøyresultater. Når Enkrypt ikke er tilgjengelig, sendes forespørsler uten skanning i stedet for å bli avvist.",
     "outputTitle": "Vernetiltak for utdata",
     "outputDescription": "Skanner svar med Enkrypt AI før medlemmer mottar dem. Av med mindre du slår det på.",
+    "outputUnavailable": "Kilo har ikke slått på skanning av utdata for denne organisasjonen, så svar kontrolleres ikke, og det er ingenting å stille inn her. Kontakt {{supportEmail}} for å be om det.",
     "detectorsHint": "Blokker avviser en forespørsel som er flagget. Bare logg registrerer den uten å forsinke forespørselen.",
     "detectorsHintOutput": "Blokker får et flagget svar til å feile. Bare logg registrerer det uten å forsinke svaret.",
     "choiceLog": "Bare logg",
     "applyTo": "Bruk på",
     "applyToAllMembers": "Alle medlemmer",
     "applyKiloDefault": "Bruk Kilo-standard",
+    "applyKiloDefaultEnglishNote": "Teksten i Kilos standardretningslinje er på engelsk, fordi Kilo Gateway bruker den nøyaktig slik den er skrevet.",
+    "applyKiloDefaultReplaceMessage": "Kilos standardretningslinje er skrevet på engelsk og erstatter det du har angitt under Brudd på retningslinjer. Teksten du skrev inn i feltet for retningslinjetekst, kan ikke gjenopprettes.",
     "invalidSavedTitle": "Lagrede innstillinger for inndatadetektorer kan ikke leses",
     "invalidSavedBody": "Forespørsler blokkeres til inndatadetektorene er lagret på nytt. Detektorene nedenfor starter fra Kilo-standard.",
     "invalidSavedOutputTitle": "Lagrede innstillinger for utdatadetektorer kan ikke leses",

@@ -14,9 +14,42 @@ export type FormState = Readonly<{
   baseline: ModelAccessDraft;
   draft: ModelAccessDraft;
   providerRowsProvisional: boolean;
-  /** Whether the draft's provider list differs from the baseline, so an arrival keeps it. */
+  /** Whether the provider list on screen is a choice of its own, not the server's. */
   providerListEdited: boolean;
 }>;
+
+/**
+ * Whether a draft change moved the provider list away from the baseline.
+ *
+ * The flag is derived on every provider edit, not latched: putting a switch back
+ * where it started leaves no choice to keep. A change that touched only the
+ * models keeps the flag as it was, because the baseline can shrink under a row
+ * gap and a comparison against that baseline would read an untouched list as the
+ * admin's own.
+ */
+export function providerListEditedBy(state: FormState, next: ModelAccessDraft): boolean {
+  const current = state.draft.providerAllowList.join('\n');
+  if (next.providerAllowList.join('\n') === current) {
+    return state.providerListEdited;
+  }
+  return next.providerAllowList.join('\n') !== state.baseline.providerAllowList.join('\n');
+}
+
+/**
+ * The screen-level notice the form shows above the tab control, by its copy key,
+ * or null when both lists have the data they need. One notice covers both
+ * missing-data states: the catalog failed to load, or it loaded without naming
+ * any provider.
+ */
+export function providerDataNotice(params: {
+  catalogUnavailable: boolean;
+  providersEmpty: boolean;
+}): string | null {
+  if (params.catalogUnavailable) {
+    return 'organizationModelAccess.catalogUnavailable';
+  }
+  return params.providersEmpty ? 'organizationModelAccess.providersUnavailable' : null;
+}
 
 /**
  * Rebases the form onto the lists the server answered.
@@ -61,7 +94,7 @@ export function syncedFormState(params: {
       providerAllowList: params.serverDraft.providerAllowList,
       modelDenyList: baseline.modelDenyList,
     };
-    // A list the admin edited stays; a provisional one, from the saved rows,
+    // A list the admin moved stays; a provisional one, from the saved rows,
     // takes the arriving catalog so a save cannot write it as the whole list.
     if (!state.providerListEdited) {
       draft = {
@@ -75,6 +108,7 @@ export function syncedFormState(params: {
     baseline,
     draft,
     providerRowsProvisional: params.providerRowsIncomplete,
+    // A draft that just took the server's list holds no choice of its own.
     providerListEdited: savedListsMoved && clean ? false : state.providerListEdited,
   };
 }

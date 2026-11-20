@@ -462,6 +462,42 @@ describe('tab debugger helpers', () => {
     ]);
   });
 
+  it('captures the tab itself when the browser can, without activating any tab', async () => {
+    const calls: unknown[] = [];
+    const pngDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+    const tabsApi: BrowserTabsApi = {
+      captureTab: (tabId, options) => {
+        calls.push({ name: 'captureTab', options, tabId });
+        return pngDataUrl;
+      },
+      captureVisibleTab: () => {
+        calls.push({ name: 'captureVisibleTab' });
+        return pngDataUrl;
+      },
+      get: tabId => ({ id: tabId, title: 'Target', url: 'https://example.com/', windowId: 3 }),
+      query: () => [{ id: 1, title: 'Active', url: 'https://kilo.ai/', windowId: 3 }],
+      update: tabId => {
+        calls.push({ name: 'update', tabId });
+        return { id: tabId, title: 'Tab', url: 'https://example.com/', windowId: 3 };
+      },
+    };
+
+    await expect(getViewportScreenshotWithTabsApi({ tabId: 7, tabsApi })).resolves.toStrictEqual({
+      ok: true,
+      value: {
+        dataUrl: pngDataUrl,
+        devicePixelRatio: 1,
+        height: 1,
+        mediaType: 'image/png',
+        width: 1,
+      },
+    });
+    expect(calls).toStrictEqual([
+      { name: 'captureTab', options: { format: 'png', scale: 1 }, tabId: 7 },
+    ]);
+  });
+
   it('refuses to capture when another tab is active at capture time', async () => {
     const tabsApi: BrowserTabsApi = {
       captureVisibleTab: () => restoreFailingPngDataUrl,

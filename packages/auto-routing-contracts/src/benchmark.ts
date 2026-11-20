@@ -49,14 +49,8 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
 export const BENCHMARK_CONTAINER_BUDGET = 250;
 
 /** Scheduler limits an admin can override at runtime, without a deploy. */
-export const BENCHMARK_SCHEDULER_SETTING_KEYS = [
-  'slots',
-  'modelConcurrency',
-  'providerConcurrency',
-  'unknownProviderConcurrency',
-] as const;
-export const BenchmarkSchedulerSettingKeySchema = z.enum(BENCHMARK_SCHEDULER_SETTING_KEYS);
-export type BenchmarkSchedulerSettingKey = z.infer<typeof BenchmarkSchedulerSettingKeySchema>;
+export const BENCHMARK_SCHEDULER_SETTING_KEYS = ['slots', 'modelConcurrency'] as const;
+export type BenchmarkSchedulerSettingKey = (typeof BENCHMARK_SCHEDULER_SETTING_KEYS)[number];
 
 export const BenchmarkSchedulerLimitSchema = z
   .number()
@@ -93,8 +87,15 @@ export const BenchmarkSchedulerSettingSchema = z.object({
 });
 export type BenchmarkSchedulerSetting = z.infer<typeof BenchmarkSchedulerSettingSchema>;
 
+/**
+ * Unknown setting keys are stripped, so a client parses a worker that still serves
+ * a retired setting.
+ */
 export const BenchmarkSchedulerConfigResponseSchema = z.object({
-  settings: z.record(BenchmarkSchedulerSettingKeySchema, BenchmarkSchedulerSettingSchema),
+  settings: z.object({
+    slots: BenchmarkSchedulerSettingSchema,
+    modelConcurrency: BenchmarkSchedulerSettingSchema,
+  } satisfies Record<BenchmarkSchedulerSettingKey, typeof BenchmarkSchedulerSettingSchema>),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
@@ -377,9 +378,65 @@ export const StartBenchmarkRunResponseSchema = z.object({
 /**
  * Wire status for a Benchmark profile. Presentation maps pending/running to
  * "Benchmarking"; "Unavailable" is a web-derived state and never a wire status.
+ * A permanently failed profile is reported as `failed` with a `permanent` failure.
  */
 export const BenchmarkProfileStatusSchema = z.enum(['pending', 'running', 'ready', 'failed']);
 export type BenchmarkProfileStatus = z.infer<typeof BenchmarkProfileStatusSchema>;
+
+/** Bounded failure text stored on failed profile rows. */
+export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
+
+export const BenchmarkProfileFailureClassSchema = z.enum([
+  'catalog_absent',
+  'context_too_small',
+  'model_not_found',
+  'unsupported',
+  'provider_unavailable',
+  'model_resolution',
+  'ambiguous_execution',
+  'container_capacity',
+  'catalog_load',
+  'grader',
+  'run_timed_out',
+  'orphaned_claim',
+  'run_init_failed',
+  'unknown',
+]);
+export type BenchmarkProfileFailureClass = z.infer<typeof BenchmarkProfileFailureClassSchema>;
+
+const BenchmarkProfileFailureShape = {
+  failureClass: BenchmarkProfileFailureClassSchema,
+  reason: z.string().max(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH).nullable(),
+  /** Consecutive failed runs since the last ready measurement. */
+  attempts: z.number().int().nonnegative(),
+  firstFailedAt: z.string(),
+  lastFailedAt: z.string(),
+};
+
+export const BenchmarkProfileFailureSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('retryable'),
+    ...BenchmarkProfileFailureShape,
+    /** Earliest time a bulk requeue re-admits this profile. */
+    retryAfter: z.string(),
+  }),
+  z.object({
+    kind: z.literal('permanent'),
+    ...BenchmarkProfileFailureShape,
+    cause: z.enum(['terminal_class', 'model_budget_exhausted', 'infrastructure_budget_exhausted']),
+  }),
+]);
+export type BenchmarkProfileFailure = z.infer<typeof BenchmarkProfileFailureSchema>;
+
+export const BenchmarkRegistryFailedEntrySchema = z.object({
+  model: z.string().trim().min(1),
+  variant: VariantSchema,
+  queues: z.array(BenchmarkRunPurposeSchema).min(1),
+  runId: z.string().nullable(),
+  failure: BenchmarkProfileFailureSchema,
+});
+export type BenchmarkRegistryFailedEntry = z.infer<typeof BenchmarkRegistryFailedEntrySchema>;
+
 /** Registry row counts for one queue, under the live engine identity. */
 export const BenchmarkRegistryQueueSchema = z.object({
   pending: z.number().int(),
@@ -409,6 +466,8 @@ export const BenchmarkRegistryResponseSchema = z.object({
       })
     )
     .optional(),
+  /** Failed rows of the live identity that a queue still wants, retryable and permanent. */
+  failedEntries: z.array(BenchmarkRegistryFailedEntrySchema).optional(),
 });
 export type BenchmarkRegistryResponse = z.infer<typeof BenchmarkRegistryResponseSchema>;
 
@@ -418,6 +477,12 @@ export const RequeueBenchmarkRegistryRequestSchema = z.object({
 });
 export const RequeueBenchmarkRegistryResponseSchema = z.object({
   requeued: z.number().int(),
+});
+
+/** Admin re-admit of one failed registry pair; clears its failure history. */
+export const ReadmitBenchmarkProfileRequestSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
+  entry: BenchmarkPairSchema,
 });
 
 export const RefreshBenchmarkProfilesRequestSchema = z.object({
@@ -443,7 +508,23 @@ export const RefreshBenchmarkProfilesResponseSchema = z.object({
   refreshed: z.array(BenchmarkPairSchema),
   unavailable: z.array(BenchmarkPairSchema),
   skipped: z.array(BenchmarkPairSchema),
+  /**
+   * Why each `unavailable` pair was refused, by the same rule the drain applies. Optional
+   * so a response from a worker that predates it still parses.
+   */
+  refusals: z
+    .array(
+      z.object({
+        entry: BenchmarkPairSchema,
+        failureClass: BenchmarkProfileFailureClassSchema,
+        reason: z.string(),
+      })
+    )
+    .optional(),
 });
+export type RefreshBenchmarkProfilesResponse = z.infer<
+  typeof RefreshBenchmarkProfilesResponseSchema
+>;
 
 export const BenchmarkRoutingTableResponseSchema = z.object({
   table: RoutingTableSchema.nullable(),
@@ -478,13 +559,11 @@ export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSc
 
 // Benchmark profile registry (global per exact measurement pair + engine).
 
-/** Bounded failure text stored on failed profile rows. */
-export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
-
 export const BenchmarkProfileEntryStatusSchema = z.object({
   entry: BenchmarkPairSchema,
   status: BenchmarkProfileStatusSchema,
   failureReason: z.string().max(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH).nullable().optional(),
+  failure: BenchmarkProfileFailureSchema.nullable().optional(),
 });
 export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntryStatusSchema>;
 

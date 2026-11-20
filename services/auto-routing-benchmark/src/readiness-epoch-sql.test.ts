@@ -146,6 +146,28 @@ describe('benchmark readiness epoch trigger (real migrations)', () => {
     expect(epoch()).toBe(before + 2);
   });
 
+  it('bumps both routers when a config row is purely re-keyed', () => {
+    insertConfig();
+    const steadyOverrides = '{"minAccuracy":0.8}';
+    sqlite.exec(
+      `UPDATE benchmark_config SET policy_overrides = '${steadyOverrides}'
+       WHERE router = 'efficient'`
+    );
+    const efficientBefore = epoch('efficient');
+    const frontierBefore = epoch('frontier');
+    expect(efficientBefore).toBeGreaterThan(0);
+
+    // Only the owning router changes: no policy value and no profile is touched, yet both routers'
+    // tables now describe different configs.
+    sqlite.exec("UPDATE benchmark_config SET router = 'frontier' WHERE router = 'efficient'");
+
+    expect(epoch('efficient')).toBe(efficientBefore + 1);
+    expect(epoch('frontier')).toBe(frontierBefore + 1);
+    expect(
+      sqlite.prepare("SELECT router FROM benchmark_config").get() as { router: string }
+    ).toEqual({ router: 'frontier' });
+  });
+
   it('leaves the epoch alone for an audit-only or identical policy save', () => {
     insertConfig();
     sqlite.exec(

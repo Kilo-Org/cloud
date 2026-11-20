@@ -61,6 +61,9 @@ WHEN OLD.`min_accuracy` IS NOT NEW.`min_accuracy`
 	OR OLD.`switch_horizon_turns` IS NOT NEW.`switch_horizon_turns`
 	OR OLD.`policy_overrides` IS NOT NEW.`policy_overrides`
 	OR OLD.`policy_computed` IS NOT NEW.`policy_computed`
+	-- A pure re-key moves the whole policy to another router, so both tables change even though
+	-- no policy value did.
+	OR OLD.`router` IS NOT NEW.`router`
 BEGIN
 	INSERT INTO `benchmark_readiness_epoch` (`router`, `epoch`, `updated_at`)
 	VALUES (NEW.`router`, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))

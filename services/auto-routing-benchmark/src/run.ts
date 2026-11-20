@@ -1244,11 +1244,7 @@ function logQueueDrainSkipped(
  * mean admission refused the batch because its reuse-aware estimate exceeds a cap
  * or could not be priced.
  */
-export type DrainSkipReason =
-  | 'active_run'
-  | 'nothing_pending'
-  | 'paused'
-  | AdmissionSkipReason;
+export type DrainSkipReason = 'active_run' | 'nothing_pending' | 'paused' | AdmissionSkipReason;
 
 export async function drainQueue(
   env: Env,
@@ -1729,7 +1725,9 @@ async function recordDeciderOutput(
   key: OutputRecoveryKey,
   benchCase: MeasuredCase,
   output: StoredDeciderOutput,
-  judge: DeciderJudge | null
+  judge: DeciderJudge | null,
+  /** Owner whose daily budget this run's spend is charged to; null for platform. */
+  spendOwner: SpendOwner | null
 ): Promise<number> {
   const pendingKey = {
     run_id: key.runId,
@@ -1783,35 +1781,39 @@ async function recordDeciderOutput(
     if (grade.score === null) {
       throw new DeciderGraderRetryError(grade.graderError ?? 'Decider judge failed');
     }
-    await upsertCaseResult(env.BENCH_DB, {
-      run_id: key.runId,
-      model: key.model,
-      variant: key.variant,
-      case_id: key.caseId,
-      route_key: taxonomyRouteKey(benchCase),
-      score: grade.score,
-      latency_ms: result.latencyMs,
-      cost_usd: result.costUsd,
-      input_tokens: result.inputTokens,
-      cached_input_tokens: result.cachedInputTokens,
-      output_tokens: result.outputTokens,
-      reasoning_tokens: result.reasoningTokens,
-      error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
-      fallback_reason: null,
-      route_hit: null,
-      retried,
-      exit_code: result.exitCode,
-      output_prefix: result.text.slice(0, 200),
-      event_count: result.eventCount,
-      last_event_types: result.lastEventTypes.join(' '),
-      tool_calls: result.tools?.calls ?? null,
-      tool_names: result.tools ? JSON.stringify(result.tools.names) : null,
-      step_count: result.tools?.steps ?? null,
-      final_finish_reason: result.tools?.finalFinishReason ?? null,
-      rep: key.rep,
-      timed_out: result.timedOut ? 1 : 0,
-      prompt_revision: output.promptRevision,
-    });
+    await upsertCaseResult(
+      env.BENCH_DB,
+      {
+        run_id: key.runId,
+        model: key.model,
+        variant: key.variant,
+        case_id: key.caseId,
+        route_key: taxonomyRouteKey(benchCase),
+        score: grade.score,
+        latency_ms: result.latencyMs,
+        cost_usd: result.costUsd,
+        input_tokens: result.inputTokens,
+        cached_input_tokens: result.cachedInputTokens,
+        output_tokens: result.outputTokens,
+        reasoning_tokens: result.reasoningTokens,
+        error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
+        fallback_reason: null,
+        route_hit: null,
+        retried,
+        exit_code: result.exitCode,
+        output_prefix: result.text.slice(0, 200),
+        event_count: result.eventCount,
+        last_event_types: result.lastEventTypes.join(' '),
+        tool_calls: result.tools?.calls ?? null,
+        tool_names: result.tools ? JSON.stringify(result.tools.names) : null,
+        step_count: result.tools?.steps ?? null,
+        final_finish_reason: result.tools?.finalFinishReason ?? null,
+        rep: key.rep,
+        timed_out: result.timedOut ? 1 : 0,
+        prompt_revision: output.promptRevision,
+      },
+      { owner: spendOwner }
+    );
     return grade.costUsd;
   } finally {
     await releaseDeciderGrading(env.BENCH_DB, pendingKey, gradingToken);
@@ -1913,7 +1915,8 @@ async function recoverPendingOutputJob(env: Env, message: BenchmarkJobMessage): 
     { runId: message.runId, model: message.model, variant, rep: message.rep, caseId },
     benchCase,
     pending,
-    judge
+    judge,
+    state.spendOwner
   );
   console.log(
     JSON.stringify({
@@ -2287,41 +2290,54 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             benchCase.input,
             message.model
           );
-          await upsertCaseResult(env.BENCH_DB, {
-            run_id: message.runId,
-            model: message.model,
-            variant: classifierVariant,
-            case_id: benchCase.id,
-            route_key: null,
-            score: gradeClassifierOutput(benchCase.expected, classification),
-            latency_ms: Math.round(performance.now() - startedAt),
-            cost_usd: cost,
-            input_tokens: null,
-            cached_input_tokens: null,
-            output_tokens: null,
-            reasoning_tokens: null,
-            error: null,
-            fallback_reason: null,
-            route_hit:
-              classification.taskType === benchCase.expected.taskType &&
-              classification.subtaskType === benchCase.expected.subtaskType,
-            retried: null,
-            exit_code: null,
-            output_prefix: null,
-            event_count: null,
-            last_event_types: null,
-            tool_calls: null,
-            tool_names: null,
-            step_count: null,
-            final_finish_reason: null,
-            rep,
-            timed_out: 0,
-            prompt_revision: state.measurementRevision,
-          });
+          await upsertCaseResult(
+            env.BENCH_DB,
+            {
+              run_id: message.runId,
+              model: message.model,
+              variant: classifierVariant,
+              case_id: benchCase.id,
+              route_key: null,
+              score: gradeClassifierOutput(benchCase.expected, classification),
+              latency_ms: Math.round(performance.now() - startedAt),
+              cost_usd: cost,
+              input_tokens: null,
+              cached_input_tokens: null,
+              output_tokens: null,
+              reasoning_tokens: null,
+              error: null,
+              fallback_reason: null,
+              route_hit:
+                classification.taskType === benchCase.expected.taskType &&
+                classification.subtaskType === benchCase.expected.subtaskType,
+              retried: null,
+              exit_code: null,
+              output_prefix: null,
+              event_count: null,
+              last_event_types: null,
+              tool_calls: null,
+              tool_names: null,
+              step_count: null,
+              final_finish_reason: null,
+              rep,
+              timed_out: 0,
+              prompt_revision: state.measurementRevision,
+            },
+            { owner: null }
+          );
         } catch (error) {
           await upsertCaseResult(
             env.BENCH_DB,
-            failedRow(message, benchCase.id, null, startedAt, error, rep, state.measurementRevision)
+            failedRow(
+              message,
+              benchCase.id,
+              null,
+              startedAt,
+              error,
+              rep,
+              state.measurementRevision
+            ),
+            { owner: null }
           );
         }
       }
@@ -2837,7 +2853,8 @@ async function processDeciderJob(
           },
           benchCase,
           output,
-          judge
+          judge,
+          state.spendOwner
         );
       } catch (error) {
         if (error instanceof DeciderGraderRetryError) {

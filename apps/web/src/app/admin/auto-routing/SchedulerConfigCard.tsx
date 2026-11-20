@@ -5,12 +5,15 @@ import { adminFetch } from '@/lib/admin/admin-fetch';
 import {
   BENCHMARK_CONTAINER_BUDGET,
   BENCHMARK_SCHEDULER_SETTING_KEYS,
+  BENCHMARK_SPEND_CAP_KEYS,
   BenchmarkSchedulerConfigResponseSchema,
-  BenchmarkSchedulerOverridesSchema,
+  BenchmarkSchedulerConfigUpdateSchema,
   type BenchmarkSchedulerConfigResponse,
-  type BenchmarkSchedulerOverrides,
+  type BenchmarkSchedulerConfigUpdate,
   type BenchmarkSchedulerSetting,
   type BenchmarkSchedulerSettingKey,
+  type BenchmarkSpendCapKey,
+  type BenchmarkSpendCapSetting,
 } from '@kilocode/auto-routing-contracts';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,14 +34,21 @@ const SETTING_LABELS: Record<BenchmarkSchedulerSettingKey, string> = {
   modelConcurrency: 'Per-model concurrency',
 };
 
+const SPEND_CAP_LABELS: Record<BenchmarkSpendCapKey, string> = {
+  perRunUsd: 'Max per run (USD)',
+  perDayUsd: 'Max per UTC day (USD)',
+  perOwnerDayUsd: 'Max per owner per day (USD)',
+};
+
 type SchedulerOverrideForm = Record<BenchmarkSchedulerSettingKey, string>;
+type SpendCapForm = Record<BenchmarkSpendCapKey, string>;
 
 async function fetchSchedulerConfig() {
   const response = await adminFetch(SCHEDULER_CONFIG_URL);
   return parseAdminResponse(response, BenchmarkSchedulerConfigResponseSchema);
 }
 
-async function saveSchedulerConfig(overrides: BenchmarkSchedulerOverrides) {
+async function saveSchedulerConfig(overrides: BenchmarkSchedulerUpdate) {
   const response = await adminFetch(SCHEDULER_CONFIG_URL, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
@@ -56,20 +66,41 @@ function settingStatus(setting: BenchmarkSchedulerSetting): string {
     : `Using the default ${setting.effective}.`;
 }
 
+function spendCapStatus(setting: BenchmarkSpendCapSetting): string {
+  const amount = `$${setting.effective.toFixed(2)}`;
+  if (setting.source === 'admin') {
+    return `Override ${amount}. Clear it to use $${setting.fallback.toFixed(2)}.`;
+  }
+  return setting.source === 'env'
+    ? `From the worker env: ${amount}.`
+    : `Default ${amount}.`;
+}
+
 function SchedulerConfigEditor({ data }: { data: BenchmarkSchedulerConfigResponse }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<SchedulerOverrideForm>(() => ({
     slots: String(data.settings.slots.override ?? ''),
     modelConcurrency: String(data.settings.modelConcurrency.override ?? ''),
   }));
-  const parsed = BenchmarkSchedulerOverridesSchema.safeParse(
-    Object.fromEntries(
+  const [capForm, setCapForm] = useState<SpendCapForm>(() => ({
+    perRunUsd: String(data.spendCaps?.perRunUsd.override ?? ''),
+    perDayUsd: String(data.spendCaps?.perDayUsd.override ?? ''),
+    perOwnerDayUsd: String(data.spendCaps?.perOwnerDayUsd.override ?? ''),
+  }));
+  const parsedCaps = BenchmarkSchedulerConfigUpdateSchema.safeParse({
+    ...Object.fromEntries(
       BENCHMARK_SCHEDULER_SETTING_KEYS.map(key => {
         const text = form[key].trim();
         return [key, text === '' ? null : Number(text)];
       })
-    )
-  );
+    ),
+    ...Object.fromEntries(
+      BENCHMARK_SPEND_CAP_KEYS.map(key => {
+        const text = capForm[key].trim();
+        return [key, text === '' ? null : Number(text)];
+      })
+    ),
+  });
 
   const saveMutation = useMutation({
     mutationFn: saveSchedulerConfig,
@@ -81,6 +112,8 @@ function SchedulerConfigEditor({ data }: { data: BenchmarkSchedulerConfigRespons
       toast.error(error instanceof Error ? error.message : 'Failed to save scheduler limits');
     },
   });
+
+  const daySpend = data.spendToday;
 
   return (
     <Card className="rounded-lg">
@@ -111,18 +144,67 @@ function SchedulerConfigEditor({ data }: { data: BenchmarkSchedulerConfigRespons
             </div>
           ))}
         </div>
-        {parsed.success ? null : (
+
+        <div className="border-t pt-3">
+          <h3 className="text-sm font-medium">Spend caps</h3>
+          <p className="text-muted-foreground mt-1 text-xs">
+            A run is refused before it starts when its estimate exceeds a cap, and a running run
+            stops claiming work when it reaches one. Nothing is dropped: held pairs stay pending and
+            are admitted once there is room. A cap can be raised, never removed.
+          </p>
+          {daySpend ? (
+            <p className="mt-2 text-xs">
+              Today ({daySpend.day}):{' '}
+              <span className="font-medium tabular-nums">${daySpend.spentUsd.toFixed(2)}</span> of $
+              {daySpend.perDayUsd.toFixed(2)}
+              {daySpend.spentUsd >= daySpend.perDayUsd ? (
+                <span className="text-destructive font-medium"> — day cap reached</span>
+              ) : null}
+            </p>
+          ) : null}
+          {data.spendCaps ? null : (
+            <p className="text-muted-foreground mt-2 text-xs">
+              This worker does not report spend caps yet; the defaults apply there.
+            </p>
+          )}
+          <div className="mt-3 grid gap-4 sm:grid-cols-3">
+            {BENCHMARK_SPEND_CAP_KEYS.map(key => (
+              <div key={key} className="flex flex-col gap-1.5">
+                <Label htmlFor={`benchmark-cap-${key}`} className="text-sm font-medium">
+                  {SPEND_CAP_LABELS[key]}
+                </Label>
+                <Input
+                  id={`benchmark-cap-${key}`}
+                  type="text"
+                  inputMode="decimal"
+                  value={capForm[key]}
+                  onChange={e => setCapForm(prev => ({ ...prev, [key]: e.target.value }))}
+                  className="h-8 w-28 tabular-nums"
+                  placeholder={data.spendCaps?.[key].fallback.toFixed(2) ?? ''}
+                />
+                <p className="text-muted-foreground text-xs">
+                  {data.spendCaps
+                    ? spendCapStatus(data.spendCaps[key])
+                    : 'Not reported by this worker.'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {parsedCaps.success ? null : (
           <p className="text-destructive text-xs">
-            Each limit must be a whole number from 1 to {BENCHMARK_CONTAINER_BUDGET}.
+            Each limit must be a whole number from 1 to {BENCHMARK_CONTAINER_BUDGET}, and each cap a
+            positive amount in USD.
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             onClick={() => {
-              if (parsed.success) saveMutation.mutate(parsed.data);
+              if (parsedCaps.success) saveMutation.mutate(parsedCaps.data);
             }}
-            disabled={!parsed.success || saveMutation.isPending}
+            disabled={!parsedCaps.success || saveMutation.isPending}
           >
             <Save className="size-4" />
             Save scheduler limits

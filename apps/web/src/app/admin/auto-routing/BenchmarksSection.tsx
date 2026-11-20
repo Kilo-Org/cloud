@@ -1513,6 +1513,16 @@ export function RunRouteTable({
 /** Column count of the runs table, shared by its empty and expanded rows. */
 const RUN_TABLE_COLUMNS = 7;
 
+/** A paused run's reason, phrased once so the badge and the row agree. */
+export function runBudgetLabel(budget: BenchmarkRun['budget']): string | null {
+  if (!budget || budget.state === 'within') return null;
+  const scope = budget.scope;
+  if (scope === 'run') return `Paused at the per-run cap ($${budget.capUsd.toFixed(2)})`;
+  if (scope === 'day') return `Paused at the daily cap ($${budget.capUsd.toFixed(2)})`;
+  if (scope === 'owner_day') return `Paused at the owner's daily cap ($${budget.capUsd.toFixed(2)})`;
+  return 'Paused: the run could not be priced';
+}
+
 function statusBadgeVariant(
   status: BenchmarkRun['status']
 ): 'default' | 'secondary' | 'destructive' {
@@ -1652,6 +1662,11 @@ export function BenchmarkRunsTable({
                 <Badge variant={statusBadgeVariant(run.status)} className="capitalize">
                   {run.status}
                 </Badge>
+                {runBudgetLabel(run.budget) ? (
+                  <span className="text-destructive mt-1 block max-w-56 text-[11px]">
+                    {runBudgetLabel(run.budget)}
+                  </span>
+                ) : null}
                 {run.progress ? (
                   <RunProgress progress={run.progress} startedAt={run.startedAt} />
                 ) : null}

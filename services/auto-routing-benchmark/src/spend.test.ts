@@ -185,9 +185,7 @@ describe('benchmark spend ledger and caps', () => {
     await backfillDayLedger(db, DAY);
 
     const row = sqlite
-      .prepare(
-        `SELECT owner_type, owner_id, spent_usd FROM benchmark_spend_ledger WHERE day = ?`
-      )
+      .prepare(`SELECT owner_type, owner_id, spent_usd FROM benchmark_spend_ledger WHERE day = ?`)
       .all(DAY) as Array<{ owner_type: string; owner_id: string; spent_usd: number }>;
     expect(row).toHaveLength(1);
     expect(row[0]).toMatchObject({ owner_type: '', owner_id: '' });

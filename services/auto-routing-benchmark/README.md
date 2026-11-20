@@ -140,6 +140,45 @@ invariant 7), the PUT also accepts and ignores the retired `providerConcurrency`
 `GET /admin/scheduler-config` returns each limit's `effective` value, its `source`
 (`admin`, `env`, or `default`), the `override`, and the `fallback` used without one.
 
+### Spend caps
+
+Three USD caps bound what the benchmark can spend. They live in the same scheduler config,
+so one admin save raises them without a deploy, and they are never unlimited: `0`, a negative
+value and a missing value are all rejected, and a `null` override means "use the env value or
+the default", never "no cap".
+
+| Cap | Default | Bounds |
+| --- | --- | --- |
+| `perRunUsd` | 50 | one run's fresh execution cost |
+| `perDayUsd` | 150 | every run's fresh cost, over one UTC day |
+| `perOwnerDayUsd` | 25 | one subscription owner's pairs, over one UTC day |
+
+Admission **fails closed**. Before a run row is written, the worker estimates the batch's
+cost by running that run's own case selection — the dataset for `(router, revision)`, minus
+what `initializeScheduledRun` would copy from an earlier run (re-measure baselines first, then
+prior-results reuse, both gated by `minimumCaseRevisions`), for every repetition — and prices
+each pair per context bucket from its own graded rows. Without a measurement it uses catalog
+price times that case's own tokens. With neither, the pair is **refused**: an unpriceable
+model is never admitted as if it were free. A forecast above the run cap, above the day's
+remaining budget, or above the owner's remaining budget starts nothing.
+
+A refusal drops no work. The pairs stay `pending`, a `benchmark_budget_holds` row records the
+cap, the estimate and the remaining budget, and the console shows why they are waiting; the
+next drain that fits admits them. Runs already in flight are bounded too: the day's ledger is
+seeded once from the day's recorded fresh results (`case_results` joined to
+`scheduler_executions`), so a run that started before the caps shipped sees the real spend at
+its first claim. Dispatch then marks a run `paused` at whichever cap it reached, and the
+lane-head query claims nothing for a paused run or one already at its own cap. A raised cap
+(or the UTC day rolling) resumes it, as does `POST /admin/runs/:runId/resume`.
+
+The day total is a running per-day, per-owner ledger written in the same batch as each fresh
+result, so admission and the guard read one indexed row instead of aggregating
+`case_results`. A reused copy is never counted: historical cost is not today's spend.
+
+`benchmark_config.user_queue_paused` pauses the owner queue by itself: while set, the user
+drain starts no run and owner admissions queue no rows, but subscription snapshots are still
+recorded so a save during the pause loses nothing. The platform queue is unaffected.
+
 ```sh
 curl -s -X PUT "$WORKER_URL/admin/scheduler-config" \
   -H "Authorization: Bearer $INTERNAL_API_SECRET_PROD" -H 'content-type: application/json' \

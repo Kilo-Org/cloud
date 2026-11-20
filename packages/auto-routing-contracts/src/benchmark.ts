@@ -134,6 +134,14 @@ export const BenchmarkSpendCapsResponseSchema = z.object({
 });
 export type BenchmarkSpendCapsResponse = z.infer<typeof BenchmarkSpendCapsResponseSchema>;
 
+/** Today's spend against the day cap, served with the scheduler config. */
+export const BenchmarkSpendTodaySchema = z.object({
+  day: z.string(),
+  spentUsd: z.number().nonnegative(),
+  perDayUsd: z.number().nonnegative(),
+});
+export type BenchmarkSpendToday = z.infer<typeof BenchmarkSpendTodaySchema>;
+
 /**
  * Unknown setting keys are stripped, so a client parses a worker that still serves
  * a retired setting. `spendCaps` is optional because a worker that predates it does
@@ -146,6 +154,8 @@ export const BenchmarkSchedulerConfigResponseSchema = z.object({
     modelConcurrency: BenchmarkSchedulerSettingSchema,
   } satisfies Record<BenchmarkSchedulerSettingKey, typeof BenchmarkSchedulerSettingSchema>),
   spendCaps: BenchmarkSpendCapsResponseSchema.optional(),
+  /** Today's total fresh spend against the day cap; optional like `spendCaps`. */
+  spendToday: BenchmarkSpendTodaySchema.optional(),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
@@ -167,12 +177,7 @@ export const BenchmarkSchedulerConfigUpdateSchema = z.strictObject({
 export type BenchmarkSchedulerConfigUpdate = z.infer<typeof BenchmarkSchedulerConfigUpdateSchema>;
 
 /** Which cap refused or paused work; `unknown_cost` is a fail-closed pricing refusal. */
-export const BenchmarkSpendCapScopeSchema = z.enum([
-  'run',
-  'day',
-  'owner_day',
-  'unknown_cost',
-]);
+export const BenchmarkSpendCapScopeSchema = z.enum(['run', 'day', 'owner_day', 'unknown_cost']);
 export type BenchmarkSpendCapScope = z.infer<typeof BenchmarkSpendCapScopeSchema>;
 
 /**
@@ -221,14 +226,6 @@ export const BenchmarkBudgetHoldSchema = z.object({
   heldAt: z.string(),
 });
 export type BenchmarkBudgetHold = z.infer<typeof BenchmarkBudgetHoldSchema>;
-
-/** Today's spend against the day cap, served with the scheduler config. */
-export const BenchmarkSpendTodaySchema = z.object({
-  day: z.string(),
-  spentUsd: z.number().nonnegative(),
-  perDayUsd: z.number().nonnegative(),
-});
-export type BenchmarkSpendToday = z.infer<typeof BenchmarkSpendTodaySchema>;
 
 /**
  * Pre-run estimate for the queue as it stands now. Served by its own route so the

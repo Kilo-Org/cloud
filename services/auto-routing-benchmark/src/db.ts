@@ -152,7 +152,24 @@ export function mapSummaryRowWithRun(row: ModelSummaryRow): BenchmarkModelSummar
   };
 }
 
-export function mapRunRow(row: RunRow): BenchmarkRun {
+export function mapRunRow(
+  row: RunRow,
+  caps?: { perRunUsd: number }
+): BenchmarkRun {
+  const budget = caps
+    ? row.spend_pause_scope !== null
+      ? ({
+          state: 'paused',
+          capUsd: caps.perRunUsd,
+          scope: row.spend_pause_scope,
+          forecastUsd: row.spend_estimate_usd,
+        } satisfies BenchmarkRun['budget'])
+      : ({
+          state: 'within',
+          capUsd: caps.perRunUsd,
+          forecastUsd: row.spend_estimate_usd,
+        } satisfies BenchmarkRun['budget'])
+    : undefined;
   return {
     id: row.id,
     router: row.router ?? 'efficient',
@@ -162,6 +179,7 @@ export function mapRunRow(row: RunRow): BenchmarkRun {
     startedAt: row.started_at,
     completedAt: row.completed_at,
     error: row.error,
+    ...(budget ? { budget } : {}),
   };
 }
 
@@ -573,10 +591,7 @@ export async function upsertCaseResult(
     upsert.toSQL(),
     orm.delete(pendingDeciderOutputs).where(pendingDeciderOutputPredicate(row)).toSQL(),
   ];
-  await db.batch([
-    ...built.map(query => db.prepare(query.sql).bind(...query.params)),
-    ...ledger,
-  ]);
+  await db.batch([...built.map(query => db.prepare(query.sql).bind(...query.params)), ...ledger]);
 }
 
 /**
@@ -1160,7 +1175,9 @@ export async function listRuns(
   // Classifier, platform-decider and profile-decider runs interleave in one
   // table and profile runs are by far the most frequent, so the admin list
   // filters server-side instead of slicing a mixed page client-side.
-  filter: { router?: AutoRouter; kind?: BenchmarkKind; purpose?: BenchmarkRunPurpose } = {}
+  filter: { router?: AutoRouter; kind?: BenchmarkKind; purpose?: BenchmarkRunPurpose } = {},
+  /** Caps in force, so each run reports its spend against the live per-run cap. */
+  caps?: { perRunUsd: number }
 ): Promise<BenchmarkRun[]> {
   const runRows = await drizzle(db)
     .select()
@@ -1174,7 +1191,7 @@ export async function listRuns(
     )
     .orderBy(desc(benchmarkRuns.started_at))
     .limit(limit);
-  return runRows.map(mapRunRow);
+  return runRows.map(row => mapRunRow(row, caps));
 }
 
 export async function listRunningRunIds(db: D1Database, router: AutoRouter): Promise<string[]> {

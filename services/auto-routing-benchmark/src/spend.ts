@@ -263,7 +263,10 @@ export async function measuredPairCosts(
     .all<{ case_id: string; cost_usd: number; prompt_revision: number }>();
   if (rows.results.length === 0) return null;
   const caseById = new Map(
-    deciderCasesForRouter(params.router, params.revision).map(benchCase => [benchCase.id, benchCase])
+    deciderCasesForRouter(params.router, params.revision).map(benchCase => [
+      benchCase.id,
+      benchCase,
+    ])
   );
   const totals = new Map<CostBucket, { sum: number; cases: number }>();
   for (const row of rows.results) {
@@ -558,16 +561,14 @@ export type RunSpendForecast = {
 export function toForecastResponse(forecast: RunSpendForecast): BenchmarkSpendForecast {
   return {
     totalUsd: forecast.totalUsd,
-    pairs: forecast.pairs.map(
-      (pair): BenchmarkSpendForecastPair => ({
-        entry: pair.entry,
-        casesPerRepetition: pair.casesPerRepetition,
-        repetitions: pair.repetitions,
-        estimateUsd: pair.estimateUsd,
-        basis: pair.basis,
-        measuredCases: pair.measuredCases,
-      })
-    ),
+    pairs: forecast.pairs.map((pair): BenchmarkSpendForecastPair => ({
+      entry: pair.entry,
+      casesPerRepetition: pair.casesPerRepetition,
+      repetitions: pair.repetitions,
+      estimateUsd: pair.estimateUsd,
+      basis: pair.basis,
+      measuredCases: pair.measuredCases,
+    })),
     perRunUsd: forecast.perRunUsd,
     daySpendUsd: forecast.daySpendUsd,
     perDayUsd: forecast.perDayUsd,
@@ -633,7 +634,9 @@ async function forecastClassifierPairs(
     const priced = pricedClassifierCaseCost(params.prices.get(pair.model) ?? null);
     const cases = caseCount * params.repetitions;
     if (measured !== null) {
-      pairs.push(classifierForecast(pair, params.repetitions, cases, measured * cases, 'measured', cases));
+      pairs.push(
+        classifierForecast(pair, params.repetitions, cases, measured * cases, 'measured', cases)
+      );
       continue;
     }
     if (priced !== null) {
@@ -669,10 +672,7 @@ function classifierForecast(
  * has none. Classifier runs are one per router and cheap; the limit of one is what
  * keeps this a point read rather than a scan.
  */
-async function measuredClassifierCaseCost(
-  db: D1Database,
-  model: string
-): Promise<number | null> {
+async function measuredClassifierCaseCost(db: D1Database, model: string): Promise<number | null> {
   const row = await db
     .prepare(`
       SELECT AVG(result.cost_usd) AS avg_cost
@@ -858,10 +858,7 @@ export function describeSpendRefusal(refusal: SpendRefusal, pairs: readonly stri
       `prior measurement and no usable catalog price is refused rather than run unbounded.`
     );
   }
-  const labels: Record<
-    Exclude<BenchmarkSpendCapScope, 'unknown_cost'>,
-    string
-  > = {
+  const labels: Record<Exclude<BenchmarkSpendCapScope, 'unknown_cost'>, string> = {
     run: 'per-run',
     day: 'daily',
     owner_day: "this owner's daily",
@@ -924,7 +921,12 @@ export async function recordBudgetHolds(
 /** Drops holds that no longer apply: their pairs are claimed, measured, or gone. */
 export async function clearStaleBudgetHolds(
   db: D1Database,
-  params: { router: AutoRouter; engineIdentity: string; repetitions: number; pairs: readonly BenchmarkPair[] }
+  params: {
+    router: AutoRouter;
+    engineIdentity: string;
+    repetitions: number;
+    pairs: readonly BenchmarkPair[];
+  }
 ): Promise<void> {
   if (params.pairs.length === 0) return;
   const wanted = JSON.stringify(
@@ -986,10 +988,7 @@ export async function listBudgetHolds(
     scope: row.scope,
     estimateUsd: Number(row.estimate_usd),
     remainingUsd: Number(row.remaining_usd),
-    ownerType:
-      row.owner_type === 'user' || row.owner_type === 'org'
-        ? row.owner_type
-        : null,
+    ownerType: row.owner_type === 'user' || row.owner_type === 'org' ? row.owner_type : null,
     ownerId: row.owner_id === '' ? null : row.owner_id,
     heldAt: row.held_at,
   }));
@@ -1027,7 +1026,12 @@ export function freshResultSpendStatements(
   now: Date = new Date()
 ): D1PreparedStatement[] {
   return [
-    addSpendStatement(db, { day: utcDayOf(now), owner: params.owner }, params.costUsd, now.toISOString()),
+    addSpendStatement(
+      db,
+      { day: utcDayOf(now), owner: params.owner },
+      params.costUsd,
+      now.toISOString()
+    ),
     addRunSpendStatement(db, params.runId, params.costUsd),
   ];
 }
@@ -1037,9 +1041,7 @@ export type RunSpend = { runId: string; spentUsd: number; owner: SpendOwner | nu
 /** One run's recorded fresh spend and the owner budget it draws on. */
 export async function readRunSpend(db: D1Database, runId: string): Promise<RunSpend | null> {
   const row = await db
-    .prepare(
-      `SELECT spent_usd, spend_owner_type, spend_owner_id FROM benchmark_runs WHERE id = ?`
-    )
+    .prepare(`SELECT spent_usd, spend_owner_type, spend_owner_id FROM benchmark_runs WHERE id = ?`)
     .bind(runId)
     .first<{ spent_usd: number; spend_owner_type: string | null; spend_owner_id: string | null }>();
   if (!row) return null;
@@ -1360,9 +1362,7 @@ export async function pauseRunsAtDailyCaps(
 ): Promise<Array<{ runId: string; scope: 'day' | 'owner_day' }>> {
   const day = utcDayOf(now);
   const ledger = await db
-    .prepare(
-      `SELECT owner_type, owner_id, spent_usd FROM benchmark_spend_ledger WHERE day = ?`
-    )
+    .prepare(`SELECT owner_type, owner_id, spent_usd FROM benchmark_spend_ledger WHERE day = ?`)
     .bind(day)
     .all<{ owner_type: string; owner_id: string; spent_usd: number }>();
   let dayUsd = 0;

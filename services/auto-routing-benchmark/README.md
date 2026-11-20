@@ -1329,9 +1329,10 @@ in `skipped`.
 - **The measurement itself.** Nothing removes it: it is the paid inference the benchmark
   exists to perform.
 - **Publish waits for every serving pair.** The table is republished from the registry only
-  when all pairs it serves are current. This is what keeps a half-measured alias move from
-  degrading the live table; it is also why one stuck pair used to hold the whole table
-  (fixed 2026-11-20: a settled failure now leaves the table instead of blocking it).
+  when every pair it serves is current or a settled failure. This is what keeps a
+  half-measured alias move from degrading the live table; it is also why one stuck pair used
+  to hold the whole table (fixed 2026-11-20: a settled failure now leaves the table instead
+  of blocking it).
 
 ### Measurement revision 3: agentic probes (defined, inactive)
 

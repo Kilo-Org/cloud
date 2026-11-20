@@ -150,7 +150,7 @@ function keyOf(row: unknown): string | undefined {
  * owner column matches another owner's row.
  *
  * `state.lockCalls` counts the profile row locks, `state.advisoryLocks` the
- * `execute`d advisory locks, `state.rowCount` tracks the stored rows,
+ * `execute`d statements, `state.rowCount` tracks the stored rows,
  * `state.upserts` counts variable writes, `initialVarKeys` are the variable
  * keys the profile already holds, `state.profileRows` is the current profile
  * rows, `state.defaultWrites` the `update`s this fake executed,
@@ -192,6 +192,8 @@ export function createLimitTestDb(
     },
     defaultWrites,
     lockCalls: 0,
+    /** `execute`d statements, counted because the creation lock is one. */
+    advisoryLocks: 0,
     commandDeletes: 0,
   };
 
@@ -273,8 +275,12 @@ export function createLimitTestDb(
   });
 
   // The owner creation lock is an advisory `execute`; the fake serializes
-  // transactions itself, so the statement only needs to succeed.
-  const execute = (): Promise<void> => Promise.resolve();
+  // transactions itself, so the statement only needs to succeed and be counted,
+  // which is what lets a test assert the create path took the owner lock.
+  const execute = (): Promise<void> => {
+    state.advisoryLocks += 1;
+    return Promise.resolve();
+  };
 
   const update = () => ({
     set: (values: { is_default?: boolean }) => ({

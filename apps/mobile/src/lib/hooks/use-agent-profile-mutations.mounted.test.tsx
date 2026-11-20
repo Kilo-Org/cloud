@@ -139,9 +139,15 @@ function QuietCreateProfileProbe({ holder }: { holder: { current: CreateProfile 
 
 type UpdateProfile = (input: { profileId: string; name?: string }) => Promise<unknown>;
 
-/** The Overview screen's rename path, which keeps the hook's toast. */
+/**
+ * The Overview screen's rename path. It asks for the quiet create as well, so
+ * the case below fails if that option ever reaches a mutation other than
+ * `create`: the update here must still toast.
+ */
 function UpdateProfileProbe({ holder }: { holder: { current: UpdateProfile | null } }) {
-  holder.current = useAgentProfileMutations('org-1').update.mutateAsync;
+  holder.current = useAgentProfileMutations('org-1', {
+    quietCreateErrorToast: true,
+  }).update.mutateAsync;
   return null;
 }
 

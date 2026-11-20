@@ -76,6 +76,18 @@ describe('createProfileWithContent command bounds', () => {
     expect(state.profileInserts).toBe(1);
     expect(state.commands).toEqual(atCap);
   });
+
+  test('takes the owner creation lock before it inserts the profile', async () => {
+    const { db, state } = createLimitTestDb(0);
+
+    await createProfileWithContent(db, '', OWNER, OWNER.id, {
+      name: 'Locked',
+      commands: ['npm ci'],
+    });
+
+    expect(state.advisoryLocks).toBe(1);
+    expect(state.profileInserts).toBe(1);
+  });
 });
 
 describe('setCommands command bounds', () => {

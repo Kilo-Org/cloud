@@ -429,14 +429,18 @@ export async function drainQueues(
   // admin who pressed a button needs to be told the queue is wedged instead of
   // being shown "nothing to run".
   errors?: unknown[],
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  // A caller that reconciled the platform queue itself, in this same request
+  // (the config save), skips the drain's own reconcile. It would read the same
+  // saved decider list and write the same rows again.
+  options: { skipPlatformSync?: boolean } = {}
 ): Promise<StartedQueueRun[]> {
   const queues: BenchmarkRunPurpose[] =
     selector === 'both' ? ['platform', 'user'] : [selector satisfies BenchmarkRunPurpose];
   const started: StartedQueueRun[] = [];
   for (const queue of queues) {
     try {
-      const drained = await drainQueue(env, queue, router);
+      const drained = await drainQueue(env, queue, router, options);
       if (drained) started.push({ ...drained, router, purpose: queue });
     } catch (error) {
       errors?.push(error);
@@ -1095,7 +1099,8 @@ export async function startRun(
 export async function drainQueue(
   env: Env,
   queue: BenchmarkRunPurpose,
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  options: { skipPlatformSync?: boolean } = {}
 ): Promise<{ runId: string; entryCount: number } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return null;
@@ -1113,7 +1118,8 @@ export async function drainQueue(
   }
 
   // Reconcile saved snapshots, not the live alias targets.
-  if (queue === 'platform') await syncPlatformRegistry(env, fetch, router);
+  if (queue === 'platform' && !options.skipPlatformSync)
+    await syncPlatformRegistry(env, fetch, router);
 
   const engineIdentity = computeEngineIdentity('decider', router);
   const repetitions = resolveEffectivePolicy(config).deciderRepetitions;

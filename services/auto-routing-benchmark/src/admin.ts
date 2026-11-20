@@ -250,9 +250,12 @@ async function drainPlatformAfterConfigSave(
 ): Promise<BenchmarkConfigSaveDrain> {
   const timedOut = Promise.withResolvers<'timeout'>();
   const timer = setTimeout(() => timedOut.resolve('timeout'), CONFIG_SAVE_DRAIN_DEADLINE_MS);
+  // A queue drain reports its own failure here instead of throwing: one wedged
+  // queue must not fail the other, and the save must not fail either.
+  const drainErrors: unknown[] = [];
   try {
     const started = await Promise.race([
-      drainQueues(env, 'platform', undefined, router),
+      drainQueues(env, 'platform', drainErrors, router, { skipPlatformSync: true }),
       timedOut.promise,
     ]);
     if (started === 'timeout') {
@@ -267,9 +270,13 @@ async function drainPlatformAfterConfigSave(
       return { runId: null, entryCount: 0, skipped: 'timeout' };
     }
     const [run] = started;
-    return run
-      ? { runId: run.runId, entryCount: run.entryCount, skipped: null }
-      : { runId: null, entryCount: 0, skipped: 'active_run' };
+    if (run) return { runId: run.runId, entryCount: run.entryCount, skipped: null };
+    // Nothing started: either the queue already holds a run, or the drain threw.
+    return {
+      runId: null,
+      entryCount: 0,
+      skipped: drainErrors.length > 0 ? 'failed' : 'active_run',
+    };
   } catch (error) {
     console.warn(
       JSON.stringify({

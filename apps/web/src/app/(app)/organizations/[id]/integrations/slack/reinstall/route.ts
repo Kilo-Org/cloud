@@ -28,6 +28,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   return NextResponse.redirect(
-    new URL(getPlatformOAuthConnectPath(PLATFORM.SLACK, id), request.url)
+    new URL(getPlatformOAuthConnectPath(PLATFORM.SLACK, { organizationId: id }), request.url)
   );
 }

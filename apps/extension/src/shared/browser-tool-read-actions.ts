@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import {
   MAX_BROWSER_TOOL_FIND_CONTEXT_LINES,
+  MAX_BROWSER_TOOL_FIND_LINES,
   boundBrowserToolText,
   captureBrowserAriaSnapshot,
   caughtMessage,
@@ -15,7 +16,7 @@ import {
 import type {
   BrowserAriaSnapshotCapture,
   BrowserAriaSnapshotLine,
-  BrowserSnapshotArguments,
+  BrowserSnapshotCaptureOptions,
   BrowserToolPageSession,
 } from './browser-tool-snapshot';
 import { ambiguousSelectorError } from './browser-agent-checks';
@@ -40,6 +41,7 @@ import {
   readWithheldFrameBoxes,
   withheldFramesOf,
 } from './browser-agent-frames';
+import { recompressPngBase64 } from './browser-png';
 import { maskScreenshotDataUrl } from './browser-screenshot-masking';
 import type {
   ScreenshotBox,
@@ -614,7 +616,7 @@ const snapshotRootFrameId = async (
  */
 const captureScopedSnapshot = async (
   deps: BrowserReadActionDeps,
-  options: BrowserSnapshotArguments,
+  options: BrowserSnapshotCaptureOptions,
   mergeRefs = false
 ): Promise<BrowserAriaSnapshotCapture> => {
   if (deps.agentScope === undefined) {
@@ -627,6 +629,7 @@ const captureScopedSnapshot = async (
 
   return captureAgentSnapshotView(deps.session, deps.agentScope, {
     ...(options.depth === undefined ? {} : { depth: options.depth }),
+    ...(options.maxLines === undefined ? {} : { maxLines: options.maxLines }),
     mergeRefs: mergeRefs || target !== '',
     ...(rootFrameId === undefined ? {} : { rootFrameId }),
   });
@@ -697,6 +700,7 @@ const NO_SCROLL = { x: 0, y: 0 } as const;
 
 /** The masker re-encodes every masked image as PNG, so a masked capture reports that type. */
 const MASKED_SCREENSHOT_MEDIA_TYPE = 'image/png';
+const PNG_DATA_URL_PREFIX = 'data:image/png;base64,';
 
 const maskAgentScreenshot = async (
   deps: BrowserReadActionDeps,
@@ -843,7 +847,12 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     );
   }
 
-  const capture = await captureScopedSnapshot(deps, {}, true);
+  // A search reads far more of the tree than one snapshot prints: a match past those lines still needs its ref, and its refs merge into the registry whatever the target.
+  const capture = await captureScopedSnapshot(
+    deps,
+    { maxLines: MAX_BROWSER_TOOL_FIND_LINES },
+    true
+  );
   const matches: number[] = [];
 
   for (const [index, line] of capture.lines.entries()) {
@@ -856,15 +865,29 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     }
   }
 
+  const query = text ?? regex ?? '';
+  const lastSearched = capture.lines.at(-1);
+  // A search that hit its line bound must not read as a page without the text: say where it stopped.
+  const stoppedAt =
+    capture.truncated && lastSearched !== undefined ? describeFindLine(lastSearched) : undefined;
+
   if (matches.length === 0) {
-    return done(`No matches for "${text ?? regex ?? ''}" in the current page snapshot.`);
+    return done(
+      stoppedAt === undefined
+        ? `No matches for "${query}" in the current page snapshot.`
+        : `No match for "${query}" in the first ${String(capture.lines.length)} lines of the page snapshot. The search stopped there, after ${stoppedAt}; the rest of the page was not searched.`
+    );
   }
 
   const sections = matches.map(index => renderFindSnippet(capture.lines, index));
+  const stoppedNote =
+    stoppedAt === undefined || matches.length >= MAX_BROWSER_TOOL_FIND_MATCHES
+      ? ''
+      : ` The search stopped after ${String(capture.lines.length)} lines, at ${stoppedAt}; the rest of the page was not searched.`;
 
   return done(
     boundBrowserToolText(
-      `Found ${String(matches.length)} match(es) for "${text ?? regex ?? ''}".\n\n${sections.join('\n\n')}`
+      `Found ${String(matches.length)} match(es) for "${query}".${stoppedNote}\n\n${sections.join('\n\n')}`
     )
   );
 };
@@ -1097,8 +1120,12 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
     `Screenshot captured (${type}, ${scope}).${filenameNote(filename)}`
   );
 
+  // The screencast frame and the masker's canvas both deflate a PNG for speed; deflating it again keeps every pixel.
+  const dataUrl = masked.dataUrl.startsWith(PNG_DATA_URL_PREFIX)
+    ? `${PNG_DATA_URL_PREFIX}${await recompressPngBase64(masked.dataUrl.slice(PNG_DATA_URL_PREFIX.length))}`
+    : masked.dataUrl;
   const value: BrowserToolScreenshotValue = {
-    dataUrl: masked.dataUrl,
+    dataUrl,
     mediaType: masked.mediaType,
     text,
   };

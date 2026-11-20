@@ -3,12 +3,12 @@ import { z } from 'zod';
 import { createWebMcpToolCall } from './agent-conversation';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
+  RUN_CODE_UNSUPPORTED_ERROR,
   ambiguousSelectorError,
   originPatternMatches,
   toBrowserOrigin,
 } from './browser-agent-checks';
 import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
-import { pressKeyChord } from './browser-tool-interact-actions';
 import type {
   BrowserToolDialog,
   BrowserToolResolvedTarget,
@@ -77,21 +77,6 @@ export const BROWSER_TOOL_NO_FILE_CHOOSER_ERROR =
 export const MAX_BROWSER_EVALUATE_STRING_LENGTH = 8000;
 const DEFAULT_PAGE_LOAD_TIMEOUT_MS = 15_000;
 const PAGE_LOAD_POLL_INTERVAL_MS = 100;
-
-/** The page methods browser_run_code_unsafe backs; anything else is a named tool error. */
-export const RUN_CODE_SUPPORTED_METHODS = [
-  'click',
-  'content',
-  'evaluate',
-  'fill',
-  'goto',
-  'press',
-  'screenshot',
-  'selectOption',
-  'title',
-  'type',
-  'waitForSelector',
-] as const;
 
 export interface BrowserToolFileChooser {
   readonly backendNodeId?: number;
@@ -174,7 +159,6 @@ const cdpExceptionSchema = z.object({ text: z.string() });
 const cdpResolveNodeResponseSchema = z.object({
   object: z.object({ objectId: z.string().optional() }).optional(),
 });
-const cdpScreenshotResponseSchema = z.object({ data: z.string().optional() });
 /** `Page.navigate` sets `errorText` when the navigation could not start or resolve. */
 const cdpNavigateResponseSchema = z.object({ errorText: z.string().optional() });
 const navigationHistorySchema = z.object({
@@ -187,7 +171,6 @@ const pageIdentitySchema = z.object({
   title: z.string().optional(),
   url: z.string().optional(),
 });
-const pageScreenshotSchema = z.object({ base64: z.string(), mediaType: z.literal('image/png') });
 
 const fail = (error: string): EvalTabResult => ({ error, ok: false });
 const done = (value: unknown): EvalTabResult => ({ ok: true, value });
@@ -443,182 +426,6 @@ const evaluateFunctionInPage = async (
       returnByValue: true,
     })
   );
-};
-
-const clickExpression = (selector: string): string =>
-  `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (element === null) { throw new Error('No element matches selector: ' + ${JSON.stringify(selector)}); } element.click(); return true; })()`;
-
-const fillExpression = (selector: string, value: string): string =>
-  `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (element === null) { throw new Error('No element matches selector: ' + ${JSON.stringify(selector)}); } const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set; if (setter) { setter.call(element, ${JSON.stringify(value)}); } else { element.value = ${JSON.stringify(value)}; } element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`;
-
-const focusExpression = (selector: string): string =>
-  `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (element === null) { throw new Error('No element matches selector: ' + ${JSON.stringify(selector)}); } element.focus(); return true; })()`;
-
-const selectOptionExpression = (selector: string, values: readonly string[]): string =>
-  `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!(element instanceof HTMLSelectElement)) { throw new Error('Element is not a select: ' + ${JSON.stringify(selector)}); } const wanted = ${JSON.stringify(values)}.map(String); for (const option of element.options) { option.selected = wanted.includes(option.value) || wanted.includes((option.textContent ?? '').trim()); } element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`;
-
-const waitForSelectorExpression = (selector: string): string =>
-  `document.querySelector(${JSON.stringify(selector)}) !== null`;
-
-/**
- * The `page` argument browser_run_code_unsafe hands the snippet, backed by the
- * session's CDP primitives. Every method the extension cannot back reports a
- * tool error naming the method instead of failing as an undefined call.
- */
-const createRunCodePage = (
-  session: BrowserToolPageActionSession,
-  now: () => number
-  // oxlint-disable-next-line anti-slop/no-unknown-returns -- the page facade surfaces the page's own untyped values to the snippet by contract.
-): Record<string, (...args: never[]) => Promise<unknown>> => {
-  const handlers = {
-    async click(selector: string): Promise<void> {
-      await runPageExpression(session, clickExpression(selector));
-    },
-    // oxlint-disable-next-line anti-slop/no-unknown-returns -- the page facade hands the snippet the page's own untyped value
-    content(): Promise<unknown> {
-      return runPageExpression(session, 'document.documentElement.outerHTML');
-    },
-    // oxlint-disable-next-line anti-slop/no-unknown-returns -- the page facade hands the snippet the page's own untyped value
-    evaluate(handler: unknown, argument?: unknown): Promise<unknown> {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the facade accepts a handler function or pre-stringified source; a function is serialized
-      const source = typeof handler === 'function' ? handler.toString() : String(handler);
-
-      return runPageExpression(
-        session,
-        `(${source})(${JSON.stringify(argument === undefined ? null : argument)})`
-      );
-    },
-    async fill(selector: string, value: string): Promise<void> {
-      await runPageExpression(session, fillExpression(selector, value));
-    },
-    async goto(url: string): Promise<{ readonly title: string; readonly url: string }> {
-      const navigationError = await navigateToUrl(session, url);
-
-      if (navigationError !== undefined) {
-        throw new Error(`page.goto could not load ${url}: ${navigationError}`);
-      }
-
-      await waitForPageLoad(session, now);
-
-      return readPageIdentity(session);
-    },
-    async press(key: string): Promise<void> {
-      const pressed = await pressKeyChord(session, key);
-
-      if (!pressed.ok) {
-        throw new Error(pressed.error);
-      }
-    },
-    async screenshot(): Promise<z.infer<typeof pageScreenshotSchema>> {
-      const response = await session.send('Page.captureScreenshot', { format: 'png' });
-      const parsed = cdpScreenshotResponseSchema.safeParse(response);
-
-      return { base64: parsed.success ? (parsed.data.data ?? '') : '', mediaType: 'image/png' };
-    },
-    async selectOption(selector: string, values: string | readonly string[]): Promise<void> {
-      await runPageExpression(
-        session,
-        selectOptionExpression(selector, Array.isArray(values) ? values : [values])
-      );
-    },
-    // oxlint-disable-next-line anti-slop/no-unknown-returns -- the page facade hands the snippet the page's own untyped value
-    title(): Promise<unknown> {
-      return runPageExpression(session, 'document.title');
-    },
-    async type(selector: string, text: string): Promise<void> {
-      await runPageExpression(session, focusExpression(selector));
-      await session.send('Input.insertText', { text });
-    },
-    async waitForSelector(
-      selector: string,
-      options?: { readonly timeout?: number }
-    ): Promise<void> {
-      const requested = options?.timeout;
-      const timeoutMs =
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- snippet-authored options are untyped; validate the timeout before clamping it
-        typeof requested === 'number' && Number.isFinite(requested) && requested > 0
-          ? Math.min(requested, DEFAULT_PAGE_LOAD_TIMEOUT_MS)
-          : DEFAULT_PAGE_LOAD_TIMEOUT_MS;
-      const start = now();
-
-      for (;;) {
-        // eslint-disable-next-line no-await-in-loop -- polling a page condition is inherently sequential
-        if ((await runPageExpression(session, waitForSelectorExpression(selector))) === true) {
-          return;
-        }
-
-        if (now() - start >= timeoutMs) {
-          throw new Error(`Timed out waiting for selector: ${selector}`);
-        }
-
-        // eslint-disable-next-line no-await-in-loop -- polling a page condition is inherently sequential
-        await sleep(PAGE_LOAD_POLL_INTERVAL_MS);
-      }
-    },
-  };
-
-  // oxlint-disable-next-line anti-slop/no-known-value-widening -- the run-code page is a deliberately open facade; unknown members throw at access time.
-  return new Proxy(handlers, {
-    get: (target, property, receiver) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- a Proxy get trap receives arbitrary string or symbol keys; there is no schema to parse
-      if (typeof property === 'symbol' || property === 'then') {
-        return;
-      }
-
-      if (Object.hasOwn(target, property)) {
-        // oxlint-disable-next-line anti-slop/no-reflect-get, typescript-eslint/no-unsafe-return -- a Proxy get trap has no direct member access for a runtime key
-        return Reflect.get(target, property, receiver);
-      }
-
-      throw new Error(
-        `page.${property} is not supported by the Kilo extension. Supported methods: ${RUN_CODE_SUPPORTED_METHODS.join(', ')}.`
-      );
-    },
-  });
-};
-
-// oxlint-disable-next-line anti-slop/no-unknown-returns -- the snippet resolves to the page's own JSON value; the shared serializer guards the result
-type RunCodeSnippet = (page: unknown) => Promise<unknown>;
-
-const runCodeUnsafe = async (
-  session: BrowserToolPageActionSession,
-  args: Record<string, unknown>,
-  now: () => number
-): Promise<EvalTabResult> => {
-  const code = getStringArgument(args, 'code');
-  const filename = getStringArgument(args, 'filename');
-
-  if (code === undefined || code.trim() === '') {
-    return filename === undefined || filename === ''
-      ? fail('browser_run_code_unsafe requires a code argument.')
-      : fail(
-          'browser_run_code_unsafe cannot load code from a file: the Kilo extension has no workspace filesystem. Pass the code inline as a function of `page`.'
-        );
-  }
-
-  let compiled: RunCodeSnippet | undefined = undefined;
-
-  try {
-    // The snippet is model-authored and RCE-equivalent by contract; it runs in the extension runtime with a page object backed by the session primitives.
-    // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access, typescript-eslint/no-unsafe-type-assertion
-    const AsyncFunctionConstructor = Object.getPrototypeOf(async () => {}).constructor as new (
-      ...parameters: string[]
-    ) => RunCodeSnippet;
-
-    compiled = new AsyncFunctionConstructor('page', `return await (${code})(page);`);
-  } catch (error) {
-    return fail(
-      `browser_run_code_unsafe could not compile the snippet: ${error instanceof Error ? error.message : 'unknown error'}`
-    );
-  }
-
-  try {
-    return serializeBrowserEvaluateResult(await compiled(createRunCodePage(session, now)));
-  } catch (error) {
-    return fail(
-      `browser_run_code_unsafe failed: ${error instanceof Error ? error.message : 'unknown error'}`
-    );
-  }
 };
 
 /**
@@ -1056,7 +863,7 @@ const runWebMcpCall = async (
   const route = routes.get(name);
 
   if (route === undefined) {
-    return fail(`WebMCP tool "${name}" is not available. Call kilo_browser_webmcp_list first.`);
+    return fail(`WebMCP tool "${name}" is not available. List the page's WebMCP tools first.`);
   }
 
   const result = await options.webMcpExecute(
@@ -1147,7 +954,7 @@ export const runPageBrowserTool = async (
         return await runEvaluate(session, args);
       }
       case 'browser_run_code_unsafe': {
-        return await runCodeUnsafe(session, args, now);
+        return fail(RUN_CODE_UNSUPPORTED_ERROR);
       }
       default: {
         return fail(`${name} is not a page browser tool.`);

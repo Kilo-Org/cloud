@@ -1,5 +1,6 @@
 import { cloud_agent_code_reviews, kilocode_users } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import type { ManualCodeReviewConfig } from '@kilocode/db/schema-types';
+import { and, eq, or } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
@@ -26,9 +27,28 @@ const MODELS = [
   'anthropic/claude-opus-4.1',
 ];
 
-export const usage = '--email <email> --count <n> [--help]';
+/**
+ * Explicit id for the `--include-superseded` row. A prepared design-gate
+ * manifest names this review literally in its deep link, so the id must
+ * survive a reseed instead of being assigned by the database.
+ */
+const SUPERSEDED_REVIEW_ID = '5ede0000-0000-4000-a000-000000000001';
+const SUPERSEDED_ERROR_MESSAGE = 'Superseded by new push';
 
-type ReviewListArgs = { email: string; count: number };
+/** A valid `ManualCodeReviewConfigSchema` value, so the detail screen offers Retry. */
+const SUPERSEDED_MANUAL_CONFIG: ManualCodeReviewConfig = {
+  agentConfig: {
+    review_style: 'balanced',
+    focus_areas: ['bugs'],
+    model_slug: 'deepseek/deepseek-v4.1-flash-1017',
+  },
+  instructions: null,
+  outputMode: 'kilo',
+};
+
+export const usage = '--email <email> --count <n> [--include-superseded] [--help]';
+
+type ReviewListArgs = { email: string; count: number; includeSuperseded: boolean };
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed code-reviews:review-list ${usage}`);
@@ -40,6 +60,8 @@ function printUsage(): void {
   console.log('  --email <email>       Account to own the reviews. Required.');
   console.log(`  --count <0-${MAX_COUNT}>       Reviews to insert (default ${DEFAULT_COUNT});`);
   console.log('                        0 resets the account to no seeded rows.');
+  console.log('  --include-superseded  Write the newest row as cancelled/superseded, so a');
+  console.log('                        design gate can open a review a newer push replaced.');
   console.log('');
   console.log('Reruns delete and rebuild only rows in kilo-seed/review-list owned by');
   console.log('that account; other reviews are untouched.');
@@ -48,11 +70,12 @@ function printUsage(): void {
 export function parseReviewListArgs(args: string[]): ReviewListArgs {
   let email: string | null = null;
   let count = DEFAULT_COUNT;
+  let includeSuperseded = false;
   const seen = new Set<string>();
 
   for (let index = 0; index < args.length; index++) {
     const flag = args[index];
-    if (flag !== '--email' && flag !== '--count') {
+    if (flag !== '--email' && flag !== '--count' && flag !== '--include-superseded') {
       printUsage();
       throw new Error(`Unexpected argument: ${flag}`);
     }
@@ -60,6 +83,11 @@ export function parseReviewListArgs(args: string[]): ReviewListArgs {
       throw new Error(`Duplicate flag: ${flag}`);
     }
     seen.add(flag);
+
+    if (flag === '--include-superseded') {
+      includeSuperseded = true;
+      continue;
+    }
 
     const value = args[index + 1];
     if (!value || value.startsWith('--')) {
@@ -84,7 +112,7 @@ export function parseReviewListArgs(args: string[]): ReviewListArgs {
     throw new Error('Missing required --email <email>.');
   }
 
-  return { email, count };
+  return { email, count, includeSuperseded };
 }
 
 function chooseByIndex<T>(values: readonly T[], index: number, label: string): T {
@@ -118,8 +146,14 @@ function usageFields(index: number, completed: boolean): Partial<ReviewRow> {
 /**
  * Deterministic, terminal-only rows. `created_at` descends one minute per row,
  * so item 0001 is the newest and the second page starts at item 0051.
+ * With `includeSuperseded`, that newest row is the one a newer push replaced.
  */
-export function generateReviewRows(userId: string, count: number, nowMs: number): ReviewRow[] {
+export function generateReviewRows(
+  userId: string,
+  count: number,
+  nowMs: number,
+  includeSuperseded = false
+): ReviewRow[] {
   const rows: ReviewRow[] = [];
 
   for (let index = 0; index < count; index++) {
@@ -128,9 +162,11 @@ export function generateReviewRows(userId: string, count: number, nowMs: number)
     const startedAtMs = createdAtMs + STARTED_AFTER_MINUTES * MINUTE_MS;
     const completedAtMs = createdAtMs + COMPLETED_AFTER_MINUTES * MINUTE_MS;
     const completedAt = new Date(completedAtMs).toISOString();
-    const status = index % 11 === 10 ? 'failed' : index % 7 === 6 ? 'cancelled' : 'completed';
+    const baseStatus = index % 11 === 10 ? 'failed' : index % 7 === 6 ? 'cancelled' : 'completed';
+    const superseded = includeSuperseded && index === 0;
 
     rows.push({
+      ...(superseded ? { id: SUPERSEDED_REVIEW_ID, manual_config: SUPERSEDED_MANUAL_CONFIG } : {}),
       owned_by_user_id: userId,
       repo_full_name: SEED_REPO_FULL_NAME,
       pr_number: prNumber,
@@ -143,13 +179,16 @@ export function generateReviewRows(userId: string, count: number, nowMs: number)
       platform: 'github',
       session_id: `agent_seed_review_list_${index}`,
       cli_session_id: `ses_seed_review_list_${index}`,
-      status,
+      status: superseded ? 'cancelled' : baseStatus,
+      ...(superseded
+        ? { terminal_reason: 'superseded', error_message: SUPERSEDED_ERROR_MESSAGE }
+        : {}),
       review_type: 'standard',
       created_at: new Date(createdAtMs).toISOString(),
       started_at: new Date(startedAtMs).toISOString(),
       completed_at: completedAt,
       updated_at: completedAt,
-      ...usageFields(index, status === 'completed'),
+      ...usageFields(index, baseStatus === 'completed'),
     });
   }
 
@@ -169,7 +208,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     return;
   }
 
-  const { email, count } = parseReviewListArgs(args);
+  const { email, count, includeSuperseded } = parseReviewListArgs(args);
   const databaseHost = assertLocalSeedDatabase('code-reviews:review-list');
   const db = getSeedDb();
   const normalizedEmail = normalizeSeedEmail(email);
@@ -187,18 +226,24 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
-  // Only this topic's rows: same owner and fixture repository. Never deletes
-  // other personal reviews, which may not belong to this seed topic.
+  // This topic's rows: the current owner's fixtures in the seed repository,
+  // plus the fixed superseded id, which any owner's earlier
+  // `--include-superseded` run may still hold. Never deletes other personal
+  // reviews, which may not belong to this seed topic.
+  const supersededId = eq(cloud_agent_code_reviews.id, SUPERSEDED_REVIEW_ID);
   await db
     .delete(cloud_agent_code_reviews)
     .where(
-      and(
-        eq(cloud_agent_code_reviews.owned_by_user_id, user.id),
-        eq(cloud_agent_code_reviews.repo_full_name, SEED_REPO_FULL_NAME)
+      or(
+        and(
+          eq(cloud_agent_code_reviews.owned_by_user_id, user.id),
+          eq(cloud_agent_code_reviews.repo_full_name, SEED_REPO_FULL_NAME)
+        ),
+        supersededId
       )
     );
 
-  const rows = generateReviewRows(user.id, count, Date.now());
+  const rows = generateReviewRows(user.id, count, Date.now(), includeSuperseded);
   await insertInChunks(rows, chunk => db.insert(cloud_agent_code_reviews).values(chunk));
   // The detail screen opens by review id, which the database assigns.
   const [newest] = await db
@@ -211,8 +256,23 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         eq(cloud_agent_code_reviews.pr_number, SEED_PR_NUMBER_BASE)
       )
     );
+  // The superseded row has a fixed id, which a prepared deep link names.
+  const [superseded] = includeSuperseded
+    ? await db
+        .select({ id: cloud_agent_code_reviews.id })
+        .from(cloud_agent_code_reviews)
+        .where(
+          and(
+            eq(cloud_agent_code_reviews.owned_by_user_id, user.id),
+            eq(cloud_agent_code_reviews.repo_full_name, SEED_REPO_FULL_NAME),
+            eq(cloud_agent_code_reviews.id, SUPERSEDED_REVIEW_ID)
+          )
+        )
+    : [];
 
-  const rerunCommand = `pnpm dev:seed code-reviews:review-list --email ${email} --count ${count}`;
+  const rerunCommand = `pnpm dev:seed code-reviews:review-list --email ${email} --count ${count}${
+    includeSuperseded ? ' --include-superseded' : ''
+  }`;
 
   console.log('This fixture represents:');
   console.log(
@@ -236,6 +296,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     page2Count: Math.max(count - 50, 0),
     firstTitle: 'Seed review 0001',
     newestReviewId: newest?.id ?? null,
+    supersededReviewId: superseded?.id ?? null,
     lastTitle: count > 0 ? `Seed review ${String(count).padStart(4, '0')}` : null,
     rerunCommand,
   };

@@ -161,9 +161,10 @@ overrides:
   glob: 13.0.6
   google-auth-library: 10.6.2
   # The vite/vitest/storybook graph picks up this copy, so the bound names the
-  # whole current minor line. The allowBuilds entry below permits the install
-  # script, and a 0.29 release resolves only through a reviewed change here, in
-  # the lockfile, and in that entry.
+  # whole current minor line. A 0.29 release resolves only through a reviewed
+  # change here and in the lockfile. The allowBuilds entry below is a separate,
+  # version-independent decision: it permits the install script for every
+  # resolved version at once, so re-check it when this minor line moves.
   esbuild: '>=0.28.1 <0.29'
   lodash: 4.18.1
   diff: 8.0.3
@@ -357,6 +358,13 @@ patchedDependencies:
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@58.0.31: patches/expo-router@58.0.31.patch
   expo-widgets@58.0.28: patches/expo-widgets@58.0.28.patch
+  # Android: a shared content URI whose provider answers with no resolver, an
+  # empty cursor (a deleted media row, a revoked grant), no permission or no
+  # mime type threw on the main thread inside onNewIntent and crashed the app —
+  # or published a file entry with no path. The module now reports such a share
+  # through its onError event, which the app shows as the "Couldn't read the
+  # shared content" toast.
+  expo-share-intent@9.0.0: patches/expo-share-intent@9.0.0.patch
   # Typed-routes generation must skip colocated tests, exactly like the Metro
   # blockList in apps/mobile/metro.config.js already does for the runtime
   # bundle. A `*.test.tsx` next to a route registers as a route, and a
@@ -480,6 +488,11 @@ allowBuilds:
   # Downloads the vendored tree-sitter grammar sources and the iOS math xcframework
   # from their upstream releases; a missing manifest is a no-op.
   react-native-enriched-markdown: true
+  # Each `false` below is an explicit decision, not a default: the package's
+  # install script does not run. An entry moves to `true` only with its own
+  # note stating why running the script is safe or necessary, as the permitted
+  # entries above and below carry, and a denial is removed when nothing in the
+  # tree depends on that package.
   '@sentry/cli': false
   bufferutil: false
   core-js: false

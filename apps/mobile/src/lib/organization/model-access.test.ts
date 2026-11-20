@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { type TFunction } from 'i18next';
 
+import { i18n } from '@/i18n';
 import {
   type CatalogModel,
   catalogProviderSlugs,
   denyListModels,
+  denyListRowNote,
   draftsEqual,
   initialDraft,
   matchesSearch,
@@ -94,6 +97,53 @@ describe('denyListModels', () => {
       { id: 'meta/llama', name: 'Llama' },
       { id: 'openai/gpt', name: 'GPT' },
     ]);
+  });
+
+  it('carries a retirement date from the first catalog entry naming one', () => {
+    const rows = denyListModels({
+      catalog: [{ id: 'openai/gpt', name: 'GPT', retires_on: '2026-11-20' }],
+      available: [],
+      denyList: [],
+    });
+    expect(rows).toEqual([{ id: 'openai/gpt', name: 'GPT', retiresOn: '2026-11-20' }]);
+  });
+
+  it('leaves retiresOn absent when no entry dates the model', () => {
+    const rows = denyListModels({
+      catalog: [{ id: 'openai/gpt', name: 'GPT' }],
+      available: [{ id: 'openai/gpt:free', name: 'GPT (free)' }],
+      denyList: [],
+    });
+    expect(rows).toEqual([{ id: 'openai/gpt', name: 'GPT' }]);
+  });
+});
+
+describe('denyListRowNote', () => {
+  const t = ((key: string, values?: { date?: string }) =>
+    key === 'common.modelRetires'
+      ? i18n.t('common.modelRetires', { date: values?.date })
+      : key) as never as TFunction;
+
+  it('states the English note alone, with the UTC short date', async () => {
+    await i18n.changeLanguage('en');
+    expect(denyListRowNote({ id: 'z-ai/glm', name: 'Z.ai: GLM', retiresOn: '2026-11-22' }, t)).toBe(
+      'Retires Nov 22'
+    );
+  });
+
+  it('words the note in the catalog language, from the same date', async () => {
+    await i18n.changeLanguage('hi');
+    try {
+      expect(
+        denyListRowNote({ id: 'z-ai/glm', name: 'Z.ai: GLM', retiresOn: '2026-11-22' }, t)
+      ).toBe('22 नव॰ को बंद हो जाएगा');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('has no note when the entry carries no date', () => {
+    expect(denyListRowNote({ id: 'openai/gpt', name: 'GPT' }, t)).toBeUndefined();
   });
 });
 
@@ -257,5 +307,11 @@ describe('matchesSearch', () => {
     expect(matchesSearch(['OpenAI: GPT-5', 'openai/gpt-5'], 'anthropic')).toBe(false);
     expect(matchesSearch(['anything'], '  ')).toBe(true);
     expect(matchesSearch([undefined, 'openai/gpt'], 'GPT')).toBe(true);
+  });
+
+  it('folds diacritics so an unaccented query keeps an accented name', () => {
+    expect(matchesSearch(['Mistrál Large'], 'mistral')).toBe(true);
+    expect(matchesSearch(['Mistrál Large'], 'MISTRAL LARGE')).toBe(true);
+    expect(matchesSearch([undefined, 'Mistrál Large'], 'minstral')).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 /* eslint-disable jest/no-conditional-in-test, max-lines, require-await, typescript-eslint/require-await, unicorn/no-useless-undefined, vitest/prefer-called-once -- Fake session and tabs API return verbatim async responses so each per-tool assertion reads the union's own branch; the config also mandates toHaveBeenCalledTimes for single calls. */
 import { describe, expect, it, vi } from 'vitest';
-import { AGENT_TAB_OUTSIDE_GROUP_ERROR } from './browser-agent-checks';
+import { AGENT_TAB_OUTSIDE_GROUP_ERROR, RUN_CODE_UNSUPPORTED_ERROR } from './browser-agent-checks';
 import type { BrowserToolDialog, BrowserToolResolvedTarget } from './browser-tool-session';
 import {
   BROWSER_TOOL_NO_DIALOG_ERROR,
@@ -1064,7 +1064,7 @@ describe('browser-tool-page-actions', () => {
   });
 
   describe('browser_run_code_unsafe', () => {
-    it('runs the snippet with a page backed by the session primitives', async () => {
+    it('refuses Playwright code without touching the page and points to browser_evaluate', async () => {
       const tabs = tabsWithOnePage();
       const { session, methods } = createFakeSession();
 
@@ -1075,80 +1075,9 @@ describe('browser-tool-page-actions', () => {
         { tabId: 1, tabsApi: tabs.tabsApi }
       );
 
-      expect(methods()).toContain('Runtime.evaluate');
-      expect(result).toStrictEqual({ ok: true, value: 'Example' });
-    });
-
-    it('presses a printable key with the metadata the browser needs to type it', async () => {
-      const tabs = tabsWithOnePage();
-      const { session, sends } = createFakeSession();
-
-      const result = await runPageBrowserTool(
-        'kilo_browser_run_code_unsafe',
-        { code: 'async (page) => { await page.press("a"); return true; }' },
-        session,
-        { tabId: 1, tabsApi: tabs.tabsApi }
-      );
-
-      expect(result).toStrictEqual({ ok: true, value: true });
-      const keyDown = sends.find(entry => entry.method === 'Input.dispatchKeyEvent');
-      expect(keyDown?.params).toMatchObject({
-        code: 'KeyA',
-        key: 'a',
-        text: 'a',
-        type: 'keyDown',
-      });
-    });
-
-    it('reports a navigation error from page.goto', async () => {
-      const tabs = tabsWithOnePage();
-      const { handlers, session } = createFakeSession();
-
-      handlers.set('Page.navigate', () => ({ errorText: 'net::ERR_CONNECTION_REFUSED' }));
-
-      const result = await runPageBrowserTool(
-        'kilo_browser_run_code_unsafe',
-        { code: 'async (page) => { await page.goto("https://down.example.com/"); return true; }' },
-        session,
-        { tabId: 1, tabsApi: tabs.tabsApi }
-      );
-
-      expect(result).toStrictEqual({
-        error:
-          'browser_run_code_unsafe failed: page.goto could not load https://down.example.com/: net::ERR_CONNECTION_REFUSED',
-        ok: false,
-      });
-    });
-
-    it('names the unsupported method in a tool error', async () => {
-      const tabs = tabsWithOnePage();
-      const { session } = createFakeSession();
-
-      const result = await runPageBrowserTool(
-        'kilo_browser_run_code_unsafe',
-        { code: 'async (page) => { await page.getByRole("button"); }' },
-        session,
-        { tabId: 1, tabsApi: tabs.tabsApi }
-      );
-
-      expect(result.ok).toBe(false);
-      expect(result.ok ? '' : result.error).toContain('page.getByRole');
-      expect(result.ok ? '' : result.error).toContain('not supported by the Kilo extension');
-    });
-
-    it('names the filesystem limit when only a filename is given', async () => {
-      const tabs = tabsWithOnePage();
-      const { session } = createFakeSession();
-
-      const result = await runPageBrowserTool(
-        'kilo_browser_run_code_unsafe',
-        { filename: 'snippet.js' },
-        session,
-        { tabId: 1, tabsApi: tabs.tabsApi }
-      );
-
-      expect(result.ok).toBe(false);
-      expect(result.ok ? '' : result.error).toContain('no workspace filesystem');
+      expect(result).toStrictEqual({ error: RUN_CODE_UNSUPPORTED_ERROR, ok: false });
+      expect(RUN_CODE_UNSUPPORTED_ERROR).toContain('browser_evaluate');
+      expect(methods()).toStrictEqual([]);
     });
   });
 

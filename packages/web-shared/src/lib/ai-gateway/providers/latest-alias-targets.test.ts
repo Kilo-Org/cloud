@@ -148,15 +148,47 @@ describe('updateLatestAliasTargets', () => {
     ).toEqual([entry]);
   });
 
-  it('drops aliases that left the catalog and ignores non-alias ids', () => {
+  it('keeps an alias the refresh omits and ignores non-alias ids', () => {
+    const entry = { alias: '~vendor/gone-latest', target: 'vendor/old' };
     expect(
       updateLatestAliasTargets({
-        previous: stored({ alias: '~vendor/gone-latest', target: 'vendor/old' }),
+        previous: stored(entry),
         models: { 'vendor/a': model('vendor/a', 'vendor/b'), 'vendor/b': model('vendor/b') },
         createdAtMs: new Map(),
         nowMs: NOW,
       })
-    ).toEqual([]);
+    ).toEqual([entry]);
+  });
+
+  it('keeps the stored target and pending switch when a refresh omits the alias', () => {
+    const entry = {
+      alias: ALIAS,
+      target: 'vendor/old',
+      pending: { target: 'vendor/new', effective_at: new Date(NOW + HOUR).toISOString() },
+    };
+    const afterOmission = updateLatestAliasTargets({
+      previous: stored(entry),
+      models: { 'vendor/old': model('vendor/old'), 'vendor/new': model('vendor/new') },
+      createdAtMs: new Map(),
+      nowMs: NOW,
+    });
+    expect(afterOmission).toEqual([entry]);
+    expect(
+      updateLatestAliasTargets({
+        previous: stored(...afterOmission),
+        models: models('vendor/new', 'vendor/old', 'vendor/new'),
+        createdAtMs: new Map(),
+        nowMs: NOW + HOUR / 2,
+      })
+    ).toEqual([entry]);
+    expect(
+      updateLatestAliasTargets({
+        previous: stored(...afterOmission),
+        models: models('vendor/new', 'vendor/old', 'vendor/new'),
+        createdAtMs: new Map(),
+        nowMs: NOW + HOUR,
+      })
+    ).toEqual([{ alias: ALIAS, target: 'vendor/new' }]);
   });
 
   it('keeps the stored entry while a refresh reports no live target', () => {

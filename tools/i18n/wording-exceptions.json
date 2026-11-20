@@ -417,6 +417,7 @@
   ],
   "hi": [
     "analysis failed",
+    "block",
     "cancelled",
     "deleted",
     "dismissed",
@@ -428,6 +429,7 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "search repositories",
     "sign out",
     "superseded"
   ],

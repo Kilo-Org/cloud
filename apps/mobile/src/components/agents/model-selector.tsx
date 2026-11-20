@@ -27,7 +27,7 @@ import {
   FIELD_TRIGGER_FRAME_CLASS,
 } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
-import { formatList } from '@/lib/format';
+import { formatDate, formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -384,6 +384,7 @@ export function ModelPickerOptionRow({
   acceptsVariant,
   isFavorite,
   showProvider,
+  suppressUnavailableCheck = false,
   onSelectModel,
   onSelectVariant,
   onToggleFavorite,
@@ -404,6 +405,13 @@ export function ModelPickerOptionRow({
    * accessibility label keeps the name either way.
    */
   showProvider: boolean;
+  /**
+   * Whether a selected unavailable row drops its check. The all-unavailable
+   * sheet sets it, because its state already says nothing can be picked;
+   * elsewhere the muted check still marks an unavailable row that is the
+   * session's model.
+   */
+  suppressUnavailableCheck?: boolean;
   onSelectModel: (option: SessionModelOption) => void;
   onSelectVariant: (variant: string) => void;
   onToggleFavorite: (option: SessionModelOption) => void;
@@ -412,7 +420,23 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData, tools, images } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
+  // The retirement note states a fact about the model beside its name, worded
+  // in the app language from `retires_on`, and is absent when the entry carries
+  // no date. It renders on its own muted line under the id: kept out of the
+  // name, the name stays the row's primary text and an RTL reading order never
+  // moves the localized sentence ahead of the Latin name. The chip's
+  // selected-model label stays without it: the picker row is where the fact
+  // matters.
   const name = autoModelLabel(option.displayId, option.name);
+  const retirementNote = option.retires_on
+    ? t('common.modelRetires', {
+        date: formatDate(new Date(`${option.retires_on}T00:00:00Z`), i18n.language, {
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        }),
+      })
+    : undefined;
   // The name may already state the fact ("… (free)", "Auto Free" in every
   // locale), so the badge and its accessibility phrase only render when it
   // does not. The free Auto model is decided by id too: nine catalogs name it
@@ -422,6 +446,7 @@ export function ModelPickerOptionRow({
     [
       option.provider?.name,
       name,
+      retirementNote,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       showFreeBadge ? freeModelFreeLabel() : undefined,
@@ -487,6 +512,9 @@ export function ModelPickerOptionRow({
                 {option.displayId}
               </Text>
             ) : null}
+            {retirementNote ? (
+              <Text className="text-xs text-muted-foreground">{retirementNote}</Text>
+            ) : null}
             {costLabel ? <Text className="text-xs text-muted-foreground">{costLabel}</Text> : null}
             {option.unavailable ? (
               <Text className="mt-1 text-xs text-muted-foreground">
@@ -523,8 +551,12 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
+        {/* The all-unavailable sheet drops the check from an unavailable row:
+         * a check there would claim a selection its state denies. Elsewhere a
+         * muted check still marks an unavailable row that is the session's
+         * model. The column stays reserved so nothing moves. */}
         <View className="items-center justify-center" style={{ width: CHECK_COLUMN_DP }}>
-          {selected ? (
+          {selected && !(option.unavailable && suppressUnavailableCheck) ? (
             <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />
           ) : null}
         </View>

@@ -30,6 +30,7 @@ import { parseOrganizationScope } from '@/lib/cloud-agent-scope';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { isAddressableStoredSessionId } from '@/lib/session-id-shape';
 import { useRestoredRouteOpen } from '@/lib/hooks/use-restored-route-open';
+import { useSessionHeaderBack } from '@/lib/navigation/back-to-agents-sessions';
 import { useSessionRouteBack } from '@/lib/navigation/session-route-back';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
@@ -108,6 +109,8 @@ export default function SessionDetailScreen() {
   // route the person came from, and it never leaves the app while this screen
   // is open.
   useSessionRouteBack();
+  // The header's Back answers the same way: history first, then the list.
+  const sessionHeaderBack = useSessionHeaderBack();
   // The open's clock starts at route mount — before the metadata query and
   // the transcript screen — so the slow-load threshold measures from when
   // the user tapped, not from when SessionDetailContent happens to mount.
@@ -272,6 +275,7 @@ export default function SessionDetailScreen() {
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback={AGENTS_SESSIONS_HREF}
+          onBack={sessionHeaderBack}
           headerRight={
             <View className="min-w-0 shrink flex-row items-center gap-2">
               <SessionContextMetrics
@@ -365,6 +369,7 @@ export default function SessionDetailScreen() {
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback={AGENTS_SESSIONS_HREF}
+          onBack={sessionHeaderBack}
         />
         <SessionPermanentError
           variant={variant}

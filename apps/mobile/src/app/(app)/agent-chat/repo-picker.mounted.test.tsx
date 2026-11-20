@@ -9,20 +9,27 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import RepoPickerScreen from '@/app/(app)/agent-chat/repo-picker';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Card } from '@/components/ui/card';
 import { type RepoOption, type RepoPickerSection } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { i18n } from '@/i18n';
 
+// Hoisted so a test can flip the interface direction: the note's paragraph
+// direction helper reads it per call.
+const rn = vi.hoisted(() => ({ I18nManager: { isRTL: false } }));
+
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
-  I18nManager: { isRTL: false },
+  I18nManager: rn.I18nManager,
   Keyboard: { dismiss: vi.fn() },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
@@ -221,8 +228,10 @@ describe('repository picker row layout', () => {
     });
     const renderer = await mount();
 
+    // The provider trails the name, so a recent row's name starts on the same
+    // edge as the names in the sections below it.
     const texts = rowFor(renderer, LONG_NAME).findAll(node => String(node.type) === 'Text');
-    expect(texts.map(node => node.props.children)).toEqual(['GitHub', LONG_NAME]);
+    expect(texts.map(node => node.props.children)).toEqual([LONG_NAME, 'GitHub']);
   });
 
   it('names the provider and the full repository in the accessibility label', async () => {
@@ -231,5 +240,58 @@ describe('repository picker row layout', () => {
     expect(row.props.accessibilityLabel).toBe(`GitHub ${SIBLING_NAME}`);
     // The shared choice row states selection and enablement together.
     expect(row.props.accessibilityState).toMatchObject({ selected: false, disabled: false });
+  });
+});
+
+describe('repository picker Bitbucket note', () => {
+  // A personal scope lists no Bitbucket rows, so the note explains the gap under
+  // the provider sections.
+  beforeEach(() => {
+    repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
+      repositories: rows,
+      sections,
+      organizationId: null,
+      currentValue: '',
+      onSelect: slotBridge.onSelect,
+    });
+  });
+
+  function noteTexts(renderer: ReactTestRenderer) {
+    return renderer.root
+      .findAllByType(Card)
+      .flatMap(card => card.findAll(node => String(node.type) === 'Text'))
+      .map(node => node.props.children);
+  }
+
+  it('states the rule once, in the sentence that already names the product', async () => {
+    const renderer = await mount();
+
+    expect(noteTexts(renderer)).toEqual([
+      i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'),
+    ]);
+  });
+
+  it('hands the note to the shared Text, which owns the paragraph direction', async () => {
+    await i18n.changeLanguage('ar');
+    onTestFinished(() => {
+      void i18n.changeLanguage('en');
+    });
+    // The Arabic sentence starts with the Latin product name, so its own first
+    // strong character would set the paragraph left to right inside a
+    // right-aligned line. `Text` adds the mark from the child tree it draws
+    // (`rtlBaseMarkedChildren`); this suite mounts the screen with that primitive
+    // stubbed to a host element, so the mark is proved in
+    // `components/ui/text.rtl-base-direction.mounted.test.tsx`, and a call-site
+    // mark here would draw a second one.
+    rn.I18nManager.isRTL = true;
+    onTestFinished(() => {
+      rn.I18nManager.isRTL = false;
+    });
+
+    const renderer = await mount();
+
+    const sentence = i18n.t('agentChat.newSession.bitbucketOrganizationsOnly');
+    expect(sentence.startsWith('Bitbucket')).toBe(true);
+    expect(noteTexts(renderer)).toEqual([sentence]);
   });
 });

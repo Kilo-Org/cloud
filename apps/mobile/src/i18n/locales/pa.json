@@ -19,7 +19,9 @@
     "presenceStatus": "ਹੋਸਟ: {{connection}}",
     "commandStatus": "ਕਮਾਂਡ ਦੀ ਡਿਲਿਵਰੀ: {{status}}",
     "delivered": "ਪਹੁੰਚਾਇਆ ਗਿਆ",
-    "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ"
+    "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ",
+    "recoveryGaps_one": "ਇਸ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦਾ {{displayCount}} ਹਿੱਸਾ ਗੁੰਮ ਹੈ।",
+    "recoveryGaps_other": "ਇਸ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦੇ {{displayCount}} ਹਿੱਸੇ ਗੁੰਮ ਹਨ।"
   },
   "common": {
     "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਪ੍ਰਬੰਧਿਤ ਕਰੋ",
@@ -138,6 +140,7 @@
     "keepRunning": "ਚੱਲਣ ਦਿਓ",
     "newSession": "ਨਵਾਂ ਸੈਸ਼ਨ",
     "noModelsAvailable": "ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ",
+    "modelRetires": "{{date}} ਨੂੰ ਰਿਟਾਇਰ ਹੋਵੇਗਾ",
     "notFound": "ਨਹੀਂ ਮਿਲਿਆ।",
     "online": "ਔਨਲਾਈਨ",
     "open": "{{name}} ਖੋਲ੍ਹੋ",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਸੰਸਥਾ ਦਾ ਮਾਲਕ kilo.ai 'ਤੇ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "privateRepositoryA11y": "{{name}}, ਨਿਜੀ ਰਿਪੋਜ਼ਟਰੀ",
     "legalDocumentEnglishOnly": "ਇਹ ਦਸਤਾਵੇਜ਼ ਸਿਰਫ਼ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਉਪਲਬਧ ਹੈ।",
-    "organizationTrialEndedBilling": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਤੁਸੀਂ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    "organizationTrialEndedBilling": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਤੁਸੀਂ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "organizationTrialEndedBillingAtKiloAi": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਤੁਸੀਂ kilo.ai 'ਤੇ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ"
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -505,7 +510,7 @@
     "changelogFixesPolish": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
     "changelogAreas": {
       "signIn": "ਸਾਈਨ ਇਨ",
-      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਸੰਸਥਾਵਾਂ"
+      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਤੇ ਸੰਸਥਾਵਾਂ"
     }
   },
   "preferences": {
@@ -750,6 +755,9 @@
       "couldNotLoadMore": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "retryLoadingMore": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "loadMoreComments": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਕਰੋ",
+      "conversationTruncated": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਟਿੱਪਣੀਆਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।",
+      "conversationTruncated_one": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਟਿੱਪਣੀਆਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।",
+      "conversationTruncated_other": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਟਿੱਪਣੀਆਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।",
       "addReaction": "ਪ੍ਰਤੀਕਿਰਿਆ ਜੋੜੋ",
       "reactionPill": "{{emoji}} ਪ੍ਰਤੀਕਿਰਿਆ, {{displayCount}} {{countLabel}}",
       "reaction_one": "ਪ੍ਰਤੀਕਿਰਿਆ",
@@ -879,7 +887,6 @@
       "noAccess": "ਤੁਹਾਡੇ ਕੋਲ ਇਸ ਰਿਪੋਜ਼ਿਟਰੀ ਦੀਆਂ ਜਾਂਚਾਂ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੈ।",
       "couldNotLoad": "ਜਾਂਚਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
       "retryChecks": "ਜਾਂਚਾਂ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ",
-      "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ",
       "noChecksReported": "ਕਿਸੇ ਜਾਂਚ ਦੀ ਰਿਪੋਰਟ ਨਹੀਂ ਮਿਲੀ",
       "passed": "{{displayCount}} ਸਫਲ",
       "passed_one": "{{displayCount}} ਸਫਲ",
@@ -963,6 +970,8 @@
       "pendingComment": "ਨਾ ਭੇਜੀਆਂ ਟਿੱਪਣੀਆਂ",
       "pendingComment_other": "ਨਾ ਭੇਜੀਆਂ ਟਿੱਪਣੀਆਂ",
       "submitCountOfTotal": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
+      "submitCountOfTotal_one": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
+      "submitCountOfTotal_other": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
       "submitReview": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰੋ",
       "partialPostedFresh": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
       "partialPostedFresh_one": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
@@ -1387,7 +1396,7 @@
     "followReviewMd": "REVIEW.md ਦੀ ਪਾਲਣਾ ਕਰੋ",
     "followReviewMdSubtitle": "ਹਰ ਰਿਪੋਜ਼ਟਰੀ ਦੀ REVIEW.md ਫਾਈਲ ਦੀਆਂ ਹਦਾਇਤਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ। ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।"
+      "notConnectedReadOnlyPlan": "ਸੰਸਥਾ ਦਾ ਟਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ, ਇਸ ਲਈ ਮਾਲਕ ਨੂੰ kilo.ai 'ਤੇ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰਨੀ ਪਵੇਗੀ।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} ਦਾ Bitbucket ਕਨੈਕਸ਼ਨ ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
@@ -1396,7 +1405,7 @@
       "managedOnWebRepositories": "ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ {{organization}} ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ।",
       "description": "{{organization}} ਲਈ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਹੇਠਾਂ ਪੇਸਟ ਕਰੋ।",
       "descriptionReconnect": "{{organization}} ਲਈ ਨਵਾਂ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਹੇਠਾਂ ਪੇਸਟ ਕਰੋ।",
-      "descriptionOverview": "{{organization}} ਲਈ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਅਗਲੀ ਸਕ੍ਰੀਨ 'ਤੇ ਪੇਸਟ ਕਰੋ।",
+      "descriptionOverview": "ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਅਗਲੀ ਸਕ੍ਰੀਨ 'ਤੇ ਪੇਸਟ ਕਰੋ।",
       "scopes": "ਖਾਤਾ: ਪੜ੍ਹਨ ਦੀ ਇਜਾਜ਼ਤ · ਰਿਪੋਜ਼ਟਰੀਆਂ: ਪੜ੍ਹਨ/ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ · ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ: ਪੜ੍ਹਨ ਦੀ ਇਜਾਜ਼ਤ · ਵੈਬਹੁੱਕ: ਪੜ੍ਹਨ/ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ",
       "tokenPlaceholder": "ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ",
       "tokenRefused": "Bitbucket ਨੇ ਇਸ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਨੂੰ ਸਵੀਕਾਰ ਨਹੀਂ ਕੀਤਾ। ਜਾਂਚ ਕਰੋ ਕਿ ਇਸ ਵਿੱਚ ਉੱਪਰ ਦਿੱਤੀਆਂ ਇਜਾਜ਼ਤਾਂ ਹਨ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
@@ -1901,7 +1910,7 @@
         "findingDismissed": "ਅਣਡਿੱਠਾ ਕੀਤਾ ਗਿਆ",
         "findingSeverityChanged": "ਗੰਭੀਰਤਾ ਬਦਲੀ ਗਈ",
         "findingStatusChange": "ਸਥਿਤੀ ਬਦਲੀ ਗਈ",
-        "findingSuperseded": "ਬਦਲਿਆ ਗਿਆ",
+        "findingSuperseded": "ਪ੍ਰਤਿਸਥਾਪਿਤ ਕੀਤਾ ਗਿਆ",
         "remediationBlocked": "ਸੁਧਾਰ ਰੋਕਿਆ ਗਿਆ",
         "remediationCancelled": "ਰੱਦ ਕੀਤਾ ਗਿਆ",
         "remediationFailed": "ਸੁਧਾਰ ਅਸਫਲ ਰਿਹਾ",
@@ -2788,7 +2797,9 @@
     "modelPicker": {
       "title": "ਮਾਡਲ ਚੁਣੋ",
       "favorites": "ਪਸੰਦੀਦਾ",
-      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "allUnavailableTitle": "ਕੋਈ ਵੀ ਮਾਡਲ ਵਰਤਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ",
+      "allUnavailableDescription": "ਪ੍ਰਦਾਤਾ ਦੀ ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "modelSelector": {
       "provider": "ਪ੍ਰਦਾਤਾ {{id}}",
@@ -3621,7 +3632,7 @@
     },
     "hub": {
       "renameTitle": "ਸੰਸਥਾ ਦਾ ਨਾਮ ਬਦਲੋ",
-      "renamePlaceholder": "ਸੰਸਥਾ ਦਾ ਨਾਮ",
+      "renamePlaceholder": "ਸੰਸਥਾ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ",
       "balance": "ਬੈਲੰਸ",
       "plan": "ਪਲਾਨ",
       "planTeams": "Teams",
@@ -4081,7 +4092,13 @@
     "providerUnavailable": "ਪ੍ਰਦਾਤਾ ਇਸ ਵੇਲੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਭੇਜੋ।"
   },
   "settingsTools": {
-    "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?"
+    "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?",
+    "guarded": {
+      "spendAlertsOff": "ਕੀ ਖਰਚ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਤੁਹਾਨੂੰ ਖਰਚ ਸੀਮਾ ਪਾਰ ਹੋਣ ਅਤੇ ਪ੍ਰਤੀ ਘੰਟਾ ਉਛਾਲਾਂ ਬਾਰੇ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "balanceAlertsOff": "ਕੀ ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਜਦੋਂ ਤੁਹਾਡੇ ਕ੍ਰੈਡਿਟ ਘੱਟ ਹੋ ਜਾਣਗੇ ਤਾਂ ਤੁਹਾਨੂੰ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "securityFindingsOff": "ਕੀ ਸੁਰੱਖਿਆ ਖੋਜਾਂ ਬੰਦ ਕਰਨੀਆਂ ਹਨ? ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਖੋਜਾਂ ਬਾਰੇ ਤੁਹਾਨੂੰ ਸੂਚਨਾਵਾਂ ਮਿਲਣੀਆਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ।",
+      "hideBalanceOn": "ਕੀ ਤੁਹਾਡੇ ਬੈਲੰਸ ਲੁਕਾਉਣੇ ਹਨ? ਕ੍ਰੈਡਿਟ ਬੈਲੰਸ ਹੁਣ ਪ੍ਰੋਫਾਈਲ ਸਕ੍ਰੀਨਾਂ ਅਤੇ ਸੰਸਥਾ ਹੱਬ 'ਤੇ ਨਹੀਂ ਦਿਸਣਗੇ।"
+    }
   },
   "appActions": {
     "start": {
@@ -4841,12 +4858,15 @@
     "inputDescription": "ਹਰ ਇਨਪੁਟ ਨੂੰ Enkrypt AI ਨਾਲ ਸਕੈਨ ਕਰਦਾ ਹੈ, ਜਿਸ ਵਿੱਚ ਟੂਲ ਨਤੀਜੇ ਵੀ ਸ਼ਾਮਲ ਹਨ। ਜਦੋਂ Enkrypt ਉਪਲਬਧ ਨਹੀਂ ਹੁੰਦਾ, ਤਾਂ ਬੇਨਤੀਆਂ ਨੂੰ ਅਸਵੀਕਾਰ ਕਰਨ ਦੀ ਬਜਾਏ ਬਿਨਾਂ ਸਕੈਨ ਕੀਤੇ ਭੇਜਿਆ ਜਾਂਦਾ ਹੈ।",
     "outputTitle": "ਆਉਟਪੁਟ ਗਾਰਡਰੇਲ",
     "outputDescription": "ਮੈਂਬਰਾਂ ਨੂੰ ਮਿਲਣ ਤੋਂ ਪਹਿਲਾਂ ਜਵਾਬਾਂ ਨੂੰ Enkrypt AI ਨਾਲ ਸਕੈਨ ਕਰਦਾ ਹੈ। ਜਦ ਤੱਕ ਤੁਸੀਂ ਇਸਨੂੰ ਚਾਲੂ ਨਹੀਂ ਕਰਦੇ, ਇਹ ਬੰਦ ਰਹਿੰਦਾ ਹੈ।",
+    "outputUnavailable": "Kilo ਨੇ ਇਸ ਸੰਗਠਨ ਲਈ ਆਉਟਪੁਟ ਸਕੈਨਿੰਗ ਸਮਰੱਥ ਨਹੀਂ ਕੀਤੀ, ਇਸ ਲਈ ਜਵਾਬਾਂ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੁੰਦੀ ਅਤੇ ਇੱਥੇ ਸੈੱਟ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ ਹੈ। ਇਸ ਦੀ ਬੇਨਤੀ ਕਰਨ ਲਈ {{supportEmail}} ਨਾਲ ਸੰਪਰਕ ਕਰੋ।",
     "detectorsHint": "ਬਲੌਕ ਫਲੈਗ ਕੀਤੀ ਬੇਨਤੀ ਨੂੰ ਅਸਵੀਕਾਰ ਕਰਦਾ ਹੈ। ਸਿਰਫ਼ ਲੌਗ ਇਸ ਨੂੰ ਬੇਨਤੀ ਵਿੱਚ ਦੇਰੀ ਕੀਤੇ ਬਿਨਾਂ ਦਰਜ ਕਰਦਾ ਹੈ।",
     "detectorsHintOutput": "ਬਲੌਕ ਫਲੈਗ ਕੀਤੇ ਜਵਾਬ ਨੂੰ ਫੇਲ੍ਹ ਕਰਦਾ ਹੈ। ਸਿਰਫ਼ ਲੌਗ ਇਸ ਨੂੰ ਜਵਾਬ ਵਿੱਚ ਦੇਰੀ ਕੀਤੇ ਬਿਨਾਂ ਦਰਜ ਕਰਦਾ ਹੈ।",
     "choiceLog": "ਸਿਰਫ਼ ਲੌਗ",
     "applyTo": "ਲਾਗੂ ਕਰੋ",
     "applyToAllMembers": "ਸਾਰੇ ਮੈਂਬਰ",
     "applyKiloDefault": "Kilo ਡਿਫ਼ਾਲਟ ਲਾਗੂ ਕਰੋ",
+    "applyKiloDefaultEnglishNote": "Kilo ਦੀ ਡਿਫ਼ਾਲਟ ਨੀਤੀ ਦਾ ਪਾਠ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਹੈ, ਕਿਉਂਕਿ Kilo Gateway ਇਸਨੂੰ ਉਵੇਂ ਹੀ ਲਾਗੂ ਕਰਦਾ ਹੈ ਜਿਵੇਂ ਇਹ ਲਿਖਿਆ ਹੈ।",
+    "applyKiloDefaultReplaceMessage": "Kilo ਦੀ ਡਿਫ਼ਾਲਟ ਨੀਤੀ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਲਿਖੀ ਹੈ ਅਤੇ ਨੀਤੀ ਉਲੰਘਣਾ ਵਿੱਚ ਤੁਹਾਡੇ ਵੱਲੋਂ ਸੈੱਟ ਕੀਤਾ ਗਿਆ ਬਦਲਦੀ ਹੈ। ਨੀਤੀ ਪਾਠ ਖੇਤਰ ਵਿੱਚ ਤੁਹਾਡੇ ਵੱਲੋਂ ਦਾਖਲ ਕੀਤਾ ਪਾਠ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।",
     "invalidSavedTitle": "ਸੰਭਾਲੀਆਂ ਇਨਪੁਟ ਡਿਟੈਕਟਰ ਸੈਟਿੰਗਾਂ ਪੜ੍ਹੀਆਂ ਨਹੀਂ ਜਾ ਸਕਦੀਆਂ",
     "invalidSavedBody": "ਜਦ ਤੱਕ ਇਨਪੁਟ ਡਿਟੈਕਟਰ ਦੁਬਾਰਾ ਸੰਭਾਲੇ ਨਹੀਂ ਜਾਂਦੇ, ਬੇਨਤੀਆਂ ਬਲੌਕ ਕੀਤੀਆਂ ਰਹਿੰਦੀਆਂ ਹਨ। ਹੇਠਾਂ ਦਿੱਤੇ ਡਿਟੈਕਟਰ Kilo ਡਿਫ਼ਾਲਟ ਤੋਂ ਸ਼ੁਰੂ ਹੁੰਦੇ ਹਨ।",
     "invalidSavedOutputTitle": "ਸੰਭਾਲੀਆਂ ਆਉਟਪੁਟ ਡਿਟੈਕਟਰ ਸੈਟਿੰਗਾਂ ਪੜ੍ਹੀਆਂ ਨਹੀਂ ਜਾ ਸਕਦੀਆਂ",
@@ -4981,6 +5001,7 @@
     "providersDescription": "ਇਸ ਸੰਗਠਨ ਲਈ Kilo ਦਾ ਕਿਸੇ ਪ੍ਰਦਾਤਾ ਵੱਲ ਰੂਟਿੰਗ ਰੋਕਣ ਲਈ ਉਸ ਪ੍ਰਦਾਤਾ ਨੂੰ ਬੰਦ ਕਰੋ।",
     "providersNeedCatalog": "ਪੂਰਾ ਮਾਡਲ ਕੈਟਾਲਾਗ ਲੋਡ ਹੋਣ ਤੱਕ ਪ੍ਰਦਾਤਾ ਸਵਿੱਚ ਸਿਰਫ਼-ਪੜ੍ਹਨਯੋਗ ਰਹਿੰਦੇ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਸੰਪਾਦਿਤ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ ਉੱਤੇ ਟੈਪ ਕਰੋ।",
     "providersEmpty": "ਇਸ ਖੋਜ ਨਾਲ ਕੋਈ ਪ੍ਰਦਾਤਾ ਨਹੀਂ ਮਿਲਦਾ।",
+    "providersNone": "ਇਸ ਸੰਗਠਨ ਲਈ ਕੋਈ ਪ੍ਰਦਾਤਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "allowAllShown": "ਦਿਖਾਏ ਗਏ ਸਾਰੇ ਮਨਜ਼ੂਰ ਕਰੋ",
     "denyAllShown": "ਦਿਖਾਏ ਗਏ ਸਾਰਿਆਂ ਨੂੰ ਮਨਾਹੀ ਕਰੋ",
     "gatewaysDescription": "Kilo ਮਾਡਲ ਬੇਨਤੀਆਂ ਨੂੰ Vercel AI Gateway ਜਾਂ OpenRouter ਰਾਹੀਂ ਰੂਟ ਕਰਦਾ ਹੈ। ਬੰਦ ਕੀਤਾ ਗੇਟਵੇ ਉਨ੍ਹਾਂ ਬੇਨਤੀਆਂ ਨੂੰ ਫੇਲ੍ਹ ਕਰਦਾ ਹੈ।",

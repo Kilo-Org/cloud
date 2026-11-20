@@ -8,6 +8,8 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'android', select: (options: Record<string, unknown>) => options.android },
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
 }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',

@@ -60,11 +60,11 @@ export function BitbucketOverview({
   // integration status beside it is what tells a Bitbucket OAuth connection
   // apart from a workspace with none.
   const integrationStatus = useBitbucketIntegrationStatus(scope);
-  // Bitbucket is org-only, so the scope always names an organization, and both
-  // the header subtitle and the connect copy name it from this one read. Until
-  // the membership list resolves the name, the screen keeps its skeleton rather
-  // than painting an unfilled placeholder, and the subtitle holds the generic
-  // stand-in so the header keeps its line.
+  // Bitbucket is org-only, so the scope always names an organization, and the
+  // header subtitle names it from this one read while the connect copy leaves
+  // the name to that subtitle. Until the membership list resolves the name, the
+  // screen keeps its skeleton rather than painting an unfilled placeholder, and
+  // the subtitle holds the generic stand-in so the header keeps its line.
   const orgBoundary = useOrgBoundary(scope);
   const organizationName = orgBoundary.org?.organizationName;
   const scopeTitle = organizationName ?? t('common.organization');
@@ -99,12 +99,24 @@ export function BitbucketOverview({
   // An organization connected through Bitbucket OAuth reads as one with no
   // token integration: the connection lives on the web page that ran its
   // consent, so this surface renders read-only — no connect action, no toggle,
-  // no config rows, and no repositories button. The header above already names
-  // the platform and the organization, so the card's line only says where the
-  // connection is managed. It waits for the membership read that decides
-  // whether the header can paint at all.
+  // no config rows, and no repositories button. The card still states the
+  // connection itself: the workspace it authorized at row-title size, or
+  // "Connected" when the authorization has not named one, over the muted line
+  // that says where the connection is managed. The footnote alone left a reader
+  // unable to tell whether Bitbucket was connected at all. It waits for the
+  // membership read that decides whether the header can paint at all.
   if (connection.kind === 'oauth-connected' || connection.kind === 'oauth-attention') {
     const workspaceName = connection.kind === 'oauth-connected' ? connection.workspace : null;
+    // The authorization's own verdict, at row-title size: the workspace it
+    // granted, "Connected" while it has not named one, or the attention state
+    // the platform list paints for the same authorization.
+    const statusLabel =
+      workspaceName?.displayName ??
+      t(
+        connection.kind === 'oauth-connected'
+          ? 'common.connected'
+          : 'codeReviewer.platformList.needsAttention'
+      );
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
@@ -113,12 +125,8 @@ export function BitbucketOverview({
             <PlatformOverviewSkeleton />
           ) : (
             <Card>
-              {workspaceName?.displayName ? (
-                <Text className="text-sm font-medium">{workspaceName.displayName}</Text>
-              ) : null}
-              <Text variant="muted" className="text-xs">
-                {t('codeReviewer.bitbucketConnect.managedOnWebShort')}
-              </Text>
+              <Text className="text-sm font-medium">{statusLabel}</Text>
+              <Text variant="muted">{t('codeReviewer.bitbucketConnect.managedOnWebShort')}</Text>
             </Card>
           )}
         </TabScreenScrollView>
@@ -153,8 +161,8 @@ export function BitbucketOverview({
     // the role rule refuses gets the sentence naming who can connect instead of
     // a press it cannot finish.
     const repair = readinessData === undefined ? null : bitbucketRepair(readinessData);
-    // An organization the membership list cannot resolve has no name for the
-    // connect copy, so the screen shows who can connect and offers no action
+    // An organization the membership list cannot resolve leaves the header with
+    // no name to paint, so the screen shows who can connect and offers no action
     // that would contradict that sentence.
     const canConnect = canEdit && organizationName !== undefined;
     return (
@@ -166,10 +174,8 @@ export function BitbucketOverview({
           title={t('prReview.connect.bitbucketNotConnectedTitle')}
           description={
             canConnect && readinessData
-              ? t('codeReviewer.bitbucketConnect.descriptionOverview', {
-                  organization: organizationName,
-                })
-              : t('codeReviewer.bitbucket.notConnectedReadOnly')
+              ? t('codeReviewer.bitbucketConnect.descriptionOverview')
+              : t('prReview.connect.adminOnlyConnectDescription')
           }
           action={
             canConnect && repair !== null ? (

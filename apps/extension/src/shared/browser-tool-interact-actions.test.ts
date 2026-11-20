@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable id-length, jest/no-conditional-expect, jest/no-conditional-in-test, jest/prefer-strict-equal, max-lines, require-await, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/prefer-array-find, vitest/prefer-describe-function-title -- Fake CDP session records verbatim commands; assertions check conditional error branches. */
+/* eslint-disable id-length, jest/no-conditional-expect, jest/no-conditional-in-test, jest/prefer-strict-equal, max-lines, no-new-func, require-await, typescript/no-implied-eval, typescript/no-unsafe-call, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/prefer-array-find, vitest/prefer-describe-function-title -- Fake CDP session records verbatim commands and runs the page-side function strings against the jsdom document; assertions check conditional error branches. */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
@@ -9,6 +9,22 @@ import {
 } from './browser-tool-interact-actions';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
 import type { BrowserToolResolvedTarget } from './browser-tool-session';
+
+/** A field attached to the document: what a fresh snapshot ref resolves to. */
+const attachedField = (): Element => {
+  const field = document.createElement('input');
+  document.body.append(field);
+
+  return field;
+};
+
+/** Runs a `Runtime.callFunctionOn` declaration the way the page does: `this` is the node. */
+const callOnNode = (node: Element, declaration: string, args: unknown[]): unknown =>
+  (
+    new Function('ShadowRoot', `return (${declaration});`)(globalThis.ShadowRoot) as (
+      ...values: unknown[]
+    ) => unknown
+  ).apply(node, args);
 
 interface RecordedCommand {
   readonly method: string;
@@ -27,20 +43,17 @@ interface FakePageHelperEnvelope {
 const createFakeSession = ({
   boxModelError,
   boxes = {},
-  nodeConnected = true,
+  node = attachedField(),
   pageHelper,
-  pushError,
   resolveNodeError,
   targets = {},
 }: {
   /** A CDP rejection, as when the ref's node was removed without a navigation. */
   boxModelError?: string;
   boxes?: Record<number, number[]>;
-  /** Whether `DOM.resolveNode` + `Runtime.callFunctionOn` report the node attached. */
-  nodeConnected?: boolean;
+  /** The node `DOM.resolveNode` hands back; `Runtime.callFunctionOn` runs on it. */
+  node?: Element;
   pageHelper?: FakePageHelperEnvelope | ((expression: string) => FakePageHelperEnvelope);
-  /** A CDP rejection while resolving the ref to a frontend node id. */
-  pushError?: string;
   /** A CDP rejection while resolving the ref's node to a remote object. */
   resolveNodeError?: string;
   targets?: Record<string, BrowserToolResolvedTarget>;
@@ -68,11 +81,8 @@ const createFakeSession = ({
       }
 
       if (method === 'DOM.pushNodesByBackendIdsToFrontend') {
-        if (pushError !== undefined) {
-          throw new Error(pushError);
-        }
-
-        return { nodeIds: [77] };
+        // What Chrome answers in a session that never sent `DOM.getDocument`, which a snapshot never does.
+        throw new Error('Document needs to be requested first');
       }
 
       if (method === 'DOM.resolveNode') {
@@ -84,7 +94,14 @@ const createFakeSession = ({
       }
 
       if (method === 'Runtime.callFunctionOn') {
-        return { result: { value: nodeConnected } };
+        const args = (params?.['arguments'] as readonly { value: unknown }[] | undefined) ?? [];
+        const value = callOnNode(
+          node,
+          String(params?.['functionDeclaration'] ?? ''),
+          args.map(arg => arg.value)
+        );
+
+        return { result: value === undefined ? {} : { value } };
       }
 
       if (method === 'Runtime.evaluate') {
@@ -111,6 +128,12 @@ const createFakeSession = ({
   };
 
   return { commands, session };
+};
+
+/** A ref error must name no tool: the side panel and the CLI call the snapshot tool by different names. */
+const expectFreshSnapshotHint = (error: string): void => {
+  expect(error).toContain('Take a new page snapshot and use a ref from it');
+  expect(error).not.toMatch(/kilo_browser_|browser_snapshot/u);
 };
 
 const ref = (backendNodeId: number): BrowserToolResolvedTarget => ({
@@ -216,7 +239,7 @@ describe('browser_click', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
+      expectFreshSnapshotHint(result.error);
     }
   });
 
@@ -248,7 +271,7 @@ describe('browser_click', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
+      expectFreshSnapshotHint(result.error);
     }
   });
 
@@ -832,28 +855,30 @@ describe('browser_select_option', () => {
     }
   });
 
-  it('reports a stale ref when the ref node is gone before the DOM-side lookup', async () => {
-    const { session } = createFakeSession({
-      pushError: 'Could not find node with given id',
+  it('selects through a snapshot ref in a session that never requested the document', async () => {
+    const { commands, session } = createFakeSession({
+      pageHelper: { ok: true, result: ['Tea'] },
       targets: { e70: ref(70) },
     });
 
     const result = await runInteractBrowserTool(
       'browser_select_option',
-      { target: 'e70', values: ['Tea'] },
+      { element: 'Drink', target: 'e70', values: ['Tea'] },
       session
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
-    }
+    expect(result).toEqual({ ok: true, value: 'Selected "Tea" in "Drink".' });
+    expect(commands).toContainEqual({
+      method: 'DOM.resolveNode',
+      params: { backendNodeId: 70 },
+    });
+    const evaluations = commands.filter(command => command.method === 'Runtime.evaluate');
+    expect(String(evaluations[0]?.params?.['expression'])).toContain('data-kilo-tool-target');
   });
 
   it('reports a stale ref when the ref node is detached from the document', async () => {
     const { commands, session } = createFakeSession({
-      nodeConnected: false,
+      node: document.createElement('select'),
       targets: { e70: ref(70) },
     });
 
@@ -866,7 +891,7 @@ describe('browser_select_option', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
+      expectFreshSnapshotHint(result.error);
     }
     expect(commands.some(command => command.method === 'Runtime.evaluate')).toBe(false);
   });
@@ -886,7 +911,7 @@ describe('browser_select_option', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('stale or unknown');
-      expect(result.error).toContain('kilo_browser_snapshot');
+      expectFreshSnapshotHint(result.error);
     }
   });
 });
@@ -918,22 +943,33 @@ describe('browser_fill_form', () => {
     expect(commands.some(command => command.method === 'Input.dispatchMouseEvent')).toBe(true);
   });
 
-  it('releases the remote object it resolved to check the node', async () => {
+  it('fills a snapshot ref, then untags the node and releases its remote object', async () => {
     const { commands, session } = createFakeSession({
       pageHelper: { ok: true, result: true },
       targets: { e1: ref(1) },
     });
 
-    await runInteractBrowserTool(
+    const result = await runInteractBrowserTool(
       'browser_fill_form',
       { fields: [{ name: 'Email', target: 'e1', type: 'textbox', value: 'a@b.c' }] },
       session
     );
 
-    expect(commands).toContainEqual({
-      method: 'Runtime.releaseObject',
-      params: { objectId: 'kilo-node-object' },
+    expect(result).toEqual({
+      ok: true,
+      value: 'Filled 1 field(s).\nEmail: ok — filled with "a@b.c"',
     });
+    const fill = commands.findIndex(command => command.method === 'Runtime.evaluate');
+    const untag = commands.findIndex(
+      command =>
+        command.method === 'Runtime.callFunctionOn' &&
+        String(command.params?.['functionDeclaration']).includes('removeAttribute')
+    );
+    const release = commands.findIndex(command => command.method === 'Runtime.releaseObject');
+    expect(fill).toBeGreaterThanOrEqual(0);
+    expect(untag).toBeGreaterThan(fill);
+    expect(release).toBeGreaterThan(untag);
+    expect(commands[release]?.params).toEqual({ objectId: 'kilo-node-object' });
   });
 
   it('reports every field while failing when one field cannot resolve', async () => {
@@ -962,7 +998,7 @@ describe('browser_fill_form', () => {
 
   it('reports a detached ref as a field failure before running the page helper', async () => {
     const { commands, session } = createFakeSession({
-      nodeConnected: false,
+      node: document.createElement('input'),
       targets: { e1: ref(1) },
     });
 
@@ -977,6 +1013,78 @@ describe('browser_fill_form', () => {
       expect(result.error).toContain('Email: failed');
       expect(result.error).toContain('stale or unknown');
     }
+    expect(commands.some(command => command.method === 'Runtime.evaluate')).toBe(false);
+    expect(commands).toContainEqual({
+      method: 'Runtime.releaseObject',
+      params: { objectId: 'kilo-node-object' },
+    });
+  });
+
+  it('reports a page that refuses the tag instead of calling the live ref stale', async () => {
+    const node = attachedField();
+    // A page can replace the setter its own tree uses; the ref is live, so a snapshot would change nothing.
+    const original = node.setAttribute.bind(node);
+
+    node.setAttribute = () => {
+      throw new Error('setAttribute is disabled');
+    };
+    const { session } = createFakeSession({ node, targets: { e70: ref(70) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_select_option',
+      { target: 'e70', values: ['Tea'] },
+      session
+    );
+
+    node.setAttribute = original;
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('would not let this tool mark the element');
+      expect(result.error).toContain('CSS selector');
+      // The ref is live: the stale hint would send the model after a snapshot that cannot help.
+      expect(result.error).not.toContain('stale or unknown');
+    }
+  });
+
+  it('reports a page whose setAttribute silently does nothing instead of calling the live ref stale', async () => {
+    const node = attachedField();
+
+    // No throw, no attribute: the read-back is what tells this apart from a tag that landed.
+    node.setAttribute = () => {};
+    const { session } = createFakeSession({ node, targets: { e70: ref(70) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_select_option',
+      { target: 'e70', values: ['Tea'] },
+      session
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('would not let this tool mark the element');
+      expect(result.error).not.toContain('stale or unknown');
+    }
+  });
+
+  it('reports a ref inside a shadow root at once instead of waiting for a selector it cannot reach', async () => {
+    const host = document.createElement('div');
+    const part = document.createElement('input');
+    document.body.append(host);
+    host.attachShadow({ mode: 'closed' }).append(part);
+    const { commands, session } = createFakeSession({ node: part, targets: { e1: ref(1) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_fill_form',
+      { fields: [{ name: 'Month', target: 'e1', type: 'textbox', value: '05' }] },
+      session
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('Month: failed');
+      expect(result.error).toContain('Target the control itself with a CSS selector');
+    }
+    expect(part.dataset['kiloToolTarget']).toBeUndefined();
     expect(commands.some(command => command.method === 'Runtime.evaluate')).toBe(false);
   });
 });

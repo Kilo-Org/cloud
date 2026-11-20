@@ -67,6 +67,8 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgGuardrails: () => ({ mutateAsync: h.mutateAsync, isPending: false }),
 }));
+// The screen hands the form the reader's role; this harness's boundary reports
+// a member, and the suite's subject is the leave guard, not the refusal copy.
 vi.mock('@/components/organization/guardrails-input-section', () => ({
   InputGuardrailsSection: (props: {
     onChange: (update: (current: GuardrailsDraft) => GuardrailsDraft) => void;
@@ -77,6 +79,7 @@ vi.mock('@/components/organization/guardrails-input-section', () => ({
 }));
 vi.mock('@/components/organization/guardrails-output-section', () => ({
   OutputGuardrailsSection: () => null,
+  OutputGuardrailsUnavailableSection: () => null,
 }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 // The real Button renders the actions the suite presses; its spinner's motion

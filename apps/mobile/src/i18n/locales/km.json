@@ -965,6 +965,8 @@
       "pendingComment": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "pendingComment_other": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "submitCountOfTotal": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
+      "submitCountOfTotal_one": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
+      "submitCountOfTotal_other": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
       "submitReview": "ដាក់ស្នើលទ្ធផលពិនិត្យ",
       "partialPostedFresh": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
       "partialPostedFresh_one": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "អនុវត្តតាម REVIEW.md",
     "followReviewMdSubtitle": "អនុវត្តតាមការណែនាំក្នុងឯកសារ REVIEW.md របស់ឃ្លាំងកូដនីមួយៗ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket មិនបានភ្ជាប់ទេ។ មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង និងអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។"
+      "notConnectedReadOnly": "Bitbucket មិនបានភ្ជាប់ទេ។ មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង និងអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។",
+      "notConnectedReadOnlyPlan": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ដូច្នេះម្ចាស់ត្រូវធ្វើបច្ចុប្បន្នភាពវិក្កយបត្រនៅ kilo.ai។"
     },
     "bitbucketConnect": {
       "managedOnWeb": "ការតភ្ជាប់ Bitbucket របស់ {{organization}} ត្រូវបានគ្រប់គ្រងនៅលើវេបតាមកុំព្យូទ័រ។",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "ប្តូរឈ្មោះអង្គការ",
-      "renamePlaceholder": "ឈ្មោះអង្គការ",
+      "renamePlaceholder": "បញ្ចូលឈ្មោះអង្គការ",
       "balance": "សមតុល្យ",
       "plan": "គម្រោង",
       "planTeams": "Teams",

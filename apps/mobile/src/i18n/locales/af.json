@@ -965,6 +965,8 @@
       "pendingComment": "hangende kommentare",
       "pendingComment_other": "hangende kommentare",
       "submitCountOfTotal": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
+      "submitCountOfTotal_one": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
+      "submitCountOfTotal_other": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
       "submitReview": "Dien hersiening in",
       "partialPostedFresh": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "Volg REVIEW.md",
     "followReviewMdSubtitle": "Volg die REVIEW.md-instruksielêer in elke bewaarplek",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel."
+      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
+      "notConnectedReadOnlyPlan": "Die organisasie se proeftydperk het geëindig, so 'n eienaar moet die fakturering by kilo.ai opdateer."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Hernoem organisasie",
-      "renamePlaceholder": "Organisasienaam",
+      "renamePlaceholder": "Voer 'n organisasienaam in",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

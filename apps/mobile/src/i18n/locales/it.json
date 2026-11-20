@@ -665,7 +665,8 @@
     },
     "autoReviews": "Revisioni automatiche",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo."
+      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
+      "notConnectedReadOnlyPlan": "Il periodo di prova dell'organizzazione è terminato, quindi il proprietario deve aggiornare la fatturazione su kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",
@@ -3295,6 +3296,9 @@
       "partialPostedStale_many": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
       "partialPostedStale_other": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
       "submitCountOfTotal": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
+      "submitCountOfTotal_many": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
       "submitReview": "Invia revisione",
       "pendingComment_many": "commenti in sospeso",
       "blockedRequestChanges": "Aggiungi un riepilogo o almeno un commento per richiedere modifiche.",
@@ -3507,7 +3511,7 @@
       "planStatusLapsed": " · Terminato",
       "planEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo.",
       "manageBilling": "Gestisci la fatturazione",
-      "renamePlaceholder": "Nome dell'organizzazione",
+      "renamePlaceholder": "Inserisci un nome per l'organizzazione",
       "renameTitle": "Rinomina l'organizzazione"
     },
     "inviteMember": {

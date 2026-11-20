@@ -444,6 +444,103 @@ test.each([null, {}, { pending: null }, { pending: { permissions: [] } }])(
   }
 );
 
+test('readable inventory entries survive beside an unreadable one, whose notice names only its request', () => {
+  const pending = reduceNativePendingRequests(state.pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        permissions: [
+          { requestID: 'first', tool: 'shell', summary: 'Run tests' },
+          { requestID: 'unreadable', tool: 'unknown', summary: 3 },
+          { requestID: 'second', tool: 'edit', summary: 'Write file' },
+        ],
+        questions: [
+          { requestID: 'asked', fields: [{ type: 'string', key: 'q' }] },
+          { requestID: 'broken', fields: 'not an array' },
+        ],
+      },
+    },
+  });
+  expect(pending.permissions.map(item => item.id)).toEqual(['first', 'second']);
+  expect(pending.permissions).toMatchObject([
+    { id: 'first', action: 'shell', resources: ['Run tests'] },
+    { id: 'second', action: 'edit', resources: ['Write file'] },
+  ]);
+  expect(pending.unreadablePermissions).toEqual([{ requestId: 'unreadable' }]);
+  expect(pending.questions.map(item => item.id)).toEqual(['asked']);
+  expect(pending.questions).toMatchObject([{ id: 'asked', metadata: { kind: 'question' } }]);
+});
+
+test('an unreadable inventory permission with no readable identity is dropped without a notice', () => {
+  const pending = reduceNativePendingRequests(state.pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        permissions: [
+          { tool: 'shell', summary: 'Run tests' },
+          { requestID: '', tool: 'shell' },
+        ],
+        questions: [{ requestID: '', fields: [{ type: 'string', key: 'q' }] }],
+      },
+    },
+  });
+  expect(pending.permissions).toEqual([]);
+  expect(pending.unreadablePermissions).toEqual([]);
+  expect(pending.questions).toEqual([]);
+});
+
+test('two unreadable inventory entries naming one request yield a single notice', () => {
+  const pending = reduceNativePendingRequests(state.pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        permissions: [
+          { requestID: 'twice', tool: 'shell' },
+          { requestID: 'twice', tool: 'edit' },
+        ],
+      },
+    },
+  });
+  expect(pending.permissions).toEqual([]);
+  expect(pending.unreadablePermissions).toEqual([{ requestId: 'twice' }]);
+});
+
+test('an inventory rebuilds unreadable notices from its own contents', () => {
+  const pending = {
+    permissions: [],
+    questions: [],
+    unreadablePermissions: [{ requestId: 'settled' }, { requestId: 'now-readable' }],
+  };
+  const next = reduceNativePendingRequests(pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        permissions: [
+          { requestID: 'now-readable', tool: 'shell', summary: 'Run tests' },
+          { requestID: 'still-unreadable', tool: 'shell' },
+        ],
+        questions: [],
+      },
+    },
+  });
+  expect(next.permissions.map(item => item.id)).toEqual(['now-readable']);
+  expect(next.unreadablePermissions).toEqual([{ requestId: 'still-unreadable' }]);
+});
+
+test('an inventory that omits questions keeps the readable permissions it lists', () => {
+  const pending = {
+    permissions: [],
+    questions: [{ id: 'stale', metadata: { kind: 'question' as const }, fields: [] }],
+    unreadablePermissions: [],
+  };
+  const next = reduceNativePendingRequests(pending, {
+    ...frame('remote.state', {}),
+    body: { pending: { permissions: [{ requestID: 'listed', tool: 'shell', summary: 'Run' }] } },
+  });
+  expect(next.permissions.map(item => item.id)).toEqual(['listed']);
+  expect(next.questions).toEqual([]);
+});
+
 test('reports a malformed live permission by identity and keeps valid pending requests', () => {
   const pending = {
     permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],

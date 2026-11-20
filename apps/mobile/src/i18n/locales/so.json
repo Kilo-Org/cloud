@@ -965,6 +965,8 @@
       "pendingComment": "faallooyin aan weli la gudbin",
       "pendingComment_other": "faallooyin aan weli la gudbin",
       "submitCountOfTotal": "Dir {{displayFreshCount}} ka mid ah {{displayTotalCount}} faallo",
+      "submitCountOfTotal_one": "Dir {{displayFreshCount}} ka mid ah {{displayTotalCount}} faallo",
+      "submitCountOfTotal_other": "Dir {{displayFreshCount}} ka mid ah {{displayTotalCount}} faallo",
       "submitReview": "Gudbi dib-u-eegista",
       "partialPostedFresh": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
       "partialPostedFresh_one": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "Raac REVIEW.md",
     "followReviewMdSubtitle": "Raac tilmaamaha ku jira faylka REVIEW.md ee kayd kasta",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara."
+      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
+      "notConnectedReadOnlyPlan": "Tijaabadii ururku way dhamaatay, sidaas darteed milkiilaha waa inuu cusboonaysiiyaa biilasha kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Beddel magaca ururka",
-      "renamePlaceholder": "Magaca ururka",
+      "renamePlaceholder": "Geli magaca ururka",
       "balance": "Hadhaaga",
       "plan": "Qorshe",
       "planTeams": "Teams",

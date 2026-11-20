@@ -983,6 +983,9 @@
       "pendingComment": "neiesniegti komentāri",
       "pendingComment_other": "neiesniegti komentāri",
       "submitCountOfTotal": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_zero": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_one": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_other": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
       "submitReview": "Iesniegt pārskatīšanas rezultātus",
       "partialPostedFresh": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
       "partialPostedFresh_zero": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
@@ -1414,7 +1417,8 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki."
+      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "notConnectedReadOnlyPlan": "Organizācijas izmēģinājuma periods ir beidzies, tāpēc īpašniekam ir jāatjaunina norēķini vietnē kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
@@ -3686,7 +3690,7 @@
     },
     "hub": {
       "renameTitle": "Pārdēvēt organizāciju",
-      "renamePlaceholder": "Organizācijas nosaukums",
+      "renamePlaceholder": "Ievadiet organizācijas nosaukumu",
       "balance": "Atlikums",
       "plan": "Plāns",
       "planTeams": "Teams",

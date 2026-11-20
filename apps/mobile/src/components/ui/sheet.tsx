@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { BackHandler, Platform, View } from 'react-native';
 
+import { SheetToastScope } from '@/components/sheet-toast-host';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SurfaceClearsSideInsets } from '@/lib/screen-insets';
 import { holdSheetTouch, SHEET_TOUCH_SETTLE_MS, useSheetTouchHold } from '@/lib/sheet-touch-guard';
@@ -402,12 +403,17 @@ export function Sheet({
           settleDismiss(presentation);
         }}
       >
-        {Platform.OS === 'android' && !snapPoints?.length ? (
-          // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
-          <View className="w-full max-w-[640px] self-center">{children}</View>
-        ) : (
-          children
-        )}
+        {/* The sheet's own window covers the root Toaster, so the toasts raised
+          while it is presented draw in here. A dismissing sheet hands them
+          back, so a toast raised as it closes is not carried away with it. */}
+        <SheetToastScope hosting={!dismissing && !dismissalPending}>
+          {Platform.OS === 'android' && !snapPoints?.length ? (
+            // Material3 caps the sheet at 640dp; Expo UI sizes its content host to the window.
+            <View className="w-full max-w-[640px] self-center">{children}</View>
+          ) : (
+            children
+          )}
+        </SheetToastScope>
       </BottomSheet>
     </SurfaceClearsSideInsets>
   );

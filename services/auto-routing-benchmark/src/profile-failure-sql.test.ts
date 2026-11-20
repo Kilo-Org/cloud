@@ -14,10 +14,12 @@ import {
   requeueRetryableCurrentProfiles,
 } from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import {
   BenchmarkModelCatalogSchema,
   CATALOG_CONTEXT_TOO_SMALL_REASON,
   CATALOG_NO_TOOL_SUPPORT_REASON,
+  benchmarkPairUnavailability,
 } from './platform-models';
 import {
   PROFILE_FAILURE_BUDGET,
@@ -326,6 +328,30 @@ describe('profile failure transitions (production migrations and real SQLite)', 
       expect((await listCurrentFailedProfiles(db, current))[0]).toEqual(listedBefore);
     }
   );
+
+  it('bounds the variant it echoes in a refusal reason', async () => {
+    const longVariant = 'v'.repeat(400);
+    const result = await refresh(
+      {
+        data: [
+          {
+            id: pair.model,
+            opencode: { variants: { high: { reasoning: { effort: 'high' } } } },
+          },
+        ],
+      },
+      T0 + HOUR
+    );
+    expect(result.refusals?.[0]?.reason).toBe(
+      'Variant default is not offered for this model in the executable benchmark catalog.'
+    );
+    expect(
+      benchmarkPairUnavailability(BenchmarkModelCatalogSchema.parse({ data: [{ id: 'm/x' }] }), {
+        model: 'm/x',
+        variant: longVariant,
+      })?.reason.length
+    ).toBeLessThanOrEqual(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH);
+  });
 
   it.each([
     {

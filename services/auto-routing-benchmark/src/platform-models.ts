@@ -107,9 +107,10 @@ export function benchmarkPairUnavailability(
     return { failureClass: 'catalog_absent', reason: CATALOG_NO_TOOL_SUPPORT_REASON };
   }
   if (!catalogSupportsBenchmarkPair(catalog, pair)) {
+    const requested = (pair.variant ?? 'default').slice(0, 60);
     return {
       failureClass: 'catalog_absent',
-      reason: `Variant ${pair.variant ?? 'default'} is not offered for this model in the executable benchmark catalog.`,
+      reason: `Variant ${requested} is not offered for this model in the executable benchmark catalog.`,
     };
   }
   const room = catalogModelInputRoom(model);

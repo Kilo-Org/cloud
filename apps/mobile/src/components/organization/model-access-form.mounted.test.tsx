@@ -465,6 +465,30 @@ describe('ModelAccessForm with no provider rows', () => {
     });
   });
 
+  it('rebases the provider list when the rows arrive under an edited draft', async () => {
+    // The draft started while the gateway named no provider. The rows arrive
+    // with a model edit in flight: the provider list must rebase to the catalog,
+    // or Save stays blocked and the first toggle writes a narrow list.
+    const root = render(undefined, {
+      catalog: [model('openai/gpt', []), model('anthropic/claude', [])],
+    });
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+
+    renderWithCatalog(undefined, { catalog: CATALOG });
+    selectTab(root, 'providers');
+    expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic', 'openai']);
+    selectTab(root, 'models');
+
+    await pressSave(root);
+
+    expect(saved.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      model_deny_list: ['openai/gpt'],
+    });
+  });
+
   it('shows the retry as loading while the catalog request runs', () => {
     const root = render(undefined, { catalog: [], catalogIsFetching: true });
 

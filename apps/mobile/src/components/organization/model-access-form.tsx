@@ -57,12 +57,13 @@ type FormState = Readonly<{
  * unless the admin holds edits of its own: those win, and the next save replaces
  * the newer policy.
  *
- * The provider rows are provisional while the catalog is unavailable: they hold
- * only the providers the organization's own models name, and no provider edit is
- * possible in that state (the tab is read-only). When the catalog arrives they
- * rebase to the whole gateway catalog and keep only the edits the deny list
+ * The provider rows are provisional while the catalog is unavailable or names
+ * no provider at all: they hold only the providers the organization's own
+ * models name, and no provider toggle is possible then. When the rows arrive
+ * they rebase to the whole gateway catalog and keep only the edits the deny list
  * holds. Without this the first toggle after a retry would write the provisional
- * rows as the organization's whole allow list.
+ * rows as the organization's whole allow list, and a draft started while the
+ * rows were missing would keep the empty list the notice described.
  *
  * Both rebases compose here, so a catalog that arrives in the same render as a
  * newer deny list keeps that deny list instead of restoring the values the
@@ -72,22 +73,22 @@ function syncedFormState(params: {
   state: FormState;
   serverKey: string;
   serverDraft: ModelAccessDraft;
-  catalogUnavailable: boolean;
+  providerRowsIncomplete: boolean;
 }): FormState {
   const { state } = params;
   const savedListsMoved = params.serverKey !== state.syncedKey;
-  const catalogArrived = state.providerRowsProvisional && !params.catalogUnavailable;
+  const rowsArrived = state.providerRowsProvisional && !params.providerRowsIncomplete;
   if (
     !savedListsMoved &&
-    !catalogArrived &&
-    state.providerRowsProvisional === params.catalogUnavailable
+    !rowsArrived &&
+    state.providerRowsProvisional === params.providerRowsIncomplete
   ) {
     return state;
   }
   const clean = draftsEqual(state.draft, state.baseline);
   let baseline = savedListsMoved ? params.serverDraft : state.baseline;
   let draft = savedListsMoved && clean ? params.serverDraft : state.draft;
-  if (catalogArrived) {
+  if (rowsArrived) {
     baseline = {
       providerAllowList: params.serverDraft.providerAllowList,
       modelDenyList: baseline.modelDenyList,
@@ -101,7 +102,7 @@ function syncedFormState(params: {
     syncedKey: savedListsMoved ? params.serverKey : state.syncedKey,
     baseline,
     draft,
-    providerRowsProvisional: params.catalogUnavailable,
+    providerRowsProvisional: params.providerRowsIncomplete,
   };
 }
 
@@ -168,13 +169,22 @@ export function ModelAccessForm({
     providers
   );
   const serverKey = `${serverDraft.providerAllowList.join(',')}|${serverDraft.modelDenyList.join(',')}`;
+  // The row set is incomplete while the catalog is unavailable or names no
+  // provider: the draft's provider list then reflects missing gateway data, so
+  // the form must rebase it when the rows arrive instead of keeping it.
+  const providerRowsIncomplete = catalogUnavailable || providersEmpty;
   const [form, setForm] = useState<FormState>(() => ({
     syncedKey: serverKey,
     baseline: serverDraft,
     draft: serverDraft,
-    providerRowsProvisional: catalogUnavailable,
+    providerRowsProvisional: providerRowsIncomplete,
   }));
-  const synced = syncedFormState({ state: form, serverKey, serverDraft, catalogUnavailable });
+  const synced = syncedFormState({
+    state: form,
+    serverKey,
+    serverDraft,
+    providerRowsIncomplete,
+  });
   if (synced !== form) {
     setForm(synced);
   }

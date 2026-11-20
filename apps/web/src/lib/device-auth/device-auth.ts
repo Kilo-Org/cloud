@@ -18,7 +18,7 @@ import type { AuthProviderId } from '@kilocode/db/schema-types';
 import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_REFUSAL_CODES,
-  type DeviceAuthRefusalCode,
+  DeviceAuthRefusalError,
 } from './refusal-codes';
 import { normalizeDeviceAuthUserCode } from './user-code';
 
@@ -26,30 +26,12 @@ export type { RequestingClient } from './requesting-client';
 export {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
   deviceAuthRefusalCopy,
   refusalCopyFor,
   type DeviceAuthRefusalCode,
 } from './refusal-codes';
 export { normalizeDeviceAuthUserCode } from './user-code';
-
-/**
- * A refusal the approval surfaces report. The `code` is the transport value the
- * routes answer with and the clients match on; the message is the diagnostic
- * the server logs and the tests read. The two are carried separately, so
- * rewording the copy can never change an HTTP status or a client branch.
- */
-export class DeviceAuthRefusalError extends Error {
-  readonly code: DeviceAuthRefusalCode;
-
-  constructor(code: DeviceAuthRefusalCode) {
-    // The message is the diagnostic a log line or a test reads; the copy a person
-    // sees travels separately in `refusalCopyFor`. Naming the code in the message
-    // keeps a stack trace readable without leaking presentation text.
-    super(`Device authorization refused: ${code}`);
-    this.name = 'DeviceAuthRefusalError';
-    this.code = code;
-  }
-}
 
 export type DeviceAuthPendingLink = {
   provider: AuthProviderId;

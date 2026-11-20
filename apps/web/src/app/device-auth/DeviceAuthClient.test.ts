@@ -2,7 +2,7 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from '@jest/globals';
 
-import { DeviceAuthClient, DeviceAuthAppReturn } from './DeviceAuthClient';
+import { DeviceAuthClient, DeviceAuthAppReturn, refusalMessage } from './DeviceAuthClient';
 import {
   buildDeviceAuthVerificationUrl,
   closeDeviceAuthWindowIfAppMode,
@@ -231,6 +231,25 @@ describe('DeviceAuthClient pending link', () => {
     expect(html).not.toContain('checked=""');
     expect(authorizeButton(html)).toContain('disabled=""');
     expect(html).toContain('Choose whether to add the sign-in method above to authorize.');
+  });
+});
+
+describe('refusalMessage', () => {
+  test('prefers the shared copy for a known code over the message the route sent', () => {
+    expect(
+      refusalMessage({ code: 'REQUEST_NOT_PENDING', message: 'server sentence' }, 'fallback')
+    ).toBe('This sign-in request can no longer be used. Start the sign-in again.');
+  });
+
+  test('keeps the sentence of a route that answers prose without a code', () => {
+    // The deny route answers its 429 and expired-viewer-token 403 this way.
+    expect(refusalMessage({ code: 'Invalid or expired viewer token' }, 'fallback')).toBe(
+      'Invalid or expired viewer token'
+    );
+  });
+
+  test('falls back when the refusal carries nothing', () => {
+    expect(refusalMessage({}, 'Failed to deny device')).toBe('Failed to deny device');
   });
 });
 

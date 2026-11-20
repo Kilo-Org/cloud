@@ -45,8 +45,18 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-import { createDeviceAuthRequest, pollDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import {
+  approveDeviceAuthRequest,
+  createDeviceAuthRequest,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
+  pollDeviceAuthRequest,
+} from '@/lib/device-auth/device-auth';
+import {
+  getUserFromAuth,
+  getUserFromSessionForCredentialIssuance,
+} from '@kilocode/web-shared/lib/user/server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import * as codesRoute from '@/app/api/device-auth/codes/route';
 import * as codesCodeRoute from '@/app/api/device-auth/codes/[code]/route';
 import * as tokenRoute from '@/app/api/device-auth/token/route';
@@ -63,6 +73,8 @@ const MOBILE_HEADERS = {
 const mockCreateDeviceAuthRequest = jest.mocked(createDeviceAuthRequest);
 const mockPollDeviceAuthRequest = jest.mocked(pollDeviceAuthRequest);
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockApproveDeviceAuthRequest = jest.mocked(approveDeviceAuthRequest);
+const mockGetUserFromSession = jest.mocked(getUserFromSessionForCredentialIssuance);
 
 let logSpy: jest.SpiedFunction<typeof console.log>;
 
@@ -178,6 +190,30 @@ describe('REST data routes emit one api_timing line', () => {
     );
 
     expect(response.status).toBe(403);
+    expectSingleTimingLine('/api/device-auth/tokens', 'POST');
+  });
+
+  test('POST /api/device-auth/tokens answers a typed refusal by its code', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: { id: 'user-1' },
+      authFailedResponse: null,
+    } as never);
+    mockApproveDeviceAuthRequest.mockRejectedValueOnce(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending)
+    );
+
+    const response = await tokensRoute.POST(
+      new Request('https://app.kilo.ai/api/device-auth/tokens', {
+        method: 'POST',
+        headers: { ...MOBILE_HEADERS, 'Content-Type': 'application/json', Origin: APP_URL },
+        body: '{"code":"ABCD-EFGH"}',
+      })
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+    });
     expectSingleTimingLine('/api/device-auth/tokens', 'POST');
   });
 

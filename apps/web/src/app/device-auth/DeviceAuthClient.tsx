@@ -47,7 +47,7 @@ const apiErrorSchema = z.object({
  * The code decides the page's copy, so the same refusal reads the same way here
  * whatever sentence the server happened to carry.
  */
-type ApiRefusal = { code?: string; message?: string };
+export type ApiRefusal = { code?: string; message?: string };
 
 async function readApiRefusal(response: Response): Promise<ApiRefusal> {
   const data: unknown = await response.json().catch(() => null);
@@ -59,12 +59,19 @@ async function readApiRefusal(response: Response): Promise<ApiRefusal> {
   };
 }
 
-function refusalMessage(refusal: ApiRefusal, fallback: string): string {
+/**
+ * The sentence the error card shows for a route refusal. The shared copy for a
+ * known code wins, so the same refusal always reads the same way; a route that
+ * still answers prose in `error` keeps its own sentence.
+ */
+export function refusalMessage(refusal: ApiRefusal, fallback: string): string {
   if (refusal.code) {
     const copy = deviceAuthRefusalCopy(refusal.code);
     if (copy) return copy;
   }
-  return refusal.message ?? fallback;
+  // A route that still answers prose in `error` has no code to map, so show the
+  // sentence it sent before falling back to the caller's own copy.
+  return refusal.message ?? refusal.code ?? fallback;
 }
 
 function getUserInitials(name: string): string {

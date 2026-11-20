@@ -114,6 +114,12 @@ describe('Device Auth', () => {
       ['abcd efgh', 'ABCD-EFGH'],
       ['ABCD-EFGH', 'ABCD-EFGH'],
       ['ABCD\tEFGH', 'ABCD-EFGH'],
+      // Each row below needs the dash removal: without it the cleaned value is
+      // longer than eight characters and cannot reach the split form.
+      ['A-B-C-D-E-F-G-H', 'ABCD-EFGH'],
+      ['ABCD\u2013EFGH', 'ABCD-EFGH'],
+      ['ABCD\u2014EFGH', 'ABCD-EFGH'],
+      ['ABCD_EFGH', 'ABCD_EFGH'],
     ])('canonicalizes %j to %j', (input, expected) => {
       expect(normalizeDeviceAuthUserCode(input)).toBe(expected);
     });

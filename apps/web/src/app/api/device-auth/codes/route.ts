@@ -64,6 +64,10 @@ async function readPairingBody(request: Request): Promise<ReadRequestBodyResult>
     return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestBody };
   }
 
+  // A client that serializes an empty payload as `null` is still sending no
+  // pairing request, so it keeps the plain flow the way an absent body does.
+  if (body === null) return { ok: true, client: null };
+
   const parsed = CreateCodesBodySchema.safeParse(body);
   if (!parsed.success) {
     const field = parsed.error.issues[0]?.path[0];

@@ -72,3 +72,21 @@ export function deviceAuthRefusalCopy(code: string): string | undefined {
 export function refusalCopyFor(code: DeviceAuthRefusalCode): string {
   return REFUSAL_COPY[code];
 }
+
+/**
+ * A refusal the approval surfaces report. The `code` is the transport value the
+ * routes answer with and the clients match on; the message is the diagnostic a
+ * log line or a test reads. The two are carried separately, so rewording the
+ * copy a person sees can never change an HTTP status or a client branch.
+ */
+export class DeviceAuthRefusalError extends Error {
+  readonly code: DeviceAuthRefusalCode;
+
+  constructor(code: DeviceAuthRefusalCode) {
+    // The message names the code rather than repeating presentation text, so a
+    // stack trace stays readable without duplicating the copy table.
+    super(`Device authorization refused: ${code}`);
+    this.name = 'DeviceAuthRefusalError';
+    this.code = code;
+  }
+}

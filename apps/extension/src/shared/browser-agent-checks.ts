@@ -512,11 +512,16 @@ export interface StepTokenBinding {
   readonly toolName: string;
 }
 
-/** The one download a step's approval buys: the tab it was on and the url of the file it started. */
-export interface StepTokenNeed {
-  readonly tabId: number;
-  readonly url: string;
-}
+/**
+ * The one download a step's approval buys: the tab it was on and the url of the file it started.
+ *
+ * `page` covers any download of that page — a repeat that regenerates its link (`?click=2`) is the same file the
+ * human approved. `exact` covers one url alone: it is what a refusal arms when the call's own requests named none of
+ * the stopped files, so the file the step meant is unknown and only the file the browser named may pass.
+ */
+export type StepTokenNeed =
+  | { readonly kind: 'exact'; readonly tabId: number; readonly url: string }
+  | { readonly kind: 'page'; readonly tabId: number; readonly url: string };
 
 export interface StepTokenIssue extends StepTokenBinding {
   /** The download this approval is for, when the step was refused for one: the call keeps that file alone. */

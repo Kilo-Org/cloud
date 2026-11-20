@@ -5950,6 +5950,98 @@ describe('the download hold on a real call', () => {
     expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
   });
 
+  it('names the step’s own file when both files are documents and the sibling arrives first', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const own = { filename: 'report.txt', id: 81, url: `${MAIN_ORIGIN}/assets/report.txt?click=1` };
+    const extra = { filename: 'second.txt', id: 82, url: `${MAIN_ORIGIN}/assets/second.txt?click=1` };
+    const suggested: number[] = [];
+    let repeat = false;
+
+    // Both files of the measured gesture are `Document` requests, so the set of this call's documents names neither:
+    // Only their order does. The click's own link is requested first, and the page script's file follows. Here the
+    // browser stops the script's file first, which is what the failing trace showed.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          for (const url of [own.url, extra.url]) {
+            cdp.emit('Network.requestWillBeSent', {
+              request: { method: 'GET', url },
+              requestId: `${repeat ? 'repeat' : 'click'}-document-${url}`,
+              type: 'Document',
+            });
+          }
+
+          const items = repeat
+            ? [
+                { file: extra, id: 84 },
+                { file: own, id: 83 },
+              ]
+            : [
+                { file: extra, id: 82 },
+                { file: own, id: 81 },
+              ];
+
+          for (const { file, id } of items) {
+            hold.handle(
+              { filename: file.filename, id, referrer: dashboard, url: file.url },
+              () => {
+                suggested.push(id);
+              }
+            );
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const guarded = await click();
+    const refused =
+      guarded.kind === 'needs_permission' && !guarded.result.ok ? guarded.result.error : '';
+
+    // The approval buys the step's own file — the one this call requested first — and the sibling is named beside it.
+    expect(refused).toContain('The download of report.txt was stopped');
+    expect(refused).toContain('second.txt');
+
+    const token = expectStepToken(guarded);
+
+    suggested.length = 0;
+    repeat = true;
+
+    const approved = await click([token]);
+
+    if (approved.kind !== 'result') {
+      throw new Error(`expected the approved file to land, got ${JSON.stringify(approved)}`);
+    }
+
+    // The approval is spent on the file it named, whichever order the browser stopped the two in.
+    expect(hold.needOf('session-1')).toMatchObject({
+      filename: 'report.txt',
+      kind: 'spent',
+      target: { kind: 'url', url: own.url },
+    });
+    // The sibling was stopped on both gestures; the step's own file was cancelled only on the guarded one.
+    expect([...downloads.cancelled].sort()).toStrictEqual([81, 82, 84]);
+    // The approved file was let through, never stopped, and the sibling was stopped again and reported.
+    expect(suggested).toStrictEqual([83, 84]);
+    expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
+  });
+
   it('answers an approved call the browser named no item for, and keeps the approval unspent', async () => {
     const downloads = createFakeDownloads();
     const { hold } = holdOver(downloads);

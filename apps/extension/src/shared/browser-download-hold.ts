@@ -95,7 +95,9 @@ export type DownloadTarget =
       readonly name?: string | undefined;
       readonly scheme: string;
     }
-  | { readonly kind: 'url'; readonly page?: string | undefined; readonly url: string };
+  | { readonly kind: 'url'; readonly page?: string | undefined; readonly url: string }
+  /** One url alone, never its page: a refusal whose own file is unknown arms only the file the browser named. */
+  | { readonly kind: 'exact'; readonly url: string };
 
 /**
  * A session's approval. `armed` while its token lives — a human may take a
@@ -346,6 +348,10 @@ const targetMatches = (
   item: DownloadHoldItem,
   announcement: DownloadHoldAnnouncement | undefined
 ): boolean => {
+  if (target.kind === 'exact') {
+    return item.url === target.url;
+  }
+
   if (target.kind === 'url') {
     const url = item.url === undefined || item.url === '' ? undefined : item.url;
 

@@ -33,6 +33,7 @@ import type {
   DownloadSettle,
   DownloadSign,
   DownloadStep,
+  DownloadTarget,
 } from './browser-download-hold';
 import {
   DOWNLOAD_FAIL_REASON,
@@ -1082,20 +1083,68 @@ const lateDownloadError = (files: readonly DownloadReport[]): string => {
 };
 
 /**
- * The file a refusal is about: the step's own download — the one whose url is a document this call asked the browser
- * for — and never whichever file the browser stopped first. A gesture that starts two downloads stops them in the
- * browser's own order: in the measured two-download click the script's `second.txt` was refused 8 ms before the link's
- * `report.txt`, so a refusal built from that order promised the human one file and then kept the other.
+ * The file a refusal is about: the step's own download — the one whose page this call asked the browser for first —
+ * and never whichever file the browser stopped first. A gesture that starts two downloads stops them in the
+ * browser's own order: in the measured two-download click the script's `second.txt` was refused 8 ms before the
+ * link's `report.txt`, so a refusal built from that order promised the human one file and then kept the other.
+ *
+ * `asked` is the pages of this call's own requests, in the order it made them: the click's own link navigation is
+ * issued first, and the files a page script starts beside it follow. Both files of the measured gesture are
+ * `Document` requests, so the set they form says nothing about which one the step named; the order does.
+ *
+ * `scope` is what the approval may cover. A file this call's requests named is the step's own, so its page is what the
+ * repeat buys — a page that regenerates its link on every click downloads the same file. No request named any stopped
+ * file (a `blob:`, or a file Chrome named only once it was saved), so the step's own file is unknown: the first
+ * stopped file stands for it, every file is named, and only that exact url may pass on the repeat.
  */
 const ownDownloadOf = <File extends { readonly url?: string | undefined }>(
   files: readonly File[],
-  documents: ReadonlySet<string>
-): File | undefined =>
-  files.find(file => {
-    const page = pageOf(file.url);
+  asked: readonly string[]
+): { readonly file: File; readonly scope: 'exact' | 'page' } | undefined => {
+  // The step's own file is the one whose page this call asked for first; a file no request named ranks -1.
+  const ranked = files
+    .map(file => {
+      const page = pageOf(file.url);
 
-    return page !== undefined && documents.has(page);
-  }) ?? files[0];
+      return { file, rank: page === undefined ? -1 : asked.indexOf(page) };
+    })
+    .filter(entry => entry.rank >= 0)
+    .toSorted((left, right) => left.rank - right.rank);
+  const [own] = ranked;
+
+  if (own !== undefined) {
+    return { file: own.file, scope: 'page' };
+  }
+
+  const [first] = files;
+
+  if (first === undefined) {
+    return undefined;
+  }
+
+  // One file alone is the step's own by being the only one it started: a page that regenerates its link on the
+  // Repeat (`?click=2`) still downloads it. Only among siblings is the step's own file unknown, and then only the
+  // File the browser named may pass.
+  return { file: first, scope: files.length === 1 ? 'page' : 'exact' };
+};
+
+/** Every stopped file but the one a refusal is about: each is named as a file the approval does not cover. */
+const otherFilesOf = <File extends { readonly url?: string | undefined }>(
+  files: readonly File[],
+  own: File
+): readonly File[] => {
+  let skipped = false;
+
+  return files.filter(file => {
+    if (!skipped && file === own) {
+      skipped = true;
+
+      return false;
+    }
+
+    return true;
+  });
+};
 
 /**
  * The downloads an act call started that the stream has not named yet, searched
@@ -1627,10 +1676,7 @@ export const createBrowserRuntime = ({
    * covers that file alone — a second download during the approved call, on another tab or another url, is
    * Guarded as usual — so the need is bound to the first item the browser creates for that tab and url.
    */
-  const approvedNeeds = new Map<
-    string,
-    { itemId: number | undefined; readonly tabId: number; readonly url: string }
-  >();
+  const approvedNeeds = new Map<string, StepTokenNeed & { itemId: number | undefined }>();
 
   /** Whether this item is the one file the session's approval bought; the first item for its tab and url is it. */
   const approvedItem = (
@@ -1647,10 +1693,10 @@ export const createBrowserRuntime = ({
       return need.itemId === item.id;
     }
 
-    if (
-      (item.tabId !== undefined && item.tabId !== need.tabId) ||
-      !sameFileUrl(need.url, item.url)
-    ) {
+    const named =
+      need.kind === 'exact' ? item.url === need.url : sameFileUrl(need.url, item.url);
+
+    if ((item.tabId !== undefined && item.tabId !== need.tabId) || !named) {
       return false;
     }
 
@@ -1672,7 +1718,11 @@ export const createBrowserRuntime = ({
   const approvedNeedUrl = (session: string, url: string, tabId: number): boolean => {
     const need = approvedNeeds.get(session);
 
-    return need !== undefined && need.tabId === tabId && sameFileUrl(need.url, url);
+    if (need === undefined || need.tabId !== tabId) {
+      return false;
+    }
+
+    return need.kind === 'exact' ? url === need.url : sameFileUrl(need.url, url);
   };
 
   /**
@@ -2749,6 +2799,17 @@ export const createBrowserRuntime = ({
   };
 
   /**
+   * The one download a refusal's token buys. `page` is the file's page, which a repeat that regenerates its link still
+   * matches; `exact` is the url alone, for a refusal whose step's own file this call's requests never named.
+   */
+  const needOfUrl = (tabId: number, url: string, scope: 'exact' | 'page'): StepTokenNeed =>
+    scope === 'page' ? { kind: 'page', tabId, url } : { kind: 'exact', tabId, url };
+
+  /** What a need arms on the hold: the file's page, or its exact url when the step's own file is unknown. */
+  const targetOfNeed = (need: StepTokenNeed): DownloadTarget =>
+    need.kind === 'page' ? targetOf(need.url) : { kind: 'exact', url: need.url };
+
+  /**
    * The refusal for a download the hold decided during this call: the step the
    * model repeats, and the one file its token then buys. The text says what
    * became of the file, so a browser that may have saved it is never reported
@@ -2761,6 +2822,8 @@ export const createBrowserRuntime = ({
       readonly origin: string;
       /** The files the same call stopped besides this one: one click can start several, and each needs its own. */
       readonly alsoStopped?: readonly DownloadReport[];
+      /** What this approval may cover: the file's page, or its exact url when the step's own file is unknown. */
+      readonly scope?: 'exact' | 'page';
       /** The file was announced where nothing could hold it: the text names the permission that would. */
       readonly unguarded?: boolean;
     },
@@ -2789,7 +2852,9 @@ export const createBrowserRuntime = ({
         ? undefined
         : tokens.issue({
             argumentHash: step.argumentHash,
-            ...(file.url === undefined ? {} : { need: { tabId: file.tabId, url: file.url } }),
+            ...(file.url === undefined
+              ? {}
+              : { need: needOfUrl(file.tabId, file.url, context.scope ?? 'page') }),
             origin: step.origin,
             reason,
             session: step.session,
@@ -2843,7 +2908,7 @@ export const createBrowserRuntime = ({
     // The repeat keeps the one file this report is about: the tab the download belongs to and the url it was named
     // By. Without it the repeat would run with no guard and every file it starts would be kept and never reported.
     const need: StepTokenNeed | undefined =
-      started?.url === undefined ? undefined : { tabId: started.tabId, url: started.url };
+      started?.url === undefined ? undefined : needOfUrl(started.tabId, started.url, 'page');
     const stepToken =
       step === undefined
         ? undefined
@@ -3507,7 +3572,7 @@ export const createBrowserRuntime = ({
             session: approvedFile.session,
             step: downloadStep,
             tabId: approvedFile.need.tabId,
-            target: targetOf(approvedFile.need.url),
+            target: targetOfNeed(approvedFile.need),
           });
         }
 
@@ -3766,16 +3831,18 @@ export const createBrowserRuntime = ({
         const earlierLate = late.filter(file => (file.since ?? callStartedAt) < callStartedAt);
         // The pages this call asked the browser for as a document: the url its own download comes from, which is
         // What tells the file the model asked for from a second one the same gesture started.
-        const stepDocuments = new Set(
-          runSession
-            .networkRequests()
-            .filter(
-              request =>
-                !requestsBefore.has(request.requestId) && request.resourceType === 'Document'
-            )
-            .map(request => pageOf(request.url) ?? '')
-            .filter(page => page !== '')
-        );
+        const stepDocuments = [
+          ...new Set(
+            runSession
+              .networkRequests()
+              .filter(
+                request =>
+                  !requestsBefore.has(request.requestId) && request.resourceType === 'Document'
+              )
+              .map(request => pageOf(request.url) ?? '')
+              .filter(page => page !== '')
+          ),
+        ];
         const stoppedFiles = downloadHold === undefined ? settlement.stopped : ownLate.length;
         // A file the guard could not delete is named, whichever call stopped it.
         const keptFiles = [
@@ -3859,7 +3926,7 @@ export const createBrowserRuntime = ({
               need:
                 approvedNeed === undefined
                   ? undefined
-                  : { tabId: approvedNeed.tabId, url: approvedNeed.url },
+                  : { kind: 'page', tabId: approvedNeed.tabId, url: approvedNeed.url },
               origin: preflight?.ok ? preflight.origin : '',
               step: downloadStep,
               tokenTabId: runTabId,
@@ -3891,16 +3958,16 @@ export const createBrowserRuntime = ({
           if (bought) {
             alsoStopped = ownLate;
           } else {
-            const ownRefusal = ownDownloadOf(ownLate, stepDocuments);
-            const otherOwn = ownLate.filter(file => file !== ownRefusal);
+            const own = ownDownloadOf(ownLate, stepDocuments);
 
-            if (ownRefusal !== undefined) {
+            if (own !== undefined) {
               return downloadRefusal(
-                ownRefusal,
+                own.file,
                 {
-                  ...(otherOwn.length === 0 ? {} : { alsoStopped: otherOwn }),
+                  ...(ownLate.length === 1 ? {} : { alsoStopped: otherFilesOf(ownLate, own.file) }),
                   keptFiles,
                   origin: preflight?.ok ? preflight.origin : '',
+                  scope: own.scope,
                 },
                 runTabId
               );
@@ -3919,14 +3986,19 @@ export const createBrowserRuntime = ({
           const reason = SENSITIVE_REASON.download;
           // The refused file is what the approval will buy: the step's own download, never the first one the browser
           // Stopped. A later step's download is a fresh approval of its own.
-          const refusedFile = ownDownloadOf(settlement.stoppedItems ?? [], stepDocuments);
+          const own = ownDownloadOf(settlement.stoppedItems ?? [], stepDocuments);
+          const refusedFile = own?.file;
           const stepToken = preflight?.ok
             ? issueSensitiveToken(
                 { origin, reason },
                 runTabId,
                 refusedFile?.url === undefined
                   ? undefined
-                  : { tabId: refusedFile.tabId ?? runTabId, url: refusedFile.url }
+                  : needOfUrl(
+                      refusedFile.tabId ?? runTabId,
+                      refusedFile.url,
+                      own?.scope ?? 'page'
+                    )
               )
             : undefined;
 
@@ -4051,7 +4123,11 @@ export const createBrowserRuntime = ({
             need:
               approvedUrl === undefined
                 ? undefined
-                : { tabId: approvedFile?.need.tabId ?? runTabId, url: approvedUrl },
+                : {
+                    kind: approvedFile?.need.kind ?? 'page',
+                    tabId: approvedFile?.need.tabId ?? runTabId,
+                    url: approvedUrl,
+                  },
             origin: preflight?.ok ? preflight.origin : '',
             step: downloadStep,
             tokenTabId: runTabId,

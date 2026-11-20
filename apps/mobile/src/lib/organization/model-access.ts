@@ -2,6 +2,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { type TFunction } from 'i18next';
+import * as z from 'zod';
 
 import { foldForSearch } from '@/i18n/fold-for-search';
 
@@ -30,6 +31,20 @@ export type ModelAccessDraft = {
   /** Models no member may use, whichever provider serves them. */
   modelDenyList: readonly string[];
 };
+
+const modelAccessDraftSchema = z.object({
+  providerAllowList: z.array(z.string()),
+  modelDenyList: z.array(z.string()),
+});
+
+/**
+ * Runtime shape guard for a stored model-access draft: two lists of model and
+ * provider ids. It checks the shape only — which providers a catalog holds, and
+ * whether a list leaves a route open, is the form's own question.
+ */
+export function isModelAccessFormDraft(value: unknown): value is ModelAccessDraft {
+  return modelAccessDraftSchema.safeParse(value).success;
+}
 
 /**
  * The gateway's own normalisation (`normalizeModelId` in web-shared): a variant

@@ -360,6 +360,35 @@ function connectActions(root: TestRenderer.ReactTestRenderer) {
   });
 }
 
+describe('BitbucketOverview OAuth connection card', () => {
+  /** The row title the card paints over the managed-on-web line. */
+  function cardTitle(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.className === 'text-sm font-medium')
+      .map(node => node.props.children);
+  }
+
+  // The granted-name case lives in `bitbucket-overview-connection.mounted.test.tsx`,
+  // which asserts the same row title from the full OAuth status shape; only the
+  // empty-name fallback is new.
+  it('reads Connected when the authorization names an empty workspace', async () => {
+    // The status read passes the server's `displayName` through, so an empty
+    // string reaches the card: a nullish fallback painted a blank title.
+    readiness.connected = false;
+    readiness.integrationId = null;
+    status.data = {
+      method: 'oauth',
+      status: 'connected',
+      workspace: { slug: 'acme', displayName: '' },
+    };
+
+    const renderer = await renderScreen();
+
+    expect(cardTitle(renderer)).toEqual([i18n.t('common.connected')]);
+  });
+});
+
 describe('BitbucketOverview not-connected state', () => {
   it('states the next step without repeating the organization in the connect description', async () => {
     readiness.connected = false;

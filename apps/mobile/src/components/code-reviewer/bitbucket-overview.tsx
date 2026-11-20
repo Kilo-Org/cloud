@@ -109,14 +109,18 @@ export function BitbucketOverview({
     const workspaceName = connection.kind === 'oauth-connected' ? connection.workspace : null;
     // The authorization's own verdict, at row-title size: the workspace it
     // granted, "Connected" while it has not named one, or the attention state
-    // the platform list paints for the same authorization.
+    // the platform list paints for the same authorization. A name that is
+    // empty or only spaces names no workspace: the status read passes the
+    // server's `displayName` through, and a blank title reads as a broken card.
+    const workspaceLabel = workspaceName?.displayName?.trim();
     const statusLabel =
-      workspaceName?.displayName ??
-      t(
-        connection.kind === 'oauth-connected'
-          ? 'common.connected'
-          : 'codeReviewer.platformList.needsAttention'
-      );
+      workspaceLabel && workspaceLabel.length > 0
+        ? workspaceLabel
+        : t(
+            connection.kind === 'oauth-connected'
+              ? 'common.connected'
+              : 'codeReviewer.platformList.needsAttention'
+          );
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />

@@ -14,14 +14,10 @@ import { type RepoOption, type RepoPickerSection } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { i18n } from '@/i18n';
 
-// Hoisted so a test can flip the interface direction: the note's paragraph
-// direction helper reads it per call.
-const rn = vi.hoisted(() => ({ I18nManager: { isRTL: false } }));
-
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
-  I18nManager: rn.I18nManager,
+  I18nManager: { isRTL: false },
   Keyboard: { dismiss: vi.fn() },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
@@ -283,10 +279,6 @@ describe('repository picker Bitbucket note', () => {
     // stubbed to a host element, so the mark is proved in
     // `components/ui/text.rtl-base-direction.mounted.test.tsx`, and a call-site
     // mark here would draw a second one.
-    rn.I18nManager.isRTL = true;
-    onTestFinished(() => {
-      rn.I18nManager.isRTL = false;
-    });
 
     const renderer = await mount();
 

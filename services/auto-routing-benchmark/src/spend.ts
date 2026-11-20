@@ -113,9 +113,9 @@ const SPEND_TOTALS_SQL = `
  */
 const SPEND_BACKFILL_SQL = `
   INSERT INTO benchmark_spend_ledger (day, owner_type, owner_id, spent_usd, updated_at)
-  SELECT ?1, owner_key_type, owner_key_id, SUM(result.cost_usd), ?2
+  SELECT ?1, owner_key_type, owner_key_id, SUM(spend_usd), ?2
   FROM (
-    SELECT result.cost_usd AS cost_usd,
+    SELECT result.cost_usd AS spend_usd,
       COALESCE(run.spend_owner_type, '') AS owner_key_type,
       COALESCE(run.spend_owner_id, '') AS owner_key_id
     FROM case_results AS result
@@ -126,10 +126,10 @@ const SPEND_BACKFILL_SQL = `
     JOIN benchmark_runs AS run ON run.id = result.run_id
     WHERE date(execution.started_at / 1000, 'unixepoch') = ?1
       AND result.cost_usd IS NOT NULL
-  )
-  WHERE cost_usd > 0
+  ) AS day_spend
+  WHERE spend_usd > 0
   GROUP BY owner_key_type, owner_key_id
-  HAVING SUM(cost_usd) > 0
+  HAVING SUM(spend_usd) > 0
   ON CONFLICT (day, owner_type, owner_id) DO NOTHING
 `;
 

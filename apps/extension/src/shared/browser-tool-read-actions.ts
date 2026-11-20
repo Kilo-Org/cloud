@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import {
   MAX_BROWSER_TOOL_FIND_CONTEXT_LINES,
+  MAX_BROWSER_TOOL_FIND_LINES,
   boundBrowserToolText,
   captureBrowserAriaSnapshot,
   caughtMessage,
@@ -841,8 +842,8 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     );
   }
 
-  // A search reads the whole tree, not only the lines one snapshot prints: a match past them still needs its ref.
-  const capture = await captureScopedSnapshot(deps, { maxLines: Number.POSITIVE_INFINITY });
+  // A search reads far more of the tree than one snapshot prints: a match past those lines still needs its ref.
+  const capture = await captureScopedSnapshot(deps, { maxLines: MAX_BROWSER_TOOL_FIND_LINES });
   const matches: number[] = [];
 
   for (const [index, line] of capture.lines.entries()) {

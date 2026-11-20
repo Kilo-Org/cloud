@@ -28,6 +28,8 @@ export const MAX_BROWSER_TOOL_RESULT_LENGTH = 60_000;
 export const MAX_BROWSER_TOOL_NAME_LENGTH = 300;
 /** How many aria snapshot lines `browser_find` shows after a match. */
 export const MAX_BROWSER_TOOL_FIND_CONTEXT_LINES = 3;
+/** Lines `browser_find` walks: far past one snapshot's printed lines, still a stop for a pathologically large or deep tree. */
+export const MAX_BROWSER_TOOL_FIND_LINES = 50_000;
 
 /**
  * An extension page has no workspace root, so a Playwright `filename` argument
@@ -282,7 +284,7 @@ export const buildBrowserAriaSnapshot = (
     readonly boxForBackendNodeId?: (backendNodeId: number) => string | undefined;
     readonly depth?: number;
     readonly rootBackendNodeId?: number;
-    /** Lines rendered before the walk stops; a snapshot prints `MAX_BROWSER_TOOL_SNAPSHOT_LINES`, a search reads the whole tree. */
+    /** Lines rendered before the walk stops; a snapshot prints `MAX_BROWSER_TOOL_SNAPSHOT_LINES`, a search reads `MAX_BROWSER_TOOL_FIND_LINES`. */
     readonly maxLines?: number;
   } = {}
 ): BrowserAriaSnapshot => {
@@ -577,13 +579,14 @@ const captureDomAriaSnapshot = async (
   options: {
     readonly boxes?: boolean;
     readonly depth?: number;
+    readonly maxLines?: number;
     readonly rootSelector?: string;
   }
 ): Promise<BrowserAriaSnapshot> => {
   const result = await readRuntimeEvaluateValue(
     session,
     buildDomSnapshotExpression({
-      maxLines: MAX_BROWSER_TOOL_SNAPSHOT_LINES,
+      maxLines: options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES,
       maxNameLength: MAX_BROWSER_TOOL_NAME_LENGTH,
       ...(options.boxes === undefined ? {} : { boxes: options.boxes }),
       ...(options.depth === undefined ? {} : { depth: options.depth }),
@@ -745,6 +748,7 @@ export const captureBrowserAriaSnapshot = async (
     (await captureDomAriaSnapshot(session, {
       ...(options.boxes === undefined ? {} : { boxes: options.boxes }),
       ...(options.depth === undefined ? {} : { depth: options.depth }),
+      ...(options.maxLines === undefined ? {} : { maxLines: options.maxLines }),
       ...(options.target === undefined || options.target === ''
         ? {}
         : { rootSelector: await resolveTargetSelector(session, options.target) }),
@@ -758,7 +762,7 @@ export const captureBrowserAriaSnapshot = async (
       ? '(no accessibility nodes)'
       : renderBrowserAriaSnapshot(resolvedSnapshot);
   const text = resolvedSnapshot.truncated
-    ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
+    ? `${body}\n... (snapshot truncated at ${String(options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;
 
   return {

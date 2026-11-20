@@ -8,7 +8,9 @@ import {
   isReadBrowserToolName,
   runReadBrowserTool,
 } from './browser-tool-read-actions';
+import { captureBrowserAriaSnapshot } from './browser-tool-snapshot';
 import type { BrowserAriaNode, BrowserToolPageSession } from './browser-tool-snapshot';
+import { captureAgentSnapshotView } from './browser-agent-frames';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
 import type { ScreenshotMaskInput, ScreenshotMaskResult } from './browser-screenshot-masking';
 
@@ -406,6 +408,33 @@ describe('browser_find', () => {
     for (const result of [panel, agent]) {
       expect(String(result.ok ? result.value : '')).toContain('(snapshot truncated at 2000 lines)');
       expect(String(result.ok ? result.value : '')).not.toContain('Needle 777');
+    }
+  });
+
+  it('walks the same number of lines on the DOM-walker fallback as on the accessibility tree', async () => {
+    // An empty accessibility tree sends the capture to the injected DOM walker.
+    const { commands, session } = createSession({ axNodes: [] });
+    await runReadBrowserTool('browser_find', { text: 'Needle' }, session);
+    const walker = commands.find(
+      command =>
+        command.method === 'Runtime.evaluate' &&
+        String(command.params?.['expression']).includes('"maxNameLength"')
+    );
+
+    expect(String(walker?.params?.['expression'])).toContain('"maxLines":50000');
+  });
+
+  it('names the line bound a capture actually stopped at', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const panel = await captureBrowserAriaSnapshot(session, { maxLines: 5 });
+    const agent = await captureAgentSnapshotView(
+      session,
+      { readableOrigins: ['https://app.example.com'] },
+      { maxLines: 5 }
+    );
+
+    for (const text of [panel.text, agent.text]) {
+      expect(text).toContain('(snapshot truncated at 5 lines)');
     }
   });
 });

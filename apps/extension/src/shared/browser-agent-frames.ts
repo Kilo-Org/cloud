@@ -409,7 +409,7 @@ export interface ScopedSnapshotInput {
    */
   readonly childSessionFrameIds?: ReadonlySet<string>;
   readonly depth?: number | undefined;
-  /** Lines rendered before the walk stops; a snapshot prints `MAX_BROWSER_TOOL_SNAPSHOT_LINES`, a search reads the whole tree. */
+  /** Lines rendered before the walk stops; a snapshot prints `MAX_BROWSER_TOOL_SNAPSHOT_LINES`, a search reads `MAX_BROWSER_TOOL_FIND_LINES`. */
   readonly maxLines?: number | undefined;
 }
 
@@ -912,7 +912,7 @@ export const captureAgentAriaSnapshot = async (
       ? '(no accessibility nodes)'
       : lines.map(line => renderLine(line)).join('\n');
   const text = snapshot.truncated
-    ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
+    ? `${body}\n... (snapshot truncated at ${String(options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;
 
   return {
@@ -1227,7 +1227,7 @@ export const captureAgentSnapshotView = async (
       ? '(no accessibility nodes)'
       : lines.map(line => renderLine(line)).join('\n');
   const text = capture.truncated
-    ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
+    ? `${body}\n... (snapshot truncated at ${String(options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;
 
   return {

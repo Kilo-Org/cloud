@@ -1,7 +1,9 @@
-// The read-only session diff paints a full-bleed notice bar above the file
-// list. On a landscape phone the body must sit inside the side safe area: the
-// wrapper takes the inset, the bar keeps its own `px-4` page gutter inside it,
-// and the two add up instead of the bar's inline padding swallowing the gutter.
+// The read-only session diff paints a full-bleed notice band above the file
+// list. On a landscape phone the body must sit inside the side safe area
+// without the band losing its fill: the band keeps `bg-secondary` and the
+// hairline and takes the inset as padding, and the bar inside it keeps its own
+// `px-4` page gutter, so the two add up instead of the band's inline padding
+// swallowing the gutter.
 
 import { type ComponentProps, createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -108,7 +110,7 @@ function mountBody(): TestRenderer.ReactTestRenderer {
   return mounted;
 }
 
-/** The notice bar's own node, its `px-4` gutter and the wrapper above it. */
+/** The notice paragraph, the padded bar around it, and the full-bleed band above. */
 function noticeNodes(root: TestRenderer.ReactTestInstance) {
   const [paragraph] = root.findAll(
     node => String(node.type) === 'Text' && node.props.testID === 'session-changes-read-only'
@@ -117,27 +119,33 @@ function noticeNodes(root: TestRenderer.ReactTestInstance) {
     throw new Error('Read-only notice is missing');
   }
   const bar = paragraph.parent;
-  const wrapper = bar?.parent;
-  if (!bar || !wrapper) {
-    throw new Error('Read-only notice has no bar and wrapper');
+  const band = bar?.parent;
+  if (!bar || !band) {
+    throw new Error('Read-only notice has no bar and band');
   }
-  return { bar, wrapper };
+  return { bar, band };
 }
 
-it('clears the landscape side insets on a wrapper above the notice gutter', () => {
+it('clears the landscape side insets under a full-bleed notice band', () => {
   state.insets.left = 47;
-  const { bar, wrapper } = noticeNodes(mountBody().root);
+  const { bar, band } = noticeNodes(mountBody().root);
 
   // The 8 dp on the other side is the shared helper's corner clearance for a
   // side status area that leaves the top inset at zero.
-  expect(wrapper.props.style).toEqual({ paddingLeft: 47, paddingRight: 8 });
-  // The bar keeps the page gutter the inset adds to.
+  expect(band.props.style).toEqual({ paddingLeft: 47, paddingRight: 8 });
+  // The fill and divider stay on the element that takes the inset, so the band
+  // still spans the window and the strip beside the cutout keeps its color.
+  expect(band.props.className).toContain('bg-secondary');
+  expect(band.props.className).toContain('border-b');
+  expect(band.props.className).toContain('border-hair-soft');
+  // The bar keeps the page gutter, so the text clears the cutout by 47 + 14.
   expect(bar.props.className).toContain('px-4');
 });
 
-it('leaves the notice bar without an inset wrapper in portrait', () => {
-  const { bar, wrapper } = noticeNodes(mountBody().root);
+it('leaves the notice band without an inset in portrait', () => {
+  const { bar, band } = noticeNodes(mountBody().root);
 
-  expect(wrapper.props.style).toBeUndefined();
+  expect(band.props.style).toBeUndefined();
+  expect(band.props.className).toContain('bg-secondary');
   expect(bar.props.className).toContain('px-4');
 });

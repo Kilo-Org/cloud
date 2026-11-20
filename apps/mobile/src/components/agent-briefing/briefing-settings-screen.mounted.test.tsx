@@ -281,7 +281,14 @@ it('clears the landscape side insets on the loading body', () => {
 it('leaves the portrait bodies without an inset style', () => {
   const mounted = mount();
 
-  const [scroll] = mounted.root.findAllByType('ScrollView');
-  const scrollProps = scroll?.props as { style?: unknown } | undefined;
-  expect(scrollProps?.style).toBeUndefined();
+  // Exactly one scroller, so a ready body that stopped rendering it fails here
+  // instead of leaving `scroll?.props` undefined and the style assertion green.
+  const scrolls = mounted.root.findAllByType('ScrollView');
+  expect(scrolls).toHaveLength(1);
+  const [scroll] = scrolls;
+  if (!scroll) {
+    throw new Error('Settings body is missing');
+  }
+  const scrollProps = scroll.props as { style?: unknown };
+  expect(scrollProps.style).toBeUndefined();
 });

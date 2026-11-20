@@ -53,13 +53,15 @@ type SessionChangesBodyProps = {
 
 function ReadOnlyNotice() {
   const { t } = useTranslation();
-  // The bar is full-bleed across the screen; the inset goes on a wrapper so the
-  // paragraph still starts at its own `px-4` page gutter. Inline padding on the
-  // bar itself would replace that gutter and the notice would start on the edge.
+  // The band is full-bleed: the fill and the divider sit on the wrapper that
+  // takes the side inset, so padding paints under them and the strip beside a
+  // landscape cutout keeps the band's color. The inner bar keeps `px-4` so the
+  // paragraph still starts at its own page gutter — inline padding on the
+  // wrapper would replace that gutter.
   const sideInsetStyle = useSideInsetStyle();
   return (
-    <View style={sideInsetStyle}>
-      <View className="border-b border-hair-soft bg-secondary px-4 py-2">
+    <View className="border-b border-hair-soft bg-secondary" style={sideInsetStyle}>
+      <View className="px-4 py-2">
         <Text variant="muted" className="text-xs" testID="session-changes-read-only">
           {t('agentChat.sessionChanges.readOnlyReason')}
         </Text>

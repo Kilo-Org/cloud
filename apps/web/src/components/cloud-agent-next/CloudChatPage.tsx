@@ -1957,9 +1957,9 @@ export default function CloudChatPage({
                             {chatTabActive &&
                               isCurrentSession &&
                               selectedWorktreeId &&
-                              sessionIdFromParams && (
+                              fetchedSessionData?.cloudAgentSessionId && (
                                 <ChatWakeup
-                                  sessionId={sessionIdFromParams}
+                                  sessionId={fetchedSessionData.cloudAgentSessionId}
                                   organizationId={organizationId}
                                   readOnly={isReadOnly}
                                 />

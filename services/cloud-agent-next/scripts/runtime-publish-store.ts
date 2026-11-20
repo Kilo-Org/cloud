@@ -175,6 +175,7 @@ export async function localR2ArtifactStore(packageRoot: string) {
   }
   const store: ArtifactObjectStore = {
     async putIfAbsent(key, bytes, contentType) {
+      if ((await bucket.head(key)) !== null) return false;
       return (
         (await bucket.put(key, new Uint8Array(bytes), {
           onlyIf: { etagDoesNotMatch: '*' },

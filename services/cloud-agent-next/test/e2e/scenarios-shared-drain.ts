@@ -16,6 +16,7 @@
  * The linked-child and background-child scenarios require a drain-capable v2 stack.
  * Cron remains disabled. Cloud wakeups need an eligible registered workspace.
  */
+import { cloudWakeupSchema } from '../../src/shared/cloud-wakeup.js';
 import {
   createHostedWorkspace,
   fakeDirective,
@@ -24,6 +25,7 @@ import {
   registerSessionCallback,
   releaseGate,
   startSession,
+  trpcCall,
   waitForGateEngaged,
   type StreamConnection,
   type StreamEvent,
@@ -306,9 +308,43 @@ async function runScheduledResume(
       });
     }
     const callbackAt = Date.now();
+    const isCloudWakeup = directive.startsWith('wakeup:');
+    if (isCloudWakeup) {
+      const wakeup = cloudWakeupSchema
+        .nullable()
+        .parse(
+          await deadline.within('pending wakeup', signal =>
+            trpcCall(
+              config,
+              'getWakeup',
+              { sessionId: opened.sessionId },
+              { method: 'GET', signal }
+            )
+          )
+        );
+      if (wakeup?.state !== 'pending') {
+        return result(scenarioName, conversation, start, stream, {
+          ok: false,
+          message: `expected a pending Cloud wakeup after scheduling, got ${wakeup?.state ?? 'none'}`,
+          events: [...stream.events],
+        });
+      }
+    }
     const resumed = await deadline.within('scheduled resume', async signal => {
-      const ready = (): boolean =>
-        assistantTexts(stream?.events ?? []).some(text => textEndsWith(text, fired));
+      const ready = (): boolean => {
+        const events = opened.stream.events;
+        const startIndex = isCloudWakeup
+          ? events.findIndex(event => {
+              if (event.streamEventType !== 'cloud.message.sent') return false;
+              const id = asRecord(event.data)?.messageId;
+              return typeof id === 'string' && id !== opened.messageId;
+            })
+          : 0;
+        return (
+          startIndex >= 0 &&
+          assistantTexts(events.slice(startIndex)).some(text => textEndsWith(text, fired))
+        );
+      };
       if (ready()) return true;
       await stream?.waitFor(
         () => ready() || signal.aborted,
@@ -327,6 +363,21 @@ async function runScheduledResume(
     }
     const gapMs = Date.now() - callbackAt;
     const heldUntilFire = gapMs < SCHEDULE_GAP_MS;
+    if (isCloudWakeup && !heldUntilFire) {
+      const resume = await sink.waitFor(
+        candidate =>
+          candidate.cloudAgentSessionId === opened.sessionId &&
+          candidate.messageId !== opened.messageId,
+        deadline.remaining('resume callback')
+      );
+      if (resume?.status !== 'completed') {
+        return result(scenarioName, conversation, start, stream, {
+          ok: false,
+          message: `the wakeup turn did not complete (status=${resume?.status ?? 'no callback'})`,
+          events: [...stream.events],
+        });
+      }
+    }
     const ok = !heldUntilFire;
     completed = ok;
     return result(scenarioName, conversation, start, stream, {

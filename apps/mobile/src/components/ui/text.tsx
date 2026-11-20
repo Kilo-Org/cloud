@@ -75,7 +75,7 @@ export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
 
 /**
  * The RTL-script twin of the eyebrow's size. The Latin display treatment leans
- * on full capitals and letterspacing, and a joined/Arabic-script label can take
+ * on full capitals and letterspacing, and an Arabic-script label can take
  * neither: its tracking is reset (`NATURAL_LETTER_SPACING`) and its capitals do
  * not exist, so without them the label kept only the 10px size — measured in an
  * Arabic interface, `الفواتير` inked 25.9 x 9.14 dp against the Latin
@@ -84,7 +84,9 @@ export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
  * Latin capitals' cap height. The script is the copy's, not the interface's,
  * exactly like `withoutMonoFamily`. Kept in step with the reserved eyebrow twin
  * in `screen-header.tsx`, which holds this same line box before the label
- * arrives.
+ * arrives. The Brahmic and Southeast Asian scripts in `JOINED_SCRIPT` lose the
+ * tracking but keep the 10px size: their stacked vowel signs already ink taller
+ * than the Latin capitals (a Tamil eyebrow inked 12.19 dp tall at 10px).
  */
 export const EYEBROW_RTL_SCRIPT_DISPLAY = 'text-[13px]';
 

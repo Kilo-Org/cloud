@@ -18,6 +18,7 @@ import {
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import { MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.schema';
 import {
   deleteOrganizationGroup,
   listOrganizationGroupsForManager,
@@ -88,6 +89,19 @@ describe('organization group policies', () => {
         provider_allow_list: ['openai'],
       },
     });
+  });
+
+  it('refuses a selected policy entry over the documented length', () => {
+    expect(() =>
+      normalizeOrganizationGroupPolicy({
+        type: 'model_access',
+        data: {
+          mode: 'selected',
+          model_allow_list: ['m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH + 1)],
+          provider_allow_list: [],
+        },
+      })
+    ).toThrow(expect.objectContaining({ code: 'BAD_REQUEST' }));
   });
 });
 

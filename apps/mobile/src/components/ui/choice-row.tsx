@@ -87,8 +87,7 @@ export function ChoiceRow({
         busy,
       })}
       accessibilityLabel={
-        accessibleName ??
-        (namedParts.length > 0 ? joinAccessibleName(namedParts) : undefined)
+        accessibleName ?? (namedParts.length > 0 ? joinAccessibleName(namedParts) : undefined)
       }
     >
       {children ?? (

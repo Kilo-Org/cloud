@@ -109,9 +109,15 @@ const RIGHT_TO_LEFT_MARK = '\u200F';
  *
  * A left-to-right interface gets its copy unchanged: its first strong character
  * already names the direction the interface has.
+ *
+ * Copy with no right-to-left letter keeps its own order in either interface: a
+ * Latin sentence already resolves left to right from its own first letter, and
+ * a mark in front of it would take the paragraph the other way — the em dash or
+ * the full stop that ends it would move to the other end of the line.
  */
 export function withRtlParagraphMark(text: string): string {
-  return I18nManager.isRTL ? `${RIGHT_TO_LEFT_MARK}${text}` : text;
+  // `RTL_LETTER` carries no `g` flag, so testing it is stateless.
+  return I18nManager.isRTL && RTL_LETTER.test(text) ? `${RIGHT_TO_LEFT_MARK}${text}` : text;
 }
 
 /**

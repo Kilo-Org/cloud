@@ -292,9 +292,28 @@ describe('withRtlParagraphMark', () => {
     }
   });
 
+  // A Latin sentence resolves left to right from its own first letter, so a mark
+  // in front of it would flip the paragraph: the full stop that ends it would
+  // move to the other end of the line. An untranslated English string in a
+  // right-to-left interface reaches this helper too.
+  it('leaves Latin copy untouched in a right-to-left interface', () => {
+    i18nManager.isRTL = true;
+    try {
+      expect(withRtlParagraphMark('Bitbucket is available for organizations only.')).toBe(
+        'Bitbucket is available for organizations only.'
+      );
+      expect(withRtlParagraphMark('42 — no letter')).toBe('42 — no letter');
+    } finally {
+      i18nManager.isRTL = false;
+    }
+  });
+
   it('leaves copy untouched in a left-to-right interface', () => {
     expect(withRtlParagraphMark('Bitbucket is available for organizations only.')).toBe(
       'Bitbucket is available for organizations only.'
+    );
+    expect(withRtlParagraphMark('Bitbucket متاح للمؤسسات فقط.')).toBe(
+      'Bitbucket متاح للمؤسسات فقط.'
     );
   });
 });

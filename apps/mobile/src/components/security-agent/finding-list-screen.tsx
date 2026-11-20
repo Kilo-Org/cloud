@@ -164,14 +164,17 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   // A retryable failure keeps the screen's own sentence, naming the read that
   // failed. The other three take their copy from the variant alone, which names
   // the refusal, the missing item, or the connection instead of blaming the
-  // server for all of them.
-  const failureMessage = failureRetryable
-    ? t(
-        findingsFailed
-          ? 'securityAgent.findingList.couldNotLoad'
-          : 'common.couldNotLoadRepositories'
-      )
-    : undefined;
+  // server for all of them. `offline` is retryable but still takes the
+  // variant's copy: its description is the connection's own sentence, and
+  // overriding it would describe a missing network as a failed read.
+  const failureMessage =
+    failureKind === 'retryable'
+      ? t(
+          findingsFailed
+            ? 'securityAgent.findingList.couldNotLoad'
+            : 'common.couldNotLoadRepositories'
+        )
+      : undefined;
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
   // `renderItem` and `extraData` by identity before re-rendering a row.

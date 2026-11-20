@@ -341,7 +341,9 @@ describe('Security Agent list surfaces', () => {
     expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(0);
     const error = root.findByType(QueryError);
     expect(error.props.variant).toBe('offline');
-    expect(error.props.message).toBe('securityAgent.findingList.couldNotLoad');
+    // The connection's sentence is the variant's own description; a message
+    // here would override it and describe a missing network as a failed read.
+    expect(error.props.message).toBeUndefined();
     act(error.props.onRetry as () => void);
     expect(findings.refetch).toHaveBeenCalledOnce();
   });

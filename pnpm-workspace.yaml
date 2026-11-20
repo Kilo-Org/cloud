@@ -490,8 +490,9 @@ allowBuilds:
   react-native-enriched-markdown: true
   # Each `false` below is an explicit decision, not a default: the package's
   # install script does not run. An entry moves to `true` only with its own
-  # one-line reason, as the permitted entries above and below carry, and a
-  # denial is removed when nothing in the tree depends on that package.
+  # note stating why running the script is safe or necessary, as the permitted
+  # entries above and below carry, and a denial is removed when nothing in the
+  # tree depends on that package.
   '@sentry/cli': false
   bufferutil: false
   core-js: false

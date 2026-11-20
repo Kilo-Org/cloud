@@ -217,11 +217,12 @@
     },
     {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*.ts", "**/__tests__/**/*.tsx"],
-      // Tests assert on untyped fixtures, so this override turns off only the checks
-      // that fixture typing trips: the `any` annotation and `any`-flow rules
-      // (`no-explicit-any` plus the five `no-unsafe-*` checks), the two assertion
-      // rules, `no-redundant-type-constituents`, and `unbound-method` (jest mocks). Test files keep every other strict check,
-      // because those report defects in the test code itself, not in fixture typing:
+      // Tests assert on untyped fixtures, so this override turns off only the
+      // checks that fixture typing trips: the `any` annotation and `any`-flow
+      // rules (`no-explicit-any` plus the five `no-unsafe-*` checks), the two
+      // assertion rules, `no-redundant-type-constituents`, and `unbound-method`
+      // (jest mocks). Test files keep every other strict check, because those
+      // report defects in the test code itself, not in fixture typing:
       // no-empty-object-type, await-thenable, no-base-to-string,
       // no-duplicate-type-constituents, no-for-in-array, no-implied-eval,
       // no-unsafe-enum-comparison, no-unsafe-unary-minus, restrict-plus-operands and

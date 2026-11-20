@@ -45,7 +45,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
   let sqlite: DatabaseSync;
   let env: Env;
   let sent: BenchmarkJobMessage[];
-  let repetitions: number;
+  const repetitionsByRouter = new Map<AutoRouter, number>();
 
   beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -103,7 +103,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
         },
         'test'
       );
-      repetitions = resolveEffectivePolicy(saved).deciderRepetitions;
+      repetitionsByRouter.set(router, resolveEffectivePolicy(saved).deciderRepetitions);
     }
   });
 
@@ -112,6 +112,12 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
+
+  function repetitionsOf(router: AutoRouter): number {
+    const repetitions = repetitionsByRouter.get(router);
+    if (repetitions === undefined) throw new Error(`Missing repetitions for ${router}`);
+    return repetitions;
+  }
 
   function insertRun(
     id: string,
@@ -131,7 +137,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
         router,
         purpose,
         new Date(Date.now()).toISOString(),
-        repetitions,
+        repetitionsOf(router),
         computeEngineIdentity('decider', router),
         BENCHMARK_USER,
         BENCHMARK_ORG
@@ -161,7 +167,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
         router,
         model,
         computeEngineIdentity('decider', router),
-        repetitions,
+        repetitionsOf(router),
         status,
         runId,
         new Date(Date.now()).toISOString(),
@@ -170,11 +176,15 @@ describe('decider queue admission (production migrations and real SQLite)', () =
   }
 
   async function initialize(runId: string, models: readonly string[]) {
+    const run = sqlite.prepare('SELECT repetitions FROM benchmark_runs WHERE id = ?').get(runId) as
+      | { repetitions: number }
+      | undefined;
+    if (!run) throw new Error(`Missing seeded run ${runId}`);
     expect(
       await scheduleRunChunks(env.BENCH_DB, {
         runId,
         entries: models.map(model => ({ model, variant: null })),
-        repetitions,
+        repetitions: run.repetitions,
         caseIds: DECIDER_CASES.slice(0, 3).map(benchCase => benchCase.id),
         chunkSize: 1,
       })
@@ -222,16 +232,13 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     expect(runningUserRuns()).toEqual(['user-large', runId]);
     expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: runId });
     expect(initialized(runId)).toBe(true);
-    expect(sent).toContainEqual(
-      expect.objectContaining({ runId, model: NEW_MODEL, kind: 'decider' })
-    );
+    const claim = sent.find(message => message.runId === runId && message.model === NEW_MODEL);
+    if (!claim?.claimId) throw new Error('Expected a claim for the new entry');
     expect(
       sqlite
-        .prepare(
-          "SELECT COUNT(*) AS n FROM scheduler_chunks WHERE run_id = ? AND status = 'queued' AND chunk = 0"
-        )
-        .get(runId)
-    ).toEqual({ n: 1 });
+        .prepare('SELECT model, rep, chunk, status FROM scheduler_chunks WHERE id = ?')
+        .get(claim.claimId)
+    ).toEqual({ model: NEW_MODEL, rep: 0, chunk: 0, status: 'queued' });
   }, 30_000);
 
   it('waits while a run of the queue is still starting, then starts once it is initialized', async () => {

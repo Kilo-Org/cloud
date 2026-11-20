@@ -181,7 +181,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
       )}
       {!creditsFailed && creditsPending && (
-        <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
+        // The bar stands in for one `caption` line (14.1pt tall), so it takes
+        // that line's height: a shorter bar lifted the value column, and the
+        // row's centering moved the amount itself when the note landed.
+        <Skeleton className="h-4 w-40 max-w-full rounded bg-muted-soft" />
       )}
       {!creditsFailed && !creditsPending && (
         <CreditExpiryNote

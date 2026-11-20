@@ -144,6 +144,15 @@ describe('RowSkeleton', () => {
     expect(classesOf(first(subtitle))).toEqual(expect.arrayContaining(['h-4', 'bg-muted-soft']));
   });
 
+  it('spaces its lines like the loaded row, at the subtitle margin', () => {
+    // `RowFrame`'s subtitle carries `mt-0.5` (1.75pt), so a column at `gap-1`
+    // made every placeholder row with a subtitle taller than the row it becomes.
+    const [title] = skeletons(renderSkeleton({ lines: 2 }));
+    const column = first(first(title).parent ?? undefined);
+    expect(classesOf(column)).toEqual(expect.arrayContaining(['gap-0.5']));
+    expect(classesOf(column)).not.toContain('gap-1');
+  });
+
   it('keeps the flat-list session shape', () => {
     const root = renderSkeleton({ variant: 'session', last: false });
     const classes = classesOf(frameOf(root));

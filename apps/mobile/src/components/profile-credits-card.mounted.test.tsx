@@ -1179,6 +1179,20 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
+  /** The one-row arm's control slot: the row's last child, beside the value column. */
+  function controlSlot(renderer: ReactTestRenderer): ReactTestInstance {
+    const row = renderer.root.find(
+      node =>
+        Object.is(node.type, 'View') &&
+        hasClasses(node, ['min-w-0', 'flex-1', 'flex-row', 'items-center', 'gap-1'])
+    );
+    const slot = row.children.at(-1);
+    if (slot === undefined || typeof slot === 'string') {
+      throw new Error('The one-row arm has no control slot');
+    }
+    return slot;
+  }
+
   /** The nearest host View above the note: the column the note shares with the amount. */
   function noteColumn(renderer: ReactTestRenderer): ReactTestInstance {
     const [note] = renderer.root.findAll(
@@ -1202,6 +1216,39 @@ describe('CreditsCard balance row', () => {
     expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
     expect(renders(balanceBlock(renderer), 'ADD_CREDITS_BUTTON')).toBe(false);
     unmount();
+  });
+
+  it('holds the toggle box while the balance loads, so the wide card is the same height after', async () => {
+    currentUser.userId = 'user-a';
+    const pending = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(pending.promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, texts, unmount } = await mountCard();
+    try {
+      const box = cardBox(renderer);
+      await act(() => {
+        (box.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+          nativeEvent: { layout: { width: 383 } },
+        });
+      });
+      // The one-row arm gives the control the row's height: a placeholder that
+      // is not the control's own 48pt box shrinks the card while the read runs
+      // and grows it when the amount lands, moving every row below the card.
+      const loadingControl = controlSlot(renderer);
+      expect(classesOf(loadingControl)).toEqual(
+        expect.arrayContaining(ICON_TARGET_BOX_CLASS.split(' '))
+      );
+
+      await act(async () => {
+        pending.resolve({ balance: 1 });
+        await pending.promise;
+      });
+      await waitFor(() => texts().includes('$1.00'));
+      expect(String(controlSlot(renderer).props.className)).toContain(ICON_TARGET_BOX_CLASS);
+    } finally {
+      unmount();
+      pending.resolve({ balance: 1 });
+    }
   });
 
   it.each<[string, number]>([

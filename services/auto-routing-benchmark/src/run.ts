@@ -176,6 +176,7 @@ import {
   type MeasuredCase,
 } from './measurement-revision';
 import { isProbeCase } from './datasets/probe-cases';
+import { applyProbeActivations } from './probe-activation';
 import { BenchmarkProbeFamilyError, runProbeCaseViaGateway } from './probe/executor';
 import { agenticEligibilityView, pairsMissingProbeResults } from './probe/eligibility';
 
@@ -1168,6 +1169,20 @@ export async function drainQueue(
   router: AutoRouter = 'efficient',
   options: { skipPlatformSync?: boolean; skipped?: DrainSkipReason[] } = {}
 ): Promise<{ runId: string; entryCount: number } | null> {
+  // A measurement-revision activation lands as data before this image is live; only a
+  // worker that knows `probe_activations` consumes it, so it is applied here and never by
+  // the previous one (which would have measured the rows at the revision it knows).
+  const activation = await applyProbeActivations(env.BENCH_DB, router);
+  if (activation.queued > 0 || activation.readmitted > 0) {
+    console.log(
+      JSON.stringify({
+        event: 'benchmark_probe_activation_applied',
+        router,
+        queued: activation.queued,
+        readmitted: activation.readmitted,
+      })
+    );
+  }
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) {
     // No saved config means no registry rows to claim: nothing is pending.

@@ -19,6 +19,7 @@ import type * as DbModule from './db';
 import type * as ExecutableModelsModule from './executable-models';
 import type * as ProfilesModule from './profiles';
 import type * as SchedulerModule from './scheduler';
+import type * as EligibilityModule from './probe/eligibility';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
@@ -97,6 +98,16 @@ vi.mock('./scheduler', async importOriginal => ({
   claimScheduledChunks: vi.fn(),
   recoverChunks: vi.fn(),
   scheduleRunChunks: vi.fn(),
+}));
+
+// These tests publish a fully measured pool; the ineligible branch is covered by
+// `src/probe/eligibility.test.ts` and `src/probe/publish.test.ts`.
+const missingProbeResults = vi.hoisted(() =>
+  vi.fn<(db: unknown, params: unknown) => Promise<Set<string>>>(async () => new Set<string>())
+);
+vi.mock('./probe/eligibility', async importOriginal => ({
+  ...(await importOriginal<typeof EligibilityModule>()),
+  pairsMissingProbeResults: missingProbeResults,
 }));
 
 vi.mock('./db', async importOriginal => {
@@ -295,6 +306,12 @@ beforeEach(() => {
     CREATE TABLE scheduler_runs (run_id TEXT);
     CREATE TABLE scheduler_chunks (run_id TEXT, model TEXT, variant TEXT, rep INTEGER, status TEXT);
     CREATE TABLE run_lane_failures (run_id TEXT, model TEXT, variant TEXT, rep INTEGER);
+    CREATE TABLE scheduler_dispatch_lock (id INTEGER PRIMARY KEY, token TEXT, lease_until INTEGER);
+    CREATE TABLE probe_activations (
+      router TEXT, action TEXT, required_revision INTEGER, model TEXT, variant TEXT,
+      engine_identity TEXT, repetitions INTEGER, requested_at TEXT,
+      PRIMARY KEY (router, action, model, variant, engine_identity, repetitions)
+    );
   `);
   for (const router of ['efficient', 'frontier']) {
     for (const model of TEST_CONFIG.deciderModels) {
@@ -1448,7 +1465,7 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('starts a drained pair on the revision-2 cases while revision 3 is inactive', async () => {
+  it('starts a drained pair on the active revision cases', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
@@ -1458,13 +1475,14 @@ describe('POST /admin/runs', () => {
 
     expect(res.status).toBe(202);
     const [, run] = vi.mocked(insertRun).mock.calls[0];
-    expect(run.measurement_revision).toBe(2);
-    // The dispatcher materializes chunks from the run's own revision, so a run started
-    // now never reaches the probe cases of the still-inactive revision 3.
+    expect(run.measurement_revision).toBe(ACTIVE_MEASUREMENT_REVISION);
+    // The dispatcher materializes chunks from the run's own revision, so a drained pair
+    // measures the probe cuts and the re-graded terminal case too.
     const scheduled = deciderCasesForRouter('efficient', ACTIVE_MEASUREMENT_REVISION);
-    expect(scheduled).toEqual(DECIDER_CASES);
+    expect(scheduled).toHaveLength(DECIDER_CASES.length + PROBE_CASES.length);
     const scheduledIds = new Set(scheduled.map(benchCase => benchCase.id));
-    expect(PROBE_CASES.filter(benchCase => scheduledIds.has(benchCase.id))).toEqual([]);
+    expect(PROBE_CASES.every(benchCase => scheduledIds.has(benchCase.id))).toBe(true);
+    expect(scheduledIds.has('supp-agent-term-pwd-base')).toBe(true);
   });
 
   it('starts one run per queue for queue=both', async () => {

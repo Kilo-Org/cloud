@@ -28,8 +28,12 @@ export const MEASUREMENT_REVISION = 3;
  * is a spending decision: every run the cron drain, pool admission, requeue or re-measure
  * starts afterwards measures that revision's cases, and the platform table holds publication
  * until every ready pair is measured under its grading.
+ *
+ * 3 was activated with migration `0035_probe_activation`, which queues the agentic-route
+ * pairs in `profile_remeasures`: a run for one of those pairs reuses its other results and
+ * measures only the 21 probe cuts and `supp-agent-term-pwd-base` per repetition.
  */
-export const ACTIVE_MEASUREMENT_REVISION = 2;
+export const ACTIVE_MEASUREMENT_REVISION = 3;
 
 export const ENGINE_IDENTITY_REVISION = PROMPT_TRANSPORT_REVISION;
 
@@ -41,7 +45,7 @@ export const CLIENT_EVAL_REVISION = PROMPT_TRANSPORT_REVISION;
 export const PROBE_REVISION = 3;
 
 // The container runs each case in a fresh temp directory, so pwd never ends with /app.
-const PWD_BASE_CASE_ID = 'supp-agent-term-pwd-base';
+export const PWD_BASE_CASE_ID = 'supp-agent-term-pwd-base';
 const PWD_BASE_CHECK: DeciderCheck = { kind: 'exact', value: 'other' };
 
 // Only this one revision-2 case changes: it stays tool-required (and so runs in its own

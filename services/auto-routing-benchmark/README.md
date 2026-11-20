@@ -1334,17 +1334,18 @@ in `skipped`.
   to hold the whole table (fixed 2026-11-20: a settled failure now leaves the table instead
   of blocking it).
 
-### Measurement revision 3: agentic probes (defined, inactive)
+### Measurement revision 3: agentic probes (active)
 
 Every run records the revision it started under (`benchmark_runs.measurement_revision`),
 and every result stores the revision that measured it in `prompt_revision`, with the CLI's
 tool evidence (`tool_calls`, `tool_names`, `step_count`, `final_finish_reason`). Tool
 evidence is recorded at every revision. `src/measurement-revision.ts` separates two
 constants: `MEASUREMENT_REVISION` (3) is the newest defined revision, and
-`ACTIVE_MEASUREMENT_REVISION` (2) is the revision every new run starts under. `startRun`,
+`ACTIVE_MEASUREMENT_REVISION` (3) is the revision every new run starts under. `startRun`,
 `insertRun`'s default, case reuse and the `remeasure-prompt-transport` planner all use
-the active revision, so revision 3 is defined but nothing measures it until someone raises
-`ACTIVE_MEASUREMENT_REVISION` to 3.
+the active revision. Revision 3 was activated with migration `0035_probe_activation`, which
+also decides which pairs measure it now (below); nothing else in the deploy schedules
+revision-3 work.
 
 The CLI benchmark cannot see the production problem this revision measures: a CLI case is
 one prompt to a fresh session, so a model that ends a tool-offering turn with narration
@@ -1422,19 +1423,64 @@ probes later, through the normal queue or an admin re-measure, makes it eligible
 `supp-agent-term-pwd-base` is the one revision-2 case that changes: revision 3 keeps it
 tool-required and accepts only `other`, the answer its isolated workspace produces.
 
-Raising `ACTIVE_MEASUREMENT_REVISION` to 3 is a spending decision and an explicit step after
-this deploys. From the next deploy:
+Revision 3 is active from the deploy that raises `ACTIVE_MEASUREMENT_REVISION` to 3.
+Migration `0035_probe_activation` is the whole activation scope, and it is what keeps the
+spend bounded:
 
-- Every efficient decider run the system starts on its own runs at revision 3: the
-  per-minute cron drain and the 05:00Z platform sync drain every `pending` profile, and each
-  run completion drains again. Such a run reuses the pair's other results and measures the
-  21 probe cuts plus `supp-agent-term-pwd-base` per repetition; nothing else changes.
-- Ready pairs re-run nothing until the `remeasure-prompt-transport` `request` action queues
-  them. Its body accepts `pairs: [{model, variant}, ...]` to measure an explicit set; the
-  activation scope is the 29 pairs that serve the agentic routes, and the dry run projects
-  the spend. At 3 repetitions and catalog prices those 29 pairs cost $21.30 / $21.50 /
-  $22.22 without cache (low/mid/high); the full 52-pair pool $113.87 / $115.05 / $119.15,
-  $68.41 of it with half the input read from cache.
+- The migration only *stages* the scope: it writes `probe_activations` rows, one per pair,
+  with the action to take. It cannot write `profile_remeasures` rows or `pending` profiles
+  directly, because a migration applies while the previous image is still serving and that
+  worker claims both without knowing the revision: the queued pairs would run at revision 2,
+  measure nothing they lack and lose their queue row, and the re-admitted rows would be
+  measured without the probes. The old worker never reads `probe_activations`; the drain of
+  the deploy that raises the revision consumes it once
+  (`applyProbeActivations`, `src/probe-activation.ts`), and it waits while the deploy holds
+  the dispatch lock so no instance of the previous image can be serving when the rows land.
+  Each staged row also names the revision its action needs (`required_revision`), and the
+  apply leaves every row staged whose revision the worker does not run.
+- The 24 pairs that are `ready` at `efficient:v1:6649fed2`, repetitions 3 and need the
+  probes become `profile_remeasures` rows (23 platform pairs plus
+  `meta/muse-spark-1.2-contributor` `high`, a user-owned pair) — the rows the
+  `remeasure-prompt-transport` `request` action writes. Each run claims one row, reuses every
+  result that is still reusable and measures the 21 probe cuts plus
+  `supp-agent-term-pwd-base` per repetition, so 22 cases × 3 repetitions per pair and
+  nothing else. A pair whose provenance run already holds a revision-3 result for all 22 is
+  skipped instead, so a pair is never re-measured by this activation.
+- `meta/muse-ember` ×6 is re-admitted by the same activation: its 2026-11-11 rep-3 run lost
+  a lane and left all six rows `failed` (class `unknown`), so they had no probe measurement
+  and would stay ineligible on the agentic routes. The activation moves exactly those six
+  rows back to `pending` with the per-row Re-admit's fields (`src/profile-refresh.ts`),
+  `invalidated_at` included, and the next platform drain measures a full revision-3 run for
+  them. The re-admit's invalidation is deliberate and is what the forecast prices: results
+  measured before it are not reused (`reuseDeciderCaseResults` in `src/db.ts`), exactly as
+  for an admin Re-admit. Ember is the model this grading exists for, so it is re-admitted on
+  purpose now that narration stops are graded.
+- Every other efficient decider run the system starts on its own also runs at revision 3:
+  the per-minute cron drain and the 05:00Z platform sync drain every `pending` profile, and
+  each run completion drains again. For a pair with all of its case results stored that is
+  the same 22 cases × repetitions.
+- The pair list lives in `src/probe-activation.ts` and is mirrored in the migration; the
+  case list is the code's own `PROBE_ACTIVATION_CASE_IDS`, so the two cannot drift.
+  `src/probe-activation-sql.test.ts` fails if the migration's pairs drift from it, if
+  anything the live worker claims is visible before the activation is applied, if a
+  re-admitted row that is not a retryable failure (or that has a live chunk) moves, or if a
+  queued pair schedules a single case outside the probe set.
+- At 3 repetitions and catalog prices the 23 platform pairs cost $19.63 / $19.81 / $20.45
+  without cache (low/mid/high, $11.09 / $11.28 / $11.92 with half the input read from
+  cache), and `meta/muse-spark-1.2-contributor` `high` — the 24th queued pair — adds
+  $0.14 / $0.14 / $0.15 ($0.14 with half the input cached). The Ember re-admit adds
+  $10.22 / $10.25 / $10.32: 3 × 90 agentic cases at the measured rep-1 cost, the 1,021
+  missing non-agentic case-reps at $5.25, and its probes — a full run, because the re-admit
+  invalidates the failed run's results. Activation total $29.99 / $30.20 / $30.92,
+  $20.79 / $21.00 / $21.72 at 50 % cache.
+- Rolling back is lowering `ACTIVE_MEASUREMENT_REVISION` to 2 and deploying: every staged
+  row carries its `required_revision` (3), and `applyProbeActivations` skips — and leaves
+  staged — every row the worker's revision does not reach. A deploy at revision 2 therefore
+  neither queues the pairs nor re-admits the Ember rows; a later deploy that raises the
+  revision back to 3 applies whatever is still staged. An activation already applied is
+  cancelled by deleting the queued `profile_remeasures` rows, and the six Ember rows can go
+  back to `failed` with their lane failure. The new table is additive and every stored
+  result stays.
 - The platform table keeps publishing every route; only the agentic routes narrow as
   described above.
 

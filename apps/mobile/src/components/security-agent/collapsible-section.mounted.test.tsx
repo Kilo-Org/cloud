@@ -273,6 +273,15 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
     expect(surface.findAllByType('Pressable' as ElementType)).toHaveLength(1);
     expect(surface.findAll(node => node.children.includes(SECTION_BODY)).length).toBeGreaterThan(0);
     expect(animatedView(surfaceSection, SURFACE_BODY_CLASSES)).toBeDefined();
+
+    // The gap under the title is the header row's own doing: it gives up its
+    // bottom padding for this variant, and it keeps that padding when the body
+    // is closed, so the title never moves. A page body keeps the full `py-3`.
+    expect(pressableNode(surfaceSection).props.className).toContain('py-3');
+    expect(pressableNode(surfaceSection).props.className).toContain('pb-0');
+    expect(pressableNode(mountSection({ bodyOnSurface: true })).props.className).toContain('pb-0');
+    expect(pressableNode(pageSection).props.className).toContain('py-3');
+    expect(pressableNode(pageSection).props.className).not.toContain('pb-0');
   });
 });
 

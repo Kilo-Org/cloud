@@ -12,9 +12,6 @@ const POSTGRES_CONNECT_TIMEOUT = requireEnv(
   'POSTGRES_CONNECT_TIMEOUT',
   process.env.POSTGRES_CONNECT_TIMEOUT
 );
-// Not read by this module: the data export pool sizes its own timeout. The check stays because
-// it is part of the deployment's startup contract.
-requireEnv('POSTGRES_MAX_QUERY_TIME', process.env.POSTGRES_MAX_QUERY_TIME);
 
 // Base url + test worker suffix (shared). It selects POSTGRES_URL_PRODUCTION or
 // POSTGRES_URL for the current mode and throws when that variable is unset, so

@@ -466,8 +466,14 @@ async function deploy() {
     const applied = await rolledOutContainerInputs();
     const state = marker =>
       marker === undefined ? 'unknown' : marker === inputs.hash ? 'ours' : 'other';
-    report('deploy_failure_state', { live: state(liveMarker), applied: state(applied) });
-    if (liveMarker !== inputs.hash || applied === inputs.hash) throw error;
+    const liveState = state(liveMarker);
+    const appliedState = state(applied);
+    report('deploy_failure_state', { live: liveState, applied: appliedState });
+    // Only a positively observed half-apply is re-run: this deploy's code is the
+    // live Worker version and the containers are on another image. An unreadable
+    // container state may be a rollout still in flight, and re-running would cut
+    // it off, so the state is reported and the failure rethrown untouched.
+    if (liveState !== 'ours' || appliedState !== 'other') throw error;
     report('half_applied', { rollout: 'rerun' });
     try {
       await runWrangler(deployArgs, deployTimeoutMs);

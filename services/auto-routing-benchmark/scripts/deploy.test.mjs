@@ -673,6 +673,7 @@ test(
   { timeout: 30_000 },
   async t => {
     const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'once' });
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
     const result = await state.start();
     assert.equal(result.code, 1);
     const rows = diagnostics(result, { commandOutput: true });
@@ -697,6 +698,7 @@ test(
   { timeout: 30_000 },
   async t => {
     const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'always' });
+    state.rollOut(`container-inputs:${'0'.repeat(64)}`);
     const result = await state.start();
     assert.equal(result.code, 1);
     const rows = diagnostics(result, { commandOutput: true });
@@ -716,6 +718,30 @@ test(
       )
     );
     assert.equal(state.count('deploy_containers_none'), 0);
+  }
+);
+
+test(
+  'does not re-run the rollout when the applied container state is unknown',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_HALF_APPLY: 'once',
+      BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'missing',
+    });
+    const result = await state.start();
+    assert.equal(result.code, 1);
+    const rows = diagnostics(result, { commandOutput: true });
+    assert.deepEqual(
+      rows
+        .filter(row => row.event === 'benchmark_deploy_deploy_failure_state')
+        .map(row => ({ live: row.live, applied: row.applied })),
+      [{ live: 'ours', applied: 'unknown' }]
+    );
+    assert.equal(rows.filter(row => row.event === 'benchmark_deploy_half_applied').length, 0);
+    assert.equal(state.count('deploy_containers_configured'), 1);
+    assert.equal(state.deployedMessages().length, 1);
+    released(state);
   }
 );
 

@@ -5,6 +5,7 @@ import {
   CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
+  CUSTOM_ROUTER_EPOCH_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
   CUSTOM_ROUTER_TABLE_VERSION_PATH,
   CustomRouterDecideResponseSchema,
@@ -432,6 +433,9 @@ beforeEach(() => {
   recordUsage.mockClear();
   cacheIdFromName.mockClear();
   benchmarkFetch.mockReset().mockImplementation(async url => {
+    if (new URL(url).pathname === CUSTOM_ROUTER_EPOCH_PATH) {
+      return Response.json({ epoch: 1 });
+    }
     if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
       return Response.json({ readinessVersion: 'readiness-1' });
     }
@@ -598,6 +602,9 @@ describe('public custom router decide', () => {
   });
   const usablePin = () =>
     benchmarkFetch.mockImplementation(async url => {
+      if (new URL(url).pathname === CUSTOM_ROUTER_EPOCH_PATH) {
+        return Response.json({ epoch: 2 });
+      }
       if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
         return Response.json({ readinessVersion: 'readiness-pinned' });
       }
@@ -662,40 +669,161 @@ describe('public custom router decide', () => {
     expect([...modelIds].sort()).toEqual([ALIAS, SONNET].sort());
   });
 
-  it('rebuilds a cached table as soon as the readiness fingerprint changes', async () => {
-    const realNow = Date.now();
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(realNow);
-    try {
-      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
-      const tableFetches = () =>
-        benchmarkFetch.mock.calls.filter(
-          ([url]) => new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH
-        ).length;
-      expect(tableFetches()).toBe(1);
+  it('serves the next request after a settlement because the router epoch moved', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    const paths = () => benchmarkFetch.mock.calls.map(([url]) => new URL(String(url)).pathname);
+    const tableFetches = () => paths().filter(path => path === CUSTOM_ROUTER_TABLE_PATH).length;
+    expect(tableFetches()).toBe(1);
 
-      // Inside the check interval the cached table serves without another fetch, even though the
-      // fingerprint would differ: a burst of requests must not probe or rebuild per request.
-      benchmarkFetch.mockImplementation(async url => {
-        if (new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
-          return Response.json({ readinessVersion: 'readiness-2' });
-        }
-        if (new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH) {
-          return Response.json({ table: rankedTable });
-        }
-        return Response.json({ error: 'unexpected path' }, { status: 500 });
-      });
-      clock.mockReturnValue(realNow + 1_000);
-      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
-      expect(tableFetches()).toBe(1);
+    // No clock movement and no polling interval: the very next request sees the new epoch, finds
+    // this pool's own ready set unchanged, and serves its cache without rebuilding.
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 2 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) return Response.json({ table: rankedTable });
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(tableFetches()).toBe(1);
 
-      // Past the interval the new fingerprint is observed and the table is rebuilt once, so a
-      // newly ready measurement reaches this pool without a click, a request or a charge.
-      clock.mockReturnValue(realNow + 10_000);
-      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
-      expect(tableFetches()).toBe(2);
-    } finally {
-      clock.mockRestore();
-    }
+    // A pool whose own readiness fingerprint moved under the same new epoch rebuilds once, so a
+    // freshly ready measurement in another pool reaches this one on its next request.
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 3 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-2' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) return Response.json({ table: rankedTable });
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(tableFetches()).toBe(2);
+  });
+
+  it('never answers a post-settlement request from a build started before it', async () => {
+    // Epoch 1's table ranks only the stale client entry, so a leaked pre-settlement build is
+    // visible as a fallback/wrong pick rather than just a call count.
+    const oldTable = table({
+      [ROUTE]: [
+        {
+          model: 'client:ollama/qwen3:32b',
+          accuracy: 0.9,
+          avgCostUsd: 0,
+          meetsThreshold: true,
+          variant: null,
+        },
+      ],
+    });
+    const newTable = table({
+      [ROUTE]: [
+        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+
+    let epoch = 1;
+    const oldBuildEntered = Promise.withResolvers<void>();
+    const oldBuildGate = Promise.withResolvers<void>();
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: `readiness-${epoch}` });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        if (epoch === 1) {
+          oldBuildEntered.resolve();
+          await oldBuildGate.promise;
+          return Response.json({ table: oldTable });
+        }
+        return Response.json({ table: newTable });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+
+    const first = post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    await oldBuildEntered.promise;
+    epoch = 2;
+    const { decision: afterSettlement } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()).finally(() => oldBuildGate.resolve())
+    );
+    await decisionOf(await first);
+    const { decision: afterOldBuildLanded } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())
+    );
+
+    expect(afterSettlement.model).toBe(SONNET);
+    expect(afterOldBuildLanded.model).toBe(SONNET);
+  });
+
+  it('re-reads the actual table once when the epoch endpoint is unavailable', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    const tableFetches = () =>
+      benchmarkFetch.mock.calls.filter(
+        ([url]) => new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH
+      ).length;
+    expect(tableFetches()).toBe(1);
+
+    // A benchmark Worker that predates the epoch endpoint answers 404: the serving side can prove
+    // nothing about the cached table, so it fetches the real one instead of pretending the epoch
+    // is unchanged. The old worker still answers the fingerprint and table paths it always had.
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return new Response('not found', { status: 404 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) return Response.json({ table: rankedTable });
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    // The rebuilt table served normally; only the epoch proof was unavailable.
+    expect(decision.fallback).toBe(false);
+    expect(tableFetches()).toBe(2);
+
+    // The next unprovable request must re-read the actual table again, so a second 404 can observe
+    // a table that changed after the first, and an unknown epoch is never cached as proof.
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return new Response('not found', { status: 404 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-2' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        return Response.json({
+          table: table({
+            [ROUTE]: [
+              {
+                model: SONNET,
+                accuracy: 0.99,
+                avgCostUsd: 0.01,
+                meetsThreshold: true,
+                variant: null,
+              },
+            ],
+          }),
+        });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const second = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(tableFetches()).toBe(3);
+    expect(second.decision.entry).toMatchObject({ kind: 'gateway', model: SONNET });
+  });
+
+  it('fails retryably when the epoch is unprovable and the table cannot be read', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return new Response('not found', { status: 404 });
+      return new Response('down', { status: 503 });
+    });
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(500);
+    expect(await errorCode(res)).toBe('internal_error');
   });
 
   const imageMessages = [

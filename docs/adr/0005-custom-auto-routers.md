@@ -464,20 +464,16 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
    `admission_marker` is `NULL` is never initialized, measured or published, whatever its
    `started_at`, so a post-cutover timestamp cannot make legacy work claimable. Migration
    `0038` adds that column with no backfill: existing rows stay `NULL` and are treated as legacy.
-4. **Apply and deploy.** Apply the additive PostgreSQL and D1 migrations, then deploy the worker
-   and the web release that speaks the same contracts. The D1 migration creates the case fence,
-   quote and request tables, the usage-receipt table, the attempt-history table, and the
-   `benchmark_runs.admission_marker` column with no backfill: existing runs keep `NULL` and are
-   never claimable as paid work. It rewrites no existing measurement, subscription, or routing
-   artifact, and it starts no measurement: the active measurement revision and engine identity are
-   unchanged, and no backfill schedules user work. The deploy wrapper drains queued and active
-   chunks, applies migrations, deploys, and waits for the container rollout when the image
-   changed. Provision the platform benchmark organization that funds platform-covered calls before
-   traffic is released: without it, a platform-covered model request has no payer to sign. Promotion
-   order is not guaranteed: the benchmark Worker deploy runs in parallel with the web and gateway
-   promotions (the Worker job depends only on the database gate, change detection, and Worker
-   detection), so do not assume the Worker lands after the gateway or the web. The operator hold,
-   not the deploy order, is what keeps spend fenced while the parts land in any order.
+4. **Apply and deploy.** Apply the additive D1 migrations. PostgreSQL uses the existing native
+   usage schema. Migration `0038` creates the case fence, request tables, receipts, and attempt
+   history. It also adds `benchmark_runs.admission_marker` without backfill.
+   The readiness migration adds one epoch row per base router. It does not invalidate results or
+   rebuild a table. The serving Worker checks that epoch before it reuses cached custom rankings.
+   During a staggered rollout, an older benchmark Worker can still return the full pool table.
+   The wrapper holds dispatch while it drains active work, applies migrations, deploys the
+   benchmark Worker, and waits for a changed container image. Verify the platform funding
+   organization and its executor membership before dispatch resumes. The Worker, web, and
+   gateway deploy jobs can complete in different orders. The operator hold fences spend.
 5. **Prove legacy work is fenced and existing pools are unchanged.** With the worker live and the
    hold still held, read (do not write) the request, registry, and run tables: every legacy run is
    terminally cancelled (none queued, paused, or resumable), no pre-cutover user run resumes, no
@@ -495,11 +491,11 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
    cancel; confirm only that no paid work is spending while the hold is in place. Check that a pool
    save or alias scan creates no request, and that an already correctly benchmarked pool keeps its
    routing table and model indicators without a quote or click.
-6. **Release and verify.** Before releasing anything, confirm that the web promotion, the gateway
-   promotion, and the benchmark Worker deployment each contain the merged head — they are separate
-   jobs and may complete in either order, so one of them being live proves nothing about the
-   others. Then the operator releases only the exact pause token they acquired — the same value
-   passed to `--expect-token`, never a broad `LIKE` match — and verifies read-only:
+6. **Release and verify.** Before release, confirm the benchmark Worker, serving Worker, web, and
+   gateway each contain the merged head. Confirm the benchmark Worker answers the serving
+   Worker's readiness check. One successful deployment proves nothing about the others.
+   Then release only the exact pause token passed to `--expect-token`, never a broad `LIKE` match.
+   Verify read-only:
    platform dispatch resumes, a pool quote is `empty` or `ready` without starting work, a fresh
    confirmed request produces its cases, and the usage receipts and admin payer breakdown match
    the requests that ran. A failed check keeps the hold and stops the rollout; do not compensate by
@@ -521,8 +517,9 @@ previous release ignores the new tables; leave stored results, requests, and rec
    from then on; it never covers a charge already recorded. Linking an entry never starts new
    platform inference. The owner pays for client inference, judged grading of client outputs, and
    classification.
-7. A saved pool, alias move, subscription sync, schedule, retry handler, or deploy starts no
-   measurement. Only a new platform pool membership and an owner's confirmed request admit work.
+7. A custom pool save, alias move, subscription sync, schedule, retry, or deploy starts no
+   measurement without an owner confirmation. The platform still measures new members and moved
+   platform aliases automatically. Deployment never requeues an existing measurement.
 
 ## Consequences
 

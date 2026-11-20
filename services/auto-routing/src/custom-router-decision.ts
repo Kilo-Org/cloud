@@ -20,10 +20,11 @@ import { formatError } from '@kilocode/worker-utils';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 import {
   customRouterBenchmarkContext,
+  fetchCustomRouterEpoch,
   fetchCustomRouterTable,
   fetchCustomRouterTableVersion,
 } from './benchmark-origin';
-import { CustomRouterError } from './caller-auth';
+import { CustomRouterError, DEPENDENCY_RETRY_AFTER_SECONDS } from './caller-auth';
 import type { CustomRouterOwner } from './custom-router-store';
 import { customRouterDecisionScope } from './decision-cache';
 import type { DecisionRun, DecisionTarget } from './decide';
@@ -102,33 +103,40 @@ type CustomRouterTableLoad = {
 
 type CachedTableEntry = {
   load: CustomRouterTableLoad;
-  /** The canonical benchmark version this table was built from, when the probe answered. */
+  /**
+   * The router epoch this table was built under, or null when the deployment could not prove one.
+   * Only an epoch match may serve the cache without re-reading the pool; an entry with no epoch is
+   * never served from cache.
+   */
+  epoch: number | null;
+  /** The pool fingerprint checked at the last epoch mismatch, when the refresh ran the probe. */
   version: string | null;
-  /** When this table was built; the hard staleness bound for changes the probe does not cover. */
+  /** When this table was built; the hard staleness bound for what the epoch does not cover. */
   builtAt: number;
-  /** When the version probe last ran, answered or not, so a probe outage is not retried per request. */
-  probedAt: number;
+  /** Insertion order of the build that produced this entry, so an older finishing build loses. */
+  sequence: number;
 };
 
 const tableCache = new Map<string, CachedTableEntry>();
 /**
  * One in-flight rebuild per context. Two requests that arrive while the same pool is being rebuilt
- * share it; a request that arrives after it finishes re-checks the canonical version first.
+ * share it, so a burst of traffic after a publish costs one epoch read and one table fetch.
  */
 const tableRefreshes = new Map<string, Promise<CustomRouterTableLoad>>();
-/**
- * How often one context re-checks the canonical version. A newly ready measurement therefore
- * becomes visible to every pool sharing it within seconds, while a burst of requests for the same
- * pool costs one probe per interval instead of one per request.
- */
-const CUSTOM_ROUTER_VERSION_CHECK_MS = 5_000;
 
 export function clearCustomRouterTableCache(): void {
   tableCache.clear();
   tableRefreshes.clear();
 }
 
+let cacheSequence = 0;
+
 function cacheEntry(key: string, entry: CachedTableEntry): void {
+  const existing = tableCache.get(key);
+  // A build that started before the cached one must never replace it: a slow pre-settlement
+  // rebuild finishing late would otherwise downgrade the rank every later request serves. A
+  // monotonic sequence is used because two builds can start within the same millisecond.
+  if (existing && existing.sequence > entry.sequence) return;
   tableCache.set(key, entry);
   if (tableCache.size <= CUSTOM_ROUTER_TABLE_CACHE_LIMIT) return;
   const oldest = tableCache.keys().next().value;
@@ -136,17 +144,21 @@ function cacheEntry(key: string, entry: CachedTableEntry): void {
 }
 
 /**
- * The table a pool serves, refreshed as soon as the benchmark worker's readiness fingerprint for it
- * changes — a newly ready measurement becomes visible to every pool that shares the concrete
- * target, without a click, a request or a charge for those owners.
+ * The table a pool serves. The benchmark Worker's per-router readiness epoch is the authority: it
+ * advances inside the same D1 transaction as every committed readiness or provenance change, so a
+ * pool whose epoch matches its cached table serves immediately and a pool whose epoch moved
+ * re-checks before serving. The first routing request after a settlement therefore sees the new
+ * rank; there is no blind interval and no KV in the path.
  *
- * Correctness without unbounded D1 work:
- * - a cached table is reused while the cheap fingerprint matches it and it is younger than the
- *   table TTL, so anything the fingerprint does not cover (catalog prices) still refreshes;
- * - a probe failure keeps serving the current table for at most the TTL, so a probe outage
- *   degrades to the previous behaviour instead of rebuilding once per request;
- * - one probe per context per few seconds, and one coalesced rebuild shared by simultaneous
- *   requests, bound the extra load to a constant independent of request rate.
+ * Costs and fail-closed rules:
+ * - one exact-key epoch read per route through the existing benchmark service binding;
+ * - a mismatch falls back to the existing per-pool fingerprint, so only the pools whose ready set
+ *   actually changed rebuild (an alias, catalog, or client-only change keeps its cached table);
+ * - the 60 s TTL still bounds what the epoch and fingerprint do not cover (catalog prices);
+ * - an unprovable epoch (older benchmark Worker answering 404 during a staggered deploy, a 5xx, an
+ *   unreadable body) never reads as "unchanged": the actual table is fetched on that request,
+ *   single-flighted so a burst shares one fetch, and it is never cached as proof, so a later 503
+ *   cannot resurrect an older rank. A failed table fetch is the retryable routing failure it was.
  */
 async function loadCustomRouterTable(
   env: Env,
@@ -154,39 +166,37 @@ async function loadCustomRouterTable(
 ): Promise<CustomRouterTableLoad> {
   const context = customRouterBenchmarkContext(router);
   const key = JSON.stringify(context);
+  const epoch = await fetchCustomRouterEpoch(env, router.baseRouter);
   const cached = tableCache.get(key);
-  const now = Date.now();
-  if (cached) {
-    if (now - cached.probedAt >= CUSTOM_ROUTER_VERSION_CHECK_MS) {
-      const version = await fetchCustomRouterTableVersion(env, context);
-      cached.probedAt = Date.now();
-      // A matching readiness fingerprint means the ready set is unchanged. The hard TTL still
-      // applies, so anything the fingerprint does not cover (catalog prices) refreshes as before.
-      const afterProbe = Date.now();
-      if (
-        version !== null &&
-        version === cached.version &&
-        afterProbe - cached.builtAt < CUSTOM_ROUTER_TABLE_CACHE_TTL_MS
-      ) {
-        return cached.load;
+  if (cached && epoch !== null && Date.now() - cached.builtAt < CUSTOM_ROUTER_TABLE_CACHE_TTL_MS) {
+    if (cached.epoch === epoch) return cached.load;
+    // The router's registry moved. Only this pool's own ready set decides whether it rebuilds, and
+    // the record of that check must not extend `builtAt`: the hard TTL still has to expire so
+    // catalogue and pricing changes refresh.
+    const version = await fetchCustomRouterTableVersion(env, context);
+    if (version !== null && version === cached.version) {
+      if (cached.epoch === null || epoch > cached.epoch) {
+        cacheEntry(key, { ...cached, epoch });
       }
-      if (version === null && afterProbe - cached.builtAt < CUSTOM_ROUTER_TABLE_CACHE_TTL_MS) {
-        // Probe outage: keep the table the TTL allows rather than rebuilding once per request.
-        return cached.load;
-      }
-    } else if (now - cached.builtAt < CUSTOM_ROUTER_TABLE_CACHE_TTL_MS) {
       return cached.load;
     }
   }
-  const inFlight = tableRefreshes.get(key);
+  // An unprovable epoch (an older benchmark Worker answering 404 during a staggered deploy, a 5xx,
+  // an unreadable body) is never treated as proof: the actual table is fetched on this request. It
+  // is single-flighted per context so a burst shares one fetch, and it is cached as unknown so a
+  // later 503 cannot keep serving a table that a previous 404 let us keep.
+  const flightKey = `${key}\u0000${epoch ?? 'unproven'}`;
+  const inFlight = tableRefreshes.get(flightKey);
   if (inFlight) return inFlight;
+  cacheSequence += 1;
+  const sequence = cacheSequence;
+  const startedAt = Date.now();
   const refresh = (async (): Promise<CustomRouterTableLoad> => {
-    // Read the fingerprint first: a publish that lands after this read is caught by the next
-    // probe, and a table built from that state is never mistaken for an older one.
+    // Fingerprint before the table: a change landing after it advances the epoch again, so the next
+    // request re-checks instead of trusting this build.
     const version = await fetchCustomRouterTableVersion(env, context);
     const load = await fetchCustomRouterTable(env, context);
-    const at = Date.now();
-    cacheEntry(key, { load, version, builtAt: at, probedAt: at });
+    cacheEntry(key, { load, epoch, version, builtAt: startedAt, sequence });
     return load;
   })()
     .catch((error: unknown) => {
@@ -197,17 +207,18 @@ async function loadCustomRouterTable(
           ...formatError(error),
         })
       );
-      const previous = tableCache.get(key);
-      if (previous) {
-        previous.probedAt = Date.now();
-        return previous.load;
-      }
-      return { table: null, servingPins: new Map<string, string>() };
+      // A failed table read is a retryable routing failure. Serving the previous table would be
+      // exactly the pre-settlement lie the epoch exists to prevent.
+      throw new CustomRouterError(
+        'internal_error',
+        'Custom router table is temporarily unavailable',
+        DEPENDENCY_RETRY_AFTER_SECONDS
+      );
     })
     .finally(() => {
-      tableRefreshes.delete(key);
+      tableRefreshes.delete(flightKey);
     });
-  tableRefreshes.set(key, refresh);
+  tableRefreshes.set(flightKey, refresh);
   return refresh;
 }
 

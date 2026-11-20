@@ -5,7 +5,9 @@ import {
   CustomRouterTableVersionResponseSchema,
   CustomRoutingTableResponseSchema,
   CUSTOM_ROUTER_TABLE_PATH,
+  CUSTOM_ROUTER_EPOCH_PATH,
   CUSTOM_ROUTER_TABLE_VERSION_PATH,
+  CustomRouterEpochResponseSchema,
   DEFAULT_AUTO_ROUTER,
   customRouterEntryKey,
   type AutoRouter,
@@ -92,6 +94,28 @@ export function customRouterBenchmarkContext(
       .filter(entry => entry.kind === 'client' || isDirectByokModelId(entry.model))
       .map(customRouterEntryKey),
   });
+}
+
+/**
+ * The router's readiness epoch through the existing benchmark service binding. `null` means "this
+ * deployment cannot prove the epoch" (an older benchmark Worker answering 404, a 5xx, or an
+ * unreadable body), which the caller must treat as unproven rather than as an unchanged value.
+ */
+export async function fetchCustomRouterEpoch(
+  env: BenchmarkEnv,
+  router: AutoRouter
+): Promise<number | null> {
+  try {
+    const body = await fetchBenchmarkJson(env, CUSTOM_ROUTER_EPOCH_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ router }),
+    });
+    const parsed = CustomRouterEpochResponseSchema.safeParse(body);
+    return parsed.success ? parsed.data.epoch : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchCustomRouterTableVersion(

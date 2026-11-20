@@ -3,11 +3,14 @@ import {
   AUTO_ROUTERS,
   AutoRouterSchema,
   CUSTOM_ROUTER_BLOCKED_MODELS_PATH,
+  CUSTOM_ROUTER_EPOCH_PATH,
   CUSTOM_ROUTER_STATUS_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
   CUSTOM_ROUTER_TABLE_VERSION_PATH,
   CustomRouterBenchmarkContextSchema,
   CustomRouterBlockedModelsRequestSchema,
+  CustomRouterEpochRequestSchema,
+  CustomRouterEpochResponseSchema,
   CustomRouterTableVersionResponseSchema,
   PLATFORM_MEASUREMENTS_PATH,
   PlatformMeasurementsResponseSchema,
@@ -103,6 +106,7 @@ import {
   listRunModelIds,
   listRunningRunIds,
   listRuns,
+  readBenchmarkReadinessEpoch,
   requeueRetryableCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
@@ -1066,6 +1070,34 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         catalogEnv: c.env,
       });
       return c.json(CustomRouterTableVersionResponseSchema.parse({ readinessVersion: version }));
+    }
+  );
+
+  // One exact-key read of the router's readiness epoch. The serving Worker calls this through the
+  // benchmark service binding before it trusts a cached custom routing table: the epoch advances
+  // inside the same D1 transaction as every readiness/provenance change, so a match proves the
+  // cache was assembled from the current registry state. It reads no catalogue and scans nothing.
+  app.post(
+    CUSTOM_ROUTER_EPOCH_PATH,
+    zodJsonValidator(CustomRouterEpochRequestSchema, {
+      errorMessage: 'Invalid custom router epoch request',
+    }),
+    async c => {
+      const { router } = c.req.valid('json');
+      try {
+        const epoch = await readBenchmarkReadinessEpoch(c.env.BENCH_DB, router);
+        return c.json(CustomRouterEpochResponseSchema.parse({ epoch }));
+      } catch (error) {
+        console.warn(
+          JSON.stringify({
+            event: 'custom_router_epoch_unavailable',
+            router,
+            ...formatError(error),
+          })
+        );
+        // Unprovable state is never "unchanged": the caller must re-read the actual table.
+        return c.json({ error: 'Readiness epoch is unavailable' }, 503);
+      }
     }
   );
 

@@ -925,6 +925,20 @@ export const CustomRouterTableVersionResponseSchema = z.object({
 export type CustomRouterTableVersionResponse = z.infer<
   typeof CustomRouterTableVersionResponseSchema
 >;
+// POST with `{ router: AutoRouter }`; answers that router's monotonic readiness epoch. Every
+// committed change to a profile row's status, provenance, or measurement identity bumps it in the
+// same D1 transaction, so a serving Worker that sees the same epoch may serve its cached table and
+// a different one must re-check the pool. One exact-key read: no catalogue or registry scan.
+export const CUSTOM_ROUTER_EPOCH_PATH = '/admin/custom-router-epoch';
+
+export const CustomRouterEpochRequestSchema = z.object({ router: AutoRouterSchema });
+export type CustomRouterEpochRequest = z.infer<typeof CustomRouterEpochRequestSchema>;
+
+export const CustomRouterEpochResponseSchema = z.object({
+  epoch: z.number().int().nonnegative(),
+});
+export type CustomRouterEpochResponse = z.infer<typeof CustomRouterEpochResponseSchema>;
+
 // GET ?router=<base router>; answers with PlatformMeasurementsResponseSchema.
 export const PLATFORM_MEASUREMENTS_PATH = '/admin/platform-measurements';
 // POST; read-only registry lookup for the pool editor's add validation. Resolves each asked model

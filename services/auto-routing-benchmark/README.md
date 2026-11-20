@@ -353,17 +353,15 @@ are read-only; step 2 cancels legacy work under the hold before the deploy, as d
    legacy cancel after the deploy.** A nonzero legacy count means keep the hold and escalate;
    canceling anything at that point is wrong. A paid request or paid run that is live while the
    hold is retained is expected — a user click under the hold is a legitimate confirmation and is
-   never a reason to cancel. Then confirm the engine identity and measurement revision are
-   unchanged, the ready-pair counts did not move, the published versions did not change, no
-   profile moved to `pending`, and no new `benchmark_runs` row exists. Per saved
-   pool, compare the routing-table bytes and each model row's classification (active,
-   benchmarking, paused, permanently failed, alias re-benchmark needed): an already correctly
-   benchmarked pool must keep the same table and need no quote or click.
-4. Before releasing, confirm that the web promotion, the gateway promotion, and this Worker
-   deployment each contain the merged head. They are separate jobs: the Worker deploy runs in
-   parallel with the Vercel stage/promote chain (it depends only on the database gate, change
-   detection, and Worker detection), so the order is not guaranteed and one part being live proves
-   nothing about the others. The holder keeps spend fenced across any order.
+   never a reason to cancel. Confirm the engine identity, measurement revision, ready-pair
+   counts, and published versions are unchanged. No legacy profile can move to a runnable state
+   or start a run. For each saved pool, compare the routing-table bytes and each model row's
+   classification. An already correctly benchmarked pool must keep the same table and need no
+   quote or click.
+4. Before releasing, confirm the benchmark Worker, serving Worker, web, and gateway contain the
+   merged head. Confirm the serving Worker can read the benchmark readiness epoch through the
+   existing service binding. The deploy jobs can complete in any order. The operator hold fences
+   spend until every check passes.
 5. Release only the exact token the hold was acquired with (never a `LIKE` pattern), then confirm
    the next dispatch pass starts no run for stored work and that a platform publish logs
    `routing_table_publish_skipped_unchanged_desired_set` for an unchanged desired set.

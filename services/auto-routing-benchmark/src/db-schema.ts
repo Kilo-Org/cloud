@@ -412,6 +412,18 @@ export const benchmarkCutover = sqliteTable('benchmark_cutover', {
   cutover_at: text('cutover_at').notNull(),
 });
 
+/**
+ * One row per base router: a monotonic counter bumped by the `benchmark_profiles` triggers in the
+ * migration that adds this table, so any committed readiness or provenance change to a profile
+ * advances it inside the same transaction. The serving Worker reads this single row through the
+ * benchmark service binding before it trusts a cached custom routing table.
+ */
+export const benchmarkReadinessEpoch = sqliteTable('benchmark_readiness_epoch', {
+  router: text('router').$type<AutoRouter>().primaryKey().notNull(),
+  epoch: integer('epoch').notNull().default(0),
+  updated_at: text('updated_at').notNull(),
+});
+
 export const routingTableCandidates = sqliteTable(
   'routing_table_candidates',
   {

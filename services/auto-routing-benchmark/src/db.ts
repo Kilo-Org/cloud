@@ -1001,6 +1001,26 @@ export async function readBenchmarkCutover(db: D1Database): Promise<string | nul
   return row?.cutover_at ?? null;
 }
 
+/**
+ * The router's readiness epoch: one exact-key read, bumped inside the same transaction as every
+ * readiness or provenance change to a profile row (migration 0039's triggers). A caller compares it
+ * with the epoch its cached table recorded; a mismatch means the served ranking may have moved.
+ *
+ * A missing row or a failed read throws: the serving Worker must fail retryably rather than keep
+ * serving a table it cannot prove current.
+ */
+export async function readBenchmarkReadinessEpoch(
+  db: D1Database,
+  router: AutoRouter
+): Promise<number> {
+  const row = await db
+    .prepare('SELECT epoch FROM benchmark_readiness_epoch WHERE router = ?')
+    .bind(router)
+    .first<{ epoch: number }>();
+  if (!row) throw new Error(`benchmark readiness epoch missing for ${router}`);
+  return row.epoch;
+}
+
 /** Claim the cutover instant if nobody has; returns the durable one. */
 export async function ensureBenchmarkCutover(
   db: D1Database,

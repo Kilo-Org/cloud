@@ -91,9 +91,11 @@ function fixture(t, overrides = {}) {
     CREATE TABLE fixture_app (updated_at INTEGER NOT NULL);
     INSERT INTO fixture_app VALUES (1);
     INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at,
-      min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity)
+      min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+      admission_marker)
     VALUES ('fixture-run', 'efficient', 'decider', 'platform', 'running', '2026-01-01T00:00:00.000Z',
-      0.7, 3, 4, 1, 'deployment-smoke');`);
+      0.7, 3, 4, 1, 'deployment-smoke', 'deployment-smoke');
+    INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, '1970-01-01T00:00:00.000Z');`);
   const env = {
     ...process.env,
     PATH: `${bin}:${process.env.PATH ?? ''}`,

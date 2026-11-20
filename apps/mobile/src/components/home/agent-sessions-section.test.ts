@@ -418,7 +418,12 @@ describe('Home live section', () => {
       renderer = TestRenderer.create(
         createElement(LiveSessionFeedback, {
           context: { ...context, isResolving: true, isReady: false, refetch: contextRefetch },
-          sessions: { ...settled, hasAcceptedSuccess: false, isPaused: true, refetch: sessionsRefetch },
+          sessions: {
+            ...settled,
+            hasAcceptedSuccess: false,
+            isPaused: true,
+            refetch: sessionsRefetch,
+          },
           failureLabel: "Couldn't load active sessions",
           inlineNotices: false,
         })

@@ -66,8 +66,7 @@ export function liveSessionContent(
   sessions: LiveSessions,
   connectivity: BannerState
 ): LiveSessionContent {
-  const offlineWaiting =
-    connectivity === 'offline' && !sessions.isFetching && !context.isFetching;
+  const offlineWaiting = connectivity === 'offline' && !sessions.isFetching && !context.isFetching;
   if (context.isResolving) {
     return offlineWaiting ? 'offline' : 'pending';
   }

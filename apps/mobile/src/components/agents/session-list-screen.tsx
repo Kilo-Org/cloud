@@ -80,9 +80,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   // The offline state owns the whole surface: the feedback band centers its
   // card, and the body (skeletons or rows) stands down for it.
   const offlineSurface = content === 'offline';
-  // A failure or the offline state owns the whole surface: its centered card
-  // takes the space the body would have used.
-  const centeredSurface = offlineSurface || (query.hasLoaded && content === 'error');
   // A status link from the Home `Live now` card narrows the live list to one
   // state. The parameter is transient: it is not stored, so it cannot silently
   // narrow a later visit. The active filter is drawn by
@@ -96,6 +93,9 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const retryableRowsFailure = hasLiveRows && sessions.terminalError?.kind === 'retryable';
 
   const query = useLiveSessionQuery(activeSessions);
+  // A failure or the offline state owns the whole surface: its centered card
+  // takes the space the body would have used.
+  const centeredSurface = offlineSurface || (query.hasLoaded && content === 'error');
   const { visibleSessions: filteredSessions, isSearching } = query;
   // The status narrowing applies after the search and persisted filters, so the
   // filter picker still offers every option the live set contains and

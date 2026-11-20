@@ -131,10 +131,11 @@ export function androidChannelIdForPushDataToAppVersion(
       // is no legacy id to redirect to. The push is data-only: the caller omits
       // `channelId` and the client draws its own card.
       return undefined;
-    // These variants carry a channel no build gates by app version, so the
-    // registered-client lookup above already returned it. Reaching here means
-    // the token predates channel creation entirely, where the caller omits
-    // `channelId` and Android posts to the app's default channel.
+    // Unreachable by construction, and named only so the switch stays total: a
+    // null app version already returned at the guard above, and each of these
+    // variants carries a channel no build gates by version, so the
+    // registered-client lookup returned it. A variant added here without an arm
+    // would instead fall into the exhaustiveness guard below.
     case 'low_balance':
     case 'spend_alert':
     case 'security_finding':

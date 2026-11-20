@@ -53,7 +53,10 @@ vi.mock('@shopify/flash-list', () => ({
       index: number;
     }) => ReactElement;
     return createElement(
-      Fragment,
+      // A host node, not a Fragment: the navigator's sheet contract is about
+      // where the scroller sits among the sheet's direct children, and a
+      // Fragment disappears from the tree before that can be asserted.
+      'FlashList',
       null,
       data.map((item, index) =>
         createElement(Fragment, { key: index }, renderItem({ item, index }))
@@ -997,6 +1000,36 @@ describe('PrDiffFileNavigator body side insets', () => {
       marginLeft: LANDSCAPE_LEFT,
       marginRight: 8,
     });
+  });
+
+  it("keeps the header and the list as the sheet content's two children", async () => {
+    const { renderer } = await renderWithProviders(
+      createElement(PrDiffFileNavigator, {
+        ...BASE_PROPS,
+        header: createElement('NavigatorHeader'),
+      })
+    );
+
+    // react-native-screens honors a formSheet's pinned header only when the
+    // content's direct children are [header, scroll view]: the header and the
+    // fixed search column share the first child, and the scroller is the
+    // second. Keep them apart and a third sibling pins the list full-bleed over
+    // the header.
+    const blocks = renderer.root.findAll(
+      node => String(node.type) === 'View' && node.props.collapsable === false
+    );
+    expect(blocks).toHaveLength(1);
+    const block = blocks[0];
+    if (block === undefined) {
+      throw new Error('the navigator renders no header block');
+    }
+    const blockChildren = block.children.filter(child => typeof child !== 'string');
+    // The header, then the search column: what the header child owns.
+    expect(blockChildren).toHaveLength(2);
+    expect(block.findAll(node => String(node.type) === 'NavigatorHeader')).toHaveLength(1);
+    // The scroller is a sibling of that block, never inside it.
+    expect(block.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(1);
   });
 
   it('leaves the portrait body without an inset style', async () => {

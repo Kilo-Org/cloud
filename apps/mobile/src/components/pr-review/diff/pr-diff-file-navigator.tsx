@@ -366,14 +366,17 @@ export function PrDiffFileNavigator({
   // listing cap left fewer listed files than the overview's changed-file count.
   const isTruncated = query.hasNextPage || fetchAll.failure !== null || changedFiles > files.length;
 
-  // The list must stay a direct child of the sheet: react-native-screens sizes
-  // this formSheet's scroll view natively by finding the scroller among the
-  // sheet's direct children, so the column takes the insets per block and the
-  // list takes them on its own frame (`useSideInsetMarginStyle`).
+  // Two direct children only: react-native-screens honors a formSheet's pinned
+  // header when the content is `[header, scroll view]`, so the header and the
+  // fixed search column share the first child and the list is the second. The
+  // scroller cannot take a padded wrapper, so the insets go on the search
+  // column's own wrapper and on the list's own frame
+  // (`useSideInsetMarginStyle`). `collapsable={false}` keeps this first child
+  // from being flattened away, which would expose `{header}` on its own.
   return (
     <>
-      {header}
       <View collapsable={false} className="bg-background pb-2">
+        {header}
         <View style={sideInsetStyle}>
           <SearchField
             className="mx-4 mt-2"

@@ -905,6 +905,92 @@ describe('the recorded state', () => {
     expect(secondHold.drain('session-1')).toEqual([]);
   });
 
+  /**
+   * The defect this covers: a call registers its tab (and its approval) before the tool runs, and the host marked the
+   * session as decided there. A record read still in flight was therefore skipped for that session, and the write the
+   * call queued persisted only its own tab — erasing the session's other tabs, an approval a human had granted before
+   * the worker slept, and the reports a previous worker queued.
+   */
+  it('merges the record into a session a call registered before the read landed', async () => {
+    const otherTab = 'https://app.example/other';
+    const attachment = 'https://app.example/reports/q4.pdf';
+    const record = {
+      'session-1': {
+        need: armedNeed({ url: attachment }),
+        owed: [
+          {
+            filename: 'earlier.txt',
+            kept: false,
+            since: 1,
+            step,
+            tabId: 9,
+            url: 'https://app.example/reports/earlier.txt',
+          },
+        ],
+        tabs: [{ page: otherTab, session: 'session-1', step, tabId: 9 }],
+      },
+    };
+    const storage = makeStorage({ deferred: true, initial: record });
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    // The call that woke the worker registers its own tab before the record has been read.
+    hold.tab(agentTab());
+
+    storage.release();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Nothing the record held was erased: the other tab, the approval, and the queued report are all still there.
+    expect(storage.recordKeys()).toStrictEqual(['session-1']);
+    expect(hold.drain('session-1').map(one => `${String(one.kept)}:${one.filename}`)).toStrictEqual(
+      ['false:earlier.txt']
+    );
+    expect(hold.needOf('session-1')?.kind).toBe('armed');
+
+    // And the call's own tab is registered too, so a download on it is still the agent's.
+    expect(
+      hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(downloads.order).toContain('suggest');
+    expect(hold.tracked(1)?.kind).toBe('allowed');
+  });
+
+  /**
+   * The defect this covers: the same registration race, read through the mirror. A download that starts on a tab the
+   * record restored is attributed only if the restore kept it, so the erased tab is the missing half of the fix.
+   */
+  it('keeps the record’s other tab registered when a call registered its own first', async () => {
+    const otherTab = 'https://app.example/other';
+    const storage = makeStorage({
+      deferred: true,
+      initial: {
+        'session-1': {
+          need: armedNeed({ url: 'https://app.example/reports/q4.pdf' }),
+          owed: [],
+          tabs: [{ page: otherTab, session: 'session-1', step, tabId: 9 }],
+        },
+      },
+    });
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    hold.tab(agentTab());
+    storage.release();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // A download on the restored tab is the agent's, exactly as it was before the worker slept.
+    expect(
+      hold.handle({ id: 1, referrer: otherTab, url: 'https://app.example/other/late.pdf' }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(downloads.order).toContain('cancel');
+  });
+
   it('keeps what this worker decided when a slower record would say otherwise', async () => {
     const storage = makeStorage({
       deferred: true,

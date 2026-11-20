@@ -8,6 +8,7 @@
  * session still owes its model.
  */
 import { z } from 'zod';
+import type { DownloadHold } from './browser-download-hold';
 
 /** Where the record lives, under one key, so a reader sees one whole value. The prefix selects `storage.session`. */
 export const DOWNLOAD_HOLD_STATE_KEY = 'session:kiloDownloadHoldState' as const;
@@ -73,6 +74,81 @@ const sessionStateSchema = z.object({
 const stateSchema = z.record(z.string(), sessionStateSchema);
 
 export type HoldState = z.infer<typeof stateSchema>;
+
+/**
+ * One session's stored record merged with what this worker already knows about it.
+ *
+ * A live entry is newer where both carry a fact — the report it queued, the approval it saw spent — so it wins those;
+ * the record is the only copy of everything else the session had before the worker slept: its other tabs, an approval
+ * a human granted, the reports a previous worker queued. A tab the worker detached is dropped from both.
+ */
+export const mergeSession = ({
+  detached,
+  existing,
+  stored,
+}: {
+  readonly detached: ReadonlySet<number>;
+  readonly existing: HoldState[string] | undefined;
+  readonly stored: HoldState[string];
+}): HoldState[string] => {
+  const tabs = stored.tabs.filter(
+    tab =>
+      !detached.has(tab.tabId) && existing?.tabs.some(entry => entry.tabId === tab.tabId) !== true
+  );
+
+  return {
+    need: existing?.need ?? stored.need,
+    owed: [...stored.owed, ...(existing?.owed ?? [])],
+    tabs: [...tabs, ...(existing?.tabs ?? [])],
+  };
+};
+
+/**
+ * Applies a stored record to a session's live mirror and the hold. Each session's record is merged into what the
+ * worker already knows (see {@link mergeSession}), a closed session is dropped whole, and only the facts the record
+ * alone carried are registered: the tabs the hold does not have, and the approval it has no need for.
+ */
+export const restoreSessions = ({
+  closed,
+  detached,
+  hold,
+  state,
+  stored,
+}: {
+  readonly closed: ReadonlySet<string>;
+  readonly detached: ReadonlySet<number>;
+  readonly hold: Pick<DownloadHold, 'arm' | 'tab'>;
+  readonly state: HoldState;
+  readonly stored: HoldState;
+}): void => {
+  for (const [session, record] of Object.entries(stored)) {
+    // A session closed before the record was read is gone for good: its tabs and its need died with it.
+    if (!closed.has(session)) {
+      const existing = state[session];
+      const merged = mergeSession({ detached, existing, stored: record });
+
+      state[session] = merged;
+
+      for (const tab of merged.tabs) {
+        if (existing?.tabs.some(entry => entry.tabId === tab.tabId) !== true) {
+          hold.tab({
+            page: tab.page,
+            session: tab.session,
+            step: tab.step === undefined ? undefined : { ...tab.step },
+            tabId: tab.tabId,
+          });
+        }
+      }
+
+      if (merged.need === record.need && record.need !== undefined) {
+        hold.arm({
+          ...record.need,
+          step: record.need.step === undefined ? undefined : { ...record.need.step },
+        });
+      }
+    }
+  }
+};
 
 /** The `storage.session` slice the record needs: the same area the tab leases live in. */
 export interface SessionStorageApi {

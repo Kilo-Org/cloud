@@ -27,7 +27,7 @@ import type {
   DeterminingFilenameDownloadsApi,
   DownloadHoldPermissionsApi,
 } from './browser-download-hold-listener';
-import { readState, writeState } from './browser-download-hold-record';
+import { readState, restoreSessions, writeState } from './browser-download-hold-record';
 import type { HoldState, SessionStorageApi } from './browser-download-hold-record';
 
 export { DOWNLOAD_HOLD_STATE_KEY } from './browser-download-hold-record';
@@ -74,13 +74,24 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
   const storageOf = (): SessionStorageApi | undefined => globals.sessionStorage?.();
   /** The record as this worker knows it: every write replaces it whole. */
   const state: HoldState = {};
-  /** The sessions this worker decided about before its record was read: what it knows is newer than the record. */
-  const touched = new Set<string>();
+  /** Sessions this worker closed before its record was read: restoring one would bring back a tab that is gone. */
+  const closed = new Set<string>();
   /** Tabs this worker forgot before its record was read: restoring one would re-register a page that is gone. */
   const detached = new Set<number>();
+  /** Registrations made before the record was read: applied after it, so neither the record nor the call is lost. */
+  const pending: (() => void)[] = [];
   /** Restored once, before the first write: a write must not erase a record this worker has not read yet. */
   const { promise: hydration, resolve: hydrated } = Promise.withResolvers<void>();
 
+  /**
+   * Whether a decision may read the hold: `restoring` until the record is applied, so no decision and no write is
+   * taken against the partial view a woken worker starts with.
+   */
+  let decision:
+    | { readonly kind: 'restoring'; readonly record: Promise<void> }
+    | { readonly kind: 'ready' } = { kind: 'restoring', record: hydration };
+
+  /** The session's mirror entry, created empty: what a report or a registration is recorded into. */
   const recordOf = (session: string) => {
     const existing = state[session];
 
@@ -91,7 +102,6 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
     const created: HoldState[string] = { owed: [], tabs: [] };
 
     state[session] = created;
-    touched.add(session);
 
     return created;
   };
@@ -100,6 +110,19 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
     // A write before the record is read would replace it with this worker's partial view of it.
     await hydration;
     await writeState(storageOf(), state);
+  };
+
+  /**
+   * A tab or an approval registered by a call that woke this worker, applied after the record is read: the record is
+   * the session's whole history, and writing this registration into the live entry first would leave its rest behind.
+   */
+  const register = (apply: () => void): void => {
+    if (decision.kind === 'restoring') {
+      pending.push(apply);
+    } else {
+      apply();
+      void write();
+    }
   };
 
   const hold = createDownloadHold({
@@ -125,20 +148,7 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
     search: async itemId => (await globals.downloads()?.search?.({ id: itemId })) ?? [],
   });
 
-  /**
-   * How a download is answered: synchronously once the record is read, or deferred until it is.
-   *
-   * A download that wakes this worker is decided only against the record it has, and the record is what says which
-   * tabs and approvals exist. Classifying before it lands would read an empty hold, and an agent's file would be
-   * passed through as the user's. Chrome holds the item for 15 s, far longer than this read.
-   */
-  let decision:
-    | { readonly kind: 'ready' }
-    | { readonly kind: 'restoring'; readonly record: Promise<void> } = {
-    kind: 'restoring',
-    record: hydration,
-  };
-
+  /** How a download is answered: at once once the record is read, or owed until it is (Chrome holds the item 15 s). */
   const decide = (item: DownloadHoldItem, suggest: SuggestFilename): boolean => {
     if (decision.kind === 'ready') {
       return hold.handle(item, suggest);
@@ -151,7 +161,6 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
       hold.handle(item, suggest);
     })();
 
-    // The answer is owed: `hold.handle` answers Chrome once the record is restored.
     return true;
   };
 
@@ -163,38 +172,24 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
 
   void (async (): Promise<void> => {
     try {
-      const stored = await readState(storageOf());
-
-      for (const [session, record] of Object.entries(stored)) {
-        // A session this worker already decided about is the newer truth: the record is only what it missed.
-        if (!touched.has(session)) {
-          state[session] = {
-            ...record,
-            tabs: record.tabs.filter(tab => !detached.has(tab.tabId)),
-          };
-
-          for (const tab of state[session].tabs) {
-            hold.tab({
-              page: tab.page,
-              session: tab.session,
-              step: tab.step === undefined ? undefined : { ...tab.step },
-              tabId: tab.tabId,
-            });
-          }
-
-          if (record.need !== undefined) {
-            hold.arm({
-              ...record.need,
-              step: record.need.step === undefined ? undefined : { ...record.need.step },
-            });
-          }
-        }
-      }
+      restoreSessions({ closed, detached, hold, state, stored: await readState(storageOf()) });
     } catch {
       // A record that cannot be applied leaves the live hold: fewer tabs are owned, never more.
     } finally {
+      // The registrations made before the read are applied last, so the call that woke this worker is what the hold
+      // And the record both end with — and the merged record is persisted once, now that both halves are in it.
+      if (pending.length > 0) {
+        for (const apply of pending.splice(0)) {
+          apply();
+        }
+
+        void write();
+      }
+
       // Once the record is read it is the authority: a later detach edits it directly, so the pre-read list is spent.
+      // It clears only now, so a tab detached mid-restore is not re-registered by a registration still waiting here.
       detached.clear();
+
       // Whatever the record said, the hold is answerable now: a decision may wait no longer than the read, and never
       // Hangs on one that threw.
       decision = { kind: 'ready' };
@@ -208,15 +203,16 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
     },
     arm: need => {
       hold.arm(need);
-      recordOf(need.session).need = need;
-      void write();
+      register(() => {
+        recordOf(need.session).need = need;
+      });
     },
     closeSession: session => {
       hold.closeSession(session);
       delete state[session];
       // A session closed before the record was read is gone for good: restoring it would re-register a tab of a
       // Session that no longer exists, and a download on that page would be reported to nobody.
-      touched.add(session);
+      closed.add(session);
       void write();
     },
     drain: session => {
@@ -260,8 +256,6 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
       return hold.settle(session, window);
     },
     tab: input => {
-      hold.tab(input);
-
       if ('detach' in input) {
         // A tab forgotten before the record was read may not come back: the record still lists it.
         detached.add(input.detach);
@@ -269,13 +263,21 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
         for (const record of Object.values(state)) {
           record.tabs = record.tabs.filter(tab => tab.tabId !== input.detach);
         }
-      } else {
+
+        hold.tab(input);
+        void write();
+
+        return;
+      }
+
+      // The hold learns the tab now: a download is attributed by it the moment the tool runs. Its mirror waits for
+      // The record only when the record has not been read, so the session's other tabs are never replaced by this one.
+      hold.tab(input);
+      register(() => {
         const record = recordOf(input.session);
 
         record.tabs = [...record.tabs.filter(tab => tab.tabId !== input.tabId), input];
-      }
-
-      void write();
+      });
     },
     tracked: itemId => hold.tracked(itemId),
   };

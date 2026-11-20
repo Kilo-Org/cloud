@@ -19,7 +19,9 @@
     "presenceStatus": "होस्ट: {{connection}}",
     "commandStatus": "कमांड वितरण: {{status}}",
     "delivered": "वितरित",
-    "expired": "कालबाह्य"
+    "expired": "कालबाह्य",
+    "recoveryGaps_one": "या प्रतिलेखाचा {{displayCount}} भाग गहाळ आहे.",
+    "recoveryGaps_other": "या प्रतिलेखाचे {{displayCount}} भाग गहाळ आहेत."
   },
   "common": {
     "manageOnWeb": "वेबवर व्यवस्थापित करा",
@@ -172,6 +174,7 @@
     "generating": "व्युत्पन्न करत आहे…",
     "working": "काम सुरू आहे",
     "yourOwnRepositories": "तुमच्या स्वतःच्या रिपॉझिटरी",
+    "organizationRepositories": "संस्थेच्या रिपॉझिटरी",
     "dismissed": "दुर्लक्षित",
     "agent": "एजंट",
     "durationMinuteShort": "min",
@@ -962,6 +965,8 @@
       "pendingComment": "प्रलंबित टिप्पण्या",
       "pendingComment_other": "प्रलंबित टिप्पण्या",
       "submitCountOfTotal": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
+      "submitCountOfTotal_one": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
+      "submitCountOfTotal_other": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
       "submitReview": "पुनरावलोकन सादर करा",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
       "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट केली. ",
@@ -1226,7 +1231,7 @@
     },
     "instructions": {
       "title": "सानुकूल सूचना",
-      "deprecation": "सानुकूल सूचनांची सुविधा बंद करण्याचे नियोजन आहे. त्याऐवजी ही मार्गदर्शक तत्त्वे तुमच्या रिपॉझिटरीतील REVIEW.md फाइलमध्ये ठेवा.",
+      "deprecation": "सानुकूल सूचनांची सुविधा काढून टाकली जाईल. त्याऐवजी ही मार्गदर्शक तत्त्वे तुमच्या रिपॉझिटरीतील REVIEW.md फाइलमध्ये ठेवा.",
       "placeholder": "उदा. त्रुटी हाताळण्यासाठीचे आमचे नियम पाळा…",
       "clearTitle": "सानुकूल सूचना काढून टाकायच्या?",
       "clearMessage": "रिक्त फील्ड जतन केल्यास या पुनरावलोककासाठी साठवलेल्या सानुकूल सूचना हटवल्या जातील."
@@ -1390,8 +1395,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
+      "managedOnWebTitle": "वेबवर व्यवस्थापित",
+      "managedOnWebShort": "हे कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
+      "managedOnWebRepositories": "{{organization}} साठीच्या रेपॉजिटरीज संगणकावरून वेबवर निवडा.",
       "description": "{{organization}} साठी वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
       "descriptionReconnect": "{{organization}} साठी नवीन वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
+      "descriptionOverview": "{{organization}} साठी वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते पुढील स्क्रीनवर पेस्ट करा.",
       "scopes": "खाते: वाचन · रिपॉझिटरी: वाचन/लेखन · पुल रिक्वेस्ट: वाचन · वेबहूक: वाचन/लेखन",
       "tokenPlaceholder": "वर्कस्पेसचे प्रवेश टोकन",
       "tokenRefused": "Bitbucket ने हे वर्कस्पेस टोकन स्वीकारले नाही. त्यात वरील परवानग्या आहेत का ते तपासा आणि नंतर पुन्हा प्रयत्न करा."
@@ -1412,6 +1421,7 @@
     "platformList": {
       "checking": "तपासत आहे…",
       "statusUnavailable": "स्थिती अनुपलब्ध",
+      "needsAttention": "लक्ष आवश्यक",
       "platforms": "प्लॅटफॉर्म",
       "activity": "क्रियाकलाप"
     },
@@ -2782,6 +2792,8 @@
     "modelPicker": {
       "title": "मॉडेल निवडा",
       "noModelsDescription": "निवडण्यासाठी कोणतेही मॉडेल उपलब्ध नाही.",
+      "allUnavailableTitle": "कोणतेही मॉडेल वापरता येत नाही",
+      "allUnavailableDescription": "प्रदाता की जोडा, नंतर पुन्हा प्रयत्न करा.",
       "favorites": "आवडते"
     },
     "modelSelector": {
@@ -3186,6 +3198,8 @@
     "retryHint": "Kilo Pass ची स्थिती पुन्हा मिळवण्याचा प्रयत्न करते.",
     "endedOn": "संपले {{date}}",
     "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही।",
+    "notAvailableTitle": "Kilo Pass ॲपमध्ये नाही",
+    "noPassDescription": "या खात्याकडे Kilo Pass नाही.",
     "statusActive": "सक्रिय",
     "statusTrialing": "चाचणीमध्ये",
     "statusPastDue": "पेमेंट थकीत",
@@ -3468,7 +3482,7 @@
       "retentionLimit": "सर्वात अलीकडची बिले दाखवली जात आहेत."
     },
     "lowBalanceAlert": {
-      "enableA11y": "शिल्लक कमी झाल्याची सूचना चालू करा",
+      "subtitle": "या संस्थेची शिल्लक तुम्ही सेट केलेल्या रकमेपेक्षा कमी झाल्यावर तुम्ही दिलेल्या पत्त्यांवर ईमेलद्वारे सूचना पाठवा.",
       "notifyEmailsLabel": "सूचना पाठवण्याचे ईमेल पत्ते",
       "permissionDenied": "तुम्हाला बिलिंगच्या सूचना व्यवस्थापित करण्याची परवानगी नाही.",
       "separateEmailsHint": "एकापेक्षा जास्त ईमेल पत्ते देताना त्यांच्यामध्ये स्वल्पविराम द्या.",
@@ -3613,10 +3627,9 @@
     },
     "hub": {
       "renameTitle": "संस्थेचे नाव बदला",
-      "renamePlaceholder": "संस्थेचे नाव",
+      "renamePlaceholder": "संस्थेचे नाव टाका",
       "balance": "शिल्लक",
-      "organizationSeats": "संस्थेतील सदस्यांच्या जागा",
-      "plan": "संस्थेचा प्लॅन",
+      "plan": "प्लॅन",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · संपली आहे",
@@ -3650,7 +3663,8 @@
     "signupStepUp": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी '$t(login.moreSignInOptions)' वापरा.",
     "signupStepUpApple": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी '$t(login.signInWithApple)' वापरा.",
     "signupStepUpGoogle": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी '$t(login.signInWithGoogle)' वापरा.",
-    "invalidCode": "तो कोड चुकीचा आहे. कृपया पुन्हा प्रयत्न करा.",
+    "signupStepUpBack": "तुमचे खाते तयार करणे पूर्ण करण्यासाठी मागे जा आणि '$t(login.moreSignInOptions)' वापरा.",
+    "invalidCode": "तो कोड चुकीचा आहे किंवा त्याची मुदत संपली आहे. कृपया पुन्हा प्रयत्न करा किंवा '$t(login.resendCode)' वापरा.",
     "codeInProgress": "तुमच्या कोडवर प्रक्रिया सुरू आहे. थोडा वेळ थांबा आणि पुन्हा प्रयत्न करा.",
     "tooManyAttempts": "खूप वेळा प्रयत्न झाले आहेत. कृपया नवीन कोड मागवा.",
     "invalidToken": "साइन इन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
@@ -3919,6 +3933,15 @@
       "checkHelp": "‘$t(modelChat.backends.checkConnection)’ हे बटण निवडलेला प्रोटोकॉल आणि मॉडेल वापरून या एंडपॉइंटला एक छोटी अनुमान विनंती पाठवते. प्रदाता त्यासाठी शुल्क आकारू शकतो.",
       "connectionSucceeded": "मॉडेलने हा प्रोटोकॉल वापरून विनंती पूर्ण केली.",
       "connectionFailed": "मॉडेलला विनंती पूर्ण करता आली नाही. API मूळ URL, प्रोटोकॉल, प्रमाणीकरण तपशील आणि मॉडेल ID तपासा.",
+      "requestTimedOut": "एंडपॉइंटने वेळेत उत्तर दिले नाही. API मूळ URL आणि तुमचे कनेक्शन तपासा, नंतर पुन्हा प्रयत्न करा.",
+      "requestUnauthorized": "एंडपॉइंटने प्रमाणीकरण तपशील नाकारले. API की आणि सानुकूल हेडर तपासा, नंतर पुन्हा प्रयत्न करा.",
+      "requestNotFound": "एंडपॉइंट किंवा मॉडेल सापडले नाही. API मूळ URL आणि मॉडेल ID तपासा.",
+      "requestRateLimited": "एंडपॉइंट विनंत्या मर्यादित करत आहे. थोडा वेळ थांबा आणि पुन्हा प्रयत्न करा.",
+      "requestUnavailable": "एंडपॉइंट सध्या उपलब्ध नाही. थोड्या वेळाने पुन्हा प्रयत्न करा.",
+      "requestUnreachable": "एंडपॉइंटपर्यंत पोहोचता आले नाही. API मूळ URL आणि तुमचे कनेक्शन तपासा.",
+      "requestInvalidResponse": "एंडपॉइंटने अपेक्षित स्वरूपात उत्तर दिले नाही. API मूळ URL आणि प्रोटोकॉल सर्व्हरशी जुळतात का ते तपासा आणि नंतर पुन्हा प्रयत्न करा.",
+      "discoveryNoModels": "एंडपॉइंटने कोणतीही मॉडेल सूचीबद्ध केली नाही. मॉडेल स्वतः प्रविष्ट करा.",
+      "connectionIncomplete": "मॉडेलने उत्तर दिले पण पूर्ण केले नाही. पुन्हा प्रयत्न करा, किंवा मॉडेल ID आणि प्रोटोकॉल तपासा.",
       "invalidInput": "बॅकएंडचे नाव, वैध हेडर आणि अद्वितीय ID व नाव असलेले किमान एक मॉडेल प्रविष्ट करा. टोकन मर्यादा धन पूर्णांक असणे आवश्यक आहे.",
       "invalidUrl": "प्रमाणीकरण तपशील, क्वेरी किंवा फ्रॅगमेंट नसलेला HTTP किंवा HTTPS API मूळ URL प्रविष्ट करा.",
       "publicHttp": "सार्वजनिक HTTP एंडपॉइंटना परवानगी नाही. HTTPS किंवा खाजगी स्थानिक एंडपॉइंट वापरा.",
@@ -4057,10 +4080,20 @@
     "reasoningEffort": {
       "modelFlag": "हे मॉडेल विचारांची पातळी समर्थित करते"
     },
-    "creditsRequired": "हा संदेश पाठवण्यासाठी पुरेसे क्रेडिट नाहीत."
+    "creditsRequired": "हा संदेश पाठवण्यासाठी पुरेसे क्रेडिट नाहीत.",
+    "providerKeyRefused": "प्रदात्याने प्रमाणीकरण तपशील नाकारले. त्याची API की तपासा, नंतर पुन्हा पाठवा.",
+    "providerModelMissing": "हा बॅकएंड आता हे मॉडेल देत नाही. दुसरे निवडा.",
+    "providerRateLimited": "प्रदाता विनंत्या मर्यादित करत आहे. थोडा वेळ थांबा आणि पुन्हा पाठवा.",
+    "providerUnavailable": "प्रदाता सध्या उपलब्ध नाही. थोड्या वेळाने पुन्हा पाठवा."
   },
   "settingsTools": {
-    "confirmTitle": "हा बदल निश्चित करायचा?"
+    "confirmTitle": "हा बदल निश्चित करायचा?",
+    "guarded": {
+      "spendAlertsOff": "खर्च सूचना बंद करायच्या? खर्च मर्यादा ओलांडल्याच्या आणि तासाभरातील वाढीच्या सूचना तुम्हाला मिळणे थांबेल.",
+      "balanceAlertsOff": "शिल्लक सूचना बंद करायच्या? तुमची क्रेडिट्स कमी झाल्यावर तुम्हाला सूचना मिळणे थांबेल.",
+      "securityFindingsOff": "सुरक्षा निष्कर्ष बंद करायचे? नवीन सुरक्षा निष्कर्षांबद्दलच्या सूचना तुम्हाला मिळणे थांबेल.",
+      "hideBalanceOn": "तुमची शिल्लक लपवायची? क्रेडिट शिल्लक आता प्रोफाइल स्क्रीन आणि संस्था हबवर दिसणार नाही."
+    }
   },
   "appActions": {
     "start": {
@@ -4432,6 +4465,7 @@
     "pickPackToBuyAgain": "नवीन खरेदी सुरू करण्यासाठी वरीलपैकी एक पॅक निवडा.",
     "purchasePending": "स्टोअर अजूनही या पेमेंटवर प्रक्रिया करत आहे. शुल्क मंजूर होताच तुमचे क्रेडिट्स जमा होतील.",
     "buyAgain": "पुन्हा खरेदी करा",
+    "checkPurchase": "खरेदी तपासा",
     "purchaseOwnedByAnotherAccount": "या Apple Account वरील क्रेडिट्स दुसऱ्या Kilo खात्याशी जोडलेली आहेत. ती वापरण्यासाठी त्या Kilo खात्यात साइन इन करा.",
     "purchaseOwnedByAnotherAccountPlay": "या Google Play खात्यावरील क्रेडिट्स वेगळ्या Kilo खात्याची आहेत. ती वापरण्यासाठी त्या Kilo खात्यावर साइन इन करा."
   },
@@ -4525,7 +4559,9 @@
     },
     "saveSheet": {
       "title": "यादीत जतन करा",
-      "saved": "{{list}} मध्ये जतन केले"
+      "saved": "{{list}} मध्ये जतन केले",
+      "saveFailed": "काम जतन करता आले नाही. तुमचा कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+      "saveRefused": "काम या यादीत जतन करता आले नाही. दुसरी यादी निवडा."
     }
   },
   "agentBriefing": {
@@ -4537,6 +4573,7 @@
     "empty": "या आढावा कालावधीत कोणताही क्रियाकलाप नाही",
     "emptyHint": "नियोजित आढाव्यात क्रियाकलाप असल्यास तुमची क्लाउड आणि CLI कोडिंग सत्रे येथे दिसतील.",
     "loadError": "आढावे लोड करता आले नाहीत",
+    "estimateLoadError": "अंदाज लोड करता आला नाही.",
     "view": "आढावा वाचा",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4804,7 +4841,7 @@
   },
   "organizationGuardrails": {
     "title": "कृत्रिम बुद्धिमत्ता गार्डरेल्स",
-    "permissionDenied": "केवळ संस्थेचे मालक आणि प्रशासक कृत्रिम बुद्धिमत्ता गार्डरेल्स व्यवस्थापित करू शकतात.",
+    "permissionDenied": "केवळ संस्थेचे मालक आणि प्रशासक कृत्रिम बुद्धिमत्ता गार्डरेल्स व्यवस्थापित करू शकतात. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "कृत्रिम बुद्धिमत्ता गार्डरेल्स सक्षम केलेले नाहीत",
     "unavailable": "Kilo विनंतीनुसार संस्थेसाठी कृत्रिम बुद्धिमत्ता गार्डरेल्स सक्षम करते. {{supportEmail}} वर संपर्क साधा, आणि Kilo टीम तुमच्या संस्थेसाठी ते सुरू करेल.",
     "contactSupport": "मदत पथकाशी संपर्क साधा",
@@ -4942,7 +4979,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "एंटरप्राइझ वैशिष्ट्य",
-    "enterpriseOnly": "हे केवळ एंटरप्राइझसाठीचे वैशिष्ट्य आहे.",
+    "enterpriseOnly": "प्रदाते आणि मॉडेल एंटरप्राइझ प्लॅनमध्ये उपलब्ध आहेत.",
     "readOnly": "केवळ संस्थेचे मालक आणि प्रशासक ही सेटिंग्ज बदलू शकतात.",
     "loadError": "प्रदाते आणि मॉडेल लोड होऊ शकले नाहीत",
     "tabModels": "मॉडेल",
@@ -4956,6 +4993,7 @@
     "providersDescription": "या संस्थेसाठी Kilo त्याकडे राउटिंग करणे थांबवण्यासाठी प्रदाता बंद करा.",
     "providersNeedCatalog": "संपूर्ण मॉडेल कॅटलॉग लोड होईपर्यंत प्रदाता स्विच केवळ-वाचनीय राहतात. ते संपादित करण्यासाठी वरील पुन्हा प्रयत्न करा वर टॅप करा.",
     "providersEmpty": "या शोधाशी कोणताही प्रदाता जुळत नाही.",
+    "providersNone": "या संस्थेसाठी कोणताही प्रदाता उपलब्ध नाही.",
     "allowAllShown": "दाखवलेले सर्व अनुमत करा",
     "denyAllShown": "दाखवलेले सर्व नाकारा",
     "gatewaysDescription": "Kilo मॉडेल विनंत्या Vercel AI Gateway किंवा OpenRouter मार्फत राउट करते. बंद केलेला गेटवे त्या विनंत्या अयशस्वी करतो.",

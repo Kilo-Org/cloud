@@ -124,7 +124,14 @@ export function ProviderKeyNewScreen() {
   if (providers.isPending || providers.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
+        {/* The loaded header names the provider on its subtitle line, so the
+            pending header holds that line and the form does not move when the
+            provider list answers. */}
+        <ScreenHeader
+          title={title}
+          reserveSubtitle={providers.isPending}
+          backFallback={PROFILE_TAB_HREF}
+        />
         {providers.isError ? (
           <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
         ) : (
@@ -271,7 +278,9 @@ export function ProviderKeyNewScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={PROFILE_TAB_HREF} />
+      {/* The provider is the scope of the key, so it is the header's subtitle,
+          not a body line that read as a field label with no field. */}
+      <ScreenHeader title={title} subtitle={provider.name} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}
@@ -280,7 +289,6 @@ export function ProviderKeyNewScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-1">
-          <Text variant="small">{provider.name}</Text>
           <Text variant="caption">
             {keyId === undefined
               ? t('profile.providerKeys.newKeyDescription')

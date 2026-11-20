@@ -387,10 +387,10 @@ patchedDependencies:
   # (expo/expo#51789, expo/expo#47316).
   expo-task-manager@58.0.14: patches/expo-task-manager@58.0.14.patch
   # PurchaseConnector.create returns the native promise, so a create failure
-  # is observable. Android: compile against the project's Kotlin stdlib, not
-  # the 2.4.10 default that RN 0.86's Kotlin 2.1 compiler cannot read. The
-  # package ships TypeScript source, so its `typeof jest` guard (TS2708 here)
-  # gets a ts-ignore.
+  # is observable. Android: the package defaults kotlin-stdlib to 2.4.10, whose
+  # Kotlin 2.4 metadata RN 0.88.1's Kotlin 2.2.0 compiler rejects; take the
+  # resolved kotlinVersion instead. The package ships TypeScript source, so its
+  # `typeof jest` guard (TS2708 here) gets a ts-ignore.
   react-native-appsflyer@7.0.2-v2: patches/react-native-appsflyer@7.0.2-v2.patch
   # Android accessibility: the virtual per-paragraph nodes that EnrichedMarkdownText
   # publishes to TalkBack took their bounds from `getPrimaryHorizontal(start)` and
@@ -448,6 +448,10 @@ patchedDependencies:
   # `undefined`, which breaks the whole module that imports it. Forward the rest from
   # the real module. Remove once upstream forwards them itself.
   react-native-css@3.1.0-rc.1: patches/react-native-css@3.1.0-rc.1.patch
+  # A toast's action and cancel buttons render a bare `Pressable`, so TalkBack
+  # read "Try again" as a clickable group with no role. Give the button its
+  # role. Remove once upstream sets it.
+  sonner-native@0.27.0: patches/sonner-native@0.27.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

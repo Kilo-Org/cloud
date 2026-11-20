@@ -2333,6 +2333,36 @@ replace a newer rename, and a repeat of a delivered rename cannot replace a late
 rename. Kilo v1 never sends `conversation.source`: its CLI keeps reporting its own
 titles.
 
+`liveSummary` and `totalCostMicrodollars` are the session card summary and cost total
+of a Kilo v2 root, the `cli_sessions_v2.live_summary` and `total_cost_microdollars`
+that the session-ingest client writes for Kilo v1. Lists, the session card and the
+briefing read them from the row; only an open chat reads the cost from the Session DO.
+`native-live-summary.ts` folds each stored root `conversation.message.updated` into a
+summary kept in DO storage, in the transaction that stores the event: the last started
+tool names the step through the shared step table (`shell` runs like `bash`), an
+unfinished reasoning item at the end of the content is `thinking`, the last `todowrite`
+is the plan, the latest assistant message's error is the failure (`aborted` is
+`cancelled`, `provider.*` is `provider`, `tool.*` is `tool`, anything else `other`),
+and a new root user message starts a turn with an empty summary. Kilo v2 reports no
+session diff, so `changes` stays null. The root's idle `session.status` clears the step
+and plan in the transaction that stores it, as the Kilo v1 idle transition does, so a
+turn that opens without a root user message (a background command's completion) does
+not start with the last turn's step; an idle or failed snapshot shows no step or plan.
+That turn's busy `session.status` clears the failure in the transaction that stores it,
+as the Kilo v1 busy transition does, so the working snapshot does not show the previous
+turn's failure while the session works; the failure otherwise stays until such a busy
+status or a new root user message starts a turn. The cost is the root's assistant-only cost
+total (`cost-total.ts`), the same value an open chat shows. Both ride every snapshot of
+a root with a native transcript and are absent for Kilo v1, whose ingest client keeps
+writing them. The first summary forces a snapshot; a changed one refreshes at most once
+per 10 seconds, the Kilo v1 summary write window, and status changes carry the final
+value of a turn. Ingest writes the summary in the status transaction only when the
+publication's status is not stale and the summary changed, so a late publication cannot
+replace a newer summary; a change under an unchanged status refreshes a session card
+that follows the session, as the Kilo v1 summary write does. It moves the cost forward
+only, together with the activity in one statement that writes no row version unless one
+of them advances.
+
 Publication has one durable, coalescing latest-status obligation per Session DO.
 Its monotonic ULID cursor survives eviction and clock rollback. Each RPC has a
 5-second deadline and failed publication retries on the shared alarm after 30

@@ -102,10 +102,7 @@ export function propertyName(property) {
   if (key.type === 'Identifier') {
     return key.name;
   }
-  if (key.type === 'Literal' && typeof key.value === 'string') {
-    return key.value;
-  }
-  return null;
+  return stringLiteralValue(key);
 }
 
 /** The wrapper nodes that only hold an expression, so a rule reads through them. */
@@ -127,6 +124,17 @@ export function unwrap(node) {
     current = current.expression;
   }
   return current;
+}
+
+/**
+ * The string a literal node carries, read through the TypeScript wrappers, or
+ * null when the node is not a string. Every rule that asks a node for a key or
+ * a class reads the same answer, so a wrapped literal cannot be a string for
+ * one rule and an opaque expression for another.
+ */
+export function stringLiteralValue(node) {
+  const value = unwrap(node);
+  return value.type === 'Literal' && typeof value.value === 'string' ? value.value : null;
 }
 
 /**

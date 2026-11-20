@@ -52,6 +52,9 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
+vi.mock('@/components/ui/icons', () => ({ PlugZap: 'PlugZap', RotateCcw: 'RotateCcw' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 
 const SCOPE: ProviderPrScope = {
   ref: {
@@ -116,7 +119,7 @@ function itemQuery(queryClient: Mounted['queryClient']) {
 type ButtonInstance = {
   props: {
     onPress: () => void;
-    children: { props: { children: string } };
+    accessibilityLabel?: string;
   };
 };
 
@@ -127,7 +130,9 @@ function findButtons(renderer: { root: { findAll: (f: (n: unknown) => boolean) =
 }
 
 async function pressCheckConnection(mounted: Mounted) {
-  const check = findButtons(mounted.renderer)[1];
+  const check = findButtons(mounted.renderer).find(
+    button => button.props.accessibilityLabel === 'Check connection'
+  );
   if (!check) {
     throw new Error('the connection check button did not render');
   }

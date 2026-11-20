@@ -19,7 +19,13 @@
     "presenceStatus": "Gwesteiwyr: {{connection}}",
     "commandStatus": "Danfon y gorchymyn: {{status}}",
     "delivered": "Wedi'i ddanfon",
-    "expired": "Wedi dod i ben"
+    "expired": "Wedi dod i ben",
+    "recoveryGaps_zero": "Does dim rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_one": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_two": "Mae {{displayCount}} ran o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_few": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_many": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_other": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll."
   },
   "common": {
     "manageOnWeb": "Rheoli ar y we",
@@ -172,6 +178,7 @@
     "generating": "Yn cynhyrchu…",
     "working": "Yn gweithio",
     "yourOwnRepositories": "Dy ystorfeydd dy hun",
+    "organizationRepositories": "Ystorfeydd y sefydliad",
     "dismissed": "Wedi'i ddiystyru",
     "agent": "Asiant",
     "durationMinuteShort": "min",
@@ -1030,6 +1037,12 @@
       "pendingComment": "sylwadau heb eu cyflwyno",
       "pendingComment_other": "sylwadau heb eu cyflwyno",
       "submitCountOfTotal": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_zero": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_one": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_two": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_few": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_many": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
+      "submitCountOfTotal_other": "Cyflwyno {{displayFreshCount}} o {{displayTotalCount}} sylw",
       "submitReview": "Cyflwyno adolygiad",
       "partialPostedFresh": "Postiwyd {{displayFreshCount}} o sylwadau. ",
       "partialPostedFresh_zero": "Postiwyd {{displayFreshCount}} o sylwadau. ",
@@ -1322,7 +1335,7 @@
     },
     "instructions": {
       "title": "Cyfarwyddiadau personol",
-      "deprecation": "Mae bwriad i roi'r gorau i gefnogi cyfarwyddiadau personol. Symudwch y canllawiau hyn i ffeil REVIEW.md yn eich ystorfa yn lle hynny.",
+      "deprecation": "Bydd cyfarwyddiadau personol yn cael eu dileu. Symudwch y canllawiau hyn i ffeil REVIEW.md yn eich ystorfa yn lle hynny.",
       "placeholder": "e.e. Gorfodi ein rheolau trin gwallau…",
       "clearTitle": "Tynnu'r cyfarwyddiadau personol?",
       "clearMessage": "Bydd cadw maes gwag yn dileu'r cyfarwyddiadau personol sydd wedi'u cadw ar gyfer yr adolygydd hwn."
@@ -1486,8 +1499,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
+      "managedOnWebTitle": "Yn cael ei reoli ar y we",
+      "managedOnWebShort": "Mae'r cysylltiad hwn yn cael ei reoli ar y we o gyfrifiadur.",
+      "managedOnWebRepositories": "Dewiswch ystorfeydd ar gyfer {{organization}} ar y we o gyfrifiadur.",
       "description": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo isod.",
       "descriptionReconnect": "Crëwch docyn mynediad gweithle newydd ar gyfer {{organization}} a'i ludo isod.",
+      "descriptionOverview": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo ar y sgrin nesaf.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
       "tokenPlaceholder": "Tocyn mynediad gweithle",
       "tokenRefused": "Ni dderbyniodd Bitbucket y tocyn mynediad gweithle hwn. Gwiriwch fod ganddo'r cwmpasau uchod, yna ceisiwch eto."
@@ -1508,6 +1525,7 @@
     "platformList": {
       "checking": "Yn gwirio…",
       "statusUnavailable": "Statws ddim ar gael",
+      "needsAttention": "Angen sylw",
       "platforms": "Platfformau",
       "activity": "Gweithgaredd"
     },
@@ -2982,6 +3000,8 @@
     "modelPicker": {
       "title": "Dewis model",
       "noModelsDescription": "Does dim modelau ar gael i'w dewis.",
+      "allUnavailableTitle": "Ni ellir defnyddio unrhyw fodel",
+      "allUnavailableDescription": "Ychwanegwch allwedd darparwr, yna rhowch gynnig arall arni.",
       "favorites": "Ffefrynnau"
     },
     "modelSelector": {
@@ -3422,6 +3442,8 @@
     "retryHint": "Mae hwn yn ceisio llwytho statws Kilo Pass eto.",
     "endedOn": "Wedi dod i ben {{date}}",
     "notAvailableInApp": "Nid yw Kilo Pass ar gael yn yr ap.",
+    "notAvailableTitle": "Nid yw Kilo Pass yn yr ap",
+    "noPassDescription": "Nid oes gan y cyfrif hwn Kilo Pass.",
     "statusActive": "Gweithredol",
     "statusTrialing": "Ar brawf",
     "statusPastDue": "Taliad yn hwyr",
@@ -3704,7 +3726,7 @@
       "retentionLimit": "Yn dangos yr anfonebau diweddaraf."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Galluogi rhybudd balans isel",
+      "subtitle": "Anfon rhybudd drwy e-bost i'r cyfeiriadau a restrwch pan fo balans y sefydliad hwn yn disgyn o dan y swm a osodwch.",
       "notifyEmailsLabel": "Cyfeiriadau e-bost i'w hysbysu",
       "permissionDenied": "Nid oes gennych ganiatâd i reoli rhybuddion bilio.",
       "separateEmailsHint": "Defnyddiwch gomâu i wahanu cyfeiriadau e-bost.",
@@ -3853,10 +3875,9 @@
     },
     "hub": {
       "renameTitle": "Ailenwi'r sefydliad",
-      "renamePlaceholder": "Enw'r sefydliad",
+      "renamePlaceholder": "Rhowch enw ar gyfer y sefydliad",
       "balance": "Balans",
-      "organizationSeats": "Seddau'r sefydliad",
-      "plan": "Cynllun y sefydliad",
+      "plan": "Cynllun",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Wedi dod i ben",
@@ -3894,7 +3915,8 @@
     "signupStepUp": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Mae'r cod hwnnw'n anghywir. Rhowch gynnig eto.",
+    "signupStepUpBack": "I orffen creu'ch cyfrif, ewch yn ôl a defnyddiwch '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Rhowch gynnig eto neu ddefnyddiwch '$t(login.resendCode)'.",
     "codeInProgress": "Mae'ch cod yn cael ei brosesu. Arhoswch ychydig a rhowch gynnig eto.",
     "tooManyAttempts": "Rydych wedi rhoi cynnig gormod o weithiau. Gofynnwch am god newydd.",
     "invalidToken": "Methodd y mewngofnodi. Rho gynnig arall arni.",
@@ -4167,6 +4189,15 @@
       "checkHelp": "Mae $t(modelChat.backends.checkConnection) yn anfon cais casglu byr i'r pwynt terfyn hwn gan ddefnyddio'r protocol a'r model a ddewiswyd. Gall y darparwr godi tâl amdano.",
       "connectionSucceeded": "Cwblhaodd y model gais gan ddefnyddio'r protocol hwn.",
       "connectionFailed": "Ni allai'r model gwblhau cais. Gwiriwch wraidd yr API, y protocol, y manylion adnabod ac ID y model.",
+      "requestTimedOut": "Ni atebodd y pwynt terfyn mewn pryd. Gwiriwch wraidd yr API a'ch cysylltiad, yna rhowch gynnig arall arni.",
+      "requestUnauthorized": "Gwrthododd y pwynt terfyn y manylion adnabod. Gwiriwch yr allwedd API a'r penawdau personol, yna rhowch gynnig arall arni.",
+      "requestNotFound": "Nid oedd y pwynt terfyn na'r model i'w cael. Gwiriwch wraidd yr API ac ID y model.",
+      "requestRateLimited": "Mae'r pwynt terfyn yn cyfyngu ceisiadau. Arhoswch eiliad a rhowch gynnig arall arni.",
+      "requestUnavailable": "Nid yw'r pwynt terfyn ar gael ar hyn o bryd. Rhowch gynnig arall arni mewn eiliad.",
+      "requestUnreachable": "Ni ellid cyrraedd y pwynt terfyn. Gwiriwch wraidd yr API a'ch cysylltiad.",
+      "requestInvalidResponse": "Ni atebodd y pwynt terfyn yn y fformat a ddisgwylid. Gwiriwch fod gwraidd yr API a'r protocol yn cyfateb i'r gweinydd, ac yna ceisiwch eto.",
+      "discoveryNoModels": "Ni restrir unrhyw fodelau gan y pwynt terfyn. Rhowch fodelau i mewn â llaw.",
+      "connectionIncomplete": "Atebodd y model ond ni orffennodd. Rhowch gynnig arall arni, neu gwiriwch ID y model a'r protocol.",
       "invalidInput": "Rhowch enw ôl-ben, penawdau dilys ac o leiaf un model ag ID ac enw unigryw. Rhaid i derfynau tocynnau fod yn gyfanrifau positif.",
       "invalidUrl": "Rhowch wraidd API HTTP neu HTTPS heb fanylion adnabod, ymholiad na darn.",
       "publicHttp": "Ni chaniateir pwyntiau terfyn HTTP cyhoeddus. Defnyddiwch HTTPS neu bwynt terfyn lleol preifat.",
@@ -4305,10 +4336,20 @@
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     },
-    "creditsRequired": "Dim digon o gredydau i anfon y neges hon."
+    "creditsRequired": "Dim digon o gredydau i anfon y neges hon.",
+    "providerKeyRefused": "Gwrthododd y darparwr y manylion adnabod. Gwiriwch ei allwedd API, yna anfonwch eto.",
+    "providerModelMissing": "Nid yw'r ôl-ben hwn yn gwasanaethu'r model hwn mwyach. Dewiswch un arall.",
+    "providerRateLimited": "Mae'r darparwr yn cyfyngu ar geisiadau. Arhoswch eiliad ac anfonwch eto.",
+    "providerUnavailable": "Nid yw'r darparwr ar gael ar hyn o bryd. Anfonwch eto cyn bo hir."
   },
   "settingsTools": {
-    "confirmTitle": "Cadarnhau'r newid hwn?"
+    "confirmTitle": "Cadarnhau'r newid hwn?",
+    "guarded": {
+      "spendAlertsOff": "Diffodd hysbysiadau gwariant? Byddech yn rhoi'r gorau i gael hysbysiadau am groesi trothwyon gwariant a sbigau bob awr.",
+      "balanceAlertsOff": "Diffodd hysbysiadau balans? Byddech yn rhoi'r gorau i gael hysbysiadau pan fydd eich credydau'n brin.",
+      "securityFindingsOff": "Diffodd canfyddiadau diogelwch? Byddech yn rhoi'r gorau i gael hysbysiadau am ganfyddiadau diogelwch newydd.",
+      "hideBalanceOn": "Cuddio eich balansau? Ni fydd balansau credyd yn ymddangos mwyach ar sgriniau'r proffil a chanolfan y sefydliad."
+    }
   },
   "appActions": {
     "start": {
@@ -4704,6 +4745,7 @@
     "pickPackToBuyAgain": "Dewiswch becyn uchod i ddechrau pryniant newydd.",
     "purchasePending": "Mae'r siop yn dal i brosesu'r taliad hwn. Bydd eich credydau'n cyrraedd unwaith y bydd yn cymeradwyo'r tâl.",
     "buyAgain": "Prynu eto",
+    "checkPurchase": "Gwirio'r pryniant",
     "purchaseOwnedByAnotherAccount": "Mae'r credydau ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio.",
     "purchaseOwnedByAnotherAccountPlay": "Mae'r credydau ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio."
   },
@@ -4813,7 +4855,9 @@
     },
     "saveSheet": {
       "title": "Cadw i'r rhestr",
-      "saved": "Wedi'i gadw i {{list}}"
+      "saved": "Wedi'i gadw i {{list}}",
+      "saveFailed": "Ni fu modd cadw'r dasg. Gwiriwch eich cysylltiad a rhowch gynnig arall.",
+      "saveRefused": "Ni fu modd cadw'r dasg i'r rhestr hon. Dewiswch restr arall."
     }
   },
   "agentBriefing": {
@@ -4825,6 +4869,7 @@
     "empty": "Dim gweithgarwch yn y cyfnod briff hwn",
     "emptyHint": "Bydd eich sesiynau codio cwmwl a CLI yn ymddangos yma pan fydd briff a drefnwyd yn cynnwys gweithgarwch.",
     "loadError": "Methu llwytho briffiau",
+    "estimateLoadError": "Methu llwytho'r amcangyfrif.",
     "view": "Darllen y briff",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5108,7 +5153,7 @@
   },
   "organizationGuardrails": {
     "title": "Mesurau diogelu AI",
-    "permissionDenied": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu rheoli Mesurau diogelu AI.",
+    "permissionDenied": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu rheoli Mesurau diogelu AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Nid yw Mesurau diogelu AI wedi'u galluogi",
     "unavailable": "Mae Kilo yn galluogi Mesurau diogelu AI i sefydliad ar gais. Cysylltwch â {{supportEmail}}, a bydd tîm Kilo yn eu troi ymlaen ar gyfer eich sefydliad.",
     "contactSupport": "Cysylltu â'r tîm cymorth",
@@ -5246,7 +5291,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Nodwedd menter",
-    "enterpriseOnly": "Nodwedd ar gyfer mentrau yn unig yw hon.",
+    "enterpriseOnly": "Mae darparwyr a modelau ar gael ar y cynllun Enterprise.",
     "readOnly": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu newid y gosodiadau hyn.",
     "loadError": "Methu llwytho darparwyr a modelau",
     "tabModels": "Modelau",
@@ -5260,6 +5305,7 @@
     "providersDescription": "Diffoddwch ddarparwr i atal Kilo rhag anfon ceisiadau ato ar gyfer y sefydliad hwn.",
     "providersNeedCatalog": "Bydd switshis darparwyr yn aros yn ddarllen-yn-unig nes i'r catalog modelau llawn lwytho. Tapiwch Rhoi cynnig eto uchod i'w golygu.",
     "providersEmpty": "Does dim darparwyr yn cyfateb i'r chwiliad hwn.",
+    "providersNone": "Nid oes darparwyr ar gael ar gyfer y sefydliad hwn.",
     "allowAllShown": "Caniatáu pob un a ddangosir",
     "denyAllShown": "Gwrthod pob un a ddangosir",
     "gatewaysDescription": "Mae Kilo yn anfon ceisiadau model drwy Vercel AI Gateway neu OpenRouter. Bydd y ceisiadau hynny'n methu os yw'r porth wedi'i analluogi.",

@@ -23,10 +23,7 @@ const positiveLimit = BenchmarkSchedulerLimitSchema;
 const SchedulerConfigSchema = z.object({
   slots: positiveLimit.default(BENCHMARK_CONTAINER_BUDGET),
   modelConcurrency: positiveLimit.default(12),
-  providerConcurrency: positiveLimit.default(16),
-  unknownProviderConcurrency: positiveLimit.default(2),
   modelLimits: z.record(z.string(), positiveLimit).default({}),
-  providerLimits: z.record(z.string(), positiveLimit).default({}),
   shares: z
     .object({
       'efficient/platform': positiveLimit.default(2),
@@ -71,16 +68,12 @@ export function resolveSchedulerConfig(
   const settings = {
     slots: setting('slots'),
     modelConcurrency: setting('modelConcurrency'),
-    providerConcurrency: setting('providerConcurrency'),
-    unknownProviderConcurrency: setting('unknownProviderConcurrency'),
   };
   return {
     config: {
       ...fallback,
       slots: settings.slots.effective,
       modelConcurrency: settings.modelConcurrency.effective,
-      providerConcurrency: settings.providerConcurrency.effective,
-      unknownProviderConcurrency: settings.unknownProviderConcurrency.effective,
     },
     settings,
   };
@@ -95,8 +88,6 @@ type StoredSchedulerOverrides = {
 type SchedulerSettingsRow = {
   slots: unknown;
   model_concurrency: unknown;
-  provider_concurrency: unknown;
-  unknown_provider_concurrency: unknown;
   updated_at: string;
   updated_by: string | null;
 };
@@ -110,8 +101,7 @@ function storedLimit(value: unknown): number | null {
 export async function getSchedulerOverrides(db: D1Database): Promise<StoredSchedulerOverrides> {
   const row = await db
     .prepare(`
-    SELECT slots, model_concurrency, provider_concurrency, unknown_provider_concurrency,
-      updated_at, updated_by
+    SELECT slots, model_concurrency, updated_at, updated_by
     FROM scheduler_settings WHERE id = 1
   `)
     .first<SchedulerSettingsRow>();
@@ -119,8 +109,6 @@ export async function getSchedulerOverrides(db: D1Database): Promise<StoredSched
     overrides: {
       slots: storedLimit(row?.slots),
       modelConcurrency: storedLimit(row?.model_concurrency),
-      providerConcurrency: storedLimit(row?.provider_concurrency),
-      unknownProviderConcurrency: storedLimit(row?.unknown_provider_concurrency),
     },
     updatedAt: row?.updated_at ?? null,
     updatedBy: row?.updated_by ?? null,
@@ -135,21 +123,12 @@ export async function saveSchedulerOverrides(
   const updatedAt = new Date().toISOString();
   await db
     .prepare(`
-    INSERT INTO scheduler_settings (
-      id, slots, model_concurrency, provider_concurrency, unknown_provider_concurrency,
-      updated_at, updated_by
-    ) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6)
-    ON CONFLICT (id) DO UPDATE SET slots = ?1, model_concurrency = ?2, provider_concurrency = ?3,
-      unknown_provider_concurrency = ?4, updated_at = ?5, updated_by = ?6
+    INSERT INTO scheduler_settings (id, slots, model_concurrency, updated_at, updated_by)
+    VALUES (1, ?1, ?2, ?3, ?4)
+    ON CONFLICT (id) DO UPDATE SET slots = ?1, model_concurrency = ?2, updated_at = ?3,
+      updated_by = ?4
   `)
-    .bind(
-      overrides.slots,
-      overrides.modelConcurrency,
-      overrides.providerConcurrency,
-      overrides.unknownProviderConcurrency,
-      updatedAt,
-      updatedBy
-    )
+    .bind(overrides.slots, overrides.modelConcurrency, updatedAt, updatedBy)
     .run();
   return { overrides, updatedAt, updatedBy };
 }
@@ -178,7 +157,6 @@ export type SchedulerClaim = {
   run_id: string;
   model: string;
   variant: string;
-  providers: string;
   rep: number;
   chunk: number;
   case_ids: string;
@@ -195,7 +173,6 @@ type SchedulerLaneHead = {
   rep: number;
   chunk: number;
   id: string;
-  providers: string;
   available_at: number;
   share: string;
   started_at: string;
@@ -203,7 +180,6 @@ type SchedulerLaneHead = {
 
 type SchedulerLiveChunk = {
   model: string;
-  providers: string;
   slot: number | null;
   share: string;
 };
@@ -221,10 +197,10 @@ export const SCHEDULER_MATERIALIZED_LANES_SQL = `
  */
 export const SCHEDULER_INSERT_CHUNK_SQL = `
   INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids, status)
-  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, CASE WHEN EXISTS (
-    SELECT 1 FROM json_each(?8) AS expected WHERE NOT EXISTS (
+  VALUES (?1, ?2, ?3, ?4, '[]', ?5, ?6, ?7, CASE WHEN EXISTS (
+    SELECT 1 FROM json_each(?7) AS expected WHERE NOT EXISTS (
       SELECT 1 FROM case_results WHERE run_id = ?2 AND model = ?3 AND variant = ?4
-        AND rep = ?6 AND case_id = expected.value
+        AND rep = ?5 AND case_id = expected.value
     )
   ) THEN 'pending' ELSE 'completed' END)
   ON CONFLICT (id) DO NOTHING
@@ -240,7 +216,7 @@ export async function scheduleRunChunks(
   db: D1Database,
   run: {
     runId: string;
-    entries: readonly { model: string; variant: string | null; providers: readonly string[] }[];
+    entries: readonly { model: string; variant: string | null }[];
     repetitions: number;
     caseIds: readonly string[];
     chunkSize: number;
@@ -287,7 +263,6 @@ export async function scheduleRunChunks(
   const chunks = Math.ceil(run.caseIds.length / run.chunkSize);
   for (const entry of run.entries) {
     const variant = entry.variant ?? '';
-    const providers = JSON.stringify([...new Set(entry.providers)].sort());
     for (let rep = 0; rep < run.repetitions; rep++) {
       const start = resumeAt.get(JSON.stringify([entry.model, variant, rep])) ?? 0;
       for (let chunk = start; chunk < chunks; chunk++) {
@@ -300,7 +275,6 @@ export async function scheduleRunChunks(
               run.runId,
               entry.model,
               variant,
-              providers,
               rep,
               chunk,
               JSON.stringify(run.caseIds.slice(offset, offset + run.chunkSize))
@@ -316,7 +290,7 @@ export async function scheduleRunChunks(
 
 /** Live reservations read by one dispatch pass; bounded by the slot budget. */
 export const SCHEDULER_LIVE_SQL = `
-  SELECT chunk.model, chunk.providers, chunk.slot, run.router || '/' || run.purpose AS share
+  SELECT chunk.model, chunk.slot, run.router || '/' || run.purpose AS share
   FROM scheduler_chunks AS chunk JOIN benchmark_runs AS run ON run.id = chunk.run_id
   WHERE chunk.status IN ('queued', 'active')
 `;
@@ -334,16 +308,16 @@ export const SCHEDULER_LIVE_SQL = `
  * seek per lane, independent of the backlog size.
  */
 export const SCHEDULER_LANE_HEADS_SQL = `
-  WITH RECURSIVE lane(run_id, model, variant, rep, chunk, id, providers, available_at) AS (
+  WITH RECURSIVE lane(run_id, model, variant, rep, chunk, id, available_at) AS (
     SELECT * FROM (
-      SELECT c.run_id, c.model, c.variant, c.rep, c.chunk, c.id, c.providers, c.available_at
+      SELECT c.run_id, c.model, c.variant, c.rep, c.chunk, c.id, c.available_at
       FROM scheduler_chunks AS c
       WHERE c.status = 'pending'
       ORDER BY c.run_id, c.model, c.variant, c.rep, c.available_at, c.chunk
       LIMIT 1
     )
     UNION ALL
-    SELECT c.run_id, c.model, c.variant, c.rep, c.chunk, c.id, c.providers, c.available_at
+    SELECT c.run_id, c.model, c.variant, c.rep, c.chunk, c.id, c.available_at
     FROM lane JOIN scheduler_chunks AS c ON c.rowid = COALESCE(
       (SELECT c3.rowid FROM scheduler_chunks AS c3
         WHERE c3.status = 'pending' AND c3.run_id = lane.run_id AND c3.model = lane.model
@@ -360,8 +334,8 @@ export const SCHEDULER_LANE_HEADS_SQL = `
         WHERE c0.status = 'pending' AND c0.run_id > lane.run_id
         ORDER BY c0.run_id, c0.model, c0.variant, c0.rep, c0.available_at, c0.chunk LIMIT 1))
   )
-  SELECT lane.run_id, lane.model, lane.variant, lane.rep, lane.chunk, lane.id, lane.providers,
-    lane.available_at, run.router || '/' || run.purpose AS share, run.started_at
+  SELECT lane.run_id, lane.model, lane.variant, lane.rep, lane.chunk, lane.id, lane.available_at,
+    run.router || '/' || run.purpose AS share, run.started_at
   FROM lane JOIN benchmark_runs AS run ON run.id = lane.run_id
   WHERE run.status = 'running'
     AND EXISTS (SELECT 1 FROM scheduler_runs WHERE scheduler_runs.run_id = run.id)
@@ -372,88 +346,66 @@ export const SCHEDULER_LANE_HEADS_SQL = `
     )
 `;
 
-function chunkProviders(providers: string): readonly string[] {
-  const parsed = z.array(z.string()).parse(JSON.parse(providers));
-  return parsed.length > 0 ? parsed : ['unknown'];
-}
-
 /**
  * Picks the highest-priority chunks that fit the free slots. Ordering mirrors the
  * pre-lane scheduler: least-served share first (weighted, so an idle lane's share
  * is borrowed), then the least-used model, then run start, chunk, repetition and
- * chunk id.
+ * chunk id. Only slots and the per-model cap bound a claim: the gateway sends each
+ * request to one upstream its aggregator picks, so the catalog's provider list
+ * says nothing about which provider a chunk will load.
  */
 function selectScheduledChunks(input: {
   config: SchedulerConfig;
   live: readonly SchedulerLiveChunk[];
   heads: readonly SchedulerLaneHead[];
   coolModels: ReadonlySet<string>;
-  coolProviders: ReadonlySet<string>;
   free: number;
   now: number;
 }): { head: SchedulerLaneHead; slot: number }[] {
   const shareCounts = new Map<string, number>();
   const modelCounts = new Map<string, number>();
-  const providerCounts = new Map<string, number>();
   const usedSlots = new Set<number>();
   const tally = (counts: Map<string, number>, key: string) =>
     counts.set(key, (counts.get(key) ?? 0) + 1);
   for (const chunk of input.live) {
     tally(shareCounts, chunk.share);
     tally(modelCounts, chunk.model);
-    for (const provider of chunkProviders(chunk.providers)) tally(providerCounts, provider);
     if (chunk.slot !== null) usedSlots.add(chunk.slot);
   }
   const modelLimits: Readonly<Record<string, number>> = input.config.modelLimits;
-  const providerLimits: Readonly<Record<string, number>> = input.config.providerLimits;
   const shareWeights: Readonly<Record<string, number>> = input.config.shares;
-  const remaining = input.heads
-    .filter(head => head.available_at <= input.now)
-    .map(head => ({ head, providers: chunkProviders(head.providers) }))
-    .filter(
-      candidate =>
-        !input.coolModels.has(candidate.head.model) &&
-        candidate.providers.every(provider => !input.coolProviders.has(provider))
-    );
-  const fits = (candidate: (typeof remaining)[number]) =>
-    (modelCounts.get(candidate.head.model) ?? 0) <
-      (modelLimits[candidate.head.model] ?? input.config.modelConcurrency) &&
-    candidate.providers.every(provider => {
-      const limit =
-        providerLimits[provider] ??
-        (provider === 'unknown'
-          ? input.config.unknownProviderConcurrency
-          : input.config.providerConcurrency);
-      return (providerCounts.get(provider) ?? 0) < limit;
-    });
-  const better = (candidate: (typeof remaining)[number], best: (typeof remaining)[number]) => {
+  const remaining = input.heads.filter(
+    head => head.available_at <= input.now && !input.coolModels.has(head.model)
+  );
+  const better = (candidate: SchedulerLaneHead, best: SchedulerLaneHead) => {
     const shareDelta =
-      (shareCounts.get(candidate.head.share) ?? 0) * (shareWeights[best.head.share] ?? 1) -
-      (shareCounts.get(best.head.share) ?? 0) * (shareWeights[candidate.head.share] ?? 1);
+      (shareCounts.get(candidate.share) ?? 0) * (shareWeights[best.share] ?? 1) -
+      (shareCounts.get(best.share) ?? 0) * (shareWeights[candidate.share] ?? 1);
     if (shareDelta !== 0) return shareDelta < 0;
-    const modelDelta =
-      (modelCounts.get(candidate.head.model) ?? 0) - (modelCounts.get(best.head.model) ?? 0);
+    const modelDelta = (modelCounts.get(candidate.model) ?? 0) - (modelCounts.get(best.model) ?? 0);
     if (modelDelta !== 0) return modelDelta < 0;
-    if (candidate.head.started_at !== best.head.started_at)
-      return candidate.head.started_at < best.head.started_at;
-    if (candidate.head.chunk !== best.head.chunk) return candidate.head.chunk < best.head.chunk;
-    if (candidate.head.rep !== best.head.rep) return candidate.head.rep < best.head.rep;
-    return candidate.head.id < best.head.id;
+    if (candidate.started_at !== best.started_at) return candidate.started_at < best.started_at;
+    if (candidate.chunk !== best.chunk) return candidate.chunk < best.chunk;
+    if (candidate.rep !== best.rep) return candidate.rep < best.rep;
+    return candidate.id < best.id;
   };
   const selected: { head: SchedulerLaneHead; slot: number }[] = [];
   while (selected.length < input.free) {
-    let best: (typeof remaining)[number] | null = null;
-    for (const candidate of remaining)
-      if (fits(candidate) && (best === null || better(candidate, best))) best = candidate;
+    let best: SchedulerLaneHead | null = null;
+    for (const candidate of remaining) {
+      const atModelCap =
+        (modelCounts.get(candidate.model) ?? 0) >=
+        (modelLimits[candidate.model] ?? input.config.modelConcurrency);
+      if (!atModelCap && (best === null || better(candidate, best))) best = candidate;
+    }
     if (best === null) break;
     remaining.splice(remaining.indexOf(best), 1);
     let slot = 0;
     while (usedSlots.has(slot)) slot++;
     usedSlots.add(slot);
-    tally(shareCounts, best.head.share);
-    tally(modelCounts, best.head.model);
-    for (const provider of best.providers) tally(providerCounts, provider);
-    selected.push({ head: best.head, slot });
+    tally(shareCounts, best.share);
+    tally(modelCounts, best.model);
+    selected.push({ head: best, slot });
   }
   return selected;
 }
@@ -505,7 +457,7 @@ export function releaseInitializationLease(db: D1Database, token: string): Promi
 
 /**
  * Claims up to the free slot budget in one pass, holding the dispatch lease while
- * it reads live occupancy, so slot, model and provider caps are applied to a
+ * it reads live occupancy, so slot and model caps are applied to a
  * stable snapshot. A dispatcher that finds the lease held returns no claims
  * immediately: the holding pass has already read that wake's completions, and the
  * per-minute cron retries if the lease expired without a release.
@@ -539,20 +491,15 @@ export async function claimScheduledChunks(
       const [heads, cooldowns] = await Promise.all([
         db.prepare(SCHEDULER_LANE_HEADS_SQL).all<SchedulerLaneHead>(),
         db
-          .prepare('SELECT scope, key FROM scheduler_cooldowns WHERE until > ?')
+          .prepare("SELECT key FROM scheduler_cooldowns WHERE scope = 'model' AND until > ?")
           .bind(now)
-          .all<{ scope: 'model' | 'provider'; key: string }>(),
+          .all<{ key: string }>(),
       ]);
       const selection = selectScheduledChunks({
         config,
         live: live.results,
         heads: heads.results,
-        coolModels: new Set(
-          cooldowns.results.filter(row => row.scope === 'model').map(row => row.key)
-        ),
-        coolProviders: new Set(
-          cooldowns.results.filter(row => row.scope === 'provider').map(row => row.key)
-        ),
+        coolModels: new Set(cooldowns.results.map(row => row.key)),
         free,
         now,
       });
@@ -1003,29 +950,16 @@ export async function clearUnbilledCase(
 }
 
 /**
- * Cools the throttled model and every inference provider the chunk could have
- * been sent to, keeping the later deadline when a cooldown is already active.
- * Cooldowns are matched by the dispatch pass instead of stamped on each pending
- * chunk, so one throttle event never rewrites the whole backlog.
+ * Cools the throttled model, keeping the later deadline when a cooldown is already
+ * active. Other models stay claimable: a throttle names no upstream, because the
+ * gateway's aggregator picks one per request. Cooldowns are matched by the dispatch
+ * pass instead of stamped on each pending chunk, so one throttle event never
+ * rewrites the whole backlog.
  */
-export async function cooldownProviders(
-  db: D1Database,
-  claim: SchedulerClaim,
-  until: number
-): Promise<void> {
-  const entries: { scope: 'model' | 'provider'; key: string }[] = [
-    { scope: 'model', key: claim.model },
-    ...chunkProviders(claim.providers).map(provider => ({
-      scope: 'provider' as const,
-      key: provider,
-    })),
-  ];
-  await db.batch(
-    entries.map(entry =>
-      db
-        .prepare(`INSERT INTO scheduler_cooldowns (scope, key, until) VALUES (?, ?, ?)
-          ON CONFLICT (scope, key) DO UPDATE SET until = MAX(until, excluded.until)`)
-        .bind(entry.scope, entry.key, until)
-    )
-  );
+export async function cooldownModel(db: D1Database, model: string, until: number): Promise<void> {
+  await db
+    .prepare(`INSERT INTO scheduler_cooldowns (scope, key, until) VALUES ('model', ?, ?)
+      ON CONFLICT (scope, key) DO UPDATE SET until = MAX(until, excluded.until)`)
+    .bind(model, until)
+    .run();
 }

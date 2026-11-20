@@ -19,7 +19,11 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregue",
-    "expired": "Expirado"
+    "expired": "Expirado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrição.",
+    "recoveryGaps_many": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_other": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_zero": "Faltam {{displayCount}} partes desta transcrição."
   },
   "common": {
     "manageOnWeb": "Gerir na web",
@@ -172,6 +176,7 @@
     "generating": "A gerar…",
     "working": "A trabalhar",
     "yourOwnRepositories": "Os teus repositórios",
+    "organizationRepositories": "Repositórios da organização",
     "dismissed": "Ignorada",
     "agent": "Agente",
     "durationMinuteShort": "min",
@@ -997,6 +1002,10 @@
       "pendingComment_other": "comentários pendentes",
       "pendingComment_zero": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
       "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
@@ -1274,7 +1283,7 @@
     },
     "instructions": {
       "title": "Instruções personalizadas",
-      "deprecation": "As instruções personalizadas vão ser descontinuadas. Transfere estas orientações para um ficheiro REVIEW.md no teu repositório.",
+      "deprecation": "As instruções personalizadas vão ser removidas. Transfere estas orientações para um ficheiro REVIEW.md no teu repositório.",
       "placeholder": "por exemplo: exigir o cumprimento das nossas regras de tratamento de erros…",
       "clearTitle": "Remover instruções personalizadas?",
       "clearMessage": "Ao guardares um campo vazio, eliminas as instruções personalizadas armazenadas para este revisor."
@@ -1438,8 +1447,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
+      "managedOnWebTitle": "Gerida na Web",
+      "managedOnWebShort": "Esta ligação é gerida na Web, a partir de um computador.",
+      "managedOnWebRepositories": "Escolhe os repositórios de {{organization}} na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
       "descriptionReconnect": "Cria um novo token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
+      "descriptionOverview": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o no ecrã seguinte.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
       "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
       "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
@@ -1460,6 +1473,7 @@
     "platformList": {
       "checking": "A verificar…",
       "statusUnavailable": "Estado indisponível",
+      "needsAttention": "Requer atenção",
       "platforms": "Plataformas",
       "activity": "Atividade"
     },
@@ -2882,7 +2896,9 @@
     "modelPicker": {
       "title": "Selecionar modelo",
       "favorites": "Favoritos",
-      "noModelsDescription": "Não há modelos disponíveis para selecionar."
+      "noModelsDescription": "Não há modelos disponíveis para selecionar.",
+      "allUnavailableTitle": "Não é possível utilizar nenhum modelo",
+      "allUnavailableDescription": "Adiciona uma chave de fornecedor e tenta novamente."
     },
     "modelSelector": {
       "provider": "Fornecedor {{id}}",
@@ -3304,6 +3320,8 @@
     "retryHint": "Tenta obter novamente o estado do Kilo Pass.",
     "endedOn": "Terminado em {{date}}",
     "notAvailableInApp": "O Kilo Pass não está disponível na app.",
+    "notAvailableTitle": "O Kilo Pass não está na app",
+    "noPassDescription": "Esta conta não tem Kilo Pass.",
     "statusActive": "Ativo",
     "statusTrialing": "Em período de teste",
     "statusPastDue": "Pagamento em atraso",
@@ -3586,7 +3604,7 @@
       "retentionLimit": "A mostrar as faturas mais recentes."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Ativar alerta de saldo baixo",
+      "subtitle": "Envia um alerta por email para os endereços que indicares quando o saldo desta organização ficar abaixo do valor que definires.",
       "notifyEmailsLabel": "Endereços de email para alertas",
       "permissionDenied": "Não tem permissão para gerir alertas de faturação.",
       "separateEmailsHint": "Separe os endereços de email com vírgulas.",
@@ -3733,10 +3751,9 @@
     },
     "hub": {
       "renameTitle": "Renomear organização",
-      "renamePlaceholder": "Nome da organização",
+      "renamePlaceholder": "Introduza um nome para a organização",
       "balance": "Saldo",
-      "organizationSeats": "Lugares da organização",
-      "plan": "Plano da organização",
+      "plan": "Plano",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Terminado",
@@ -3772,7 +3789,8 @@
     "signupStepUp": "Para concluir a criação da tua conta, usa '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Para concluir a criação da tua conta, usa '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para concluir a criação da tua conta, usa '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Esse código está incorreto. Tenta novamente.",
+    "signupStepUpBack": "Para concluir a criação da tua conta, volta atrás e usa '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Esse código está incorreto ou expirou. Tenta novamente ou usa '$t(login.resendCode)'.",
     "codeInProgress": "O teu código está a ser processado. Aguarda um momento e tenta novamente.",
     "tooManyAttempts": "Demasiadas tentativas. Pede um novo código.",
     "invalidToken": "O início de sessão falhou. Tenta novamente.",
@@ -4043,6 +4061,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) envia um breve pedido de inferência a este ponto de acesso usando o protocolo e o modelo selecionados. O fornecedor pode cobrar por este pedido.",
       "connectionSucceeded": "O modelo concluiu um pedido usando este protocolo.",
       "connectionFailed": "O modelo não conseguiu concluir um pedido. Verifica o URL base da API, o protocolo, as credenciais e o ID do modelo.",
+      "requestTimedOut": "O ponto de acesso não respondeu a tempo. Verifica o URL base da API e a tua ligação e tenta novamente.",
+      "requestUnauthorized": "O ponto de acesso recusou as credenciais. Verifica a chave da API e os cabeçalhos personalizados e tenta novamente.",
+      "requestNotFound": "O ponto de acesso ou o modelo não foi encontrado. Verifica o URL base da API e o ID do modelo.",
+      "requestRateLimited": "O ponto de acesso está a limitar pedidos. Aguarda um momento e tenta novamente.",
+      "requestUnavailable": "O ponto de acesso está indisponível neste momento. Tenta novamente dentro de instantes.",
+      "requestUnreachable": "Não foi possível alcançar o ponto de acesso. Verifica o URL base da API e a tua ligação.",
+      "requestInvalidResponse": "O ponto de acesso respondeu com algo que não está no formato esperado. Confirma que o URL base da API e o protocolo correspondem ao servidor e tenta novamente.",
+      "discoveryNoModels": "O ponto de acesso não listou nenhum modelo. Introduz os modelos manualmente.",
+      "connectionIncomplete": "O modelo respondeu mas não terminou. Tenta novamente ou verifica o ID do modelo e o protocolo.",
       "invalidInput": "Introduz um nome de serviço, cabeçalhos válidos e pelo menos um modelo com ID e nome únicos. Os limites de tokens têm de ser números inteiros positivos.",
       "invalidUrl": "Introduz um URL base da API com HTTP ou HTTPS, sem credenciais, parâmetros de consulta ou fragmentos.",
       "publicHttp": "Não são permitidos pontos de acesso HTTP públicos. Usa HTTPS ou um ponto de acesso local privado.",
@@ -4181,10 +4208,20 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo suporta esforço de raciocínio"
     },
-    "creditsRequired": "Não há créditos suficientes para enviar esta mensagem."
+    "creditsRequired": "Não há créditos suficientes para enviar esta mensagem.",
+    "providerKeyRefused": "O fornecedor recusou as credenciais. Verifica a chave da API do fornecedor e volta a enviar.",
+    "providerModelMissing": "Este backend já não disponibiliza este modelo. Escolhe outro.",
+    "providerRateLimited": "O fornecedor está a limitar pedidos. Aguarda um momento e volta a enviar.",
+    "providerUnavailable": "O fornecedor está indisponível neste momento. Volta a enviar dentro de instantes."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmar esta alteração?"
+    "confirmTitle": "Confirmar esta alteração?",
+    "guarded": {
+      "spendAlertsOff": "Desativar alertas de gastos? Deixaria de receber notificações sobre ultrapassagens dos limites de gastos e picos horários.",
+      "balanceAlertsOff": "Desativar alertas de saldo? Deixaria de receber notificações quando os seus créditos estiverem quase esgotados.",
+      "securityFindingsOff": "Desativar deteções de segurança? Deixaria de receber notificações sobre novas deteções de segurança.",
+      "hideBalanceOn": "Ocultar os seus saldos? Os saldos de créditos deixariam de aparecer nos ecrãs de perfil e no hub da organização."
+    }
   },
   "appActions": {
     "start": {
@@ -4568,6 +4605,7 @@
     "pickPackToBuyAgain": "Escolha um pacote acima para iniciar uma nova compra.",
     "purchasePending": "A loja ainda está a processar este pagamento. Os seus créditos chegam assim que a cobrança for aprovada.",
     "buyAgain": "Comprar novamente",
+    "checkPurchase": "Verificar compra",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencem a outra conta Kilo. Inicia sessão nessa conta Kilo para os usares.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta do Google Play pertencem a uma conta Kilo diferente. Inicie sessão nessa conta Kilo para os usar."
   },
@@ -4669,7 +4707,9 @@
     },
     "saveSheet": {
       "title": "Guardar numa lista",
-      "saved": "Guardado em {{list}}"
+      "saved": "Guardado em {{list}}",
+      "saveFailed": "Não foi possível guardar a tarefa. Verifica a tua ligação e tenta novamente.",
+      "saveRefused": "Não foi possível guardar a tarefa nesta lista. Escolhe outra lista."
     }
   },
   "agentBriefing": {
@@ -4681,6 +4721,7 @@
     "empty": "Sem atividade neste período do relatório",
     "emptyHint": "As suas sessões de programação na cloud e na CLI aparecem aqui quando um relatório agendado tem atividade.",
     "loadError": "Não foi possível carregar os relatórios",
+    "estimateLoadError": "Não foi possível carregar a estimativa.",
     "view": "Ler relatório",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4956,7 +4997,7 @@
   },
   "organizationGuardrails": {
     "title": "Proteções de IA",
-    "permissionDenied": "Apenas os proprietários e administradores da organização podem gerir as Proteções de IA.",
+    "permissionDenied": "Apenas os proprietários e administradores da organização podem gerir as Proteções de IA. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "As Proteções de IA não estão ativadas",
     "unavailable": "A Kilo ativa as Proteções de IA para uma organização a pedido. Contacte {{supportEmail}}, e a equipa do Kilo as ativa para a sua organização.",
     "contactSupport": "Contactar o suporte",
@@ -5094,7 +5135,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funcionalidade empresarial",
-    "enterpriseOnly": "Esta é uma funcionalidade exclusiva para empresas.",
+    "enterpriseOnly": "Os fornecedores e os modelos estão disponíveis no plano Enterprise.",
     "readOnly": "Apenas os proprietários e administradores da organização podem alterar estas definições.",
     "loadError": "Não foi possível carregar os fornecedores e os modelos",
     "tabModels": "Modelos",
@@ -5108,6 +5149,7 @@
     "providersDescription": "Desative um fornecedor para impedir o Kilo de encaminhar pedidos para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos fornecedores ficam só de leitura até o catálogo completo de modelos ser carregado. Toque em Tentar novamente acima para os editar.",
     "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",
+    "providersNone": "Nenhum fornecedor está disponível para esta organização.",
     "allowAllShown": "Permitir todos os apresentados",
     "denyAllShown": "Negar todos os apresentados",
     "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",

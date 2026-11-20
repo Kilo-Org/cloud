@@ -1,7 +1,16 @@
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { webhook_events } from '@kilocode/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { webhook_event_signatures, webhook_events, webhook_events_v2 } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { captureMessage } from '@sentry/nextjs';
 import type { Owner } from '@/lib/integrations/core/types';
+import { withWebhookEventPartitions } from '@/lib/integrations/db/webhook-event-partitions';
+
+/**
+ * Identifies a row of the partitioned `webhook_events_v2`. `createdAt` lets
+ * updates touch one partition instead of probing all of them, so it must be
+ * passed back exactly as it was written or read.
+ */
+export type WebhookEventRef = { id: string; createdAt: string };
 
 /**
  * Unicode NUL (\u0000) is not representable in PostgreSQL text, so a payload or
@@ -27,8 +36,53 @@ function stripNulBytes(value: unknown): unknown {
 }
 
 /**
+ * Whether the pre-partitioning `webhook_events` table already holds this
+ * delivery. Until its rows age out, a redelivery of an event accepted before
+ * the switch is only recorded there. Remove once that table is dropped.
+ */
+export async function legacyWebhookEventIdForSignature(
+  tx: DrizzleTransaction,
+  eventSignature: string
+): Promise<string | null> {
+  const [row] = await tx
+    .select({ id: webhook_events.id })
+    .from(webhook_events)
+    .where(eq(webhook_events.event_signature, eventSignature))
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/**
+ * Claims a delivery signature for `event`. Returns false when another delivery
+ * already holds it. A concurrent claim of the same signature waits for this
+ * transaction, so if the event insert that follows fails and the transaction
+ * rolls back, the delivery can be claimed again on retry.
+ */
+export async function claimWebhookEventSignature(
+  tx: DrizzleTransaction,
+  eventSignature: string,
+  event: WebhookEventRef
+): Promise<boolean> {
+  const claimed = await tx
+    .insert(webhook_event_signatures)
+    .values({
+      event_signature: eventSignature,
+      webhook_event_id: event.id,
+      webhook_event_created_at: event.createdAt,
+    })
+    .onConflictDoNothing({ target: webhook_event_signatures.event_signature })
+    .returning({ eventSignature: webhook_event_signatures.event_signature });
+  return claimed.length > 0;
+}
+
+/** A new event identity, generated in the app so the insert need not return it. */
+export function newWebhookEventRef(): WebhookEventRef {
+  return { id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+}
+
+/**
  * Logs a webhook event
- * Returns isDuplicate=true if event signature already exists
+ * Returns isDuplicate=true if the delivery signature was already accepted
  */
 export async function logWebhookEvent(data: {
   owner: Owner;
@@ -38,11 +92,23 @@ export async function logWebhookEvent(data: {
   payload: unknown;
   headers: unknown;
   event_signature: string;
-}): Promise<{ id?: string; isDuplicate: boolean }> {
-  try {
-    const [event] = await db
-      .insert(webhook_events)
-      .values({
+}): Promise<{ event?: WebhookEventRef; isDuplicate: boolean }> {
+  const event = newWebhookEventRef();
+
+  return withWebhookEventPartitions(db, () =>
+    db.transaction(async tx => {
+      if (await legacyWebhookEventIdForSignature(tx, data.event_signature)) {
+        console.log('Duplicate webhook event detected:', data.event_signature);
+        return { isDuplicate: true };
+      }
+      if (!(await claimWebhookEventSignature(tx, data.event_signature, event))) {
+        console.log('Duplicate webhook event detected:', data.event_signature);
+        return { isDuplicate: true };
+      }
+
+      await tx.insert(webhook_events_v2).values({
+        id: event.id,
+        created_at: event.createdAt,
         owned_by_organization_id: data.owner.type === 'org' ? data.owner.id : null,
         owned_by_user_id: data.owner.type === 'user' ? data.owner.id : null,
         platform: data.platform,
@@ -51,33 +117,18 @@ export async function logWebhookEvent(data: {
         payload: stripNulBytes(data.payload),
         headers: stripNulBytes(data.headers),
         event_signature: data.event_signature,
-      })
-      .returning();
+      });
 
-    return { id: event.id, isDuplicate: false };
-  } catch (error) {
-    // Drizzle wraps Postgres errors — the code/constraint may be on error itself or on error.cause
-    const err = error as {
-      code?: string;
-      constraint?: string;
-      cause?: { code?: string; constraint?: string };
-    };
-    const pgCode = err.code ?? err.cause?.code;
-    const pgConstraint = err.constraint ?? err.cause?.constraint;
-    // Unique constraint violation on event_signature = duplicate
-    if (pgCode === '23505' && pgConstraint === 'UQ_webhook_events_signature') {
-      console.log('Duplicate webhook event detected:', data.event_signature);
-      return { isDuplicate: true };
-    }
-    throw error;
-  }
+      return { event, isDuplicate: false };
+    })
+  );
 }
 
 /**
  * Updates webhook event processing status
  */
 export async function updateWebhookEvent(
-  eventId: string,
+  event: WebhookEventRef,
   updates: {
     processed: boolean;
     processed_at: string;
@@ -85,42 +136,26 @@ export async function updateWebhookEvent(
     errors: Array<{ message: string; handler: string; stack?: string }> | null;
   }
 ) {
-  await db
-    .update(webhook_events)
+  const updated = await db
+    .update(webhook_events_v2)
     .set({
       processed: updates.processed,
       processed_at: updates.processed_at,
       handlers_triggered: updates.handlers_triggered,
       errors: updates.errors,
     })
-    .where(eq(webhook_events.id, eventId));
-}
+    .where(
+      and(eq(webhook_events_v2.id, event.id), eq(webhook_events_v2.created_at, event.createdAt))
+    )
+    .returning({ id: webhook_events_v2.id });
 
-/**
- * Gets recent webhook events for an owner (organization or user)
- */
-export async function getRecentWebhookEvents(owner: Owner, limit: number = 100) {
-  const ownerCondition =
-    owner.type === 'user'
-      ? eq(webhook_events.owned_by_user_id, owner.id)
-      : eq(webhook_events.owned_by_organization_id, owner.id);
-
-  return await db
-    .select()
-    .from(webhook_events)
-    .where(ownerCondition)
-    .orderBy(desc(webhook_events.created_at))
-    .limit(limit);
-}
-
-/**
- * Gets unprocessed webhook events
- */
-export async function getUnprocessedWebhookEvents(limit: number = 100) {
-  return await db
-    .select()
-    .from(webhook_events)
-    .where(eq(webhook_events.processed, false))
-    .orderBy(webhook_events.created_at)
-    .limit(limit);
+  // Callers only log a thrown error, so report a missed update here: it leaves
+  // the event looking unprocessed, usually because createdAt was altered.
+  if (updated.length === 0) {
+    captureMessage('webhook event update matched no row', {
+      level: 'error',
+      tags: { source: 'updateWebhookEvent' },
+      extra: { eventId: event.id, createdAt: event.createdAt },
+    });
+  }
 }

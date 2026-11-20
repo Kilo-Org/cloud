@@ -123,6 +123,67 @@ test('a descriptor of an unknown kind is refused', () => {
     false
   );
 });
+
+test('an element descriptor in a picker-sheet diagnostic is refused at the schema', () => {
+  const result = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...TARGET,
+        screen: '(app)/design-proof-card',
+        diagnostic: {
+          component: PRODUCT,
+          presentation: 'picker-sheet',
+          props: { headerRight: { $element: 'save-cluster' }, title: 'Review' },
+        },
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+  const issue = result.error.issues.find(
+    candidate => !candidate.message.includes('Invalid input')
+  );
+  assert.ok(issue !== undefined);
+  assert.match(
+    issue.message,
+    /An element descriptor needs the bare card presentation, not picker-sheet/u
+  );
+  // A string nested inside an array under the slot still hits the refusal, and
+  // a plain shell around a descriptor keeps it recoverable by the expansion.
+  const nested = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...TARGET,
+        diagnostic: {
+          component: PRODUCT,
+          props: { headerRight: [{ $element: 'save-cluster' }, ['Save']] },
+        },
+      },
+    ],
+  });
+  assert.equal(nested.success, false);
+  assert.match(
+    nested.error.issues.map(entry => entry.message).join('\n'),
+    /"headerRight" must be \{ "\$element": "save-cluster" \}/u
+  );
+});
+
+test('a nested string in a node slot names its full path', () => {
+  const result = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...TARGET,
+        diagnostic: { component: PRODUCT, props: { headerRight: { row: ['Save'] } } },
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.error.issues[0]?.path.join('/'), 'targets/0/diagnostic/props/headerRight/row/0');
+  assert.match(result.error.issues[0]?.message ?? '', /"headerRight" must be/u);
+});
+
 function syntheticRepo(t: TestContext, proofManifest = manifest) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-proof-git-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

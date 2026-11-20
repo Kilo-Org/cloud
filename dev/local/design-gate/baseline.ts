@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { z, type RefinementCtx, type core } from 'zod';
+import { z, type RefinementCtx } from 'zod';
 
 import { evaluate, listPages, openSession, selectPage } from './cdp';
 import type { RunOutcome } from './capture';
@@ -71,26 +71,36 @@ const SCREEN_HEADER_NODE_SLOT_NAMES = [
 ] as const;
 const descriptorMessage =
   'must be { "$element": "save-cluster" } or an object/array whose values the component can render, not a bare string';
+/** A diagnostic prop value: plain JSON, which is all a manifest can carry. */
+type DiagnosticProp =
+  | string
+  | number
+  | boolean
+  | null
+  | DiagnosticProp[]
+  | { [key: string]: DiagnosticProp };
 
 function checkNodeSlotProps(
-  props: core.JSONType,
+  props: { [key: string]: DiagnosticProp },
   ctx: RefinementCtx,
   path: (string | number)[]
 ): void {
   const slots: readonly string[] = SCREEN_HEADER_NODE_SLOT_NAMES;
-  for (const [name, value] of Object.entries(props)) {
-    const at = [...path, name];
+  const visit = (name: string, value: DiagnosticProp, at: (string | number)[]): void => {
     if (value === null || typeof value !== 'object') {
-      // A bare string in a node slot is the LogBox violation itself; the
-      // refusal names the descriptor so the author knows the fix.
-      if (slots.includes(name) && typeof value === 'string') {
+      // A bare string anywhere under a node slot's value is the LogBox
+      // violation itself; the refusal names the slot and the descriptor.
+      const slot = at.find(
+        (step): step is string => typeof step === 'string' && slots.includes(step)
+      );
+      if (typeof value === 'string' && slot !== undefined) {
         ctx.addIssue({
           code: 'custom',
           path: at,
-          message: `${JSON.stringify(name)} ${descriptorMessage}`,
+          message: `${JSON.stringify(slot)} ${descriptorMessage}`,
         });
       }
-      continue;
+      return;
     }
     if (!Array.isArray(value) && '$element' in value) {
       // Rejected in the schema so a descriptor typo fails `prepare` before any
@@ -104,14 +114,17 @@ function checkNodeSlotProps(
           )}`,
         });
       }
-      continue;
+      return;
     }
-    for (const item of Array.isArray(value) ? value : Object.values(value)) {
-      checkNodeSlotProps(item as core.JSONType, ctx, at);
+    const items = Array.isArray(value) ? value.entries() : Object.entries(value);
+    for (const [key, item] of items) {
+      visit(String(key), item as DiagnosticProp, [...at, key]);
     }
+  };
+  for (const [name, value] of Object.entries(props)) {
+    visit(name, value, [...path, name]);
   }
 }
-
 const SAVE_CLUSTER_BINDING = 'saveCluster';
 /**
  * The cluster a `{ "$element": "save-cluster" }` descriptor expands to, built
@@ -138,7 +151,7 @@ const SAVE_CLUSTER_SOURCE = `const ${
 );
 `;
 
-function hasElementDescriptor(value: core.JSONType): boolean {
+function hasElementDescriptor(value: DiagnosticProp): boolean {
   if (value === null || typeof value !== 'object') return false;
   if (Array.isArray(value)) return value.some(hasElementDescriptor);
   if ('$element' in value) return true;
@@ -149,7 +162,7 @@ function hasElementDescriptor(value: core.JSONType): boolean {
  * JSON literal of the diagnostic props, element descriptors spliced as element
  * bindings, for the generated route's `createElement(Component, …)` argument.
  */
-function propsLiteral(value: core.JSONType, indent: number): string {
+function propsLiteral(value: DiagnosticProp, indent: number): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   const pad = ' '.repeat(indent);
   if (Array.isArray(value)) {
@@ -214,8 +227,23 @@ export const ProofManifestSchema = z
   .strict()
   .superRefine((manifest, ctx) => {
     for (const [index, target] of manifest.targets.entries()) {
-      if (target.diagnostic !== undefined)
-        checkNodeSlotProps(target.diagnostic.props, ctx, ['targets', String(index)]);
+      const diagnostic = target.diagnostic;
+      if (diagnostic === undefined) continue;
+      checkNodeSlotProps(
+        diagnostic.props,
+        ctx,
+        ['targets', String(index), 'diagnostic', 'props']
+      );
+      // The cluster expansion only wires the imports the bare card route
+      // writes; a sheet route would render the binding undefined, so the
+      // descriptor is refused where the author sees it, at prepare.
+      if (diagnostic.presentation === 'picker-sheet' && hasElementDescriptor(diagnostic.props)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['targets', String(index), 'diagnostic', 'presentation'],
+          message: 'An element descriptor needs the bare card presentation, not picker-sheet',
+        });
+      }
     }
   })
   .superRefine((manifest, ctx) => {

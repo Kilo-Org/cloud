@@ -218,7 +218,7 @@ test(
     const config = schedulerConfig('{"slots":8}');
     await scheduleRunChunks(db, {
       runId: 'fixture-run',
-      entries: [{ model: 'claimable/model', variant: '', providers: ['deepinfra'] }],
+      entries: [{ model: 'claimable/model', variant: '' }],
       repetitions: 1,
       caseIds: ['case'],
       chunkSize: 1,
@@ -284,7 +284,7 @@ test(
     const db = sqliteD1(state.db);
     await scheduleRunChunks(db, {
       runId: 'fixture-run',
-      entries: [{ model: 'claimable/model', variant: '', providers: ['deepinfra'] }],
+      entries: [{ model: 'claimable/model', variant: '' }],
       repetitions: 1,
       caseIds: ['case'],
       chunkSize: 1,

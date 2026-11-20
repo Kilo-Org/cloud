@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
+import { TAXONOMY_ROUTE_KEYS, benchmarkPairKey } from '@kilocode/auto-routing-contracts';
 import type * as CliRunnerModule from './cli-runner';
 import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
@@ -9,8 +9,15 @@ import type * as ConfigModule from './config';
 import type * as SchedulerModule from './scheduler';
 import type * as SubscriptionsModule from './subscriptions';
 
-vi.mock('./subscriptions', async importOriginal => ({
-  ...(await importOriginal<typeof SubscriptionsModule>()),
+vi.mock('./subscriptions', () => ({
+  PLATFORM_SUBSCRIPTION_OWNER: { ownerType: 'platform', ownerId: '' },
+  snapshotPairs: (snapshot: SubscriptionsModule.SubscriptionSnapshot, serving = false) => [
+    ...new Map(
+      snapshot
+        .flatMap(entry => (serving ? entry.servingPairs : entry.pairs))
+        .map(pair => [benchmarkPairKey(pair), pair])
+    ).values(),
+  ],
   syncSubscriptionSnapshot: vi.fn(),
   servingSubscriptionSnapshot: vi.fn(),
 }));
@@ -148,6 +155,7 @@ import {
   processJob,
   acceptContainerCaseResult,
   computeEngineIdentity,
+  publishPlatformRoutingTable,
   PAID_OUTPUT_WAIT_MS,
 } from './run';
 import { createDeciderJudge } from './decider-judge';
@@ -1920,6 +1928,117 @@ describe('processJob — canonical registry publication', () => {
       cases: 5,
       meetsThreshold: true,
     });
+  });
+});
+
+describe('publishPlatformRoutingTable — a live pair that lost its measurement', () => {
+  const aliasA = '~vendor/a-latest';
+  const aliasB = '~vendor/b-latest';
+  const steady = 'vendor/steady';
+  const target = 'vendor/target';
+
+  async function publishWithLoss(status: 'failed' | 'pending' | 'running') {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            { id: aliasA, alias_target: steady },
+            { id: steady },
+            { id: aliasB, alias_target: target },
+            { id: target },
+          ],
+        })
+      )
+    );
+    const baseConfig = await getBenchmarkConfig(env.BENCH_DB, 'efficient');
+    if (!baseConfig) throw new Error('config missing');
+    vi.mocked(getBenchmarkConfig).mockResolvedValue({
+      ...baseConfig,
+      deciderModels: [{ id: aliasA }, { id: aliasB }],
+    });
+    vi.mocked(servingSubscriptionSnapshot).mockResolvedValue([
+      {
+        model: aliasA,
+        pairs: [{ model: steady, variant: null }],
+        servingPairs: [{ model: steady, variant: null }],
+        resolutionError: null,
+      },
+      {
+        model: aliasB,
+        pairs: [{ model: target, variant: null }],
+        servingPairs: [{ model: target, variant: null }],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+      { model: steady, variant: '', run_id: 'run-steady' },
+    ]);
+    vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
+      { model: steady, variant: null, status: 'ready' },
+      { model: target, variant: null, status },
+    ]);
+    vi.mocked(getLatestRoutingTable).mockResolvedValue({
+      table: {
+        version: 'previous',
+        routes: {
+          'implementation/code_generation': [{ model: steady }, { model: target }],
+        },
+      },
+    } as never);
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        runId: 'run-steady',
+        model: steady,
+        variant: null,
+        routeKey,
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
+        avgLatencyMs: 100,
+        p50LatencyMs: 90,
+        p95LatencyMs: 120,
+        cases: 5,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const published = await publishPlatformRoutingTable(env, fetch, 'efficient');
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
+    return { published, events };
+  }
+
+  it('drops a settled failed pair and publishes the rest of the table', async () => {
+    const { published, events } = await publishWithLoss('failed');
+    expect(published).not.toBeNull();
+    expect(saveRoutingTable).toHaveBeenCalledOnce();
+    expect(events).toContainEqual({
+      event: 'routing_table_publish_dropped_failed_pairs',
+      router: 'efficient',
+      dropped: [{ model: target, variant: null, status: 'failed' }],
+    });
+    const table = vi.mocked(saveRoutingTable).mock.calls[0]?.[1];
+    expect(
+      table?.routes['implementation/code_generation'].map(candidate => candidate.model)
+    ).toEqual([steady]);
+  });
+
+  it('holds the table while the loss is a measurement still in flight', async () => {
+    for (const status of ['pending', 'running'] as const) {
+      vi.mocked(saveRoutingTable).mockClear();
+      const { published, events } = await publishWithLoss(status);
+      expect(published).toBeNull();
+      expect(saveRoutingTable).not.toHaveBeenCalled();
+      expect(events.map(entry => entry.event)).toContain(
+        'routing_table_publish_skipped_serving_pair_unready'
+      );
+    }
   });
 });
 

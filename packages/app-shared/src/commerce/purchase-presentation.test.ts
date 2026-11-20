@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapKiloPassStatusToClass, resolvePurchasePresentation } from './purchase-presentation';
+import {
+  mapKiloPassStatusToClass,
+  resolvePurchasePresentation,
+  type PurchasePresentationCta,
+} from './purchase-presentation';
 
 describe('resolvePurchasePresentation', () => {
   it('marks iOS credits unavailable with no CTA', () => {
@@ -110,6 +114,31 @@ describe('resolvePurchasePresentation', () => {
     });
 
     expect(result.program).toBeNull();
+  });
+
+  it('types an unavailable CTA so it cannot carry a web path', () => {
+    const iosCredits = resolvePurchasePresentation({
+      platform: 'ios',
+      storefront: 'app_store',
+      product: 'credits',
+      hasStripeManagedPass: false,
+    });
+    const missingPlatform = resolvePurchasePresentation({
+      platform: null,
+      storefront: null,
+      product: 'credits',
+      hasStripeManagedPass: false,
+    });
+
+    expect(iosCredits.cta).toEqual({ action: 'none', webPath: null });
+    expect(missingPlatform.cta).toEqual({ action: 'none', webPath: null });
+
+    // Compile-time guard only, and the result is a plain value (never frozen):
+    // the union rejects a `none` CTA with a web target, so this is a type error
+    // against a mutable `{ action; webPath: string | null }` CTA type.
+    // @ts-expect-error a `none` CTA always reports a null web path
+    const forged: PurchasePresentationCta = { action: 'none', webPath: '/credits' };
+    expect(forged.webPath).toBe('/credits');
   });
 });
 

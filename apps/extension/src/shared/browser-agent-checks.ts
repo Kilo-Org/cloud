@@ -263,6 +263,7 @@ export const SENSITIVE_REASON = {
   cardFormSubmit: 'submitting a form with payment fields',
   download: 'downloading a file',
   fileUpload: 'uploading a file',
+  frameUnverified: 'acting in a frame whose page could not be inspected',
   oauthConsent: 'acting on an OAuth consent page',
   oneTimeCode: 'typing a one-time code',
   password: 'typing a password',

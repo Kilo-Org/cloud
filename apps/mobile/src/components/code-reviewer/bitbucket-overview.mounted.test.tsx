@@ -388,7 +388,7 @@ describe('BitbucketOverview not-connected state', () => {
     const root = await renderScreen();
     const text = JSON.stringify(root.toJSON());
 
-    expect(text).toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(text).toContain(i18n.t('prReview.connect.adminOnlyConnectDescription'));
     expect(connectActions(root)).toHaveLength(0);
   });
 
@@ -402,7 +402,7 @@ describe('BitbucketOverview not-connected state', () => {
     const text = JSON.stringify(root.toJSON());
 
     expect(skeletonRenders.count).toBeGreaterThan(0);
-    expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(text).not.toContain(i18n.t('prReview.connect.adminOnlyConnectDescription'));
     expect(text).not.toContain('{{');
     expect(connectActions(root)).toHaveLength(0);
   });

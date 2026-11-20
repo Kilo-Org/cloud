@@ -353,12 +353,24 @@ test('gutter: a centred block inside a landscape inset is not inside the gutter'
   // The block spans the window minus symmetric margins: its start edge is 1 dp
   // outside the page box, which the inside-gutter test read as content painted
   // in the gutter. The centred block's placement is its own, so nothing here is
-  // an error — and the same block pushed to 0 dp still is one.
+  // an error.
   assert.deepEqual(run(landscapeCenteredState(), LANDSCAPE), []);
-  const flush = landscapeCenteredState();
-  flush[5] = { ...flush[5], rect: [0, 172, 848, 24] };
-  flush[6] = { ...flush[6], rect: [0, 200, 848, 18] };
-  const findings = run(flush, LANDSCAPE);
+
+  // The exemption is the centred placement, not the inset: a block pinned to
+  // the page box's own start edge, with no centred ancestor above it, is still
+  // content painted in the gutter.
+  const pinned: ProbeNode[] = [
+    { parent: 0, tag: 'RNSScreen', rect: [0, 0, 900, 400] },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 0, 900, 400],
+      style: { backgroundColor: '#ffffff' },
+    },
+    { parent: 2, tag: 'View', rect: [47, 172, 700, 46] },
+    { parent: 3, tag: 'Paragraph', rect: [47, 172, 700, 24], text: 'Body line' },
+  ];
+  const findings = run(pinned, LANDSCAPE);
   assert.ok(findings.length > 0);
   assert.ok(findings.every(finding => finding.measured === 0));
 });

@@ -54,7 +54,7 @@ export function parseDisplay(enumerate: string): IosDisplay {
   const pixels = /Pixel Size:\s*\{(\d+),\s*(\d+)\}/.exec(block);
   const scale = /Preferred UI Scale:\s*(\d+(?:\.\d+)?)/.exec(block);
   const raw = /UI Orientation:\s*([\w ]+)/.exec(block)?.[1]?.replace(/\s+/g, '');
-  if (pixels === undefined || scale === undefined || raw === undefined) {
+  if (pixels === null || scale === null || raw === undefined) {
     throw new InfraError(`simctl io enumerate LCD block is incomplete: ${block.trim()}`);
   }
   const divisor = Number(scale[1]);

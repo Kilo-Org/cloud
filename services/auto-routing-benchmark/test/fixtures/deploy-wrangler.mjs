@@ -13,6 +13,15 @@ const count = kind =>
   Number(db.prepare('SELECT COUNT(*) AS n FROM fixture_events WHERE kind = ?').get(kind).n);
 const event = kind =>
   db.prepare('INSERT INTO fixture_events (kind, at) VALUES (?, ?)').run(kind, Date.now());
+const reached = (gate, sinceRowid) =>
+  gate !== 'never' &&
+  gate.split(',').every(condition => {
+    const [kind, required] = condition.split(':');
+    const seen = db
+      .prepare('SELECT COUNT(*) AS n FROM fixture_events WHERE kind = ? AND rowid > ?')
+      .get(kind, sinceRowid).n;
+    return Number(seen) >= Number(required);
+  });
 const assertArguments = () => {
   if (
     !args.includes('--config') ||
@@ -86,7 +95,8 @@ try {
     if (kind === 'drain') {
       pauseAction('drain');
       const after = Number(process.env.BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER ?? 0);
-      if (after > 0 && count('drain') >= after) {
+      const gate = process.env.BENCHMARK_DEPLOY_FIXTURE_DRAIN_UNTIL;
+      if ((after > 0 && count('drain') >= after) || (gate && reached(gate, 0))) {
         db.exec(
           "UPDATE scheduler_chunks SET status = 'completed', slot = NULL, lease_until = 0 WHERE status IN ('queued', 'active')"
         );
@@ -238,7 +248,9 @@ try {
     }
     if (!lockHeld()) event('rollout_without_lease');
     event('rollout_poll');
-    if (process.env.BENCHMARK_DEPLOY_FIXTURE_CONTAINER_INFO === 'fail') {
+    const infoFailure = process.env.BENCHMARK_DEPLOY_FIXTURE_CONTAINER_INFO;
+    const failedPolls = infoFailure?.startsWith('fail:') ? Number(infoFailure.slice(5)) : 0;
+    if (infoFailure === 'fail' || count('rollout_poll') <= failedPolls) {
       process.exitCode = 1;
     } else {
       const rolling =
@@ -276,10 +288,16 @@ try {
         process.exit(1);
       };
       process.on('SIGTERM', onSignal);
-      event('deploy_started');
+      const started = event('deploy_started').lastInsertRowid;
       process.stdout.write('untrusted-stdout-canary');
       process.stderr.write('untrusted-stderr-canary');
-      await sleep(Number(process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS ?? 0));
+      const gate = process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL;
+      if (gate) {
+        const abandonAt = Date.now() + 30_000;
+        while (!reached(gate, started) && Date.now() < abandonAt) await sleep(20);
+      } else {
+        await sleep(Number(process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS ?? 0));
+      }
       process.off('SIGTERM', onSignal);
       if (process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_FAIL === '1') {
         event('deploy_failed');

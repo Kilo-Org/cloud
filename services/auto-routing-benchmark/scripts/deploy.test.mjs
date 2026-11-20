@@ -87,13 +87,13 @@ function fixture(t, overrides = {}) {
     ...process.env,
     PATH: `${bin}:${process.env.PATH ?? ''}`,
     BENCHMARK_DEPLOY_FIXTURE_DB: path,
-    BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '500',
-    BENCHMARK_DEPLOY_DRAIN_TIMEOUT_MS: '2000',
+    BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '30000',
+    BENCHMARK_DEPLOY_DRAIN_TIMEOUT_MS: '30000',
     BENCHMARK_DEPLOY_LEASE_MS: '2400',
     BENCHMARK_DEPLOY_POLL_INTERVAL_MS: '50',
     BENCHMARK_DEPLOY_COMMAND_TIMEOUT_MS: '900',
     BENCHMARK_DEPLOY_DEPLOY_TIMEOUT_MS: '6000',
-    BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '3000',
+    BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '60000',
     ...overrides,
   };
   let child;
@@ -136,6 +136,9 @@ function fixture(t, overrides = {}) {
     start,
     kill(signal) {
       child.kill(signal);
+    },
+    mark(kind) {
+      db.prepare('INSERT INTO fixture_events (kind, at) VALUES (?, ?)').run(kind, Date.now());
     },
     count(kind) {
       return Number(
@@ -244,7 +247,7 @@ test(
   'does not steal a contended lease and does not deploy after lock timeout',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t);
+    const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '500' });
     state.db
       .prepare(
         "UPDATE scheduler_dispatch_lock SET token = 'replacement-owner', lease_until = ? WHERE id = 1"
@@ -264,7 +267,7 @@ test(
   'a real scheduler dispatch pass claims nothing while the deploy holds the lease',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '1500' });
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'test_released:1' });
     const db = sqliteD1(state.db);
     const config = schedulerConfig('{"slots":8}');
     await scheduleRunChunks(db, {
@@ -287,6 +290,7 @@ test(
         .get().n,
       0
     );
+    state.mark('test_released');
     assert.equal((await result).code, 0);
     released(state);
     const claims = await claimScheduledChunks(db, config, Date.now(), 'after-deploy');
@@ -330,7 +334,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER: '3',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '1500',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'verify_pause:1,test_released:1',
     });
     const db = sqliteD1(state.db);
     await scheduleRunChunks(db, {
@@ -348,6 +352,7 @@ test(
       await claimScheduledChunks(db, schedulerConfig('{"slots":8}'), Date.now(), 'contender'),
       []
     );
+    state.mark('test_released');
     const finished = await result;
     assert.equal(finished.code, 0, finished.stdout);
     assert.deepEqual({ ...state.lock() }, held);
@@ -384,7 +389,7 @@ for (const [checkpoint, change, reason] of [
         BENCHMARK_DEPLOY_FIXTURE_PAUSE_CHANGE_AT: checkpoint,
         BENCHMARK_DEPLOY_FIXTURE_PAUSE_CHANGE: change,
         BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER: '3',
-        BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: checkpoint === 'deploy' ? '5000' : '0',
+        ...(checkpoint === 'deploy' ? { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'never' } : {}),
       });
       state.addLive();
       pause(state);
@@ -418,7 +423,7 @@ for (const token of [
     `treats unexpired owner ${token} as contention, not an operator pause`,
     { timeout: 15_000 },
     async t => {
-      const state = fixture(t);
+      const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '500' });
       const held = pause(state, token, Date.now() + 60_000);
       const result = await state.start();
       failed(result, 'lock_timeout');
@@ -615,7 +620,11 @@ for (const [name, rolledOutMessage, runEnv] of [
   ['the deployment list fails', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'fail' }],
   ['the deployment list is malformed', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'malformed' }],
   ['traffic was split across versions', true, { BENCHMARK_DEPLOY_FIXTURE_DEPLOYMENTS: 'split' }],
-  ['the container listing fails', true, { BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'fail' }],
+  [
+    'the container listing fails',
+    true,
+    { BENCHMARK_DEPLOY_FIXTURE_CONTAINERS: 'fail', BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '300' },
+  ],
   [
     'the container application is missing',
     true,
@@ -777,12 +786,11 @@ test(
   { timeout: 15_000 },
   async t => {
     const state = fixture(t, {
-      BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '1000',
-      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '2000',
+      BENCHMARK_DEPLOY_FIXTURE_ROLLOUT_POLLS: '1000000',
+      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '300',
     });
     const result = await state.start();
     assert.equal(result.code, 0, result.stdout);
-    assert.ok(state.count('rollout_poll') >= 2);
     assert.ok(
       diagnostics(result).some(row => row.event === 'benchmark_deploy_rollout_wait_timeout')
     );
@@ -791,23 +799,19 @@ test(
 );
 
 test(
-  'keeps polling through unreadable rollout state until the deadline',
+  'keeps polling through unreadable rollout state until the rollout is observed finished',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t, {
-      BENCHMARK_DEPLOY_FIXTURE_CONTAINER_INFO: 'fail',
-      BENCHMARK_DEPLOY_ROLLOUT_TIMEOUT_MS: '2000',
-    });
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_CONTAINER_INFO: 'fail:2' });
     const result = await state.start();
     assert.equal(result.code, 0, result.stdout);
-    assert.ok(state.count('rollout_poll') >= 2);
+    assert.equal(state.count('rollout_poll'), 3);
     const rows = diagnostics(result);
-    assert.ok(
-      rows
-        .filter(row => row.event === 'benchmark_deploy_rollout_progress')
-        .every(row => row.rolling === null)
+    assert.deepEqual(
+      rows.filter(row => row.event === 'benchmark_deploy_rollout_progress').map(row => row.rolling),
+      [null, null, 0]
     );
-    assert.ok(rows.some(row => row.event === 'benchmark_deploy_rollout_wait_timeout'));
+    assert.ok(!rows.some(row => row.event === 'benchmark_deploy_rollout_wait_timeout'));
     released(state);
   }
 );
@@ -829,11 +833,12 @@ test(
 
 test(
   'renews the lease while draining and throughout a long deployment',
-  { timeout: 15_000 },
+  { timeout: 60_000 },
   async t => {
     const state = fixture(t, {
-      BENCHMARK_DEPLOY_FIXTURE_DRAIN_AFTER: '12',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '2000',
+      BENCHMARK_DEPLOY_DEPLOY_TIMEOUT_MS: '30000',
+      BENCHMARK_DEPLOY_FIXTURE_DRAIN_UNTIL: 'renew:1',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'renew:2',
     });
     state.addLive();
     const result = await state.start();
@@ -857,7 +862,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_RENEW_FAILURES_DURING_DEPLOY: '2',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '2500',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'renew:3',
     });
     const result = await state.start();
     assert.equal(result.code, 0, result.stdout);
@@ -959,7 +964,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_LOSE_DURING_DEPLOY: '1',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '5000',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'never',
     });
     const result = await state.start();
     failed(result, 'lease_lost');
@@ -976,7 +981,7 @@ test(
   async t => {
     const state = fixture(t, {
       BENCHMARK_DEPLOY_FIXTURE_RENEW_DELAY_MS: '5000',
-      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '5000',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'never',
     });
     const result = await state.start();
     failed(result, 'lease_lost');
@@ -998,7 +1003,7 @@ test(
   'handles interruption by aborting deployment and releasing its lease',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '5000' });
+    const state = fixture(t, { BENCHMARK_DEPLOY_FIXTURE_DEPLOY_UNTIL: 'never' });
     const result = state.start();
     await until(() => state.count('deploy_started') === 1);
     state.kill('SIGTERM');

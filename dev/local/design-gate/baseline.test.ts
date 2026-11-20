@@ -37,6 +37,92 @@ const TARGET = {
 };
 const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
 
+
+const SLOT_TARGET = { ...TARGET, diagnostic: { component: PRODUCT, props: {} } };
+
+test('a bare string in a node slot is refused with the descriptor guidance', () => {
+  for (const slot of [
+    'headerRight',
+    'inlineActions',
+    'titleContent',
+    'titleAccessory',
+    'subtitlePlaceholder',
+    'eyebrowPlaceholder',
+  ]) {
+    const result = ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...SLOT_TARGET, diagnostic: { component: PRODUCT, props: { [slot]: 'Save' } } }],
+    });
+    assert.equal(result.success, false);
+    const issue = result.error.issues.find(
+      candidate => !candidate.message.includes('Invalid input')
+    );
+    assert.ok(issue !== undefined, `no refusal for ${slot}`);
+    assert.match(issue.message, /"headerRight"|Save|"\$element"/);
+    assert.match(issue.path.join('/'), new RegExp(slot));
+  }
+  // A string slot outside the node-slot list is the component's own data.
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...SLOT_TARGET, diagnostic: { component: PRODUCT, props: { title: 'Save' } } }],
+    }).success,
+    true
+  );
+});
+
+test('a save-cluster descriptor prepares and the generated route splices the element', async t => {
+  const fixture = syntheticRepo(
+    t,
+    ProofManifestSchema.parse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          diagnostic: { component: PRODUCT, props: { title: 'Review', headerRight: { $element: 'save-cluster' } } },
+        },
+      ],
+    })
+  );
+  const preparation = await prepareProof(fixture);
+  const route = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/(auth)/design-proof-card.tsx'),
+    'utf8'
+  );
+  // The descriptor never reaches the component as data: the cluster is a
+  // createElement expansion, the string slot example of the LogBox defect is
+  // gone, and the helper carries the two accessibility labels the fixture has.
+  assert.match(route, /const saveCluster = React\.createElement\(/u);
+  assert.match(route, /accessibilityLabel: 'Fixture save'/u);
+  assert.match(route, /accessibilityLabel: 'Fixture secondary'/u);
+  assert.match(route, /"headerRight": saveCluster/u);
+  assert.doesNotMatch(route, /"headerRight":"Save"/u);
+  assert.match(route, /import \{ Pressable, View \} from 'react-native';/u);
+  assert.match(route, /import \{ Text \} from '@\/components\/ui\/text';/u);
+  const intent = fs.readFileSync(
+    path.join(preparation.base.directory, INTENT),
+    'utf8'
+  );
+  assert.match(intent, /design-proof-card/u);
+});
+
+test('a descriptor of an unknown kind is refused', () => {
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          diagnostic: {
+            component: PRODUCT,
+            props: { headerRight: { $element: 'rocket' }, title: 'Review' },
+          },
+        },
+      ],
+    }).success,
+    false
+  );
+});
 function syntheticRepo(t: TestContext, proofManifest = manifest) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-proof-git-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

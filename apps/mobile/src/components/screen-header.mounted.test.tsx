@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
+import { View } from 'react-native';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -255,6 +256,12 @@ function findInlineActionsWrapper(root: TestInstance): TestInstance {
   return wrapper;
 }
 
+/**
+ * A node-slot value under the narrowed slot contract: one element and never a
+ * bare string — a string child of the slot's `View` is the React Native `Text`
+ * invariant the slots refuse, so the layout markers are empty views.
+ */
+const slotView = () => createElement(View, null);
 function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -391,7 +398,7 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
-    const renderer = renderHeader({ title: 'Sessions', headerRight: 'RIGHT' });
+    const renderer = renderHeader({ title: 'Sessions', headerRight: slotView() });
 
     // The pull is on the START edge, so it must compile to the logical
     // `marginInlineStart`. A hand-picked `-mr-4` under RTL compiles to
@@ -420,14 +427,14 @@ describe('ScreenHeader mounted', () => {
     // painting past the screen edge (session-compose-kbup capture).
     expect(headerRight.props.className).toContain('shrink-0');
     expect(headerRight.props.className).not.toContain('max-w-[50%]');
-    expect(headerRight.children).toEqual(['RIGHT']);
+    expect(headerRight.children).toHaveLength(1);
   });
 
   it('renders inlineActions in the title row uncapped beside the content-sized cluster', () => {
     const renderer = renderHeader({
       title: 'Agents',
-      headerRight: 'RIGHT',
-      inlineActions: 'ACTIONS',
+      headerRight: slotView(),
+      inlineActions: slotView(),
     });
 
     const cluster = findHeaderRight(renderer.root);
@@ -436,19 +443,19 @@ describe('ScreenHeader mounted', () => {
     // Both trailing slots sit in the title row beside the heading, so the
     // heading keeps `flex-1 min-w-0` and the title keeps its tail ellipsis.
     expect(inline.parent).toBe(cluster.parent);
-    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.children).toHaveLength(1);
     expect(inline.parent?.props.className).toContain('flex-row');
     const heading = inline.parent?.children[0] as TestInstance;
     expect(heading.props.className).toContain('min-w-0 flex-1');
     // Neither trailing slot clamps itself: `headerRight` sizes to its content
     // and `inlineActions` keeps its full width instead of wrapping the controls.
-    expect(cluster.children).toEqual(['RIGHT']);
+    expect(cluster.children).toHaveLength(1);
     expect(inline.props.className).toContain('min-w-0');
     expect(inline.props.className).toContain('shrink');
   });
 
   it('renders inlineActions alone in the title row', () => {
-    const renderer = renderHeader({ title: 'Agents', inlineActions: 'ACTIONS' });
+    const renderer = renderHeader({ title: 'Agents', inlineActions: slotView() });
 
     const inline = findInlineActionsWrapper(renderer.root);
     expect(inline.parent?.props.className).toContain('flex-row');
@@ -468,10 +475,10 @@ describe('ScreenHeader mounted', () => {
     // A centered title (`centerTitle`, e.g. a modal with a title or eyebrow)
     // shares its row with the leading control; the inline actions slot must not
     // be dropped just because the title is centered.
-    const renderer = renderHeader({ modal: true, title: 'Filters', inlineActions: 'ACTIONS' });
+    const renderer = renderHeader({ modal: true, title: 'Filters', inlineActions: slotView() });
 
     const inline = findInlineActionsWrapper(renderer.root);
-    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.children).toHaveLength(1);
     expect(inline.parent?.props.className).toContain('flex-row');
     expect(inline.props.className).toContain('min-w-0');
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
@@ -484,13 +491,13 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({
       title: 'Agenti',
       size: 'large',
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
       inlineActionsWidth: 92,
     });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
     const inline = findInlineActionsWrapper(renderer.root);
-    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.children).toHaveLength(1);
     expect(inline.parent?.props.className).toContain('flex-row');
   });
 
@@ -502,14 +509,14 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({
       title: 'Agenti',
       size: 'large',
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
       inlineActionsWidth: 333,
     });
 
     const stacked = renderer.root.findAll(isStackedActionsRow);
     expect(stacked).toHaveLength(1);
     const [stackedRow] = stacked;
-    expect(stackedRow?.children).toEqual(['ACTIONS']);
+    expect(stackedRow?.children).toHaveLength(1);
     // The title row no longer carries the inline slot, and the heading keeps
     // its full-width `min-w-0 flex-1` box, so the title cannot be squeezed.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
@@ -533,22 +540,22 @@ describe('ScreenHeader mounted', () => {
 
     const reflowed = renderHeader({
       title: 'Kilo',
-      titleContent: 'MARK',
+      titleContent: slotView(),
       size: 'large',
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
     });
     expect(reflowed.root.findAll(isStackedActionsRow)).toHaveLength(1);
 
     const pinned = renderHeader({
       title: 'Kilo',
-      titleContent: 'MARK',
+      titleContent: slotView(),
       size: 'large',
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
       allowInlineActionsStacking: false,
     });
     expect(pinned.root.findAll(isStackedActionsRow)).toHaveLength(0);
     const inline = findInlineActionsWrapper(pinned.root);
-    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.children).toHaveLength(1);
     expect(inline.parent?.props.className).toContain('flex-row');
     // Turning the reflow off must cap the slot instead: the heading sits on a
     // zero flex basis, so an unbounded cluster would keep all negative free
@@ -560,9 +567,9 @@ describe('ScreenHeader mounted', () => {
     Object.assign(layout, { width: 390, fontScale: 1 });
     const uncapped = renderHeader({
       title: 'Kilo',
-      titleContent: 'MARK',
+      titleContent: slotView(),
       size: 'large',
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
     });
     expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
   });
@@ -790,10 +797,10 @@ describe('ScreenHeader mounted', () => {
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
-      { title: 'Sessions', headerRight: 'RIGHT', reserveTitleSpace: true },
-      { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
+      { title: 'Sessions', headerRight: slotView(), reserveTitleSpace: true },
+      { title: longTitle, titleNumberOfLines: 1, headerRight: slotView() },
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
-      { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
+      { title: longTitle, titleNumberOfLines: 3, headerRight: slotView(), reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
       { title: 'Agents', size: 'large', reserveTitleSpace: true },
       { title: longTitle, size: 'large', titleNumberOfLines: 2, reserveTitleSpace: true },
@@ -801,7 +808,7 @@ describe('ScreenHeader mounted', () => {
         title: longTitle,
         size: 'large',
         titleNumberOfLines: 3,
-        headerRight: 'METRICS',
+        headerRight: slotView(),
         reserveTitleSpace: true,
       },
     ];
@@ -1122,7 +1129,7 @@ describe('ScreenHeader mounted', () => {
     const repositories = ['KILO-ORG/CLOUD', 'organization-with-a-long-name/repository-name'];
 
     for (const eyebrow of repositories) {
-      const renderer = renderHeader({ title: '#6054', eyebrow, headerRight: 'Submit review' });
+      const renderer = renderHeader({ title: '#6054', eyebrow, headerRight: slotView() });
       const label = renderer.root.findByType('Eyebrow');
       expect(label.props.numberOfLines).toBe(1);
       expect(label.props.ellipsizeMode).toBe('tail');
@@ -1352,7 +1359,7 @@ describe('ScreenHeader mounted', () => {
   it('pads the container by the landscape side insets while keeping the gutter and back pull', () => {
     safeArea.left = 47;
     safeArea.right = 59;
-    const renderer = renderHeader({ title: 'Sessions', headerRight: 'RIGHT' });
+    const renderer = renderHeader({ title: 'Sessions', headerRight: slotView() });
 
     // The outer container keeps only its top inset and the `px-4` gutter class;
     // the side insets land on the inner wrapper so they ADD to the gutter (an
@@ -1546,7 +1553,7 @@ describe('centered title balance', () => {
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,
-      headerRight: 'SAVE',
+      headerRight: slotView(),
       headerRightWidth: 140,
     });
 
@@ -1574,7 +1581,7 @@ describe('centered title balance', () => {
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,
-      headerRight: 'SAVE',
+      headerRight: slotView(),
     });
 
     const row = findTitleRow(renderer.root);
@@ -1614,7 +1621,7 @@ describe('centered title balance', () => {
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,
-      headerRight: 'SAVE',
+      headerRight: slotView(),
       headerRightWidth: 140,
     });
 
@@ -1642,7 +1649,7 @@ describe('centered title balance', () => {
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,
-      headerRight: 'SHARE REVIEW MERGE',
+      headerRight: slotView(),
       headerRightWidth: 140,
       allowHeaderRightStacking: false,
     });
@@ -1680,9 +1687,9 @@ describe('centered title balance', () => {
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,
-      headerRight: 'RIGHT',
+      headerRight: slotView(),
       headerRightWidth: 40,
-      inlineActions: 'ACTIONS',
+      inlineActions: slotView(),
       inlineActionsWidth: 92,
     });
 
@@ -1705,7 +1712,7 @@ describe('centered title balance', () => {
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,
-      headerRight: 'SAVE',
+      headerRight: slotView(),
       headerRightWidth: 140,
     });
 
@@ -1732,7 +1739,7 @@ describe('header actions row', () => {
   });
 
   it('keeps the actions on the title row at a normal phone width', () => {
-    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
+    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: slotView() });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
     const cluster = findHeaderRight(renderer.root);
@@ -1748,7 +1755,7 @@ describe('header actions row', () => {
     // 48dp, which broke it and the mono link beside it into letter columns.
     layout.width = 160;
     layout.fontScale = 1.5;
-    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: 'RIGHT' });
+    const renderer = renderHeader({ title: 'Agents', size: 'large', headerRight: slotView() });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
     // The single-row cluster is gone: the actions own a full-width row.
@@ -1768,7 +1775,7 @@ describe('header actions row', () => {
   it('reflows a centered modal header the same way', () => {
     layout.width = 160;
     layout.fontScale = 1.5;
-    const renderer = renderHeader({ title: 'Agents', modal: true, headerRight: 'RIGHT' });
+    const renderer = renderHeader({ title: 'Agents', modal: true, headerRight: slotView() });
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
@@ -1790,7 +1797,7 @@ describe('header actions row', () => {
     const renderer = renderHeader({
       title: 'Detail',
       eyebrow: 'owner/repo',
-      headerRight: 'RIGHT',
+      headerRight: slotView(),
       headerRightWidth: 236,
     });
 
@@ -1802,7 +1809,7 @@ describe('header actions row', () => {
     const renderer = renderHeader({
       title: 'Detail',
       eyebrow: 'owner/repo',
-      headerRight: 'RIGHT',
+      headerRight: slotView(),
       headerRightWidth: 92,
     });
 
@@ -1818,7 +1825,7 @@ describe('header actions row', () => {
         title: 'PR review #7',
         titleNumberOfLines: 1,
         centerTitle,
-        headerRight: 'SHARE REVIEW MERGE',
+        headerRight: slotView(),
         headerRightWidth: 140,
         allowHeaderRightStacking: false,
       });
@@ -1828,7 +1835,7 @@ describe('header actions row', () => {
       expect(title.props.numberOfLines).toBe(1);
       expect(title.props.ellipsizeMode).toBe('tail');
       const controls = findHeaderRight(renderer.root);
-      expect(controls.children).toEqual(['SHARE REVIEW MERGE']);
+      expect(controls.children).toHaveLength(1);
     }
   );
 });

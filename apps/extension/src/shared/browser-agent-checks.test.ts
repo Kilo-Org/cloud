@@ -259,7 +259,7 @@ describe('step tokens', () => {
   it('keeps the file an approval is for, for the whole life of the token', () => {
     let clock = 1000;
     const store = createStepTokenStore({ now: () => clock, random: () => 'token-need' });
-    const need = { tabId: 7, url: 'https://example.com/invoice.pdf' };
+    const need = { kind: 'page' as const, tabId: 7, url: 'https://example.com/invoice.pdf' };
     const token = store.issue({ ...binding, need, reason: SENSITIVE_REASON.download });
 
     // A human takes half a minute: no download record survives that long, and the token still names the file.

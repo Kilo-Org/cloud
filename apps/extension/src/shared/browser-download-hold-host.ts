@@ -43,8 +43,9 @@ const stepSchema = z.object({
 });
 
 const targetSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('url'), page: z.string().optional(), url: z.string() }),
+  z.object({ kind: z.literal('exact'), url: z.string() }),
   z.object({ kind: z.literal('scheme'), name: z.string().optional(), scheme: z.string() }),
+  z.object({ kind: z.literal('url'), page: z.string().optional(), url: z.string() }),
 ]);
 
 const needSchema = z.discriminatedUnion('kind', [

@@ -77,6 +77,27 @@ describe('stripQueryString', () => {
     );
   });
 
+  it('keeps a host with a port unchanged when its first path segment carries an at-sign', () => {
+    const segment = ['a', HOST].join('@');
+    expect(stripQueryString(`https://${HOST}:8443/${segment}/c`)).toBe(
+      `https://${HOST}:8443/${segment}/c`
+    );
+  });
+
+  it('reduces userinfo that carries a port and keeps the rest of the target', () => {
+    const userinfo = ['user', 'pw'].join(':');
+    expect(stripQueryString(`https://${userinfo}@${HOST}:8443/api/x?y=1`)).toBe(
+      `https://${HOST}:8443/api/x`
+    );
+  });
+
+  it('keeps an IPv4 authority with a port and drops a query value carrying an at-sign', () => {
+    const procedure = ['x', 'y'].join('.');
+    const url = `https://127.0.0.1:8080${TRPC_PATH}${procedure}?x=${MEMBER}`;
+
+    expect(stripQueryString(url)).toBe(`https://127.0.0.1:8080${TRPC_PATH}${procedure}`);
+  });
+
   it('keeps origin and path for a numeric-leading run that spans several separators', () => {
     const segment = ['12345', 'abcdefghij', 'klmnopqrst'].join('/');
     const url = `https://user:${segment}@${HOST}${TRPC_PATH_FIXTURE}`;

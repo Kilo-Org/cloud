@@ -49,34 +49,6 @@ function isHostLike(text: string): boolean {
 }
 
 /**
- * Whether an `@` sits after `position` and before the next `/`, `?`, `#` or the
- * end of the text.
- */
-function atSignBeforeDelimiter(text: string, position: number): boolean {
-  for (let i = position + 1; i < text.length; i += 1) {
-    const c = text[i];
-    if (c === '@') {
-      return true;
-    }
-    if (c === '/' || c === '?' || c === '#') {
-      return false;
-    }
-  }
-  return false;
-}
-
-/**
- * Whether a delimiter at `delimiterIndex` closes the authority: the run before
- * it reads as a host, and — for `/` — no `@` follows in that path segment.
- */
-function closesAuthority(url: string, delimiterIndex: number, schemeEnd: number): boolean {
-  if (!isHostLike(url.slice(schemeEnd, delimiterIndex))) {
-    return false;
-  }
-  return url[delimiterIndex] !== '/' || !atSignBeforeDelimiter(url, delimiterIndex);
-}
-
-/**
  * Reduce a URL to its origin and path: drop the query string, the fragment and
  * any authority userinfo, which ends at its last `@` whatever characters it
  * carries. Fields built from this — the `network.url` context, the synthesized
@@ -95,10 +67,9 @@ export function stripQueryString(url: string): string {
     // the text is a plain origin and path.
     //
     // A run that carries a ':' may be either userinfo or an authority with a
-    // port, so the delimiter is read against the run's shape. Once the run
-    // reads as a host, the delimiter closes the authority; otherwise the
-    // userinfo continues past it, and only an `@` before the following
-    // delimiter closes it.
+    // port, so the delimiter is read against the run's shape: a run that reads
+    // as a host closes the authority there, and any other run is userinfo, so
+    // the authority continues past the delimiter.
     let lastAt = -1;
     let colonBefore = false;
     for (let i = schemeEnd; i < url.length; i += 1) {
@@ -109,7 +80,7 @@ export function stripQueryString(url: string): string {
         colonBefore = true;
       } else if (
         (c === '/' || c === '?' || c === '#') &&
-        (lastAt !== -1 || !colonBefore || closesAuthority(url, i, schemeEnd))
+        (lastAt !== -1 || !colonBefore || isHostLike(url.slice(schemeEnd, i)))
       ) {
         break;
       }

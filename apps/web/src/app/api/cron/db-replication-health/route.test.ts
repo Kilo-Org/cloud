@@ -27,6 +27,7 @@ function report(overrides: Partial<ReplicationHealthReport> = {}): ReplicationHe
     replicas: [],
     walSenders: [],
     slots: [],
+    disabledReplicas: [],
     errors: [],
     ...overrides,
   };

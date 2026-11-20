@@ -1,4 +1,5 @@
 import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
+import { readReplicaInventory } from '@kilocode/web-shared/lib/read-replicas';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
 import { computeDatabaseUrl } from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
@@ -64,20 +65,19 @@ export function selectReplicaUrl({
 /**
  * Get the read replica URL based on deployment region.
  * - US deployments use the US replica (POSTGRES_REPLICA_US_URL) for lower latency
- * - EU deployments randomly select one of two EU replicas to split read traffic
+ * - EU deployments randomly select one of the enabled EU replicas to split read traffic
  *   across ~2,200 concurrent Vercel instances (~50/50 statistical distribution)
- * - Falls back to primary if no replica URL is configured for the region
+ * - Replicas listed in POSTGRES_REPLICAS_DISABLED are skipped (see read-replicas.ts)
+ * - Falls back to primary if no enabled replica is configured for the region
  */
 function getReplicaUrl(): string {
+  const { enabled } = readReplicaInventory();
   return selectReplicaUrl({
     primaryUrl: postgresUrl,
     nodeEnv: NODE_ENV,
     vercelRegion: VERCEL_REGION,
-    usReplicaUrl: getEnvVariable('POSTGRES_REPLICA_US_URL'),
-    euReplicaUrls: [
-      getEnvVariable('POSTGRES_REPLICA_EU_URL'),
-      getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
-    ].filter(Boolean),
+    usReplicaUrl: enabled.find(replica => replica.side === 'us')?.url,
+    euReplicaUrls: enabled.filter(replica => replica.side === 'eu').map(replica => replica.url),
   });
 }
 

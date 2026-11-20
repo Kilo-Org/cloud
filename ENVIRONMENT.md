@@ -343,6 +343,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `POSTGRES_URL` - Primary Postgres connection string. `[SECRET]`
 - `POSTGRES_REPLICA_US_URL` - US read replica used by `readDb` in US Vercel regions (`sfo1`); see `packages/web-shared/src/lib/drizzle.ts`. When unset, `readDb` falls back to the primary, so it must be set on every project that runs in `sfo1`, including `kilocode-ai-gateway`. `[SECRET]`
 - `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
+- `POSTGRES_REPLICAS_DISABLED` - Comma-separated read replica names to switch off without deleting their URLs: `us-west`, `eu-central-1`, `eu-central-2` (the names in replication health alerts). `readDb` skips them and falls back as if their URL were unset, and the replication health check stops probing them and lowers its expected replica count. An unknown name is a health check error. Set it on every project that reads replicas (`kilocode-app` and `kilocode-ai-gateway`) and redeploy; see `packages/web-shared/src/lib/read-replicas.ts`. [SERVER]
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]

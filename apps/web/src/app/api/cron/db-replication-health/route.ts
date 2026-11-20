@@ -82,6 +82,7 @@ export async function GET(request: Request) {
     healthy: report.healthy,
     problems,
     replicas: report.replicas.length,
+    disabledReplicas: report.disabledReplicas,
     slots: report.slots.length,
     timestamp: report.timestamp,
   });

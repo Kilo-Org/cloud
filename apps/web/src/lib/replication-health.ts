@@ -1,8 +1,12 @@
 import { createDrizzleClient, type DrizzleClient, type pg } from '@kilocode/db/client';
 import { sql } from 'drizzle-orm';
 
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  KNOWN_READ_REPLICA_COUNT,
+  readReplicaInventory,
+  type ReadReplicaInventory,
+} from '@kilocode/web-shared/lib/read-replicas';
 
 /**
  * Replication health for the primary's read replicas and logical (Snowflake)
@@ -21,24 +25,11 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
  * streaming right now".
  */
 
-/** A replica we expect to exist, resolved from its per-region connection string. */
+/** A replica to probe, from the shared read replica inventory. */
 export type ReplicaTarget = {
   name: string;
   url: string;
 };
-
-/**
- * Expected replicas, mirroring the replica URLs consumed in lib/drizzle.ts.
- * Targets without a configured URL are omitted (nothing to probe).
- */
-export function getExpectedReplicaTargets(): ReplicaTarget[] {
-  const entries: Array<[string, string]> = [
-    ['us-west', getEnvVariable('POSTGRES_REPLICA_US_URL')],
-    ['eu-central-1', getEnvVariable('POSTGRES_REPLICA_EU_URL')],
-    ['eu-central-2', getEnvVariable('POSTGRES_REPLICA_EU_URL_2')],
-  ];
-  return entries.filter(([, url]) => url.length > 0).map(([name, url]) => ({ name, url }));
-}
 
 /**
  * A healthy read replica trails the primary by well under a second. Anything
@@ -46,14 +37,6 @@ export function getExpectedReplicaTargets(): ReplicaTarget[] {
  * sat days behind before this was noticed).
  */
 export const REPLICA_LAG_ALERT_SECONDS = 300;
-
-/**
- * Number of read replicas we expect in production, one per POSTGRES_REPLICA_*
- * connection string (US + two EU). If fewer are configured (env var dropped,
- * renamed, or misspelled), the monitor would otherwise probe nothing and still
- * report `healthy: true` — so we surface it as an error in production.
- */
-export const EXPECTED_REPLICA_COUNT = 3;
 
 /**
  * `pg_replication_slots.wal_status` values that mean the slot is at, or past,
@@ -175,6 +158,8 @@ export type ReplicationHealthReport = {
   replicas: ReplicaHealth[];
   walSenders: WalSender[];
   slots: ReplicationSlot[];
+  /** Replicas switched off through `POSTGRES_REPLICAS_DISABLED`; they are not probed. */
+  disabledReplicas: string[];
   errors: string[];
 };
 
@@ -334,24 +319,35 @@ async function getReplicationSlots(): Promise<ReplicationSlot[]> {
  * replica), connected walsenders, and slot health. Primary-side queries are
  * isolated so one failing component does not blank the whole report.
  *
- * `probe` and `targets` are injectable for testing.
+ * `probe` and `inventory` are injectable for testing.
  */
 export async function collectReplicationHealth(options?: {
   probe?: (target: ReplicaTarget) => Promise<ReplicaHealth>;
-  targets?: ReplicaTarget[];
+  inventory?: ReadReplicaInventory;
 }): Promise<ReplicationHealthReport> {
-  const targets = options?.targets ?? getExpectedReplicaTargets();
+  const inventory = options?.inventory ?? readReplicaInventory();
+  const targets = inventory.enabled;
   const probe = options?.probe ?? probeReplica;
   const errors: string[] = [];
 
+  // A disable request that matches no replica leaves the intended replica serving reads.
+  if (inventory.unknownDisabled.length > 0) {
+    errors.push(
+      `POSTGRES_REPLICAS_DISABLED names unknown replicas: ${inventory.unknownDisabled.join(', ')}`
+    );
+  }
+
   // A monitor that silently checks zero replicas is itself an invisible failure.
-  // In production every replica URL should be set, so treat a short inventory as
-  // an error (which forces `healthy: false` and triggers the cron's alert).
+  // In production every replica that is not explicitly disabled must have a URL, so
+  // treat a short inventory as an error (which forces `healthy: false` and triggers
+  // the cron's alert). A missing URL is not the same as a disabled replica: only
+  // POSTGRES_REPLICAS_DISABLED lowers the expected count.
   // Preview/dev deployments legitimately run without replica URLs, so gate on
   // VERCEL_ENV to avoid false alarms there.
-  if (process.env.VERCEL_ENV === 'production' && targets.length < EXPECTED_REPLICA_COUNT) {
+  const expectedCount = KNOWN_READ_REPLICA_COUNT - inventory.disabled.length;
+  if (process.env.VERCEL_ENV === 'production' && targets.length < expectedCount) {
     errors.push(
-      `expected ${EXPECTED_REPLICA_COUNT} read replicas but only ${targets.length} configured; ` +
+      `expected ${expectedCount} read replicas but only ${targets.length} configured; ` +
         `check POSTGRES_REPLICA_* env vars`
     );
   }
@@ -396,6 +392,7 @@ export async function collectReplicationHealth(options?: {
     replicas,
     walSenders,
     slots,
+    disabledReplicas: inventory.disabled,
     errors,
   };
 }

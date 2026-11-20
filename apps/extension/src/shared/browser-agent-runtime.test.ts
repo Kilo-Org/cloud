@@ -4550,7 +4550,13 @@ describe('agent browser calls', () => {
     // The destination page opens a dialog as it loads, and nothing answers it.
     fixture.cdp.setHandlers({
       'Page.navigate': () => {
+        // The document commits, then its script opens the dialog: the frame tree reports the origin it committed with.
+        fixture.cdp.emitOn(fixture.newTab, 'Page.frameNavigated', {
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/report.txt` },
+        });
         fixture.cdp.emitOn(fixture.newTab, 'Page.javascriptDialogOpening', {
+          // The frame that opened it is the tab's own document; the harness's frame tree reports its origin.
+          frameId: 'main',
           message: 'Saved',
           type: 'alert',
           // `url` is required by the protocol: the page that opened the dialog.
@@ -6129,7 +6135,13 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
   it('withholds the message of a dialog from a frame the agent may not read', async () => {
     const { cdp, runtime } = await createHarness();
 
-    pageDialog(cdp, { message: 'Card declined', type: 'alert', url: `${FRAME_ORIGIN}/widget` });
+    // The widget frame (f1) is cross-origin and the agent holds no read grant for it.
+    pageDialog(cdp, {
+      frameId: 'f1',
+      message: 'Card declined',
+      type: 'alert',
+      url: `${FRAME_ORIGIN}/widget`,
+    });
 
     await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
       kind: 'result',
@@ -6139,6 +6151,65 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
           '### Modal state\n- ["alert" dialog (message withheld: no read permission for the frame that opened it)]: can be handled by browser_handle_dialog',
       },
     });
+  });
+
+  it('withholds the message of an about:blank dialog whose creating frame is cross-origin', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Pay now?', type: 'confirm', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // The browser reports the blank frame's origin as the pay frame's, which is what decides both the reading and the answer.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+            { frame: { id: 'blank', securityOrigin: payOrigin, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+
+    await expect(call(runtime, 'browser_click', { target: '#pay' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["confirm" dialog (message withheld: no read permission for the frame that opened it)]: can be handled by browser_handle_dialog',
+      },
+    });
+  });
+
+  it('shows an about:blank dialog’s message when its creating frame is an origin the agent may read', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The blank frame the top page created carries the tab's origin, which the harness's read grant covers.
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'blank', securityOrigin: MAIN_ORIGIN, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+
+    const shown = await call(runtime, 'browser_click', { target: '#save' });
+
+    expect(shown.kind === 'result' && shown.result.ok ? String(shown.result.value) : '').toContain(
+      'dialog with message "Saved"'
+    );
   });
 
   it('judges a dialog answer by the origin of the frame that opened it, not the tab’s document', async () => {

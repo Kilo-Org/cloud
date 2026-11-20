@@ -692,6 +692,9 @@ const frameTreeLevelSchema = z.object({
 const frameTreeResponseSchema = z.object({ frameTree: frameTreeLevelSchema });
 /** The one frame-list read whose answer also records each frame's origin. */
 const FRAME_TREE_METHOD = 'Page.getFrameTree';
+/** A frame that left the tree, so its recorded origin can go with it. */
+const FRAME_DETACHED_METHOD = 'Page.frameDetached';
+const frameDetachedParamsSchema = z.object({ frameId: z.string() });
 
 const frameNavigatedParamsSchema = z.object({
   frame: z.object({
@@ -1747,6 +1750,7 @@ export const createBrowserToolSession = ({
     networkById.clear();
     mainFrameId = undefined;
     childFrames.clear();
+    frameOrigins.clear();
     clearRefs();
     documentNodeId = undefined;
     dialog = undefined;
@@ -2048,6 +2052,13 @@ export const createBrowserToolSession = ({
       mainFrameId = frame.id;
     }
 
+    // A new top-level document replaces every frame the old one held: only its own origin is still known.
+    frameOrigins.clear();
+
+    if (frame.id !== undefined && frame.securityOrigin !== undefined) {
+      frameOrigins.set(frame.id, frame.securityOrigin);
+    }
+
     invalidateDocument();
   };
 
@@ -2074,6 +2085,7 @@ export const createBrowserToolSession = ({
 
     if (parsed.data.targetId !== undefined) {
       childFrames.delete(parsed.data.targetId);
+      frameOrigins.delete(parsed.data.targetId);
       return;
     }
 
@@ -2081,6 +2093,7 @@ export const createBrowserToolSession = ({
     for (const [frameId, frame] of childFrames) {
       if (frame.sessionId === parsed.data.sessionId) {
         childFrames.delete(frameId);
+        frameOrigins.delete(frameId);
         return;
       }
     }
@@ -2173,6 +2186,17 @@ export const createBrowserToolSession = ({
 
     if (method === 'Target.detachedFromTarget') {
       handleDetachedFromTarget(params);
+      return;
+    }
+
+    if (method === FRAME_DETACHED_METHOD) {
+      // A same-process frame that went away: its id and origin are not reused, and keeping them would grow with every iframe the page loads.
+      const detached = frameDetachedParamsSchema.safeParse(params);
+
+      if (detached.success) {
+        frameOrigins.delete(detached.data.frameId);
+      }
+
       return;
     }
 

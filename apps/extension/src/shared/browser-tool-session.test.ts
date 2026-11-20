@@ -81,6 +81,7 @@ const createDebuggerApi = ({
   emitDetach: (tabId: number, reason?: string) => void;
   emitEvent: (tabId: number, method: string, params?: Record<string, unknown>) => void;
   setDocumentNodeId: (nextDocumentNodeId: number) => void;
+  setFrameTree: (payload: Record<string, unknown>) => void;
   setVisibilityState: (nextVisibilityState: string) => void;
 } => {
   const attachCalls: number[] = [];
@@ -89,6 +90,7 @@ const createDebuggerApi = ({
   const detachListeners: ChromeDebuggerDetachListener[] = [];
   const eventListeners: ChromeDebuggerEventListener[] = [];
   let currentDocumentNodeId = documentNodeId;
+  let frameTree: Record<string, unknown> | undefined = undefined;
   let currentVisibilityState = visibilityState;
 
   const api: ChromeDebuggerApi = {
@@ -136,6 +138,10 @@ const createDebuggerApi = ({
 
       if (method === 'DOM.querySelectorAll') {
         return { nodeIds: selectorMatches };
+      }
+
+      if (method === 'Page.getFrameTree' && frameTree !== undefined) {
+        return frameTree;
       }
 
       if (method === 'Page.getLayoutMetrics') {
@@ -187,6 +193,9 @@ const createDebuggerApi = ({
     },
     setDocumentNodeId: nextDocumentNodeId => {
       currentDocumentNodeId = nextDocumentNodeId;
+    },
+    setFrameTree: payload => {
+      frameTree = payload;
     },
     setVisibilityState: nextVisibilityState => {
       currentVisibilityState = nextVisibilityState;
@@ -1063,6 +1072,44 @@ describe('browser tool session', () => {
     debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', {});
 
     expect(session.takeDialog()).toBeUndefined();
+  });
+
+  it('forgets a frame origin when its frame detaches, keeping the frames that remain', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    // The fake answers this one read: the origins a dialog is judged by come from the frame tree.
+    debuggerApi.setFrameTree({
+      frameTree: {
+        childFrames: [
+          { frame: { id: 'gone', securityOrigin: 'https://gone.example.com', url: 'about:blank' } },
+          { frame: { id: 'kept', securityOrigin: 'https://kept.example.com', url: 'about:blank' } },
+        ],
+        frame: {
+          id: 'main',
+          securityOrigin: 'https://main.example.com',
+          url: 'https://main.example.com/',
+        },
+      },
+    });
+    await session.send('Page.getFrameTree');
+
+    debuggerApi.emitEvent(7, 'Page.frameDetached', { frameId: 'gone', reason: 'remove' });
+
+    // A dialog in the detached frame names no origin any more, while the remaining frame still does.
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      frameId: 'gone',
+      message: 'Gone',
+      type: 'alert',
+    });
+    expect(session.takeDialog()?.origin).toBeUndefined();
+
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      frameId: 'kept',
+      message: 'Kept',
+      type: 'alert',
+    });
+    expect(session.takeDialog()?.origin).toBe('https://kept.example.com');
   });
 
   it('bounds the page-written dialog message like every other page text', async () => {

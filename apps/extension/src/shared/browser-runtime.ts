@@ -508,16 +508,25 @@ const argumentText = (value: unknown): string | undefined => {
 };
 
 /**
+ * The origin a dialog's answer is judged by, and whose grant decides whether
+ * its message is readable: the frame's own recorded origin, which the browser
+ * computes (so an `about:blank` child of a cross-origin frame carries that
+ * frame's origin, not the tab's). A dialog whose frame the browser never named
+ * or whose origin was never reported names none, and no grant can cover it.
+ */
+const dialogOriginOf = (dialog: BrowserToolDialog): string =>
+  dialog.origin === undefined ? 'opaque:null' : (toBrowserOrigin(dialog.origin) ?? 'opaque:null');
+
+/**
  * Whether a caller may read a dialog's message. A panel reads every page; an
  * agent reads the message only from an origin it holds a `read` grant for, as a
- * snapshot shows only those frames.
+ * snapshot shows only those frames — judged by the same origin its answer acts in.
  */
 const dialogMessageReadable = (
   dialog: BrowserToolDialog,
   agent: BrowserAgentCallContext | undefined
 ): boolean =>
-  agent === undefined ||
-  isOriginGranted(agent.authorized, 'read', toBrowserOrigin(dialog.url) ?? 'opaque:null');
+  agent === undefined || isOriginGranted(agent.authorized, 'read', dialogOriginOf(dialog));
 
 /** The tab a guard attributes a download to: its id and the page url a referrer is compared with. */
 const guardTabOf = async (
@@ -2825,15 +2834,11 @@ export const createBrowserRuntime = ({
   ): Promise<AgentFrameInventory> => {
     const tab = await tabsApi.get?.(tabId);
     const url = dialog.url ?? tab?.url ?? '';
-    const origin =
-      dialog.origin === undefined
-        ? 'opaque:null'
-        : (toBrowserOrigin(dialog.origin) ?? 'opaque:null');
 
     return {
       childSessions: new Map(),
       complete: false,
-      frames: [{ id: 'main', origin, url }],
+      frames: [{ id: 'main', origin: dialogOriginOf(dialog), url }],
     };
   };
 

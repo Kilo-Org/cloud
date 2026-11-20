@@ -34,9 +34,15 @@ import {
   DOWNLOAD_RESPONSE_PATTERNS,
   downloadResponseName,
   downloadResponsePause,
+  INTERCEPT_POLL_MS,
+  interceptWait,
   isDownloadResponse,
 } from './browser-download-intercept';
-import type { DownloadResponsePause } from './browser-download-intercept';
+import type {
+  DownloadResponsePause,
+  InterceptWaitReading,
+  InterceptWaitState,
+} from './browser-download-intercept';
 import {
   createAgentFrameReader,
   enableAgentFrameAutoAttach,
@@ -868,7 +874,12 @@ interface InterceptSettlement {
 
 /** One armed response interceptor: the only answer a paused response gets, and the way out at call end. */
 interface ResponseInterceptor {
-  readonly settle: () => Promise<InterceptSettlement>;
+  /**
+   * The settle's own wait: `settle` owns which pauses it has answered, and the caller only says what the tab started.
+   */
+  readonly settle: (
+    reading: () => Omit<InterceptWaitReading, 'answeredIds'>
+  ) => Promise<InterceptSettlement>;
 }
 
 /**
@@ -885,6 +896,14 @@ interface ResponseInterceptor {
  * answered: `failRequest` for a download, `continueResponse` for everything
  * else. `undefined` when the tab cannot intercept, so the caller reports the
  * announcement honestly instead of pretending a guard exists.
+ *
+ * The pause outlives the tool by the call's own settle. A link click's attachment
+ * response arrives just after the click returns (measured 9 ms on real Chrome),
+ * so a guard that released its pause with the call would continue the response
+ * nobody had answered and the file would land unguarded. The settle therefore
+ * keeps the pause armed while a Document the call started still owes a pause,
+ * and releases as soon as every one of them is answered — a plain click starts
+ * no Document and pays one poll.
  */
 const armResponseInterceptor = async (
   session: BrowserToolSession
@@ -934,7 +953,31 @@ const armResponseInterceptor = async (
   }
 
   return {
-    settle: async () => {
+    settle: async readingSupplier => {
+      // The pause stays armed while this call's own Documents still owe one: the response that becomes a file is
+      // Delivered after the tool answered, and releasing here would continue it unread. The map above is the ledger of
+      // What has been answered, so the state reads it rather than a count that another poll could move underneath.
+      let state: InterceptWaitState = { kind: 'entered', since: Date.now() };
+
+      for (;;) {
+        // eslint-disable-next-line no-await-in-loop -- one bounded poll, then the state decides again
+        const reading = readingSupplier();
+
+        const next = interceptWait(state, {
+          ...reading,
+          answeredIds: new Set(answers.keys()),
+        });
+
+        if (next.step === 'release') {
+          break;
+        }
+
+        state = next.state;
+
+        // eslint-disable-next-line no-await-in-loop -- one bounded poll for the pause this call is owed
+        await after(INTERCEPT_POLL_MS);
+      }
+
       // From here nothing new is paused; every answer already sent is awaited before the pause is released.
       stopWatching();
       await Promise.all(answers.values());
@@ -3462,6 +3505,10 @@ export const createBrowserRuntime = ({
         // Without an item guard nothing can hold or cancel a download: the pause on the tab's own session fails
         // The response that would become a file, and every other response is continued untouched. Decided here,
         // After the permission was read for the item guard, so a revoke mid-call falls back to the pause.
+        // The Documents the tab already had are not this call's, so the settle reads only what it starts.
+        const interceptBefore = new Set(
+          interceptGuards ? runSession.networkRequests().map(request => request.requestId) : []
+        );
         const responseInterceptor =
           interceptGuards && downloadGuard === undefined
             ? await armResponseInterceptor(runSession)
@@ -3581,8 +3628,19 @@ export const createBrowserRuntime = ({
           }
 
           if (responseInterceptor !== undefined) {
-            // Every pause this call armed is answered and the interception is released before the call answers.
-            intercepted = await responseInterceptor.settle();
+            // Every pause this call armed is answered and the interception is released before the call answers. The
+            // Pause outlives the tool while a Document this call started still owes one: a click's attachment
+            // Response arrives just after the click returned, and releasing here would continue it unread.
+            intercepted = await responseInterceptor.settle(() => ({
+              // The pause's own ledger is the interceptor's: the caller supplies only what the tab started.
+              documents: runSession
+                .networkRequests()
+                .filter(
+                  request =>
+                    !interceptBefore.has(request.requestId) && request.resourceType === 'Document'
+                ),
+              now: Date.now(),
+            }));
           }
 
           // The announcement for a file no response could stop is read before the watch goes: a blob that lands

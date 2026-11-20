@@ -25,6 +25,75 @@ export const DOWNLOAD_RESPONSE_PATTERNS = [
 /** The protocol reason a stopped response reports: the page load is aborted, and no file exists. */
 export const DOWNLOAD_FAIL_REASON = 'Aborted';
 
+/**
+ * How long a call keeps its Document pauses armed after the tool answered. A link click's attachment response arrives
+ * a few milliseconds after the click returns — measured at 9 ms on real Chrome — so a guard that disarmed with the
+ * call would continue the response nobody had answered yet and the file would land.
+ */
+export const INTERCEPT_WAIT_MS = 1500;
+
+/** How long one settle poll waits before reading the tab again. */
+export const INTERCEPT_POLL_MS = 10;
+
+/**
+ * How a call's own Document read, for the settle that decides whether its pause stays armed: the Documents the tab
+ * started during the call, and which of them the interceptor has already answered.
+ */
+export interface InterceptWaitReading {
+  /** The request ids the interceptor has already answered. */
+  readonly answeredIds: ReadonlySet<string>;
+  /** The Documents this call started: the only responses the interceptor could still fail for it. */
+  readonly documents: readonly { readonly requestId: string }[];
+  readonly now: number;
+}
+
+/** What the interceptor's settle is waiting for, as one state rather than a pair of flags. */
+export type InterceptWaitState =
+  /** The settle has just begun: the step's own Document request can be recorded after the tool already answered. */
+  | { readonly kind: 'entered'; readonly since: number }
+  /**
+   * A Document this call started has no answer yet: the pause stays armed until the interceptor answers it or
+   * `deadline` passes. The response that becomes a file is one of these, and its pause arrives after the tool returned.
+   */
+  | { readonly deadline: number; readonly kind: 'owed' }
+  /** Every one of the call's Documents is answered, or the bound is spent: the pauses are released. */
+  | { readonly kind: 'released' };
+
+/**
+ * One step of the settle: whether the pause stays armed, and the state it waits in.
+ *
+ * The sign is a Document the call started that the interceptor has not answered yet. A plain click's `element.click()`
+ * starts none — nothing on the fixture page is an attachment — so such a call releases after one confirming poll. A
+ * link click on an attachment starts one, and its pause arrives a few milliseconds later; releasing there would answer
+ * it with `continueResponse` and let the file land.
+ */
+export const interceptWait = (
+  state: InterceptWaitState,
+  reading: InterceptWaitReading
+): { readonly state: InterceptWaitState; readonly step: 'hold' | 'release' } => {
+  if (state.kind === 'released') {
+    return { state, step: 'release' };
+  }
+
+  if (reading.documents.some(document => !reading.answeredIds.has(document.requestId))) {
+    // The bound runs from the settle's own entry, never from this poll: a call that keeps seeing its Document
+    // Unanswered must still release inside {@link INTERCEPT_WAIT_MS}, or the page hangs behind a pause nobody answers.
+    const deadline =
+      state.kind === 'owed' ? state.deadline : reading.now + INTERCEPT_WAIT_MS;
+
+    return reading.now < deadline
+      ? { state: { deadline, kind: 'owed' }, step: 'hold' }
+      : { state: { kind: 'released' }, step: 'release' };
+  }
+
+  // The first poll after the tool answered confirms: the call's own navigation request can be recorded last.
+  if (state.kind === 'entered' && reading.now < state.since + INTERCEPT_POLL_MS) {
+    return { state, step: 'hold' };
+  }
+
+  return { state: { kind: 'released' }, step: 'release' };
+};
+
 /** Media types Chrome shows as a document instead of saving; anything else with a body is a file. */
 const RENDERED_CONTENT_TYPES = new Set([
   'application/javascript',

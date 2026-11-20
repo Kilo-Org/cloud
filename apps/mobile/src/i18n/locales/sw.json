@@ -4991,6 +4991,7 @@
     "providersDescription": "Zima mtoa huduma ili kuzuia Kilo kupeleka maombi kwake kwa shirika hili.",
     "providersNeedCatalog": "Swichi za watoa huduma zitabaki za kusoma tu hadi orodha kamili ya miundo ipakie. Gusa Jaribu tena hapo juu ili kuzihariri.",
     "providersEmpty": "Hakuna watoa huduma wanaolingana na utafutaji huu.",
+    "providersNone": "Hakuna watoa huduma wanaopatikana kwa shirika hili.",
     "allowAllShown": "Ruhusu vitu vyote vinavyoonyeshwa",
     "denyAllShown": "Kataza vitu vyote vinavyoonyeshwa",
     "gatewaysDescription": "Kilo hupeleka maombi ya modeli kupitia Vercel AI Gateway au OpenRouter. Lango lililozimwa hufanya maombi hayo kushindwa.",

@@ -5145,6 +5145,7 @@
     "providersDescription": "Išjunkite teikėją, kad Kilo nebesiųstų jam užklausų šioje organizacijoje.",
     "providersNeedCatalog": "Teikėjų jungikliai lieka tik skaitomi, kol neįkeliamas visas modelių katalogas. Norėdami juos redaguoti, viršuje bakstelėkite Bandyti dar kartą.",
     "providersEmpty": "Nė vienas teikėjas neatitinka šios paieškos.",
+    "providersNone": "Šioje organizacijoje nėra prieinamų teikėjų.",
     "allowAllShown": "Leisti visus rodomus",
     "denyAllShown": "Drausti visus rodomus",
     "gatewaysDescription": "Kilo nukreipia modelių užklausas per Vercel AI Gateway arba OpenRouter. Kai vartai išjungti, tos užklausos nepavyksta.",

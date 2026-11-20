@@ -5145,6 +5145,7 @@
     "providersDescription": "Desative um fornecedor para impedir o Kilo de encaminhar pedidos para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos fornecedores ficam só de leitura até o catálogo completo de modelos ser carregado. Toque em Tentar novamente acima para os editar.",
     "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",
+    "providersNone": "Nenhum fornecedor está disponível para esta organização.",
     "allowAllShown": "Permitir todos os apresentados",
     "denyAllShown": "Negar todos os apresentados",
     "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",

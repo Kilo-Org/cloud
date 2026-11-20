@@ -37,7 +37,12 @@ const TARGET = {
 };
 const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
 
-function syntheticRepo(t: TestContext, proofManifest = manifest) {
+const INLINE_INTENT =
+  'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n';
+const FORMATTED_INTENT =
+  'export function redirectSystemPath({\n  path,\n  initial,\n}: {\n  path: string;\n  initial: boolean;\n}): string | null {\n  return initial ? path : null;\n}\n';
+
+function syntheticRepo(t: TestContext, proofManifest = manifest, intent = INLINE_INTENT) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-proof-git-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, 'repo');
@@ -51,10 +56,7 @@ function syntheticRepo(t: TestContext, proofManifest = manifest) {
   git('config', 'user.email', 'synthetic@example.invalid');
   git('config', 'user.name', 'Synthetic design proof');
   for (const [file, content] of [
-    [
-      INTENT,
-      'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n',
-    ],
+    [INTENT, intent],
     [PRODUCT, 'export default function Card() { return "base product"; }\n'],
   ]) {
     fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
@@ -115,6 +117,22 @@ test('real git preparation keeps true base/head product and generates identical 
   validatePreparedSource(preparation, 'base', preparation.base.directory);
   validatePreparedSource(preparation, 'head', preparation.head.directory);
   await assert.rejects(() => prepareProof(fixture), /EEXIST/);
+});
+
+test('a formatted native-intent declaration still receives the generated diagnostic branch', async t => {
+  const fixture = syntheticRepo(t, manifest, FORMATTED_INTENT);
+  const preparation = await prepareProof(fixture);
+  validatePreparedSource(preparation, 'head', preparation.head.directory);
+  const generated = fs.readFileSync(path.join(preparation.head.directory, INTENT), 'utf8');
+  assert.match(
+    generated,
+    /export function redirectSystemPath\(\{\n {2}path,\n {2}initial,\n\}: \{/
+  );
+  const returned = generated.indexOf('return "/(auth)/design-proof-card"');
+  assert.ok(returned > generated.indexOf('export function redirectSystemPath('));
+  // The branch is the branch's own line inside the body, not a rewrite of the
+  // formatted declaration around it.
+  assert.match(generated, /\{\n {2}if \(__DEV__ && !initial/);
 });
 
 test('preparation rejects symbolic refs, unrelated histories and unsafe executable-source manifests', async t => {

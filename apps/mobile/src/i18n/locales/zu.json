@@ -4991,6 +4991,7 @@
     "providersDescription": "Cisha umhlinzeki ukuze uvimbe i-Kilo ekudluliseleni izicelo kuwo kule nhlangano.",
     "providersNeedCatalog": "Amaswishi abahlinzeki ahlala engokufunda kuphela kuze kulayishwe ikhathalogi ephelele yamamodeli. Thepha Zama futhi ngenhla ukuze uwahlele.",
     "providersEmpty": "Abekho abahlinzeki abahambisana nalokhu kusesha.",
+    "providersNone": "Akukho bahlinzeki abatholakalayo kule nhlangano.",
     "allowAllShown": "Vumela konke okubonisiwe",
     "denyAllShown": "Nqaba konke okubonisiwe",
     "gatewaysDescription": "I-Kilo idlulisela izicelo zamamodeli nge-Vercel AI Gateway noma nge-OpenRouter. Isango elikhutshaziwe lehluleka lezo zicelo.",

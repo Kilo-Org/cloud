@@ -4991,6 +4991,7 @@
     "providersDescription": "プロバイダーをオフにすると、この組織でKiloがそのプロバイダーへルーティングするのを停止します。",
     "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
     "providersEmpty": "この検索に一致するプロバイダーはありません。",
+    "providersNone": "この組織で利用できるプロバイダーはありません。",
     "allowAllShown": "表示されているすべてを許可",
     "denyAllShown": "表示されているすべてを拒否",
     "gatewaysDescription": "KiloはモデルリクエストをVercel AI GatewayまたはOpenRouter経由でルーティングします。無効なゲートウェイはそれらのリクエストを失敗させます。",

@@ -4991,6 +4991,7 @@
     "providersDescription": "Kilo'nun bu kuruluş için o sağlayıcıya yönlendirme yapmasını durdurmak üzere bir sağlayıcıyı kapatın.",
     "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
     "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",
+    "providersNone": "Bu kuruluş için kullanılabilir sağlayıcı yok.",
     "allowAllShown": "Gösterilenlerin tümüne izin ver",
     "denyAllShown": "Gösterilenlerin tümünü reddet",
     "gatewaysDescription": "Kilo, model isteklerini Vercel AI Gateway veya OpenRouter üzerinden yönlendirir. Devre dışı bırakılan bir ağ geçidi bu istekleri başarısız kılar.",

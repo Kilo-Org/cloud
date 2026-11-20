@@ -1181,19 +1181,34 @@ export function modelTotalsFromSummaries(
 ): BenchmarkModelTotals[] {
   const groups = new Map<
     string,
-    BenchmarkModelTotals & { scoreSum: number; costSum: number; costedCases: number }
+    BenchmarkModelTotals & {
+      scoreSum: number;
+      costSum: number;
+      costedCases: number;
+      costedKnown: boolean;
+    }
   >();
   for (const summary of summaries) {
     const key = JSON.stringify([summary.model, summary.variant ?? null]);
     const group = groups.get(key);
-    // A route without a cost has an unknown cost per case, not a free one, so
-    // its cases stay out of the sum and are reported apart.
-    const costedCases = summary.avgCostUsd === null ? 0 : summary.cases;
-    const costed = summary.avgCostUsd === null ? 0 : summary.avgCostUsd * summary.cases;
+    // `avgCostUsd` is the route's mean over the cases that reported a cost, so
+    // the route's total is that mean times its costed count — never times
+    // `cases`, which also counts the errored and timed-out rows it left out.
+    // A route whose own count is unknown (a row written before the count was
+    // captured) has no denominator, so the pair's cost stays unknown rather
+    // than being charged at the route's mean. A route that reported no cost at
+    // all has a known count of zero: it contributes nothing and its cases are
+    // counted as uncosted.
+    const routeCosted = summary.costedCases ?? null;
+    // A count of zero is known (nothing was priced); a positive count needs the
+    // mean it belongs to. Anything else is a row older than the count.
+    const costKnown = routeCosted === 0 || (routeCosted !== null && summary.avgCostUsd !== null);
+    const costed = costKnown ? (summary.avgCostUsd ?? 0) * (routeCosted ?? 0) : 0;
     if (group) {
       group.scoreSum += summary.accuracy * summary.cases;
       group.costSum += costed;
-      group.costedCases += costedCases;
+      group.costedCases += costKnown ? (routeCosted ?? 0) : 0;
+      group.costedKnown = group.costedKnown && costKnown;
       group.cases += summary.cases;
       group.errors += summary.errors;
       group.timeouts += summary.timeouts;
@@ -1211,19 +1226,22 @@ export function modelTotalsFromSummaries(
         timeouts: summary.timeouts,
         scoreSum: summary.accuracy * summary.cases,
         costSum: costed,
-        costedCases,
+        costedCases: costKnown ? (routeCosted ?? 0) : 0,
+        costedKnown: costKnown,
       });
     }
   }
   return [...groups.values()]
-    .map(({ scoreSum, costSum, costedCases, ...totals }) => ({
+    .map(({ scoreSum, costSum, costedCases, costedKnown, ...totals }) => ({
       ...totals,
-      // A pair whose cases all reported a cost of 0 is genuinely free: the total
-      // is 0, not unknown, so only a pair with no costed case stays null.
-      uncostedCases: totals.cases - costedCases,
+      // A pair with no known cost leaves every case unpriced; a priced pair
+      // names just the cases its routes left out. A genuine $0 stays $0, and a
+      // pair whose cases all reported no cost at all has no total to state.
+      uncostedCases: costedKnown ? totals.cases - costedCases : totals.cases,
       accuracy: totals.cases > 0 ? Number((scoreSum / totals.cases).toFixed(4)) : 0,
-      costPerCaseUsd: costedCases > 0 ? Number((costSum / costedCases).toFixed(8)) : null,
-      totalCostUsd: costedCases > 0 ? Number(costSum.toFixed(8)) : null,
+      costPerCaseUsd:
+        costedKnown && costedCases > 0 ? Number((costSum / costedCases).toFixed(8)) : null,
+      totalCostUsd: costedKnown && costedCases > 0 ? Number(costSum.toFixed(8)) : null,
     }))
     .toSorted((a, b) => b.accuracy - a.accuracy || a.model.localeCompare(b.model));
 }

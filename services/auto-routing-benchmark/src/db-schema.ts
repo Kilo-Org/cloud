@@ -164,6 +164,10 @@ export const modelSummaries = sqliteTable(
     avg_latency_ms: real('avg_latency_ms').notNull(),
     p50_latency_ms: real('p50_latency_ms'),
     cases: integer('cases').notNull(),
+    // Rows whose cost_usd was reported: the denominator of avg_cost_usd. Null
+    // on rows written before it was captured, which the console reads as
+    // "unknown", never as "every case was priced".
+    costed_cases: integer('costed_cases'),
     errors: integer('errors').notNull(),
     p95_latency_ms: real('p95_latency_ms'),
     timeouts: integer('timeouts').notNull().default(0),

@@ -262,6 +262,11 @@ export const BenchmarkModelSummarySchema = z.object({
   p50TtftMs: z.number().nonnegative().nullable().optional(),
   p95LatencyMs: z.number().nullable(),
   cases: z.number().int(),
+  // Cases that reported a cost: the denominator of `avgCostUsd` for the route.
+  // Absent or null on a summary from a worker that predates it and on rows
+  // written before it was stored, so a reader must treat it as unknown rather
+  // than assume every case was priced.
+  costedCases: z.number().int().nonnegative().nullable().optional(),
   errors: z.number().int(),
   timeouts: z.number().int().default(0),
   // Classifier runs only: share of cases whose predicted taskType/subtaskType

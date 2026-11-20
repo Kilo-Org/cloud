@@ -1,0 +1,1 @@
+ALTER TABLE `model_summaries` ADD `costed_cases` integer;--> statement-breakpoint

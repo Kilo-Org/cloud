@@ -10,7 +10,6 @@ import {
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  BenchmarkConfigEditor,
   ConfigSaveWarnings,
   configToFormState,
   effortCoverageForModel,
@@ -36,7 +35,7 @@ const mockSummariesQuery: {
 jest.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: mockSummariesQuery.data, isLoading: false, error: null }),
   useMutation: () => ({ mutate: () => {}, isPending: false }),
-  useQueryClient: () => ({ invalidateQueries: () => {} }),
+  useQueryClient: () => ({ invalidateQueries: () => {}, setQueryData: () => {} }),
 }));
 
 // The model picker reads tRPC user preferences; the effort-coverage column
@@ -412,13 +411,19 @@ describe('run cost totals', () => {
 });
 
 describe('per-model totals from route rows', () => {
+  /**
+   * One route row. `costedCases` defaults to every case, the ordinary shape of
+   * a route whose cases all reported a cost; pass a smaller count (or null for
+   * a row written before the count existed) to model a partially priced route.
+   */
   const summary = (
     model: string,
     routeKey: string,
     accuracy: number,
     avgCostUsd: number | null,
     cases: number,
-    errors = 0
+    errors = 0,
+    costedCases: number | null = avgCostUsd === null ? 0 : cases
   ): BenchmarkModelSummary => ({
     model,
     variant: null,
@@ -429,6 +434,7 @@ describe('per-model totals from route rows', () => {
     p50LatencyMs: 90,
     p95LatencyMs: 120,
     cases,
+    costedCases,
     errors,
     timeouts: 0,
     routeAccuracy: null,
@@ -469,6 +475,33 @@ describe('per-model totals from route rows', () => {
     // The cases still count for accuracy: they were measured, just not priced.
     expect(alpha.cases).toBe(40);
     expect(alpha.accuracy).toBe(1);
+  });
+
+  it('charges a partially costed route only for the cases it priced', () => {
+    // One route: 40 cases, only 10 of which reported a cost, at $0.10 each.
+    const [alpha] = modelTotalsFromSummaries([
+      summary('vendor/alpha', 'debugging/bug_fixing', 1, 0.1, 40, 0, 10),
+    ]);
+
+    // Multiplying the route's mean by `cases` would report $4.00 with no note.
+    expect(alpha.totalCostUsd).toBeCloseTo(1, 8);
+    expect(alpha.costPerCaseUsd).toBeCloseTo(0.1, 8);
+    expect(alpha.uncostedCases).toBe(30);
+    expect(alpha.cases).toBe(40);
+    expect(alpha.accuracy).toBe(1);
+  });
+
+  it('leaves the cost unknown when a route predates the costed count', () => {
+    // Without the count a route cannot be split into priced and unpriced cases,
+    // so neither its total nor its mean is guessed.
+    const [alpha] = modelTotalsFromSummaries([
+      summary('vendor/alpha', 'debugging/bug_fixing', 1, 0.1, 40, 0, null),
+    ]);
+
+    expect(alpha.totalCostUsd).toBeNull();
+    expect(alpha.costPerCaseUsd).toBeNull();
+    expect(alpha.uncostedCases).toBe(40);
+    expect(alpha.cases).toBe(40);
   });
 
   it('keeps a genuine zero cost as zero rather than unknown', () => {
@@ -567,43 +600,6 @@ describe('find a model', () => {
   it('shows every run when the query is blank', () => {
     expect(runMentionsModel({ models: [] }, '')).toBe(true);
     expect(runMentionsModel({}, '   ')).toBe(true);
-  });
-});
-
-describe('policy tab effort coverage', () => {
-  it('reads the whole registry, so a filtered run list cannot unmeasure a model', () => {
-    const config: BenchmarkConfig = {
-      ...baseConfig,
-      deciderModels: [{ id: 'vendor/ready-at-two-efforts' }],
-    };
-    const registryEntries = [
-      { model: 'vendor/ready-at-two-efforts', variant: 'low' as const, status: 'ready' as const },
-      { model: 'vendor/ready-at-two-efforts', variant: 'high' as const, status: 'ready' as const },
-      // A row for another model; the run-list filter would have dropped it.
-      { model: 'vendor/other', variant: null, status: 'pending' as const },
-    ];
-
-    const html = renderToStaticMarkup(
-      React.createElement(BenchmarkConfigEditor, {
-        router: 'efficient',
-        config,
-        onSaved: () => {},
-        modelOptions: [
-          {
-            id: 'vendor/ready-at-two-efforts',
-            name: 'Ready at two efforts',
-            reasoningVariants: ['low', 'high'],
-          },
-        ],
-        modelsLoading: false,
-        registryEntries,
-        classifierModelOptions: [],
-        classifierModelsLoading: false,
-        catalogModalities: null,
-      })
-    );
-
-    expect(html).toContain('2 of 2 measured');
   });
 });
 

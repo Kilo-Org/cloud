@@ -523,6 +523,16 @@ const createFramedScriptingSession = () => {
   ];
   const isolatedKinds: string[] = [];
   const mainWorldFrames: (number | undefined)[] = [];
+  const pressedIn = new Set<string>();
+
+  for (const [name, dom] of [
+    ['shop', shop],
+    ['pay', pay],
+  ] as const) {
+    dom.window.document.addEventListener('keydown', () => {
+      pressedIn.add(name);
+    });
+  }
   const updatedListeners: TabUpdatedListener[] = [];
   const scriptingApi: BrowserScriptingApi = {
     executeScript: async details => {
@@ -550,6 +560,11 @@ const createFramedScriptingSession = () => {
         });
         await withPageGlobals(
           {
+            Event: dom.window.Event,
+            HTMLInputElement: dom.window.HTMLInputElement,
+            HTMLSelectElement: dom.window.HTMLSelectElement,
+            HTMLTextAreaElement: dom.window.HTMLTextAreaElement,
+            KeyboardEvent: dom.window.KeyboardEvent,
             MouseEvent: dom.window.MouseEvent,
             document: dom.window.document,
             location: dom.window.location,
@@ -586,6 +601,8 @@ const createFramedScriptingSession = () => {
     isolatedKinds,
     mainWorldFrames,
     pay,
+    // Where a dispatched key landed, by document name: the tab's own document versus the frame's.
+    pressedIn: () => [...pressedIn].toSorted(),
     session: createBrowserToolSession({ scriptingApi, tabId: 7, tabsApi }),
     shop,
   };
@@ -1907,13 +1924,19 @@ describe('browser tool session scripting backend', () => {
       session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] })
     ).resolves.toStrictEqual({
       ok: true,
-      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+      value: [
+        '- button "Top" [ref=e1]',
+        '- iframe',
+        '  - button "Buy" [ref=e3]',
+        '  - textbox [ref=e4]',
+      ].join('\n'),
     });
     await expect(session.resolveTarget('e2')).resolves.toBeUndefined();
     expect(isolatedKinds).toStrictEqual(['frame']);
   });
 
-  it('splices from the call’s frame inventory instead of probing the frames again', async () => {
+  it('resolves the hosted frame from the frames read after the snapshot, not the call’s earlier inventory', async () => {
+    // The inventory was read before the snapshot ran; this fake says it saw no iframe at all.
     const { isolatedKinds, session } = createFramedScriptingSession();
     const readFrames = vi.fn(() =>
       Promise.resolve({
@@ -1924,7 +1947,7 @@ describe('browser tool session scripting backend', () => {
           { id: '4', origin: PAY_ORIGIN, parentId: '0', url: `${PAY_ORIGIN}/` },
         ],
         owners: new Map<string, readonly (string | undefined)[]>([
-          ['0', ['4']],
+          ['0', []],
           ['4', []],
         ]),
       })
@@ -1938,10 +1961,15 @@ describe('browser tool session scripting backend', () => {
       )
     ).resolves.toStrictEqual({
       ok: true,
-      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+      value: [
+        '- button "Top" [ref=e1]',
+        '- iframe',
+        '  - button "Buy" [ref=e3]',
+        '  - textbox [ref=e4]',
+      ].join('\n'),
     });
-    expect(readFrames.mock.calls).toStrictEqual([[]]);
-    expect(isolatedKinds).toStrictEqual([]);
+    // Frame owners come from a read taken after the snapshot, so they align with the lines it printed.
+    expect(isolatedKinds).toStrictEqual(['frame']);
   });
 
   it('makes every scripting ref stale once the tab starts loading another document', async () => {
@@ -1959,6 +1987,119 @@ describe('browser tool session scripting backend', () => {
       error: STALE_REF_ERROR,
       ok: false,
     });
+  });
+
+  it('runs a ref from a granted frame in that frame, never in the top document', async () => {
+    const { mainWorldFrames, pay, session, shop } = createFramedScriptingSession();
+    const clicked: string[] = [];
+
+    shop.window.document.querySelector('button')?.addEventListener('click', () => {
+      clicked.push('shop');
+    });
+    pay.window.document.querySelector('button')?.addEventListener('click', () => {
+      clicked.push('pay');
+    });
+
+    await session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    // Both documents name their button `body > button`; only the frame id tells them apart.
+    await expect(session.resolveTarget('e3')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+    await expect(session.resolveTarget('e1')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+    // The input exists only in the frame, so its match is counted in the frame's document.
+    await expect(session.resolveTarget('e4')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > input',
+    });
+
+    mainWorldFrames.length = 0;
+
+    await expect(session.callTool('browser_click', { target: 'e3' })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Clicked ref=e3 with the left button.',
+    });
+    expect(clicked).toStrictEqual(['pay']);
+    expect(mainWorldFrames).toStrictEqual([4]);
+
+    await expect(
+      session.callTool('browser_fill_form', {
+        fields: [
+          { name: 'Top', target: 'e1', type: 'textbox', value: 'a' },
+          { name: 'Card', target: 'e4', type: 'textbox', value: 'b' },
+        ],
+      })
+    ).resolves.toStrictEqual({
+      error:
+        'browser_fill_form fields live in different frames: fill each frame with its own call.',
+      ok: false,
+    });
+
+    await expect(session.callTool('browser_snapshot', { target: 'e3' })).resolves.toStrictEqual({
+      ok: true,
+      value: '- button "Buy" [ref=e5]',
+    });
+    await expect(session.resolveTarget('e5')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+  });
+
+  it('presses a key in the frame a typed ref focused, across the separate calls the runtime makes', async () => {
+    const { mainWorldFrames, pressedIn, session } = createFramedScriptingSession();
+
+    // The runtime binds a fresh view per tool message; only the caller key is the same.
+    const typeCall = session.bindCaller('cli-session');
+    const pressCall = session.bindCaller('cli-session');
+
+    await typeCall.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    const typed = await typeCall.callTool(
+      'browser_type',
+      { target: 'e4', text: 'igor@example.com' },
+      { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+    );
+
+    expect(typed).toMatchObject({ ok: true });
+    mainWorldFrames.length = 0;
+
+    await expect(pressCall.callTool('browser_press_key', { key: 'Enter' })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Pressed Enter.',
+    });
+    // Enter must reach the field's own document: the top document's <iframe> element would swallow it.
+    expect(pressedIn()).toStrictEqual(['pay']);
+    expect(mainWorldFrames).toStrictEqual([4]);
+  });
+
+  it('keeps the previous focus when a type call fails', async () => {
+    const { mainWorldFrames, pressedIn, session } = createFramedScriptingSession();
+
+    const typeCall = session.bindCaller('cli-session');
+    const pressCall = session.bindCaller('cli-session');
+
+    const failed = await typeCall.callTool(
+      'browser_type',
+      { target: 'e404', text: 'x' },
+      { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+    );
+
+    expect(failed.ok).toBe(false);
+    mainWorldFrames.length = 0;
+
+    await pressCall.callTool('browser_press_key', { key: 'Enter' });
+
+    expect(pressedIn()).toStrictEqual(['shop']);
+    expect(mainWorldFrames).toStrictEqual([undefined]);
   });
 
   it('caps a caller’s merged refs, dropping the oldest earlier refs first', async () => {

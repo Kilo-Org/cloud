@@ -40,8 +40,8 @@ export type CurrentProfileContext = {
 
 /**
  * Shared currency predicate: a profile row is current only when it was measured
- * (or is being measured) under the live decider engine identity and the saved
- * deciderRepetitions, for the same exact Pool entry (model + variant). Platform and
+ * (or is being measured) under the live decider engine identity and the router's
+ * decider repetitions, for the same exact Pool entry (model + variant). Platform and
  * owner-pool tables require it; custom routers serve an older ready row flagged
  * stale instead (ADR 0005).
  */
@@ -62,11 +62,11 @@ export function isCurrentBenchmarkProfile(
 }
 
 export function currentProfileContextFromConfig(
-  config: PolicySettingSource & { router?: AutoRouter }
+  config: PolicySettingSource
 ): CurrentProfileContext {
   return {
-    router: config.router ?? 'efficient',
-    engineIdentity: computeEngineIdentity('decider', config.router ?? 'efficient'),
+    router: config.router,
+    engineIdentity: computeEngineIdentity('decider', config.router),
     repetitions: resolveEffectivePolicy(config).deciderRepetitions,
   };
 }
@@ -527,7 +527,7 @@ export type RegisterProfilesInput = {
  */
 export async function registerProfiles(
   db: D1Database,
-  config: PolicySettingSource & { router?: AutoRouter },
+  config: PolicySettingSource,
   input: RegisterProfilesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   assertUniquePairs(input.pairs);
@@ -685,7 +685,7 @@ export type LookupProfileStatusesInput = {
  */
 export async function lookupProfileStatuses(
   db: D1Database,
-  config: PolicySettingSource & { router?: AutoRouter },
+  config: PolicySettingSource,
   input: LookupProfileStatusesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   assertUniquePairs(input.pairs);

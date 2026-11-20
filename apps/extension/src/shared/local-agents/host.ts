@@ -155,7 +155,16 @@ const isTrustedPanelSender = (sender: unknown, runtimeId: string | undefined): b
   return url.startsWith('chrome-extension://') || url.startsWith('moz-extension://');
 };
 
-const errorResponse = (id: string | number, error: unknown) => {
+/** Enough of an unexpected error's own text to say what failed, without a page's worth of it. */
+const UNEXPECTED_DETAIL_LIMIT = 300;
+
+/**
+ * The methods whose failure can leave a page step half done. Only a tool call runs one: `tools.list` is an
+ * in-memory contract read, and every other method's own failure is compensated before it answers.
+ */
+const PAGE_STEP_METHOD = 'tools.call';
+
+const errorResponse = (id: string | number, error: unknown, method: string) => {
   if (error instanceof LocalAgentRpcError) {
     const frame = buildErrorMessage({
       code: error.code,
@@ -169,10 +178,21 @@ const errorResponse = (id: string | number, error: unknown) => {
       : { ...frame, error: { ...frame.error, data: error.data } };
   }
 
+  // The model reads this text: it names what failed, never the transport, and says what to do next (SPEC).
+  const detail =
+    error instanceof Error && error.message.trim() !== ''
+      ? error.message.trim().slice(0, UNEXPECTED_DETAIL_LIMIT).replace(/\.$/u, '')
+      : 'an unexpected error';
+  // Only a call that ran a page step may have changed the page; advice to re-read it elsewhere is a wasted turn.
+  const advice =
+    method === PAGE_STEP_METHOD
+      ? 'Part of it may have run; take a new page snapshot before retrying.'
+      : 'Nothing on the page changed; retrying the call is safe.';
+
   return buildErrorMessage({
     code: LOCAL_AGENT_ERROR_CODES.internalError,
     id,
-    message: 'Local agent request failed.',
+    message: `The browser could not finish the call: ${detail}. ${advice}`,
   });
 };
 
@@ -342,7 +362,7 @@ export const startLocalAgentsHost = (
 
       connection.send(controllerId, buildResultMessage(message.id, result));
     } catch (error) {
-      connection.send(controllerId, errorResponse(message.id, error));
+      connection.send(controllerId, errorResponse(message.id, error, message.method));
     }
   };
 

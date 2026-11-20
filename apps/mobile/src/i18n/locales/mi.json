@@ -965,6 +965,8 @@
       "pendingComment": "kōrero e tatari ana",
       "pendingComment_other": "kōrero e tatari ana",
       "submitCountOfTotal": "Tukuna te {{displayFreshCount}} o ngā kōrero {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Tukuna te {{displayFreshCount}} o ngā kōrero {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Tukuna te {{displayFreshCount}} o ngā kōrero {{displayTotalCount}}",
       "submitReview": "Tukuna te arotake",
       "partialPostedFresh": "Kua tukuna ngā kōrero {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Kua tukuna te kōrero {{displayFreshCount}}. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Whakaingoatia anō te rōpū",
-      "renamePlaceholder": "Te ingoa o te rōpū",
+      "renamePlaceholder": "Tāurutia he ingoa rōpū",
       "balance": "Te toenga",
       "plan": "Mahere",
       "planTeams": "Teams",

@@ -1,9 +1,15 @@
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { DismissSheetFrame } from '@/components/security-agent/dismiss-sheet-frame';
+import {
+  DISMISS_REASONS,
+  type DismissReason,
+  isDismissReason,
+} from '@/components/security-agent/dismissal-reasons';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { RefusalStatus } from '@/components/refusal-status';
@@ -20,65 +26,35 @@ import {
   isDismissFailureRetryable,
   resolveDismissFailure,
 } from '@/components/security-agent/dismiss-finding-failure';
-import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
+import {
+  useRetrySecurityAgentCapability,
+  useSecurityAgentCapability,
+} from '@/lib/hooks/use-security-agent';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
-import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   isSecurityTrialRefusal,
   isSecurityTrialRefusalCopyKey,
   securityMutationCopyKey,
 } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
-import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
+import {
+  useDismissSecurityFinding,
+  useRetrySecurityFinding,
+  useSecurityFinding,
+} from '@/lib/hooks/use-security-findings';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import {
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+} from '@/lib/query/read-failure-variant';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
-
-// The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
-// (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
-// pairs from the task brief, matching web's dismissal reason picker.
-const DISMISS_REASONS = [
-  { value: 'fix_started', labelKey: 'securityAgent.dismiss.reasonFixStarted' },
-  { value: 'no_bandwidth', labelKey: 'securityAgent.dismiss.reasonNoBandwidth' },
-  { value: 'tolerable_risk', labelKey: 'securityAgent.dismiss.reasonTolerableRisk' },
-  { value: 'inaccurate', labelKey: 'securityAgent.dismiss.reasonInaccurate' },
-  { value: 'not_used', labelKey: 'securityAgent.dismiss.reasonNotUsed' },
-] as const;
-
-type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
-
-function isDismissReason(value: string): value is DismissReason {
-  return DISMISS_REASONS.some(reason => reason.value === value);
-}
 
 type DismissFindingScreenProps = {
   scope: string;
   findingId: string;
 };
-
-/**
- * The chrome the states without a form share: the sheet's title and its close
- * button, over one of the body states below.
- */
-function DismissSheetFrame({ children }: Readonly<{ children: ReactNode }>) {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const headerTopInset = useFormSheetHeaderTopInset();
-  return (
-    <View className="flex-1 bg-background">
-      <SheetHeader
-        title={t('securityAgent.dismiss.title')}
-        variant="close"
-        topInset={headerTopInset}
-        onDone={() => {
-          router.back();
-        }}
-      />
-      {children}
-    </View>
-  );
-}
 
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
@@ -89,6 +65,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const headerTopInset = useFormSheetHeaderTopInset();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
+  const findingRetry = useRetrySecurityFinding(scope, findingId);
+  const capabilityRetry = useRetrySecurityAgentCapability(scope);
   const [reason, setReason] = useState<DismissReason | null>(null);
   const commentRef = useRef('');
   const dismissFinding = useDismissSecurityFinding(scope);
@@ -205,6 +183,29 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     );
   }
 
+  // A paused first read never reaches the loading gate: name the connection
+  // and offer Retry for whichever read the form waits on. A deliberate retry
+  // above retires the paused promise a plain `refetch` would only join.
+  const findingPaused = isReadPausedBeforeData({ ...findingQuery, connectivity });
+  if (findingPaused || isReadPausedBeforeData({ ...capability, connectivity })) {
+    return (
+      <DismissSheetFrame>
+        <QueryError
+          variant="offline"
+          message={t(
+            findingPaused
+              ? 'securityAgent.dismiss.couldNotLoad'
+              : 'securityAgent.dismiss.couldNotCheckPermissions'
+          )}
+          onRetry={() => {
+            void (findingPaused ? findingRetry.retry() : capabilityRetry.retry());
+          }}
+          isRetrying={findingPaused ? findingRetry.isRetrying : capabilityRetry.isRetrying}
+        />
+      </DismissSheetFrame>
+    );
+  }
+
   if (capability.status === 'error') {
     return (
       <DismissSheetFrame>
@@ -215,11 +216,16 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
       </DismissSheetFrame>
     );
   }
-
+  // `capability.isLoading` is `isPending && isFetching`, which stays false for
+  // a read paused with no data — a paused capability read in the unsettled
+  // window would fall through to the cannot-dismiss empty state with no
+  // Retry. `status === 'loading'` is the state the hook models for exactly
+  // that case (settings-overview-screen.tsx gates on it), and it makes the
+  // paused branch above true for both reads.
   if (
     findingQuery.isLoading ||
     !findingQuery.data ||
-    capability.isLoading ||
+    capability.status === 'loading' ||
     !dismissDraft.hydrated
   ) {
     return <DismissFindingSkeleton />;

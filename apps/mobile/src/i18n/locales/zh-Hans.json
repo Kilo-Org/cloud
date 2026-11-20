@@ -3238,6 +3238,8 @@
       "partialPostedStale_one": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
       "partialPostedStale_other": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
       "submitCountOfTotal": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
+      "submitCountOfTotal_one": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
+      "submitCountOfTotal_other": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
       "submitReview": "提交审查意见",
       "blockedRequestChanges": "请填写总结或添加至少一条评论，才能要求更改。",
       "blockedComment": "请填写总结或添加至少一条评论，才能提交评论类型的审查。"
@@ -3447,7 +3449,7 @@
       "planStatusLapsed": " · 已结束",
       "planEnded": "组织的试用期已结束，且没有生效的套餐。",
       "manageBilling": "管理账单",
-      "renamePlaceholder": "组织名称",
+      "renamePlaceholder": "请输入组织名称",
       "renameTitle": "重命名组织"
     },
     "inviteMember": {

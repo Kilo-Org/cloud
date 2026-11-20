@@ -5,7 +5,6 @@ import { and, eq } from 'drizzle-orm';
 import { organization_groups } from '@kilocode/db/schema';
 import type {
   OrganizationGroupAgentPermissionsPolicy,
-  OrganizationGroupClientAccessPolicy,
   OrganizationGroupPolicy,
 } from '@kilocode/db/schema-types';
 import {
@@ -60,25 +59,13 @@ function orderLayers<T>(layers: T[]): T[] {
     .map(({ layer }) => layer);
 }
 
-function collectPermissionLayers(policies: OrganizationGroupPolicy[]) {
-  const agentLayers: OrganizationGroupAgentPermissionsPolicy['data'][] = [];
-  const clientLayers: OrganizationGroupClientAccessPolicy['data'][] = [];
-  for (const policy of permissionPolicies(policies)) {
-    if (policy.type === 'agent_permissions') agentLayers.push(policy.data);
-    else clientLayers.push(policy.data);
-  }
-  return { agentLayers, clientLayers };
-}
-
 function buildMemberPolicyResponse(params: {
   organizationId: string;
   managed: boolean;
   revision: number;
-  agentLayers: OrganizationGroupAgentPermissionsPolicy['data'][];
-  clientLayers: OrganizationGroupClientAccessPolicy['data'][];
+  policies: OrganizationGroupAgentPermissionsPolicy[];
 }) {
-  const agentLayers = orderLayers(dedupeLayers(params.agentLayers));
-  const clientLayers = orderLayers(dedupeLayers(params.clientLayers));
+  const agentLayers = orderLayers(dedupeLayers(params.policies.map(policy => policy.data)));
   return {
     schema_version: 1 as const,
     organization_id: params.organizationId,
@@ -87,7 +74,6 @@ function buildMemberPolicyResponse(params: {
     max_age_seconds: PERMISSION_POLICY_MAX_AGE_SECONDS,
     policy: {
       ...(agentLayers.length ? { agent_permissions: { layers: agentLayers } } : {}),
-      ...(clientLayers.length ? { client_access: { layers: clientLayers } } : {}),
     },
   };
 }
@@ -120,14 +106,12 @@ export async function assertOrganizationPermissionPolicyFits(
       })
     ),
   ];
-  const { agentLayers, clientLayers } = collectPermissionLayers(policies);
   const parsed = MemberPermissionPolicySchema.safeParse(
     buildMemberPolicyResponse({
       organizationId,
       managed: true,
       revision: context.policyRevision,
-      agentLayers,
-      clientLayers,
+      policies: permissionPolicies(policies),
     })
   );
   if (!parsed.success) {
@@ -210,17 +194,12 @@ export async function getOrganizationPermissionPolicy(organizationId: string, ki
             return policies.length ? [{ groupId, policies }] : [];
           })
         : [];
-      const { agentLayers, clientLayers } = collectPermissionLayers([
-        ...defaultPolicies,
-        ...groups.flatMap(group => group.policies),
-      ]);
       const validated = MemberPermissionPolicySchema.safeParse(
         buildMemberPolicyResponse({
           organizationId: context.organization.id,
           managed,
           revision: context.policyRevision,
-          agentLayers,
-          clientLayers,
+          policies: [...defaultPolicies, ...groups.flatMap(group => group.policies)],
         })
       );
       if (!validated.success) {

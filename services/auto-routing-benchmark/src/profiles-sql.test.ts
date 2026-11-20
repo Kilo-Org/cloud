@@ -227,6 +227,7 @@ describe('registerProfiles multi-variant quota (migrated SQLite)', () => {
         const db = sqliteD1(sqlite);
         const orm = drizzle(db);
         const config = {
+          router: 'efficient' as const,
           minAccuracy: 0.7,
           accuracyNoiseBand: 0.05,
           productionTokenProfile: null,
@@ -283,6 +284,7 @@ describe('registerProfiles multi-variant quota (migrated SQLite)', () => {
         const db = sqliteD1(sqlite);
         const orm = drizzle(db);
         const config = {
+          router: 'efficient' as const,
           minAccuracy: 0.7,
           accuracyNoiseBand: 0.05,
           productionTokenProfile: null,

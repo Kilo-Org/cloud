@@ -74,15 +74,27 @@ const capability = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
 }));
 const finding = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   error: null as unknown,
   data: undefined as MockedFinding | undefined,
   refetch: vi.fn(),
+}));
+const findingRetry = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
+}));
+const capabilityRetry = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
 }));
 const pillGroup = vi.hoisted(() => ({
   onChange: (() => undefined) as (value: string) => void,
@@ -98,8 +110,6 @@ const dismissDraft = vi.hoisted(() => ({
 const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 const keyboard = vi.hoisted(() => ({ height: 0 }));
-// The whole-body load failure classifies its cause from committed connectivity.
-const connectivity = vi.hoisted(() => ({ status: 'online' as 'online' | 'offline' | 'unknown' }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -146,13 +156,18 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
+  useRetrySecurityAgentCapability: () => capabilityRetry,
+}));
+const connectivity = vi.hoisted(() => ({
+  committed: 'online' as 'online' | 'offline' | 'unknown',
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.committed,
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => findingRetry,
   useDismissSecurityFinding: () => dismiss,
-}));
-vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => connectivity.status,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
@@ -168,7 +183,15 @@ vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
 }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (_props: {
+    variant?: string;
+    message?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+    placement?: string;
+  }) => 'QueryError',
+}));
 vi.mock('@/components/security-agent/settings-recovery-status', () => ({
   SettingsRecoveryStatus: 'SettingsRecoveryStatus',
 }));
@@ -261,6 +284,20 @@ function billingSteps(root: I): I[] {
   );
 }
 
+/** Every failure-body node the screen rendered, its props along. */
+function findAllFailures(root: I): I[] {
+  return root.findAll(n => n.type === QueryError);
+}
+
+/** The one load-failure surface the screen must show. */
+function renderFailure(tree: R): I {
+  const nodes = findAllFailures(tree.root);
+  if (nodes.length !== 1) {
+    throw new Error(`expected 1 load-failure surface, got ${nodes.length}`);
+  }
+  return nodes[0] as I;
+}
+
 describe('DismissFindingScreen dismissal CTA states', () => {
   beforeEach(() => {
     trialRole.role = undefined;
@@ -273,14 +310,22 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     capability.isLoading = false;
     capability.isFetching = false;
     capability.isError = false;
+    capability.isPending = false;
+    capability.fetchStatus = 'idle';
     capability.refetch.mockReset();
+    capabilityRetry.retry.mockClear();
+    capabilityRetry.isRetrying = false;
     finding.isLoading = false;
     finding.isFetching = false;
     finding.isError = false;
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
     finding.error = null;
+    connectivity.committed = 'online';
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
-    connectivity.status = 'online';
+    findingRetry.retry.mockClear();
+    findingRetry.isRetrying = false;
     dismissDraft.draft = null;
     dismissDraft.hydrated = true;
     dismissDraft.persist.mockClear();
@@ -396,34 +441,102 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       query.isError = true;
       if (source === 'finding') {
         finding.data = undefined;
+        finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
       } else {
         capability.status = 'error';
       }
       const tree = renderScreen();
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
-      const error = tree.root.findByType(QueryError);
-      expect(error.props.placement).not.toBe('top');
+      const error = renderFailure(tree);
+      if (source === 'finding') {
+        // The sheet's own failure keeps its screen title, and the description
+        // comes from the classified variant rather than a repeated message.
+        expect(error.props.title).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
+        expect(error.props.message).toBeUndefined();
+        expect(error.props.variant).toBe('server');
+      } else {
+        expect(error.props.variant).toBeUndefined();
+      }
       act(error.props.onRetry as () => void);
       expect(query.refetch).toHaveBeenCalledOnce();
     }
   );
 
-  it.each<[string, unknown]>([
-    // A transport rejection never reached the server; a tRPC code proves it did.
-    ['offline', new TypeError('Network request failed')],
-    ['server', { data: { code: 'INTERNAL_SERVER_ERROR' } }],
-  ])('titles an uncached finding failure that reads as %s', (variant, error) => {
-    finding.isError = true;
-    finding.error = error;
-    finding.data = undefined;
+  it.each(['finding', 'permissions'] as const)(
+    'names the connection and offers Retry for a paused %s read',
+    source => {
+      const query = source === 'finding' ? finding : capability;
+      const otherQuery = source === 'finding' ? capability : finding;
+      finding.data = undefined;
+      query.isPending = true;
+      query.fetchStatus = 'paused';
+      connectivity.committed = 'offline';
+      const tree = renderScreen();
+
+      expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
+      const error = renderFailure(tree);
+      expect(error.props.variant).toBe('offline');
+      expect(error.props.message).toBe(
+        source === 'finding'
+          ? i18n.t('securityAgent.dismiss.couldNotLoad')
+          : i18n.t('securityAgent.dismiss.couldNotCheckPermissions')
+      );
+      const retryRecord = source === 'finding' ? findingRetry : capabilityRetry;
+      const otherRetryRecord = source === 'finding' ? capabilityRetry : findingRetry;
+      // The paused branch offers the deliberate paused-read retry, not the
+      // plain query refetch, for whichever read the form waits on.
+      expect(error.props.isRetrying).toBe(false);
+      act(error.props.onRetry as () => void);
+      expect(retryRecord.retry).toHaveBeenCalledOnce();
+      expect(otherRetryRecord.retry).not.toHaveBeenCalled();
+      expect(query.refetch).not.toHaveBeenCalled();
+      expect(otherQuery.refetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the skeleton when a capability read pauses with the finding loaded', () => {
+    // The form's own read settled, then the capability read pauses in the
+    // unsettled window: not a connection failure yet, and no data can close
+    // it. `capability.isLoading` is `isPending && isFetching`, which stays
+    // false for a paused read, so the pre-fix gate fell through to the
+    // cannot-dismiss empty state; `status === 'loading'` holds the skeleton.
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    capability.canManage = false;
+    connectivity.committed = 'unknown';
     const tree = renderScreen();
-    const body = tree.root.findByType(QueryError);
-    // The sheet's own failure keeps its screen title, and the description comes
-    // from the classified variant rather than a repeated message.
-    expect(body.props.title).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
-    expect(body.props.variant).toBe(variant);
-    expect(body.props.message).toBeUndefined();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({ title: i18n.t('securityAgent.dismiss.cannotDismissTitle') })
+    ).toHaveLength(0);
+    expect(capabilityRetry.retry).not.toHaveBeenCalled();
+  });
+
+  it('keeps the skeleton for a pause while connectivity is unsettled', () => {
+    // The online manager also pauses on an unsettled NetInfo report, which is
+    // the normal cold-launch window: that is not a connection failure yet.
+    finding.data = undefined;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    connectivity.committed = 'unknown';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+  });
+
+  it('keeps the skeleton for a first finding read still in flight', () => {
+    finding.data = undefined;
+    finding.isLoading = true;
+    finding.fetchStatus = 'fetching';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
   });
 
   it.each([

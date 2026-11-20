@@ -136,7 +136,7 @@ export function mapSummaryRowWithRun(row: ModelSummaryRow): BenchmarkModelSummar
   };
 }
 
-export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): BenchmarkRun {
+export function mapRunRow(row: RunRow): BenchmarkRun {
   return {
     id: row.id,
     router: row.router ?? 'efficient',
@@ -146,7 +146,6 @@ export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): Benc
     startedAt: row.started_at,
     completedAt: row.completed_at,
     error: row.error,
-    summaries,
   };
 }
 
@@ -924,6 +923,29 @@ export async function getSummaries(
   return rows.map(mapSummaryRow);
 }
 
+/**
+ * One run's summaries for the admin run list, or null when the run is not
+ * visible under `router`. Classifier runs are shared by every router.
+ */
+export async function getRunSummariesForRouter(
+  db: D1Database,
+  runId: string,
+  router: AutoRouter
+): Promise<BenchmarkModelSummary[] | null> {
+  const run = await drizzle(db)
+    .select({ id: benchmarkRuns.id })
+    .from(benchmarkRuns)
+    .where(
+      and(
+        eq(benchmarkRuns.id, runId),
+        or(eq(benchmarkRuns.router, router), eq(benchmarkRuns.kind, 'classifier'))
+      )
+    )
+    .get();
+  if (!run) return null;
+  return getSummaries(db, runId);
+}
+
 export async function listRuns(
   db: D1Database,
   limit: number,
@@ -932,8 +954,7 @@ export async function listRuns(
   // filters server-side instead of slicing a mixed page client-side.
   filter: { router?: AutoRouter; kind?: BenchmarkKind; purpose?: BenchmarkRunPurpose } = {}
 ): Promise<BenchmarkRun[]> {
-  const orm = drizzle(db);
-  const runRows = await orm
+  const runRows = await drizzle(db)
     .select()
     .from(benchmarkRuns)
     .where(
@@ -945,32 +966,16 @@ export async function listRuns(
     )
     .orderBy(desc(benchmarkRuns.started_at))
     .limit(limit);
+  return runRows.map(mapRunRow);
+}
 
-  if (runRows.length === 0) {
-    return [];
-  }
-
-  const summaryRows = await orm
-    .select()
-    .from(modelSummaries)
-    .where(
-      inArray(
-        modelSummaries.run_id,
-        runRows.map(r => r.id)
-      )
-    );
-
-  const summariesByRunId = new Map<string, BenchmarkModelSummary[]>();
-  for (const row of summaryRows) {
-    const existing = summariesByRunId.get(row.run_id);
-    if (existing) {
-      existing.push(mapSummaryRow(row));
-    } else {
-      summariesByRunId.set(row.run_id, [mapSummaryRow(row)]);
-    }
-  }
-
-  return runRows.map(row => mapRunRow(row, summariesByRunId.get(row.id) ?? []));
+export async function existsRunningRun(db: D1Database, router: AutoRouter): Promise<boolean> {
+  const run = await drizzle(db)
+    .select({ id: benchmarkRuns.id })
+    .from(benchmarkRuns)
+    .where(and(eq(benchmarkRuns.router, router), eq(benchmarkRuns.status, 'running')))
+    .get();
+  return run !== undefined;
 }
 
 export type RunProgressCountRow = {

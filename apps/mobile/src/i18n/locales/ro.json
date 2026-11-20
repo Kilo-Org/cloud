@@ -19,7 +19,10 @@
     "presenceStatus": "Gazde: {{connection}}",
     "commandStatus": "Livrarea comenzii: {{status}}",
     "delivered": "Livrat",
-    "expired": "Expirat"
+    "expired": "Expirat",
+    "recoveryGaps_one": "Lipsește {{displayCount}} parte din această transcriere.",
+    "recoveryGaps_few": "Lipsesc {{displayCount}} părți din această transcriere.",
+    "recoveryGaps_other": "Lipsesc {{displayCount}} de părți din această transcriere."
   },
   "common": {
     "manageOnWeb": "Gestionează pe web",
@@ -2838,7 +2841,9 @@
     "modelPicker": {
       "title": "Model",
       "favorites": "Favorite",
-      "noModelsDescription": "Nu este disponibil niciun model."
+      "noModelsDescription": "Nu este disponibil niciun model.",
+      "allUnavailableTitle": "Niciun model nu poate fi folosit",
+      "allUnavailableDescription": "Adaugă o cheie de furnizor, apoi încearcă din nou."
     },
     "modelSelector": {
       "provider": "Furnizor {{id}}",
@@ -5063,6 +5068,7 @@
     "providersDescription": "Dezactivați un furnizor pentru a opri rutarea Kilo către acesta pentru această organizație.",
     "providersNeedCatalog": "Comutatoarele furnizorilor rămân doar pentru citire până la încărcarea catalogului complet de modele. Atingeți Reîncearcă mai sus pentru a le edita.",
     "providersEmpty": "Niciun furnizor nu corespunde acestei căutări.",
+    "providersNone": "Nu există furnizori disponibili pentru această organizație.",
     "allowAllShown": "Permite toate cele afișate",
     "denyAllShown": "Interzice toate cele afișate",
     "gatewaysDescription": "Kilo direcționează cererile către modele prin Vercel AI Gateway sau OpenRouter. O poartă de acces dezactivată face ca aceste cereri să eșueze.",

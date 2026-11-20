@@ -19,7 +19,11 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregue",
-    "expired": "Expirado"
+    "expired": "Expirado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrição.",
+    "recoveryGaps_many": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_other": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_zero": "Faltam {{displayCount}} partes desta transcrição."
   },
   "common": {
     "manageOnWeb": "Gerir na web",
@@ -2888,7 +2892,9 @@
     "modelPicker": {
       "title": "Selecionar modelo",
       "favorites": "Favoritos",
-      "noModelsDescription": "Não há modelos disponíveis para selecionar."
+      "noModelsDescription": "Não há modelos disponíveis para selecionar.",
+      "allUnavailableTitle": "Não é possível utilizar nenhum modelo",
+      "allUnavailableDescription": "Adiciona uma chave de fornecedor e tenta novamente."
     },
     "modelSelector": {
       "provider": "Fornecedor {{id}}",
@@ -5139,6 +5145,7 @@
     "providersDescription": "Desative um fornecedor para impedir o Kilo de encaminhar pedidos para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos fornecedores ficam só de leitura até o catálogo completo de modelos ser carregado. Toque em Tentar novamente acima para os editar.",
     "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",
+    "providersNone": "Nenhum fornecedor está disponível para esta organização.",
     "allowAllShown": "Permitir todos os apresentados",
     "denyAllShown": "Negar todos os apresentados",
     "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",

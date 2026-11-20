@@ -19,7 +19,9 @@
     "presenceStatus": "Isännät: {{connection}}",
     "commandStatus": "Komennon toimitus: {{status}}",
     "delivered": "Toimitettu",
-    "expired": "Vanhentunut"
+    "expired": "Vanhentunut",
+    "recoveryGaps_one": "{{displayCount}} osa tästä litteroinnista puuttuu.",
+    "recoveryGaps_other": "{{displayCount}} osaa tästä litteroinnista puuttuu."
   },
   "common": {
     "manageOnWeb": "Hallinnoi verkossa",
@@ -2788,6 +2790,8 @@
     "modelPicker": {
       "title": "Valitse malli",
       "noModelsDescription": "Valittavissa ei ole malleja.",
+      "allUnavailableTitle": "Yhtään mallia ei voi käyttää",
+      "allUnavailableDescription": "Lisää palveluntarjoajan avain ja yritä uudelleen.",
       "favorites": "Suosikit"
     },
     "modelSelector": {
@@ -4987,6 +4991,7 @@
     "providersDescription": "Poista palveluntarjoaja käytöstä, niin Kilo ei enää reititä pyyntöjä sille tässä organisaatiossa.",
     "providersNeedCatalog": "Palveluntarjoajien kytkimet ovat vain luku -tilassa, kunnes koko mallikatalogi on ladattu. Muokkaa niitä napauttamalla yllä Yritä uudelleen.",
     "providersEmpty": "Haulla ei löytynyt palveluntarjoajia.",
+    "providersNone": "Tälle organisaatiolle ei ole saatavilla palveluntarjoajia.",
     "allowAllShown": "Salli kaikki näytetyt",
     "denyAllShown": "Estä kaikki näytetyt",
     "gatewaysDescription": "Kilo reitittää mallipyynnöt Vercel AI Gatewayn tai OpenRouterin kautta. Jos yhdyskäytävä on poistettu käytöstä, sen kautta kulkevat pyynnöt epäonnistuvat.",

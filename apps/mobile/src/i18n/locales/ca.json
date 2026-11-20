@@ -19,7 +19,10 @@
     "presenceStatus": "Amfitrions: {{connection}}",
     "commandStatus": "Lliurament de l'ordre: {{status}}",
     "delivered": "Lliurada",
-    "expired": "Caducada"
+    "expired": "Caducada",
+    "recoveryGaps_one": "Falta {{displayCount}} part d'aquesta transcripció.",
+    "recoveryGaps_many": "Falten {{displayCount}} parts d'aquesta transcripció.",
+    "recoveryGaps_other": "Falten {{displayCount}} parts d'aquesta transcripció."
   },
   "common": {
     "manageOnWeb": "Gestiona-ho al web",
@@ -2838,7 +2841,9 @@
     "modelPicker": {
       "title": "Model",
       "favorites": "Preferits",
-      "noModelsDescription": "No hi ha cap model per seleccionar."
+      "noModelsDescription": "No hi ha cap model per seleccionar.",
+      "allUnavailableTitle": "No es pot utilitzar cap model",
+      "allUnavailableDescription": "Afegeix una clau de proveïdor i torna-ho a provar."
     },
     "modelSelector": {
       "provider": "Proveïdor {{id}}",
@@ -5063,6 +5068,7 @@
     "providersDescription": "Desactiva un proveïdor perquè Kilo hi deixi d'encaminar sol·licituds en aquesta organització.",
     "providersNeedCatalog": "Els interruptors dels proveïdors són de només lectura fins que es carregui el catàleg complet de models. Toca Torna-ho a provar a dalt per editar-los.",
     "providersEmpty": "Cap proveïdor coincideix amb aquesta cerca.",
+    "providersNone": "No hi ha cap proveïdor disponible per a aquesta organització.",
     "allowAllShown": "Permet tots els mostrats",
     "denyAllShown": "Denega tots els mostrats",
     "gatewaysDescription": "Kilo encamina les sol·licituds de models a través de Vercel AI Gateway o OpenRouter. Si una passarel·la està desactivada, aquestes sol·licituds fallen.",

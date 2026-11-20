@@ -19,7 +19,10 @@
     "presenceStatus": "Hostovi: {{connection}}",
     "commandStatus": "Isporuka naredbe: {{status}}",
     "delivered": "Isporučeno",
-    "expired": "Isteklo"
+    "expired": "Isteklo",
+    "recoveryGaps_one": "Nedostaje {{displayCount}} dio ovog transkripta.",
+    "recoveryGaps_few": "Nedostaju {{displayCount}} dijela ovog transkripta.",
+    "recoveryGaps_other": "Nedostaje {{displayCount}} dijelova ovog transkripta."
   },
   "common": {
     "manageOnWeb": "Upravljaj na webu",
@@ -2838,7 +2841,9 @@
     "modelPicker": {
       "title": "Odabir modela",
       "favorites": "Omiljeni",
-      "noModelsDescription": "Nijedan model nije dostupan za odabir."
+      "noModelsDescription": "Nijedan model nije dostupan za odabir.",
+      "allUnavailableTitle": "Nijedan model se ne može koristiti",
+      "allUnavailableDescription": "Dodaj ključ pružaoca i pokušaj ponovo."
     },
     "modelSelector": {
       "provider": "Pružalac usluge {{id}}",
@@ -5063,6 +5068,7 @@
     "providersDescription": "Isključite pružaoca da Kilo prestane usmjeravati zahtjeve prema njemu za ovu organizaciju.",
     "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita kompletan katalog modela. Dodirnite Pokušaj ponovo iznad da ih uredite.",
     "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",
+    "providersNone": "Nijedan pružalac nije dostupan za ovu organizaciju.",
     "allowAllShown": "Dozvoli sve prikazane",
     "denyAllShown": "Zabrani sve prikazane",
     "gatewaysDescription": "Kilo usmjerava zahtjeve modelima putem Vercel AI Gatewaya ili OpenRoutera. Ako je gateway onemogućen, ti zahtjevi neće uspjeti.",

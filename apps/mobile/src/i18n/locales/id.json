@@ -19,7 +19,9 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Pengiriman perintah: {{status}}",
     "delivered": "Terkirim",
-    "expired": "Kedaluwarsa"
+    "expired": "Kedaluwarsa",
+    "recoveryGaps_one": "{{displayCount}} bagian transkrip ini tidak ada.",
+    "recoveryGaps_other": "{{displayCount}} bagian transkrip ini tidak ada."
   },
   "common": {
     "manageOnWeb": "Kelola di web",
@@ -2231,6 +2233,8 @@
     "modelPicker": {
       "title": "Pilih model",
       "noModelsDescription": "Tidak ada model yang dapat dipilih.",
+      "allUnavailableTitle": "Tidak ada model yang dapat digunakan",
+      "allUnavailableDescription": "Tambah kunci penyedia, lalu coba lagi.",
       "favorites": "Favorit"
     },
     "modelSelector": {
@@ -4987,6 +4991,7 @@
     "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
+    "providersNone": "Tidak ada penyedia yang tersedia untuk organisasi ini.",
     "allowAllShown": "Izinkan semua yang ditampilkan",
     "denyAllShown": "Tolak semua yang ditampilkan",
     "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",

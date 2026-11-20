@@ -19,7 +19,9 @@
     "presenceStatus": "හෝස්ට්: {{connection}}",
     "commandStatus": "විධානය යැවීම: {{status}}",
     "delivered": "ලැබී ඇත",
-    "expired": "කල් ඉකුත් වී ඇත"
+    "expired": "කල් ඉකුත් වී ඇත",
+    "recoveryGaps_one": "මෙම පිටපතේ කොටස් {{displayCount}}ක් අස්ථානගත වී ඇත.",
+    "recoveryGaps_other": "මෙම පිටපතේ කොටස් {{displayCount}}ක් අස්ථානගත වී ඇත."
   },
   "common": {
     "manageOnWeb": "වෙබයේ කළමනාකරණය කරන්න",
@@ -2788,6 +2790,8 @@
     "modelPicker": {
       "title": "මාදිලිය තෝරන්න",
       "noModelsDescription": "තේරීමට මාදිලි නොමැත.",
+      "allUnavailableTitle": "කිසිදු මාදිලියක් භාවිත කළ නොහැක",
+      "allUnavailableDescription": "සපයන්නාගේ යතුරක් එක් කර නැවත උත්සාහ කරන්න.",
       "favorites": "ප්‍රියතමයන්"
     },
     "modelSelector": {
@@ -4987,6 +4991,7 @@
     "providersDescription": "මෙම සංවිධානය සඳහා Kilo එයට මාර්ගගත කිරීම නැවැත්වීමට සපයන්නෙකු ක්‍රියා විරහිත කරන්න.",
     "providersNeedCatalog": "සම්පූර්ණ මාදිලි නාමාවලිය පූරණය වන තුරු සපයන්නන්ගේ ස්විච කියවීමට පමණි. ඒවා සංස්කරණය කිරීමට ඉහත ඇති නැවත උත්සාහ කරන්න බොත්තම තට්ටු කරන්න.",
     "providersEmpty": "මෙම සෙවුමට ගැළපෙන සපයන්නන් නැත.",
+    "providersNone": "මෙම සංවිධානය සඳහා ලබා ගත හැකි සපයන්නන් නොමැත.",
     "allowAllShown": "පෙන්වා ඇති සියල්ලට ඉඩ දෙන්න",
     "denyAllShown": "පෙන්වා ඇති සියල්ල ප්‍රතික්ෂේප කරන්න",
     "gatewaysDescription": "Kilo ආකෘති ඉල්ලීම් Vercel AI Gateway හෝ OpenRouter හරහා මාර්ගගත කරයි. ක්‍රියා විරහිත ද්වාරයක් එම ඉල්ලීම් අසාර්ථක කරයි.",

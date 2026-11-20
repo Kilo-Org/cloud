@@ -19,7 +19,9 @@
     "presenceStatus": "Hoostota: {{connection}}",
     "commandStatus": "Ergaa ajajaa: {{status}}",
     "delivered": "Ga'eera",
-    "expired": "Yeroon isaa darbeera"
+    "expired": "Yeroon isaa darbeera",
+    "recoveryGaps_one": "{{displayCount}} kutaa barreeffama kanaa hin argamne.",
+    "recoveryGaps_other": "{{displayCount}} kutaan barreeffama kanaa hin argamne."
   },
   "common": {
     "manageOnWeb": "Weebii irratti bulchi",
@@ -2788,7 +2790,9 @@
     "modelPicker": {
       "title": "Moodela filadhu",
       "favorites": "Kan jaallatte",
-      "noModelsDescription": "Moodeloonni filatamuu danda'an hin jiran."
+      "noModelsDescription": "Moodeloonni filatamuu danda'an hin jiran.",
+      "allUnavailableTitle": "Moodeelli tokkollee fayyadamuu hin danda'u",
+      "allUnavailableDescription": "Furtuu dhiyeessaa dabaliitii deebi'ii yaali."
     },
     "modelSelector": {
       "provider": "Dhiyeessaa {{id}}",
@@ -4987,6 +4991,7 @@
     "providersDescription": "Dhiyeessaa dhaabi dhaabbata kanaaf Kilo gara isaa akka hin geessineef.",
     "providersNeedCatalog": "Furtuuwwan dhiyeessaa hanga kaataalogiin moodeelaa guutuun fe'amutti dubbisuuf qofa ta'anii turu. Isaan gulaaluuf Irra deebi'ii yaali armaan olii tuqi.",
     "providersEmpty": "Dhiyeessaan barbaacha kanaaf hin jiru.",
+    "providersNone": "Dhiyeessaan dhaabbata kanaaf hin argamu.",
     "allowAllShown": "Kan mul'atan hunda hayyami",
     "denyAllShown": "Kan mul'atan hunda dhorki",
     "gatewaysDescription": "Kilo gaaffiiwwan moodelaa Vercel AI Gateway yookaan OpenRouter keessa geessa. Kallattiin cufame gaaffiiwwan sana ni kasaasa.",

@@ -125,6 +125,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
   // The session route's system Back listener registers on mount. These tests

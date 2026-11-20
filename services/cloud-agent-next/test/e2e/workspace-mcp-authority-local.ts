@@ -444,14 +444,20 @@ async function exerciseQuestions(config: DriverConfig, url: string, root: Chat, 
       },
     });
     const cancelInput = { sessionId: child.cloudAgentSessionId, messageId };
-    assert.deepEqual(await toolData(url, token, 'cancel_queued_message', cancelInput), {
-      dropped: true,
-    });
+    const cancelled = z
+      .object({ dropped: z.boolean() })
+      .parse(await toolData(url, token, 'cancel_queued_message', cancelInput));
     assert.deepEqual(await toolData(url, token, 'cancel_queued_message', cancelInput), {
       dropped: false,
     });
-    assert.equal(await waitForTurn(config, child, messageId), 'interrupted');
-    observe('queued-message-cancel', { result: 'passed' });
+    // Delivery moves a queued message to the runtime within the same pass, so
+    // the cancel can lose the race. A delivered message runs; a dropped one
+    // settles without running.
+    assert.equal(
+      await waitForTurn(config, child, messageId),
+      cancelled.dropped ? 'interrupted' : 'completed'
+    );
+    observe('queued-message-cancel', { result: 'passed', dropped: cancelled.dropped });
   }
 }
 

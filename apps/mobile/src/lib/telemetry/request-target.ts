@@ -11,20 +11,48 @@
 /** The path prefix a tRPC HTTP call is served under. */
 export const TRPC_PATH = '/api/trpc/';
 
-/** A URL authority's userinfo prefix, the part before the host. */
-const URL_USERINFO_PATTERN = /^([a-z][\da-z+.-]*:\/\/)[^/?#]*@/iu;
+/** A URL's scheme and its `//` authority marker, at the start of the string. */
+const SCHEME_PREFIX = /^[a-z][\da-z+.-]*:\/\//iu;
+
+/** The text before the first `?` or `#`. */
+function cutAtQueryOrFragment(text: string): string {
+  const cut = text.search(/[?#]/u);
+  return cut === -1 ? text : text.slice(0, cut);
+}
 
 /**
- * Reduce a URL to its origin and path: drop the query string, the fragment,
- * and the authority's userinfo prefix. Fields built from this — the
- * `network.url` context, the synthesized message, the fingerprint path — carry
- * origin and path. Returns empty string on a non-string.
+ * Reduce a URL to its origin and path: drop the query string, the fragment and
+ * any authority userinfo, which ends at its last `@` whatever characters it
+ * carries. Fields built from this — the `network.url` context, the synthesized
+ * message, the fingerprint path — carry origin and path. Returns empty string
+ * on a non-string.
  */
 export function stripQueryString(url: string): string {
   try {
-    const cut = url.search(/[?#]/u);
-    const originAndPath = cut === -1 ? url : url.slice(0, cut);
-    return originAndPath.replace(URL_USERINFO_PATTERN, '$1');
+    const scheme = SCHEME_PREFIX.exec(url);
+    if (scheme === null) {
+      return cutAtQueryOrFragment(url);
+    }
+    const schemeEnd = scheme[0].length;
+    // A delimiter ends the authority once the userinfo is terminated, or when
+    // the run since the scheme cannot be userinfo (it holds no ':'); otherwise
+    // the delimiter sits inside the userinfo and the authority continues.
+    let lastAt = -1;
+    let runHoldsColon = false;
+    for (let i = schemeEnd; i < url.length; i += 1) {
+      const c = url[i];
+      if (c === '@') {
+        lastAt = i;
+      } else if (c === ':') {
+        runHoldsColon = true;
+      } else if ((c === '/' || c === '?' || c === '#') && (lastAt !== -1 || !runHoldsColon)) {
+        break;
+      }
+    }
+    if (lastAt === -1) {
+      return cutAtQueryOrFragment(url);
+    }
+    return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(lastAt + 1));
   } catch {
     return '';
   }

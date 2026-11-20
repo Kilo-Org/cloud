@@ -505,7 +505,7 @@ describe('GET /admin/config', () => {
       bestAccuracySwitchThreshold: 0.05,
       lowConfidenceThreshold: null,
       classifierRepetitions: 1,
-      deciderRepetitions: 1,
+      deciderRepetitions: 3,
       classifierMaxP95LatencyMs: null,
     });
   });
@@ -660,7 +660,7 @@ describe('PUT /admin/config', () => {
       bestAccuracySwitchThreshold: 0.05,
       lowConfidenceThreshold: null,
       classifierRepetitions: 1,
-      deciderRepetitions: 1,
+      deciderRepetitions: 3,
       classifierMaxP95LatencyMs: null,
     });
   });
@@ -693,7 +693,7 @@ describe('PUT /admin/config', () => {
       bestAccuracySwitchThreshold: 0.05,
       lowConfidenceThreshold: null,
       classifierRepetitions: 1,
-      deciderRepetitions: 1,
+      deciderRepetitions: 3,
       classifierMaxP95LatencyMs: null,
     });
     expect(body.config.minAccuracy).toBe(0.85);
@@ -958,7 +958,7 @@ describe('POST /admin/runs', () => {
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: expect.any(String),
       entries: [{ model: 'owner/a', variant: 'high', providers: [] }],
-      repetitions: 1,
+      repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -1021,12 +1021,12 @@ describe('POST /admin/runs', () => {
     expect(res.status).toBe(200);
     const [, run, modelRows] = vi.mocked(insertRun).mock.calls[0];
     expect(modelRows).toHaveLength(100);
-    expect(run).toMatchObject({ repetitions: 1, max_concurrency: 0, router: 'efficient' });
+    expect(run).toMatchObject({ repetitions: 3, max_concurrency: 0, router: 'efficient' });
     expect(modelRows[0].model).toBe('m/0');
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: run.id,
       entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
-      repetitions: 1,
+      repetitions: 3,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
     });
@@ -1109,7 +1109,7 @@ describe('GET /admin/registry', () => {
     expect(body).toEqual({
       router,
       engineIdentity: expect.any(String),
-      repetitions: 1,
+      repetitions: router === 'efficient' ? 3 : 1,
       platform: { pending: 0, running: 0, ready: 0, failed: 0 },
       user: { pending: 0, running: 0, ready: 0, failed: 0 },
       platformEntries: [],
@@ -1130,7 +1130,7 @@ describe('GET /admin/registry', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       router: 'efficient',
-      repetitions: 1,
+      repetitions: 3,
       platformEntries,
     });
   });
@@ -2224,7 +2224,7 @@ describe('POST /admin/custom-routing-table', () => {
     await expect(res.json()).resolves.toEqual({ table: null });
     expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
       env.BENCH_DB,
-      expect.objectContaining({ repetitions: 1 }),
+      expect.objectContaining({ repetitions: 3 }),
       [
         { model: 'a/b', variant: 'low' },
         { model: 'a/b', variant: 'high' },

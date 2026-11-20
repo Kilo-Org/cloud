@@ -131,16 +131,10 @@ test('a loading row is held, then released back onto its own screen', () => {
   assert.ok(batch);
   const [held, retryable] = batchTargets(batch, undefined);
   const link = 'kiloapp:///(app)/(tabs)/(2_agents)';
-  assert.equal(
-    held?.link,
-    `kiloapp:///dev/force-state/loading?next=${encodeURIComponent(link)}`
-  );
+  assert.equal(held?.link, `kiloapp:///dev/force-state/loading?next=${encodeURIComponent(link)}`);
   // A held target releases onto the same screen: the landing is what the jump is
   // measured against, and Home is not where the content lands.
-  assert.equal(
-    held?.after,
-    `kiloapp:///dev/force-state/clear?next=${encodeURIComponent(link)}`
-  );
+  assert.equal(held?.after, `kiloapp:///dev/force-state/clear?next=${encodeURIComponent(link)}`);
   assert.equal(held?.hold, true);
   // Every other forced state resets to Home, unchanged.
   assert.equal(retryable?.after, FORCE_CLEAR_LINK);

@@ -212,6 +212,10 @@ T3-L04	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/code-revie
 T3-L04	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/code-reviewer/personal/analytics	screen	(app)/code-reviewer/[scope]/analytics
 T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/pr-review	screen	(app)/pr-review
 T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/pr-review/gitlab/acme/sample/7	screen	(app)/pr-review/[platform]/[...identity]
+T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/pr-review/gitlab/acme/sample/7/file-navigator	screen	(app)/pr-review/[platform]/[...identity]/file-navigator
+T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/pr-review/gitlab/acme/sample/7/merge	screen	(app)/pr-review/[platform]/[...identity]/merge
+T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/pr-review/gitlab/acme/sample/7/review-submit	screen	(app)/pr-review/[platform]/[...identity]/review-submit
+T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/pr-review/gitlab/acme/sample/7/comment-composer	screen	(app)/pr-review/[platform]/[...identity]/comment-composer
 T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/agent-chat/new	screen	(app)/agent-chat/new
 T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/credits	screen	(app)/credits
 T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/usage	screen	(app)/usage

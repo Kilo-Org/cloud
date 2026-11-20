@@ -11,7 +11,7 @@
 
 import { i18n } from '@/i18n';
 import { servedAnswer } from '@/lib/query/read-failure-variant';
-import { readTrpcErrorField } from '@/lib/trpc-error';
+import { isControlPlaneTimeout, readTrpcErrorField } from '@/lib/trpc-error';
 
 export type PrReviewQueryState =
   | {
@@ -70,6 +70,12 @@ export type PrReviewQueryState =
 
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   const code = readTrpcErrorField(error, 'code');
+  // A client-side deadline is a slow but reachable server: it carries no code
+  // and no status, so the connection rule below would blame the network for a
+  // read the app itself gave up on. Retryable is what a second attempt fixes.
+  if (isControlPlaneTimeout(error)) {
+    return { kind: 'retryable' };
+  }
   // A read that never reached the server is the connection, not the backend.
   // `servedAnswer` is the rule the rest of the app classifies with: a tRPC
   // envelope carrying a code, or an HTTP status, proves the server answered —

@@ -246,6 +246,19 @@ describe('PrReviewFileList full-body states', () => {
     }
   );
 
+  it('names the connection when the file list never reached the server', () => {
+    listQueryState.firstPageErrorState = { kind: 'offline' };
+    listQueryState.query.refetch.mockClear();
+    const renderer = mountList();
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    expect(bottomPaddedViews(renderer)).toHaveLength(0);
+    act(() => {
+      (error.props.onRetry as () => void)();
+    });
+    expect(listQueryState.query.refetch).toHaveBeenCalledOnce();
+  });
+
   it('names the outage cause instead of leaving the body to the server default', () => {
     listQueryState.firstPageErrorState = { kind: 'service-unavailable' };
     const renderer = mountList();

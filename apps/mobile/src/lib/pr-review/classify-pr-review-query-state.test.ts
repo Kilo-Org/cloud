@@ -87,6 +87,14 @@ describe('classifyPrReviewQueryState', () => {
     expect(classifyPrReviewQueryState({ name: 'TRPCClientError' })).toEqual({ kind: 'offline' });
   });
 
+  // The app's own control-plane deadline rejects with no code and no status,
+  // but the server was reachable: it is a retry, not the connection.
+  it('classifies a client-side deadline as retryable, not offline', () => {
+    expect(classifyPrReviewQueryState({ name: 'RequestDeadlineError' })).toEqual({
+      kind: 'retryable',
+    });
+  });
+
   it('falls back to retryable for tRPC 5xx-class codes', () => {
     expect(classifyPrReviewQueryState(makeTrpcError('INTERNAL_SERVER_ERROR'))).toEqual({
       kind: 'retryable',

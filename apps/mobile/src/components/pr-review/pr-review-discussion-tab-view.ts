@@ -33,19 +33,29 @@ export function selectDiscussionTabView(args: {
    * start (spot check e7).
    */
   isPaused: boolean;
+  /**
+   * The device's committed connectivity is offline. A paused first page is the
+   * connection's doing then, not a read that failed, so it takes the
+   * connection's copy.
+   */
+  isOffline?: boolean;
   isEmpty: boolean;
 }): DiscussionTabView {
-  const { firstPageErrorState, isPending, isPaused, isEmpty } = args;
+  const { firstPageErrorState, isPending, isPaused, isOffline = false, isEmpty } = args;
 
   if (firstPageErrorState) {
     return { kind: firstPageErrorState.kind };
   }
   if (isPending) {
     // A paused page has no end: the skeleton would sit there with no
-    // comments, no empty state, and no error. Surface the retryable state so
-    // the tab always carries an escape. A page in flight — and the one frame
-    // before the fetch starts — keeps the skeleton.
-    return { kind: isPaused ? 'retryable' : 'loading' };
+    // comments, no empty state, and no error. Surface a failure state so the
+    // tab always carries an escape — the connection's own when the device is
+    // confirmed offline, the read's otherwise. A page in flight — and the one
+    // frame before the fetch starts — keeps the skeleton.
+    if (!isPaused) {
+      return { kind: 'loading' };
+    }
+    return { kind: isOffline ? 'offline' : 'retryable' };
   }
   if (isEmpty) {
     return { kind: 'empty' };

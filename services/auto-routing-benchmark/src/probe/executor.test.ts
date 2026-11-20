@@ -5,13 +5,19 @@ import type { CatalogModel } from '../platform-models';
 import { isExactModelUnavailableResult, isUnbilledTransientProviderResult } from '../cli-runner';
 import { gradeProbeOutput } from '../grading';
 import { PROBE_CASES } from '../datasets/probe-cases';
-import { BenchmarkProbeFamilyError, runProbeCaseViaGateway } from './executor';
+import { BenchmarkProbeFamilyError, PROBE_TIMEOUT_MS, runProbeCaseViaGateway } from './executor';
 import { PROBE_TEMPLATES, probeTemplate } from './request';
 import { probeFamily } from './family';
 
 const probeCase = PROBE_CASES[0]!;
 
-type Reply = { status: number; body: string; contentType?: string };
+type Reply = {
+  status: number;
+  body: string;
+  contentType?: string;
+  delayMs?: number;
+  hold?: 'before-headers' | 'after-headers';
+};
 
 type Recorded = { url: string; headers: Record<string, string>; body: Record<string, unknown> };
 
@@ -233,10 +239,21 @@ beforeEach(async () => {
         body,
       });
       const reply = replies.shift() ?? { status: 500, body: '{"error":"no reply queued"}' };
-      res.writeHead(reply.status, {
-        'content-type': reply.contentType ?? 'text/event-stream',
-      });
-      res.end(reply.body);
+      const respond = () => {
+        res.writeHead(reply.status, {
+          'content-type': reply.contentType ?? 'text/event-stream',
+        });
+        res.end(reply.body);
+      };
+      if (reply.hold === 'before-headers') return;
+      if (reply.hold === 'after-headers') {
+        res.writeHead(reply.status, {
+          'content-type': reply.contentType ?? 'text/event-stream',
+        });
+        return;
+      }
+      if (reply.delayMs === undefined) respond();
+      else setTimeout(respond, reply.delayMs);
     });
   });
   const listening = Promise.withResolvers<void>();
@@ -245,6 +262,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  server.closeAllConnections();
   const closed = Promise.withResolvers<void>();
   server.close(() => closed.resolve());
   await closed.promise;
@@ -255,8 +273,17 @@ function baseUrl(): string {
   return `http://127.0.0.1:${address.port}`;
 }
 
+function withTimeout(ms: number): typeof fetch {
+  return (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(ms) });
+}
+
 function run(
-  overrides: { catalogModel?: CatalogModel; model?: string; variant?: string | null } = {}
+  overrides: {
+    catalogModel?: CatalogModel;
+    model?: string;
+    variant?: string | null;
+    fetchImpl?: typeof fetch;
+  } = {}
 ) {
   return runProbeCaseViaGateway({
     model: overrides.model ?? model,
@@ -267,6 +294,7 @@ function run(
     kiloApiUrl: baseUrl(),
     orgId: 'org-1',
     now: new Date('2026-11-20T09:00:00.000Z').getTime(),
+    fetchImpl: overrides.fetchImpl,
   });
 }
 
@@ -510,6 +538,29 @@ describe('probe executor — failures keep the paid-call policy', () => {
     replies.push({ status: 503, body: 'upstream unavailable' });
     const result = await run();
     expect(isUnbilledTransientProviderResult(result)).toBe(true);
+  });
+
+  it('times out a request that never answered instead of failing the lane as ambiguous', async () => {
+    replies.push({ status: 200, body: '', hold: 'before-headers' });
+    const result = await run({ fetchImpl: withTimeout(20) });
+    expect(result).toMatchObject({ timedOut: true, exitCode: 1, costUsd: 0 });
+    expect(result.stderrTail).toBe(`probe request timed out after ${PROBE_TIMEOUT_MS}ms`);
+    expect(result.lastEventTypes).toEqual(['error']);
+  });
+
+  it('times out a rejection whose timeout is not an Error, as the worker reports it', async () => {
+    const result = await run({
+      fetchImpl: () => Promise.reject({ name: 'TimeoutError' }),
+    });
+    expect(result).toMatchObject({ timedOut: true, exitCode: 1, costUsd: 0 });
+    expect(result.stderrTail).toBe(`probe request timed out after ${PROBE_TIMEOUT_MS}ms`);
+  });
+
+  it('times out a stream that stops after the headers', async () => {
+    replies.push({ status: 200, body: '', hold: 'after-headers' });
+    const result = await run({ fetchImpl: withTimeout(20) });
+    expect(result).toMatchObject({ timedOut: true, exitCode: 1, costUsd: 0 });
+    expect(result.stderrTail).toBe(`probe request timed out after ${PROBE_TIMEOUT_MS}ms`);
   });
 
   it('treats a rejected model as unavailable, which fails the entry permanently', async () => {

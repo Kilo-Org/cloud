@@ -151,8 +151,13 @@ async function readStream(response: Response): Promise<StreamRead> {
   }
 }
 
-function isTimeout(error: unknown): boolean {
-  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+// `AbortSignal.timeout()` rejects with a DOMException, which is not an `Error` in Node or a
+// worker, so the rejection's name and the signal's own state are the timeout evidence.
+function isTimeout(error: unknown, signal: AbortSignal): boolean {
+  if (signal.aborted) return true;
+  if (typeof error !== 'object' || error === null || !('name' in error)) return false;
+  const { name } = error;
+  return name === 'TimeoutError' || name === 'AbortError';
 }
 
 /**
@@ -188,6 +193,7 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
   const fetchImpl = request.fetchImpl ?? fetch;
 
   let response: Response;
+  const signal = AbortSignal.timeout(PROBE_TIMEOUT_MS);
   try {
     response = await fetchImpl(url, {
       method: 'POST',
@@ -201,10 +207,10 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
         'content-type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      signal,
     });
   } catch (error) {
-    if (!isTimeout(error)) throw error;
+    if (!isTimeout(error, signal)) throw error;
     return { ...unbilledFailure(PROBE_TIMEOUT_DIAGNOSTIC, Date.now() - startedAt), timedOut: true };
   }
   const latencyMs = Date.now() - startedAt;
@@ -223,7 +229,7 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
   const billed = (reply.costUsd ?? 0) > 0 || (reply.outputTokens ?? 0) > 0;
   const produced = billed || reply.text.length > 0 || reply.toolCalls.length > 0;
   if (read.failure !== null) {
-    if (isTimeout(read.failure) && !produced) {
+    if (isTimeout(read.failure, signal) && !produced) {
       return { ...unbilledFailure(PROBE_TIMEOUT_DIAGNOSTIC, latencyMs), timedOut: true };
     }
     // The gateway may already have billed a generation whose output we cannot grade.

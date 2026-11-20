@@ -497,25 +497,22 @@ export const createDownloadHold = ({
    */
   const tabByNavigation = (item: DownloadHoldItem, at: number): number | undefined => {
     const named = pageOf(item.url) ?? pageOf(item.finalUrl);
-    let newest: { readonly tabId: number; readonly until: number } | undefined;
+    const live = [...navigations.entries()].filter(
+      ([tabId, navigation]) => navigation.until >= at && tabs.has(tabId)
+    );
+    const matched = live.find(
+      ([, navigation]) => named !== undefined && pageOf(navigation.url) === named
+    );
 
-    for (const [tabId, navigation] of navigations) {
-      if (navigation.until < at || !tabs.has(tabId)) {
-        continue;
-      }
-
-      if (named !== undefined && pageOf(navigation.url) === named) {
-        return tabId;
-      }
-
-      // An item with no url, or one redirected away from the url the call sent: the newest expectation is the tie.
-      if (newest === undefined || navigation.until > newest.until) {
-        newest = { tabId, until: navigation.until };
-      }
+    if (matched !== undefined) {
+      return matched[0];
     }
 
+    // An item with no url, or one redirected away from the url the call sent: the newest expectation is the tie.
+    const [newest] = live.toSorted((left, right) => right[1].until - left[1].until);
+
     // An item that carries a referrer is attributed by it, never by an expectation.
-    return pageOf(item.referrer) === undefined ? newest?.tabId : undefined;
+    return pageOf(item.referrer) === undefined ? newest?.[0] : undefined;
   };
 
   const classify = (item: DownloadHoldItem): Attribution => {

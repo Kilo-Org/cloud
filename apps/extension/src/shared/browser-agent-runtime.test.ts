@@ -1,5 +1,5 @@
 /* eslint-disable vitest/no-conditional-in-test -- the fake CDP and tabs API answer per method and per tab id */
-/* eslint-disable max-lines, require-await -- the suite drives one fake CDP session and one fake tab-group API through every agent tool path, whose fakes are async by contract. */
+/* eslint-disable import/max-dependencies, max-lines, require-await, vitest/max-expects -- the suite drives one fake CDP session and one fake tab-group API through every agent tool path, whose fakes are async by contract. */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createBrowserTabGroupController } from './browser-tab-groups';
@@ -5707,10 +5707,10 @@ describe('the download hold on a real call', () => {
   const holdOver = (downloads: ReturnType<typeof createFakeDownloads>) => {
     const reports: DownloadHoldReport[] = [];
     const hold = createDownloadHold({
-      cancel: downloads.api.cancel,
-      erase: downloads.api.erase,
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      erase: async itemId => downloads.api.erase?.({ id: itemId }),
       onReport: report => reports.push(report),
-      search: async itemId => downloads.api.search({ id: itemId }),
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
     });
 
     return { hold, reports };
@@ -5719,8 +5719,10 @@ describe('the download hold on a real call', () => {
   it('names browser_tabs new for a file the step’s own tab started, not the earlier navigate on the caller’s', async () => {
     const downloads = createFakeDownloads();
     const { hold } = holdOver(downloads);
-    const openedListeners: ((tab: { readonly id?: number; readonly openerTabId?: number }) => void)[] =
-      [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
     const created: Record<string, unknown>[] = [];
     const newTab = TAB_ID + 6;
     const url = `${MAIN_ORIGIN}/report.txt`;
@@ -5847,7 +5849,9 @@ describe('the download hold on a real call', () => {
     expect(guarded.kind).toBe('needs_permission');
     expect(suggested).toStrictEqual([71, 72]);
     // Both files were stopped, and both are named: the approval is for one of them.
-    expect(guarded.kind === 'needs_permission' ? guarded.result.error : '').toContain('second.txt');
+    expect(
+      guarded.kind === 'needs_permission' && !guarded.result.ok ? guarded.result.error : ''
+    ).toContain('second.txt');
 
     const token = expectStepToken(guarded);
 
@@ -5872,10 +5876,10 @@ describe('a download the dialog answer starts', () => {
   const holdOver = (downloads: ReturnType<typeof createFakeDownloads>) => {
     const reports: DownloadHoldReport[] = [];
     const hold = createDownloadHold({
-      cancel: downloads.api.cancel,
-      erase: downloads.api.erase,
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      erase: async itemId => downloads.api.erase?.({ id: itemId }),
       onReport: report => reports.push(report),
-      search: async itemId => downloads.api.search({ id: itemId }),
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
     });
 
     return { hold, reports };
@@ -5926,13 +5930,16 @@ describe('a download the dialog answer starts', () => {
 
     const guarded = await answerDialog(runtime);
 
-    expect(guarded.kind).toBe('needs_permission');
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
     expect(guarded.step).toStrictEqual({
       argumentsHash: hashBrowserToolArguments({ accept: true }),
       tool: 'browser_handle_dialog',
     });
     expect(downloads.cancelled).toStrictEqual([81]);
-    expect(expectStepToken(guarded)).toEqual(expect.any(String));
+    expect(expectStepToken(guarded)).toStrictEqual(expect.any(String));
   });
 
   it('fails the attachment response when the response interceptor is the guard', async () => {
@@ -6020,7 +6027,10 @@ describe('a download the dialog answer starts', () => {
 
     const approved = await answerDialog(runtime, [token]);
 
-    expect(approved.kind).toBe('result');
+    if (approved.kind !== 'result') {
+      throw new Error(`expected the approved file to land, got ${JSON.stringify(approved)}`);
+    }
+
     // The approval bought one file: the other the same answer started is refused and reported.
     expect(hold.needOf('session-1')?.kind).toBe('spent');
     expect(downloads.cancelled).toStrictEqual([81, 82]);

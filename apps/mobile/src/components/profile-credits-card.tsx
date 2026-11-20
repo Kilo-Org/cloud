@@ -27,6 +27,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+} from '@/lib/query/read-failure-variant';
 import { useTRPC } from '@/lib/trpc';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
@@ -63,7 +67,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   const { hideBalance, hasLoaded: hideBalanceLoaded, setHideBalance } = useHideBalancePreference();
   const canLinkExternalPurchase = useCanLinkExternalPurchase();
-  const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
+  const {
+    userId,
+    isError: userIdError,
+    error: userIdFailure,
+    refetch: refetchUserId,
+  } = useCurrentUserId({ enabled });
   const hasUserId = userId !== undefined;
 
   const balanceOptions = trpc.user.getContextBalance.queryOptions({
@@ -87,6 +96,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     isLoading: balanceLoading,
     isPlaceholderData: balancePlaceholder,
     isError: balanceQueryError,
+    error: balanceError,
     refetch: refetchBalance,
   } = useQuery({
     ...balanceOptions,
@@ -116,6 +126,19 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // A failed getMe (no userId) can never render a trusted balance, so it shares
   // the balance error surface. Retry re-resolves the owner and re-fetches.
   const balanceFailed = balanceQueryError || userIdError;
+
+  // The kind of the failure decides the copy and the action: a refusal is not a
+  // transient failure, and a terminal one is the answer. Only a retryable or
+  // offline failure offers Retry, because only those can succeed on a second
+  // attempt. The read itself settles regardless of the online manager
+  // (`SETTLE_WHILE_OFFLINE`), so an unreachable one names the connection by
+  // having no server answer at all — no separate probe is needed here.
+  const balanceFailureKind = classifyReadFailureKind({
+    errors: [balanceQueryError ? balanceError : undefined, userIdError ? userIdFailure : undefined].filter(
+      (error): error is unknown => error != null
+    ),
+  });
+  const balanceRetryable = readFailureKindIsRetryable(balanceFailureKind);
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;
   const creditsFailed = selectedOrgId ? orgCreditsError : personalCreditsError;
@@ -240,19 +263,50 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     };
   }
 
+  const retryBalance = () => {
+    refetchUserId();
+    void refetchBalance();
+  };
+
+  // The failure's own sentence: the variant names the cause, so a refusal is
+  // not described as a transient failure and an unreachable read is not
+  // described as the server's. Only the retryable case keeps the short line
+  // beside a Retry.
+  const balanceFailureLabel =
+    balanceFailureKind === 'retryable'
+      ? t('profile.balanceLoadFailed')
+      : t(
+          balanceFailureKind === 'offline'
+            ? 'profile.balanceUnreachable'
+            : balanceFailureKind === 'permission'
+              ? 'profile.balanceAccessDenied'
+              : 'profile.balanceUnavailable'
+        );
+
+  // The retry line's spoken label names the action ("Tap to retry"), which the
+  // visible sentence cannot carry in one line; the other kinds are statements.
+  const balanceFailureAccessibilityLabel =
+    balanceFailureKind === 'retryable'
+      ? t('profile.failedToLoadBalance')
+      : balanceFailureLabel;
+
   // The balance slot's state: one shell paints all three, so the card never
   // moves as the read answers, fails or retries.
   let balanceState: BalanceBlockState = 'ready';
   if (showBalanceSkeleton) {
     balanceState = 'loading';
   } else if (balanceFailed) {
-    balanceState = 'failed';
+    balanceState = {
+      kind: 'failed',
+      failure: {
+        label: balanceFailureLabel,
+        accessibilityLabel: balanceFailureAccessibilityLabel,
+        retry: balanceRetryable
+          ? { onRetry: retryBalance, actionLabel: t('common.retry') }
+          : undefined,
+      },
+    };
   }
-
-  const retryBalance = () => {
-    refetchUserId();
-    void refetchBalance();
-  };
 
   return (
     <View
@@ -290,10 +344,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         amount={amountLine}
         toggle={visibilityToggle}
         note={expirySlot}
-        failureLabel={t('profile.balanceLoadFailed')}
-        retryLabel={t('profile.failedToLoadBalance')}
-        retryActionLabel={t('common.retry')}
-        onRetry={retryBalance}
       />
       {/* The person's own history and invoices sit under their balance; an
           organization's balance has no personal rows, so only the personal

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  classifyReadFailureKind,
   classifyReadFailureVariant,
   isReadPausedBeforeData,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
   type SelectReadFailureVariantInput,
 } from './read-failure-variant';
 
@@ -141,5 +144,67 @@ describe('isReadPausedBeforeData', () => {
     expect(
       isReadPausedBeforeData({ isPending: false, fetchStatus: 'paused', connectivity: 'offline' })
     ).toBe(false);
+  });
+});
+
+describe('classifyReadFailureKind', () => {
+  const kindFor = (patch: Partial<SelectReadFailureVariantInput>) =>
+    classifyReadFailureKind({ errors: [], isPaused: false, connectivity: 'online', ...patch });
+
+  it('names the connection for a read that never reached the server', () => {
+    expect(kindFor({ errors: [new TypeError('Network request failed')] })).toBe('offline');
+  });
+
+  it('names the connection for a paused read', () => {
+    expect(kindFor({ isPaused: true })).toBe('offline');
+  });
+
+  it('names a refusal as permission, not a transient server failure', () => {
+    expect(kindFor({ errors: [serverError('FORBIDDEN')] })).toBe('permission');
+    expect(kindFor({ errors: [serverError('UNAUTHORIZED')] })).toBe('permission');
+  });
+
+  it('names a removed read as terminal', () => {
+    expect(kindFor({ errors: [serverError('NOT_FOUND')] })).toBe('terminal');
+  });
+
+  it('names a 5xx as retryable', () => {
+    expect(kindFor({ errors: [serverError('INTERNAL_SERVER_ERROR')] })).toBe('retryable');
+  });
+
+  it('names the connection only while NO read reached the server', () => {
+    // One coded answer proves the server was reachable, so the refusal is the
+    // more specific truth about the surface than the transport error beside it.
+    expect(
+      kindFor({
+        errors: [new TypeError('Network request failed'), serverError('FORBIDDEN')],
+      })
+    ).toBe('permission');
+    // Nothing reached the server at all: the connection is the cause.
+    expect(
+      kindFor({ errors: [new TypeError('Network request failed'), new TypeError('timeout')] })
+    ).toBe('offline');
+  });
+
+  it('lets a refusal outrank a terminal code', () => {
+    // `FORBIDDEN` is itself in the terminal set; the refusal copy is the one
+    // that explains it.
+    expect(kindFor({ errors: [serverError('FORBIDDEN'), serverError('NOT_FOUND')] })).toBe(
+      'permission'
+    );
+  });
+
+  it('offers a retry only for the kinds a second attempt can fix', () => {
+    expect(readFailureKindIsRetryable('retryable')).toBe(true);
+    expect(readFailureKindIsRetryable('offline')).toBe(true);
+    expect(readFailureKindIsRetryable('permission')).toBe(false);
+    expect(readFailureKindIsRetryable('terminal')).toBe(false);
+  });
+
+  it('maps each kind to the variant that carries its copy', () => {
+    expect(readFailureKindVariant('offline')).toBe('offline');
+    expect(readFailureKindVariant('permission')).toBe('permission');
+    expect(readFailureKindVariant('terminal')).toBe('not-found');
+    expect(readFailureKindVariant('retryable')).toBe('server');
   });
 });

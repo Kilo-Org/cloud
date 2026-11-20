@@ -1,9 +1,50 @@
 import { type BannerState } from '@/lib/offline-banner-state';
-import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
+import {
+  isPermissionDeniedError,
+  isTerminalTrpcCode,
+  isTrpcClientError,
+  readTrpcErrorField,
+} from '@/lib/trpc-error';
 import { z } from 'zod';
 
 /** The presentation of a failed first load: who the failure blames. */
 export type ReadFailureVariant = 'offline' | 'server';
+
+/**
+ * Which of the app's four failure kinds a read landed in. A surface that reads
+ * through more than one call (a card over a balance and an identity, a list
+ * over its repositories and its rows) names ONE kind for the whole surface, so
+ * the reader cannot be told two different things about one failure.
+ *
+ * Only `retryable` and `offline` can succeed on a second attempt: a refusal is
+ * refused again, and a terminal code is the answer.
+ */
+export type ReadFailureKind = 'offline' | 'permission' | 'terminal' | 'retryable';
+
+/** True when asking the server again can plausibly succeed. */
+export function readFailureKindIsRetryable(kind: ReadFailureKind): boolean {
+  return kind === 'retryable' || kind === 'offline';
+}
+
+/**
+ * The `QueryError` variant that carries the kind's copy: the connection's own
+ * wording, the refusal, the removed-or-malformed read, or the server's
+ * transient failure. Plain strings so this module stays free of components.
+ */
+export function readFailureKindVariant(
+  kind: ReadFailureKind
+): 'offline' | 'permission' | 'not-found' | 'server' {
+  switch (kind) {
+    case 'offline':
+      return 'offline';
+    case 'permission':
+      return 'permission';
+    case 'terminal':
+      return 'not-found';
+    case 'retryable':
+      return 'server';
+  }
+}
 
 export type SelectReadFailureVariantInput = {
   /** Errors of the reads whose failure produced the error view. */
@@ -54,6 +95,34 @@ export function isReadPausedBeforeData(read: {
   connectivity: BannerState;
 }): boolean {
   return read.isPending && read.fetchStatus === 'paused' && read.connectivity !== 'unknown';
+}
+
+/**
+ * Names the kind of a failed first load, for the surfaces that must pick copy
+ * and an action from it.
+ *
+ * The connection comes first, but only when no read reached the server: a
+ * coded answer proves the server was reachable, so a refusal beside a
+ * transport error is still a refusal. After that, a refusal outranks a
+ * terminal code (a `FORBIDDEN` is itself terminal, and the refusal copy is the
+ * one that explains it), then any other terminal code, then a transient
+ * failure.
+ */
+export function classifyReadFailureKind({
+  errors,
+  isPaused,
+  connectivity,
+}: SelectReadFailureVariantInput): ReadFailureKind {
+  if (classifyReadFailureVariant({ errors, isPaused, connectivity }) === 'offline') {
+    return 'offline';
+  }
+  if (errors.some(error => isPermissionDeniedError(error))) {
+    return 'permission';
+  }
+  if (errors.some(error => isTerminalTrpcCode(readTrpcErrorField(error, 'code')))) {
+    return 'terminal';
+  }
+  return 'retryable';
 }
 
 function servedAnswer(error: unknown): boolean {

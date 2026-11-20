@@ -140,7 +140,7 @@ function EmptyStateBody({
             />
           </View>
         )}
-        <View className="items-center gap-1">
+        <View className="items-center gap-1 max-w-sm">
           <Text
             variant="large"
             className={cn('text-center', compact ? compactTitleClassName : undefined)}
@@ -156,7 +156,14 @@ function EmptyStateBody({
           {
             // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
             typeof description === 'string' ? (
-              <Text variant="muted" className="text-center">
+              <Text
+                variant="muted"
+                className="text-center"
+                // The block is capped at `max-w-sm`, so a long sentence wraps here;
+                // greedy wrap would leave one word alone on the second line.
+                // Android-only; iOS ignores the prop.
+                textBreakStrategy="balanced"
+              >
                 {description}
               </Text>
             ) : (

@@ -560,19 +560,30 @@ describe('local agents host over a loopback endpoint', () => {
     host.stop();
   });
 
-  it('answers an unexpected failure with what failed, in words the model can act on', async () => {
+  it('answers an unexpected failure of a tool call with what failed, in words the model can act on', async () => {
     const harness = createHarness();
     seedEnabledWithEndpoint(harness.storage);
-    harness.bridge.listTools.mockRejectedValueOnce(new Error('No tab with id: 42.'));
     const host = startHost(harness);
     await host.ready;
     const socket = await connectSocketIfNeeded(harness);
 
     await completeHandshake(socket);
+    // The call must reach the bridge, so the session it names is the one this controller opened.
+    const opened = z
+      .object({ result: z.object({ sessionHandle: z.string() }) })
+      .parse(await openSession(socket, { cliVersion: '1', cwd: '/tmp', title: 'Work' }));
+    const { sessionHandle } = opened.result;
+
+    harness.bridge.callTool.mockRejectedValueOnce(new Error('No tab with id: 42.'));
     socket.handlers.onText(
       JSON.stringify({
         controllerId: CONTROLLER_ID,
-        message: { id: 8, jsonrpc: '2.0', method: 'tools.list', params: {} },
+        message: {
+          id: 8,
+          jsonrpc: '2.0',
+          method: 'tools.call',
+          params: { arguments: {}, name: 'browser_snapshot', sessionHandle },
+        },
         type: 'rpc',
       })
     );
@@ -585,6 +596,39 @@ describe('local agents host over a loopback endpoint', () => {
       message:
         'The browser could not finish the call: No tab with id: 42. Part of it may have run; take a new page snapshot before retrying.',
     });
+    host.stop();
+  });
+
+  it('does not send the model after a snapshot when the failed method ran no page step', async () => {
+    const harness = createHarness();
+    seedEnabledWithEndpoint(harness.storage);
+    // `tools.list` reads the contract in memory: no page step ran, and a snapshot could not help.
+    harness.bridge.listTools.mockRejectedValueOnce(new Error('No tab with id: 42.'));
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    await completeHandshake(socket);
+    socket.handlers.onText(
+      JSON.stringify({
+        controllerId: CONTROLLER_ID,
+        message: { id: 9, jsonrpc: '2.0', method: 'tools.list', params: {} },
+        type: 'rpc',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 9)).toBeDefined();
+    });
+    const answered = messageOf(rpcWith(socket.sent, 'id', 9))?.['error'];
+
+    expect(answered).toStrictEqual({
+      code: -32_603,
+      message:
+        'The browser could not finish the call: No tab with id: 42. Nothing on the page changed; retrying the call is safe.',
+    });
+    // The advice a tool call needs must not leak into a method that never touched the page.
+    expect(JSON.stringify(answered)).not.toContain('snapshot');
     host.stop();
   });
 

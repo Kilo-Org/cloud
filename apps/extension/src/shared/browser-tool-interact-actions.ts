@@ -481,12 +481,28 @@ const releaseRemoteObject = async (
  * can never find. A node inside a shadow root (the month, day and year parts of
  * a date input are one) is out of reach of the page helper's document query, so
  * it is reported instead of tagged.
+ *
+ * The tag is read back: a page that overrides `Element.prototype.setAttribute`
+ * to throw, or to do nothing, would otherwise leave a live ref reported as stale.
  */
 const TAG_CONNECTED_NODE_FUNCTION =
-  "function (name, value) { if (this.isConnected !== true) { return 'detached'; } if (this.getRootNode() instanceof ShadowRoot) { return 'shadow'; } this.setAttribute(name, value); return 'tagged'; }";
-const UNTAG_NODE_FUNCTION = 'function (name) { this.removeAttribute(name); }';
+  "function (name, value) { try { if (this.isConnected !== true) { return 'detached'; } if (this.getRootNode() instanceof ShadowRoot) { return 'shadow'; } this.setAttribute(name, value); return this.getAttribute(name) === value ? 'tagged' : 'threw'; } catch (error) { return 'threw'; } }";
+const UNTAG_NODE_FUNCTION =
+  "function (name) { try { this.removeAttribute(name); } catch (error) { return 'threw'; } return 'untagged'; }";
 const SHADOW_PART_ERROR =
   'This ref points inside a control’s built-in parts (such as the month, day and year of a date input), which this tool cannot fill one by one. Target the control itself with a CSS selector; a date input takes one YYYY-MM-DD value.';
+const TAGGING_UNAVAILABLE_ERROR =
+  'The page would not let this tool mark the element, so nothing was run. Target the element with a unique CSS selector instead.';
+
+/** What a failed tag outcome means to the caller; `detached` and no value at all are a ref this session cannot see. */
+const tagRefusalError = (outcome: unknown): string => {
+  if (outcome === 'shadow') {
+    return SHADOW_PART_ERROR;
+  }
+
+  // A page that overrode the setter, or dropped the tag, is a live ref this tool cannot mark.
+  return outcome === 'threw' ? TAGGING_UNAVAILABLE_ERROR : STALE_REF_ERROR;
+};
 
 /**
  * Resolves a snapshot ref to a live CSS selector by tagging the node. Selector
@@ -531,7 +547,9 @@ const toPageHelperTarget = async (
   if (outcome !== 'tagged') {
     await releaseRemoteObject(session, objectId);
 
-    return { error: outcome === 'shadow' ? SHADOW_PART_ERROR : STALE_REF_ERROR, ok: false };
+    // `detached` and no value at all mean the ref is gone; a page that refused the tag is a different failure,
+    // And telling the caller its live ref is stale would send it looking for a snapshot that changes nothing.
+    return { error: tagRefusalError(outcome), ok: false };
   }
 
   return {

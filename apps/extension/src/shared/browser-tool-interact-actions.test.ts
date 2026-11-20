@@ -1020,6 +1020,52 @@ describe('browser_fill_form', () => {
     });
   });
 
+  it('reports a page that refuses the tag instead of calling the live ref stale', async () => {
+    const node = attachedField();
+    // A page can replace the setter its own tree uses; the ref is live, so a snapshot would change nothing.
+    const original = node.setAttribute.bind(node);
+
+    node.setAttribute = () => {
+      throw new Error('setAttribute is disabled');
+    };
+    const { session } = createFakeSession({ node, targets: { e70: ref(70) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_select_option',
+      { target: 'e70', values: ['Tea'] },
+      session
+    );
+
+    node.setAttribute = original;
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('would not let this tool mark the element');
+      expect(result.error).toContain('CSS selector');
+      // The ref is live: the stale hint would send the model after a snapshot that cannot help.
+      expect(result.error).not.toContain('stale or unknown');
+    }
+  });
+
+  it('reports a page whose setAttribute silently does nothing instead of calling the live ref stale', async () => {
+    const node = attachedField();
+
+    // No throw, no attribute: the read-back is what tells this apart from a tag that landed.
+    node.setAttribute = () => {};
+    const { session } = createFakeSession({ node, targets: { e70: ref(70) } });
+
+    const result = await runInteractBrowserTool(
+      'browser_select_option',
+      { target: 'e70', values: ['Tea'] },
+      session
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('would not let this tool mark the element');
+      expect(result.error).not.toContain('stale or unknown');
+    }
+  });
+
   it('reports a ref inside a shadow root at once instead of waiting for a selector it cannot reach', async () => {
     const host = document.createElement('div');
     const part = document.createElement('input');

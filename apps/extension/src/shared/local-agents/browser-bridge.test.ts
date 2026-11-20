@@ -4,12 +4,14 @@ import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
   SENSITIVE_REASON,
+  UNSERVED_BROWSER_TOOL_NAMES,
   createStepTokenStore,
   hashBrowserToolArguments,
 } from '../browser-agent-checks';
 import type { StepTokenIssue, StepTokenStore } from '../browser-agent-checks';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
 import type { BrowserCaller } from '../browser-caller';
+import { BROWSER_TOOL_CONTRACT } from '../browser-tool-contract';
 import type { BrowserToolRunInput, BrowserToolRunOutcome } from '../browser-runtime';
 import type { BrowserShareTabResult, BrowserTabGroupSessionSummary } from '../browser-tab-groups';
 import { BROWSER_TOOL_CONTRACT_SHA } from './envelope';
@@ -950,6 +952,22 @@ describe('local agent browser bridge', () => {
     expect(list['tools']).toContainEqual(
       expect.objectContaining({ name: 'browser_snapshot', readOnly: true })
     );
+  });
+
+  it('does not offer the one pinned tool no backend here can run', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+    const listed = await bridge.listTools();
+    const { tools } = z.object({ tools: z.array(z.object({ name: z.string() })) }).parse(listed);
+    const names = tools.map(tool => tool.name);
+
+    // The contract stays verbatim, so the handshake SHA still matches; only the offer is narrowed.
+    // A caller that still sends the name is answered `unsupported_in_browser` (its own test).
+    expect(names).not.toContain('browser_run_code_unsafe');
+    expect(names).toHaveLength(BROWSER_TOOL_CONTRACT.length - 1);
+    for (const name of UNSERVED_BROWSER_TOOL_NAMES) {
+      expect(names).not.toContain(name);
+    }
   });
 
   it('refuses a share when the browser has no active tab', async () => {

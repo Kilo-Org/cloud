@@ -8,6 +8,7 @@ import {
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
   RUN_CODE_UNSUPPORTED_ERROR,
+  UNSERVED_BROWSER_TOOL_NAMES,
 } from '../browser-agent-checks';
 import type { BrowserCaller } from '../browser-caller';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
@@ -569,7 +570,11 @@ export const createRuntimeBrowserBridge = ({
     listTools: () =>
       Promise.resolve({
         contractSha: BROWSER_TOOL_CONTRACT_SHA,
-        tools: BROWSER_TOOL_CONTRACT.map(tool => ({
+        // The contract stays verbatim — its SHA is of the pinned upstream `tools/list` and the handshake compares it —
+        // But a tool no backend here can run is not offered: an offer costs a turn the call can only refuse.
+        tools: BROWSER_TOOL_CONTRACT.filter(
+          tool => !UNSERVED_BROWSER_TOOL_NAMES.has(tool.name)
+        ).map(tool => ({
           inputSchema: tool.inputSchema,
           name: tool.name,
           readOnly: tool.readOnly,

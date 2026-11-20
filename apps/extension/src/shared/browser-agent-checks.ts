@@ -245,6 +245,15 @@ export const AGENT_TAB_OUTSIDE_GROUP_ERROR =
 export const RUN_CODE_UNSUPPORTED_ERROR =
   'browser_run_code_unsafe is not available: the Kilo extension cannot run Playwright code in Chrome or Firefox. Run a JavaScript function in the page with browser_evaluate instead.';
 
+/**
+ * The pinned tools no backend can run here. The vendored contract keeps them —
+ * its SHA-256 is of the upstream `tools/list` and the handshake compares that —
+ * but a listing must not offer a tool whose every call is refused above.
+ */
+export const UNSERVED_BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'browser_run_code_unsafe',
+]);
+
 /** The two tools that run model-authored page code (D11: they need the `act` grant). */
 export const isScriptTool = (toolName: string): boolean =>
   toolName === 'browser_evaluate' || toolName === 'browser_run_code_unsafe';

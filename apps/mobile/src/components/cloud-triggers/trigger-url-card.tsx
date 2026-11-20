@@ -14,6 +14,7 @@ import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Copy } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -24,8 +25,9 @@ export function TriggerUrlCard({ url }: Readonly<{ url: string }>) {
   // centre follows the URL block whatever the address wraps to, and it stays
   // out of the column's flow so the pair keeps the field's label-to-value gap:
   // a control on the value's line would centre the URL inside 48 dp and push it
-  // further from its label than the pairs below it. The empty cell below holds
-  // the control's width in the row, so the address wraps before it.
+  // further from its label than the pairs below it. The empty cell beside the
+  // address holds the control's own width in the row, so the address wraps
+  // before the control instead of running under it.
   return (
     <View className="gap-1.5">
       <FormFieldLabel label={t('cloudAgent.triggers.webhookUrl')} />
@@ -34,7 +36,7 @@ export function TriggerUrlCard({ url }: Readonly<{ url: string }>) {
           <Text variant="mono" className="min-w-0 flex-1 text-xs">
             {url}
           </Text>
-          <View className="w-12" />
+          <View className={ICON_TARGET_BOX_CLASS} />
         </View>
         <View className="absolute inset-y-0 end-0 justify-center">
           <IconButton

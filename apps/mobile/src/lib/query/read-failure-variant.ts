@@ -26,6 +26,14 @@ export function readFailureKindIsRetryable(kind: ReadFailureKind): boolean {
   return kind === 'retryable' || kind === 'offline';
 }
 
+/** The `QueryError` variant that carries each kind's copy. */
+const VARIANT_BY_KIND = {
+  offline: 'offline',
+  permission: 'permission',
+  terminal: 'not-found',
+  retryable: 'server',
+} as const satisfies Record<ReadFailureKind, 'offline' | 'permission' | 'not-found' | 'server'>;
+
 /**
  * The `QueryError` variant that carries the kind's copy: the connection's own
  * wording, the refusal, the removed-or-malformed read, or the server's
@@ -34,16 +42,7 @@ export function readFailureKindIsRetryable(kind: ReadFailureKind): boolean {
 export function readFailureKindVariant(
   kind: ReadFailureKind
 ): 'offline' | 'permission' | 'not-found' | 'server' {
-  switch (kind) {
-    case 'offline':
-      return 'offline';
-    case 'permission':
-      return 'permission';
-    case 'terminal':
-      return 'not-found';
-    case 'retryable':
-      return 'server';
-  }
+  return VARIANT_BY_KIND[kind];
 }
 
 export type SelectReadFailureVariantInput = {

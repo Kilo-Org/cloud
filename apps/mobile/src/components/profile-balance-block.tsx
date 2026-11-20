@@ -22,7 +22,7 @@ export type BalanceBlockState =
 export type BalanceFailure = Readonly<{
   readonly label: string;
   /** Absent when the failure cannot be fixed by asking again. */
-  readonly retry?: { readonly onRetry: () => void; readonly actionLabel: string };
+  readonly retry?: { readonly handleRetry: () => void; readonly actionLabel: string };
   /** The spoken label of the line, when it is a button. */
   readonly accessibilityLabel?: string;
 }>;
@@ -79,7 +79,7 @@ export function BalanceBlock({ state, stacked, amount, toggle, note }: BalanceBl
       <Pressable
         className="min-h-7 min-w-0 flex-row items-center gap-2 active:opacity-70"
         hitSlop={LINE_ACTION_HIT_SLOP}
-        onPress={failure.retry.onRetry}
+        onPress={failure.retry.handleRetry}
         accessibilityRole="button"
         accessibilityLabel={failure.accessibilityLabel ?? failure.label}
       >

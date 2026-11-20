@@ -47,6 +47,17 @@ type CreditsCardProps = {
  */
 const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
 
+/**
+ * The sentence each failure kind paints: the connection's own wording, the
+ * refusal, the terminal read, or the transient failure beside its Retry.
+ */
+const BALANCE_FAILURE_COPY = {
+  offline: 'profile.balanceUnreachable',
+  permission: 'profile.balanceAccessDenied',
+  terminal: 'profile.balanceUnavailable',
+  retryable: 'profile.balanceLoadFailed',
+} as const;
+
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
@@ -134,10 +145,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // (`SETTLE_WHILE_OFFLINE`), so an unreachable one names the connection by
   // having no server answer at all — no separate probe is needed here.
   const balanceFailureErrors: unknown[] = [];
-  if (balanceQueryError && balanceError != null) {
+  if (balanceError) {
     balanceFailureErrors.push(balanceError);
   }
-  if (userIdError && userIdFailure != null) {
+  if (userIdFailure) {
     balanceFailureErrors.push(userIdFailure);
   }
   const balanceFailureKind = classifyReadFailureKind({
@@ -279,16 +290,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // not described as a transient failure and an unreachable read is not
   // described as the server's. Only the retryable case keeps the short line
   // beside a Retry.
-  const balanceFailureLabel =
-    balanceFailureKind === 'retryable'
-      ? t('profile.balanceLoadFailed')
-      : t(
-          balanceFailureKind === 'offline'
-            ? 'profile.balanceUnreachable'
-            : balanceFailureKind === 'permission'
-              ? 'profile.balanceAccessDenied'
-              : 'profile.balanceUnavailable'
-        );
+  const balanceFailureLabel = t(BALANCE_FAILURE_COPY[balanceFailureKind]);
 
   // The retry line's spoken label names the action ("Tap to retry"), which the
   // visible sentence cannot carry in one line; the other kinds are statements.
@@ -309,7 +311,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         label: balanceFailureLabel,
         accessibilityLabel: balanceFailureAccessibilityLabel,
         retry: balanceRetryable
-          ? { onRetry: retryBalance, actionLabel: t('common.retry') }
+          ? { handleRetry: retryBalance, actionLabel: t('common.retry') }
           : undefined,
       },
     };

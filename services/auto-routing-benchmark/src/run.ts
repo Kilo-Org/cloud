@@ -1297,7 +1297,10 @@ export async function dispatchScheduler(env: Env): Promise<void> {
     }
     await finalizeRunIfComplete(env, claim.run_id, 'decider', await getRunState(env, claim.run_id));
   }
-  for (const runId of await listSettledSchedulerRuns(env.BENCH_DB, 3)) {
+  for (const runId of await listSettledSchedulerRuns(
+    env.BENCH_DB,
+    REGISTRY_QUEUES * MAX_RUNNING_RUNS_PER_QUEUE
+  )) {
     await finalizeRunIfComplete(env, runId, 'decider', await getRunState(env, runId));
   }
   let claimed = await dispatchClaims(env, config);

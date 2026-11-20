@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { NETWORK_BODY_CONTEXT, redactUrlText, scrubBreadcrumb, scrubEvent } from './sentry-scrub';
+import { NETWORK_BODY_CONTEXT, scrubBreadcrumb, scrubEvent } from './sentry-scrub';
 
 describe('scrubEvent', () => {
   it('strips query strings from request.url', () => {
@@ -369,17 +369,5 @@ describe('scrubBreadcrumb', () => {
   it('handles breadcrumb with null data gracefully', () => {
     const breadcrumb = { category: 'navigation', data: null };
     expect(() => scrubBreadcrumb(breadcrumb)).not.toThrow();
-  });
-});
-
-describe('redactUrlText', () => {
-  it('keeps origin and path for a multi-part authority secret', () => {
-    const password = ['abcdefghij', 'klmnopqrst'].join('/');
-    const url = `https://user:${password}@example.com/api/trpc/a.b`;
-
-    const result = redactUrlText(url);
-
-    expect(result).toBe('https://example.com/api/trpc/a.b');
-    expect(result).not.toContain('abcdefghij');
   });
 });

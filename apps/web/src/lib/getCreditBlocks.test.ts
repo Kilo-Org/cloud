@@ -311,9 +311,15 @@ describe('getCreditGrants', () => {
         created_at: '2024-01-03',
       }),
       makeTransaction('other', 0, 100, { created_at: '2024-01-04' }),
+      // The admin Referral/Review grant: its category has no prefix.
+      makeTransaction('admin-referral', 0, 100, {
+        credit_category: 'referral',
+        created_at: '2024-01-05',
+      }),
     ];
 
     expect(getCreditGrants(transactions).map(grant => grant.kind)).toEqual([
+      'referral',
       'grant',
       'kilo_pass',
       'welcome',

@@ -148,7 +148,9 @@ export type CreditGrant = {
 };
 
 function grantKindOf(creditCategory: string | null): CreditGrantKind {
-  if (creditCategory?.startsWith('referral-')) {
+  // `referral` is the admin Referral/Review grant; the two self-service bonuses
+  // carry the `referral-` prefix.
+  if (creditCategory === 'referral' || creditCategory?.startsWith('referral-')) {
     return 'referral';
   }
   if (creditCategory === 'automatic-welcome-credits') {

@@ -266,9 +266,12 @@ export const GrantHistoryRow = memo(function GrantHistoryRow({
   grant,
   last,
 }: Readonly<{ grant: CreditGrant; last: boolean }>) {
+  // The hook is what re-renders the memoized row when the reader switches the
+  // catalog in place, the same way the two sibling rows read their copy.
+  const { t } = useTranslation();
   // A kind this app predates still paints a title: the generic grant label is
   // the row name, and an empty one reads as a broken row.
-  const title = i18n.t(lookup(GRANT_TITLE_KEYS, grant.kind) ?? 'credits.history.kind.grant');
+  const title = t(lookup(GRANT_TITLE_KEYS, grant.kind) ?? 'credits.history.kind.grant');
 
   return (
     <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>

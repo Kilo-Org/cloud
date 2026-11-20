@@ -321,4 +321,25 @@ describe('GrantHistoryRow', () => {
       });
     }
   });
+
+  it('retitles itself when the reader switches language in place', async () => {
+    const renderer = await renderGrantRow(grant({ kind: 'referral' }));
+    expect(texts(renderer)).toContain('Referral bonus');
+
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+
+      // No remount and no new props: the row subscribes to the catalog itself.
+      const painted = texts(renderer);
+      expect(painted).toContain('مكافأة الإحالة');
+      expect(painted).not.toContain('Referral bonus');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
 });

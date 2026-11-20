@@ -20,6 +20,7 @@ import {
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
+import { ReviewStatusBadge } from '@/components/code-reviewer/review-status-badge';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import {
   CouncilSection,
@@ -164,6 +165,11 @@ export function ReviewDetailScreen({
       subtitlePlaceholder={
         !loadedReview && isLoading ? <Skeleton className="h-3.5 w-28 rounded-full" /> : undefined
       }
+      // The outcome word rides the title line, the way the list row and the web
+      // detail page both state it, so no block in the body has to label it.
+      titleAccessory={
+        loadedReview ? <ReviewStatusBadge status={loadedReview.status} /> : undefined
+      }
     />
   );
 
@@ -281,24 +287,23 @@ export function ReviewDetailScreen({
           </Text>
         </Animated.View>
 
-        {/* Conclusion: the outcome leads — status first, then the reason. */}
-        <View className="gap-2">
-          <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
-          {reviewMessage ? (
-            // A failure keeps the danger tile under it: the red ink alone on
-            // the card surface read as ordinary copy, and the tint is the
-            // palette's own danger token, not a hand-built card fill.
-            <Card className={cancellationLabel ? undefined : 'bg-danger-tile-bg'}>
-              <Text
-                variant={cancellationLabel ? 'muted' : undefined}
-                className={cn('text-xs', !cancellationLabel && 'text-destructive')}
-                numberOfLines={4}
-              >
-                {reviewMessage}
-              </Text>
-            </Card>
-          ) : null}
-        </View>
+        {/* The outcome: a settled review states its status in the header badge
+            beside the title, so this block carries only the reason it ended.
+            The findings, council and gate sections below never repeat it. */}
+        {reviewMessage ? (
+          // A failure keeps the danger tile under it: the red ink alone on
+          // the card surface read as ordinary copy, and the tint is the
+          // palette's own danger token, not a hand-built card fill.
+          <Card className={cancellationLabel ? undefined : 'bg-danger-tile-bg'}>
+            <Text
+              variant={cancellationLabel ? 'muted' : undefined}
+              className={cn('text-xs', !cancellationLabel && 'text-destructive')}
+              numberOfLines={4}
+            >
+              {reviewMessage}
+            </Text>
+          </Card>
+        ) : null}
 
         {/* Findings: flattened from the council result, paginated in memory. */}
         <Section label={t('common.findings')}>

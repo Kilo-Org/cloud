@@ -424,6 +424,28 @@ describe('buildDirectProvider reasoning effort map', () => {
     expect(withoutEffort.body.reasoning_effort).toBeUndefined();
   });
 
+  it.each([
+    ['no effort', {}, 'max'],
+    ['an explicit effort', { reasoning: { effort: 'low' } }, 'low'],
+    ['a disable', { reasoning: { enabled: false } }, 'none'],
+  ] as const)(
+    'maps the mistral-thinking default effort for a request with %s',
+    async (_name, extra, expected) => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: { model: 'public-model', messages: [], ...extra },
+      };
+
+      await transformRequest(request, {
+        reasoning_effort_map: { high: 'max', none: 'low' },
+        reasoning_details_transform: ReasoningDetailsTransform.MistralThinking,
+      });
+
+      expect(request.body.reasoning_effort).toBe(expected);
+      expect(request.body.reasoning).toBeUndefined();
+    }
+  );
+
   it('lets extra_body override the mapped effort', async () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',

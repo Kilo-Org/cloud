@@ -646,6 +646,20 @@ describe('getProvider skips the partner', () => {
       }
     );
 
+    test('does not skip for the mistral-thinking default effort, even when the map makes it undeclared', async () => {
+      await insertPartner({
+        ...declared,
+        reasoning_details_transform: 'mistral-thinking',
+        reasoning_effort_map: { high: 'medium' },
+      });
+
+      const { result } = await routeAndRecord({
+        request: request('chat_completions', { messages: [] }),
+      });
+
+      expect((await result.routes[0]()).provider.type).toBe('partner');
+    });
+
     test('skips when the map replaces a declared effort with an undeclared one', async () => {
       await insertPartner({ ...declared, reasoning_effort_map: { high: 'medium' } });
 

@@ -396,8 +396,8 @@ function providerSettingsAllowPartner(
  * `reasoning-content` and `reasoning` transforms drop the `reasoning` object and forward only its
  * effort, behind an existing `reasoning_effort`, so `reasoning.enabled: false` does not reach the
  * upstream there and `reasoning_effort` wins over `reasoning.effort`. Null when the request
- * carries no effort, even though `mistral-thinking` then sends `high`: the partner is not skipped
- * for an effort the client did not choose.
+ * carries no effort, even though `mistral-thinking` then sends `high`, after
+ * `reasoning_effort_map`: the partner is not skipped for an effort the client did not choose.
  */
 function getUpstreamReasoningEffort(
   request: GatewayRequest,

@@ -30,6 +30,7 @@ import type { BrowserSensitiveStep } from './browser-agent-gate';
 import { ATTRIBUTION_WAIT_MS, targetOf } from './browser-download-hold';
 import type {
   DownloadHold,
+  DownloadHoldNavigation,
   DownloadSettle,
   DownloadSign,
   DownloadStep,
@@ -3573,6 +3574,8 @@ export const createBrowserRuntime = ({
                 toolName: stepToolName,
               }
             : undefined;
+        /** The navigation this call sent, when it sent one: its expectation is re-dated at the settle's entry. */
+        let navigateExpectation: DownloadHoldNavigation | null = null;
 
         if (downloadHold !== undefined && downloadStep !== undefined) {
           // The tab's page and step go with the call, before the tool runs: a download it starts is
@@ -3586,20 +3589,22 @@ export const createBrowserRuntime = ({
 
           // A navigation this runtime sends is the one call whose download Chrome reports with no referrer and,
           // On real Chrome, no announcement either: the call's own expectation is then the only tie to the tab.
-          // It covers exactly its own settle window, so a download after it stays the user's.
+          // It is registered now so the file is claimed while the tool runs, and extended when the tool returns
+          // Below: a slow navigation still produces its file inside its own settle window, never after a fixed span.
           if (
             stepToolName === 'browser_navigate' ||
             stepToolName === 'browser_navigate_back' ||
             stepToolName === 'browser_reload' ||
             (stepToolName === 'browser_tabs' && stepArgumentsRecord['action'] === 'new')
           ) {
-            downloadHold.navigate({
+            navigateExpectation = {
               attempt: `call-${String(guardArmedAt)}-${String(runTabId)}`,
               session: sessionKey,
               tabId: runTabId,
               until: guardArmedAt + DOWNLOAD_HOLD_SETTLE_MS + ATTRIBUTION_WAIT_MS,
               url: destination ?? '',
-            });
+            };
+            downloadHold.navigate(navigateExpectation);
           }
         }
 
@@ -3687,7 +3692,9 @@ export const createBrowserRuntime = ({
             : undefined;
 
         // The sign that a download started, which the hold cannot see before its item exists: the browser's own
-        // Announcement on this call's tab. It is what makes a signed call wait for its item instead of answering.
+        // Announcement on this call's tab. It is what makes a signed call wait for its item instead of answering,
+        // And what attributes a `no-referrer` item: the hold's own map is filled by the start-of-call drain, which
+        // Is empty for the call that actually starts the file, so the announcement has to reach it as it arrives.
         const stopSignWatch =
           holdGuards && agentContext !== undefined
             ? runSession.watchDownloads(download => {
@@ -3698,6 +3705,7 @@ export const createBrowserRuntime = ({
                     'the downloaded file',
                   url: download.url,
                 };
+                downloadHold?.announce({ ...download, tabId: runTabId });
               })
             : undefined;
 
@@ -3825,6 +3833,19 @@ export const createBrowserRuntime = ({
           stopSignWatch?.();
 
           if (holdGuards) {
+            // The tool answered, so the window a download of this call may land in starts now: a navigation that
+            // Took longer than the expectation's first span still produces its file inside the settle it owns, and
+            // The settle's own bound is measured from here rather than from a call start it may have already spent.
+            const settleEnteredAt = Date.now();
+
+            if (downloadHold !== undefined && navigateExpectation !== null) {
+              navigateExpectation = {
+                ...navigateExpectation,
+                until: settleEnteredAt + DOWNLOAD_HOLD_SETTLE_MS + ATTRIBUTION_WAIT_MS,
+              };
+              downloadHold.navigate(navigateExpectation);
+            }
+
             // A call with no sign of a download answers after the short grace; one that saw its tab announce a file
             // (or a load the browser answered as one) waits the bounded item wait for the hold's decision.
             settleState =
@@ -3948,13 +3969,16 @@ export const createBrowserRuntime = ({
             }
           }
 
-          // An approved repeat is a call for exactly the one file its approval bought. When the call ends with that
-          // Approval still unspent and no file of its own, the browser created no item for it — Chrome's own
-          // Multiple-downloads limiter refuses it — so the answer says so instead of a success the human cannot trust.
-          // A Document this call started and the browser has not answered yet is not that: its item can still arrive,
-          // And calling it blocked would spend the human's approval on a file the browser is still writing.
+          // An approved repeat is a call for exactly the one file its approval bought. When the call succeeded and
+          // Ends with that approval still unspent and no file of its own, the browser created no item for it —
+          // Chrome's own multiple-downloads limiter refuses it — so the answer says so instead of a success the human
+          // Cannot trust. A failed call is the tool's own failure, not the browser's: its missing element, its tab
+          // Error, its navigation refusal is what the model has to read, and the approval stays unspent for the retry.
+          // A Document this call started and the browser has not answered yet is not blocked either: its item can
+          // Still arrive, and calling it blocked would spend the human's approval on a file the browser is writing.
           if (
             downloadApproved &&
+            settled.ok &&
             ownLate.length === 0 &&
             settleState !== 'waiting_for_item' &&
             !hasUnansweredDocument() &&

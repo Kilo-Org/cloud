@@ -29,7 +29,14 @@ import {
 import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
 import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
 import { createDownloadHold } from './browser-download-hold';
-import type { DownloadHold, DownloadHoldReport } from './browser-download-hold';
+import type {
+  ApprovalNeed,
+  DownloadHold,
+  DownloadHoldNavigation,
+  DownloadHoldReport,
+  SettleWindow,
+  TrackedDownload,
+} from './browser-download-hold';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import type {
@@ -378,10 +385,26 @@ const createTabsApi = (): BrowserTabsApi => {
   };
 };
 
+/** What the fake `chrome.downloads` hands a test: the API the runtime reads, and the records it left behind. */
+interface FakeDownloads {
+  readonly api: BrowserDownloadsApi;
+  readonly cancelled: readonly number[];
+  /** Records an item and tells the guard, as `chrome.downloads.onCreated` does. */
+  readonly emit: (item: BrowserDownloadItem) => void;
+  readonly erased: readonly { readonly id: number }[];
+  /** How many `onCreated` listeners the guard has installed right now. */
+  readonly live: () => number;
+  /** Records an item without telling the guard: the browser creates one after the call's own command returned. */
+  readonly record: (item: BrowserDownloadItem) => void;
+  readonly removed: readonly number[];
+  /** The history a `startedAfter` search answers with, which a test seeds itself. */
+  readonly searched: BrowserDownloadItem[];
+}
+
 /** `chrome.downloads` as the runtime sees it: the single `onCreated` stream and the erase that deletes the file. */
 const createFakeDownloads = (
   options: { readonly cancelRejects?: boolean; readonly removeRejects?: boolean } = {}
-) => {
+): FakeDownloads => {
   const listeners: ((item: BrowserDownloadItem) => void)[] = [];
   const cancelled: number[] = [];
   const erased: { readonly id: number }[] = [];
@@ -5853,7 +5876,7 @@ describe('agent browser calls', () => {
 
 describe('the download hold on a real call', () => {
   /** A hold over the fake downloads, with the reports it queued in order. */
-  const holdOver = (downloads: ReturnType<typeof createFakeDownloads>) => {
+  const holdOver = (downloads: FakeDownloads) => {
     const reports: DownloadHoldReport[] = [];
     const hold = createDownloadHold({
       cancel: async itemId => downloads.api.cancel?.(itemId),
@@ -6247,11 +6270,212 @@ describe('the download hold on a real call', () => {
     expectStepToken(approved);
     expect(downloads.cancelled).toStrictEqual([51]);
   });
+
+  /**
+   * The hold's own map of announcements is filled by the start-of-call drains, which are empty for the call that
+   * actually starts the file. A page that hides its referrer leaves the item naming no tab at all, so the
+   * announcement the tab makes while the tool runs is the only thing that can attribute it.
+   */
+  it('claims a no-referrer file the tab announces during the call, instead of letting it go as foreign', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const url = `${MAIN_ORIGIN}/report.txt`;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        // One press per click: the release that follows starts nothing.
+        if (params?.['type'] === 'mousePressed') {
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: 'no-referrer-1',
+            suggestedFilename: 'report.txt',
+            url,
+          });
+          // The item carries no referrer at all, which is what a `no-referrer` page produces.
+          hold.handle({ id: 61, url }, () => {});
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The file belongs to this tab, so it is cancelled and reported as the agent's rather than saved as the user's.
+    await vi.waitFor(() => {
+      expect(downloads.cancelled).toStrictEqual([61]);
+    });
+    expect(outcome.kind).toBe('needs_permission');
+    expect(
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : ''
+    ).toContain('report.txt');
+  });
+
+  it('does not blame the browser for an approved repeat whose own tool call failed', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    let repeat = false;
+
+    // The guarded click starts the file and the hold stops it. The repeat then fails in the tool itself — the page
+    // Is gone when the press is dispatched — which starts no download and says nothing about what the browser allowed.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          if (repeat) {
+            throw new Error('The page was closed before the click could be dispatched.');
+          }
+
+          hold.handle({ filename: 'report.txt', id: 52, referrer: dashboard, url }, () => {});
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const guarded = await click([]);
+    const token = expectStepToken(guarded);
+
+    repeat = true;
+
+    const failed = await click([token]);
+    const error =
+      failed.kind === 'result' && !failed.result.ok
+        ? failed.result.error
+        : `expected the tool's own failure, got ${JSON.stringify(failed)}`;
+
+    // The model is told what actually failed, and the approval it already received is still unspent.
+    expect(error).toContain('The page was closed before the click could be dispatched.');
+    expect(error).not.toContain(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+    expect(hold.needOf('session-1')?.kind).toBe('armed');
+    expect(downloads.cancelled).toStrictEqual([52]);
+  });
+});
+
+/**
+ * A call that took longer than the window its own download was given. The tool is held open while the wall clock
+ * moves past the span, so a bound counted from the call's start would already be spent by the time the settle runs.
+ */
+describe('a download call slower than its settle window', () => {
+  /** A hold that only records what the runtime tells it: the window is the runtime's own decision. */
+  const recordingHold = () => {
+    /** What this stub was asked to remember: an approval it was armed with, and one item it was handed. */
+    const needs = new Map<string, ApprovalNeed>();
+    const items = new Map<number, TrackedDownload>();
+    const settled: SettleWindow[] = [];
+    const navigations: DownloadHoldNavigation[] = [];
+    const at: number[] = [];
+    const hold: DownloadHold = {
+      announce: () => {},
+      arm: need => {
+        needs.set(need.session, need);
+      },
+      closeSession: session => {
+        needs.delete(session);
+      },
+      drain: () => [],
+      escape: () => {},
+      handle: () => false,
+      navigate: navigation => {
+        navigations.push(navigation);
+        at.push(Date.now());
+      },
+      needOf: session => needs.get(session),
+      settle: async (_session, window) => {
+        settled.push(window);
+
+        return 'no_sign';
+      },
+      tab: () => {},
+      tracked: itemId => items.get(itemId),
+    };
+
+    return { at, hold, navigations, settled };
+  };
+
+  it('re-dates the navigation expectation when the tool answers, so a slow navigation still claims its file', async () => {
+    const { at, hold, navigations, settled } = recordingHold();
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: createFakeDownloads().api,
+    });
+    const { promise: gated, resolve: answered } = Promise.withResolvers<void>();
+    const url = `${MAIN_ORIGIN}/reports/q4.pdf`;
+
+    cdp.setHandlers({
+      'Page.navigate': async () => {
+        await gated;
+
+        return { frameId: 'main' };
+      },
+    });
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+
+    try {
+      const call = runtime.runTool({
+        agent: { authorized: [readGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+        arguments: { url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_navigate',
+      });
+
+      // Let the call reach its own navigation: the expectation is registered before the tool runs.
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The navigation is still running three seconds later: the expectation registered before it has run out.
+      vi.setSystemTime(Date.now() + 3000);
+      answered();
+
+      await call;
+
+      // Two registrations of one navigation: the one sent with the call, and the one its settle entry re-dates.
+      expect(navigations).toHaveLength(2);
+      expect(settled).toHaveLength(1);
+
+      const [sent, extended] = navigations;
+      const [sentAt, extendedAt] = at;
+
+      // It is the same navigation: the file is claimed against the call that sent it, not a new one.
+      expect(extended?.url).toBe(url);
+      expect(extended?.attempt).toBe(sent?.attempt);
+
+      // The tool's own three seconds are what the second registration buys back: it ends a span later than the first.
+      expect((extended?.until ?? 0) - (sent?.until ?? 0)).toBeGreaterThanOrEqual(3000);
+      expect((extendedAt ?? 0) - (sentAt ?? 0)).toBeGreaterThanOrEqual(3000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('a download the dialog answer starts', () => {
   /** A hold over the fake downloads, with the reports it queued in order. */
-  const holdOver = (downloads: ReturnType<typeof createFakeDownloads>) => {
+  const holdOver = (downloads: FakeDownloads) => {
     const reports: DownloadHoldReport[] = [];
     const hold = createDownloadHold({
       cancel: async itemId => downloads.api.cancel?.(itemId),

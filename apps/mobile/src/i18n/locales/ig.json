@@ -1427,9 +1427,9 @@
       "activity": "Ihe omume"
     },
     "providerConnect": {
-      "githubApp": "Ngwa GitHub",
+      "githubApp": "ngwa GitHub",
       "githubError": "Enweghị ike imepe nhazi GitHub. Biko nwaa ọzọ.",
-      "gitlabAccount": "Akaụntụ GitLab",
+      "gitlabAccount": "akaụntụ GitLab",
       "gitlabError": "Enweghị ike imepe nhazi GitLab. Biko nwaa ọzọ.",
       "description": "Jikọọ {{label}} na Kilo iji nyochaa arịrịọ ijikọ koodu na-akpaghị aka."
     },

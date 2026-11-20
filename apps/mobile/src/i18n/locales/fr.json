@@ -717,9 +717,9 @@
     },
     "providerConnect": {
       "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
-      "githubApp": "Application GitHub",
+      "githubApp": "application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
-      "gitlabAccount": "Compte GitLab",
+      "gitlabAccount": "compte GitLab",
       "gitlabError": "Impossible d'ouvrir la configuration de GitLab. Réessayez."
     },
     "reviewDetail": {

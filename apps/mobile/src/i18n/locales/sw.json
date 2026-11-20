@@ -1427,9 +1427,9 @@
       "activity": "Shughuli"
     },
     "providerConnect": {
-      "githubApp": "Programu ya GitHub",
+      "githubApp": "programu ya GitHub",
       "githubError": "Imeshindikana kufungua usanidi wa GitHub. Tafadhali jaribu tena.",
-      "gitlabAccount": "Akaunti ya GitLab",
+      "gitlabAccount": "akaunti ya GitLab",
       "gitlabError": "Imeshindikana kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
       "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki."
     },

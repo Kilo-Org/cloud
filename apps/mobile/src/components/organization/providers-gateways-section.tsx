@@ -126,8 +126,10 @@ export function GatewaySettingsSection({
             }}
           />
         </RowGroup>
-        <Text variant="caption">{t('organizationModelAccess.inferenceRegionDescription')}</Text>
-        <Text variant="caption">{t('organizationModelAccess.disableOpenrouterNote')}</Text>
+        <View className="gap-3">
+          <Text variant="caption">{t('organizationModelAccess.inferenceRegionDescription')}</Text>
+          <Text variant="caption">{t('organizationModelAccess.disableOpenrouterNote')}</Text>
+        </View>
       </SettingsSection>
       <MenuSheet
         visible={regionPickerOpen}

@@ -35,6 +35,7 @@ import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
   classifyAdmissionPayload,
   countAdmissionCondition,
+  reportAttestedKeyCollision,
   requireAdmissionPayload,
   verifyAdmissionAsync,
   persistAttestedKey,
@@ -613,6 +614,7 @@ async function runNativeTokenExchange(
         admissionVerification.existingKeyUserId !== result.user.id
       ) {
         captureMessage('native_attested_key_ownership_mismatch');
+        countAdmissionCondition('native_admission_refused');
         phase = 'release';
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
@@ -645,7 +647,7 @@ async function runNativeTokenExchange(
           };
         } catch (err) {
           if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
+            reportAttestedKeyCollision();
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
@@ -657,7 +659,7 @@ async function runNativeTokenExchange(
           await persistAttestedKey(result.user.id, admissionVerification);
         } catch (err) {
           if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
+            reportAttestedKeyCollision();
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
@@ -772,6 +774,7 @@ async function runNativeTokenExchange(
     admissionVerification.existingKeyUserId !== result.user.id
   ) {
     captureMessage('native_attested_key_ownership_mismatch');
+    countAdmissionCondition('native_admission_refused');
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
@@ -797,7 +800,7 @@ async function runNativeTokenExchange(
         };
       } catch (err) {
         if (err instanceof KeyCollisionError) {
-          captureMessage('native_attested_key_cross_user_collision');
+          reportAttestedKeyCollision();
           return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
         }
         captureMessage('native_attested_key_persist_failed_after_settlement');
@@ -807,7 +810,7 @@ async function runNativeTokenExchange(
         await persistAttestedKey(result.user.id, admissionVerification);
       } catch (err) {
         if (err instanceof KeyCollisionError) {
-          captureMessage('native_attested_key_cross_user_collision');
+          reportAttestedKeyCollision();
           return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
         }
         captureMessage('native_attested_key_persist_failed_after_settlement');

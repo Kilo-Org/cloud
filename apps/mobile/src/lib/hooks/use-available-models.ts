@@ -105,6 +105,14 @@ export function sortModelOptions<
   });
 }
 
+/**
+ * The `yyyy-MM-dd` a catalog value names, or `undefined` when it is not one. A value off the
+ * contract (`2026-11-22T00:00:00Z`, say) loses only its note: the row and the catalog stay.
+ */
+function retirementDay(value: string | undefined): string | undefined {
+  return value !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
 export function toModelOptions(data: ModelResponse | undefined, language: string): ModelOption[] {
   if (!data?.data) {
     return [];
@@ -123,7 +131,7 @@ export function toModelOptions(data: ModelResponse | undefined, language: string
       pricing: model.pricing,
       context_length: model.context_length ?? null,
       supportsImages: model.architecture?.input_modalities?.includes('image') === true,
-      retires_on: model.retires_on,
+      retires_on: retirementDay(model.retires_on),
       ...(model.preferredIndex === undefined ? {} : { preferredIndex: model.preferredIndex }),
     })
   );
@@ -168,11 +176,9 @@ export const OpenRouterModelsResponseSchema = z.object({
         .optional(),
       opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
       architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),
-      retires_on: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .optional()
-        .catch(undefined),
+      // An off-contract value drops only the note, never the catalog body: `toModelOptions` reads it
+      // through the date-only guard below.
+      retires_on: z.string().optional(),
     })
   ),
 });

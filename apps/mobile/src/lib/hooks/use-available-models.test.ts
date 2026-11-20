@@ -72,6 +72,22 @@ describe('toModelOptions', () => {
       'c/schematron',
     ]);
   });
+
+  it('keeps a date-only retires_on on the option and drops an off-contract one', () => {
+    const options = toModelOptions(
+      {
+        data: [
+          { id: 'a', name: 'A', retires_on: '2026-07-01' },
+          { id: 'b', name: 'B', retires_on: '2026-07-01T00:00:00Z' },
+        ],
+      },
+      'en'
+    );
+    const byId = new Map(options.map(option => [option.id, option]));
+    expect(byId.get('a')?.retires_on).toBe('2026-07-01');
+    expect(byId.get('b')).toBeDefined();
+    expect(byId.get('b')?.retires_on).toBeUndefined();
+  });
 });
 
 describe('OpenRouterModelsResponseSchema', () => {
@@ -110,13 +126,6 @@ describe('OpenRouterModelsResponseSchema', () => {
       data: [{ id: 'a', name: 'A', retires_on: '2026-07-01' }],
     });
     expect(parsed.data[0]).toEqual({ id: 'a', name: 'A', retires_on: '2026-07-01' });
-  });
-
-  it('drops an off-contract retires_on instead of rejecting the body', () => {
-    const parsed = OpenRouterModelsResponseSchema.parse({
-      data: [{ id: 'a', name: 'A', retires_on: '2026-07-01T00:00:00Z' }],
-    });
-    expect(parsed.data[0]).toEqual({ id: 'a', name: 'A', retires_on: undefined });
   });
 });
 

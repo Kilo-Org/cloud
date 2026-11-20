@@ -105,10 +105,10 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !(status.isError && status.data == null);
   let title = t('agentChat.repoPicker.platformBitbucket');
   let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
-  // The lapsed plan's own line under the role sentence, and `undefined` in every
-  // denial that has one reason only. The two are unrelated blockers, so they
-  // stay two blocks instead of one dense paragraph the reader takes as a single
-  // claim.
+  // The lapsed plan's second paragraph under the role sentence, and `undefined`
+  // in every denial that has one reason only. The two reasons are unrelated
+  // blockers, so they stay apart instead of forming one dense paragraph the
+  // reader takes as a single claim.
   let deniedPlanLine: string | undefined = undefined;
   // The denial's way out, offered only where the sheet joins the two refusals
   // below: a retry here re-reads the three answers the page was decided from.
@@ -213,22 +213,23 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
 
     if (!canManage) {
       // The role sentence stays the state's description. The plan line is a
-      // second block under it, one type step down in the same muted token, so
-      // the reader sees two reasons rather than one run-on paragraph.
+      // second paragraph in the same muted body token, one paragraph gap under
+      // it, so the reader sees two reasons rather than one cramped paragraph at
+      // a different size.
       return (
         <PermissionDenied
           description={
             deniedPlanLine === undefined ? (
               deniedDescription
             ) : (
-              <>
+              <View className="items-center gap-2">
                 <Text variant="muted" className="text-center">
                   {deniedDescription}
                 </Text>
-                <Text variant="caption" className="text-center">
+                <Text variant="muted" className="text-center">
                   {deniedPlanLine}
                 </Text>
-              </>
+              </View>
             )
           }
           showBack={false}

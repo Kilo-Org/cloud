@@ -141,13 +141,14 @@ describe('BitbucketConnectSheet', () => {
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
     // The role is not the only blocker: the same organization's lapsed plan
     // refuses the connection too. The reasons are unrelated, so the state keeps
-    // them apart — the role sentence is the description, and the plan line sits
-    // under it one type step down — instead of one dense paragraph. The plan
-    // line is this sheet's own key: the shared ended-plan sentence keeps the
-    // "then try again" clause for the surfaces with no control.
+    // them apart — the role sentence is the description, and both reasons carry
+    // the state's body size as two paragraphs, with a paragraph gap between
+    // them — instead of one dense paragraph. The plan line is this sheet's own
+    // key: the shared ended-plan sentence keeps the "then try again" clause for
+    // the surfaces with no control.
     expect(await descriptionBlocks(denied?.props.description as ReactNode)).toEqual([
       { text: i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'), variant: 'muted' },
-      { text: i18n.t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'), variant: 'caption' },
+      { text: i18n.t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'), variant: 'muted' },
     ]);
     // The plan is the blocker the reader cannot clear by role, so the denial
     // carries the retry that re-reads the state once the owner updates billing.

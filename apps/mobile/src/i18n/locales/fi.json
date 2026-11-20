@@ -19,7 +19,9 @@
     "presenceStatus": "Isännät: {{connection}}",
     "commandStatus": "Komennon toimitus: {{status}}",
     "delivered": "Toimitettu",
-    "expired": "Vanhentunut"
+    "expired": "Vanhentunut",
+    "recoveryGaps_one": "{{displayCount}} osa tästä litteroinnista puuttuu.",
+    "recoveryGaps_other": "{{displayCount}} osaa tästä litteroinnista puuttuu."
   },
   "common": {
     "manageOnWeb": "Hallinnoi verkossa",

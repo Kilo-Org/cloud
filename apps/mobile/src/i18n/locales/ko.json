@@ -19,7 +19,9 @@
     "presenceStatus": "호스트: {{connection}}",
     "commandStatus": "명령 전달: {{status}}",
     "delivered": "전달됨",
-    "expired": "만료됨"
+    "expired": "만료됨",
+    "recoveryGaps_one": "이 대화 기록의 {{displayCount}}개 부분이 누락되었습니다.",
+    "recoveryGaps_other": "이 대화 기록의 {{displayCount}}개 부분이 누락되었습니다."
   },
   "common": {
     "manageOnWeb": "웹에서 관리",

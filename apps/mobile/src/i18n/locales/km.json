@@ -19,7 +19,9 @@
     "presenceStatus": "ម៉ាស៊ីន: {{connection}}",
     "commandStatus": "ការបញ្ជូនពាក្យបញ្ជា: {{status}}",
     "delivered": "បានបញ្ជូន",
-    "expired": "បានផុតកំណត់"
+    "expired": "បានផុតកំណត់",
+    "recoveryGaps_one": "ផ្នែកចំនួន {{displayCount}} នៃប្រតិចារិកនេះបាត់។",
+    "recoveryGaps_other": "ផ្នែកចំនួន {{displayCount}} នៃប្រតិចារិកនេះបាត់។"
   },
   "common": {
     "manageOnWeb": "គ្រប់គ្រងនៅលើគេហទំព័រ",

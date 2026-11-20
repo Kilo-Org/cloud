@@ -19,7 +19,9 @@
     "presenceStatus": "Хостове: {{connection}}",
     "commandStatus": "Доставка на командата: {{status}}",
     "delivered": "Доставено",
-    "expired": "Изтекло"
+    "expired": "Изтекло",
+    "recoveryGaps_one": "Липсва {{displayCount}} част от този транскрипт.",
+    "recoveryGaps_other": "Липсват {{displayCount}} части от този транскрипт."
   },
   "common": {
     "manageOnWeb": "Управлявай в уеб",

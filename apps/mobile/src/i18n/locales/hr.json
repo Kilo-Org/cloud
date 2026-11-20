@@ -19,7 +19,10 @@
     "presenceStatus": "Hostovi: {{connection}}",
     "commandStatus": "Isporuka naredbe: {{status}}",
     "delivered": "Isporučeno",
-    "expired": "Isteklo"
+    "expired": "Isteklo",
+    "recoveryGaps_one": "Nedostaje {{displayCount}} dio ovog transkripta.",
+    "recoveryGaps_few": "Nedostaju {{displayCount}} dijela ovog transkripta.",
+    "recoveryGaps_other": "Nedostaje {{displayCount}} dijelova ovog transkripta."
   },
   "common": {
     "manageOnWeb": "Upravljaj na webu",

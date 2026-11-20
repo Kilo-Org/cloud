@@ -19,7 +19,9 @@
     "presenceStatus": "አስተናጋጆች፦ {{connection}}",
     "commandStatus": "የትዕዛዝ መድረስ፦ {{status}}",
     "delivered": "ደርሷል",
-    "expired": "ጊዜው አልፏል"
+    "expired": "ጊዜው አልፏል",
+    "recoveryGaps_one": "{{displayCount}} ክፍል ከዚህ የውይይት መዝገብ ጠፍቷል።",
+    "recoveryGaps_other": "{{displayCount}} ክፍሎች ከዚህ የውይይት መዝገብ ጠፍተዋል።"
   },
   "common": {
     "manageOnWeb": "በድር ላይ ያስተዳድሩ",

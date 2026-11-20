@@ -345,6 +345,20 @@ function NativeRemoteScope({ organizationID }: { organizationID: string | undefi
                 presentationMode="live"
               />
             )}
+            {conversation?.session && conversation.recoveryGaps > 0 && (
+              <p className="text-muted-foreground text-sm">
+                {conversation.recoveryGaps === 1
+                  ? '1 part of this transcript is missing.'
+                  : `${conversation.recoveryGaps} parts of this transcript are missing.`}{' '}
+                <Button
+                  disabled={state?.connection !== 'connected'}
+                  variant="outline"
+                  onClick={() => void sessionRef.current?.requestRecovery()}
+                >
+                  Retry
+                </Button>
+              </p>
+            )}
             {conversation?.session &&
               conversation.messages.length === 0 &&
               conversation.incompleteMessageIDs.length === 0 && (

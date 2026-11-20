@@ -19,7 +19,9 @@
     "presenceStatus": "ਹੋਸਟ: {{connection}}",
     "commandStatus": "ਕਮਾਂਡ ਦੀ ਡਿਲਿਵਰੀ: {{status}}",
     "delivered": "ਪਹੁੰਚਾਇਆ ਗਿਆ",
-    "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ"
+    "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ",
+    "recoveryGaps_one": "ਇਸ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦਾ {{displayCount}} ਹਿੱਸਾ ਗੁੰਮ ਹੈ।",
+    "recoveryGaps_other": "ਇਸ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦੇ {{displayCount}} ਹਿੱਸੇ ਗੁੰਮ ਹਨ।"
   },
   "common": {
     "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਪ੍ਰਬੰਧਿਤ ਕਰੋ",

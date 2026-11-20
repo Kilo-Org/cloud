@@ -19,7 +19,9 @@
     "presenceStatus": "Hòt: {{connection}}",
     "commandStatus": "Livrezon kòmand: {{status}}",
     "delivered": "Livre",
-    "expired": "Ekspire"
+    "expired": "Ekspire",
+    "recoveryGaps_one": "{{displayCount}} pati nan transkripsyon sa a manke.",
+    "recoveryGaps_other": "{{displayCount}} pati nan transkripsyon sa a manke."
   },
   "common": {
     "manageOnWeb": "Jere sou entènèt la",

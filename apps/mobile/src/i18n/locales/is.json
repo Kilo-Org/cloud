@@ -19,7 +19,9 @@
     "presenceStatus": "Vélar: {{connection}}",
     "commandStatus": "Afhending skipunar: {{status}}",
     "delivered": "Afhent",
-    "expired": "Útrunnið"
+    "expired": "Útrunnið",
+    "recoveryGaps_one": "{{displayCount}} hluti af þessari umritun vantar.",
+    "recoveryGaps_other": "{{displayCount}} hlutar af þessari umritun vantar."
   },
   "common": {
     "manageOnWeb": "Stjórna á vefnum",

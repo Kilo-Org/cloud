@@ -19,7 +19,9 @@
     "presenceStatus": "Хосттар: {{connection}}",
     "commandStatus": "Команданың жеткізілуі: {{status}}",
     "delivered": "Жеткізілді",
-    "expired": "Мерзімі өтті"
+    "expired": "Мерзімі өтті",
+    "recoveryGaps_one": "Бұл транскрипттің {{displayCount}} бөлігі жоқ.",
+    "recoveryGaps_other": "Бұл транскрипттің {{displayCount}} бөлігі жоқ."
   },
   "common": {
     "manageOnWeb": "Вебте басқару",

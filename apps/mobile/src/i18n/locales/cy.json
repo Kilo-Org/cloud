@@ -19,7 +19,13 @@
     "presenceStatus": "Gwesteiwyr: {{connection}}",
     "commandStatus": "Danfon y gorchymyn: {{status}}",
     "delivered": "Wedi'i ddanfon",
-    "expired": "Wedi dod i ben"
+    "expired": "Wedi dod i ben",
+    "recoveryGaps_zero": "Does dim rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_one": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_two": "Mae {{displayCount}} ran o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_few": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_many": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll.",
+    "recoveryGaps_other": "Mae {{displayCount}} rhan o'r trawsgrifiad hwn ar goll."
   },
   "common": {
     "manageOnWeb": "Rheoli ar y we",

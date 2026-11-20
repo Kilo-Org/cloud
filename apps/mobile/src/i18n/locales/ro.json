@@ -19,7 +19,10 @@
     "presenceStatus": "Gazde: {{connection}}",
     "commandStatus": "Livrarea comenzii: {{status}}",
     "delivered": "Livrat",
-    "expired": "Expirat"
+    "expired": "Expirat",
+    "recoveryGaps_one": "Lipsește {{displayCount}} parte din această transcriere.",
+    "recoveryGaps_few": "Lipsesc {{displayCount}} părți din această transcriere.",
+    "recoveryGaps_other": "Lipsesc {{displayCount}} de părți din această transcriere."
   },
   "common": {
     "manageOnWeb": "Gestionează pe web",

@@ -19,7 +19,9 @@
     "presenceStatus": "Abasingathi: {{connection}}",
     "commandStatus": "Ukulethwa komyalo: {{status}}",
     "delivered": "Kulethiwe",
-    "expired": "Kuphelelwe yisikhathi"
+    "expired": "Kuphelelwe yisikhathi",
+    "recoveryGaps_one": "Ingxenye {{displayCount}} yalo mbhalo ilahlekile.",
+    "recoveryGaps_other": "Izingxenye {{displayCount}} zalo mbhalo zilahlekile."
   },
   "common": {
     "manageOnWeb": "Phatha kuwebhu",

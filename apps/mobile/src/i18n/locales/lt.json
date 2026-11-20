@@ -19,7 +19,11 @@
     "presenceStatus": "Vykdymo procesai: {{connection}}",
     "commandStatus": "Komandos pristatymas: {{status}}",
     "delivered": "Pristatyta",
-    "expired": "Galiojimas baigėsi"
+    "expired": "Galiojimas baigėsi",
+    "recoveryGaps_one": "Trūksta {{displayCount}} šio įrašo dalies.",
+    "recoveryGaps_few": "Trūksta {{displayCount}} šio įrašo dalių.",
+    "recoveryGaps_many": "Trūksta {{displayCount}} šio įrašo dalies.",
+    "recoveryGaps_other": "Trūksta {{displayCount}} šio įrašo dalių."
   },
   "common": {
     "manageOnWeb": "Tvarkyti žiniatinklyje",

@@ -19,7 +19,9 @@
     "presenceStatus": "Хостови: {{connection}}",
     "commandStatus": "Испорака на командата: {{status}}",
     "delivered": "Испорачано",
-    "expired": "Истечено"
+    "expired": "Истечено",
+    "recoveryGaps_one": "Недостасува {{displayCount}} дел од овој транскрипт.",
+    "recoveryGaps_other": "Недостасуваат {{displayCount}} делови од овој транскрипт."
   },
   "common": {
     "manageOnWeb": "Управувај на веб",

@@ -19,7 +19,10 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega del comando: {{status}}",
     "delivered": "Entregado",
-    "expired": "Caducado"
+    "expired": "Caducado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte de esta transcripción.",
+    "recoveryGaps_many": "Faltan {{displayCount}} partes de esta transcripción.",
+    "recoveryGaps_other": "Faltan {{displayCount}} partes de esta transcripción."
   },
   "common": {
     "manageOnWeb": "Gestionar en la web",

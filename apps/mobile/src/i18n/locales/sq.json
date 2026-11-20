@@ -19,7 +19,9 @@
     "presenceStatus": "Hostet: {{connection}}",
     "commandStatus": "Dorëzimi i komandës: {{status}}",
     "delivered": "Dorëzuar",
-    "expired": "Skaduar"
+    "expired": "Skaduar",
+    "recoveryGaps_one": "Mungon {{displayCount}} pjesë e këtij transkripti.",
+    "recoveryGaps_other": "Mungojnë {{displayCount}} pjesë të këtij transkripti."
   },
   "common": {
     "manageOnWeb": "Menaxho në ueb",

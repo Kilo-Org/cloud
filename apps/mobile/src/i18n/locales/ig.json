@@ -19,7 +19,9 @@
     "presenceStatus": "Igwe: {{connection}}",
     "commandStatus": "Nbufe iwu: {{status}}",
     "delivered": "Ebufela",
-    "expired": "Oge agwụla"
+    "expired": "Oge agwụla",
+    "recoveryGaps_one": "{{displayCount}} akụkụ nke ndekọ a na-efu.",
+    "recoveryGaps_other": "{{displayCount}} akụkụ nke ndekọ a na-efu."
   },
   "common": {
     "manageOnWeb": "Jikwaa na weebụ",

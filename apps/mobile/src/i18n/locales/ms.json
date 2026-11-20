@@ -19,7 +19,9 @@
     "presenceStatus": "Hos: {{connection}}",
     "commandStatus": "Penghantaran arahan: {{status}}",
     "delivered": "Dihantar",
-    "expired": "Tamat tempoh"
+    "expired": "Tamat tempoh",
+    "recoveryGaps_one": "{{displayCount}} bahagian transkrip ini tiada.",
+    "recoveryGaps_other": "{{displayCount}} bahagian transkrip ini tiada."
   },
   "common": {
     "manageOnWeb": "Urus di web",

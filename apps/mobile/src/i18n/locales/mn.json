@@ -19,7 +19,9 @@
     "presenceStatus": "Хостууд: {{connection}}",
     "commandStatus": "Командын хүргэлт: {{status}}",
     "delivered": "Хүргэгдсэн",
-    "expired": "Хугацаа нь дууссан"
+    "expired": "Хугацаа нь дууссан",
+    "recoveryGaps_one": "Энэ тэмдэглэлийн {{displayCount}} хэсэг дутуу байна.",
+    "recoveryGaps_other": "Энэ тэмдэглэлийн {{displayCount}} хэсэг дутуу байна."
   },
   "common": {
     "manageOnWeb": "Вэб дээр удирдах",

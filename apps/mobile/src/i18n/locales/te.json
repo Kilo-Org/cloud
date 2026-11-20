@@ -19,7 +19,9 @@
     "presenceStatus": "హోస్ట్‌లు: {{connection}}",
     "commandStatus": "కమాండ్ డెలివరీ: {{status}}",
     "delivered": "చేరింది",
-    "expired": "గడువు ముగిసింది"
+    "expired": "గడువు ముగిసింది",
+    "recoveryGaps_one": "ఈ ట్రాన్స్క్రిప్ట్‌లోని {{displayCount}} భాగం కనిపించడం లేదు.",
+    "recoveryGaps_other": "ఈ ట్రాన్స్క్రిప్ట్‌లోని {{displayCount}} భాగాలు కనిపించడం లేదు."
   },
   "common": {
     "manageOnWeb": "వెబ్‌లో నిర్వహించండి",

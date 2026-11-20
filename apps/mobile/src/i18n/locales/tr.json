@@ -19,7 +19,9 @@
     "presenceStatus": "Ana makineler: {{connection}}",
     "commandStatus": "Komut iletimi: {{status}}",
     "delivered": "İletildi",
-    "expired": "Süresi doldu"
+    "expired": "Süresi doldu",
+    "recoveryGaps_one": "Bu dökümün {{displayCount}} bölümü eksik.",
+    "recoveryGaps_other": "Bu dökümün {{displayCount}} bölümü eksik."
   },
   "common": {
     "manageOnWeb": "Web'de yönet",

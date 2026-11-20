@@ -19,7 +19,9 @@
     "presenceStatus": "Martigeliyeyaasha: {{connection}}",
     "commandStatus": "Gaarsiinta amarka: {{status}}",
     "delivered": "La gaarsiiyay",
-    "expired": "Waqtigiisu dhacay"
+    "expired": "Waqtigiisu dhacay",
+    "recoveryGaps_one": "{{displayCount}} qayb oo ka mid ah qoraalkan ayaa maqan.",
+    "recoveryGaps_other": "{{displayCount}} qaybood oo ka mid ah qoraalkan ayaa maqan."
   },
   "common": {
     "manageOnWeb": "Ku maamul shabakadda",

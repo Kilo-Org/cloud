@@ -19,7 +19,9 @@
     "presenceStatus": "ஹோஸ்ட்கள்: {{connection}}",
     "commandStatus": "கட்டளை வழங்கல்: {{status}}",
     "delivered": "வழங்கப்பட்டது",
-    "expired": "காலாவதியானது"
+    "expired": "காலாவதியானது",
+    "recoveryGaps_one": "இந்த உரைநகலின் {{displayCount}} பகுதி காணவில்லை.",
+    "recoveryGaps_other": "இந்த உரைநகலின் {{displayCount}} பகுதிகள் காணவில்லை."
   },
   "common": {
     "manageOnWeb": "இணையத்தில் நிர்வகிக்கவும்",

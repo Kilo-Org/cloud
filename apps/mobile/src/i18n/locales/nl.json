@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Opdrachtbezorging: {{status}}",
     "delivered": "Bezorgd",
-    "expired": "Verlopen"
+    "expired": "Verlopen",
+    "recoveryGaps_one": "{{displayCount}} deel van dit transcript ontbreekt.",
+    "recoveryGaps_other": "{{displayCount}} delen van dit transcript ontbreken."
   },
   "common": {
     "manageOnWeb": "Beheren op het web",

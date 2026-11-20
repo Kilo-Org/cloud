@@ -19,7 +19,9 @@
     "presenceStatus": "โฮสต์: {{connection}}",
     "commandStatus": "การส่งคำสั่ง: {{status}}",
     "delivered": "ส่งถึงแล้ว",
-    "expired": "หมดอายุแล้ว"
+    "expired": "หมดอายุแล้ว",
+    "recoveryGaps_one": "ส่วน {{displayCount}} ของบันทึกนี้หายไป",
+    "recoveryGaps_other": "ส่วน {{displayCount}} ของบันทึกนี้หายไป"
   },
   "common": {
     "manageOnWeb": "จัดการบนเว็บ",

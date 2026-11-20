@@ -19,7 +19,9 @@
     "presenceStatus": "होस्ट: {{connection}}",
     "commandStatus": "आदेश डिलीवरी: {{status}}",
     "delivered": "पहुँचाया गया",
-    "expired": "समय समाप्त"
+    "expired": "समय समाप्त",
+    "recoveryGaps_one": "इस ट्रांसक्रिप्ट का {{displayCount}} हिस्सा गायब है।",
+    "recoveryGaps_other": "इस ट्रांसक्रिप्ट के {{displayCount}} हिस्से गायब हैं।"
   },
   "common": {
     "manageOnWeb": "वेब पर प्रबंधित करें",

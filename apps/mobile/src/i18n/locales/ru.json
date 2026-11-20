@@ -19,7 +19,11 @@
     "presenceStatus": "Хосты: {{connection}}",
     "commandStatus": "Доставка команды: {{status}}",
     "delivered": "Доставлено",
-    "expired": "Срок истёк"
+    "expired": "Срок истёк",
+    "recoveryGaps_one": "Отсутствует {{displayCount}} часть этой расшифровки.",
+    "recoveryGaps_few": "Отсутствуют {{displayCount}} части этой расшифровки.",
+    "recoveryGaps_many": "Отсутствует {{displayCount}} частей этой расшифровки.",
+    "recoveryGaps_other": "Отсутствуют {{displayCount}} части этой расшифровки."
   },
   "common": {
     "manageOnWeb": "Управление в веб-версии",

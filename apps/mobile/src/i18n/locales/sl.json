@@ -19,7 +19,11 @@
     "presenceStatus": "Gostitelji: {{connection}}",
     "commandStatus": "Dostava ukaza: {{status}}",
     "delivered": "Dostavljeno",
-    "expired": "Poteklo"
+    "expired": "Poteklo",
+    "recoveryGaps_one": "Manjka {{displayCount}} del tega prepisa.",
+    "recoveryGaps_two": "Manjkata {{displayCount}} dela tega prepisa.",
+    "recoveryGaps_few": "Manjkajo {{displayCount}} deli tega prepisa.",
+    "recoveryGaps_other": "Manjka {{displayCount}} delov tega prepisa."
   },
   "common": {
     "manageOnWeb": "Upravljaj v spletu",

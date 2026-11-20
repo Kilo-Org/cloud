@@ -19,7 +19,9 @@
     "presenceStatus": "હોસ્ટ: {{connection}}",
     "commandStatus": "આદેશ ડિલિવરી: {{status}}",
     "delivered": "પહોંચાડાયું",
-    "expired": "સમયસીમા સમાપ્ત"
+    "expired": "સમયસીમા સમાપ્ત",
+    "recoveryGaps_one": "આ ટ્રાન્સક્રિપ્ટનો {{displayCount}} ભાગ ખૂટે છે.",
+    "recoveryGaps_other": "આ ટ્રાન્સક્રિપ્ટના {{displayCount}} ભાગ ખૂટે છે."
   },
   "common": {
     "manageOnWeb": "વેબ પર મેનેજ કરો",

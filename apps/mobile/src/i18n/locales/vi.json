@@ -19,7 +19,9 @@
     "presenceStatus": "Máy chủ: {{connection}}",
     "commandStatus": "Trạng thái gửi lệnh: {{status}}",
     "delivered": "Đã gửi đến nơi",
-    "expired": "Đã hết hạn"
+    "expired": "Đã hết hạn",
+    "recoveryGaps_one": "Thiếu {{displayCount}} phần của bản ghi này.",
+    "recoveryGaps_other": "Thiếu {{displayCount}} phần của bản ghi này."
   },
   "common": {
     "manageOnWeb": "Quản lý trên web",

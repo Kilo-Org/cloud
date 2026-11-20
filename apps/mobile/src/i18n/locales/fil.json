@@ -19,7 +19,9 @@
     "presenceStatus": "Mga host: {{connection}}",
     "commandStatus": "Paghahatid ng command: {{status}}",
     "delivered": "Naihatid",
-    "expired": "Nag-expire"
+    "expired": "Nag-expire",
+    "recoveryGaps_one": "Kulang ang {{displayCount}} bahagi ng transcript na ito.",
+    "recoveryGaps_other": "Kulang ang {{displayCount}} bahagi ng transcript na ito."
   },
   "common": {
     "manageOnWeb": "Pamahalaan sa web",

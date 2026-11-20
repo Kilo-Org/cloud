@@ -19,7 +19,9 @@
     "presenceStatus": "Հոսթեր՝ {{connection}}",
     "commandStatus": "Հրամանի առաքում՝ {{status}}",
     "delivered": "Առաքված",
-    "expired": "Ժամկետանց"
+    "expired": "Ժամկետանց",
+    "recoveryGaps_one": "Այս տեքստագրության {{displayCount}} մասը բացակայում է։",
+    "recoveryGaps_other": "Այս տեքստագրության {{displayCount}} մասը բացակայում է։"
   },
   "common": {
     "manageOnWeb": "Կառավարել վեբում",

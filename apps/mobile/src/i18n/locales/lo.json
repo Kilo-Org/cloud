@@ -19,7 +19,9 @@
     "presenceStatus": "ໂຮສ: {{connection}}",
     "commandStatus": "ການສົ່ງຄຳສັ່ງ: {{status}}",
     "delivered": "ສົ່ງເຖິງແລ້ວ",
-    "expired": "ໝົດອາຍຸແລ້ວ"
+    "expired": "ໝົດອາຍຸແລ້ວ",
+    "recoveryGaps_one": "ພາກສ່ວນ {{displayCount}} ຂອງບັນທຶກນີ້ຂາດຫາຍ.",
+    "recoveryGaps_other": "ພາກສ່ວນ {{displayCount}} ຂອງບັນທຶກນີ້ຂາດຫາຍ."
   },
   "common": {
     "manageOnWeb": "ຈັດການໃນເວັບ",

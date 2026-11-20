@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregado",
-    "expired": "Caducado"
+    "expired": "Caducado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrición.",
+    "recoveryGaps_other": "Faltan {{displayCount}} partes desta transcrición."
   },
   "common": {
     "manageOnWeb": "Xestionar na web",

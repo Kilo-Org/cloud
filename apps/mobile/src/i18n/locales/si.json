@@ -19,7 +19,9 @@
     "presenceStatus": "හෝස්ට්: {{connection}}",
     "commandStatus": "විධානය යැවීම: {{status}}",
     "delivered": "ලැබී ඇත",
-    "expired": "කල් ඉකුත් වී ඇත"
+    "expired": "කල් ඉකුත් වී ඇත",
+    "recoveryGaps_one": "මෙම පිටපතේ කොටස් {{displayCount}}ක් අස්ථානගත වී ඇත.",
+    "recoveryGaps_other": "මෙම පිටපතේ කොටස් {{displayCount}}ක් අස්ථානගත වී ඇත."
   },
   "common": {
     "manageOnWeb": "වෙබයේ කළමනාකරණය කරන්න",

@@ -19,7 +19,10 @@
     "presenceStatus": "Resursdatori: {{connection}}",
     "commandStatus": "Komandas piegāde: {{status}}",
     "delivered": "Piegādāts",
-    "expired": "Termiņš beidzies"
+    "expired": "Termiņš beidzies",
+    "recoveryGaps_zero": "Nav pazudušu šī ieraksta daļu.",
+    "recoveryGaps_one": "Trūkst {{displayCount}} šī ieraksta daļas.",
+    "recoveryGaps_other": "Trūkst {{displayCount}} šī ieraksta daļu."
   },
   "common": {
     "manageOnWeb": "Pārvaldi tīmeklī",

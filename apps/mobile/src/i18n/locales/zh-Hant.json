@@ -19,7 +19,9 @@
     "presenceStatus": "主機：{{connection}}",
     "commandStatus": "命令傳送狀態：{{status}}",
     "delivered": "已送達",
-    "expired": "已過期"
+    "expired": "已過期",
+    "recoveryGaps_one": "此對話記錄缺少 {{displayCount}} 個部分。",
+    "recoveryGaps_other": "此對話記錄缺少 {{displayCount}} 個部分。"
   },
   "common": {
     "manageOnWeb": "在網頁上管理",

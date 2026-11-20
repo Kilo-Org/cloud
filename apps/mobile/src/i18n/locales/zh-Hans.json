@@ -19,7 +19,9 @@
     "presenceStatus": "主机：{{connection}}",
     "commandStatus": "命令送达状态：{{status}}",
     "delivered": "已送达",
-    "expired": "已过期"
+    "expired": "已过期",
+    "recoveryGaps_one": "此对话记录缺少 {{displayCount}} 个部分。",
+    "recoveryGaps_other": "此对话记录缺少 {{displayCount}} 个部分。"
   },
   "common": {
     "manageOnWeb": "在网页上管理",

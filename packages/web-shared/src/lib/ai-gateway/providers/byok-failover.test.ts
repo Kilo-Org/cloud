@@ -718,4 +718,212 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
       250, 751,
     ]);
   });
+
+  describe('for a partner custom LLM', () => {
+    const partner: ProviderRoute = {
+      provider: { type: 'partner', apiKey: 'partner-key' } as Provider,
+      userByok: null,
+      isFree: false,
+      bypassAccessCheck: false,
+      customLlmPublicId: 'acme/partner-model',
+    };
+    const kilo = route('kilo-key', 'openai', 'vercel');
+
+    async function failOverFromPartner(partnerAttempt: SendUpstreamAttemptResult) {
+      answerAfter(100, partnerAttempt);
+      answerAfter(200, servedAttempt());
+      const result = await sendUpstreamAttemptWithByokFailover(input(partner), failoverTo(kilo));
+      return failoverAttemptsOf(result);
+    }
+
+    const promptEcho = 'secret prompt text: my password is hunter2';
+
+    it('logs the custom LLM id with the failover', async () => {
+      const [partnerAttempt] = await failOverFromPartner(
+        upstreamJsonFailure(503, { error: { code: 'overloaded' } })
+      );
+
+      expect(partnerAttempt).toMatchObject({
+        provider_type: 'partner',
+        status: 503,
+        error_code: 'overloaded',
+      });
+      expect(partnerAttempt).not.toHaveProperty('error_summary');
+      expect(console.warn).toHaveBeenCalledWith(
+        '[byok-failover] Upstream failed, trying the next route',
+        expect.objectContaining({
+          failedProviderType: 'partner',
+          failedCustomLlmPublicId: 'acme/partner-model',
+          status: 503,
+        })
+      );
+    });
+
+    it('summarizes a Mistral 422 with the details nested in the message', async () => {
+      const [partnerAttempt] = await failOverFromPartner(
+        upstreamJsonFailure(422, {
+          object: 'error',
+          message: {
+            detail: [
+              {
+                type: 'extra_forbidden',
+                loc: ['body', 'user'],
+                msg: promptEcho,
+                input: promptEcho,
+              },
+              { type: 'missing', loc: ['body', 'messages', 0, 'user', 'name'], msg: promptEcho },
+            ],
+          },
+          code: null,
+        })
+      );
+
+      expect(partnerAttempt?.error_summary).toEqual({
+        issues: [
+          { type: 'extra_forbidden', loc: 'body.user' },
+          { type: 'missing', loc: 'body.messages.0.user.name' },
+        ],
+      });
+      expect(partnerAttempt).not.toHaveProperty('error_code');
+      expect(JSON.stringify(partnerAttempt)).not.toContain('hunter2');
+      expect(console.warn).toHaveBeenCalledWith(
+        '[byok-failover] Custom LLM upstream rejected the request',
+        {
+          customLlmPublicId: 'acme/partner-model',
+          status: 422,
+          errorSummary: {
+            issues: [
+              { type: 'extra_forbidden', loc: 'body.user' },
+              { type: 'missing', loc: 'body.messages.0.user.name' },
+            ],
+          },
+        }
+      );
+      expect(JSON.stringify(jest.mocked(console.warn).mock.calls)).not.toContain('hunter2');
+    });
+
+    it('summarizes a 422 with the details at the top level', async () => {
+      const [partnerAttempt] = await failOverFromPartner(
+        upstreamJsonFailure(422, {
+          detail: [{ type: 'extra_forbidden', loc: ['body', 'store'], input: promptEcho }],
+        })
+      );
+
+      expect(partnerAttempt?.error_summary).toEqual({
+        issues: [{ type: 'extra_forbidden', loc: 'body.store' }],
+      });
+    });
+
+    it('summarizes an OpenAI-shaped error by its code and type only', async () => {
+      const [partnerAttempt] = await failOverFromPartner(
+        upstreamJsonFailure(400, {
+          error: {
+            message: promptEcho,
+            type: 'invalid_request_error',
+            param: 'user',
+            code: 'unknown_parameter',
+          },
+        })
+      );
+
+      expect(partnerAttempt).toMatchObject({
+        error_code: 'unknown_parameter',
+        error_summary: { code: 'unknown_parameter', type: 'invalid_request_error' },
+      });
+      expect(partnerAttempt?.error_summary).not.toHaveProperty('issues');
+      expect(JSON.stringify(partnerAttempt)).not.toContain('hunter2');
+    });
+
+    it.each([
+      ['a non-JSON body', upstreamFailure(400, `<html>${promptEcho}</html>`)],
+      ['an empty body', upstreamFailure(400, null)],
+      ['a JSON array', upstreamJsonFailure(400, [{ type: 'extra_forbidden' }])],
+      ['a free-text message only', upstreamJsonFailure(400, { message: promptEcho })],
+      [
+        'malformed details',
+        upstreamJsonFailure(422, { detail: [null, 'x', { loc: 'body', type: 3 }, { type: {} }] }),
+      ],
+      ['no summary for a 5xx', upstreamJsonFailure(500, { detail: [{ type: 'extra_forbidden' }] })],
+    ])('records no summary for %s', async (_name, partnerAttempt) => {
+      const [attempt] = await failOverFromPartner(partnerAttempt);
+
+      expect(attempt).not.toHaveProperty('error_summary');
+      expect(JSON.stringify(attempt)).not.toContain('hunter2');
+    });
+
+    it('drops types and paths that are not identifier-shaped', async () => {
+      const [attempt] = await failOverFromPartner(
+        upstreamJsonFailure(422, {
+          detail: [
+            { type: promptEcho, loc: ['body', promptEcho] },
+            { type: 'extra_forbidden', loc: ['body', 'a b'] },
+          ],
+        })
+      );
+
+      expect(attempt?.error_summary).toEqual({ issues: [{ type: 'extra_forbidden' }] });
+    });
+
+    it('caps the number and length of summary entries', async () => {
+      const long = 'a'.repeat(300);
+      const [attempt] = await failOverFromPartner(
+        upstreamJsonFailure(422, {
+          type: long,
+          detail: Array.from({ length: 30 }, (_, i) => ({
+            type: `type_${i}`,
+            loc: ['body', long, i],
+          })),
+        })
+      );
+
+      const summary = attempt?.error_summary;
+      expect(summary?.type).toHaveLength(200);
+      expect(summary?.issues).toHaveLength(5);
+      expect(summary?.issues?.map(issue => issue.type)).toEqual([
+        'type_0',
+        'type_1',
+        'type_2',
+        'type_3',
+        'type_4',
+      ]);
+      expect(summary?.issues?.every(issue => issue.loc?.length === 200)).toBe(true);
+    });
+
+    it('summarizes a final partner failure and leaves its body readable', async () => {
+      const body = { detail: [{ type: 'extra_forbidden', loc: ['body', 'user'], input: 'abc' }] };
+      answerAfter(100, upstreamJsonFailure(503, { error: { code: 'overloaded' } }));
+      answerAfter(200, upstreamJsonFailure(422, body));
+
+      const result = await sendUpstreamAttemptWithByokFailover(
+        input(route('primary-key')),
+        failoverTo(partner)
+      );
+
+      const attempts = await failoverAttemptsOf(result);
+      expect(attempts.at(-1)).toMatchObject({
+        outcome: 'failed',
+        error_summary: { issues: [{ type: 'extra_forbidden', loc: 'body.user' }] },
+      });
+      if (result.attempt.type === 'unknown-gateway-model') throw new Error('Expected a response');
+      expect(await result.attempt.response.json()).toEqual(body);
+    });
+
+    it('records no summary for a route that is not a custom LLM', async () => {
+      answerAfter(
+        100,
+        upstreamJsonFailure(422, { detail: [{ type: 'extra_forbidden', loc: ['body', 'user'] }] })
+      );
+      answerAfter(200, servedAttempt());
+
+      const result = await sendUpstreamAttemptWithByokFailover(
+        input(route('primary-key')),
+        failoverTo(kilo)
+      );
+
+      expect(await failoverAttemptsOf(result)).toEqual([
+        expect.not.objectContaining({ error_summary: expect.anything() }),
+        expect.anything(),
+      ]);
+    });
+  });
 });

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -7,8 +7,9 @@ import * as z from 'zod';
 import { promptText } from '../src/decider-prompt';
 import type { ProbeTranscript } from '../src/datasets/probe-transcripts';
 import { startCaptureContainers } from '../src/probe/capture-containers';
+import { writeProbeCaptureFiles } from '../src/probe/capture-files';
 import { probeFamily, type ProbeFamily } from '../src/probe/family';
-import { mergeProbeTemplates, ProbeTemplatesSchema } from '../src/probe/request';
+import { ProbeTemplatesSchema } from '../src/probe/request';
 
 // Regenerates the probe fixtures from the pinned CLI: builds the runner image with that CLI,
 // drives it against scripts/probe-gateway.mjs (which serves the public catalog and needs no
@@ -21,7 +22,8 @@ import { mergeProbeTemplates, ProbeTemplatesSchema } from '../src/probe/request'
 // Router pool). Every family in it gets a template; a family whose endpoint the probe cannot
 // speak is recorded under `unsupportedFamilies` with the reason the worker reports.
 // `--only <family>` captures one family and merges it into the existing templates file,
-// keeping every other family and the rest of the bookkeeping.
+// keeping every other family and the rest of the bookkeeping. A family that run finds
+// unsupported loses its template entry and its capture file in the same write.
 
 const CAPTURE_TASK = 'Run one command that prints two lines, then report what it printed.';
 const CAPTURE_SYSTEM_PROMPT =
@@ -391,7 +393,7 @@ function main() {
   });
 
   const families: Record<string, unknown> = {};
-  const captures: Record<string, unknown> = {};
+  const captures: Record<string, object> = {};
   const unsupportedFamilies: Record<string, string> = { ...unsupported };
   const today = new Date().toDateString();
 
@@ -661,23 +663,26 @@ function main() {
     families,
     unsupportedFamilies,
   });
-  let written = captured;
-  if (args.only.length > 0) {
-    const existing = ProbeTemplatesSchema.parse(JSON.parse(readFileSync(templatesPath, 'utf8')));
-    written = mergeProbeTemplates(existing, captured, args.only);
-    if (existing.cliVersion !== args.cliVersion) {
-      console.warn(
-        `${templatesPath} now mixes CLI ${existing.cliVersion} templates with ${args.cliVersion} captures; recapture every family to align the version.`
-      );
-    }
-  }
-  mkdirSync(join(args.out, 'probe-captures'), { recursive: true });
-  writeFileSync(templatesPath, `${JSON.stringify(written, null, 2)}\n`);
-  for (const [key, capture] of Object.entries(captures)) {
-    writeFileSync(
-      join(args.out, 'probe-captures', `${key.replaceAll('/', '--')}.json`),
-      `${JSON.stringify({ cliVersion: args.cliVersion, ...(capture as object) }, null, 2)}\n`
+  const existing =
+    args.only.length > 0
+      ? ProbeTemplatesSchema.parse(JSON.parse(readFileSync(templatesPath, 'utf8')))
+      : undefined;
+  if (existing && existing.cliVersion !== args.cliVersion) {
+    console.warn(
+      `${templatesPath} now mixes CLI ${existing.cliVersion} templates with ${args.cliVersion} captures; recapture every family to align the version.`
     );
+  }
+  // A family this run found unsupported loses its template entry and its capture together.
+  const { templates: written, removedFiles } = writeProbeCaptureFiles({
+    out: args.out,
+    cliVersion: args.cliVersion,
+    existing,
+    captured,
+    scope: args.only,
+    captures,
+  });
+  if (removedFiles.length > 0) {
+    console.log(`removed ${removedFiles.join(', ')}: the family is unsupported now`);
   }
   console.log(
     `wrote ${Object.keys(written.families).length} families and ${Object.keys(captures).length} captures to ${args.out}`

@@ -5,7 +5,12 @@ import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
-import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
+import {
+  type OrganizationContextValue,
+  OrganizationProvider,
+  type OrganizationSelection,
+  useOrganization,
+} from '@/lib/organization-context';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -53,15 +58,25 @@ const orgB: OrgEntry = { organizationId: 'org-b', organizationName: 'Org B', rol
 
 const savedMetadata = new Map<string, string>();
 
-let current: ReturnType<typeof useOrganization> | undefined = undefined;
-const publications: { token: string | undefined; id: string | null; loaded: boolean }[] = [];
+let current: OrganizationContextValue | undefined = undefined;
+const publications: {
+  token: string | undefined;
+  id: string | null;
+  loaded: boolean;
+  status: OrganizationSelection['status'];
+}[] = [];
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounted: Mounted[] = [];
 let client: QueryClient | undefined = undefined;
 
 function Probe() {
   current = useOrganization();
-  publications.push({ token: auth.token, id: current.organizationId, loaded: current.isLoaded });
+  publications.push({
+    token: auth.token,
+    id: current.organizationId,
+    loaded: current.isLoaded,
+    status: current.selection.status,
+  });
   return createElement('Scope', current);
 }
 
@@ -139,16 +154,30 @@ afterEach(() => {
 });
 
 describe('OrganizationProvider default organization', () => {
-  it('publishes a stored organization without waiting for the list', async () => {
+  it('holds a stored organization pending until the list confirms it', async () => {
     savedMetadata.set(ORG_KEY, 'org-b');
     const names = Promise.withResolvers<OrgEntry[]>();
     list.mockReturnValue(names.promise);
     await mount();
-    expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: true, error: null });
+    // The stored id is published, but the selection is NOT loaded: nothing may
+    // load a membership the list has not confirmed. This is the window a
+    // deleted organization used to paint its name and a failed session load in.
+    expect(scope()).toMatchObject({
+      organizationId: 'org-b',
+      isLoaded: false,
+      error: null,
+      selection: { status: 'restored', organizationId: 'org-b' },
+    });
     await act(() => {
       names.resolve([orgA, orgB]);
     });
-    expect(scope().organizationId).toBe('org-b');
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({
+      organizationId: 'org-b',
+      isLoaded: true,
+      error: null,
+      selection: { status: 'organization', organizationId: 'org-b' },
+    });
   });
 
   it('defaults to the first organization when nothing is stored', async () => {
@@ -467,5 +496,119 @@ describe('OrganizationProvider persistence', () => {
     });
     await waitFor(() => !scope().isSaving);
     expect(scope()).toMatchObject({ organizationId: 'org-a', error: null });
+  });
+});
+
+describe('OrganizationProvider deleted membership', () => {
+  it('keeps a restored organization pending while the list is in flight', async () => {
+    // The device sequence: an organization the person belonged to is deleted
+    // while the app is closed, so the stored id names nothing. On relaunch the
+    // stored id is published before `organizations.list` answers.
+    savedMetadata.set(ORG_KEY, 'org-gone');
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+
+    await mount();
+
+    expect(scope()).toMatchObject({
+      organizationId: 'org-gone',
+      isLoaded: false,
+      error: null,
+      selection: { status: 'restored', organizationId: 'org-gone' },
+    });
+    // Nothing may report a failure for an organization no settled list has
+    // named: no publication before the answer is loaded, and no error.
+    expect(publications.filter(value => value.loaded)).toHaveLength(0);
+    expect(publications.some(value => value.id === 'org-gone' && value.loaded)).toBe(false);
+  });
+
+  it('switches to Personal once the list settles without the stored organization', async () => {
+    savedMetadata.set(ORG_KEY, 'org-gone');
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+    await mount();
+    expect(scope().isLoaded).toBe(false);
+
+    await act(() => {
+      names.resolve([]);
+    });
+
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({
+      organizationId: null,
+      isLoaded: true,
+      error: null,
+      selection: { status: 'personal-chosen' },
+    });
+    // Personal is written as an explicit choice, so the dead id never returns.
+    await waitFor(() => savedMetadata.get(MARKER_KEY) === 'personal');
+    expect(savedMetadata.has(ORG_KEY)).toBe(false);
+    // The switch happened after the answer, never before it.
+    const firstLoaded = publications.find(value => value.loaded);
+    expect(firstLoaded?.id).toBeNull();
+  });
+
+  it('keeps the organization when the settled list still names it', async () => {
+    savedMetadata.set(ORG_KEY, 'org-b');
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+    await mount();
+    expect(scope().isLoaded).toBe(false);
+
+    await act(() => {
+      names.resolve([orgA, orgB]);
+    });
+
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({
+      organizationId: 'org-b',
+      isLoaded: true,
+      error: null,
+      selection: { status: 'organization', organizationId: 'org-b' },
+    });
+    // A confirmed membership is not rewritten: the pair already names it.
+    expect(savedMetadata.get(ORG_KEY)).toBe('org-b');
+    expect(savedMetadata.has(MARKER_KEY)).toBe(false);
+  });
+
+  it('lands on Personal when the thrown-away selection is the only membership', async () => {
+    savedMetadata.set(ORG_KEY, 'org-gone');
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReturnValue(names.promise);
+    await mount();
+    await act(() => {
+      names.resolve([orgA]);
+    });
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({
+      organizationId: 'org-a',
+      selection: { status: 'organization', organizationId: 'org-a' },
+    });
+  });
+
+  it('publishes the stored id as unverified when the list fails, and promotes it after Retry', async () => {
+    savedMetadata.set(ORG_KEY, 'org-b');
+    list.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([orgB]);
+    await mount();
+
+    // A failed read is not an answer about the membership: the id is published
+    // so the surfaces can show the list's own failure and its Retry.
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({
+      organizationId: 'org-b',
+      isLoaded: true,
+      selection: { status: 'restored-unverified', organizationId: 'org-b' },
+    });
+
+    await act(() => {
+      scope().retry();
+    });
+
+    await waitFor(() => scope().selection.status === 'organization' && scope().error === null);
+    expect(scope()).toMatchObject({
+      organizationId: 'org-b',
+      isLoaded: true,
+      error: null,
+    });
   });
 });

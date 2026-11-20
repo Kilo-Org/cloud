@@ -32,7 +32,7 @@ const h = vi.hoisted(() => ({
   setData: null as ((next: OrgGuardrails) => void) | null,
   /** The edit callback the stubbed input section forwards to the form. */
   sectionOnChange: null as ((update: (current: GuardrailsDraft) => GuardrailsDraft) => void) | null,
-  /** What the durable draft answers; `loading` has no `save`/`clear` to call. */
+  /** What the durable draft answers; both states carry the write it accepts. */
   formDraft: {
     kind: 'loading' as 'loading' | 'ready',
     value: null as unknown,
@@ -88,7 +88,7 @@ vi.mock('@/lib/persist/use-form-draft', () => ({
           save: h.formDraft.save,
           clear: h.formDraft.clear,
         }
-      : { kind: 'loading' },
+      : { kind: 'loading', save: h.formDraft.save, clear: h.formDraft.clear },
 }));
 // The real module opens the encrypted SQLCipher store, which this Node project
 // cannot import; the form reads only its key helper.
@@ -453,6 +453,22 @@ describe('GuardrailsForm leave guard', () => {
       await Promise.resolve();
     });
 
+    expect(h.formDraft.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the stored draft on Discard before the draft answers', async () => {
+    await mountForm();
+
+    editInputToggle();
+    pressBack();
+    await act(async () => {
+      discardRequest().onConfirm?.();
+      await Promise.resolve();
+    });
+
+    // The store had not settled yet, and the confirmed Discard still drops the
+    // stored draft: the hook writes that clear through while it reports
+    // `loading`.
     expect(h.formDraft.clear).toHaveBeenCalledTimes(1);
   });
 

@@ -202,17 +202,13 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   // while the person has not edited.
   const restored = draft.kind === 'ready' ? draft.value : null;
   // The form is typed into before the store answers — the stored row paints
-  // first — and `useFormDraft` holds such a write and replays it once the draft
-  // answers, so these forward whenever the hook has them.
+  // first — but `useFormDraft` writes through while it still reports `loading`,
+  // so neither write may wait for the draft to settle.
   const onDraftChange = (value: SpendAlertsFormDraft) => {
-    if (draft.kind === 'ready') {
-      draft.save(value);
-    }
+    draft.save(value);
   };
   const onDraftClear = () => {
-    if (draft.kind === 'ready') {
-      draft.clear();
-    }
+    draft.clear();
   };
 
   if (!scopeResolved) {

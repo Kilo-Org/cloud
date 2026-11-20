@@ -33,7 +33,9 @@ const boundary = vi.hoisted(() => ({
 }));
 
 // The durable draft, controllable per case: a form's restore path needs the
-// draft to land after the stored row painted, and an edit to beat it.
+// draft to land after the stored row painted, and an edit to beat it. Both
+// states carry `save`/`clear`, because the real hook writes through while it
+// still reports `loading`.
 const formDraft = vi.hoisted(() => {
   const save = vi.fn<(value: unknown) => void>();
   const clear = vi.fn<() => void>();
@@ -44,7 +46,7 @@ const formDraft = vi.hoisted(() => {
   const useFormDraft = vi.fn(
     (_input: { userId?: string; isIdentityLoading: boolean; entityKey: string }) =>
       current.kind === 'loading'
-        ? { kind: 'loading' as const }
+        ? { kind: 'loading' as const, save, clear }
         : { kind: 'ready' as const, value: current.value, save, clear }
   );
   return { save, clear, current, useFormDraft };
@@ -910,6 +912,29 @@ describe('SpendAlertsScreen restored draft', () => {
     expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('40');
     expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
     expect(channelSwitches(renderer, i18n.t('common.email'))[0]?.props.value).toBe(true);
+  });
+
+  it('writes an edit made before the stored draft settles', async () => {
+    // The load window: the store has not answered, so the form shows the stored
+    // row. An edit there still reaches the store — the hook writes through
+    // instead of dropping the write until the draft answers.
+    formDraft.current.kind = 'loading';
+    const { renderer } = await mountLoaded();
+
+    type(renderer, LIMIT, '40');
+
+    expect(formDraft.save).toHaveBeenLastCalledWith(expect.objectContaining({ threshold: '40' }));
+  });
+
+  it('clears the stored draft when a save settles before the draft answers', async () => {
+    formDraft.current.kind = 'loading';
+    const { renderer } = await mountLoaded();
+
+    type(renderer, LIMIT, '30');
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => formDraft.clear.mock.calls.length === 1);
+    expect(formDraft.clear).toHaveBeenCalledTimes(1);
   });
 
   it('saves the whole draft on an edit and clears it when the save lands', async () => {

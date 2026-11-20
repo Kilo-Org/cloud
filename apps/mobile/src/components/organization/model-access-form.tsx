@@ -259,10 +259,9 @@ export function ModelAccessForm({
     clearWhere(() => true);
     touchedRef.current = true;
     setForm(previous => ({ ...previous, draft: next }));
-    // The whole draft, on every edit: a reload may follow any of them.
-    if (formDraft.kind === 'ready') {
-      formDraft.save(next);
-    }
+    // The whole draft, on every edit: a reload may follow any of them, and the
+    // hook writes through while it still reports `loading`.
+    formDraft.save(next);
   };
 
   const onSave = async () => {
@@ -291,9 +290,7 @@ export function ModelAccessForm({
       }));
       // The draft became the saved policy; nothing is left to restore.
       restoredRef.current = true;
-      if (formDraft.kind === 'ready') {
-        formDraft.clear();
-      }
+      formDraft.clear();
       attempt.succeed();
     } catch (error) {
       attempt.fail({
@@ -373,9 +370,7 @@ export function ModelAccessForm({
               // screen's, or a language-direction reload would restore exactly
               // the edits the person just threw away.
               touchedRef.current = true;
-              if (formDraft.kind === 'ready') {
-                formDraft.clear();
-              }
+              formDraft.clear();
               setForm(previous => ({ ...previous, draft: previous.baseline }));
             }}
           >

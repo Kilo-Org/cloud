@@ -31,8 +31,9 @@ const h = vi.hoisted(() => ({
   /** Re-render the harness, so a mocked draft load can land after mount. */
   rerender: null as (() => void) | null,
   /**
-   * What the durable draft answers. `loading` has no `save`/`clear`, so the
-   * state also models the identity or the store not having answered yet.
+   * What the durable draft answers. Both states carry `save`/`clear`: the real
+   * hook writes through while it still reports `loading`, before the identity
+   * or the store has answered.
    */
   formDraft: {
     kind: 'loading' as 'loading' | 'ready',
@@ -57,7 +58,7 @@ vi.mock('@/lib/persist/use-form-draft', () => ({
           save: h.formDraft.save,
           clear: h.formDraft.clear,
         }
-      : { kind: 'loading' },
+      : { kind: 'loading', save: h.formDraft.save, clear: h.formDraft.clear },
 }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -333,6 +334,10 @@ describe('GuardrailsForm durable draft', () => {
       onChange(current => ({ ...current, groupId: 'group-1' }));
     });
 
+    // The hook writes through while it still reports `loading`, so the edit
+    // reached the store before the load settled.
+    expect(h.formDraft.save).toHaveBeenCalledWith(expect.objectContaining({ groupId: 'group-1' }));
+
     // The load settles after the edit: the person's change wins.
     h.formDraft.kind = 'ready';
     h.formDraft.value = { ...serverDraft(), inputEnabled: false };
@@ -342,6 +347,25 @@ describe('GuardrailsForm durable draft', () => {
     });
 
     expect(h.sectionDraft).toEqual({ ...serverDraft(), groupId: 'group-1' });
+  });
+
+  it('clears the stored draft when a save settles before the draft answers', async () => {
+    const renderer = await mountForm('refused');
+    h.mutateAsync.mockReset();
+    h.mutateAsync.mockResolvedValue({ ...payload(), enabled: false });
+
+    await pressSave(renderer);
+
+    expect(h.formDraft.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the stored draft on Cancel before the draft answers', async () => {
+    const renderer = await mountForm('refused');
+
+    editInputToggle();
+    pressLabelledButton(renderer.root, i18n.t('common.cancel'));
+
+    expect(h.formDraft.clear).toHaveBeenCalledTimes(1);
   });
 
   it('saves the whole draft on every edit', async () => {

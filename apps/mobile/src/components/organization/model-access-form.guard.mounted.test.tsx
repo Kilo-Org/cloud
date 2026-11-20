@@ -80,6 +80,21 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: h.mutateAsync, isPending: false }),
 }));
+// The form's draft key reads the account id, whose real hook opens the auth
+// store; the store is not what this suite drives.
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+// The durable draft is the account-scoped encrypted store, which mounts its own
+// providers; this suite drives the guard the form reports to, not the store.
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () => ({ kind: 'loading', save: vi.fn(), clear: vi.fn() }),
+}));
+// The real module opens the encrypted SQLCipher store, which this Node project
+// cannot import; the form reads only its key helper.
+vi.mock('@/lib/persist/drafts', () => ({
+  orgModelAccessFormDraftKey: (organizationId: string) => `org-model-access-form:${organizationId}`,
+}));
 vi.mock('@/components/organization/model-access-lists', async () => {
   const { createElement: render } = await import('react');
   return {

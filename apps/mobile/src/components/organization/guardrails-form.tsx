@@ -95,8 +95,9 @@ export function GuardrailsForm({
   const guard = useMetadataLeaveGuard({
     enabled: true,
     saving,
-    // A confirmed Discard is the person dropping the draft on purpose.
-    onDiscard: formDraft.kind === 'ready' ? formDraft.clear : undefined,
+    // A confirmed Discard is the person dropping the draft on purpose, whether
+    // or not the store has answered: `clear` writes through while loading.
+    onDiscard: formDraft.clear,
   });
 
   useEffect(() => {
@@ -132,10 +133,9 @@ export function GuardrailsForm({
     const next = update(draft);
     touchedRef.current = true;
     setDraft(next);
-    // The whole draft, on every edit: a reload may follow any of them.
-    if (formDraft.kind === 'ready') {
-      formDraft.save(next);
-    }
+    // The whole draft, on every edit: a reload may follow any of them, and the
+    // hook writes through while it still reports `loading`.
+    formDraft.save(next);
     guard.handleDirtyChange(!draftsEqual(next, baseline, outputAvailable));
   };
 
@@ -164,9 +164,7 @@ export function GuardrailsForm({
       replaceDraft(savedDraft);
       // The draft became the saved record; nothing is left to restore.
       restoredRef.current = true;
-      if (formDraft.kind === 'ready') {
-        formDraft.clear();
-      }
+      formDraft.clear();
       guard.handleDirtyChange(false);
       attempt.succeed();
     } catch (error) {
@@ -239,9 +237,7 @@ export function GuardrailsForm({
               clearWhere(() => true);
               // Cancel drops the draft on purpose, so the stored copy goes too.
               touchedRef.current = true;
-              if (formDraft.kind === 'ready') {
-                formDraft.clear();
-              }
+              formDraft.clear();
               replaceDraft(baseline);
               guard.handleDirtyChange(false);
             }}

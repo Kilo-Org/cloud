@@ -26,8 +26,9 @@ import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
 
 /**
- * What the durable draft answers. `loading` has no `save`/`clear`, so the state
- * also models the identity or the store not having answered yet.
+ * What the durable draft answers. Both states carry `save`/`clear`: the real
+ * hook writes through while it still reports `loading`, before the identity or
+ * the store has answered.
  */
 const draftStore = vi.hoisted(() => ({
   kind: 'loading' as 'loading' | 'ready',
@@ -53,7 +54,7 @@ vi.mock('@/lib/persist/use-form-draft', () => ({
           save: draftStore.save,
           clear: draftStore.clear,
         }
-      : { kind: 'loading' },
+      : { kind: 'loading', save: draftStore.save, clear: draftStore.clear },
 }));
 // The real module opens the encrypted SQLCipher store, which this Node project
 // cannot import; the form reads only its key helper.
@@ -490,6 +491,14 @@ describe('ModelAccessForm durable draft', () => {
     const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
     changeDraft(root, toggleModel(draft, 'openai/gpt', false));
 
+    // The hook writes through while it still reports `loading`, so the edit
+    // reached the store before the load settled.
+    expect(draftStore.save).toHaveBeenCalledTimes(1);
+    expect(draftStore.save.mock.calls[0]?.[0]).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: ['openai/gpt'],
+    });
+
     // The load settles after the edit: the person's change wins.
     draftStore.kind = 'ready';
     draftStore.value = { providerAllowList: ['anthropic'], modelDenyList: ['anthropic/claude'] };
@@ -559,6 +568,31 @@ describe('ModelAccessForm durable draft', () => {
       await Promise.resolve();
     });
 
+    expect(draftStore.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the stored draft when a save settles before the draft answers', async () => {
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    await pressSave(root);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(draftStore.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the stored draft on Cancel before the draft answers', () => {
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    pressCancel(root);
+
+    // The store had not settled yet, and Cancel still drops the durable copy:
+    // the hook writes that clear through while it reports `loading`.
     expect(draftStore.clear).toHaveBeenCalledTimes(1);
   });
 

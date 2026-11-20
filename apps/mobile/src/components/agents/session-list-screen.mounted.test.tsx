@@ -895,8 +895,23 @@ describe('AgentSessionListScreen live presentation', () => {
     // The lock released: the second press is not dropped.
     expect(state.boundaryRefetch).toHaveBeenCalledTimes(2);
 
+    // On an organization scope the same press leaves the boundary read failed,
+    // and that failure is the outage rather than a verdict on the organization:
+    // the card stays instead of "Couldn't load your organizations".
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    await renderScreen();
+    // The surface keeps the offline card; the header's context control may name
+    // the failed organizations read on its own, but the list never falls to the
+    // organization-unavailable state.
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    expect(text()).not.toContain(i18n.t('organization.boundary.unavailableSessionsDescription'));
+
     // The connection returns: the paused read resumes by itself and the card
-    // gives way to the confirmed list.
+    // gives way to the confirmed list. The boundary read answers again too.
+    state.organization.organizationId = null;
+    state.boundary.isError = false;
     state.internet = 'online';
     state.connection.isConnected = true;
     state.live.isPaused = false;

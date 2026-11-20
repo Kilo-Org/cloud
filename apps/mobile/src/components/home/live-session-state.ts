@@ -70,8 +70,31 @@ export function liveSessionContent(
   // profile focus, or the card's own Retry — and on an organization scope the
   // failed read would then land the surface on the boundary error instead.
   const offlineWaiting = connectivity === 'offline' && !sessions.isFetching;
-  if (context.isResolving) {
+  if (connectivity === 'offline') {
+    // Offline, the boundary read's own failure is a consequence of the outage,
+    // not a verdict on the scope: it is the read that cannot settle, and on an
+    // organization scope it would otherwise turn the card into "Couldn't load
+    // your organizations" for the rest of the outage (its Retry, an app
+    // foreground, a profile focus). The answers the device already has and the
+    // offline card outrank it. A real refusal still wins: a non-retryable
+    // sessions error is the server's own verdict, not a lost connection.
+    if (sessions.terminalError?.kind === 'non-retryable') {
+      return 'error';
+    }
+    if (sessions.activeSessions.length > 0) {
+      return 'rows';
+    }
+    // A failed live read is the read's own verdict, not the boundary's outage.
+    if (sessions.terminalError) {
+      return 'error';
+    }
+    if (sessions.hasAcceptedSuccess) {
+      return 'empty';
+    }
     return offlineWaiting ? 'offline' : 'pending';
+  }
+  if (context.isResolving) {
+    return 'pending';
   }
   if (!context.isReady || sessions.terminalError?.kind === 'non-retryable') {
     return 'error';
@@ -85,5 +108,5 @@ export function liveSessionContent(
   if (sessions.hasAcceptedSuccess) {
     return 'empty';
   }
-  return offlineWaiting ? 'offline' : 'pending';
+  return 'pending';
 }

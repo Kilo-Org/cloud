@@ -131,7 +131,12 @@ export function LiveSessionFeedback({
   // that remain readable keep both: the list is still usable there, and the
   // query retry and the socket retry are separate actions.
   let failureOwnsRetry = false;
-  if (context.isError) {
+  // The boundary error owns the surface only while the classifier calls it an
+  // error. Offline, its failed read is the outage: the offline card (or the
+  // rows and empty state the device already has) stays instead of
+  // "Couldn't load your organizations", which its own Retry and every
+  // foreground re-enter.
+  if (context.isError && content === 'error') {
     failureOwnsRetry = true;
     failure = (
       <QueryError

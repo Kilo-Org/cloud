@@ -394,6 +394,39 @@ describe('Home live section', () => {
     expect(node('QueryError').props.variant).toBe('offline');
   });
 
+  it('keeps the offline card when the boundary read fails on an organization scope', async () => {
+    // The boundary read runs on `networkMode: 'always'`, so offline it settles
+    // by failing. That failure is the outage, not a verdict on the organization:
+    // the card's own Retry, an app foreground and a profile focus all re-run it,
+    // and none of them may turn the surface into "Couldn't load your
+    // organizations" for the rest of the outage.
+    connectivity.offline = true;
+    connectivity.connected = false;
+    const failedBoundary = { ...context, isReady: false, isError: true };
+    await render({ ...settled, hasAcceptedSuccess: false, isPaused: true }, failedBoundary);
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(node('QueryError').props.variant).toBe('offline');
+    expect(node('QueryError').props.title).not.toBe(i18n.t('organization.boundary.loadErrorTitle'));
+
+    // Answers the device already has outrank the same failure.
+    await render(
+      {
+        ...settled,
+        activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+      },
+      failedBoundary
+    );
+    expect(nodes('QueryError')).toHaveLength(0);
+    expect(text()).toContain('a1');
+
+    // Online, the same boundary failure is the error it always was.
+    connectivity.offline = false;
+    connectivity.connected = true;
+    await render({ ...settled, hasAcceptedSuccess: false }, failedBoundary);
+    expect(node('QueryError').props.variant).not.toBe('offline');
+    expect(node('QueryError').props.title).toBe(i18n.t('organization.boundary.loadErrorTitle'));
+  });
+
   it('keeps rows and confirmed-empty content through an outage', async () => {
     connectivity.offline = true;
     connectivity.connected = false;
@@ -593,7 +626,9 @@ describe('Home live section status box', () => {
   });
 
   it('draws the column when the failure block owns the surface', () => {
-    mountFeedback(settled, { ...context, isError: true });
+    // A boundary failure is never `isReady`: the live context derives readiness
+    // from the same read.
+    mountFeedback(settled, { ...context, isError: true, isReady: false });
     expect(nodes('View').length).toBeGreaterThan(0);
     expect(nodes('QueryError')).toHaveLength(1);
   });
@@ -614,8 +649,14 @@ describe('Home live section status box', () => {
     act(() => {
       renderer?.update(
         createElement(LiveSessionFeedback, {
-          context: { ...context, isError: true },
-          sessions: settled,
+          // A boundary failure is never ready, so the column that appears beside
+          // a live connection fact is the live read's own failure here.
+          context,
+          sessions: {
+            ...settled,
+            hasAcceptedSuccess: false,
+            terminalError: { kind: 'retryable', error: new Error('temporary') } as const,
+          },
           failureLabel: "Couldn't load active sessions",
           inlineNotices: false,
         })

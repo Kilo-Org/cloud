@@ -133,6 +133,14 @@ function discardRequest() {
 
 /** Hand the guard the removal the navigator produces for a Back press. */
 function pressBack() {
+  // A disabled guard registers no interception, so the navigator removes the
+  // route without consulting it. Modelling that is what lets a test tell an
+  // armed guard from one the screen turned off.
+  if (!h.guard.enabled) {
+    h.routeFocused = false;
+    h.repeat();
+    return;
+  }
   const handler = h.guard.handler;
   if (!handler) {
     throw new Error('the leave guard did not register a removal handler');
@@ -405,16 +413,21 @@ describe('ModelAccessForm leave guard', () => {
     expect(h.guard.enabled).toBe(true);
   });
 
-  it('never arms the guard for a read-only viewer, even after a prop move', async () => {
-    await mountForm({ canEdit: false });
+  it('never asks a read-only viewer, whose lists are disabled', async () => {
+    const root = await mountForm({ canEdit: false });
 
+    // The evidence the gate reads: the form disables the lists it would
+    // otherwise let a manager edit, so the viewer cannot make a draft.
+    expect(findAll(root, 'ModelDenyList')[0]?.props.disabled).toBe(true);
+
+    // Drive the edit path anyway. A form that armed the guard regardless of the
+    // viewer would prompt here, and this is the only state in which the route
+    // could then hold unsaved edits.
+    denyOneModel(root);
     expect(h.guard.enabled).toBe(false);
 
-    moveProps({ canEdit: false, providerAllowList: ['anthropic'], modelDenyList: ['openai/gpt'] });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(h.guard.enabled).toBe(false);
+    pressBack();
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.repeat).toHaveBeenCalledTimes(1);
   });
 });

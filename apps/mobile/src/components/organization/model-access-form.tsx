@@ -189,10 +189,11 @@ export function ModelAccessForm({
   // guardrails, mode and group forms do. The dirty flag is a derivation of this
   // form's own state, including the two rebases `syncedFormState` applies during
   // render, so the guard recomputes it on every render instead of taking it from
-  // a change event. A read-only viewer cannot have edited the form. A save in
-  // flight owns the route: the guard drops the removal rather than offering a
-  // Discard for a request that still lands.
+  // a change event. A save in flight owns the route: the guard drops the removal
+  // rather than offering a Discard for a request that still lands.
   const guard = useMetadataLeaveGuard({
+    // The controls are disabled for a viewer who may not manage the
+    // organization, so the route never holds a draft of that viewer's making.
     enabled: canEdit,
     isDirty: () => dirty,
     saving,

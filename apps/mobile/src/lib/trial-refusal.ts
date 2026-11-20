@@ -22,7 +22,6 @@ export {
   TRIAL_ENDED_BILLING_AT_KILO_AI_COPY_KEY,
   TRIAL_ENDED_BILLING_COPY_KEY,
   TRIAL_ENDED_COPY_KEY,
-  type TrialRefusalBillingStep,
   trialRefusalCopyKey,
   trialRefusalMessage,
 } from '@/lib/trial-refusal-copy';

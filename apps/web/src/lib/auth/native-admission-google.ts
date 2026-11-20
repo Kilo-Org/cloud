@@ -87,6 +87,7 @@ const KNOWN_INTEGRITY_LABELS = [
   REQUIRED_INTEGRITY_LABEL,
   'MEETS_BASIC_INTEGRITY',
   'MEETS_STRONG_INTEGRITY',
+  'MEETS_VIRTUAL_INTEGRITY',
 ] as const;
 
 function classifyAppRecognition(verdict: string | undefined): PlayIntegrityAppRecognition {

@@ -329,7 +329,7 @@ describe('verifyPlayIntegrity decode endpoint', () => {
             certificateSha256Digest: ['test-cert-digest'],
             packageName: 'com.kilocode.kiloapp',
           },
-          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_BASIC_INTEGRITY'] },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_VIRTUAL_INTEGRITY'] },
         },
       })
     );

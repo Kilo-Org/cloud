@@ -1279,7 +1279,6 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-
   it('answers a full user queue with no started run instead of a conflict', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(getQueueRunOccupancy).mockResolvedValue({
@@ -1300,7 +1299,6 @@ describe('POST /admin/runs', () => {
     });
     expect(insertRun).not.toHaveBeenCalled();
   });
-
 
   it('starts a drained pair on the revision-2 cases while revision 3 is inactive', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);

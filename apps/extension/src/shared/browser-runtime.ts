@@ -1704,8 +1704,7 @@ export const createBrowserRuntime = ({
       return need.itemId === item.id;
     }
 
-    const named =
-      need.kind === 'exact' ? item.url === need.url : sameFileUrl(need.url, item.url);
+    const named = need.kind === 'exact' ? item.url === need.url : sameFileUrl(need.url, item.url);
 
     if ((item.tabId !== undefined && item.tabId !== need.tabId) || !named) {
       return false;
@@ -4035,11 +4034,7 @@ export const createBrowserRuntime = ({
                 runTabId,
                 refusedFile?.url === undefined
                   ? undefined
-                  : needOfUrl(
-                      refusedFile.tabId ?? runTabId,
-                      refusedFile.url,
-                      own?.scope ?? 'page'
-                    )
+                  : needOfUrl(refusedFile.tabId ?? runTabId, refusedFile.url, own?.scope ?? 'page')
               )
             : undefined;
 

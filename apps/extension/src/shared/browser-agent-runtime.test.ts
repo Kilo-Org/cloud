@@ -6108,7 +6108,11 @@ describe('the download hold on a real call', () => {
     });
     const dashboard = `${MAIN_ORIGIN}/dashboard`;
     const own = { filename: 'report.txt', id: 81, url: `${MAIN_ORIGIN}/assets/report.txt?click=1` };
-    const extra = { filename: 'second.txt', id: 82, url: `${MAIN_ORIGIN}/assets/second.txt?click=1` };
+    const extra = {
+      filename: 'second.txt',
+      id: 82,
+      url: `${MAIN_ORIGIN}/assets/second.txt?click=1`,
+    };
     const suggested: number[] = [];
     let repeat = false;
 
@@ -6137,12 +6141,9 @@ describe('the download hold on a real call', () => {
               ];
 
           for (const { file, id } of items) {
-            hold.handle(
-              { filename: file.filename, id, referrer: dashboard, url: file.url },
-              () => {
-                suggested.push(id);
-              }
-            );
+            hold.handle({ filename: file.filename, id, referrer: dashboard, url: file.url }, () => {
+              suggested.push(id);
+            });
           }
         }
 

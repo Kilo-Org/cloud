@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
 
 import { SessionPreviewTranscript } from '@/components/agents/session-preview-transcript';
+import { sessionBranchLabel } from '@/components/agents/session-provenance-subtitle';
 import { QueryError } from '@/components/query-error';
 import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
@@ -72,7 +73,7 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
     : null;
   const subtitle = [
     t('sharedSession.sharedBy', { owner: ownerName }),
-    metadata?.gitBranch ?? null,
+    sessionBranchLabel(metadata?.gitBranch),
     dateLabel,
   ]
     .filter(value => value !== null && value !== '')

@@ -194,6 +194,37 @@ describe('filterLiveSessions', () => {
     );
   });
 
+  it('searches the decoded branch the row paints, and the stored branch', () => {
+    // The row paints `sessionBranchLabel(gitBranch)`, so the visible branch
+    // text must find the row even though the stored value is percent-encoded.
+    const branchSessions = [
+      {
+        id: 'encoded',
+        title: 'Reissue the invoice export',
+        gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+        createdOnPlatform: 'cli',
+      },
+      {
+        id: 'plain',
+        title: 'Backfill the retry budget',
+        gitBranch: 'fix/checkout-retries',
+        createdOnPlatform: 'cli',
+      },
+    ];
+    expect(
+      filterLiveSessions(
+        branchSessions,
+        query({ searchQuery: '請求書', platformFilter: [], projectFilter: [] })
+      ).map(s => s.id)
+    ).toEqual(['encoded']);
+    expect(
+      filterLiveSessions(
+        branchSessions,
+        query({ searchQuery: 'checkout', platformFilter: [], projectFilter: [] })
+      ).map(s => s.id)
+    ).toEqual(['plain']);
+  });
+
   it('treats a whitespace-only query as no search', () => {
     expect(filterLiveSessions(sessions, query({ searchQuery: '   ' }))).toBe(sessions);
   });

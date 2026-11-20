@@ -8,6 +8,7 @@ import {
   projectOptionKey,
 } from '@/components/agents/session-list-helpers';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
+import { sessionBranchLabel } from './session-provenance-subtitle';
 
 /** The part of an active session the live filters read. */
 export type LiveFilterSession = {
@@ -84,6 +85,10 @@ export function buildLiveFilterOptions(sessions: readonly LiveFilterSession[]): 
  * `sessionDisplayTitle`, so the server's creation-default placeholder
  * (`New session - <ISO timestamp>`) is not searchable: the row shows the
  * generic untitled label for it, never that timestamp.
+ *
+ * The branch appears twice on purpose: the haystack holds both the stored
+ * (percent-encoded) branch and the decoded branch the row paints, so a person
+ * finds the row by typing either form.
  */
 function matchesSearch(session: LiveFilterSession, needle: string): boolean {
   return [
@@ -92,6 +97,7 @@ function matchesSearch(session: LiveFilterSession, needle: string): boolean {
     session.gitUrl,
     session.gitUrl ? formatGitUrlProject(session.gitUrl) : undefined,
     session.gitBranch,
+    sessionBranchLabel(session.gitBranch),
     session.associatedPr?.title,
     session.associatedPr?.number?.toString(),
   ].some(value => value?.toLowerCase().includes(needle));

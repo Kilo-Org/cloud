@@ -1,26 +1,8 @@
+import { decodePercentEncodedSegments } from './percent-encoded-segments';
+
 /** Drop one trailing `.git`, the suffix a clone URL carries and a name does not. */
 function stripGitSuffix(value: string): string {
   return value.endsWith('.git') ? value.slice(0, -4) : value;
-}
-
-/**
- * Decode every segment of a git URL path. Splitting before decoding keeps an
- * encoded slash inside its own segment, so the path keeps the boundaries the
- * raw URL had. A malformed escape (a lone `%` or a truncated sequence) cannot
- * be decoded, and its raw segment is kept instead of throwing: one bad segment
- * never blanks the label.
- */
-function decodePathSegments(path: string): string {
-  return path
-    .split('/')
-    .map(segment => {
-      try {
-        return decodeURIComponent(segment);
-      } catch {
-        return segment;
-      }
-    })
-    .join('/');
 }
 
 /**
@@ -39,7 +21,7 @@ export function formatGitUrlProject(gitUrl: string): string {
   const sshMatch = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl);
   const sshPath = sshMatch?.[1];
   if (sshPath) {
-    return stripGitSuffix(decodePathSegments(sshPath));
+    return stripGitSuffix(decodePercentEncodedSegments(sshPath));
   }
 
   const protocolIndex = gitUrl.indexOf('://');
@@ -62,7 +44,7 @@ export function formatGitUrlProject(gitUrl: string): string {
   const projectParts = dashIndex >= 2 ? pathParts.slice(0, dashIndex) : pathParts;
 
   if (projectParts.length >= 2) {
-    return stripGitSuffix(decodePathSegments(projectParts.join('/')));
+    return stripGitSuffix(decodePercentEncodedSegments(projectParts.join('/')));
   }
 
   return gitUrl;

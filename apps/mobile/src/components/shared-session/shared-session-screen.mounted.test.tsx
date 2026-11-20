@@ -181,3 +181,21 @@ describe('shared session header eyebrow', () => {
     renderer.unmount();
   });
 });
+
+describe('shared session subtitle', () => {
+  it('shows the decoded branch, not the stored percent-encoded one', () => {
+    query.data = sharedSession({
+      title: 'Fix login',
+      ownerName: 'alice',
+      gitUrl: 'Kilo-Org/cloud',
+      gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+      createdAt: CREATED_AT,
+    });
+    const renderer = renderScreen();
+
+    expect(headers.rendered).toHaveLength(1);
+    expect(headers.rendered[0]?.subtitle).toContain('fix/請求書');
+    expect(headers.rendered[0]?.subtitle).not.toContain('%E8%AB%8B');
+    renderer.unmount();
+  });
+});

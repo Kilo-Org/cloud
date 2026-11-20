@@ -17,6 +17,7 @@
 import { z } from 'zod';
 
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { sessionBranchLabel } from '@/components/agents/session-provenance-subtitle';
 import {
   githubPrRef,
   providerPrNumber,
@@ -211,7 +212,7 @@ function sessionSearchDocument(input: {
     // session keeps its `organizationId` in the id.
     id: getAgentSessionPath(input.sessionId, input.organizationId ?? undefined) as string,
     title,
-    description: input.gitBranch ?? '',
+    description: sessionBranchLabel(input.gitBranch) ?? '',
     keywords: [],
   });
 }

@@ -39,7 +39,10 @@ import {
   remoteSessionEyebrowState,
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
-import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
+import {
+  composeSessionProvenanceSubtitle,
+  sessionBranchLabel,
+} from './session-provenance-subtitle';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
@@ -156,7 +159,18 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 
   const canExit = canExitSessionFromList(session);
   const statusKind = glanceableStatusKind(session.status);
-  const { title, agentLabel, agentState, subtitle, spokenPrNumber, scheduledWake, spokenMeta } =
+  // Provenance subtitle: list rows show "branch · #N", card rows keep the
+  // branch-only subtitle. The branch decodes once, and the spoken label names
+  // the same decoded text.
+  const branchLabel = sessionBranchLabel(session.gitBranch);
+  const subtitle =
+    variant === 'card'
+      ? branchLabel
+      : composeSessionProvenanceSubtitle({
+          branchLabel,
+          prNumber: session.associatedPr?.number,
+        });
+  const { title, agentLabel, agentState, spokenPrNumber, scheduledWake, spokenMeta } =
     useMemo(() => {
       const isScheduled = session.status === 'scheduled';
       const scheduledWakeValue =
@@ -169,16 +183,6 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         // Tint by what the eyebrow names, never by its string: the state word is
         // catalog copy, so its text hashes to a different hue per locale.
         agentState: remoteSessionEyebrowState(session),
-        // Provenance subtitle: list rows show "branch · #N", card rows keep the
-        // branch-only subtitle. The spoken label mirrors this, with the PR phrase
-        // only on the list variant.
-        subtitle:
-          variant === 'card'
-            ? (session.gitBranch ?? null)
-            : composeSessionProvenanceSubtitle({
-                branch: session.gitBranch,
-                prNumber: session.associatedPr?.number,
-              }),
         spokenPrNumber: variant === 'card' ? null : (session.associatedPr?.number ?? null),
         scheduledWake: scheduledWakeValue,
         spokenMeta: selectRemoteRowSpokenMeta({
@@ -321,7 +325,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         statusKind,
         badge: agentLabel,
         meta: spokenMeta,
-        subtitle: session.gitBranch ?? null,
+        subtitle: branchLabel,
         prNumber: spokenPrNumber,
         platform: spokenPlatform,
       })}

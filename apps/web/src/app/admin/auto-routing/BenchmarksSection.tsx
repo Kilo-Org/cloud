@@ -7,9 +7,11 @@ import {
   DEFAULT_AUTO_ROUTER,
   type AutoRouter,
   BenchmarkConfigResponseSchema,
+  type BenchmarkConfigSaveWarning,
   BenchmarkRegistryResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkRunsResponseSchema,
+  BenchmarkRunSummariesResponseSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   DEFAULT_BENCHMARK_DECIDER_MODEL_IDS,
@@ -25,6 +27,7 @@ import {
   type BenchmarkRegistryResponse,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
+  type BenchmarkRunsResponse,
   type PolicySettingState,
   type PolicySettingValue,
   resolvePolicySettings,
@@ -314,6 +317,19 @@ async function fetchBenchmarkRuns(filter: RunFilter, router: AutoRouter) {
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
+async function fetchBenchmarkRunSummaries(runId: string, router: AutoRouter) {
+  const response = await adminFetch(
+    `/admin/api/auto-routing/benchmark-runs/${encodeURIComponent(runId)}/summaries?router=${router}`
+  );
+  return parseAdminResponse(response, BenchmarkRunSummariesResponseSchema);
+}
+
+const RUNS_POLL_INTERVAL_MS = 30_000;
+
+function responseHasRunningRun(response: BenchmarkRunsResponse): boolean {
+  return response.hasRunningRun ?? response.runs.some(run => run.status === 'running');
+}
+
 async function startBenchmarkRun({
   kind,
   force,
@@ -587,6 +603,9 @@ function BenchmarkConfigEditor({
   // polls; the query also refetches on focus) must not silently overwrite
   // in-progress edits, so the sync effect only resets the form while pristine.
   const [dirty, setDirty] = useState(false);
+  // What the last save could not do after persisting the config; replaced by
+  // the next save.
+  const [saveWarnings, setSaveWarnings] = useState<BenchmarkConfigSaveWarning[]>([]);
 
   // Any user edit goes through this so it marks the form dirty.
   const updateForm = useCallback(
@@ -620,7 +639,10 @@ function BenchmarkConfigEditor({
       setForm(configToFormState(data.config, router));
       setDirty(false);
       onSaved(data);
-      toast.success('Benchmark config saved');
+      const warnings = data.warnings ?? [];
+      setSaveWarnings(warnings);
+      if (warnings.length === 0) toast.success('Benchmark config saved');
+      else toast.warning('Benchmark config saved with warnings');
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to save benchmark config');
@@ -1096,6 +1118,7 @@ function BenchmarkConfigEditor({
             </>
           ) : null}
         </div>
+        <ConfigSaveWarnings warnings={saveWarnings} />
         {config === null ? (
           <p className="text-muted-foreground text-xs">
             No config saved yet — runs cannot start until one is saved.
@@ -1111,16 +1134,57 @@ function BenchmarkConfigEditor({
   );
 }
 
-function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
+const CONFIG_SAVE_WARNING_TITLES: Record<BenchmarkConfigSaveWarning['kind'], string> = {
+  registry_sync_failed: 'Platform registry not synced',
+  routing_table_publish_failed: 'Routing table not republished',
+};
+
+export function ConfigSaveWarnings({ warnings }: { warnings: BenchmarkConfigSaveWarning[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div role="alert" className="flex flex-col gap-2">
+      {warnings.map(warning => (
+        <div
+          key={warning.kind}
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500"
+        >
+          <p className="font-medium">{CONFIG_SAVE_WARNING_TITLES[warning.kind]}</p>
+          <p className="whitespace-pre-wrap break-words">{warning.message}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RunSummariesTable({
+  run,
+  router,
+  id,
+}: {
+  run: BenchmarkRun;
+  router: AutoRouter;
+  id: string;
+}) {
   const isDecider = run.kind === 'decider';
+  const running = run.status === 'running';
+  // Mounted only while the row is expanded, so a running run polls only then.
+  // The status is part of the key: a run that finishes fetches its final
+  // summaries once, and a terminal run's summaries never change.
+  const summariesQuery = useQuery({
+    queryKey: ['auto-routing', 'benchmark-run-summaries', router, run.id, run.status],
+    queryFn: () => fetchBenchmarkRunSummaries(run.id, router),
+    staleTime: running ? 0 : Infinity,
+    refetchInterval: running ? RUNS_POLL_INTERVAL_MS : false,
+  });
+  const summaries = summariesQuery.data?.summaries ?? [];
 
   const sortedSummaries: BenchmarkModelSummary[] = isDecider
-    ? [...run.summaries].sort((a, b) => {
+    ? [...summaries].sort((a, b) => {
         const routeDiff = a.routeKey.localeCompare(b.routeKey);
         if (routeDiff !== 0) return routeDiff;
         return b.accuracy - a.accuracy;
       })
-    : run.summaries;
+    : summaries;
 
   return (
     <TableRow className="bg-muted/30">
@@ -1131,7 +1195,16 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
             {run.error}
           </div>
         ) : null}
-        {sortedSummaries.length === 0 ? (
+        {summariesQuery.isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : summariesQuery.error ? (
+          <p className="text-destructive py-1 text-center text-xs">
+            Summaries unavailable:{' '}
+            {summariesQuery.error instanceof Error
+              ? summariesQuery.error.message
+              : 'request failed'}
+          </p>
+        ) : sortedSummaries.length === 0 ? (
           <p className="text-muted-foreground py-1 text-center text-xs">No summaries</p>
         ) : (
           <div className="overflow-x-auto">
@@ -1223,7 +1296,7 @@ function RunProgress({
   );
 }
 
-function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
+function BenchmarkRunsTable({ runs, router }: { runs: BenchmarkRun[]; router: AutoRouter }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const toggleExpand = useCallback((id: string) => {
@@ -1299,7 +1372,7 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                 {run.error ?? ''}
               </TableCell>
             </TableRow>
-            {expanded ? <RunSummariesTable run={run} id={summariesId} /> : null}
+            {expanded ? <RunSummariesTable run={run} router={router} id={summariesId} /> : null}
           </React.Fragment>
         );
       })}
@@ -1514,9 +1587,13 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryFn: () => fetchBenchmarkConfig(router),
   });
 
+  // One request per poll: the worker reports whether any run of this router is
+  // running whatever the filter, so the filtered list alone drives polling.
   const runsQuery = useQuery({
     queryKey: ['auto-routing', 'benchmark-runs', router, runFilter],
     queryFn: () => fetchBenchmarkRuns(runFilter, router),
+    refetchInterval: query =>
+      query.state.data && responseHasRunningRun(query.state.data) ? RUNS_POLL_INTERVAL_MS : false,
   });
 
   const registryQuery = useQuery({
@@ -1529,35 +1606,20 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryFn: () => fetchBenchmarkRoutingTable(router),
   });
 
-  // Run activity drives polling and cache invalidation, so it must not depend
-  // on what the list is filtered to — a platform run finishing while the admin
-  // reads the classifier list is still a completion. On the 'all' filter this
-  // shares its key with runsQuery, so it costs no extra request.
-  const allRunsQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-runs', router, 'all'],
-    queryFn: () => fetchBenchmarkRuns('all', router),
-  });
-
-  const hasRunningRun = allRunsQuery.data?.runs.some(r => r.status === 'running') ?? false;
-  const refetchRuns = runsQuery.refetch;
-  const refetchAllRuns = allRunsQuery.refetch;
-  useEffect(() => {
-    if (!hasRunningRun) return;
-    const id = setInterval(() => {
-      void refetchRuns();
-      void refetchAllRuns();
-    }, 30_000);
-    return () => clearInterval(id);
-  }, [hasRunningRun, refetchRuns, refetchAllRuns]);
+  // Undefined while a newly selected filter loads, so switching filters is not
+  // mistaken for a run finishing.
+  const runActivity = runsQuery.data ? responseHasRunningRun(runsQuery.data) : undefined;
+  const hasRunningRun = runActivity ?? false;
 
   // When the last running run finishes, its completion publishes a routing
   // table / classifier winner. Those live in their own query caches, so
   // invalidate them on the running→terminal edge — otherwise the published
   // routing table keeps showing stale data (or "No routing table published
   // yet") until a focus refetch or manual reload.
-  const prevHasRunningRun = useRef(hasRunningRun);
+  const prevHasRunningRun = useRef(runActivity);
   useEffect(() => {
-    if (prevHasRunningRun.current && !hasRunningRun) {
+    if (runActivity === undefined) return;
+    if (prevHasRunningRun.current && !runActivity) {
       void queryClient.invalidateQueries({
         queryKey: ['auto-routing', 'benchmark-routing-table', router],
       });
@@ -1568,8 +1630,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
         queryKey: ['auto-routing', 'benchmark-registry', router],
       });
     }
-    prevHasRunningRun.current = hasRunningRun;
-  }, [hasRunningRun, queryClient, router]);
+    prevHasRunningRun.current = runActivity;
+  }, [runActivity, queryClient, router]);
 
   const startRunMutation = useMutation({
     mutationFn: (input: { kind: BenchmarkKind; force: boolean; queue: BenchmarkQueueSelector }) =>
@@ -1837,7 +1899,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <BenchmarkRunsTable runs={runsQuery.data?.runs ?? []} />
+                  <BenchmarkRunsTable runs={runsQuery.data?.runs ?? []} router={router} />
                 </TableBody>
               </Table>
             )}

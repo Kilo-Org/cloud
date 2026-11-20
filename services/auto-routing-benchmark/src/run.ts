@@ -424,6 +424,10 @@ export async function drainQueues(
   return started;
 }
 
+// Must match the daily entry of `triggers.crons` in wrangler.jsonc.
+export const PLATFORM_SYNC_CRON = '0 5 * * *';
+export const PLATFORM_SYNC_SCHEDULE = 'daily at 05:00 UTC';
+
 /**
  * Reconcile the platform queue with the saved decider model list. Every
  * configured exact pair ends up with a current-engine registry row; pairs that
@@ -474,11 +478,18 @@ export async function syncPlatformRegistry(
  * This still refuses to publish a table thinner than the live one. After an
  * engine bump every row is re-requested under the new engine, so `desired` keeps
  * the previous serving pairs, no ready row matches them, and publishing waits.
+ *
+ * `flushUnchangedTable` drops the gateway's cached table even when the rebuilt
+ * version equals the stored one. An admin save sets it, so saving again repairs
+ * a cache flush that failed after the table was written. The cron and run-end
+ * paths leave it off: flushing on every publish would send the gateway's
+ * read-through traffic to D1 each time.
  */
 export async function publishPlatformRoutingTable(
   env: Env,
   fetchImpl: typeof fetch = fetch,
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  options: { flushUnchangedTable?: boolean } = {}
 ): Promise<{ version: string } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return null;
@@ -617,8 +628,12 @@ export async function publishPlatformRoutingTable(
   )}-variants`;
 
   // The version hashes the contributing registry rows and the config knobs, so
-  // an identical version means an identical table. Skip the write and the flush.
+  // an identical version means an identical table. Skip the write, and the
+  // flush unless the caller asked for it.
   if (previous?.table.version === table.version) {
+    if (options.flushUnchangedTable) {
+      await env.AUTO_ROUTING_CONFIG.delete(routingTableKvKey(router));
+    }
     return { version: table.version };
   }
 

@@ -368,13 +368,16 @@ type Attribution =
 type OpenAnnouncement = DownloadHoldAnnouncement & { claimed: boolean };
 
 /**
- * A file this hold already decided on a tab, remembered by the page it came from. Chrome raises
+ * A file this hold already decided on a tab, remembered by the download it was. Chrome raises
  * `downloadWillBegin` before the item for an attachment whose response is already in flight, but after it when the
  * response only becomes a file later: that announcement names a download this tab has settled, never a new one.
+ *
+ * The identity is the exact url the browser named, never the page: one page downloads `report.txt` again on every
+ * click, and a page that regenerates its link (`?click=2`) is a second download of a file the hold has not decided.
  */
 interface SettledFile {
-  /** The page identity of the file's url: the only identity an announcement and an item share. */
-  readonly page: string;
+  /** The url the browser named for the item, exactly: the one identity an announcement and an item share. */
+  readonly url: string;
   /** When the hold decided it, so only an announcement that arrives afterwards can be that late arrival. */
   readonly since: number;
 }
@@ -429,7 +432,7 @@ export const createDownloadHold = ({
   const navigations = new Map<number, DownloadHoldNavigation>();
   /** The announcements a tripwire watches, so one announcement is reported at most once. */
   const watched = new Set<string>();
-  /** The files each tab has already had decided, by the page they came from: what a late announcement belongs to. */
+  /** The files each tab has already had decided, by the url the browser named: what a late announcement belongs to. */
   const settledFiles = new Map<number, SettledFile[]>();
 
   const announcementKey = (download: DownloadHoldAnnouncement): string =>
@@ -460,13 +463,12 @@ export const createDownloadHold = ({
 
   /**
    * Remembers a file this tab has decided, so a `downloadWillBegin` that names it afterwards is read as that
-   * download's own late announcement instead of a second, unobserved file. The page is the identity: the name is
-   * not enough, because a page that downloads `report.txt` twice has two files and the second is still unobserved.
+   * download's own late announcement instead of a second, unobserved file. The url is the identity, exactly: the
+   * name is not enough — a page that downloads `report.txt` twice has two files — and the page is not either, since
+   * a page that regenerates its link downloads a different file the hold has not decided.
    */
   const noteSettled = (tabId: number, url: string | undefined, since: number): void => {
-    const page = pageOf(url);
-
-    if (page === undefined) {
+    if (url === undefined || url === '') {
       return;
     }
 
@@ -474,20 +476,20 @@ export const createDownloadHold = ({
       entry => entry.since + ANNOUNCEMENT_TTL_MS >= since
     );
 
-    settledFiles.set(tabId, [...live, { page, since }]);
+    settledFiles.set(tabId, [...live, { since, url }]);
   };
 
-  /** Whether this announcement names a download the tab settled already: an announcement that arrived after it. */
-  const settledBefore = (tabId: number, url: string | undefined, at: number): boolean => {
-    const page = pageOf(url);
-
-    return (
-      page !== undefined &&
-      (settledFiles.get(tabId) ?? []).some(
-        entry => entry.page === page && entry.since <= at && at - entry.since <= ANNOUNCEMENT_TTL_MS
-      )
+  /**
+   * Whether this announcement names a download the tab settled already. The ordering says nothing: the browser
+   * raises `downloadWillBegin` before the item while the response is in flight and after it when the response only
+   * becomes a file later, and either way the announcement is that settled download's own event.
+   */
+  const isSettled = (tabId: number, url: string | undefined, at: number): boolean =>
+    url !== undefined &&
+    url !== '' &&
+    (settledFiles.get(tabId) ?? []).some(
+      entry => entry.url === url && Math.abs(at - entry.since) <= ANNOUNCEMENT_TTL_MS
     );
-  };
 
   /** The session's approval, dropped once its token's own lifetime is over. */
   const needOf = (session: string): ApprovalNeed | undefined => {
@@ -947,10 +949,10 @@ export const createDownloadHold = ({
       const entry = { ...download, claimed: false, startedAt: download.startedAt ?? now() };
 
       // Chrome names an attachment's download before its item while the response is in flight, and after it when the
-      // Response only becomes a file later. An announcement that arrives after this tab settled a download of the
-      // Same page is that download's: it is nothing to watch, and the tripwire must not report a file the hold
-      // Already answered for. The name never decides this on its own — two downloads of one name are two files.
-      if (settledBefore(download.tabId, download.url, entry.startedAt)) {
+      // Response only becomes a file later. An announcement that names a download this tab already settled is that
+      // download's own event: it is nothing to watch, and the tripwire must not report a file the hold already
+      // answered for. The url decides it exactly; a page that downloads the same name again is a new download.
+      if (isSettled(download.tabId, download.url, entry.startedAt)) {
         return;
       }
 

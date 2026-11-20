@@ -67,8 +67,18 @@ export const extensionIdFromPath = (extensionDir: string): string => {
     .join('');
 };
 
-/** The profile preferences that make Chrome download into our folder without a prompt. */
-const writePreferences = async (userDataDir: string, downloadsPath: string): Promise<void> => {
+/**
+ * The profile preferences that make Chrome download into our folder without a prompt.
+ *
+ * `automaticDownloads` writes Chrome's own multiple-downloads setting as allowed. Only a spec whose one gesture
+ * really starts two files asks for it: Chrome's limiter refuses the second file of a gesture otherwise, and every
+ * other spec measures the guard's behaviour on the defaults a user has.
+ */
+const writePreferences = async (
+  userDataDir: string,
+  downloadsPath: string,
+  automaticDownloads: boolean
+): Promise<void> => {
   const defaultProfile = join(userDataDir, 'Default');
 
   await mkdir(defaultProfile, { recursive: true });
@@ -80,7 +90,13 @@ const writePreferences = async (userDataDir: string, downloadsPath: string): Pro
         directory_upgrade: true,
         prompt_for_download: false,
       },
-      profile: { exit_type: 'Normal', exited_cleanly: true },
+      profile: {
+        ...(automaticDownloads
+          ? { default_content_setting_values: { automatic_downloads: 1 } }
+          : {}),
+        exit_type: 'Normal',
+        exited_cleanly: true,
+      },
     })
   );
 };
@@ -232,6 +248,11 @@ export const launchRealDownloadBrowser = async (
     readonly extraLaunchArgs?: readonly string[];
     /** Optional permissions Chrome cannot be asked for by automation, granted at load time in a copy of the build. */
     readonly grantPermissions?: readonly string[];
+    /**
+     * Allows the second file of one gesture. Off by default: Chrome's own multiple-downloads limiter is the state
+     * most specs measure, and only a spec whose click really starts two files turns it on.
+     */
+    readonly automaticDownloads?: boolean;
   } = {}
 ): Promise<RealDownloadBrowser> => {
   const userDataDir = await mkdtemp(join(tmpdir(), 'kilo-real-download-profile-'));
@@ -240,7 +261,7 @@ export const launchRealDownloadBrowser = async (
     options.extensionPath ??
     (await copyExtensionWithGrantedPermissions(options.grantPermissions ?? ['downloads']));
 
-  await writePreferences(userDataDir, downloadsPath);
+  await writePreferences(userDataDir, downloadsPath, options.automaticDownloads === true);
 
   const executablePath = process.env['EXTENSION_E2E_EXECUTABLE_PATH'] ?? chromium.executablePath();
   const args = [

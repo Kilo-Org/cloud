@@ -671,6 +671,38 @@ describe('a download announced after its own item', () => {
     expect(hold.drain('session-1')).toEqual([]);
   });
 
+  it('is that settled file’s own event even when the browser stamped it before the settle', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    // The item is decided at this instant, and the hold stamps it as settled then.
+    hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(hold.tracked(1)?.kind).toBe('blocked');
+    hold.drain('session-1');
+
+    // The browser's own stamp can be a hair earlier than the moment the hold decided: `downloadWillBegin` and the
+    // Item are dispatched from one browser event, and the stamp is read before the item reaches this listener. Two
+    // Milliseconds earlier is still that same download — the ordering never decides whether a file is a second one.
+    hold.announce({
+      guid: 'earlier',
+      startedAt: Date.now() - 2,
+      suggestedFilename: 'q4.pdf',
+      tabId: 7,
+      url: 'https://app.example/reports/q4.pdf',
+    });
+    await vi.advanceTimersByTimeAsync(TRIPWIRE_MS + 20);
+
+    // The hold already answered for that file, so the tripwire must not report it as possibly saved a second time.
+    expect(hold.drain('session-1')).toEqual([]);
+    expect(reports).toEqual(['stopped:q4.pdf']);
+  });
+
   it('is a new file when the tab settled a different page, even under the same name', async () => {
     const downloads = makeDownloads();
     const { hold, reports } = makeHold(downloads);

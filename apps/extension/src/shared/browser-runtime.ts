@@ -3613,6 +3613,20 @@ export const createBrowserRuntime = ({
         let settlement: GuardSettlement = { kept: [], stopped: 0 };
         let intercepted: InterceptSettlement = { stopped: [] };
 
+        // A Document this call started that the browser has not answered yet: it may still become a file. Hoisted
+        // because both the settle's sign and the blocked answer below need the same reading.
+        const hasUnansweredDocument = (): boolean =>
+          runSession
+            .networkRequests()
+            .some(
+              request =>
+                !requestsBefore.has(request.requestId) &&
+                request.resourceType === 'Document' &&
+                request.status === undefined &&
+                request.finishedAt === undefined &&
+                request.failure === undefined
+            );
+
         try {
           dispatched = true;
 
@@ -3718,18 +3732,7 @@ export const createBrowserRuntime = ({
 
                   // A Document this call started that the browser has not answered can still become a file: the
                   // Item it would produce arrives after the announcement, so the call may not answer "nothing" yet.
-                  const unanswered = runSession
-                    .networkRequests()
-                    .some(
-                      request =>
-                        !requestsBefore.has(request.requestId) &&
-                        request.resourceType === 'Document' &&
-                        request.status === undefined &&
-                        request.finishedAt === undefined &&
-                        request.failure === undefined
-                    );
-
-                  return unanswered ? 'pending' : 'none';
+                  return hasUnansweredDocument() ? 'pending' : 'none';
                 },
                 since: callStartedAt,
                 // An approved call waits for the one file its approval bought: the browser creates its item a moment
@@ -3839,11 +3842,15 @@ export const createBrowserRuntime = ({
           }
 
           // An approved repeat is a call for exactly the one file its approval bought. When the call ends with that
-          // Approval still unspent and no file of its own, the browser named no item for it — Chrome's own
+          // Approval still unspent and no file of its own, the browser created no item for it — Chrome's own
           // Multiple-downloads limiter refuses it — so the answer says so instead of a success the human cannot trust.
+          // A Document this call started and the browser has not answered yet is not that: its item can still arrive,
+          // and calling it blocked would spend the human's approval on a file the browser is still writing.
           if (
             downloadApproved &&
             ownLate.length === 0 &&
+            settleState !== 'waiting_for_item' &&
+            !hasUnansweredDocument() &&
             downloadHold.needOf(sessionKey)?.kind === 'armed'
           ) {
             const approvedNeed = approvedFile?.need;

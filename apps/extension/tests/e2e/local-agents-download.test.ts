@@ -681,7 +681,9 @@ test('one click that starts two files: the guarded call keeps none, and the appr
   test.setTimeout(180_000);
   const fixture = await startDownloadFixture();
   const hub = await startFakeHub();
-  const launch = await launchRealDownloadBrowser();
+  // Chrome's own multiple-downloads limiter refuses the second file this one gesture starts, which is not what this
+  // Spec measures: the hold's answer for two files. Only this spec allows it.
+  const launch = await launchRealDownloadBrowser({ automaticDownloads: true });
   const { context, downloadsPath, extensionId } = launch;
   await mockKiloApi(context, {});
   await context.addInitScript({

@@ -1962,27 +1962,6 @@ export async function getSummariesForRuns(
   return summaries;
 }
 
-export async function getRunMeasurementRevisions(
-  db: D1Database,
-  runIds: readonly string[]
-): Promise<{ runId: string; measurementRevision: number }[]> {
-  const orm = drizzle(db);
-  const ids = [...runIds];
-  const revisions: { runId: string; measurementRevision: number }[] = [];
-  for (let i = 0; i < ids.length; i += PROFILE_ENTRY_FILTER_BATCH_SIZE) {
-    revisions.push(
-      ...(await orm
-        .select({
-          runId: benchmarkRuns.id,
-          measurementRevision: benchmarkRuns.measurement_revision,
-        })
-        .from(benchmarkRuns)
-        .where(inArray(benchmarkRuns.id, ids.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE))))
-    );
-  }
-  return revisions;
-}
-
 /**
  * Running decider run ids older than the stale threshold (for profile fail-over
  * after the bulk stale sweep).

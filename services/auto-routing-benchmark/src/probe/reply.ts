@@ -239,6 +239,9 @@ function parseChat(data: string[], reply: MutableReply): void {
   for (const payload of data) {
     if (payload === '[DONE]') {
       note(reply, 'done');
+      // The sentinel ends the stream: a cut stream never carries it, and a gateway may close
+      // the reply with it instead of a finish-reason chunk.
+      reply.terminal = true;
       continue;
     }
     const chunk = eventOf(ChatChunkSchema, payload);

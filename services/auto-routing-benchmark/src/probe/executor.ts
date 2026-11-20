@@ -26,10 +26,12 @@ function randomBase62(length: number): string {
   return [...bytes].map(byte => BASE62[byte % BASE62.length]).join('');
 }
 
-// The CLI's session id shape (`ses_` + 12 hex + 14 base62). The gateway reads it for
-// session affinity only; the probe sends one id per request.
+// The CLI's session id shape (`ses_` + 12 hex + 14 base62). The hex part is the low 48 bits
+// of `Date.now() * 0x1000`, as `@opencode-ai/schema/identifier` builds it; the gateway reads
+// the id for session affinity only, so one per request is enough.
 function probeSessionId(now: number): string {
-  return `ses_${(now * 0x1000).toString(16).padStart(12, '0')}${randomBase62(14)}`;
+  const time = (now * 0x1000) % 0x1000000000000;
+  return `ses_${time.toString(16).padStart(12, '0')}${randomBase62(14)}`;
 }
 
 function probeMachineId(): string {
@@ -273,10 +275,12 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
     }
     throw new Error('probe stream was cut after the gateway billed for output');
   }
-  if (reply.errorMessage !== null && reply.toolCalls.length === 0 && reply.text.length === 0) {
+  if (reply.errorMessage !== null) {
     const diagnostic = `provider error: ${reply.errorMessage}`;
-    // A terminal provider error that reported usage was billed, so its cost and tokens stay
-    // in the ledger and the case is graded as a failure instead of being retried for free.
+    // A terminal provider error ends the generation wherever it landed: items a failed
+    // generation emitted before it are not a completed turn, so they never grade as one.
+    // A billed error keeps its cost and tokens in the ledger and the case is a failure
+    // instead of a free retry; an unbilled one stays transient.
     if (!billed) return unbilledFailure(diagnostic, latencyMs);
     return { ...measuredReply(reply, request, latencyMs, 1), stderrTail: diagnostic };
   }

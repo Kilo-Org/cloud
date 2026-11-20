@@ -117,6 +117,31 @@ function responsesFailure(message: string, usage: Record<string, unknown> | null
   ].join('');
 }
 
+function responsesFailureAfterCall(message: string, usage: Record<string, unknown> | null): string {
+  const event = (type: string, payload: Record<string, unknown>) =>
+    `event: ${type}\ndata: ${JSON.stringify({ type, ...payload })}\n\n`;
+  return [
+    event('response.created', { response: { id: 'resp_6', created_at: 1, model } }),
+    event('response.output_item.added', {
+      output_index: 0,
+      item: { type: 'function_call', id: 'fc_6', call_id: 'call_6', name: 'bash', arguments: '' },
+    }),
+    event('response.function_call_arguments.delta', {
+      item_id: 'fc_6',
+      output_index: 0,
+      delta: '{"command":"node scripts/ver',
+    }),
+    event('response.failed', {
+      response: {
+        id: 'resp_6',
+        status: 'failed',
+        error: { message },
+        ...(usage === null ? {} : { usage }),
+      },
+    }),
+  ].join('');
+}
+
 function chatToolCalls(cost: number): string {
   const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
     `data: ${JSON.stringify({
@@ -336,6 +361,10 @@ describe('probe executor — responses endpoint', () => {
     );
     expect(request.body.model).toBe(model);
     expect(request.body.reasoning).toEqual({ effort: 'high' });
+    // The CLI's own shape: `ses_`, 12 hex digits of `Date.now() * 0x1000`, 14 base62 chars.
+    expect(request.headers['x-session-id']).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+    expect(request.headers['x-session-affinity']).toBe(request.headers['x-session-id']);
+    expect(request.headers['x-kilocode-taskid']).toBe(request.headers['x-session-id']);
     const input = request.body.input as Record<string, unknown>[];
     expect(input[0]?.role).toBe('developer');
     expect(String(input[0]?.content)).toContain(model);
@@ -472,6 +501,46 @@ describe('probe executor — chat endpoint', () => {
       gradeProbeOutput(probeCase.check, { text: result.text, toolCalls: result.tools.calls })
     ).toBe(1);
   });
+
+  it('treats the [DONE] sentinel as the end of a reply that carries no finish reason', async () => {
+    const chunk = (delta: Record<string, unknown>) =>
+      `data: ${JSON.stringify({
+        id: 'chatcmpl_3',
+        object: 'chat.completion.chunk',
+        choices: [{ index: 0, delta, finish_reason: null }],
+      })}\n\n`;
+    replies.push({
+      status: 200,
+      body: [
+        chunk({ role: 'assistant', content: '' }),
+        chunk({
+          tool_calls: [
+            {
+              index: 0,
+              id: 'call_3',
+              type: 'function',
+              function: { name: 'bash', arguments: '{"command":"ls"}' },
+            },
+          ],
+        }),
+        `data: ${JSON.stringify({
+          id: 'chatcmpl_3',
+          choices: [],
+          usage: { prompt_tokens: 2000, completion_tokens: 9, cost: 0.0003 },
+        })}\n\n`,
+        'data: [DONE]\n\n',
+      ].join(''),
+    });
+
+    const result = await run({ catalogModel: chatModel, model: chatModel.id });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.costUsd).toBe(0.0003);
+    expect(result.tools.calls).toBe(1);
+    expect(
+      gradeProbeOutput(probeCase.check, { text: result.text, toolCalls: result.tools.calls })
+    ).toBe(1);
+  });
 });
 
 describe('probe executor — anthropic messages endpoint', () => {
@@ -481,7 +550,10 @@ describe('probe executor — anthropic messages endpoint', () => {
     description: 'Claude Haiku, captured.',
     opencode: {
       ai_sdk_provider: 'anthropic',
-      variants: { high: { reasoning: { effort: 'high' } } },
+      variants: {
+        high: { reasoning: { effort: 'high' } },
+        none: { reasoning: { effort: 'none' } },
+      },
     },
   });
 
@@ -624,6 +696,29 @@ describe('probe executor — failures keep the paid-call policy', () => {
     expect(result.costUsd).toBe(0);
     expect(result.inputTokens).toBeNull();
     expect(isUnbilledTransientProviderResult(result)).toBe(true);
+  });
+
+  it('never grades a failed generation after a partial tool call as a continuation', async () => {
+    replies.push({
+      status: 200,
+      body: responsesFailureAfterCall('upstream overloaded', {
+        input_tokens: 4000,
+        output_tokens: 12,
+        cost: 0.0008,
+      }),
+    });
+    const billed = await run();
+    expect(billed.exitCode).toBe(1);
+    expect(billed.costUsd).toBe(0.0008);
+    expect(billed.tools.calls).toBe(1);
+    expect(billed.stderrTail).toBe('provider error: upstream overloaded');
+    expect(isUnbilledTransientProviderResult(billed)).toBe(false);
+
+    replies.push({ status: 200, body: responsesFailureAfterCall('service unavailable', null) });
+    const unbilled = await run();
+    expect(unbilled.costUsd).toBe(0);
+    expect(unbilled.exitCode).toBe(1);
+    expect(isUnbilledTransientProviderResult(unbilled)).toBe(true);
   });
 
   it('treats a rejected model as unavailable, which fails the entry permanently', async () => {

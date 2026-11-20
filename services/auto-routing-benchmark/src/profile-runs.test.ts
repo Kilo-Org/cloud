@@ -98,7 +98,6 @@ vi.mock('./db', async importOriginal => {
     getRunWithModels: vi.fn(),
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
-    getRunMeasurementRevisions: vi.fn(),
     getRoutingCaseResultsForEntries: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
     listCurrentPlatformProfileStatuses: vi.fn(),
@@ -126,7 +125,6 @@ import {
   getRunWithModels,
   getSummaries,
   getSummariesForRuns,
-  getRunMeasurementRevisions,
   getRoutingCaseResultsForEntries,
   insertRun,
   listLaneFailures,
@@ -396,9 +394,6 @@ beforeEach(() => {
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
-  vi.mocked(getRunMeasurementRevisions).mockImplementation(async (_db, runIds) =>
-    runIds.map(runId => ({ runId, measurementRevision: 2 }))
-  );
   vi.mocked(getRoutingCaseResultsForEntries).mockResolvedValue([]);
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
@@ -1233,13 +1228,6 @@ describe('decider run completion', () => {
       ...summariesFor('platform/a', null, 'revision-3-a'),
       ...summariesFor('platform/b', 'high', 'revision-2-b'),
     ]);
-    const revisions: Record<string, number> = {
-      'revision-3-a': 3,
-      'revision-2-b': 2,
-    };
-    vi.mocked(getRunMeasurementRevisions).mockImplementation(async (_db, runIds) =>
-      runIds.map(runId => ({ runId, measurementRevision: revisions[runId] }))
-    );
 
     await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
 
@@ -1300,10 +1288,6 @@ describe('decider run completion', () => {
         }))
       )
     );
-    vi.mocked(getRunMeasurementRevisions).mockResolvedValue([
-      { runId: 'frontier-revision-3', measurementRevision: 3 },
-      { runId: 'frontier-revision-2', measurementRevision: 2 },
-    ]);
 
     await expect(
       publishPlatformRoutingTable(env, catalogFetch, 'frontier')

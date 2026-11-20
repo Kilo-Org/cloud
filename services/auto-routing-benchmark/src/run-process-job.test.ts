@@ -84,7 +84,6 @@ vi.mock('./db', async importOriginal => {
     countCurrentProfilesByStatus: vi.fn(),
     listCurrentPlatformProfileStatuses: vi.fn(),
     getSummariesForRuns: vi.fn(),
-    getRunMeasurementRevisions: vi.fn(),
     getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     listReadyCurrentProfilesForEntries: vi.fn(),
     markRunCompleted: vi.fn(),
@@ -145,7 +144,6 @@ import {
   countCurrentProfilesByStatus,
   listCurrentPlatformProfileStatuses,
   getSummariesForRuns,
-  getRunMeasurementRevisions,
   listReadyCurrentProfilesForEntries,
   listLaneFailures,
   listStaleRunningDeciderRuns,
@@ -748,6 +746,44 @@ describe('processJob — scheduler-owned execution', () => {
           tool_calls: 0,
           final_finish_reason: 'stop',
         })
+      );
+    });
+
+    it('fails a probe lane at once when its paid reply cannot arrive', async () => {
+      mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
+      vi.mocked(runProbeCaseViaGateway).mockRejectedValueOnce(
+        new Error('probe stream was cut after the gateway billed for output')
+      );
+
+      await processJob(env, deciderMessage());
+
+      // No container exists on this path, so nothing can deliver the reply later.
+      expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+      expect(recordLaneFailure).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({ failureClass: 'ambiguous_execution' })
+      );
+      expect(upsertCaseResult).not.toHaveBeenCalled();
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(queueSend).not.toHaveBeenCalledWith(
+        expect.objectContaining({ claimId: 'chunk-1' }),
+        expect.anything()
+      );
+    });
+
+    it('fails a probe lane at once when a prior probe execution left no output', async () => {
+      mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
+      vi.mocked(getPaidCaseStartedAt).mockResolvedValue(Date.now() - 1_000);
+
+      await processJob(env, deciderMessage());
+
+      expect(runProbeCaseViaGateway).not.toHaveBeenCalled();
+      expect(beginPaidCase).not.toHaveBeenCalled();
+      expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(queueSend).not.toHaveBeenCalledWith(
+        expect.objectContaining({ claimId: 'chunk-1' }),
+        expect.anything()
       );
     });
   });
@@ -2097,9 +2133,6 @@ describe('processJob — canonical registry publication', () => {
     vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([benchCase.id]));
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model, variant, run_id: runId },
-    ]);
-    vi.mocked(getRunMeasurementRevisions).mockResolvedValue([
-      { runId, measurementRevision: MEASUREMENT_REVISION },
     ]);
     vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([{ status: 'ready', count: 1 }]);
     vi.mocked(getLatestRoutingTable).mockResolvedValue(null);

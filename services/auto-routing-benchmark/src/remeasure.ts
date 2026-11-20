@@ -107,20 +107,20 @@ export async function planPromptTransportRemeasure(
   );
   const pairBindings = [params.router, params.engineIdentity, params.repetitions];
   // An explicit pair list measures exactly those pairs, so the operator can request the
-  // probe measurement of a chosen set instead of the whole pool.
-  const pairFilter =
-    params.pairs && params.pairs.length > 0
-      ? `AND (SELECT 1 FROM json_each(?) AS wanted
-           WHERE wanted.value = json_array(p.model, p.variant))`
-      : '';
-  const pairFilterBindings =
-    params.pairs && params.pairs.length > 0
-      ? [
-          JSON.stringify(
-            params.pairs.map(pair => JSON.stringify([pair.model, variantToStorage(pair.variant)]))
-          ),
-        ]
-      : [];
+  // probe measurement of a chosen set instead of the whole pool — and a `cancel` with one
+  // removes only those pairs' queued rows.
+  const scopedPairs = params.pairs && params.pairs.length > 0 ? params.pairs : null;
+  const pairFilter = scopedPairs
+    ? `AND (SELECT 1 FROM json_each(?) AS wanted
+         WHERE wanted.value = json_array(p.model, p.variant))`
+    : '';
+  const pairFilterBindings = scopedPairs
+    ? [
+        JSON.stringify(
+          scopedPairs.map(pair => JSON.stringify([pair.model, variantToStorage(pair.variant)]))
+        ),
+      ]
+    : [];
   const [{ results }, { results: measured }] = await Promise.all([
     db
       .prepare(`
@@ -207,7 +207,7 @@ export async function planPromptTransportRemeasure(
     params.action === 'request'
       ? await queueRemeasures(db, params, pairDetails, params.nowIso ?? new Date().toISOString())
       : params.action === 'cancel'
-        ? await cancelQueuedRemeasures(db, params)
+        ? await cancelQueuedRemeasures(db, params, scopedPairs)
         : 0;
 
   return {
@@ -259,14 +259,27 @@ async function queueRemeasures(
 
 async function cancelQueuedRemeasures(
   db: D1Database,
-  current: { router: AutoRouter; engineIdentity: string; repetitions: number }
+  current: { router: AutoRouter; engineIdentity: string; repetitions: number },
+  scopedPairs: readonly { model: string; variant: string | null }[] | null
 ): Promise<number> {
+  const pairFilter = scopedPairs
+    ? `AND (SELECT 1 FROM json_each(?) AS wanted
+         WHERE wanted.value = json_array(model, variant))`
+    : '';
+  const pairFilterBindings = scopedPairs
+    ? [
+        JSON.stringify(
+          scopedPairs.map(pair => JSON.stringify([pair.model, variantToStorage(pair.variant)]))
+        ),
+      ]
+    : [];
   const result = await db
     .prepare(`
       DELETE FROM profile_remeasures
       WHERE router = ? AND engine_identity = ? AND repetitions = ? AND run_id IS NULL
+        ${pairFilter}
     `)
-    .bind(current.router, current.engineIdentity, current.repetitions)
+    .bind(current.router, current.engineIdentity, current.repetitions, ...pairFilterBindings)
     .run();
   return result.meta.changes ?? 0;
 }

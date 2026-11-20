@@ -446,6 +446,23 @@ describe('prompt transport re-measure (real SQLite)', () => {
     ]);
   });
 
+  it('cancels only the pairs a pair-scoped cancel names', async () => {
+    insertRun('old');
+    seedMeasuredPair('vendor/a');
+    seedMeasuredPair('vendor/b');
+    await planPromptTransportRemeasure(db, { ...newest, action: 'request', prices: new Map() });
+    const report = await planPromptTransportRemeasure(db, {
+      ...newest,
+      action: 'cancel',
+      prices: new Map(),
+      pairs: [{ model: 'vendor/a', variant: null }],
+    });
+    expect(report.changed).toBe(1);
+    expect(sqlite.prepare('SELECT model FROM profile_remeasures').all()).toEqual([
+      { model: 'vendor/b' },
+    ]);
+  });
+
   it('widens the frontier set with the inner-quote flag', async () => {
     insertRun('old', { router: 'frontier' });
     insertResult('old', frontierLong.id);

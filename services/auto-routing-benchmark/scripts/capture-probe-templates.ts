@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 import * as z from 'zod';
 import { promptText } from '../src/decider-prompt';
 import type { ProbeTranscript } from '../src/datasets/probe-transcripts';
+import { startCaptureContainers } from '../src/probe/capture-containers';
 import { probeFamily, type ProbeFamily } from '../src/probe/family';
 import { mergeProbeTemplates, ProbeTemplatesSchema } from '../src/probe/request';
 
@@ -379,26 +380,15 @@ function main() {
     `KILO_CLI_VERSION=${args.cliVersion}`,
     'container',
   ]);
-  sh('docker', ['rm', '-f', runner, gateway], { allowFailure: true });
-  sh('docker', ['run', '-d', '--name', runner, image]);
-  sh('docker', ['exec', runner, 'mkdir', '-p', '/tmp/capture']);
-  sh('docker', [
-    'run',
-    '-d',
-    '--name',
+  startCaptureContainers({
+    sh,
+    image,
+    runner,
     gateway,
-    '--network',
-    `container:${runner}`,
-    '-v',
-    `${workDir}:${workDir}`,
-    '-e',
-    `CATALOG_FILE=${catalogFile}`,
-    '-e',
-    `LOG=${logFile}`,
-    'node:22-slim',
-    'node',
-    join(workDir, 'gateway.mjs'),
-  ]);
+    workDir,
+    catalogFile,
+    logFile,
+  });
 
   const families: Record<string, unknown> = {};
   const captures: Record<string, unknown> = {};

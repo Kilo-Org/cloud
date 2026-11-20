@@ -1417,15 +1417,17 @@ class AmbiguousBenchmarkExecutionError extends Error {
   /**
    * Until this time the container may still deliver the paid call's output, so the
    * chunk keeps its slot and provider lease and rechecks instead of failing its lane.
+   * A probe has no container and produces its reply in the invocation, so nothing can
+   * satisfy that wait and its window is zero.
    */
   readonly outputDeadline: number;
 
-  constructor(paidStartedAt: number, options?: ErrorOptions) {
+  constructor(paidStartedAt: number, options?: ErrorOptions & { deliveryWindowMs?: number }) {
     super(
       'Previous paid execution has no recoverable output; refusing automatic duplicate inference',
       options
     );
-    this.outputDeadline = paidStartedAt + PAID_OUTPUT_WAIT_MS;
+    this.outputDeadline = paidStartedAt + (options?.deliveryWindowMs ?? PAID_OUTPUT_WAIT_MS);
   }
 }
 
@@ -2414,15 +2416,21 @@ async function processDeciderJob(
       let unstartedRetryAt: number | undefined;
       const runPaidCase = async (): Promise<StoredDeciderOutput> => {
         const promptRevision = state.measurementRevision;
+        // A container that loses its caller still posts its result, so an ambiguity there
+        // waits out that delivery. A probe answers in this invocation and has no later
+        // delivery to wait for, so its ambiguity fails the lane at once.
+        const deliveryWindowMs = isProbeCase(benchCase) ? 0 : PAID_OUTPUT_WAIT_MS;
         const priorStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
-        if (priorStartedAt !== null) throw new AmbiguousBenchmarkExecutionError(priorStartedAt);
+        if (priorStartedAt !== null) {
+          throw new AmbiguousBenchmarkExecutionError(priorStartedAt, { deliveryWindowMs });
+        }
         const kiloToken = await mintedToken();
         if (!isProbeCase(benchCase)) await warmUpContainer(kiloToken);
         let startedAt = Date.now();
         if (!(await beginPaidCase(env.BENCH_DB, execution, startedAt))) {
           const ledgeredStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
           if (ledgeredStartedAt === null) throw new ChunkClaimLostError();
-          throw new AmbiguousBenchmarkExecutionError(ledgeredStartedAt);
+          throw new AmbiguousBenchmarkExecutionError(ledgeredStartedAt, { deliveryWindowMs });
         }
         attemptStartedAt = startedAt;
         let retried = false;
@@ -2439,7 +2447,7 @@ async function processDeciderJob(
             slot: claim.slot,
             chunk,
             promptRevision,
-            outputDeadline: startedAt + PAID_OUTPUT_WAIT_MS,
+            outputDeadline: startedAt + deliveryWindowMs,
           })
         );
         // A probe goes straight to the gateway with the captured request template; every
@@ -2457,7 +2465,10 @@ async function processDeciderJob(
                 now: startedAt,
               }).catch(error => {
                 if (error instanceof BenchmarkProbeFamilyError) throw error;
-                throw new AmbiguousBenchmarkExecutionError(startedAt, { cause: error });
+                throw new AmbiguousBenchmarkExecutionError(startedAt, {
+                  cause: error,
+                  deliveryWindowMs,
+                });
               })
           : async () =>
               runDeciderCaseViaCli(env, {

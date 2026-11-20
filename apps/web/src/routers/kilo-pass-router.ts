@@ -41,6 +41,7 @@ import {
 import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
+import { isKiloClawPaidHostingAvailable } from '@/lib/kiloclaw/paid-hosting';
 import {
   credit_transactions,
   impact_referral_reward_decisions,
@@ -1596,6 +1597,14 @@ export const kiloPassRouter = createTRPCRouter({
           duration_ms: Date.now() - startedAt,
         });
         return { outcome: 'not_requested', hostingIntent: 'none' };
+      }
+
+      if (!isKiloClawPaidHostingAvailable()) {
+        return {
+          outcome: 'action_required',
+          hostingIntent: hostingPlan,
+          reason: 'signup_unavailable',
+        };
       }
 
       const stripeSubscription = checkoutSession.subscription;

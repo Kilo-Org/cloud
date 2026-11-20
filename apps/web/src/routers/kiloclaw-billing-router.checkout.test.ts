@@ -26,6 +26,49 @@ import { createOrganization } from '@kilocode/web-shared/lib/organizations/organ
 import type Stripe from 'stripe';
 import { KiloPassTier, KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import { isKiloClawPaidHostingAvailable } from '@/lib/kiloclaw/paid-hosting';
+import type * as PaidHosting from '@/lib/kiloclaw/paid-hosting';
+
+it('blocks all personal KiloClaw paid hosting actions at end of life', async () => {
+  const { isKiloClawPaidHostingAvailable: actual } = jest.requireActual<typeof PaidHosting>(
+    '@/lib/kiloclaw/paid-hosting'
+  );
+  const { id: instanceId } = await createKiloclawInstance(user.id);
+  const { kiloclaw } = await createCallerForUser(user.id);
+  const routes = [
+    () => kiloclaw.createSubscriptionCheckout({ plan: 'standard' }),
+    () => kiloclaw.enrollWithCredits({ plan: 'standard' }),
+    () =>
+      kiloclaw.createKiloPassUpsellCheckout({
+        tier: '49',
+        cadence: 'monthly',
+        hostingPlan: 'standard',
+      }),
+    () => kiloclaw.reactivateSubscription(),
+    () => kiloclaw.reactivateSubscriptionAtInstance({ instanceId }),
+    () => kiloclaw.acceptConversion(),
+    () => kiloclaw.acceptConversionAtInstance({ instanceId }),
+    () => kiloclaw.continueCommitAsStandard({ instanceId }),
+    () => kiloclaw.switchPlan({ toPlan: 'standard' }),
+    () => kiloclaw.switchPlanAtInstance({ instanceId, toPlan: 'standard' }),
+    () => kiloclaw.cancelPlanSwitch(),
+    () => kiloclaw.cancelPlanSwitchAtInstance({ instanceId }),
+  ];
+  await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(actual, async () => {
+    for (const call of routes) {
+      await expect(call()).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'KiloClaw no longer accepts new hosting purchases or renewals.',
+      });
+    }
+  });
+  expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+  expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
+  const deductions = await db.query.credit_transactions.findMany({
+    where: eq(credit_transactions.kilo_user_id, user.id),
+  });
+  expect(deductions).toHaveLength(0);
+});
 
 describe('createSubscriptionCheckout', () => {
   it('rejects Commit checkout at the retirement cutoff and directs to Standard', async () => {

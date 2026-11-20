@@ -61,6 +61,7 @@ import type dayjsType from 'dayjs';
 import type utcType from 'dayjs/plugin/utc';
 import type * as Sentry from '@sentry/nextjs';
 import type { CreatePersonalKiloPassCheckoutSession } from '@/routers/kilo-pass-router';
+import type * as PaidHosting from '@/lib/kiloclaw/paid-hosting';
 import type {
   ServiceFeeAssessmentRecord,
   ServiceFeeAssessmentStore,
@@ -85,6 +86,10 @@ type ChargeVerdict = { enforced: boolean; code?: 'charge_blocked'; flags: unknow
 const mockChargeDecide = jest
   .fn<(request: unknown) => Promise<ChargeVerdict | null>>()
   .mockResolvedValue(null);
+jest.mock('@/lib/kiloclaw/paid-hosting', () => ({
+  isKiloClawPaidHostingAvailable: jest.fn(() => true),
+}));
+
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
   const actual = jest.requireActual<typeof BouncerClient>(
     '@kilocode/web-shared/lib/bouncer/client'
@@ -2619,6 +2624,31 @@ describe('kiloPassRouter', () => {
   });
 
   describe('activateCheckoutHosting', () => {
+    it('does not activate paid KiloClaw hosting after end of life', async () => {
+      const { isKiloClawPaidHostingAvailable } = await import('@/lib/kiloclaw/paid-hosting');
+      const { isKiloClawPaidHostingAvailable: actual } = jest.requireActual<typeof PaidHosting>(
+        '@/lib/kiloclaw/paid-hosting'
+      );
+      const user = await insertTestUser();
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        status: 'complete',
+        subscription: 'sub_paid_hosting',
+        metadata: { type: 'kilo-pass', kiloUserId: user.id, kiloclawHostingPlan: 'standard' },
+      });
+      const caller = await createCallerForUser(user.id);
+
+      await jest.mocked(isKiloClawPaidHostingAvailable).withImplementation(actual, async () => {
+        await expect(
+          caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_paid_hosting' })
+        ).resolves.toEqual({
+          outcome: 'action_required',
+          hostingIntent: 'standard',
+          reason: 'signup_unavailable',
+        });
+      });
+      expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+    });
     it('does not let a completed stale checkout create a first KiloClaw subscription', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-stale-first-kiloclaw@example.com',

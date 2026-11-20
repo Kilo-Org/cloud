@@ -200,13 +200,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       setRefreshing(true);
       try {
         // Refresh only — never triggers a new sync. The list shows the
-        // repository fetch failure inline, so every list refresh retries it,
-        // and the capacity counters are on screen, so a pull refreshes them
-        // too instead of leaving the notice and the actions on an older read.
+        // repository fetch failure inline, so every list refresh retries it.
+        // The counters refresh with the same flag that enables their read: a
+        // disabled read's `refetch` still reaches the network, and a pull on a
+        // list with no analyzable row has no notice for its answer.
         const [findingsResult] = await Promise.all([
           findings.refetch(),
           repositories.refetch(),
-          capacity.refetch(),
+          hasAnalyzableRow ? capacity.refetch() : undefined,
         ]);
         if (findingsResult.isError) {
           toast.error(t('common.couldNotRefresh'));

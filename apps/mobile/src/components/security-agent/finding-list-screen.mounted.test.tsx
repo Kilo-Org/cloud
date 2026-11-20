@@ -315,12 +315,25 @@ describe('Security Agent list surfaces', () => {
   });
 
   it('retries the repositories query on pull-to-refresh', async () => {
+    findings.data = { pages: [{ findings: [analyzableFinding('a')] }] };
     const root = await mount();
-    const empty = root.findByType(EmptyState);
+    const list = root.findByType(FlashList);
 
-    await refresh(empty.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
+    await refresh(list.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
     expect(repositories.refetch).toHaveBeenCalledTimes(1);
     expect(capacity.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the disabled capacity read out of pull-to-refresh', async () => {
+    findings.data = { pages: [{ findings: [analyzedFinding('a')] }] };
+    const root = await mount();
+    const list = root.findByType(FlashList);
+
+    await refresh(list.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    // A disabled read's `refetch` still reaches the network, so the pull must
+    // not ask for a notice that no row can render.
+    expect(capacity.refetch).not.toHaveBeenCalled();
   });
 
   it('shows the skeleton for a first read in flight', async () => {

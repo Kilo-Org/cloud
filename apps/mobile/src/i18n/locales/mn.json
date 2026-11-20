@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.md зааврыг дагах",
     "followReviewMdSubtitle": "Репозитори бүрийн REVIEW.md файл дахь зааврыг дагах",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй."
+      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
+      "notConnectedReadOnlyPlan": "Байгууллагын туршилтын хугацаа дууссан тул эзэн нь kilo.ai дээр төлбөрийн мэдээллээ шинэчлэх ёстой."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ийн Bitbucket холболтыг компьютерээс вэб дээр удирддаг.",

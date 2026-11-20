@@ -1443,7 +1443,8 @@
     "followReviewMd": "Выконваць інструкцыі REVIEW.md",
     "followReviewMdSubtitle": "Выконваць інструкцыі з файла REVIEW.md у кожным рэпазіторыі",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket не падключаны. Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць."
+      "notConnectedReadOnly": "Bitbucket не падключаны. Толькі ўладальнікі, адміністратары і кіраўнікі плацяжоў арганізацыі могуць яго падключыць.",
+      "notConnectedReadOnlyPlan": "Пробны перыяд арганізацыі скончыўся, таму ўладальнік павінен абнавіць плацежныя даныя на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Падключэнне Bitbucket для {{organization}} кіруецца ў вэб-версіі з камп'ютара.",

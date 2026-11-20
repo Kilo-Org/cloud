@@ -1391,7 +1391,8 @@
     "followReviewMd": "Fuata REVIEW.md",
     "followReviewMdSubtitle": "Fuata maagizo katika faili ya REVIEW.md ya kila hazina",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha."
+      "notConnectedReadOnly": "Bitbucket haijaunganishwa. Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
+      "notConnectedReadOnlyPlan": "Kipindi cha majaribio cha shirika kimeisha, kwa hivyo mmiliki anapaswa kusasisha malipo kwenye kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",

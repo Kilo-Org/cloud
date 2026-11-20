@@ -1417,7 +1417,8 @@
     "followReviewMd": "Sledi uputstva iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj uputstva iz datoteke REVIEW.md u svakom repozitorijumu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu."
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
+      "notConnectedReadOnlyPlan": "Probni period organizacije je završen, pa vlasnik mora da ažurira naplatu na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom sa {{organization}} upravlja se na vebu, sa računara.",

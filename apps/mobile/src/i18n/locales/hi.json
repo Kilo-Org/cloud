@@ -697,7 +697,8 @@
     },
     "autoReviews": "स्वचालित समीक्षाएँ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।"
+      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
+      "notConnectedReadOnlyPlan": "संगठन का परीक्षण समाप्त हो गया है, इसलिए मालिक को kilo.ai पर बिलिंग अपडेट करनी होगी।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",

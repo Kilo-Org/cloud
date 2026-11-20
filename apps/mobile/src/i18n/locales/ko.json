@@ -697,7 +697,8 @@
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다."
+      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
+      "notConnectedReadOnlyPlan": "조직의 체험이 종료되었으므로 소유자가 kilo.ai에서 결제 정보를 업데이트해야 합니다."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",

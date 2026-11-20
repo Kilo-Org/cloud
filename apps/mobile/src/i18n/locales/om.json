@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.md hordofi",
     "followReviewMdSubtitle": "Faayiloota qajeelfamaa REVIEW.md kuusaa koodii tokkoon tokkoo keessa jiran kabaji",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u."
+      "notConnectedReadOnly": "Bitbucket hin walqabsiifamne. Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
+      "notConnectedReadOnlyPlan": "Yeroon yaalii dhaabbataa xumurameera, kanaaf abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu qaba."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Walqunnamtiin Bitbucket {{organization}}iif weebii irratti kompiitara irraa bulfama.",

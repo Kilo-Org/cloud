@@ -1391,7 +1391,8 @@
     "followReviewMd": "Tẹ̀lé REVIEW.md",
     "followReviewMdSubtitle": "Tẹ̀lé àwọn fáìlì ìtọ́sọ́nà REVIEW.md nínú ibi ìpamọ́ kọ̀ọ̀kan",
     "bitbucket": {
-      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀."
+      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+      "notConnectedReadOnlyPlan": "Àkókò ìdánwò àjọ náà ti parí, nítorí náà ẹni tó ni àjọ gbọ́dọ̀ ṣe àtúnṣe ìsanwó ní kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",

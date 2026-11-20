@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.md मधील सूचना पाळा",
     "followReviewMdSubtitle": "प्रत्येक रिपॉझिटरीतील REVIEW.md फाइलमधील सूचना पाळा",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात."
+      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
+      "notConnectedReadOnlyPlan": "संस्थेची चाचणी संपली आहे, म्हणून मालकाने kilo.ai वर बिलिंग अपडेट करणे आवश्यक आहे."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",

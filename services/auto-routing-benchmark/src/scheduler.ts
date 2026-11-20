@@ -753,7 +753,8 @@ export const SCHEDULER_PRUNE_EXECUTIONS_SQL = `
 
 /**
  * A run that stopped before its initialization finished holds chunks but never got a
- * marker, so chunk owners are walked one distinct run id at a time instead.
+ * marker, so chunk owners are walked one distinct run id at a time instead. Such a run
+ * failed by the stale sweep has no completion time, so it ages from its start.
  */
 export const SCHEDULER_PRUNE_CHUNKS_SQL = `
   WITH RECURSIVE chunk_run(run_id) AS (
@@ -766,7 +767,8 @@ export const SCHEDULER_PRUNE_CHUNKS_SQL = `
   stale_run(run_id) AS MATERIALIZED (
     SELECT chunk_run.run_id FROM chunk_run
     CROSS JOIN benchmark_runs AS run
-    WHERE run.id = chunk_run.run_id AND run.status != 'running' AND run.completed_at < ?
+    WHERE run.id = chunk_run.run_id AND run.status != 'running'
+      AND COALESCE(run.completed_at, run.started_at) < ?
     LIMIT 100
   )
   DELETE FROM scheduler_chunks WHERE id IN (

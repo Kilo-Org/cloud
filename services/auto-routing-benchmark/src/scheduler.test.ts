@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
+import { markStaleRunsFailed } from './db';
 import {
   beginPaidCase,
   claimScheduledChunks,
@@ -1548,6 +1549,39 @@ describe('scheduler (production migrations and real SQLite)', () => {
       ['unmarked-running', 'completed'],
       ['unmarked-running', 'failed'],
       ['unmarked-running', 'pending'],
+    ]);
+  });
+
+  it('prunes a markerless run the stale sweep failed without a completion time', async () => {
+    const insertChunk = sqlite.prepare(`
+      INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids, status)
+      VALUES (?, ?, 'stale/model', '', '[]', 0, ?, '["case"]', ?)`);
+    for (const [runId, startedAgo, purpose] of [
+      ['stale-day-old', 2 * 86400_000, 'platform'],
+      ['stale-hours-old', 7 * 3600_000, 'user'],
+    ] as const) {
+      insertRun(sqlite, runId, { purpose });
+      sqlite
+        .prepare('UPDATE benchmark_runs SET started_at = ? WHERE id = ?')
+        .run(new Date(NOW - startedAgo).toISOString(), runId);
+      for (const [chunk, chunkStatus] of ['completed', 'failed', 'pending'].entries()) {
+        insertChunk.run(JSON.stringify([runId, chunk]), runId, chunk, chunkStatus);
+      }
+    }
+    await markStaleRunsFailed(db, new Date(NOW - 6 * 3600_000).toISOString());
+    expect(
+      sqlite.prepare('SELECT id, status, completed_at FROM benchmark_runs ORDER BY id').all()
+    ).toEqual([
+      { id: 'stale-day-old', status: 'failed', completed_at: null },
+      { id: 'stale-hours-old', status: 'failed', completed_at: null },
+    ]);
+
+    await recoverChunks(db, NOW);
+
+    expect(storedChunks(sqlite).map(row => [row.run_id, row.status])).toEqual([
+      ['stale-hours-old', 'completed'],
+      ['stale-hours-old', 'failed'],
+      ['stale-hours-old', 'completed'],
     ]);
   });
 

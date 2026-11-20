@@ -2251,7 +2251,17 @@ async function processDeciderJob(
           token
         );
       });
-      const entry = (await catalogForProbes).data.find(candidate => candidate.id === model);
+      // A catalog read that fails after the paid case started is a transient lookup failure,
+      // not a missing template: the case is cleared and the chunk retried, never failed.
+      const catalog = await catalogForProbes.catch(error => {
+        throw new BenchmarkCatalogLoadError(
+          `Benchmark model catalog could not be loaded: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          'catalog_load'
+        );
+      });
+      const entry = catalog.data.find(candidate => candidate.id === model);
       if (!entry) {
         throw new BenchmarkProbeFamilyError(
           `Probe lane cannot run: ${model} is not in the executable model catalog.`,
@@ -2521,7 +2531,8 @@ async function processDeciderJob(
         }
         if (
           (isRetryableContainerAvailabilityError(error) ||
-            error instanceof BenchmarkProbeFamilyError) &&
+            error instanceof BenchmarkProbeFamilyError ||
+            error instanceof BenchmarkCatalogLoadError) &&
           attemptStartedAt !== undefined
         ) {
           await clearUnbilledCase(env.BENCH_DB, { ...execution, attemptStartedAt });

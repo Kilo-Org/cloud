@@ -676,6 +676,42 @@ describe('processJob — scheduler-owned execution', () => {
       );
     });
 
+    it('defers a probe whose catalog fetch fails after the paid case started', async () => {
+      mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async url =>
+          String(url).endsWith('/models')
+            ? new Response('{"error":"unavailable"}', { status: 503 })
+            : Response.json({
+                token: 'kilo-user-token',
+                expiresAt: '2026-06-16T01:00:00.000Z',
+              })
+        )
+      );
+
+      await processJob(env, deciderMessage());
+
+      expect(beginPaidCase).toHaveBeenCalledTimes(1);
+      expect(runProbeCaseViaGateway).not.toHaveBeenCalled();
+      expect(clearUnbilledCase).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({
+          runId,
+          caseId: probeCase.id,
+          attemptStartedAt: expect.any(Number),
+        })
+      );
+      expect(deferChunk).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        'chunk-1',
+        'token-1',
+        expect.any(Number)
+      );
+      expect(failChunk).not.toHaveBeenCalled();
+      expect(upsertCaseResult).not.toHaveBeenCalled();
+    });
+
     it('scores a probe that narrates and stops without a tool call as zero', async () => {
       mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
       vi.mocked(runProbeCaseViaGateway).mockResolvedValueOnce({

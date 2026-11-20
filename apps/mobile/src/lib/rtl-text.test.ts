@@ -7,6 +7,7 @@ import {
   contentTextDirection,
   hasRtlScript,
   ltrValueTextStyle,
+  rtlBaseMarkedChildren,
   withoutMonoFamily,
 } from './rtl-text';
 
@@ -229,6 +230,47 @@ describe('contentTextDirection', () => {
 
   it('leaves copy with no letter to the interface', () => {
     expect(contentTextDirection(['42 · ', 7])).toBeUndefined();
+  });
+});
+
+describe('rtlBaseMarkedChildren', () => {
+  afterEach(() => {
+    i18nManager.isRTL = false;
+  });
+
+  // The Bitbucket denial sentence: it opens on a Latin product name and then
+  // holds Arabic words.
+  const MIXED = 'Bitbucket غير متصل. يمكن لمالكي المؤسسة ربطه.';
+
+  it('prefixes a Latin-first label that holds Arabic copy in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren(MIXED)).toBe(`\u200F${MIXED}`);
+  });
+
+  it('prefixes a Latin-first label that holds Hebrew copy', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('Bitbucket לא מחובר.')).toBe('\u200FBitbucket לא מחובר.');
+  });
+
+  it('leaves a label that already opens right to left alone', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('استكشف')).toBe('استكشف');
+  });
+
+  it('leaves Latin-only copy alone, so its full stop stays on the word', () => {
+    i18nManager.isRTL = true;
+    expect(rtlBaseMarkedChildren('Sentry.')).toBe('Sentry.');
+  });
+
+  it('leaves the copy alone in a left-to-right interface', () => {
+    expect(i18nManager.isRTL).toBe(false);
+    expect(rtlBaseMarkedChildren(MIXED)).toBe(MIXED);
+  });
+
+  it('puts the mark in front of a child tree that is not one string', () => {
+    i18nManager.isRTL = true;
+    const child = createElement('Text', null, 'Kilo غير متصل');
+    expect(rtlBaseMarkedChildren(child)).toEqual(['\u200F', child]);
   });
 });
 

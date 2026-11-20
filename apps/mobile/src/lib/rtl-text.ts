@@ -220,6 +220,43 @@ export function contentTextDirection(children: ReactNode): TextStyle | undefined
 }
 
 /**
+ * A right-to-left mark (U+200F): a strong character with no width, so it names
+ * a paragraph's start edge for the bidi algorithm without drawing or speaking
+ * anything.
+ */
+const RIGHT_TO_LEFT_MARK = '\u200F';
+
+/**
+ * `children` with a right-to-left mark in front when an app label has to lay
+ * out right to left for the interface's sake, not its own first letter's.
+ * Android resolves a paragraph's direction from its first strong character, and
+ * React Native never sets a text view's own direction, so a label that opens on
+ * a Latin product name inside a right-to-left interface otherwise lays out left
+ * to right and its Arabic half lands at the far end. The mark names the
+ * interface's start edge for the paragraph, and the label's own words keep
+ * their own direction after it.
+ *
+ * The mark applies only when the interface is right to left, the tree holds an
+ * Arabic or Hebrew letter (`hasRtlScript`), and the tree's first letter is not
+ * a right-to-left one (`RTL_LETTER`). Copy that already opens right to left
+ * needs no mark, and Latin-only copy such as `Sentry.` keeps its own base
+ * direction, so its full stop stays at the end of the word.
+ *
+ * A string child takes the mark in front of it; any other node gets the mark as
+ * its first sibling.
+ */
+export function rtlBaseMarkedChildren(children: ReactNode): ReactNode {
+  if (!I18nManager.isRTL || !hasRtlScript(children)) {
+    return children;
+  }
+  const letter = firstLetter(children);
+  if (letter === undefined || RTL_LETTER.test(letter)) {
+    return children;
+  }
+  return isStringChild(children) ? RIGHT_TO_LEFT_MARK + children : [RIGHT_TO_LEFT_MARK, children];
+}
+
+/**
  * A joined script's letters connect into one shape, so `letter-spacing` — a
  * Latin display device — opens every glyph from its neighbour and splits a word
  * mid-shape («الوكلاء» draws as «الوكلا ء»). This is the script, not the

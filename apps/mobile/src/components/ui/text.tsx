@@ -12,6 +12,7 @@ import {
   hasRtlScript,
   NATURAL_LETTER_SPACING,
   RTL_WRITING_DIRECTION,
+  rtlBaseMarkedChildren,
   withoutMonoFamily,
 } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
@@ -177,6 +178,15 @@ function Text({
     direction === 'auto'
       ? (contentTextDirection(props.children) ?? interfaceDirection)
       : interfaceDirection;
+  // A style direction does not move the paragraph itself: React Native never
+  // sets a text view's own direction, and Android resolves a paragraph from its
+  // first strong character, so app copy that opens on a Latin product name
+  // needs a right-to-left mark in front of it (`rtlBaseMarkedChildren`).
+  // Content names its own first letter's direction and gets no mark, and
+  // `Slot.Text` takes one element child, so `asChild` passes the children
+  // through unchanged (`asChild` has no call site in the app today).
+  const renderedChildren =
+    asChild || direction === 'auto' ? props.children : rtlBaseMarkedChildren(props.children);
   // The direction and reset land in the same array the component has always
   // built, so a non-eyebrow text node's style never grows an empty entry; the
   // eyebrow's line box leads its own array, before `props.style`, so a caller's
@@ -201,7 +211,9 @@ function Text({
       {...props}
       maxFontSizeMultiplier={fontScaleCap ?? props.maxFontSizeMultiplier}
       style={resolvedStyle}
-    />
+    >
+      {renderedChildren}
+    </Component>
   );
 }
 

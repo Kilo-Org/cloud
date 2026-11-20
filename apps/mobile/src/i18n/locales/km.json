@@ -3750,6 +3750,34 @@
     "nextScheduled": "កាលវិភាគបន្ទាប់",
     "answerNeeded": "ត្រូវការការឆ្លើយតប",
     "waitingToRetry": "រង់ចាំព្យាយាមម្ដងទៀត",
+    "countNoun": {
+      "needsInput_one": "ត្រូវការការឆ្លើយតប",
+      "needsInput_other": "ត្រូវការការឆ្លើយតប",
+      "running_one": "កំពុងដំណើរការ",
+      "running_other": "កំពុងដំណើរការ",
+      "scheduled_one": "បានកំណត់ពេល",
+      "scheduled_other": "បានកំណត់ពេល",
+      "idle_one": "ទំនេរ",
+      "idle_other": "ទំនេរ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ត្រូវការការឆ្លើយតប",
+      "needsInput_other": "{{displayCount}} ត្រូវការការឆ្លើយតប",
+      "running_one": "{{displayCount}} កំពុងដំណើរការ",
+      "running_other": "{{displayCount}} កំពុងដំណើរការ",
+      "scheduled_one": "{{displayCount}} បានកំណត់ពេល",
+      "scheduled_other": "{{displayCount}} បានកំណត់ពេល",
+      "idle_one": "{{displayCount}} ទំនេរ",
+      "idle_other": "{{displayCount}} ទំនេរ"
+    },
+    "footer": {
+      "checked": "បានពិនិត្យ {{time}}",
+      "lastKnown": "ស្ថានភាពដែលដឹងចុងក្រោយ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ការដំណើរការបន្ទាប់ {{time}}",
+      "wasDue": "គ្រោងទុក {{time}}"
+    },
     "step": {
       "editing": "ការកែសម្រួល",
       "reading": "ការអាន",

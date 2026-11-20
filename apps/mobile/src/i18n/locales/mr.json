@@ -3750,6 +3750,34 @@
     "nextScheduled": "पुढील नियोजित",
     "answerNeeded": "उत्तर आवश्यक",
     "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा",
+    "countNoun": {
+      "needsInput_one": "प्रतिसाद आवश्यक",
+      "needsInput_other": "प्रतिसाद आवश्यक",
+      "running_one": "काम सुरू आहे",
+      "running_other": "काम सुरू आहे",
+      "scheduled_one": "नियोजित",
+      "scheduled_other": "नियोजित",
+      "idle_one": "निष्क्रिय",
+      "idle_other": "निष्क्रिय"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} प्रतिसाद आवश्यक",
+      "needsInput_other": "{{displayCount}} प्रतिसाद आवश्यक",
+      "running_one": "{{displayCount}} काम सुरू आहे",
+      "running_other": "{{displayCount}} काम सुरू आहे",
+      "scheduled_one": "{{displayCount}} नियोजित",
+      "scheduled_other": "{{displayCount}} नियोजित",
+      "idle_one": "{{displayCount}} निष्क्रिय",
+      "idle_other": "{{displayCount}} निष्क्रिय"
+    },
+    "footer": {
+      "checked": "तपासले {{time}}",
+      "lastKnown": "शेवटची ज्ञात स्थिती · {{time}}"
+    },
+    "wake": {
+      "nextRun": "पुढील कार्यारंभ {{time}}",
+      "wasDue": "अपेक्षित होते {{time}}"
+    },
     "step": {
       "editing": "संपादन",
       "reading": "वाचन",

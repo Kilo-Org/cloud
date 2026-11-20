@@ -3750,6 +3750,34 @@
     "nextScheduled": "შემდეგი დაგეგმილი",
     "answerNeeded": "პასუხს ელის",
     "waitingToRetry": "ხელახალ ცდას ელის",
+    "countNoun": {
+      "needsInput_one": "პასუხს ელის",
+      "needsInput_other": "პასუხს ელის",
+      "running_one": "მუშაობს",
+      "running_other": "მუშაობს",
+      "scheduled_one": "დაგეგმილი",
+      "scheduled_other": "დაგეგმილი",
+      "idle_one": "უმოქმედოა",
+      "idle_other": "უმოქმედოა"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} პასუხს ელის",
+      "needsInput_other": "{{displayCount}} პასუხს ელის",
+      "running_one": "{{displayCount}} მუშაობს",
+      "running_other": "{{displayCount}} მუშაობს",
+      "scheduled_one": "{{displayCount}} დაგეგმილი",
+      "scheduled_other": "{{displayCount}} დაგეგმილი",
+      "idle_one": "{{displayCount}} უმოქმედოა",
+      "idle_other": "{{displayCount}} უმოქმედოა"
+    },
+    "footer": {
+      "checked": "შემოწმდა {{time}}",
+      "lastKnown": "ბოლო ცნობილი · {{time}}"
+    },
+    "wake": {
+      "nextRun": "შემდეგი გაშვება {{time}}",
+      "wasDue": "მოსალოდნელი იყო {{time}}"
+    },
     "step": {
       "editing": "რედაქტირება",
       "reading": "კითხვა",

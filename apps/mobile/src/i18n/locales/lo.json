@@ -3750,6 +3750,34 @@
     "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
     "answerNeeded": "ລໍຄຳຕອບ",
     "waitingToRetry": "ລໍລອງໃໝ່",
+    "countNoun": {
+      "needsInput_one": "ລໍຂໍ້ມູນຈາກທ່ານ",
+      "needsInput_other": "ລໍຂໍ້ມູນຈາກທ່ານ",
+      "running_one": "ກຳລັງເຮັດວຽກ",
+      "running_other": "ກຳລັງເຮັດວຽກ",
+      "scheduled_one": "ກຳນົດເວລາ",
+      "scheduled_other": "ກຳນົດເວລາ",
+      "idle_one": "ວ່າງ",
+      "idle_other": "ວ່າງ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ລໍຂໍ້ມູນຈາກທ່ານ",
+      "needsInput_other": "{{displayCount}} ລໍຂໍ້ມູນຈາກທ່ານ",
+      "running_one": "{{displayCount}} ກຳລັງເຮັດວຽກ",
+      "running_other": "{{displayCount}} ກຳລັງເຮັດວຽກ",
+      "scheduled_one": "{{displayCount}} ກຳນົດເວລາ",
+      "scheduled_other": "{{displayCount}} ກຳນົດເວລາ",
+      "idle_one": "{{displayCount}} ວ່າງ",
+      "idle_other": "{{displayCount}} ວ່າງ"
+    },
+    "footer": {
+      "checked": "ກວດສອບແລ້ວ {{time}}",
+      "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ເຮັດວຽກຄັ້ງຕໍ່ໄປ {{time}}",
+      "wasDue": "ຄາດໄວ້ {{time}}"
+    },
     "step": {
       "editing": "ກຳລັງແກ້ໄຂ",
       "reading": "ກຳລັງອ່ານ",

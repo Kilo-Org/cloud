@@ -3814,6 +3814,42 @@
     "nextScheduled": "Prossime pianificate",
     "answerNeeded": "In attesa di risposta",
     "waitingToRetry": "In attesa di riprovare",
+    "countNoun": {
+      "needsInput_one": "In attesa di risposta",
+      "needsInput_many": "In attesa di risposta",
+      "needsInput_other": "In attesa di risposta",
+      "running_one": "In corso",
+      "running_many": "In corso",
+      "running_other": "In corso",
+      "scheduled_one": "Pianificata",
+      "scheduled_many": "Pianificata",
+      "scheduled_other": "Pianificata",
+      "idle_one": "Inattivo",
+      "idle_many": "Inattivo",
+      "idle_other": "Inattivo"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} In attesa di risposta",
+      "needsInput_many": "{{displayCount}} In attesa di risposta",
+      "needsInput_other": "{{displayCount}} In attesa di risposta",
+      "running_one": "{{displayCount}} In corso",
+      "running_many": "{{displayCount}} In corso",
+      "running_other": "{{displayCount}} In corso",
+      "scheduled_one": "{{displayCount}} Pianificata",
+      "scheduled_many": "{{displayCount}} Pianificata",
+      "scheduled_other": "{{displayCount}} Pianificata",
+      "idle_one": "{{displayCount}} Inattivo",
+      "idle_many": "{{displayCount}} Inattivo",
+      "idle_other": "{{displayCount}} Inattivo"
+    },
+    "footer": {
+      "checked": "Verificato {{time}}",
+      "lastKnown": "Ultimo stato noto · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Prossima esecuzione {{time}}",
+      "wasDue": "Era previsto {{time}}"
+    },
     "step": {
       "editing": "Modifica",
       "reading": "Lettura",

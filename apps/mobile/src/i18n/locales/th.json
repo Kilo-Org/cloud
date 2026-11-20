@@ -3750,6 +3750,34 @@
     "nextScheduled": "กำหนดการถัดไป",
     "answerNeeded": "รอคำตอบ",
     "waitingToRetry": "รอลองใหม่",
+    "countNoun": {
+      "needsInput_one": "รอข้อมูลจากคุณ",
+      "needsInput_other": "รอข้อมูลจากคุณ",
+      "running_one": "กำลังทำงาน",
+      "running_other": "กำลังทำงาน",
+      "scheduled_one": "กำหนดเวลาไว้",
+      "scheduled_other": "กำหนดเวลาไว้",
+      "idle_one": "รอทำงาน",
+      "idle_other": "รอทำงาน"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} รอข้อมูลจากคุณ",
+      "needsInput_other": "{{displayCount}} รอข้อมูลจากคุณ",
+      "running_one": "{{displayCount}} กำลังทำงาน",
+      "running_other": "{{displayCount}} กำลังทำงาน",
+      "scheduled_one": "{{displayCount}} กำหนดเวลาไว้",
+      "scheduled_other": "{{displayCount}} กำหนดเวลาไว้",
+      "idle_one": "{{displayCount}} รอทำงาน",
+      "idle_other": "{{displayCount}} รอทำงาน"
+    },
+    "footer": {
+      "checked": "ตรวจสอบล่าสุด {{time}}",
+      "lastKnown": "สถานะล่าสุดที่ทราบ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ทำงานครั้งถัดไป {{time}}",
+      "wasDue": "เลยกำหนด {{time}}"
+    },
     "step": {
       "editing": "กำลังแก้ไข",
       "reading": "กำลังอ่าน",

@@ -3750,6 +3750,34 @@
     "nextScheduled": "Hurrengo programatuak",
     "answerNeeded": "Zure erantzunaren zain",
     "waitingToRetry": "Berriro saiatzeko zain",
+    "countNoun": {
+      "needsInput_one": "Zure erantzunaren zain",
+      "needsInput_other": "Zure erantzunaren zain",
+      "running_one": "Lanean",
+      "running_other": "Lanean",
+      "scheduled_one": "Programatuta",
+      "scheduled_other": "Programatuta",
+      "idle_one": "Geldirik",
+      "idle_other": "Geldirik"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Zure erantzunaren zain",
+      "needsInput_other": "{{displayCount}} Zure erantzunaren zain",
+      "running_one": "{{displayCount}} Lanean",
+      "running_other": "{{displayCount}} Lanean",
+      "scheduled_one": "{{displayCount}} Programatuta",
+      "scheduled_other": "{{displayCount}} Programatuta",
+      "idle_one": "{{displayCount}} Geldirik",
+      "idle_other": "{{displayCount}} Geldirik"
+    },
+    "footer": {
+      "checked": "Egiaztatuta {{time}}",
+      "lastKnown": "Azken egoera ezaguna · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Hurrengo exekuzioa {{time}}",
+      "wasDue": "Espero zen {{time}}"
+    },
     "step": {
       "editing": "Editatzen",
       "reading": "Irakurtzen",

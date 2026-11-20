@@ -3750,6 +3750,34 @@
     "nextScheduled": "Të planifikuara në vijim",
     "answerNeeded": "Pret përgjigje",
     "waitingToRetry": "Në pritje për të riprovuar",
+    "countNoun": {
+      "needsInput_one": "Pret përgjigje",
+      "needsInput_other": "Pret përgjigje",
+      "running_one": "Duke punuar",
+      "running_other": "Duke punuar",
+      "scheduled_one": "E planifikuar",
+      "scheduled_other": "E planifikuar",
+      "idle_one": "Në pritje",
+      "idle_other": "Në pritje"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Pret përgjigje",
+      "needsInput_other": "{{displayCount}} Pret përgjigje",
+      "running_one": "{{displayCount}} Duke punuar",
+      "running_other": "{{displayCount}} Duke punuar",
+      "scheduled_one": "{{displayCount}} E planifikuar",
+      "scheduled_other": "{{displayCount}} E planifikuar",
+      "idle_one": "{{displayCount}} Në pritje",
+      "idle_other": "{{displayCount}} Në pritje"
+    },
+    "footer": {
+      "checked": "Kontrolluar {{time}}",
+      "lastKnown": "Gjendja e fundit e njohur · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Ekzekutimi i radhës {{time}}",
+      "wasDue": "Ishte planifikuar {{time}}"
+    },
     "step": {
       "editing": "Duke redaktuar",
       "reading": "Duke lexuar",

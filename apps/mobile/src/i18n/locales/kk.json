@@ -3750,6 +3750,34 @@
     "nextScheduled": "Келесі жоспарланғандар",
     "answerNeeded": "Жауап қажет",
     "waitingToRetry": "Қайта әрекет күтілуде",
+    "countNoun": {
+      "needsInput_one": "Жауап қажет",
+      "needsInput_other": "Жауап қажет",
+      "running_one": "Орындалуда",
+      "running_other": "Орындалуда",
+      "scheduled_one": "Жоспарланған",
+      "scheduled_other": "Жоспарланған",
+      "idle_one": "Бос",
+      "idle_other": "Бос"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Жауап қажет",
+      "needsInput_other": "{{displayCount}} Жауап қажет",
+      "running_one": "{{displayCount}} Орындалуда",
+      "running_other": "{{displayCount}} Орындалуда",
+      "scheduled_one": "{{displayCount}} Жоспарланған",
+      "scheduled_other": "{{displayCount}} Жоспарланған",
+      "idle_one": "{{displayCount}} Бос",
+      "idle_other": "{{displayCount}} Бос"
+    },
+    "footer": {
+      "checked": "Тексерілді {{time}}",
+      "lastKnown": "Соңғы белгілі күй · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Келесі іске қосылу {{time}}",
+      "wasDue": "Күтілді {{time}}"
+    },
     "step": {
       "editing": "Өңдеу",
       "reading": "Оқу",

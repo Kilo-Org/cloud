@@ -3814,6 +3814,42 @@
     "nextScheduled": "Properes programades",
     "answerNeeded": "Pendent de resposta",
     "waitingToRetry": "Pendent de reintent",
+    "countNoun": {
+      "needsInput_one": "Pendent de resposta",
+      "needsInput_many": "Pendent de resposta",
+      "needsInput_other": "Pendent de resposta",
+      "running_one": "En curs",
+      "running_many": "En curs",
+      "running_other": "En curs",
+      "scheduled_one": "Programada",
+      "scheduled_many": "Programada",
+      "scheduled_other": "Programada",
+      "idle_one": "En espera",
+      "idle_many": "En espera",
+      "idle_other": "En espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Pendent de resposta",
+      "needsInput_many": "{{displayCount}} Pendent de resposta",
+      "needsInput_other": "{{displayCount}} Pendent de resposta",
+      "running_one": "{{displayCount}} En curs",
+      "running_many": "{{displayCount}} En curs",
+      "running_other": "{{displayCount}} En curs",
+      "scheduled_one": "{{displayCount}} Programada",
+      "scheduled_many": "{{displayCount}} Programada",
+      "scheduled_other": "{{displayCount}} Programada",
+      "idle_one": "{{displayCount}} En espera",
+      "idle_many": "{{displayCount}} En espera",
+      "idle_other": "{{displayCount}} En espera"
+    },
+    "footer": {
+      "checked": "Comprovat {{time}}",
+      "lastKnown": "Últim estat conegut · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Propera execució {{time}}",
+      "wasDue": "S’esperava {{time}}"
+    },
     "step": {
       "editing": "Edició",
       "reading": "Lectura",

@@ -3750,6 +3750,34 @@
     "nextScheduled": "خشتەکراوەکانی داهاتوو",
     "answerNeeded": "چاوەڕێی وەڵام",
     "waitingToRetry": "چاوەڕێی هەوڵدانەوە",
+    "countNoun": {
+      "needsInput_one": "چاوەڕێی وەڵام",
+      "needsInput_other": "چاوەڕێی وەڵام",
+      "running_one": "لە کاردا",
+      "running_other": "لە کاردا",
+      "scheduled_one": "خشتەکراو",
+      "scheduled_other": "خشتەکراو",
+      "idle_one": "بێکار",
+      "idle_other": "بێکار"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} چاوەڕێی وەڵام",
+      "needsInput_other": "{{displayCount}} چاوەڕێی وەڵام",
+      "running_one": "{{displayCount}} لە کاردا",
+      "running_other": "{{displayCount}} لە کاردا",
+      "scheduled_one": "{{displayCount}} خشتەکراو",
+      "scheduled_other": "{{displayCount}} خشتەکراو",
+      "idle_one": "{{displayCount}} بێکار",
+      "idle_other": "{{displayCount}} بێکار"
+    },
+    "footer": {
+      "checked": "پشکنراو {{time}}",
+      "lastKnown": "دوایین دۆخی زانراو · {{time}}"
+    },
+    "wake": {
+      "nextRun": "جێبەجێکردنی داهاتوو {{time}}",
+      "wasDue": "چاوەڕوان دەکرا {{time}}"
+    },
     "step": {
       "editing": "دەستکاریکردن",
       "reading": "خوێندنەوە",

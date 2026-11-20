@@ -3878,6 +3878,50 @@
     "nextScheduled": "Najbliższe zaplanowane",
     "answerNeeded": "Czeka na odpowiedź",
     "waitingToRetry": "Czeka na ponowną próbę",
+    "countNoun": {
+      "needsInput_one": "Czeka na odpowiedź",
+      "needsInput_other": "Czeka na odpowiedź",
+      "needsInput_few": "Czeka na odpowiedź",
+      "needsInput_many": "Czeka na odpowiedź",
+      "running_one": "W toku",
+      "running_other": "W toku",
+      "running_few": "W toku",
+      "running_many": "W toku",
+      "scheduled_one": "Zaplanowano",
+      "scheduled_other": "Zaplanowano",
+      "scheduled_few": "Zaplanowano",
+      "scheduled_many": "Zaplanowano",
+      "idle_one": "W gotowości",
+      "idle_other": "W gotowości",
+      "idle_few": "W gotowości",
+      "idle_many": "W gotowości"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Czeka na odpowiedź",
+      "needsInput_other": "{{displayCount}} Czeka na odpowiedź",
+      "needsInput_few": "{{displayCount}} Czeka na odpowiedź",
+      "needsInput_many": "{{displayCount}} Czeka na odpowiedź",
+      "running_one": "{{displayCount}} W toku",
+      "running_other": "{{displayCount}} W toku",
+      "running_few": "{{displayCount}} W toku",
+      "running_many": "{{displayCount}} W toku",
+      "scheduled_one": "{{displayCount}} Zaplanowano",
+      "scheduled_other": "{{displayCount}} Zaplanowano",
+      "scheduled_few": "{{displayCount}} Zaplanowano",
+      "scheduled_many": "{{displayCount}} Zaplanowano",
+      "idle_one": "{{displayCount}} W gotowości",
+      "idle_other": "{{displayCount}} W gotowości",
+      "idle_few": "{{displayCount}} W gotowości",
+      "idle_many": "{{displayCount}} W gotowości"
+    },
+    "footer": {
+      "checked": "Sprawdzono {{time}}",
+      "lastKnown": "Ostatni znany stan · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Następne uruchomienie {{time}}",
+      "wasDue": "Oczekiwano {{time}}"
+    },
     "step": {
       "editing": "Edytowanie",
       "reading": "Czytanie",

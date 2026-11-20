@@ -3750,6 +3750,34 @@
     "nextScheduled": "Sıradaki zamanlananlar",
     "answerNeeded": "Yanıt bekliyor",
     "waitingToRetry": "Yeniden deneme bekleniyor",
+    "countNoun": {
+      "needsInput_one": "Yanıt bekliyor",
+      "needsInput_other": "Yanıt bekliyor",
+      "running_one": "Çalışıyor",
+      "running_other": "Çalışıyor",
+      "scheduled_one": "Zamanlandı",
+      "scheduled_other": "Zamanlandı",
+      "idle_one": "Boşta",
+      "idle_other": "Boşta"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Yanıt bekliyor",
+      "needsInput_other": "{{displayCount}} Yanıt bekliyor",
+      "running_one": "{{displayCount}} Çalışıyor",
+      "running_other": "{{displayCount}} Çalışıyor",
+      "scheduled_one": "{{displayCount}} Zamanlandı",
+      "scheduled_other": "{{displayCount}} Zamanlandı",
+      "idle_one": "{{displayCount}} Boşta",
+      "idle_other": "{{displayCount}} Boşta"
+    },
+    "footer": {
+      "checked": "Kontrol edildi {{time}}",
+      "lastKnown": "Son bilinen · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Sonraki çalışma {{time}}",
+      "wasDue": "Bekleniyordu {{time}}"
+    },
     "step": {
       "editing": "Düzenleniyor",
       "reading": "Okunuyor",

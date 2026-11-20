@@ -3750,6 +3750,34 @@
     "nextScheduled": "Als Nächstes geplant",
     "answerNeeded": "Antwort erforderlich",
     "waitingToRetry": "Wartet auf erneuten Versuch",
+    "countNoun": {
+      "needsInput_one": "Eingabe erforderlich",
+      "needsInput_other": "Eingabe erforderlich",
+      "running_one": "In Bearbeitung",
+      "running_other": "In Bearbeitung",
+      "scheduled_one": "Geplant",
+      "scheduled_other": "Geplant",
+      "idle_one": "Inaktiv",
+      "idle_other": "Inaktiv"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Eingabe erforderlich",
+      "needsInput_other": "{{displayCount}} Eingabe erforderlich",
+      "running_one": "{{displayCount}} In Bearbeitung",
+      "running_other": "{{displayCount}} In Bearbeitung",
+      "scheduled_one": "{{displayCount}} Geplant",
+      "scheduled_other": "{{displayCount}} Geplant",
+      "idle_one": "{{displayCount}} Inaktiv",
+      "idle_other": "{{displayCount}} Inaktiv"
+    },
+    "footer": {
+      "checked": "Geprüft {{time}}",
+      "lastKnown": "Zuletzt bekannt · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Nächste Ausführung {{time}}",
+      "wasDue": "War fällig {{time}}"
+    },
     "step": {
       "editing": "Bearbeiten",
       "reading": "Lesen",

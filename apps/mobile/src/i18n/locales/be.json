@@ -3878,6 +3878,50 @@
     "nextScheduled": "Наступныя запланаваныя",
     "answerNeeded": "Патрэбны адказ",
     "waitingToRetry": "Чакае паўторнай спробы",
+    "countNoun": {
+      "needsInput_one": "Чакае адказу",
+      "needsInput_other": "Чакае адказу",
+      "needsInput_few": "Чакае адказу",
+      "needsInput_many": "Чакае адказу",
+      "running_one": "Працуе",
+      "running_other": "Працуе",
+      "running_few": "Працуе",
+      "running_many": "Працуе",
+      "scheduled_one": "Запланавана",
+      "scheduled_other": "Запланавана",
+      "scheduled_few": "Запланавана",
+      "scheduled_many": "Запланавана",
+      "idle_one": "Чакае",
+      "idle_other": "Чакае",
+      "idle_few": "Чакае",
+      "idle_many": "Чакае"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Чакае адказу",
+      "needsInput_other": "{{displayCount}} Чакае адказу",
+      "needsInput_few": "{{displayCount}} Чакае адказу",
+      "needsInput_many": "{{displayCount}} Чакае адказу",
+      "running_one": "{{displayCount}} Працуе",
+      "running_other": "{{displayCount}} Працуе",
+      "running_few": "{{displayCount}} Працуе",
+      "running_many": "{{displayCount}} Працуе",
+      "scheduled_one": "{{displayCount}} Запланавана",
+      "scheduled_other": "{{displayCount}} Запланавана",
+      "scheduled_few": "{{displayCount}} Запланавана",
+      "scheduled_many": "{{displayCount}} Запланавана",
+      "idle_one": "{{displayCount}} Чакае",
+      "idle_other": "{{displayCount}} Чакае",
+      "idle_few": "{{displayCount}} Чакае",
+      "idle_many": "{{displayCount}} Чакае"
+    },
+    "footer": {
+      "checked": "Праверана {{time}}",
+      "lastKnown": "Апошні вядомы стан · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Наступны запуск {{time}}",
+      "wasDue": "Чакалася {{time}}"
+    },
     "step": {
       "editing": "Рэдагаванне",
       "reading": "Чытанне",

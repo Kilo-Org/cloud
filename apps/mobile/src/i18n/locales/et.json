@@ -3750,6 +3750,34 @@
     "nextScheduled": "Järgmisena ajastatud",
     "answerNeeded": "Vajab vastust",
     "waitingToRetry": "Ootab uut katset",
+    "countNoun": {
+      "needsInput_one": "Vajab sisendit",
+      "needsInput_other": "Vajab sisendit",
+      "running_one": "Töös",
+      "running_other": "Töös",
+      "scheduled_one": "Ajastatud",
+      "scheduled_other": "Ajastatud",
+      "idle_one": "Ooterežiimis",
+      "idle_other": "Ooterežiimis"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Vajab sisendit",
+      "needsInput_other": "{{displayCount}} Vajab sisendit",
+      "running_one": "{{displayCount}} Töös",
+      "running_other": "{{displayCount}} Töös",
+      "scheduled_one": "{{displayCount}} Ajastatud",
+      "scheduled_other": "{{displayCount}} Ajastatud",
+      "idle_one": "{{displayCount}} Ooterežiimis",
+      "idle_other": "{{displayCount}} Ooterežiimis"
+    },
+    "footer": {
+      "checked": "Kontrollitud {{time}}",
+      "lastKnown": "Viimane teadaolev · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Järgmine käivitus {{time}}",
+      "wasDue": "Pidi toimuma {{time}}"
+    },
     "step": {
       "editing": "Redigeerimine",
       "reading": "Lugemine",

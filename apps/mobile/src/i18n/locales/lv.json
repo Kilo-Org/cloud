@@ -3814,6 +3814,42 @@
     "nextScheduled": "Nākamie ieplānotie",
     "answerNeeded": "Nepieciešama atbilde",
     "waitingToRetry": "Gaida atkārtotu mēģinājumu",
+    "countNoun": {
+      "needsInput_one": "Gaida ievadi",
+      "needsInput_other": "Gaida ievadi",
+      "needsInput_zero": "Gaida ievadi",
+      "running_one": "Strādā",
+      "running_other": "Strādā",
+      "running_zero": "Strādā",
+      "scheduled_one": "Ieplānota",
+      "scheduled_other": "Ieplānotas",
+      "scheduled_zero": "Ieplānotu",
+      "idle_one": "Dīkstāvē",
+      "idle_other": "Dīkstāvē",
+      "idle_zero": "Dīkstāvē"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Gaida ievadi",
+      "needsInput_other": "{{displayCount}} Gaida ievadi",
+      "needsInput_zero": "{{displayCount}} Gaida ievadi",
+      "running_one": "{{displayCount}} Strādā",
+      "running_other": "{{displayCount}} Strādā",
+      "running_zero": "{{displayCount}} Strādā",
+      "scheduled_one": "{{displayCount}} Ieplānota",
+      "scheduled_other": "{{displayCount}} Ieplānotas",
+      "scheduled_zero": "{{displayCount}} Ieplānotu",
+      "idle_one": "{{displayCount}} Dīkstāvē",
+      "idle_other": "{{displayCount}} Dīkstāvē",
+      "idle_zero": "{{displayCount}} Dīkstāvē"
+    },
+    "footer": {
+      "checked": "Pārbaudīts {{time}}",
+      "lastKnown": "Pēdējais zināmais · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Nākamā palaišana {{time}}",
+      "wasDue": "Bija jābūt {{time}}"
+    },
     "step": {
       "editing": "Rediģēšana",
       "reading": "Lasīšana",

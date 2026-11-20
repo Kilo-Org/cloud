@@ -3814,6 +3814,42 @@
     "nextScheduled": "Prochaines exécutions",
     "answerNeeded": "Réponse requise",
     "waitingToRetry": "Nouvelle tentative en attente",
+    "countNoun": {
+      "needsInput_one": "Intervention requise",
+      "needsInput_many": "Intervention requise",
+      "needsInput_other": "Intervention requise",
+      "running_one": "En cours",
+      "running_many": "En cours",
+      "running_other": "En cours",
+      "scheduled_one": "Planifiée",
+      "scheduled_many": "Planifiée",
+      "scheduled_other": "Planifiée",
+      "idle_one": "En veille",
+      "idle_many": "En veille",
+      "idle_other": "En veille"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Intervention requise",
+      "needsInput_many": "{{displayCount}} Intervention requise",
+      "needsInput_other": "{{displayCount}} Intervention requise",
+      "running_one": "{{displayCount}} En cours",
+      "running_many": "{{displayCount}} En cours",
+      "running_other": "{{displayCount}} En cours",
+      "scheduled_one": "{{displayCount}} Planifiée",
+      "scheduled_many": "{{displayCount}} Planifiée",
+      "scheduled_other": "{{displayCount}} Planifiée",
+      "idle_one": "{{displayCount}} En veille",
+      "idle_many": "{{displayCount}} En veille",
+      "idle_other": "{{displayCount}} En veille"
+    },
+    "footer": {
+      "checked": "Vérifié {{time}}",
+      "lastKnown": "Dernier état connu · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Prochaine exécution {{time}}",
+      "wasDue": "Était prévu {{time}}"
+    },
     "step": {
       "editing": "Modification",
       "reading": "Lecture",

@@ -3750,6 +3750,34 @@
     "nextScheduled": "راتلونکی مهال ویش",
     "answerNeeded": "ځواب ته اړتیا لري",
     "waitingToRetry": "د بیا هڅې په تمه",
+    "countNoun": {
+      "needsInput_one": "ننوتنې ته اړتیا لري",
+      "needsInput_other": "ننوتنې ته اړتیا لري",
+      "running_one": "په کار بوخت",
+      "running_other": "په کار بوخت",
+      "scheduled_one": "مهال ویش شوی",
+      "scheduled_other": "مهال ویش شوی",
+      "idle_one": "وزګار",
+      "idle_other": "وزګار"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ننوتنې ته اړتیا لري",
+      "needsInput_other": "{{displayCount}} ننوتنې ته اړتیا لري",
+      "running_one": "{{displayCount}} په کار بوخت",
+      "running_other": "{{displayCount}} په کار بوخت",
+      "scheduled_one": "{{displayCount}} مهال ویش شوی",
+      "scheduled_other": "{{displayCount}} مهال ویش شوی",
+      "idle_one": "{{displayCount}} وزګار",
+      "idle_other": "{{displayCount}} وزګار"
+    },
+    "footer": {
+      "checked": "کتل شوی {{time}}",
+      "lastKnown": "وروستی معلوم حالت · {{time}}"
+    },
+    "wake": {
+      "nextRun": "راتلونکی چلول {{time}}",
+      "wasDue": "تمه کېده {{time}}"
+    },
     "step": {
       "editing": "سمون",
       "reading": "لوستل",

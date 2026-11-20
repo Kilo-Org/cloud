@@ -3750,6 +3750,34 @@
     "nextScheduled": "Seuraavaksi ajastetut",
     "answerNeeded": "Odottaa vastausta",
     "waitingToRetry": "Odottaa uutta yritystä",
+    "countNoun": {
+      "needsInput_one": "Odottaa vastausta",
+      "needsInput_other": "Odottaa vastausta",
+      "running_one": "Työn alla",
+      "running_other": "Työn alla",
+      "scheduled_one": "Ajastettu",
+      "scheduled_other": "Ajastettu",
+      "idle_one": "Valmiina",
+      "idle_other": "Valmiina"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Odottaa vastausta",
+      "needsInput_other": "{{displayCount}} Odottaa vastausta",
+      "running_one": "{{displayCount}} Työn alla",
+      "running_other": "{{displayCount}} Työn alla",
+      "scheduled_one": "{{displayCount}} Ajastettu",
+      "scheduled_other": "{{displayCount}} Ajastettu",
+      "idle_one": "{{displayCount}} Valmiina",
+      "idle_other": "{{displayCount}} Valmiina"
+    },
+    "footer": {
+      "checked": "Tarkistettu {{time}}",
+      "lastKnown": "Viimeisin tiedossa oleva · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Seuraava ajo {{time}}",
+      "wasDue": "Odotettiin {{time}}"
+    },
     "step": {
       "editing": "Muokkaus",
       "reading": "Lukeminen",

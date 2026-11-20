@@ -3750,6 +3750,34 @@
     "nextScheduled": "পরবর্তী নির্ধারিত",
     "answerNeeded": "উত্তর প্রয়োজন",
     "waitingToRetry": "আবার চেষ্টার অপেক্ষায়",
+    "countNoun": {
+      "needsInput_one": "ইনপুট প্রয়োজন",
+      "needsInput_other": "ইনপুট প্রয়োজন",
+      "running_one": "কাজ চলছে",
+      "running_other": "কাজ চলছে",
+      "scheduled_one": "নির্ধারিত",
+      "scheduled_other": "নির্ধারিত",
+      "idle_one": "নিষ্ক্রিয়",
+      "idle_other": "নিষ্ক্রিয়"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ইনপুট প্রয়োজন",
+      "needsInput_other": "{{displayCount}} ইনপুট প্রয়োজন",
+      "running_one": "{{displayCount}} কাজ চলছে",
+      "running_other": "{{displayCount}} কাজ চলছে",
+      "scheduled_one": "{{displayCount}} নির্ধারিত",
+      "scheduled_other": "{{displayCount}} নির্ধারিত",
+      "idle_one": "{{displayCount}} নিষ্ক্রিয়",
+      "idle_other": "{{displayCount}} নিষ্ক্রিয়"
+    },
+    "footer": {
+      "checked": "যাচাই করা হয়েছে {{time}}",
+      "lastKnown": "সর্বশেষ জানা · {{time}}"
+    },
+    "wake": {
+      "nextRun": "পরবর্তী রান {{time}}",
+      "wasDue": "প্রত্যাশিত ছিল {{time}}"
+    },
     "step": {
       "editing": "সম্পাদনা",
       "reading": "পড়া",

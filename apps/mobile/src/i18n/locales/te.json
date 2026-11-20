@@ -3750,6 +3750,34 @@
     "nextScheduled": "తదుపరి షెడ్యూల్",
     "answerNeeded": "మీ సమాధానం అవసరం",
     "waitingToRetry": "మళ్లీ ప్రయత్నించడానికి వేచి ఉంది",
+    "countNoun": {
+      "needsInput_one": "మీ స్పందన అవసరం",
+      "needsInput_other": "మీ స్పందన అవసరం",
+      "running_one": "పని జరుగుతోంది",
+      "running_other": "పని జరుగుతోంది",
+      "scheduled_one": "షెడ్యూల్ చేయబడింది",
+      "scheduled_other": "షెడ్యూల్ చేయబడింది",
+      "idle_one": "పని లేదు",
+      "idle_other": "పని లేదు"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} మీ స్పందన అవసరం",
+      "needsInput_other": "{{displayCount}} మీ స్పందన అవసరం",
+      "running_one": "{{displayCount}} పని జరుగుతోంది",
+      "running_other": "{{displayCount}} పని జరుగుతోంది",
+      "scheduled_one": "{{displayCount}} షెడ్యూల్ చేయబడింది",
+      "scheduled_other": "{{displayCount}} షెడ్యూల్ చేయబడింది",
+      "idle_one": "{{displayCount}} పని లేదు",
+      "idle_other": "{{displayCount}} పని లేదు"
+    },
+    "footer": {
+      "checked": "తనిఖీ చేయబడింది {{time}}",
+      "lastKnown": "చివరిగా తెలిసిన స్థితి · {{time}}"
+    },
+    "wake": {
+      "nextRun": "తదుపరి అమలు {{time}}",
+      "wasDue": "ఆశించబడింది {{time}}"
+    },
     "step": {
       "editing": "సవరణ",
       "reading": "చదవడం",

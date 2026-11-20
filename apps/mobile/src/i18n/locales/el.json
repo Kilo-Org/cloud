@@ -3750,6 +3750,34 @@
     "nextScheduled": "Επόμενα προγραμματισμένα",
     "answerNeeded": "Αναμονή απάντησης",
     "waitingToRetry": "Αναμονή νέας προσπάθειας",
+    "countNoun": {
+      "needsInput_one": "Αναμονή απάντησης",
+      "needsInput_other": "Αναμονή απάντησης",
+      "running_one": "Σε εξέλιξη",
+      "running_other": "Σε εξέλιξη",
+      "scheduled_one": "Προγραμματισμένο",
+      "scheduled_other": "Προγραμματισμένο",
+      "idle_one": "Σε αδράνεια",
+      "idle_other": "Σε αδράνεια"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Αναμονή απάντησης",
+      "needsInput_other": "{{displayCount}} Αναμονή απάντησης",
+      "running_one": "{{displayCount}} Σε εξέλιξη",
+      "running_other": "{{displayCount}} Σε εξέλιξη",
+      "scheduled_one": "{{displayCount}} Προγραμματισμένο",
+      "scheduled_other": "{{displayCount}} Προγραμματισμένο",
+      "idle_one": "{{displayCount}} Σε αδράνεια",
+      "idle_other": "{{displayCount}} Σε αδράνεια"
+    },
+    "footer": {
+      "checked": "Ελέγχθηκε {{time}}",
+      "lastKnown": "Τελευταία γνωστή κατάσταση · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Επόμενη εκτέλεση {{time}}",
+      "wasDue": "Αναμενόταν {{time}}"
+    },
     "step": {
       "editing": "Επεξεργασία",
       "reading": "Ανάγνωση",

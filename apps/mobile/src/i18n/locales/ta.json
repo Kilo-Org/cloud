@@ -3750,6 +3750,34 @@
     "nextScheduled": "அடுத்து திட்டமிடப்பட்டவை",
     "answerNeeded": "பதில் தேவை",
     "waitingToRetry": "மீண்டும் முயலக் காத்திருக்கிறது",
+    "countNoun": {
+      "needsInput_one": "உள்ளீடு தேவை",
+      "needsInput_other": "உள்ளீடு தேவை",
+      "running_one": "பணியில்",
+      "running_other": "பணியில்",
+      "scheduled_one": "திட்டமிடப்பட்டது",
+      "scheduled_other": "திட்டமிடப்பட்டது",
+      "idle_one": "ஓய்வில்",
+      "idle_other": "ஓய்வில்"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} உள்ளீடு தேவை",
+      "needsInput_other": "{{displayCount}} உள்ளீடு தேவை",
+      "running_one": "{{displayCount}} பணியில்",
+      "running_other": "{{displayCount}} பணியில்",
+      "scheduled_one": "{{displayCount}} திட்டமிடப்பட்டது",
+      "scheduled_other": "{{displayCount}} திட்டமிடப்பட்டது",
+      "idle_one": "{{displayCount}} ஓய்வில்",
+      "idle_other": "{{displayCount}} ஓய்வில்"
+    },
+    "footer": {
+      "checked": "சரிபார்க்கப்பட்டது {{time}}",
+      "lastKnown": "கடைசியாக அறியப்பட்ட நிலை · {{time}}"
+    },
+    "wake": {
+      "nextRun": "அடுத்த இயக்கம் {{time}}",
+      "wasDue": "எதிர்பார்க்கப்பட்டது {{time}}"
+    },
     "step": {
       "editing": "திருத்துதல்",
       "reading": "படித்தல்",

@@ -3750,6 +3750,34 @@
     "nextScheduled": "Kan itti aansee karoorfame",
     "answerNeeded": "Deebii barbaada",
     "waitingToRetry": "Irra deebi'uuf eeggachaa jira",
+    "countNoun": {
+      "needsInput_one": "Deebii barbaada",
+      "needsInput_other": "Deebii barbaada",
+      "running_one": "Hojjechaa jira",
+      "running_other": "Hojjechaa jira",
+      "scheduled_one": "Karoorfame",
+      "scheduled_other": "Karoorfame",
+      "idle_one": "Hojii malee",
+      "idle_other": "Hojii malee"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Deebii barbaada",
+      "needsInput_other": "{{displayCount}} Deebii barbaada",
+      "running_one": "{{displayCount}} Hojjechaa jira",
+      "running_other": "{{displayCount}} Hojjechaa jira",
+      "scheduled_one": "{{displayCount}} Karoorfame",
+      "scheduled_other": "{{displayCount}} Karoorfame",
+      "idle_one": "{{displayCount}} Hojii malee",
+      "idle_other": "{{displayCount}} Hojii malee"
+    },
+    "footer": {
+      "checked": "Mirkanaa'e {{time}}",
+      "lastKnown": "Kan dhumarratti beekame · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Raawwii itti aanu {{time}}",
+      "wasDue": "Yeroo eegame {{time}}"
+    },
     "step": {
       "editing": "Gulaaluu",
       "reading": "Dubbisuu",

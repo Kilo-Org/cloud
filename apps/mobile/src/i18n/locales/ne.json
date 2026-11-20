@@ -3750,6 +3750,34 @@
     "nextScheduled": "अब तय भएका",
     "answerNeeded": "जवाफ चाहिन्छ",
     "waitingToRetry": "फेरि प्रयासको प्रतीक्षामा",
+    "countNoun": {
+      "needsInput_one": "जवाफ चाहिन्छ",
+      "needsInput_other": "जवाफ चाहिन्छ",
+      "running_one": "काम गर्दै",
+      "running_other": "काम गर्दै",
+      "scheduled_one": "तय भएको",
+      "scheduled_other": "तय भएको",
+      "idle_one": "निष्क्रिय",
+      "idle_other": "निष्क्रिय"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} जवाफ चाहिन्छ",
+      "needsInput_other": "{{displayCount}} जवाफ चाहिन्छ",
+      "running_one": "{{displayCount}} काम गर्दै",
+      "running_other": "{{displayCount}} काम गर्दै",
+      "scheduled_one": "{{displayCount}} तय भएको",
+      "scheduled_other": "{{displayCount}} तय भएको",
+      "idle_one": "{{displayCount}} निष्क्रिय",
+      "idle_other": "{{displayCount}} निष्क्रिय"
+    },
+    "footer": {
+      "checked": "जाँच गरिएको {{time}}",
+      "lastKnown": "पछिल्लो ज्ञात · {{time}}"
+    },
+    "wake": {
+      "nextRun": "अर्को सञ्चालन {{time}}",
+      "wasDue": "अपेक्षित थियो {{time}}"
+    },
     "step": {
       "editing": "सम्पादन गर्दै",
       "reading": "पढ्दै",

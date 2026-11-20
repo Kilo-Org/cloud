@@ -3750,6 +3750,34 @@
     "nextScheduled": "زمانبندی‌های بعدی",
     "answerNeeded": "نیازمند پاسخ",
     "waitingToRetry": "در انتظار تلاش مجدد",
+    "countNoun": {
+      "needsInput_one": "در انتظار ورودی",
+      "needsInput_other": "در انتظار ورودی",
+      "running_one": "در حال کار",
+      "running_other": "در حال کار",
+      "scheduled_one": "زمانبندیشده",
+      "scheduled_other": "زمانبندیشده",
+      "idle_one": "بیکار",
+      "idle_other": "بیکار"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} در انتظار ورودی",
+      "needsInput_other": "{{displayCount}} در انتظار ورودی",
+      "running_one": "{{displayCount}} در حال کار",
+      "running_other": "{{displayCount}} در حال کار",
+      "scheduled_one": "{{displayCount}} زمانبندیشده",
+      "scheduled_other": "{{displayCount}} زمانبندیشده",
+      "idle_one": "{{displayCount}} بیکار",
+      "idle_other": "{{displayCount}} بیکار"
+    },
+    "footer": {
+      "checked": "آخرین بررسی {{time}}",
+      "lastKnown": "آخرین وضعیت شناخته‌شده · {{time}}"
+    },
+    "wake": {
+      "nextRun": "اجرای بعدی {{time}}",
+      "wasDue": "قرار بود {{time}}"
+    },
     "step": {
       "editing": "ویرایش",
       "reading": "خواندن",

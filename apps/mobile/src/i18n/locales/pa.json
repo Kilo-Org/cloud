@@ -3750,6 +3750,34 @@
     "nextScheduled": "ਅਗਲਾ ਨਿਰਧਾਰਿਤ",
     "answerNeeded": "ਜਵਾਬ ਚਾਹੀਦਾ ਹੈ",
     "waitingToRetry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਦੀ ਉਡੀਕ",
+    "countNoun": {
+      "needsInput_one": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "needsInput_other": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "running_one": "ਕੰਮ ਜਾਰੀ",
+      "running_other": "ਕੰਮ ਜਾਰੀ",
+      "scheduled_one": "ਨਿਰਧਾਰਿਤ",
+      "scheduled_other": "ਨਿਰਧਾਰਿਤ",
+      "idle_one": "ਵਿਹਲਾ",
+      "idle_other": "ਵਿਹਲਾ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "needsInput_other": "{{displayCount}} ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "running_one": "{{displayCount}} ਕੰਮ ਜਾਰੀ",
+      "running_other": "{{displayCount}} ਕੰਮ ਜਾਰੀ",
+      "scheduled_one": "{{displayCount}} ਨਿਰਧਾਰਿਤ",
+      "scheduled_other": "{{displayCount}} ਨਿਰਧਾਰਿਤ",
+      "idle_one": "{{displayCount}} ਵਿਹਲਾ",
+      "idle_other": "{{displayCount}} ਵਿਹਲਾ"
+    },
+    "footer": {
+      "checked": "ਜਾਂਚ ਕੀਤੀ {{time}}",
+      "lastKnown": "ਆਖਰੀ ਜਾਣੀ ਸਥਿਤੀ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ਅਗਲੀ ਵਾਰ ਚੱਲੇਗਾ {{time}}",
+      "wasDue": "ਉਮੀਦ ਸੀ {{time}}"
+    },
     "step": {
       "editing": "ਸੰਪਾਦਨ ਕਰ ਰਿਹਾ",
       "reading": "ਪੜ੍ਹ ਰਿਹਾ",

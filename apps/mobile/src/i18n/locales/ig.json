@@ -3750,6 +3750,34 @@
     "nextScheduled": "Ihe ahaziri na-esote",
     "answerNeeded": "Achọrọ azịza",
     "waitingToRetry": "Na-eche ịnwale ọzọ",
+    "countNoun": {
+      "needsInput_one": "Chọrọ nzaghachi",
+      "needsInput_other": "Chọrọ nzaghachi",
+      "running_one": "Na-arụ ọrụ",
+      "running_other": "Na-arụ ọrụ",
+      "scheduled_one": "Ahaziri",
+      "scheduled_other": "Ahaziri",
+      "idle_one": "Anaghị arụ ọrụ",
+      "idle_other": "Anaghị arụ ọrụ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Chọrọ nzaghachi",
+      "needsInput_other": "{{displayCount}} Chọrọ nzaghachi",
+      "running_one": "{{displayCount}} Na-arụ ọrụ",
+      "running_other": "{{displayCount}} Na-arụ ọrụ",
+      "scheduled_one": "{{displayCount}} Ahaziri",
+      "scheduled_other": "{{displayCount}} Ahaziri",
+      "idle_one": "{{displayCount}} Anaghị arụ ọrụ",
+      "idle_other": "{{displayCount}} Anaghị arụ ọrụ"
+    },
+    "footer": {
+      "checked": "Enyochara {{time}}",
+      "lastKnown": "Nke ikpeazụ a maara · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Oge ọrụ ọzọ {{time}}",
+      "wasDue": "A tụrụ anya {{time}}"
+    },
     "step": {
       "editing": "Na-edezi",
       "reading": "Na-agụ",

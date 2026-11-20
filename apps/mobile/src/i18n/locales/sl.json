@@ -3878,6 +3878,50 @@
     "nextScheduled": "Naslednje načrtovano",
     "answerNeeded": "Potreben odgovor",
     "waitingToRetry": "Čaka na ponovni poskus",
+    "countNoun": {
+      "needsInput_one": "Čaka na vnos",
+      "needsInput_other": "Čaka na vnos",
+      "needsInput_two": "Čaka na vnos",
+      "needsInput_few": "Čaka na vnos",
+      "running_one": "V teku",
+      "running_other": "V teku",
+      "running_two": "V teku",
+      "running_few": "V teku",
+      "scheduled_one": "Načrtovano",
+      "scheduled_other": "Načrtovano",
+      "scheduled_two": "Načrtovano",
+      "scheduled_few": "Načrtovano",
+      "idle_one": "Nedejavno",
+      "idle_other": "Nedejavno",
+      "idle_two": "Nedejavno",
+      "idle_few": "Nedejavno"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čaka na vnos",
+      "needsInput_other": "{{displayCount}} Čaka na vnos",
+      "needsInput_two": "{{displayCount}} Čaka na vnos",
+      "needsInput_few": "{{displayCount}} Čaka na vnos",
+      "running_one": "{{displayCount}} V teku",
+      "running_other": "{{displayCount}} V teku",
+      "running_two": "{{displayCount}} V teku",
+      "running_few": "{{displayCount}} V teku",
+      "scheduled_one": "{{displayCount}} Načrtovano",
+      "scheduled_other": "{{displayCount}} Načrtovano",
+      "scheduled_two": "{{displayCount}} Načrtovano",
+      "scheduled_few": "{{displayCount}} Načrtovano",
+      "idle_one": "{{displayCount}} Nedejavno",
+      "idle_other": "{{displayCount}} Nedejavno",
+      "idle_two": "{{displayCount}} Nedejavno",
+      "idle_few": "{{displayCount}} Nedejavno"
+    },
+    "footer": {
+      "checked": "Preverjeno {{time}}",
+      "lastKnown": "Nazadnje znano · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Naslednji zagon {{time}}",
+      "wasDue": "Pričakovano {{time}}"
+    },
     "step": {
       "editing": "Urejanje",
       "reading": "Branje",

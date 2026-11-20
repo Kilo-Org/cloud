@@ -3750,6 +3750,34 @@
     "nextScheduled": "ቀጣይ የተያዙ",
     "answerNeeded": "ምላሽ ይፈልጋል",
     "waitingToRetry": "ዳግም ለመሞከር በመጠበቅ ላይ",
+    "countNoun": {
+      "needsInput_one": "ምላሽ ይፈልጋል",
+      "needsInput_other": "ምላሽ ይፈልጋል",
+      "running_one": "በመሥራት ላይ",
+      "running_other": "በመሥራት ላይ",
+      "scheduled_one": "የተያዘ",
+      "scheduled_other": "የተያዘ",
+      "idle_one": "በእረፍት",
+      "idle_other": "በእረፍት"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ምላሽ ይፈልጋል",
+      "needsInput_other": "{{displayCount}} ምላሽ ይፈልጋል",
+      "running_one": "{{displayCount}} በመሥራት ላይ",
+      "running_other": "{{displayCount}} በመሥራት ላይ",
+      "scheduled_one": "{{displayCount}} የተያዘ",
+      "scheduled_other": "{{displayCount}} የተያዘ",
+      "idle_one": "{{displayCount}} በእረፍት",
+      "idle_other": "{{displayCount}} በእረፍት"
+    },
+    "footer": {
+      "checked": "የተረጋገጠ {{time}}",
+      "lastKnown": "ለመጨረሻ ጊዜ የታወቀ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ቀጣይ አፈጻጸም {{time}}",
+      "wasDue": "ይጠበቅ ነበር {{time}}"
+    },
     "step": {
       "editing": "በማረም ላይ",
       "reading": "በማንበብ ላይ",

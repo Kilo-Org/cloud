@@ -3750,6 +3750,34 @@
     "nextScheduled": "နောက်ထပ် စီစဉ်ထားမှုများ",
     "answerNeeded": "အဖြေ လိုအပ်",
     "waitingToRetry": "ပြန်လည်ကြိုးစားရန် စောင့်နေ",
+    "countNoun": {
+      "needsInput_one": "တုံ့ပြန်ချက် လိုအပ်",
+      "needsInput_other": "တုံ့ပြန်ချက် လိုအပ်",
+      "running_one": "လုပ်ဆောင်နေ",
+      "running_other": "လုပ်ဆောင်နေ",
+      "scheduled_one": "စီစဉ်ထားသည်",
+      "scheduled_other": "စီစဉ်ထားသည်",
+      "idle_one": "အလုပ်မလုပ်နေ",
+      "idle_other": "အလုပ်မလုပ်နေ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} တုံ့ပြန်ချက် လိုအပ်",
+      "needsInput_other": "{{displayCount}} တုံ့ပြန်ချက် လိုအပ်",
+      "running_one": "{{displayCount}} လုပ်ဆောင်နေ",
+      "running_other": "{{displayCount}} လုပ်ဆောင်နေ",
+      "scheduled_one": "{{displayCount}} စီစဉ်ထားသည်",
+      "scheduled_other": "{{displayCount}} စီစဉ်ထားသည်",
+      "idle_one": "{{displayCount}} အလုပ်မလုပ်နေ",
+      "idle_other": "{{displayCount}} အလုပ်မလုပ်နေ"
+    },
+    "footer": {
+      "checked": "စစ်ဆေးထားသည် {{time}}",
+      "lastKnown": "နောက်ဆုံး သိရှိထားသည် · {{time}}"
+    },
+    "wake": {
+      "nextRun": "နောက်တစ်ကြိမ် လုပ်ဆောင်ချိန် {{time}}",
+      "wasDue": "မျှော်လင့်ခဲ့သည် {{time}}"
+    },
     "step": {
       "editing": "တည်းဖြတ်ခြင်း",
       "reading": "ဖတ်ရှုခြင်း",

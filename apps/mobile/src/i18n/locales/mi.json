@@ -3750,6 +3750,34 @@
     "nextScheduled": "Te whakaritenga e whai ake nei",
     "answerNeeded": "Me whai whakautu",
     "waitingToRetry": "E tatari ana ki te ngana anō",
+    "countNoun": {
+      "needsInput_one": "Me whai urupare",
+      "needsInput_other": "Me whai urupare",
+      "running_one": "Kei te mahi",
+      "running_other": "Kei te mahi",
+      "scheduled_one": "Kua whakaritea",
+      "scheduled_other": "Kua whakaritea",
+      "idle_one": "Kore mahi",
+      "idle_other": "Kore mahi"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Me whai urupare",
+      "needsInput_other": "{{displayCount}} Me whai urupare",
+      "running_one": "{{displayCount}} Kei te mahi",
+      "running_other": "{{displayCount}} Kei te mahi",
+      "scheduled_one": "{{displayCount}} Kua whakaritea",
+      "scheduled_other": "{{displayCount}} Kua whakaritea",
+      "idle_one": "{{displayCount}} Kore mahi",
+      "idle_other": "{{displayCount}} Kore mahi"
+    },
+    "footer": {
+      "checked": "Kua manatoko {{time}}",
+      "lastKnown": "Mōhiotanga whakamutunga · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Te whakahaerenga e whai ake nei {{time}}",
+      "wasDue": "I whakaritea {{time}}"
+    },
     "step": {
       "editing": "Whakatika",
       "reading": "Pānui",

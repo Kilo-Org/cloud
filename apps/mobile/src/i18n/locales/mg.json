@@ -3750,6 +3750,34 @@
     "nextScheduled": "Voalahatra manaraka",
     "answerNeeded": "Mila valiny",
     "waitingToRetry": "Miandry hanandrana indray",
+    "countNoun": {
+      "needsInput_one": "Mila valiny",
+      "needsInput_other": "Mila valiny",
+      "running_one": "Miasa",
+      "running_other": "Miasa",
+      "scheduled_one": "Voalahatra",
+      "scheduled_other": "Voalahatra",
+      "idle_one": "Tsy miasa",
+      "idle_other": "Tsy miasa"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Mila valiny",
+      "needsInput_other": "{{displayCount}} Mila valiny",
+      "running_one": "{{displayCount}} Miasa",
+      "running_other": "{{displayCount}} Miasa",
+      "scheduled_one": "{{displayCount}} Voalahatra",
+      "scheduled_other": "{{displayCount}} Voalahatra",
+      "idle_one": "{{displayCount}} Tsy miasa",
+      "idle_other": "{{displayCount}} Tsy miasa"
+    },
+    "footer": {
+      "checked": "Voamarina {{time}}",
+      "lastKnown": "Fantatra farany · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Fampandehanana manaraka {{time}}",
+      "wasDue": "Nokasaina {{time}}"
+    },
     "step": {
       "editing": "Fanovana",
       "reading": "Famakiana",

@@ -3750,6 +3750,34 @@
     "nextScheduled": "Keyingi rejalashtirilganlar",
     "answerNeeded": "Javob kutilmoqda",
     "waitingToRetry": "Qayta urinish kutilmoqda",
+    "countNoun": {
+      "needsInput_one": "Javob kutilmoqda",
+      "needsInput_other": "Javob kutilmoqda",
+      "running_one": "Ishlamoqda",
+      "running_other": "Ishlamoqda",
+      "scheduled_one": "Rejalashtirilgan",
+      "scheduled_other": "Rejalashtirilgan",
+      "idle_one": "Kutmoqda",
+      "idle_other": "Kutmoqda"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Javob kutilmoqda",
+      "needsInput_other": "{{displayCount}} Javob kutilmoqda",
+      "running_one": "{{displayCount}} Ishlamoqda",
+      "running_other": "{{displayCount}} Ishlamoqda",
+      "scheduled_one": "{{displayCount}} Rejalashtirilgan",
+      "scheduled_other": "{{displayCount}} Rejalashtirilgan",
+      "idle_one": "{{displayCount}} Kutmoqda",
+      "idle_other": "{{displayCount}} Kutmoqda"
+    },
+    "footer": {
+      "checked": "Tekshirilgan {{time}}",
+      "lastKnown": "So‘nggi ma’lum holat · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Keyingi ishga tushish {{time}}",
+      "wasDue": "Kutilgan edi {{time}}"
+    },
     "step": {
       "editing": "Tahrirlanmoqda",
       "reading": "O'qilmoqda",

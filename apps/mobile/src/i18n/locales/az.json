@@ -3750,6 +3750,34 @@
     "nextScheduled": "Növbəti planlaşdırılanlar",
     "answerNeeded": "Cavab gözləyir",
     "waitingToRetry": "Təkrar cəhd gözlənilir",
+    "countNoun": {
+      "needsInput_one": "Cavab gözləyir",
+      "needsInput_other": "Cavab gözləyir",
+      "running_one": "İşləyir",
+      "running_other": "İşləyir",
+      "scheduled_one": "Planlaşdırılıb",
+      "scheduled_other": "Planlaşdırılıb",
+      "idle_one": "Gözləmədə",
+      "idle_other": "Gözləmədə"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Cavab gözləyir",
+      "needsInput_other": "{{displayCount}} Cavab gözləyir",
+      "running_one": "{{displayCount}} İşləyir",
+      "running_other": "{{displayCount}} İşləyir",
+      "scheduled_one": "{{displayCount}} Planlaşdırılıb",
+      "scheduled_other": "{{displayCount}} Planlaşdırılıb",
+      "idle_one": "{{displayCount}} Gözləmədə",
+      "idle_other": "{{displayCount}} Gözləmədə"
+    },
+    "footer": {
+      "checked": "Yoxlanılıb {{time}}",
+      "lastKnown": "Son məlum vəziyyət · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Növbəti işə düşmə {{time}}",
+      "wasDue": "Gözlənilirdi {{time}}"
+    },
     "step": {
       "editing": "Redaktə",
       "reading": "Oxu",

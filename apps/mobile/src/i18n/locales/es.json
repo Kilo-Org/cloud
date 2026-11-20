@@ -3814,6 +3814,42 @@
     "nextScheduled": "Próximas programadas",
     "answerNeeded": "En espera de respuesta",
     "waitingToRetry": "En espera de reintento",
+    "countNoun": {
+      "needsInput_one": "En espera de respuesta",
+      "needsInput_many": "En espera de respuesta",
+      "needsInput_other": "En espera de respuesta",
+      "running_one": "Trabajando",
+      "running_many": "Trabajando",
+      "running_other": "Trabajando",
+      "scheduled_one": "Programada",
+      "scheduled_many": "Programada",
+      "scheduled_other": "Programada",
+      "idle_one": "En espera",
+      "idle_many": "En espera",
+      "idle_other": "En espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} En espera de respuesta",
+      "needsInput_many": "{{displayCount}} En espera de respuesta",
+      "needsInput_other": "{{displayCount}} En espera de respuesta",
+      "running_one": "{{displayCount}} Trabajando",
+      "running_many": "{{displayCount}} Trabajando",
+      "running_other": "{{displayCount}} Trabajando",
+      "scheduled_one": "{{displayCount}} Programada",
+      "scheduled_many": "{{displayCount}} Programada",
+      "scheduled_other": "{{displayCount}} Programada",
+      "idle_one": "{{displayCount}} En espera",
+      "idle_many": "{{displayCount}} En espera",
+      "idle_other": "{{displayCount}} En espera"
+    },
+    "footer": {
+      "checked": "Comprobado {{time}}",
+      "lastKnown": "Último estado conocido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima ejecución {{time}}",
+      "wasDue": "Estaba previsto {{time}}"
+    },
     "step": {
       "editing": "Editando",
       "reading": "Leyendo",

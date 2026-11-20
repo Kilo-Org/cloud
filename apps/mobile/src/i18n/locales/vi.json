@@ -3750,6 +3750,34 @@
     "nextScheduled": "Lịch tiếp theo",
     "answerNeeded": "Cần trả lời",
     "waitingToRetry": "Đang chờ thử lại",
+    "countNoun": {
+      "needsInput_one": "Cần phản hồi",
+      "needsInput_other": "Cần phản hồi",
+      "running_one": "Đang xử lý",
+      "running_other": "Đang xử lý",
+      "scheduled_one": "Đã lên lịch",
+      "scheduled_other": "Đã lên lịch",
+      "idle_one": "Đang rảnh",
+      "idle_other": "Đang rảnh"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Cần phản hồi",
+      "needsInput_other": "{{displayCount}} Cần phản hồi",
+      "running_one": "{{displayCount}} Đang xử lý",
+      "running_other": "{{displayCount}} Đang xử lý",
+      "scheduled_one": "{{displayCount}} Đã lên lịch",
+      "scheduled_other": "{{displayCount}} Đã lên lịch",
+      "idle_one": "{{displayCount}} Đang rảnh",
+      "idle_other": "{{displayCount}} Đang rảnh"
+    },
+    "footer": {
+      "checked": "Đã kiểm tra {{time}}",
+      "lastKnown": "Ghi nhận gần nhất · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Lần chạy tiếp theo {{time}}",
+      "wasDue": "Đã đến hạn {{time}}"
+    },
     "step": {
       "editing": "Đang chỉnh sửa",
       "reading": "Đang đọc",

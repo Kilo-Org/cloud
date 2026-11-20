@@ -3750,6 +3750,34 @@
     "nextScheduled": "Næst á dagskrá",
     "answerNeeded": "Bíður eftir svari",
     "waitingToRetry": "Bíður eftir endurtilraun",
+    "countNoun": {
+      "needsInput_one": "Bíður eftir svari",
+      "needsInput_other": "Bíður eftir svari",
+      "running_one": "Í vinnslu",
+      "running_other": "Í vinnslu",
+      "scheduled_one": "Áætlað",
+      "scheduled_other": "Áætlað",
+      "idle_one": "Í bið",
+      "idle_other": "Í bið"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Bíður eftir svari",
+      "needsInput_other": "{{displayCount}} Bíður eftir svari",
+      "running_one": "{{displayCount}} Í vinnslu",
+      "running_other": "{{displayCount}} Í vinnslu",
+      "scheduled_one": "{{displayCount}} Áætlað",
+      "scheduled_other": "{{displayCount}} Áætlað",
+      "idle_one": "{{displayCount}} Í bið",
+      "idle_other": "{{displayCount}} Í bið"
+    },
+    "footer": {
+      "checked": "Staðfest {{time}}",
+      "lastKnown": "Síðast þekkta staða · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Næsta keyrsla {{time}}",
+      "wasDue": "Átti að vera {{time}}"
+    },
     "step": {
       "editing": "Breyting",
       "reading": "Lestur",

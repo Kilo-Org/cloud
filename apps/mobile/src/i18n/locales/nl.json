@@ -3750,6 +3750,34 @@
     "nextScheduled": "Hierna gepland",
     "answerNeeded": "Antwoord nodig",
     "waitingToRetry": "Wacht op nieuwe poging",
+    "countNoun": {
+      "needsInput_one": "Invoer nodig",
+      "needsInput_other": "Invoer nodig",
+      "running_one": "Bezig",
+      "running_other": "Bezig",
+      "scheduled_one": "Gepland",
+      "scheduled_other": "Gepland",
+      "idle_one": "Inactief",
+      "idle_other": "Inactief"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Invoer nodig",
+      "needsInput_other": "{{displayCount}} Invoer nodig",
+      "running_one": "{{displayCount}} Bezig",
+      "running_other": "{{displayCount}} Bezig",
+      "scheduled_one": "{{displayCount}} Gepland",
+      "scheduled_other": "{{displayCount}} Gepland",
+      "idle_one": "{{displayCount}} Inactief",
+      "idle_other": "{{displayCount}} Inactief"
+    },
+    "footer": {
+      "checked": "Gecontroleerd {{time}}",
+      "lastKnown": "Laatst bekend · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Volgende uitvoering {{time}}",
+      "wasDue": "Was verwacht {{time}}"
+    },
     "step": {
       "editing": "Bewerken",
       "reading": "Lezen",

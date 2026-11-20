@@ -3750,6 +3750,34 @@
     "nextScheduled": "Следващи планирани",
     "answerNeeded": "Нужен е отговор",
     "waitingToRetry": "Изчаква повторен опит",
+    "countNoun": {
+      "needsInput_one": "Нужен е отговор",
+      "needsInput_other": "Нужен е отговор",
+      "running_one": "В процес",
+      "running_other": "В процес",
+      "scheduled_one": "Планирана",
+      "scheduled_other": "Планирани",
+      "idle_one": "Без активност",
+      "idle_other": "Без активност"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Нужен е отговор",
+      "needsInput_other": "{{displayCount}} Нужен е отговор",
+      "running_one": "{{displayCount}} В процес",
+      "running_other": "{{displayCount}} В процес",
+      "scheduled_one": "{{displayCount}} Планирана",
+      "scheduled_other": "{{displayCount}} Планирани",
+      "idle_one": "{{displayCount}} Без активност",
+      "idle_other": "{{displayCount}} Без активност"
+    },
+    "footer": {
+      "checked": "Проверено {{time}}",
+      "lastKnown": "Последно известно · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Следващо изпълнение {{time}}",
+      "wasDue": "Очакваше се {{time}}"
+    },
     "step": {
       "editing": "Редактиране",
       "reading": "Четене",

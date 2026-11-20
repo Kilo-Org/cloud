@@ -3750,6 +3750,34 @@
     "nextScheduled": "Na gaba da aka tsara",
     "answerNeeded": "Ana buƙatar amsa",
     "waitingToRetry": "Ana jiran sake gwadawa",
+    "countNoun": {
+      "needsInput_one": "Ana buƙatar bayani",
+      "needsInput_other": "Ana buƙatar bayani",
+      "running_one": "Ana aiki",
+      "running_other": "Ana aiki",
+      "scheduled_one": "An tsara",
+      "scheduled_other": "An tsara",
+      "idle_one": "A jiran aiki",
+      "idle_other": "A jiran aiki"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Ana buƙatar bayani",
+      "needsInput_other": "{{displayCount}} Ana buƙatar bayani",
+      "running_one": "{{displayCount}} Ana aiki",
+      "running_other": "{{displayCount}} Ana aiki",
+      "scheduled_one": "{{displayCount}} An tsara",
+      "scheduled_other": "{{displayCount}} An tsara",
+      "idle_one": "{{displayCount}} A jiran aiki",
+      "idle_other": "{{displayCount}} A jiran aiki"
+    },
+    "footer": {
+      "checked": "An duba {{time}}",
+      "lastKnown": "Na ƙarshe da aka sani · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Aiki na gaba {{time}}",
+      "wasDue": "An tsammanin {{time}}"
+    },
     "step": {
       "editing": "Ana gyarawa",
       "reading": "Ana karatu",

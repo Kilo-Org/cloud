@@ -3750,6 +3750,34 @@
     "nextScheduled": "Àwọn ètò tó kàn",
     "answerNeeded": "Nílò èsì",
     "waitingToRetry": "Ń dúró láti tún gbìyànjú",
+    "countNoun": {
+      "needsInput_one": "Nílò èsì rẹ",
+      "needsInput_other": "Nílò èsì rẹ",
+      "running_one": "Ń ṣiṣẹ́",
+      "running_other": "Ń ṣiṣẹ́",
+      "scheduled_one": "Ti ṣètò",
+      "scheduled_other": "Ti ṣètò",
+      "idle_one": "Kò ṣiṣẹ́ lọ́wọ́",
+      "idle_other": "Kò ṣiṣẹ́ lọ́wọ́"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Nílò èsì rẹ",
+      "needsInput_other": "{{displayCount}} Nílò èsì rẹ",
+      "running_one": "{{displayCount}} Ń ṣiṣẹ́",
+      "running_other": "{{displayCount}} Ń ṣiṣẹ́",
+      "scheduled_one": "{{displayCount}} Ti ṣètò",
+      "scheduled_other": "{{displayCount}} Ti ṣètò",
+      "idle_one": "{{displayCount}} Kò ṣiṣẹ́ lọ́wọ́",
+      "idle_other": "{{displayCount}} Kò ṣiṣẹ́ lọ́wọ́"
+    },
+    "footer": {
+      "checked": "Ti ṣàyẹ̀wò {{time}}",
+      "lastKnown": "Tí a mọ̀ kẹ́yìn · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Ìṣiṣẹ́ tó kàn {{time}}",
+      "wasDue": "A retí {{time}}"
+    },
     "step": {
       "editing": "Ṣíṣe àtúnṣe",
       "reading": "Kíkà",

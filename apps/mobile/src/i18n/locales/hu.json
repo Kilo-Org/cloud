@@ -3750,6 +3750,34 @@
     "nextScheduled": "Következő ütemezések",
     "answerNeeded": "Válaszra vár",
     "waitingToRetry": "Újrapróbálkozásra vár",
+    "countNoun": {
+      "needsInput_one": "Válaszra vár",
+      "needsInput_other": "Válaszra vár",
+      "running_one": "Dolgozik",
+      "running_other": "Dolgozik",
+      "scheduled_one": "Ütemezve",
+      "scheduled_other": "Ütemezve",
+      "idle_one": "Tétlen",
+      "idle_other": "Tétlen"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Válaszra vár",
+      "needsInput_other": "{{displayCount}} Válaszra vár",
+      "running_one": "{{displayCount}} Dolgozik",
+      "running_other": "{{displayCount}} Dolgozik",
+      "scheduled_one": "{{displayCount}} Ütemezve",
+      "scheduled_other": "{{displayCount}} Ütemezve",
+      "idle_one": "{{displayCount}} Tétlen",
+      "idle_other": "{{displayCount}} Tétlen"
+    },
+    "footer": {
+      "checked": "Ellenőrizve {{time}}",
+      "lastKnown": "Utolsó ismert · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Következő futás {{time}}",
+      "wasDue": "Esedékes volt {{time}}"
+    },
     "step": {
       "editing": "Szerkesztés",
       "reading": "Olvasás",

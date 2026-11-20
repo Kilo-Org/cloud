@@ -3814,6 +3814,42 @@
     "nextScheduled": "התזמונים הבאים",
     "answerNeeded": "נדרשת תשובה",
     "waitingToRetry": "ממתין לניסיון חוזר",
+    "countNoun": {
+      "needsInput_one": "נדרש קלט",
+      "needsInput_two": "נדרש קלט",
+      "needsInput_other": "נדרש קלט",
+      "running_one": "בפעולה",
+      "running_two": "בפעולה",
+      "running_other": "בפעולה",
+      "scheduled_one": "מתוזמן",
+      "scheduled_two": "מתוזמן",
+      "scheduled_other": "מתוזמן",
+      "idle_one": "בהמתנה",
+      "idle_two": "בהמתנה",
+      "idle_other": "בהמתנה"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} נדרש קלט",
+      "needsInput_two": "{{displayCount}} נדרש קלט",
+      "needsInput_other": "{{displayCount}} נדרש קלט",
+      "running_one": "{{displayCount}} בפעולה",
+      "running_two": "{{displayCount}} בפעולה",
+      "running_other": "{{displayCount}} בפעולה",
+      "scheduled_one": "{{displayCount}} מתוזמן",
+      "scheduled_two": "{{displayCount}} מתוזמן",
+      "scheduled_other": "{{displayCount}} מתוזמן",
+      "idle_one": "{{displayCount}} בהמתנה",
+      "idle_two": "{{displayCount}} בהמתנה",
+      "idle_other": "{{displayCount}} בהמתנה"
+    },
+    "footer": {
+      "checked": "נבדק {{time}}",
+      "lastKnown": "מצב אחרון ידוע · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ההפעלה הבאה {{time}}",
+      "wasDue": "היה אמור {{time}}"
+    },
     "step": {
       "editing": "עריכה",
       "reading": "קריאה",

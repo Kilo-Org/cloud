@@ -5334,9 +5334,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // normally returns at once; the membership test is the local guarantee that
       // the rows, the accepted set and the adoption marker agree. Otherwise the
       // claim continues to verification and the accepted-entry transaction below.
-      const finalDigest = candidateDigest ?? (await digestRuntimeProxyHandle(finalHandle));
-      if (updated === grant && acceptedDigests.has(finalDigest))
-        return { kind: 'handle', handle: finalHandle };
+      if (updated === grant) {
+        const accepted = acceptedDigests.has(
+          candidateDigest ?? (await digestRuntimeProxyHandle(finalHandle))
+        );
+        if (accepted) return { kind: 'handle', handle: finalHandle };
+      }
 
       const claims = await verifyRuntimeCredentialProxyHandle(this.env, finalHandle);
       if (!claims || claims.userId !== input.ownerId) return { kind: 'fail' };

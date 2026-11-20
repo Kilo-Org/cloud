@@ -553,7 +553,11 @@ export const PRIOR_CASE_RESULTS_REUSE_SQL = `
     CROSS JOIN case_results AS source
     WHERE run.id = source.run_id
       AND run.kind = 'decider' AND run.status IN ('completed', 'failed')
-      AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+      AND run.router = ? AND run.engine_identity = ?
+      -- A prior run of any repetition count contributes only the repetitions it
+      -- measured, and only the repetitions this run measures: repetition r fills
+      -- repetition r, so one stored repetition is never copied to two.
+      AND source.rep < ?
       AND source.model = ? AND source.variant = ?
       AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
       AND NOT EXISTS (
@@ -594,7 +598,9 @@ export const PRIOR_PENDING_OUTPUTS_REUSE_SQL = `
     CROSS JOIN pending_decider_outputs AS source
     WHERE run.id = source.run_id
       AND run.kind = 'decider' AND run.status IN ('completed', 'failed')
-      AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+      AND run.router = ? AND run.engine_identity = ?
+      -- Same repetition rule as PRIOR_CASE_RESULTS_REUSE_SQL.
+      AND source.rep < ?
       AND source.model = ? AND source.variant = ?
       AND NOT EXISTS (
         SELECT 1 FROM benchmark_profiles AS profile
@@ -634,6 +640,12 @@ export const PRIOR_PENDING_OUTPUTS_REUSE_SQL = `
  * Copy each pair's newest compatible graded case (and recoverable pending output) from
  * earlier runs into this run. A result measured below its case's entry in
  * `minimumRevisions` (src/measurement-revision.ts) is never copied, so that case runs again.
+ *
+ * Repetitions are compared per index, not per run: a prior run's repetition `r` is one
+ * valid independent draw for this run's repetition `r` whenever this run takes more than
+ * `r` repetitions, whatever the prior run's repetition count was. A three-repetition run
+ * therefore reuses one-repetition priors for its first repetition and measures the rest,
+ * and a one-repetition run reuses a longer prior's first repetition only.
  */
 export async function reuseDeciderCaseResults(
   db: D1Database,

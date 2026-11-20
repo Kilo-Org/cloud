@@ -485,6 +485,83 @@ describe('origin grants', () => {
 
       expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://app.example.com' });
     });
+
+    // The <iframe> e12 sits in frame f1 (shop) and hosts frame f2 (pay).
+    const nestedOwnerSession = () =>
+      createSession({
+        frameIdForBackendNode: backendNodeId => (backendNodeId === 12 ? 'f1' : 'main'),
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 30,
+            securityOrigin: 'https://shop.example.com',
+            url: 'https://shop.example.com/cart',
+          },
+          {
+            frameId: 'f2',
+            ownerBackendNodeId: 12,
+            parentId: 'f1',
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      });
+
+    it('needs the grants of a nested owner frame and its hosted frame, both labelled frames', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [],
+        session: nestedOwnerSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [
+          { class: 'act', frame: true, origin: 'https://shop.example.com' },
+          { class: 'act', frame: true, origin: 'https://pay.example.com' },
+        ],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('allows an element in a nested owner frame granted on both frames', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [
+          { class: 'act', origin: 'https://shop.example.com' },
+          { class: 'act', origin: 'https://pay.example.com' },
+        ],
+        session: nestedOwnerSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://pay.example.com' });
+    });
+
+    it('asks once, as the top-level page, for a same-site iframe whose owner shares its origin', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [],
+        session: createSession({
+          nestedFrames: [
+            {
+              frameId: 'f1',
+              ownerBackendNodeId: 12,
+              securityOrigin: 'https://app.example.com',
+              url: 'https://app.example.com/embedded',
+            },
+          ],
+          targetNodeName: 'IFRAME',
+        }),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'act', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
   });
 
   it('allows an act inside a granted frame and marks it as a frame target', async () => {

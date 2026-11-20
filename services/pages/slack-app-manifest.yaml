@@ -1,0 +1,27 @@
+# Slack app for link previews (Work Objects) of pages-dev Pages.
+# Create it at api.slack.com/apps: Create New App, From a manifest.
+# The steps the manifest can't do are in README.md, "Slack link previews".
+# A second deployment gets its own app, with its own hostname in both places.
+display_information:
+  name: Kilo Pages Dev
+  description: Rich previews for pages-dev.kiloapps.io links
+features:
+  bot_user:
+    display_name: Kilo Pages Dev
+    always_online: false
+  unfurl_domains:
+    - pages-dev.kiloapps.io
+oauth_config:
+  scopes:
+    bot:
+      - links:read
+      - links:write
+settings:
+  event_subscriptions:
+    request_url: https://pages-dev.kiloapps.io/api/slack/events
+    bot_events:
+      - link_shared
+      - entity_details_requested
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

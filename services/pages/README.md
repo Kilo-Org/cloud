@@ -36,6 +36,7 @@ source.json → the same archive, read by the same code
 | `scripts/pin.mjs` | Moves the pin to a release, after checking its attestation |
 | `scripts/pinned.mjs` | Reads `source.json`, downloads the archive and checks it; both builds call it |
 | `scripts/package.mjs` | The checks on the archive and its configuration |
+| `slack-app-manifest.yaml` | The Slack app that shows link previews of `pages-dev` Pages |
 
 A Pages package ships a deployment-neutral `wrangler.json`: the fields the code
 fixes (Durable Object classes, migrations, cron triggers, asset handling,
@@ -137,6 +138,7 @@ requests" in nteract's `apps/pages/DEPLOYMENT.md` for the boundary.
 | `/mcp` | POST | Pages OAuth token | MCP server |
 | `/api/tools` | POST | Signed in | The same tools over HTTP |
 | `/connect`, `/llms.txt` | GET | None | How to connect an agent |
+| `/api/slack/events` | POST | Slack request signature | Slack link previews. 404 until all three Slack values are set |
 
 "HTTP and MCP tools" in the Pages source's `REFERENCE.md` describes the tools.
 
@@ -232,6 +234,9 @@ No secret is in this repository.
 | `NOTEBOOK_CLOUD_APP_SESSION_KEYS` | Worker secret on `pages-dev` | Session keyring |
 | `PAGES_KILO_EXCHANGE_SECRET` | Worker secret on `pages-dev` | Sign-in handoff with the web app |
 | `PAGES_DEV_AUTH_SECRET` | The web app's Vercel environment (`pnpm web:env set`) | The same value as `PAGES_KILO_EXCHANGE_SECRET` |
+| `PAGES_SLACK_SIGNING_SECRET` | Worker secret on `pages-dev` | Signing secret of the Kilo Pages Dev Slack app. Optional |
+| `PAGES_SLACK_BOT_TOKEN` | Worker secret on `pages-dev` | Bot token (`xoxb-`) from installing that app. Optional |
+| `PAGES_SLACK_TEAM_ID` | Worker secret on `pages-dev` | ID of the one Slack workspace the app serves. Not secret. Optional |
 
 `wrangler deploy` keeps the secrets already on the Worker, so a deploy never
 reads or writes them. Set or rotate one with
@@ -244,6 +249,76 @@ Workers secrets are write-only. The only readable copy of the session keyring
 is on the machine that made the first deploy; it belongs in the team secret
 store before anyone else needs to rotate it. Losing it only signs browser
 sessions out: a new keyring can replace it.
+
+## Slack link previews
+
+A Pages link posted in Slack can unfurl as a Work Object: a card with the
+Page's published preview, and a flexpane with its details. `/api/slack/events`
+serves it. The Worker answers 404 there unless all three of
+`PAGES_SLACK_SIGNING_SECRET`, `PAGES_SLACK_BOT_TOKEN` and `PAGES_SLACK_TEAM_ID`
+are set. It serves one workspace, the one the team ID names, and rejects events
+from any other.
+
+The Slack app is `slack-app-manifest.yaml`. It is its own app, Kilo Pages Dev,
+apart from the Kilo Slack integration in `apps/web`: that app serves many
+workspaces and its events go to `app.kilo.ai`, and a Slack app has one event
+URL.
+
+`PAGES_SLACK_TEAM_ID` is not secret, but it is a Worker secret like the other
+two. Then the repository holds no workspace ID, the three values live in one
+place, and deleting any one of them turns the feature off without a deploy.
+
+Set it up in this order. A Slack workspace admin does steps 1 to 3.
+
+1. At api.slack.com/apps, Create New App, From a manifest. Pick the workspace
+   and paste `slack-app-manifest.yaml`. Slack may report the request URL
+   unverified. That is expected until step 5.
+2. In the app's settings, open Work Object Previews, turn it on, select the
+   Content Item entity type and save. The manifest cannot set this.
+3. Install the app in the workspace. A workspace that restricts apps asks an
+   admin to approve it first.
+4. Set the three values from this folder. Each command creates and deploys a
+   new version of the Worker with the secret added, so no deploy job is needed:
+
+   ```bash
+   pnpm exec wrangler secret put PAGES_SLACK_SIGNING_SECRET --name pages-dev
+   pnpm exec wrangler secret put PAGES_SLACK_BOT_TOKEN --name pages-dev
+   pnpm exec wrangler secret put PAGES_SLACK_TEAM_ID --name pages-dev
+   ```
+
+   The signing secret is on the app's Basic Information page. The bot token is
+   on OAuth & Permissions after the install. The team ID starts with `T`, and
+   is in the workspace's URL in Slack's web client.
+5. In the app's Event Subscriptions, retry the request URL. Slack sends a
+   challenge, and the Worker answers it only once all three values are set.
+   Save.
+6. Publish a preview of a test Page. Paste its link in the message composer,
+   then post it in a channel. Check both unfurls, the image, the flexpane, an
+   update to the preview, and removing it.
+
+Check the endpoint without Slack:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}' https://pages-dev.kiloapps.io/api/slack/events
+```
+
+A GET answers 404 while the feature is off and 405 once all three values are
+set.
+
+Turn it off by deleting one value. The endpoint answers 404 again at once:
+
+```bash
+pnpm exec wrangler secret delete PAGES_SLACK_BOT_TOKEN --name pages-dev
+```
+
+Links then post without a preview. Slack turns off an app's event delivery
+when most deliveries fail for an hour, so uninstall the app if it stays off.
+To turn it back on, set the value again and retry the request URL.
+
+To rotate the signing secret, regenerate it on Basic Information and put the
+new value. To rotate the bot token, reinstall the app and put the new token.
+Previews fail while Slack and the Worker hold different values; nothing else
+does.
 
 ## Environment Variables
 

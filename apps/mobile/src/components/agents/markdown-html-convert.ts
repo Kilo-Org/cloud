@@ -6,30 +6,96 @@ import { parseMarkdownHtml } from './markdown-html-tree';
 const LINE_END = /[ \t]*(?:\n|$)/y;
 // A line a `<br>` cannot continue: a heading, a quote, a list item, a table
 // row, or indented code. The paragraph-only hard break would change its block.
-const BREAK_BLOCKED_LINE = /^(?: {4}|\t|\s*(?:#|>|[-+*]\s|\d{1,9}[.)]\s))|\|/;
+// Whitespace here is matched without the newline that ends the line, so the
+// pattern reads the same on the whole value as on the one line.
+const BREAK_BLOCKED_LINE = /(?: {4}|\t|[^\S\n]*(?:#|>|[-+*][^\S\n]|\d{1,9}[.)][^\S\n]))/y;
 // A line that ends the paragraph before it, so a break before it draws nothing.
 const PARAGRAPH_ENDING_LINE =
-  /^(?:[ \t]*(?:\n|$)| {0,3}(?:#{1,6}(?:\s|$)|>|[-+*][ \t]|\d{1,9}[.)][ \t]|`{3}|~{3}|<|[=-]+[ \t]*(?:\n|$)|(?:[*_][ \t]*){3,}(?:\n|$)))/;
+  /(?:[ \t]*(?:\n|$)| {0,3}(?:#{1,6}(?:\s|$)|>|[-+*][ \t]|\d{1,9}[.)][ \t]|`{3}|~{3}|<|[=-]+[ \t]*(?:\n|$)|(?:[*_][ \t]*){3,}(?:\n|$)))/y;
+const WHITESPACE = /\s/;
+
+/** The line of a root `<br>`: where it begins and ends, and whether a break can continue it. */
+type LineInfo = {
+  start: number;
+  end: number;
+  blocked: boolean;
+  // The last non-whitespace character before the first break on the line, or
+  // that break's start when the text before it is blank. A later break on the
+  // line has the tag of an earlier one before it, so it has text before it too.
+  firstNonSpace: number;
+  // A tag with a newline of its own makes the line it reads run past that
+  // newline, so only a tag that stays on one line gives bounds to share.
+  reusable: boolean;
+};
+
+/** Root nodes arrive in document order, so the line of one break often holds the next. */
+type LineCache = { line: LineInfo | null };
+
+/** Reads the line around a break, and whether a break there would change its block. */
+function analyseLine(value: string, element: HtmlElement): LineInfo {
+  const start = value.lastIndexOf('\n', element.start - 1) + 1;
+  const newline = value.indexOf('\n', element.end);
+  const end = newline === -1 ? value.length : newline;
+  BREAK_BLOCKED_LINE.lastIndex = start;
+  const pipe = value.indexOf('|', start);
+  const blocked = BREAK_BLOCKED_LINE.test(value) || (pipe !== -1 && pipe < end);
+  let at = element.start - 1;
+  while (at >= start) {
+    const character = value[at];
+    if (character === undefined || !WHITESPACE.test(character)) {
+      break;
+    }
+    at -= 1;
+  }
+  return {
+    start,
+    end,
+    blocked,
+    firstNonSpace: at >= start ? at : element.start,
+    reusable: value.lastIndexOf('\n', element.end - 1) < element.start,
+  };
+}
 
 /**
  * A root `<br>` as markdown: a backslash break that continues the paragraph,
  * nothing where the paragraph ends anyway, or null on a line a break would
  * change. `skip` is the source after the tag the break already accounts for.
  */
-function rootBreak(value: string, element: HtmlElement): { text: string; skip: number } | null {
-  const lineStart = value.lastIndexOf('\n', element.start - 1) + 1;
-  const lineEnd = value.indexOf('\n', element.end);
-  const line = value.slice(lineStart, lineEnd === -1 ? value.length : lineEnd);
-  if (value.slice(lineStart, element.start).trim() === '' || BREAK_BLOCKED_LINE.test(line)) {
+function rootBreak(
+  value: string,
+  element: HtmlElement,
+  cache: LineCache
+): { text: string; skip: number } | null {
+  let line = cache.line;
+  if (line === null || element.start < line.start || element.end > line.end) {
+    line = analyseLine(value, element);
+    cache.line = line.reusable ? line : null;
+  }
+  if (line.firstNonSpace >= element.start || line.blocked) {
     return null;
   }
-  const rest = value.slice(element.end);
-  const newline = /^[ \t]*(\n)?[ \t]*/.exec(rest);
-  const following = rest.slice(newline?.[0].length ?? 0);
-  if (following === '' || (newline?.[1] !== undefined && PARAGRAPH_ENDING_LINE.test(following))) {
+  let at = element.end;
+  while (value[at] === ' ' || value[at] === '\t') {
+    at += 1;
+  }
+  let broke = false;
+  if (value[at] === '\n') {
+    broke = true;
+    at += 1;
+    while (value[at] === ' ' || value[at] === '\t') {
+      at += 1;
+    }
+  }
+  if (at >= value.length) {
     return { text: '', skip: 0 };
   }
-  return { text: '\\\n', skip: newline?.[0].length ?? 0 };
+  if (broke) {
+    PARAGRAPH_ENDING_LINE.lastIndex = at;
+    if (PARAGRAPH_ENDING_LINE.test(value)) {
+      return { text: '', skip: 0 };
+    }
+  }
+  return { text: '\\\n', skip: at - element.end };
 }
 
 /**
@@ -70,13 +136,14 @@ export function convertHtmlToMarkdown(value: string): string {
   }
   let markdown = '';
   let skip = 0;
+  const cache: LineCache = { line: null };
   for (const node of nodes) {
     const skipped = skip;
     skip = 0;
     if (node.kind === 'text') {
       markdown += value.slice(node.start + Math.min(skipped, node.end - node.start), node.end);
     } else if (node.name === 'br') {
-      const lineBreak = rootBreak(value, node);
+      const lineBreak = rootBreak(value, node, cache);
       markdown += lineBreak?.text ?? value.slice(node.start, node.end);
       skip = lineBreak?.skip ?? 0;
     } else if (MARKDOWN_BLOCK_TAGS.has(node.name)) {

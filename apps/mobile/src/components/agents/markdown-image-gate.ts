@@ -113,16 +113,170 @@ function gatedImageMarkdown(image: MarkdownImageRef, t: TFunction): string {
 
 /**
  * Whole-value lexes one gate pass may spend telling images from literal copies.
- * Past it every copy is rewritten, so crafted repetition cannot stall a render.
+ * Past it every copy is rewritten, and every other pass over the value is a
+ * single traversal, so crafted repetition cannot stall a render.
  */
 const MAX_IMAGE_PROBES = 8;
 
-function occurrences(value: string, raw: string): number[] {
+/** One character per edge; `raw` marks the end of the key spelled by the path. */
+type TrieNode = { children: Map<string, TrieNode>; raw: string | null };
+
+function buildTrie(keys: readonly string[]): TrieNode {
+  const root: TrieNode = { children: new Map(), raw: null };
+  for (const key of keys) {
+    let node = root;
+    // Code units, not code points: the walk over the value reads single units.
+    for (let index = 0; index < key.length; index += 1) {
+      const char = key.charAt(index);
+      let child = node.children.get(char);
+      if (child === undefined) {
+        child = { children: new Map(), raw: null };
+        node.children.set(char, child);
+      }
+      node = child;
+    }
+    node.raw = key;
+  }
+  return root;
+}
+
+/**
+ * Every occurrence of every key in `value`, overlapping ones included, from one
+ * left-to-right traversal: a bucket per key, ascending, with a restart per key
+ * avoided. A key that ends inside a longer key's path still gets its own hits.
+ */
+function locateOccurrences(value: string, keys: readonly string[]): Map<string, number[]> {
+  const buckets = new Map<string, number[]>();
+  for (const key of keys) {
+    buckets.set(key, []);
+  }
+  const root = buildTrie(keys);
+  for (let start = 0; start < value.length; start += 1) {
+    let node = root.children.get(value.charAt(start));
+    let end = start;
+    while (node !== undefined) {
+      const key = node.raw;
+      if (key !== null) {
+        buckets.get(key)?.push(start);
+      }
+      end += 1;
+      node = node.children.get(value.charAt(end));
+    }
+  }
+  return buckets;
+}
+
+/**
+ * `indexOf` restarts at the end of the copy it just kept, so a candidate that
+ * overlaps it is skipped: keep only the hits at or past the previous copy's end.
+ */
+function occurrences(candidates: readonly number[], length: number): number[] {
   const found: number[] = [];
-  for (let at = value.indexOf(raw); at !== -1; at = value.indexOf(raw, at + raw.length)) {
-    found.push(at);
+  let cursor = 0;
+  for (const at of candidates) {
+    if (at >= cursor) {
+      found.push(at);
+      cursor = at + length;
+    }
   }
   return found;
+}
+
+/**
+ * Whether a match of `href` can only exist across an emitted load scheme: its
+ * last characters are the scheme's first ones, or its first characters are the
+ * scheme's last ones, so the copy spans the seam the replacement makes.
+ */
+function crossesImageLoadScheme(href: string): boolean {
+  for (let length = 1; length < href.length && length <= IMAGE_LOAD_SCHEME.length; length += 1) {
+    if (IMAGE_LOAD_SCHEME.startsWith(href.slice(href.length - length))) {
+      return true;
+    }
+    if (IMAGE_LOAD_SCHEME.endsWith(href.slice(0, length))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether the hrefs can share one left-to-right pass. Replacing them one at a
+ * time differs whenever a pass changes what a later href still sees: one href
+ * occurring inside another (or inside the load scheme), a copy that only exists
+ * across an emitted scheme, or two hrefs matching the same characters. Those
+ * keep the sequential loop; everything else is independent of the order.
+ */
+function hrefsRewriteIndependently(hrefs: readonly string[]): boolean {
+  if (hrefs.some(href => IMAGE_LOAD_SCHEME.includes(href) || crossesImageLoadScheme(href))) {
+    return false;
+  }
+  // One href inside another is a trie walk, not a rescan per pair: the trie
+  // holds every href, so walking an href from each of its starts meets a
+  // terminal only where another href begins inside it.
+  const root = buildTrie(hrefs);
+  return !hrefs.some(href => holdsAnotherHref(href, root));
+}
+
+/** Whether `href` spells a different href starting at any of its characters. */
+function holdsAnotherHref(href: string, root: TrieNode): boolean {
+  for (let start = 0; start < href.length; start += 1) {
+    let node = root.children.get(href.charAt(start));
+    let end = start;
+    while (node !== undefined) {
+      // At the walk's first character only a shorter prefix href closes here;
+      // from any later character, every terminal is another href inside this one.
+      if (node.raw !== null && (node.raw !== href || start > 0)) {
+        return true;
+      }
+      end += 1;
+      node = node.children.get(href.charAt(end));
+    }
+  }
+  return false;
+}
+
+/** The href spelled at `at`, or null; independent hrefs allow no other choice. */
+function hrefAt(value: string, at: number, root: TrieNode): string | null {
+  let node = root.children.get(value.charAt(at));
+  let end = at;
+  while (node?.raw === null) {
+    end += 1;
+    node = node.children.get(value.charAt(end));
+  }
+  return node === undefined ? null : node.raw;
+}
+
+/**
+ * One pass that stands in for a `replaceAll` per href: where an href starts,
+ * emit the load scheme in its place. Null when a copy of another href overlaps
+ * one already taken, which only the order of the sequential loop can settle.
+ */
+function substituteImageLoadLinks(value: string, hrefs: readonly string[]): string | null {
+  const root = buildTrie(hrefs);
+  const parts: string[] = [];
+  let copied = 0;
+  let at = 0;
+  let covered = 0;
+  let covering: string | null = null;
+  while (at < value.length) {
+    const match = hrefAt(value, at, root);
+    // `replaceAll` skips a copy overlapping the one it already replaced, but a
+    // copy of another href leaves the outcome to the order of the sequential
+    // loop.
+    if (match !== null && at < covered && match !== covering) {
+      return null;
+    }
+    if (match !== null && at >= covered) {
+      parts.push(value.slice(copied, at), IMAGE_LOAD_SCHEME);
+      covered = at + match.length;
+      copied = covered;
+      covering = match;
+    }
+    // One character at a time: another href may start inside the copy just taken.
+    at += 1;
+  }
+  parts.push(value.slice(copied));
+  return parts.join('');
 }
 
 /**
@@ -152,9 +306,10 @@ export function gateMarkdownImages(
   }
   const edits: { start: number; end: number; text: string }[] = [];
   const unfoundHrefs: string[] = [];
+  const buckets = locateOccurrences(value, [...byRaw.keys()]);
   let probesLeft = MAX_IMAGE_PROBES;
   for (const [raw, { image, count }] of byRaw) {
-    const all = occurrences(value, raw);
+    const all = occurrences(buckets.get(raw) ?? [], raw.length);
     // With no more copies than images every copy is an image. Otherwise, while
     // the budget lasts, tell images from literal text with the lexer: swapping
     // a copy's `!` for a letter turns a real image into a link and changes
@@ -192,7 +347,18 @@ export function gateMarkdownImages(
     }
   }
   rewritten += value.slice(cursor);
-  for (const href of unfoundHrefs) {
+  // One href can go unfound many times; its first appearance decides its place.
+  const hrefs = [...new Set(unfoundHrefs)];
+  if (hrefs.length === 0) {
+    return rewritten;
+  }
+  if (hrefsRewriteIndependently(hrefs)) {
+    const onePass = substituteImageLoadLinks(rewritten, hrefs);
+    if (onePass !== null) {
+      return onePass;
+    }
+  }
+  for (const href of hrefs) {
     rewritten = rewritten.replaceAll(href, IMAGE_LOAD_SCHEME);
   }
   return rewritten;

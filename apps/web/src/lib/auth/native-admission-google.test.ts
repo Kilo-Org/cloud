@@ -278,8 +278,23 @@ describe('verifyPlayIntegrity decode endpoint', () => {
 
     const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
 
-    expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
+    expect(result).toEqual({
+      ok: false,
+      error: 'NONCE_MISMATCH',
+      diagnostics: {
+        appRecognition: 'play_recognized',
+        certificatePresent: true,
+        deviceIntegrity: 'meets_device_integrity',
+      },
+    });
+    // A client-shaped refusal is counted, never reported per event.
     expect(mockCaptureMessage).not.toHaveBeenCalled();
+
+    now.mockReturnValue(6_061_000);
+    countAdmissionCondition('native_admission_missing');
+    const mismatchLines = metricLines('play_integrity_request_hash_mismatch');
+    expect(mismatchLines).toHaveLength(1);
+    expect(mismatchLines[0]).toMatchObject({ count: 1 });
   });
 
   test('counts a verdict that carries no request binding', async () => {
@@ -304,7 +319,15 @@ describe('verifyPlayIntegrity decode endpoint', () => {
 
     const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
 
-    expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
+    expect(result).toEqual({
+      ok: false,
+      error: 'NONCE_MISMATCH',
+      diagnostics: {
+        appRecognition: 'play_recognized',
+        certificatePresent: true,
+        deviceIntegrity: 'meets_device_integrity',
+      },
+    });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
 
     now.mockReturnValue(6_061_000);
@@ -329,6 +352,11 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     await expect(verifyPlayIntegrity('test-integrity-token', 'challenge-value')).resolves.toEqual({
       ok: false,
       error: 'APP_NOT_RECOGNIZED',
+      diagnostics: {
+        appRecognition: 'unevaluated',
+        certificatePresent: false,
+        deviceIntegrity: 'missing',
+      },
     });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
@@ -398,7 +426,15 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     mockFetch.mockResolvedValueOnce(verdictWithDeviceVerdicts([]));
 
     const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
-    expect(result).toEqual({ ok: false, error: 'DEVICE_NOT_RECOGNIZED' });
+    expect(result).toEqual({
+      ok: false,
+      error: 'DEVICE_NOT_RECOGNIZED',
+      diagnostics: {
+        appRecognition: 'play_recognized',
+        certificatePresent: true,
+        deviceIntegrity: 'empty',
+      },
+    });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
 
     now.mockReturnValue(6_061_000);
@@ -406,6 +442,127 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     const lines = metricLines('play_integrity_device_verdict_insufficient');
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({ count: 1 });
+  });
+
+  test('reports a certificate on a signer refusal as present, without the digest', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json({ access_token: 'test-access-token' }));
+    const requestHash = createHash('sha256').update('challenge-value').digest('base64');
+    mockFetch.mockResolvedValueOnce(
+      Response.json({
+        tokenPayloadExternal: {
+          requestDetails: { requestPackageName: 'com.kilocode.kiloapp', requestHash },
+          appIntegrity: {
+            appRecognitionVerdict: 'PLAY_RECOGNIZED',
+            certificateSha256Digest: ['some-other-signer-digest'],
+            packageName: 'com.kilocode.kiloapp',
+          },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
+        },
+      })
+    );
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'CERT_DIGEST_MISMATCH',
+      diagnostics: {
+        appRecognition: 'play_recognized',
+        certificatePresent: true,
+        deviceIntegrity: 'meets_device_integrity',
+      },
+    });
+    // The digest Google returned never leaves the verifier.
+    expect(JSON.stringify(result)).not.toContain('some-other-signer-digest');
+  });
+
+  test('reports an unevaluated app with no certificate that also failed device integrity', async () => {
+    // The observed production shape: Google did not evaluate the app, so it
+    // returned no digest and no device verdict at all.
+    mockFetch.mockResolvedValueOnce(Response.json({ access_token: 'test-access-token' }));
+    const requestHash = createHash('sha256').update('challenge-value').digest('base64');
+    mockFetch.mockResolvedValueOnce(
+      Response.json({
+        tokenPayloadExternal: {
+          requestDetails: { requestPackageName: 'com.kilocode.kiloapp', requestHash },
+          appIntegrity: { appRecognitionVerdict: 'UNEVALUATED' },
+          deviceIntegrity: { deviceRecognitionVerdict: [] },
+        },
+      })
+    );
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'APP_NOT_RECOGNIZED',
+      diagnostics: {
+        appRecognition: 'unevaluated',
+        certificatePresent: false,
+        deviceIntegrity: 'empty',
+      },
+    });
+  });
+
+  test('classifies an unrecognized app version and a below-threshold device label', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json({ access_token: 'test-access-token' }));
+    const requestHash = createHash('sha256').update('challenge-value').digest('base64');
+    mockFetch.mockResolvedValueOnce(
+      Response.json({
+        tokenPayloadExternal: {
+          requestDetails: { requestPackageName: 'com.kilocode.kiloapp', requestHash },
+          appIntegrity: {
+            appRecognitionVerdict: 'UNRECOGNIZED_VERSION',
+            certificateSha256Digest: ['test-cert-digest'],
+            packageName: 'com.kilocode.kiloapp',
+          },
+          deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_VIRTUAL_INTEGRITY'] },
+        },
+      })
+    );
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'APP_NOT_RECOGNIZED',
+      diagnostics: {
+        appRecognition: 'unrecognized_version',
+        certificatePresent: true,
+        deviceIntegrity: 'other_integrity_label',
+      },
+    });
+  });
+
+  test('marks an unknown device label as outside the known buckets', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json({ access_token: 'test-access-token' }));
+    const requestHash = createHash('sha256').update('challenge-value').digest('base64');
+    mockFetch.mockResolvedValueOnce(
+      Response.json({
+        tokenPayloadExternal: {
+          requestDetails: { requestPackageName: 'com.kilocode.kiloapp', requestHash },
+          appIntegrity: {
+            appRecognitionVerdict: 'PLAY_RECOGNIZED',
+            certificateSha256Digest: ['test-cert-digest'],
+            packageName: 'com.kilocode.kiloapp',
+          },
+          deviceIntegrity: { deviceRecognitionVerdict: ['SOME_FUTURE_LABEL'] },
+        },
+      })
+    );
+
+    const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'DEVICE_NOT_RECOGNIZED',
+      diagnostics: {
+        appRecognition: 'play_recognized',
+        certificatePresent: true,
+        deviceIntegrity: 'no_known_label',
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('SOME_FUTURE_LABEL');
   });
 });
 

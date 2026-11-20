@@ -52,6 +52,70 @@ export type PlayIntegrityError =
   | 'PACKAGE_MISMATCH'
   | 'CERT_DIGEST_MISMATCH';
 
+/**
+ * Allowlisted classifications of Google's verdict for telemetry. Every value is
+ * one this module names itself: the raw verdict strings and the certificate
+ * digests Google returned never leave it, so a log record built from these can
+ * only say which fixed bucket a proof landed in.
+ */
+export type PlayIntegrityAppRecognition =
+  | 'play_recognized'
+  | 'unrecognized_version'
+  | 'unevaluated'
+  | 'unknown'
+  | 'missing';
+
+export type PlayIntegrityDeviceIntegrity =
+  | 'meets_device_integrity'
+  | 'other_integrity_label'
+  | 'no_known_label'
+  | 'empty'
+  | 'missing';
+
+export type PlayIntegrityDiagnostics = {
+  appRecognition: PlayIntegrityAppRecognition;
+  certificatePresent: boolean;
+  deviceIntegrity: PlayIntegrityDeviceIntegrity;
+};
+
+/** Google's `appRecognitionVerdict` values this module distinguishes by name. */
+const PLAY_RECOGNIZED = 'PLAY_RECOGNIZED';
+const UNRECOGNIZED_VERSION = 'UNRECOGNIZED_VERSION';
+const UNEVALUATED = 'UNEVALUATED';
+
+/** Integrity labels Google may put in `deviceRecognitionVerdict`. */
+const KNOWN_INTEGRITY_LABELS = [
+  REQUIRED_INTEGRITY_LABEL,
+  'MEETS_BASIC_INTEGRITY',
+  'MEETS_STRONG_INTEGRITY',
+  'MEETS_VIRTUAL_INTEGRITY',
+] as const;
+
+function classifyAppRecognition(verdict: string | undefined): PlayIntegrityAppRecognition {
+  switch (verdict) {
+    case PLAY_RECOGNIZED:
+      return 'play_recognized';
+    case UNRECOGNIZED_VERSION:
+      return 'unrecognized_version';
+    case UNEVALUATED:
+      return 'unevaluated';
+    case undefined:
+      return 'missing';
+    default:
+      return 'unknown';
+  }
+}
+
+function classifyDeviceIntegrity(verdicts: string[] | undefined): PlayIntegrityDeviceIntegrity {
+  if (!Array.isArray(verdicts)) return 'missing';
+  if (verdicts.length === 0) return 'empty';
+  if (verdicts.includes(REQUIRED_INTEGRITY_LABEL)) return 'meets_device_integrity';
+  if (verdicts.some(verdict => KNOWN_INTEGRITY_LABELS.some(label => label === verdict))) {
+    return 'other_integrity_label';
+  }
+  return 'no_known_label';
+}
+
 /** Obtain a GCP access token from a service-account key via JWT bearer assertion. */
 async function requestAccessToken(
   clientEmail: string,
@@ -198,10 +262,24 @@ function parseCertDigestAllowlist(): string[] {
  * Throws on infrastructure faults (network errors, auth failures) so the
  * admission layer can surface them as 5xx.
  */
+export type PlayIntegrityResult =
+  | { ok: true; packageName: string }
+  | { ok: false; error: PlayIntegrityError; diagnostics: PlayIntegrityDiagnostics };
+
+/**
+ * The classification of a verdict that was never parsed, so a refusal before the
+ * payload exists still reports a complete, log-safe shape.
+ */
+const UNPARSED_VERDICT_DIAGNOSTICS: PlayIntegrityDiagnostics = {
+  appRecognition: 'missing',
+  certificatePresent: false,
+  deviceIntegrity: 'missing',
+};
+
 export async function verifyPlayIntegrity(
   integrityToken: string,
   challenge: string
-): Promise<{ ok: true; packageName: string } | { ok: false; error: PlayIntegrityError }> {
+): Promise<PlayIntegrityResult> {
   const config = getPlayIntegrityConfig();
 
   if (!config) {
@@ -286,8 +364,20 @@ export async function verifyPlayIntegrity(
   const payload = result.tokenPayloadExternal;
   if (!payload) {
     countAdmissionCondition('play_integrity_invalid_token');
-    return { ok: false, error: 'INVALID_TOKEN' };
+    return { ok: false, error: 'INVALID_TOKEN', diagnostics: UNPARSED_VERDICT_DIAGNOSTICS };
   }
+
+  // The classification every refusal below reports. Built once from the parsed
+  // verdict, so the record says which fixed bucket the proof landed in and
+  // never carries Google's raw strings or the digest itself.
+  const certDigests = payload.appIntegrity?.certificateSha256Digest ?? [];
+  const diagnostics: PlayIntegrityDiagnostics = {
+    appRecognition: classifyAppRecognition(payload.appIntegrity?.appRecognitionVerdict),
+    certificatePresent: certDigests.length > 0,
+    deviceIntegrity: classifyDeviceIntegrity(payload.deviceIntegrity?.deviceRecognitionVerdict),
+  };
+
+  // ── Challenge binding ───────────────────────────────────────────────────
   // Standard requests bind through `requestHash`, returned verbatim; classic
   // requests use `nonce`. The client sends standard requests, so read
   // `requestHash` and fall back to `nonce` only so a device still running a
@@ -296,13 +386,13 @@ export async function verifyPlayIntegrity(
   const binding = payload.requestDetails?.requestHash ?? payload.requestDetails?.nonce;
   if (!binding) {
     countAdmissionCondition('play_integrity_missing_request_hash');
-    return { ok: false, error: 'NONCE_MISMATCH' };
+    return { ok: false, error: 'NONCE_MISMATCH', diagnostics };
   }
 
   const expectedBinding = createHash('sha256').update(challenge, 'utf8').digest('base64');
   if (binding !== expectedBinding) {
     countAdmissionCondition('play_integrity_request_hash_mismatch');
-    return { ok: false, error: 'NONCE_MISMATCH' };
+    return { ok: false, error: 'NONCE_MISMATCH', diagnostics };
   }
 
   // ── Package identity ────────────────────────────────────────────────────
@@ -310,24 +400,23 @@ export async function verifyPlayIntegrity(
     payload.requestDetails?.requestPackageName ?? payload.appIntegrity?.packageName;
   if (!actualPackageName || actualPackageName !== config.expectedPackageName) {
     countAdmissionCondition('play_integrity_package_mismatch');
-    return { ok: false, error: 'PACKAGE_MISMATCH' };
+    return { ok: false, error: 'PACKAGE_MISMATCH', diagnostics };
   }
 
   // ── App recognition ─────────────────────────────────────────────────────
   const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
-  if (appVerdict !== 'PLAY_RECOGNIZED') {
+  if (appVerdict !== PLAY_RECOGNIZED) {
     countAdmissionCondition('play_integrity_app_unrecognized');
-    return { ok: false, error: 'APP_NOT_RECOGNIZED' };
+    return { ok: false, error: 'APP_NOT_RECOGNIZED', diagnostics };
   }
 
   // ── Signing certificate digest ──────────────────────────────────────────
-  const certDigests = payload.appIntegrity?.certificateSha256Digest ?? [];
   const hasMatch = config.expectedCertDigests.some(expected =>
     certDigests.some(actual => actual.toLowerCase() === expected.toLowerCase())
   );
   if (!hasMatch) {
     countAdmissionCondition('play_integrity_cert_digest_mismatch');
-    return { ok: false, error: 'CERT_DIGEST_MISMATCH' };
+    return { ok: false, error: 'CERT_DIGEST_MISMATCH', diagnostics };
   }
 
   // ── Device integrity: must contain MEETS_DEVICE_INTEGRITY in the array ──
@@ -336,12 +425,12 @@ export async function verifyPlayIntegrity(
     // Same refusal reason as an array without the required label: the verdict
     // did not establish device integrity, so both count on one metric.
     countAdmissionCondition('play_integrity_device_verdict_insufficient');
-    return { ok: false, error: 'DEVICE_NOT_RECOGNIZED' };
+    return { ok: false, error: 'DEVICE_NOT_RECOGNIZED', diagnostics };
   }
 
   if (!deviceVerdicts.includes(REQUIRED_INTEGRITY_LABEL)) {
     countAdmissionCondition('play_integrity_device_verdict_insufficient');
-    return { ok: false, error: 'DEVICE_NOT_RECOGNIZED' };
+    return { ok: false, error: 'DEVICE_NOT_RECOGNIZED', diagnostics };
   }
 
   return { ok: true, packageName: actualPackageName };

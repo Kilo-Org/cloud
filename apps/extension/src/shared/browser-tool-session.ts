@@ -2844,16 +2844,28 @@ export const createBrowserToolSession = ({
     let grace: ReturnType<typeof setTimeout> | undefined = undefined;
     const listener = (
       updatedTabId: number,
-      changeInfo: { readonly status?: string; readonly url?: string }
+      changeInfo: {
+        readonly pendingUrl?: string;
+        readonly status?: string;
+        readonly url?: string;
+      }
     ): void => {
       if (updatedTabId !== tabId) {
         return;
       }
 
-      // The browser reported on this tab: the action did something, so its load is awaited up to the full timeout instead of the quiet grace.
-      reported = true;
-      clearTimeout(grace);
       loading ||= changeInfo.status === 'loading';
+
+      // A load start, a pending url or a url change is the navigation this call started. A bare `complete` (a document the tab was already loading) and other tab state (a title, a favicon) belong to no navigation here.
+      const navigated =
+        changeInfo.status === 'loading' ||
+        changeInfo.pendingUrl !== undefined ||
+        changeInfo.url !== undefined;
+
+      if (navigated) {
+        reported = true;
+        clearTimeout(grace);
+      }
 
       if (loading && changeInfo.status === 'complete') {
         loaded.resolve();
@@ -2863,7 +2875,7 @@ export const createBrowserToolSession = ({
       // Only a fragment change on the document the tab already showed is a same-document navigation; any other url is a document still committing.
       if (
         !loading &&
-        changeInfo.status === undefined &&
+        navigated &&
         changeInfo.url !== undefined &&
         before !== undefined &&
         before.split('#')[0] === changeInfo.url.split('#')[0]

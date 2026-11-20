@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, AppState, Platform } from 'react-native';
@@ -9,7 +9,7 @@ import { AgentsViewSegment } from '@/components/todos/agents-view-segment';
 import { TodoListsScreen } from '@/components/todos/todo-lists-screen';
 import { runPendingWidgetActions } from '@/glanceable-ios/widget-actions';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
-import { type AgentsView, agentsViewParam, parseAgentsViewParam } from '@/lib/agents-view';
+import { type AgentsView, parseAgentsViewParam } from '@/lib/agents-view';
 import {
   getGitHubInstallReturnOutcome,
   type GitHubInstallReturnOutcome,
@@ -141,18 +141,29 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
 
 export default function AgentSessionList() {
   const router = useRouter();
-  // The selected view is the route parameter, not local state: a link that
-  // names one (`…/(2_agents)?view=todos`) opens that surface, and a press on
-  // the segment writes the same parameter, so a relaunch, a Back and a share
-  // all land on the view the URL names.
+  // A link names the view it wants (`…/(2_agents)?view=todos`), and that name is
+  // a payload for one arrival, not tab state: the screen reads it into the view
+  // it shows and clears it, and the segment a person presses only changes that
+  // view. It must not stay on the route: Expo Router merges a bare string href
+  // into the target's existing params, so a `view` left behind would follow
+  // every later navigation to this tab and show To-dos to a destination that
+  // promised the sessions list — the reason `AGENTS_SESSIONS_INDEX_HREF` clears
+  // `status` on the way in.
   const params = useLocalSearchParams<{ view?: string | string[] }>();
-  const view = parseAgentsViewParam(params.view);
-  const setView = useCallback(
-    (next: AgentsView) => {
-      router.setParams({ view: agentsViewParam(next) });
-    },
-    [router]
-  );
+  const [view, setView] = useState<AgentsView>(() => parseAgentsViewParam(params.view));
+  const linkedView = params.view === undefined ? null : parseAgentsViewParam(params.view);
+  useEffect(() => {
+    if (linkedView === null) {
+      return;
+    }
+    // A second link while the tab is mounted is a new answer rather than the
+    // one the first link gave.
+    setView(linkedView);
+    // `setParams` clears the marker through the navigation container, which is
+    // not guaranteed to reach this screen's params; the latch above keeps an
+    // uncleared marker from reading as a new arrival on every render.
+    router.setParams({ view: undefined });
+  }, [linkedView, router]);
   const consumeReturnOutcome = useCallback(() => {
     const result = getGitHubInstallReturnOutcome();
     const alert = buildGitHubInstallOutcomeAlert(result, () => {

@@ -163,7 +163,7 @@ T2-G17c	T2	signed-in	base	android,ios	long-content	-	kiloapp:///dev/instance-pic
 T2-G18	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/voice-language-picker	screen	(app)/voice-language-picker
 T2-G18	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///(app)/share-gate?shareId=not-a-seeded-share	not-found	(app)/share-gate
 T2-G18	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///(app)/todos/item/not-a-seeded-item	not-found	(app)/todos/item/[item-id]
-T2-G18	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///(app)/context-picker	screen	(app)/context-picker
+T2-G18	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///dev/context-picker-fixture	screen	(app)/context-picker
 T2-auth01a	T2	signed-out	base	android,ios	happy	-	kiloapp:///(auth)/transcript-style-fixture	screen	(auth)/transcript-style-fixture
 T2-auth01a	T2	signed-out	base	android,ios	non-retryable-error	-	kiloapp:///(auth)/part-detail-transition-fixture?open=missing&state=running	screen	(auth)/part-detail-transition-fixture
 T2-auth01a	T2	signed-out	base	android,ios	happy	-	kiloapp:///(auth)/question-card-fixture	screen	(auth)/question-card-fixture

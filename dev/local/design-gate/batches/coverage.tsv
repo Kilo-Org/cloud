@@ -191,8 +191,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (app)/consent-details.tsx	(app)/consent-details	route	ios	none	n/a	T1-G04b kiloapp:///(app)/consent-details?mode=review	none	n/a	n/a	none	B:T1-G04b
 (app)/consent.tsx	(app)/consent	route	android	none	n/a	T2-G04b kiloapp:///(app)/consent?mode=review	none	n/a	n/a	none	n/a
 (app)/consent.tsx	(app)/consent	route	ios	none	n/a	T2-G04b kiloapp:///(app)/consent?mode=review	none	n/a	n/a	none	n/a
-(app)/context-picker.tsx	(app)/context-picker	route	android	n/a	n/a: bridge rows	B:T2-G18	n/a	T2-G18 kiloapp:///(app)/context-picker	n/a	n/a	B:T2-G18
-(app)/context-picker.tsx	(app)/context-picker	route	ios	n/a	n/a: bridge rows	B:T2-G18	n/a	T2-G18 kiloapp:///(app)/context-picker	n/a	n/a	B:T2-G18
+(app)/context-picker.tsx	(app)/context-picker	route	android	n/a	n/a: bridge rows	B:T2-G18	n/a	T2-G18 kiloapp:///dev/context-picker-fixture	n/a	n/a	B:T2-G18
+(app)/context-picker.tsx	(app)/context-picker	route	ios	n/a	n/a: bridge rows	B:T2-G18	n/a	T2-G18 kiloapp:///dev/context-picker-fixture	n/a	n/a	B:T2-G18
 (app)/credits-pack-prices-fixture.tsx	(app)/credits-pack-prices-fixture	dev-fixture	android	n/a	n/a	T2-G17b kiloapp:///dev/credits-pack-prices-fixture/priced ; T2-G17b kiloapp:///dev/credits-pack-prices-fixture/unresolved ; note: ?state=priced	T2-G17c kiloapp:///dev/credits-pack-prices-fixture/failed ; note: ?state=failed	note: ?state=refused-unresolved	n/a	n/a	n/a
 (app)/credits-pack-prices-fixture.tsx	(app)/credits-pack-prices-fixture	dev-fixture	ios	n/a	n/a	T2-G17b kiloapp:///dev/credits-pack-prices-fixture/priced ; T2-G17b kiloapp:///dev/credits-pack-prices-fixture/unresolved ; note: ?state=priced	T2-G17c kiloapp:///dev/credits-pack-prices-fixture/failed ; note: ?state=failed	note: ?state=refused-unresolved	n/a	n/a	n/a
 (app)/credits.tsx	(app)/credits	route	android	none	n/a: pack rows	T1-G04b kiloapp:///(app)/credits	F:dev/credits-pack-prices-fixture/failed	F:dev/credits-pack-prices-fixture/refused-unresolved	n/a	none	n/a

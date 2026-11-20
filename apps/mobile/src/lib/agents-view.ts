@@ -2,9 +2,10 @@
  * The Agents tab's two views and the one route parameter that names them.
  *
  * The view is addressable: `…/(2_agents)?view=todos` opens the To-dos list,
- * which is how a link reaches that surface, and a press on the segment writes
- * the same parameter, so one value names the selected view whether a link or a
- * person chose it.
+ * which is how a link (and the forced-state tool) reaches that surface. The
+ * parameter is a payload for one arrival — the tab reads it, shows that view,
+ * and clears it — so a link can pick the view without that choice following
+ * every later navigation to the tab.
  *
  * Kept apart from `components/todos/agents-view-segment.tsx` because that file
  * renders `react-native` and this rule is pure, so the node test project can
@@ -13,19 +14,15 @@
 export type AgentsView = 'sessions' | 'todos';
 
 /**
- * Read the `view` route parameter as the selected segment. An absent, empty,
- * repeated or unknown value is the Sessions list: that is the tab's own first
- * view, and a link that names nothing else must not present To-dos.
+ * Read the `view` route parameter as the view a link names.
+ *
+ * Only `todos` selects the To-dos list: to-dos is the surface a link asks for
+ * by name, while sessions is the tab's own first view, so an absent or empty
+ * value keeps it. A repeated value reads its first entry, as `parseStatusFilterKind`
+ * does for the sessions list's own status filter, and an unknown value falls
+ * back to sessions rather than guessing.
  */
 export function parseAgentsViewParam(value: string | string[] | undefined): AgentsView {
   const raw = Array.isArray(value) ? value[0] : value;
   return raw === 'todos' ? 'todos' : 'sessions';
-}
-
-/**
- * The parameter value that names a view. Sessions is the tab's default, so it
- * is written as an absent value instead of a redundant name.
- */
-export function agentsViewParam(view: AgentsView): string | undefined {
-  return view === 'todos' ? 'todos' : undefined;
 }

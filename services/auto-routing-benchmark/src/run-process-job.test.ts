@@ -110,7 +110,7 @@ vi.mock('./db', async importOriginal => {
     markProfilesReadyForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
-    getRunningRun: vi.fn(),
+    getQueueRunOccupancy: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
   };
@@ -149,7 +149,7 @@ import {
   getRunWithModels,
   getLiveContainerLanes,
   listPendingCurrentProfiles,
-  getRunningRun,
+  getQueueRunOccupancy,
   syncPlatformRegistryRows,
   getLatestRoutingTable,
   countCurrentProfilesByStatus,
@@ -386,7 +386,7 @@ beforeEach(() => {
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
   vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
-  vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getQueueRunOccupancy).mockResolvedValue({ activeRuns: 0, startingRunId: null });
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   tokenGet.mockResolvedValue('internal-secret');
   queueSendBatch.mockResolvedValue(undefined);

@@ -125,7 +125,11 @@ export const benchmarkRuns = sqliteTable(
     measurement_revision: integer('measurement_revision').notNull().default(2),
   },
   table => [
-    uniqueIndex('UQ_benchmark_runs_one_running_per_router_kind_purpose')
+    // Decider queues run several runs at once; a classifier run derives one winner.
+    uniqueIndex('UQ_benchmark_runs_one_running_classifier_per_router_purpose')
+      .on(table.router, table.purpose)
+      .where(sql`${table.status} = 'running' AND ${table.kind} = 'classifier'`),
+    index('IX_benchmark_runs_running')
       .on(table.router, table.kind, table.purpose)
       .where(sql`${table.status} = 'running'`),
   ]

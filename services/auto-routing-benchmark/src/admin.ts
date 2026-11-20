@@ -70,10 +70,10 @@ import {
 import {
   countCurrentProfilesByStatus,
   listCurrentFailedProfiles,
-  existsRunningRun,
   listCurrentPlatformProfileStatuses,
   getClassifierWinner,
   getRunSummariesForRouter,
+  listRunningRunIds,
   listRuns,
   requeueRetryableCurrentProfiles,
 } from './db';
@@ -441,13 +441,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     const purpose = BenchmarkRunPurposeSchema.safeParse(c.req.query('purpose'));
     const listRouter =
       kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c);
-    const [runs, hasRunningRun] = await Promise.all([
+    const [runs, runningRunIds] = await Promise.all([
       listRuns(c.env.BENCH_DB, limit, {
         kind: kind.success ? kind.data : undefined,
         purpose: purpose.success ? purpose.data : undefined,
         router: listRouter,
       }),
-      existsRunningRun(c.env.BENCH_DB, requestRouter(c)),
+      listRunningRunIds(c.env.BENCH_DB, requestRouter(c)),
     ]);
     // Progress is display-only: a failed count query must not hide the run list.
     const progressByRunId = await loadRunProgress(
@@ -464,7 +464,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         const progress = progressByRunId.get(run.id);
         return withLegacyAdminRunFields(progress ? { ...run, progress } : run);
       }),
-      hasRunningRun,
+      runningRunIds,
     } satisfies BenchmarkRunsResponse);
   });
 

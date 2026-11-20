@@ -25,7 +25,7 @@ import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { PROBE_CASES } from './datasets/probe-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { computeEngineIdentity, publishPlatformRoutingTable, RunAlreadyActiveError } from './run';
+import { computeEngineIdentity, publishPlatformRoutingTable } from './run';
 import {
   ACTIVE_MEASUREMENT_REVISION,
   deciderCasesForRouter,
@@ -117,7 +117,7 @@ vi.mock('./db', async importOriginal => {
     getConfigRows: vi.fn(),
     replaceConfig: vi.fn(),
     listRuns: vi.fn(),
-    existsRunningRun: vi.fn(),
+    listRunningRunIds: vi.fn(),
     listRunProgressCounts: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     getClassifierWinner: vi.fn(),
@@ -144,6 +144,7 @@ vi.mock('./db', async importOriginal => {
     markProfilesFailedForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
+    getQueueRunOccupancy: vi.fn(),
     getRunningRun: vi.fn(),
     getLiveContainerLanes: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
@@ -165,10 +166,12 @@ import {
   getClassifierWinner,
   getLatestRoutingTable,
   getLatestSummariesByModel,
+  getQueueRunOccupancy,
   getRunningRun,
   getLiveContainerLanes,
   existsNewerCompletedRun,
   insertRun,
+  MAX_RUNNING_RUNS_PER_QUEUE,
   getRunWithModels,
   listPendingCurrentProfiles,
   markProfilesFailedForRun,
@@ -180,7 +183,7 @@ import {
   listCurrentPlatformProfileStatuses,
   countCurrentProfilesByStatus,
   listRuns,
-  existsRunningRun,
+  listRunningRunIds,
   listRunProgressCounts,
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
@@ -302,7 +305,7 @@ beforeEach(() => {
       id INTEGER PRIMARY KEY, slots INTEGER, model_concurrency INTEGER,
       updated_at TEXT, updated_by TEXT
     );
-    CREATE TABLE benchmark_runs (id TEXT, kind TEXT, status TEXT);
+    CREATE TABLE benchmark_runs (id TEXT, kind TEXT, status TEXT, started_at TEXT);
     CREATE TABLE scheduler_runs (run_id TEXT);
     CREATE TABLE scheduler_chunks (run_id TEXT, model TEXT, variant TEXT, rep INTEGER, status TEXT);
     CREATE TABLE run_lane_failures (run_id TEXT, model TEXT, variant TEXT, rep INTEGER);
@@ -351,12 +354,12 @@ beforeEach(() => {
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
-  vi.mocked(existsRunningRun).mockResolvedValue(false);
+  vi.mocked(listRunningRunIds).mockResolvedValue([]);
   vi.mocked(listRunProgressCounts).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
-  vi.mocked(insertRun).mockResolvedValue(undefined);
+  vi.mocked(insertRun).mockResolvedValue({ admitted: true });
   vi.mocked(getRunWithModels)
     .mockReset()
     .mockImplementation(async (_db, id) => {
@@ -393,6 +396,7 @@ beforeEach(() => {
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(getQueueRunOccupancy).mockResolvedValue({ activeRuns: 0, startingRunId: null });
   vi.mocked(getLiveContainerLanes).mockResolvedValue(0);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(registerProfiles).mockReset();
@@ -804,12 +808,10 @@ describe('PUT /admin/config', () => {
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
-    vi.mocked(getRunningRun).mockResolvedValue({
-      id: 'run-active',
-      kind: 'decider',
-      purpose: 'platform',
-      router: 'efficient',
-    } as never);
+    vi.mocked(getQueueRunOccupancy).mockResolvedValue({
+      activeRuns: 1,
+      startingRunId: 'run-active',
+    });
 
     const res = await authedPut('/admin/config', TEST_CONFIG);
 
@@ -827,8 +829,11 @@ describe('PUT /admin/config', () => {
       { model: 'platform/a', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
     // The pre-check saw a free slot; another drain inserted its run before this
-    // one's insert, so `startRun` reports the slot as taken.
-    vi.mocked(insertRun).mockRejectedValueOnce(new RunAlreadyActiveError('decider', 'run-winner'));
+    // one's insert, so the admission statement refuses this run.
+    vi.mocked(insertRun).mockResolvedValueOnce({
+      admitted: false,
+      occupancy: { activeRuns: 1, startingRunId: 'run-winner' },
+    });
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -885,7 +890,7 @@ describe('PUT /admin/config', () => {
     // The next drain still starts it. `POST /admin/runs` calls the same
     // `drainQueues` the per-minute cron does; this mock D1 has no
     // `pending_decider_outputs`, so the cron's own recovery sweep cannot run here.
-    vi.mocked(insertRun).mockResolvedValue(undefined);
+    vi.mocked(insertRun).mockResolvedValue({ admitted: true });
     const next = await authedPost('/admin/runs', { kind: 'decider', queue: 'platform' });
 
     expect(next.status).toBe(202);
@@ -1049,7 +1054,7 @@ describe('GET /admin/runs', () => {
   it('returns an empty runs array when the table is empty', async () => {
     const res = await authedGet('/admin/runs');
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ runs: [], hasRunningRun: false });
+    await expect(res.json()).resolves.toEqual({ runs: [], runningRunIds: [] });
   });
 
   it('lists runs without writing, leaving the stale-run sweep to the cron', async () => {
@@ -1215,7 +1220,7 @@ describe('run list and per-run summaries against D1', () => {
   beforeEach(async () => {
     const actual = await vi.importActual<typeof DbModule>('./db');
     vi.mocked(listRuns).mockImplementation(actual.listRuns);
-    vi.mocked(existsRunningRun).mockImplementation(actual.existsRunningRun);
+    vi.mocked(listRunningRunIds).mockImplementation(actual.listRunningRunIds);
     sqlite.close();
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
@@ -1253,21 +1258,28 @@ describe('run list and per-run summaries against D1', () => {
     const res = await authedGet('/admin/runs');
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { runs: Record<string, unknown>[]; hasRunningRun: boolean };
+    const body = (await res.json()) as { runs: Record<string, unknown>[]; runningRunIds: string[] };
     expect(body.runs.map(run => run.id)).toEqual(['decider-efficient', 'classifier-shared']);
     // Empty for the previous web release; the summaries route serves the rows.
     for (const run of body.runs) expect(run.summaries).toEqual([]);
     // Only the frontier router has a running run.
-    expect(body.hasRunningRun).toBe(false);
+    expect(body.runningRunIds).toEqual([]);
   });
 
-  it('reports a running run of the router even when the filter hides it', async () => {
+  it('reports every running run of the router even when the filter hides them', async () => {
+    seedRun({
+      id: 'decider-frontier-user',
+      router: 'frontier',
+      kind: 'decider',
+      status: 'running',
+      startedAt: '2026-06-04T00:00:00.000Z',
+    });
     const res = await authedGet('/admin/runs?router=frontier&kind=classifier');
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { runs: { id: string }[]; hasRunningRun: boolean };
+    const body = (await res.json()) as { runs: { id: string }[]; runningRunIds: string[] };
     expect(body.runs.map(run => run.id)).toEqual(['classifier-shared']);
-    expect(body.hasRunningRun).toBe(true);
+    expect(body.runningRunIds).toEqual(['decider-frontier', 'decider-frontier-user']);
   });
 
   it('returns one run’s summaries', async () => {
@@ -1321,7 +1333,7 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('returns 409 when a run of the same kind is already in progress', async () => {
+  it('returns 409 when a classifier run is already in progress', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     vi.mocked(getRunningRun).mockResolvedValue({
       id: 'classifier-2026-06-15T00-00-00-000Z',
@@ -1463,6 +1475,27 @@ describe('POST /admin/runs', () => {
     });
     expect(scheduleRunChunks).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('answers a full user queue with no started run instead of a conflict', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(getQueueRunOccupancy).mockResolvedValue({
+      activeRuns: MAX_RUNNING_RUNS_PER_QUEUE,
+      startingRunId: null,
+    });
+    vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
+      { model: 'owner/a', variant: 'high', requested_at: '2026-06-01T00:00:00.000Z' },
+    ]);
+
+    const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'user' });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      runId: null,
+      startedRuns: [],
+      drainErrors: [],
+    });
+    expect(insertRun).not.toHaveBeenCalled();
   });
 
   it('starts a drained pair on the active revision cases', async () => {

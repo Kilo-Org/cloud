@@ -327,8 +327,23 @@ async function fetchBenchmarkRunSummaries(runId: string, router: AutoRouter) {
 
 const RUNS_POLL_INTERVAL_MS = 30_000;
 
-function responseHasRunningRun(response: BenchmarkRunsResponse): boolean {
-  return response.hasRunningRun ?? response.runs.some(run => run.status === 'running');
+export function responseRunningRunIds(response: BenchmarkRunsResponse): readonly string[] {
+  return (
+    response.runningRunIds ??
+    response.runs.filter(run => run.status === 'running').map(run => run.id)
+  );
+}
+
+/**
+ * Whether a run that was running has since left the running set. Each such run
+ * may have published a routing table or changed the registry, even while other
+ * runs keep going.
+ */
+export function runLeftRunningSet(
+  previous: readonly string[],
+  current: readonly string[]
+): boolean {
+  return previous.some(runId => !current.includes(runId));
 }
 
 async function startBenchmarkRun({
@@ -1595,7 +1610,9 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryKey: ['auto-routing', 'benchmark-runs', router, runFilter],
     queryFn: () => fetchBenchmarkRuns(runFilter, router),
     refetchInterval: query =>
-      query.state.data && responseHasRunningRun(query.state.data) ? RUNS_POLL_INTERVAL_MS : false,
+      query.state.data && responseRunningRunIds(query.state.data).length > 0
+        ? RUNS_POLL_INTERVAL_MS
+        : false,
   });
 
   const registryQuery = useQuery({
@@ -1610,18 +1627,22 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
 
   // Undefined while a newly selected filter loads, so switching filters is not
   // mistaken for a run finishing.
-  const runActivity = runsQuery.data ? responseHasRunningRun(runsQuery.data) : undefined;
-  const hasRunningRun = runActivity ?? false;
+  const runsData = runsQuery.data;
+  const runningRunIds = useMemo(
+    () => (runsData ? responseRunningRunIds(runsData) : undefined),
+    [runsData]
+  );
+  const hasRunningRun = (runningRunIds?.length ?? 0) > 0;
 
-  // When the last running run finishes, its completion publishes a routing
-  // table / classifier winner. Those live in their own query caches, so
-  // invalidate them on the running→terminal edge — otherwise the published
-  // routing table keeps showing stale data (or "No routing table published
-  // yet") until a focus refetch or manual reload.
-  const prevHasRunningRun = useRef(runActivity);
+  // A run that finishes publishes a routing table / classifier winner and
+  // settles registry rows. Those live in their own query caches, so invalidate
+  // them whenever a run leaves the running set — otherwise the published
+  // routing table keeps showing stale data while other runs are still going.
+  const prevRunning = useRef<{ router: AutoRouter; runIds: readonly string[] }>(undefined);
   useEffect(() => {
-    if (runActivity === undefined) return;
-    if (prevHasRunningRun.current && !runActivity) {
+    if (runningRunIds === undefined) return;
+    const previous = prevRunning.current;
+    if (previous?.router === router && runLeftRunningSet(previous.runIds, runningRunIds)) {
       void queryClient.invalidateQueries({
         queryKey: ['auto-routing', 'benchmark-routing-table', router],
       });
@@ -1632,8 +1653,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
         queryKey: ['auto-routing', 'benchmark-registry', router],
       });
     }
-    prevHasRunningRun.current = runActivity;
-  }, [runActivity, queryClient, router]);
+    prevRunning.current = { router, runIds: runningRunIds };
+  }, [runningRunIds, queryClient, router]);
 
   const startRunMutation = useMutation({
     mutationFn: (input: { kind: BenchmarkKind; force: boolean; queue: BenchmarkQueueSelector }) =>
@@ -1646,7 +1667,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
             : `Classifier benchmark started — ${data.enqueuedModels} models enqueued, ${data.skippedModels.length} skipped`
         );
       } else if (data.startedRuns.length === 0) {
-        // Honest empty result: nothing pending, or the queue's slot is busy.
+        // Honest empty result: nothing pending, or the queue is starting a run or full.
         toast.success('Nothing to run — no pending registry entries for that queue');
       } else {
         toast.success(
@@ -1817,7 +1838,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Queues also drain on a timer. A queue whose run is already active is skipped.
+              Queues also drain on a timer. A queue starts one run at a time and holds up to 4
+              active runs.
             </p>
           </CardContent>
         </Card>

@@ -7,7 +7,7 @@ import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { kilocode_users, openai_chatgpt_connections, type User } from '@kilocode/db/schema';
 import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { openAiChatGptConnectorGone } from './connector';
@@ -420,6 +420,32 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
         })
       ).resolves.not.toBeNull();
     });
+  });
+
+  it('still clears a recorded limit when the replica pre-check fails', async () => {
+    const person = await insertTestUser({
+      google_user_email: `usage-limit-replica-down-${randomUUID()}@example.com`,
+    });
+    const personalOwner: OpenAiChatGptOwner = { kiloUserId: person.id, organizationId: null };
+    await saveOpenAiChatGptConnection(
+      personalOwner,
+      connection('replica-down@example.com'),
+      person.id
+    );
+    await recordOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN, {
+      code: null,
+      resetsAt: null,
+    });
+
+    const select = jest.spyOn(readDb, 'select').mockImplementation(() => {
+      throw new Error('replica unavailable');
+    });
+    try {
+      await clearOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN);
+    } finally {
+      select.mockRestore();
+    }
+    await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
   });
 
   it('deletes the shared row and leaves the member row in place', async () => {

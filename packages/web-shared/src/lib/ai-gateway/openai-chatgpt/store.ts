@@ -440,12 +440,17 @@ export async function clearOpenAiChatGptUsageLimit(
   owner: OpenAiChatGptOwner,
   accessToken: string
 ): Promise<void> {
-  const recorded = await readDb
-    .select({ usage_limit_reached_at: openai_chatgpt_connections.usage_limit_reached_at })
-    .from(openai_chatgpt_connections)
-    .where(openAiChatGptOwnerWhere(owner))
-    .limit(1);
-  if (!recorded[0]?.usage_limit_reached_at) return;
+  try {
+    const recorded = await readDb
+      .select({ usage_limit_reached_at: openai_chatgpt_connections.usage_limit_reached_at })
+      .from(openai_chatgpt_connections)
+      .where(openAiChatGptOwnerWhere(owner))
+      .limit(1);
+    if (!recorded[0]?.usage_limit_reached_at) return;
+  } catch {
+    // An unavailable replica must not disable clearing: the locked path below
+    // re-checks on the primary, exactly as before the pre-check existed.
+  }
 
   await withConnectionHoldingToken(
     owner,

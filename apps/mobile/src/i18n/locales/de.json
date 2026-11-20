@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
+      "managedOnWebTitle": "Im Web verwaltet",
+      "managedOnWebShort": "Diese Verbindung wird im Web über einen Computer verwaltet.",
+      "managedOnWebRepositories": "Wähle die Repositories für {{organization}} im Web über einen Computer aus.",
       "description": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "descriptionReconnect": "Erstelle ein neues Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "descriptionOverview": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es auf dem nächsten Bildschirm ein.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "Aktivität",
       "checking": "Wird geprüft …",
+      "needsAttention": "Aktion erforderlich",
       "platforms": "Plattformen",
       "statusUnavailable": "Status nicht verfügbar"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Der Anbieter ist derzeit nicht verfügbar. Sende in Kürze erneut."
   },
   "settingsTools": {
-    "confirmTitle": "Diese Änderung bestätigen?"
+    "confirmTitle": "Diese Änderung bestätigen?",
+    "guarded": {
+      "spendAlertsOff": "Ausgabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr über Überschreitungen der Ausgabenschwellen und stündliche Spitzen erhalten.",
+      "balanceAlertsOff": "Guthabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr erhalten, wenn Ihr Guthaben knapp wird.",
+      "securityFindingsOff": "Sicherheitsbefunde ausschalten? Sie würden keine Benachrichtigungen mehr über neue Sicherheitsbefunde erhalten.",
+      "hideBalanceOn": "Guthaben ausblenden? Ihre Guthaben würden dann nicht mehr auf den Profilseiten und im Organisations-Hub angezeigt."
+    }
   },
   "appActions": {
     "start": {

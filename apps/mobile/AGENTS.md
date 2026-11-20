@@ -16,15 +16,16 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Commands
 
-Run from `apps/mobile/`: `pnpm typecheck`, `pnpm lint`, `pnpm format` (or `format:check`), `pnpm check:unused`, `pnpm test`.
+Run from `apps/mobile/`: `pnpm typecheck`, `pnpm lint`, `pnpm format` (or `format:check`), `pnpm check:unused`, `pnpm assert:config`, `pnpm test`.
 
 Before pushing:
 
 ```bash
-pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused
+pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused && pnpm assert:config
 git diff --check
 ```
 
+- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `pnpm test` runs it too.
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
@@ -239,6 +240,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Center single-line content on both axes in its row or control: icons beside text, carets, button labels, badges, and the text and placeholder of single-line inputs.
 - Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
 - Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
+- At a large font scale (`LARGE_FONT_SCALE` from `@/lib/font-scale/system-font-scale-context`), primary text wraps instead of truncating: a row title, a header title and a header subtitle take up to two lines, a `KvRow` value moves under its label, and a header's `inlineActions` cluster (the account picker) takes its own row under the title. Read the threshold through that constant or `useIsLargeFontScale()`; never add a second one. At any scale, a header title that its `inlineActions` cluster would cut (a long translated tab title) moves the cluster under the title; the header decides it by comparing the title's box with the width a hidden copy of the title takes outside the row. Never decide a cut from a copy laid out inside the title's box: Android lays an uncapped line out up to a pixel wider than its box without breaking it, while the capped title beside it ends in an ellipsis.
 - Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
 - Never grow a row or a section header to a control's touch size. Keep the row one line tall and reach 44pt with `hitSlop` on a shared compact box from `@/lib/a11y/tap-target` (`LINE_ACTION_BOX_CLASS`, `SECTION_ACTION_BOX_CLASS`). A taller box leaves empty space above its text, and at the top of a screen that space reads as a hole under the title.
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
@@ -256,7 +258,7 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | Section header | A heading (the label carries the header role): 10pt mono uppercase eyebrow, muted; optional icon, 11pt mono primary action in a compact box that never changes the header's height, and notice. No hand-made labels. Gutter-free inside a padded body; `inset` for a full-bleed list; `actionTestID` for a native test handle. | `SectionHeader` from `@/components/ui/section-header`, or `Section` when it has content |
 | Settings and navigation rows | One grouped card per section; hairline between rows inset to the row text; none after the last. | `RowGroup` from `@/components/ui/row-group`; pass `leadingTile` for icon rows |
 | Grouped rows in a virtualized list | A list cannot pass its rows as one child array, so each cell draws its own rounded end, surface and trailing hairline. | `RowGroupItem` with `position` `first`/`middle`/`last` (`only` for a one-row section) |
-| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line; up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
+| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line (two at a large font scale); up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
 | Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`, which owns that geometry; callers add no padding of their own. Rows own no card and no grouped divider |
 | Card | Non-row block (balance, metric, info, a field block on a non-form screen): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. For full-bleed layered content the surface alone, with each layer owning its inset. | `Card` from `@/components/ui/card`; `padding="none"` for the bare surface |
 | Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box |

@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",
+      "managedOnWebTitle": "Jere sou entènèt la",
+      "managedOnWebShort": "Koneksyon sa a jere sou entènèt la, apati yon òdinatè.",
+      "managedOnWebRepositories": "Chwazi depo yo pou {{organization}} sou entènèt la, apati yon òdinatè.",
       "description": "Kreye yon jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
       "descriptionReconnect": "Kreye yon nouvo jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
       "descriptionOverview": "Kreye yon jeton aksè pou espas travay la pou {{organization}}, epi kole li nan pwochen ekran an.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Ap tcheke…",
       "statusUnavailable": "Estati pa disponib",
+      "needsAttention": "Bezwen atansyon",
       "platforms": "Platfòm",
       "activity": "Aktivite"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Founisè a pa disponib kounye a. Voye ankò talè."
   },
   "settingsTools": {
-    "confirmTitle": "Konfime chanjman sa a?"
+    "confirmTitle": "Konfime chanjman sa a?",
+    "guarded": {
+      "spendAlertsOff": "Fèmen alèt depans yo? Ou p ap resevwa notifikasyon ankò sou depasman limit depans ak pik chak èdtan.",
+      "balanceAlertsOff": "Fèmen alèt balans yo? Ou p ap resevwa notifikasyon ankò lè kredi w ap vin ba.",
+      "securityFindingsOff": "Fèmen dekouvèt sekirite yo? Ou p ap resevwa notifikasyon ankò sou nouvo dekouvèt sekirite.",
+      "hideBalanceOn": "Kache balans ou yo? Balans kredi yo p ap parèt ankò sou ekran pwofil yo ak sant òganizasyon an."
+    }
   },
   "appActions": {
     "start": {

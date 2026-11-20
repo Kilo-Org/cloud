@@ -18,6 +18,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
+import { createContractFailures } from './contract-failures.mjs';
+
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // `react-native-css`'s Metro plugin writes `nativewind-env.d.ts` relative to the cwd.
 process.chdir(appDir);
@@ -115,11 +117,7 @@ function packageRoot(packageName) {
   }
 }
 
-const failures = [];
-function check(label, condition, detail) {
-  if (condition) return;
-  failures.push(`${label}\n    ${detail}`);
-}
+const { check, report } = createContractFailures();
 
 // The React Native surface a package can reach through the proxy. `AssetRegistry` is the
 // export expo-asset reads; the components stand for the proxy's own styled versions.
@@ -166,34 +164,30 @@ const proxyPath = resolveFrom(expoAsset, 'react-native');
 const resolved = `${path.relative(appDir, expoAsset)} -> 'react-native' => ${proxyPath ?? '(unresolved)'}`;
 
 check(
-  'a package resolves the styled `react-native` proxy',
   proxyPath !== null && proxyPath.includes(STYLED_PROXY),
-  resolved
+  `a package resolves the styled \`react-native\` proxy\n    ${resolved}`
 );
 
 if (proxyPath !== null && proxyPath.includes(STYLED_PROXY)) {
   const { exports: proxyExports, reactNative } = evaluateProxyExports(proxyPath);
   for (const name of ['AssetRegistry', 'Dimensions', 'NativeModules', 'Platform']) {
     check(
-      `the proxy forwards \`${name}\``,
       proxyExports[name] === reactNative[name],
-      `\`${name}\` is ${proxyExports[name] === undefined ? 'undefined' : 'a different value'} through the proxy`
+      `the proxy forwards \`${name}\`\n    \`${name}\` is ${proxyExports[name] === undefined ? 'undefined' : 'a different value'} through the proxy`
     );
   }
   for (const name of ['Text', 'View']) {
     check(
-      `the proxy keeps its styled \`${name}\``,
       proxyExports[name] !== undefined && proxyExports[name] !== reactNative[name],
-      `\`${name}\` is ${proxyExports[name] === undefined ? 'undefined' : 'the real component, not the styled one'} through the proxy`
+      `the proxy keeps its styled \`${name}\`\n    \`${name}\` is ${proxyExports[name] === undefined ? 'undefined' : 'the real component, not the styled one'} through the proxy`
     );
   }
 }
 
-if (failures.length > 0) {
-  console.error(`\nreact-native resolution is wrong in ${failures.length} case(s):\n`);
-  for (const failure of failures) console.error(`  ${failure}`);
-  console.error('\nSee the proxy patch in patches/react-native-css@3.1.0-rc.1.patch.\n');
-  process.exit(1);
-}
+const exitCode = report(
+  'react-native resolution is wrong',
+  'See the proxy patch in patches/react-native-css@3.1.0-rc.1.patch.'
+);
+if (exitCode !== 0) process.exit(exitCode);
 
 console.log(resolved);

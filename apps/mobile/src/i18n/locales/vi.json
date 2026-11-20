@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
+      "managedOnWebTitle": "Quản lý trên web",
+      "managedOnWebShort": "Kết nối này được quản lý trên web từ máy tính.",
+      "managedOnWebRepositories": "Chọn kho lưu trữ cho {{organization}} trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào bên dưới.",
       "descriptionReconnect": "Tạo mã truy cập không gian làm việc mới cho {{organization}} rồi dán vào bên dưới.",
       "descriptionOverview": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào màn hình tiếp theo.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "Hoạt động",
       "checking": "Đang kiểm tra…",
+      "needsAttention": "Cần xử lý",
       "platforms": "Nền tảng",
       "statusUnavailable": "Không lấy được trạng thái"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Nhà cung cấp hiện không khả dụng. Hãy gửi lại sau ít phút."
   },
   "settingsTools": {
-    "confirmTitle": "Xác nhận thay đổi này?"
+    "confirmTitle": "Xác nhận thay đổi này?",
+    "guarded": {
+      "spendAlertsOff": "Tắt cảnh báo chi tiêu? Bạn sẽ không còn nhận thông báo khi vượt ngưỡng chi tiêu và khi chi tiêu tăng đột biến theo giờ.",
+      "balanceAlertsOff": "Tắt cảnh báo số dư? Bạn sẽ không còn nhận thông báo khi tín dụng của bạn sắp hết.",
+      "securityFindingsOff": "Tắt cảnh báo phát hiện bảo mật? Bạn sẽ không còn nhận thông báo về các phát hiện bảo mật mới.",
+      "hideBalanceOn": "Ẩn số dư của bạn? Số dư tín dụng sẽ không còn hiển thị trên các màn hình hồ sơ và trung tâm tổ chức."
+    }
   },
   "appActions": {
     "start": {

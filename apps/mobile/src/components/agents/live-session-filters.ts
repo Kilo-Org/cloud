@@ -1,5 +1,6 @@
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import {
-  formatGitUrlProject,
   knownPlatformBucket,
   normalisePlatformSelection,
   PLATFORM_FILTERS,

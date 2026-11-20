@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
+import { stripLeadingDocumentTitle } from '@/app/legal-body';
 import { loadPrivacyPolicyMainHtml } from '@/app/privacy-app/privacy-policy-source';
 import { loadTermsMainHtml } from '@/app/terms-app/terms-source';
 
@@ -21,17 +22,10 @@ function isLegalDocumentName(value: string): value is LegalDocumentName {
 }
 
 // The mobile reader renders the document title in its own header, so the served
-// body starts after the source page's title heading. The web fallback pages keep
-// their H1; only this API response drops it. A document that does not open with
-// an H1 element is served unchanged.
-const LEADING_TITLE_HEADING = /^\s*<h1\b[^>]*>[\s\S]*?<\/h1>/i;
-
-export function stripLeadingTitleHeading(html: string): string {
-  // Non-greedy is safe: sanitize-html escapes `<` in text and attribute values,
-  // so `</h1>` cannot occur inside the element and the first one closes it.
-  return html.replace(LEADING_TITLE_HEADING, '');
-}
-
+// body starts at the document content: the response drops whichever heading the
+// sanitized body opens with, along with wrappers that heading leaves empty. The
+// web fallback pages keep their own titles, and a body that does not lead with a
+// heading is served byte-for-byte as loaded.
 export const GET = withRestTiming(
   '/api/legal',
   async (_request: Request, context?: { params: Promise<{ document: string }> }) => {
@@ -44,7 +38,7 @@ export const GET = withRestTiming(
     try {
       const html = await LEGAL_DOCUMENTS[document]();
       return NextResponse.json(
-        { html: stripLeadingTitleHeading(html) },
+        { html: stripLeadingDocumentTitle(html) },
         { headers: { 'Cache-Control': 'public, max-age=300' } }
       );
     } catch (error) {

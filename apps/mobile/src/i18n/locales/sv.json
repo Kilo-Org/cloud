@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
+      "managedOnWebTitle": "Hanteras på webben",
+      "managedOnWebShort": "Den här anslutningen hanteras på webben från en dator.",
+      "managedOnWebRepositories": "Välj repositorier för {{organization}} på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionOverview": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den på nästa skärm.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Kontrollerar…",
       "statusUnavailable": "Status inte tillgänglig",
+      "needsAttention": "Kräver åtgärd",
       "platforms": "Plattformar",
       "activity": "Aktivitet"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Leverantören är inte tillgänglig just nu. Skicka igen om en stund."
   },
   "settingsTools": {
-    "confirmTitle": "Bekräfta denna ändring?"
+    "confirmTitle": "Bekräfta denna ändring?",
+    "guarded": {
+      "spendAlertsOff": "Stänga av förbrukningsvarningar? Du skulle sluta få aviseringar om överskridna förbrukningströsklar och timtoppar.",
+      "balanceAlertsOff": "Stänga av saldovarningar? Du skulle sluta få aviseringar när dina krediter börjar ta slut.",
+      "securityFindingsOff": "Stänga av säkerhetsfynd? Du skulle sluta få aviseringar om nya säkerhetsfynd.",
+      "hideBalanceOn": "Dölja dina saldon? Kreditsaldon visas inte längre på profilsidorna och organisationshubben."
+    }
   },
   "appActions": {
     "start": {

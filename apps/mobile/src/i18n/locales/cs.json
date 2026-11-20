@@ -1439,6 +1439,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
+      "managedOnWebTitle": "Spravuje se na webu",
+      "managedOnWebShort": "Toto připojení se spravuje na webu z počítače.",
+      "managedOnWebRepositories": "Vyberte repozitáře pro {{organization}} na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionOverview": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej na další obrazovce.",
@@ -1462,6 +1465,7 @@
     "platformList": {
       "checking": "Kontroluje se…",
       "statusUnavailable": "Stav nedostupný",
+      "needsAttention": "Vyžaduje pozornost",
       "platforms": "Platformy",
       "activity": "Aktivita"
     },
@@ -4201,7 +4205,13 @@
     "providerUnavailable": "Poskytovatel je nyní nedostupný. Odešlete znovu za chvíli."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrdit tuto změnu?"
+    "confirmTitle": "Potvrdit tuto změnu?",
+    "guarded": {
+      "spendAlertsOff": "Vypnout upozornění na výdaje? Přestali byste dostávat oznámení o překročení prahů výdajů a hodinových špičkách.",
+      "balanceAlertsOff": "Vypnout upozornění na zůstatek? Přestali byste dostávat oznámení, když vám klesne zůstatek kreditů.",
+      "securityFindingsOff": "Vypnout bezpečnostní nálezy? Přestali byste dostávat oznámení o nových bezpečnostních nálezech.",
+      "hideBalanceOn": "Skrýt zůstatky? Zůstatky kreditů se už nebudou zobrazovat na obrazovkách profilu a v centru organizace."
+    }
   },
   "appActions": {
     "start": {

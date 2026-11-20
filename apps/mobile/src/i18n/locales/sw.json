@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "managedOnWebTitle": "Inasimamiwa kwenye wavuti",
+      "managedOnWebShort": "Muunganisho huu unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "managedOnWebRepositories": "Chagua hazina za {{organization}} kwenye wavuti ukitumia kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike kwenye skrini inayofuata.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Inaangalia…",
       "statusUnavailable": "Hali haipatikani",
+      "needsAttention": "Inahitaji uangalizi",
       "platforms": "Majukwaa",
       "activity": "Shughuli"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Mtoa huduma hapatikani kwa sasa. Tuma tena baada ya muda mfupi."
   },
   "settingsTools": {
-    "confirmTitle": "Thibitisha mabadiliko haya?"
+    "confirmTitle": "Thibitisha mabadiliko haya?",
+    "guarded": {
+      "spendAlertsOff": "Zima arifa za matumizi? Utaacha kupokea arifa kuhusu kuvuka vizingiti vya matumizi na miongezeko ya ghafla ya kila saa.",
+      "balanceAlertsOff": "Zima arifa za salio? Utaacha kupokea arifa salio lako la krediti linapopungua.",
+      "securityFindingsOff": "Zima matokeo ya usalama? Utaacha kupokea arifa kuhusu matokeo mapya ya usalama.",
+      "hideBalanceOn": "Ficha salio lako? Salio la krediti halitaonekana tena kwenye skrini za wasifu na kitovu cha shirika."
+    }
   },
   "appActions": {
     "start": {

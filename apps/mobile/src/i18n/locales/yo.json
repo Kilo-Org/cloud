@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
+      "managedOnWebTitle": "A ń ṣàkóso lórí wẹ́ẹ̀bù",
+      "managedOnWebShort": "A ń ṣàkóso ìsopọ̀ yìí lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútá.",
+      "managedOnWebRepositories": "Yan àwọn ibi ìpamọ́ kóòdù fún {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
       "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "descriptionReconnect": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ tuntun fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "descriptionOverview": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ ojú-ìwé tó kàn.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "A ń ṣàyẹ̀wò…",
       "statusUnavailable": "A kò lè rí ipò",
+      "needsAttention": "Nílò àfiyèsí",
       "platforms": "Àwọn pẹpẹ",
       "activity": "Ìgbòkègbodò"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Olùpèsè kò sí lárọ̀ọ́wọ́tó báyìí. Tún ránṣẹ́ ní kété."
   },
   "settingsTools": {
-    "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?"
+    "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?",
+    "guarded": {
+      "spendAlertsOff": "Ṣé kí a pa ìkìlọ̀ ìnáwó dé? Ìwọ kò ní gbà ìránnilétí mọ́ nípa ìkọjá ààlà ìnáwó àti àwọn ìgbéga ojú-wákàti.",
+      "balanceAlertsOff": "Ṣé kí a pa ìkìlọ̀ ìyọkù dé? Ìwọ kò ní gbà ìránnilétí mọ́ nígbà tí àwọn kírẹ́dìtì rẹ bá ń dín kù.",
+      "securityFindingsOff": "Ṣé kí a pa àwọn àwárí ààbò dé? Ìwọ kò ní gbà ìránnilétí mọ́ nípa àwọn àwárí ààbò tuntun.",
+      "hideBalanceOn": "Ṣé kí a fi àwọn ìyọkù rẹ pamọ́? Àwọn ìyọkù kírẹ́dìtì kò ní hàn mọ́ lórí àwọn ojú-ìbójú profáìlì àti ibùdó àjọ."
+    }
   },
   "appActions": {
     "start": {

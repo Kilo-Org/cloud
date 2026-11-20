@@ -22,6 +22,7 @@ import {
 } from '@/lib/a11y/tap-target';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { NESTED_SECTION_GAP_CLASS } from '@/lib/layout';
 import { useRepositoryBranches } from '@/lib/use-new-session-repos';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
@@ -108,7 +109,9 @@ export function RepositoryBranchSelector({
   });
 
   return (
-    <View className="mt-3">
+    // The branch block is a nested section inside the repository group, so it
+    // keeps the form's section break above the label in every branch-row state.
+    <View className={NESTED_SECTION_GAP_CLASS}>
       <Text className="mb-2 text-sm font-medium text-muted-foreground">{t('common.branch')}</Text>
       {/*
         Each state is its own native view. React would otherwise recycle the
@@ -255,8 +258,10 @@ export function RepositoryBranchSelector({
           <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
             {label}
           </Text>
+          {/* The Default tag is a trigger detail line, so it takes the same
+              secondary size and token as the row's other detail text. */}
           {isDefault ? (
-            <Text className="text-xs text-muted-foreground">
+            <Text className="text-sm text-muted-foreground">
               {t('agentChat.newSession.branchDefault')}
             </Text>
           ) : null}

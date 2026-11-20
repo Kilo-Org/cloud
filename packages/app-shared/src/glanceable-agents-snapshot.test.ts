@@ -355,7 +355,7 @@ describe('buildGlanceableSnapshot', () => {
     expect(snapshot.status).toBe('happy');
   });
 
-  it('sets organizationBound only when organizationId is a string', () => {
+  it('sets organizationBound only for a non-empty organization id', () => {
     const personal = buildGlanceableSnapshot({
       sessions: [],
       userId: 'u1',
@@ -370,6 +370,17 @@ describe('buildGlanceableSnapshot', () => {
     });
     expect(personal.organizationBound).toBe(false);
     expect(org.organizationBound).toBe(true);
+  });
+
+  it('reads an empty organization id as the personal scope', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: '',
+      now: NOW,
+    });
+    expect(snapshot.organizationBound).toBe(false);
+    expect(snapshot.scopeKey).toBe(buildOpaqueScopeKey({ userId: 'u1', organizationId: null }));
   });
 
   it('honours a status override and omits accountEpoch when absent', () => {

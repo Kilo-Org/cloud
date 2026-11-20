@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ny fifandraisana Bitbucket amin'ny {{organization}} dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
+      "managedOnWebTitle": "Tantanana amin'ny tranonkala",
+      "managedOnWebShort": "Ity fifandraisana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
+      "managedOnWebRepositories": "Safidio ny fitahirizana kaody ho an'ny {{organization}} amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
       "descriptionReconnect": "Mamoròna mari-pidirana vaovao ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
       "descriptionOverview": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho amin'ny efijery manaraka.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Manamarina…",
       "statusUnavailable": "Tsy azo jerena ny sata",
+      "needsAttention": "Mila jerena",
       "platforms": "Sehatra",
       "activity": "Asa"
     },
@@ -4077,7 +4081,13 @@
     "providerUnavailable": "Tsy misy amin'izao fotoana izao ny mpamatsy. Alefaso indray rahoway kely."
   },
   "settingsTools": {
-    "confirmTitle": "Hamafiso ity fanovana ity?"
+    "confirmTitle": "Hamafiso ity fanovana ity?",
+    "guarded": {
+      "spendAlertsOff": "Hamono ny fampitandremana momba ny fandaniana? Tsy handray fampandrenesana intsony ianao momba ny fihoaran'ny fetra fandaniana sy ny fisondrotana isan'ora.",
+      "balanceAlertsOff": "Hamono ny fampitandremana momba ny fifandanjana? Tsy handray fampandrenesana intsony ianao rehefa kely ny kreditrao.",
+      "securityFindingsOff": "Hamono ny fahitana momba ny fiarovana? Tsy handray fampandrenesana intsony ianao momba ny fahitana vaovao momba ny fiarovana.",
+      "hideBalanceOn": "Hanafina ny fifandanjanao? Tsy hiseho intsony eo amin'ny efijery mombamomba sy ny foiben'ny fikambanana ny fifandanjana kreditrao."
+    }
   },
   "appActions": {
     "start": {

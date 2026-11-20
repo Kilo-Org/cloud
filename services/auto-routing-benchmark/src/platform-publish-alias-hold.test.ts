@@ -34,6 +34,11 @@ describe('publishPlatformRoutingTable — an alias move holds the live table, th
     catalogFetch.mockClear();
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
+    // The paid cutover is durable state: a worker that cannot read the marker refuses to publish,
+    // so the fixture records the deploy instant the same way the deploy does.
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('2026-11-20T00:00:00.000Z');
     env = {
       BENCH_DB: sqliteD1(sqlite),
       AUTO_ROUTING_CONFIG: { delete: vi.fn(), put: vi.fn(), get: vi.fn() },
@@ -285,10 +290,12 @@ describe('publishPlatformRoutingTable — an alias move holds the live table, th
     seedSummaries(steady, 'run-steady', 0.9);
     expect(await publishPlatformRoutingTable(env, catalogFetch, router)).not.toBeNull();
 
-    // What an exhausted failure budget or a terminal class leaves behind (#12035).
+    // What an exhausted failure budget or a terminal class leaves behind (#12035). The failure
+    // transition stamps `completed_at`, which is the evidence a post-cutover drop is fenced on.
     sqlite
       .prepare(
-        "UPDATE benchmark_profiles SET status = 'unavailable', failure_class = 'catalog_absent' WHERE router = ? AND model = ?"
+        `UPDATE benchmark_profiles SET status = 'unavailable', failure_class = 'catalog_absent',
+          completed_at = '2026-11-20T01:00:00.000Z' WHERE router = ? AND model = ?`
       )
       .run(router, NEXT);
 
@@ -333,6 +340,183 @@ describe('publishPlatformRoutingTable — an alias move holds the live table, th
     const live = await getLatestRoutingTable(env.BENCH_DB, router);
     expect(live?.table.version).toBe(liveVersion);
     expect((live?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([LIVE]);
+  });
+
+  it('keeps a pre-cutover failed pair in the artifact across the first and second tick', async () => {
+    const PLAIN = 'vendor/astra-plain';
+    const STEADY = 'vendor/astra-steady';
+    catalogFetch.mockImplementation(async () =>
+      Response.json({
+        data: [PLAIN, STEADY].map(id => ({
+          id,
+          pricing: { prompt: '0.000001', completion: '0.000002' },
+        })),
+      })
+    );
+    await replaceConfig(
+      env.BENCH_DB,
+      {
+        min_accuracy: 0.7,
+        benchmark_user_id: null,
+        benchmark_org_id: null,
+        updated_at: '2026-11-20',
+        updated_by: null,
+      },
+      ['classifier/a'],
+      [PLAIN, STEADY].map(model => ({ model, variant: null, reasoning_effort: null })),
+      router
+    );
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_subscriptions (router, owner_type, owner_id, revision, snapshot, updated_at)
+         VALUES (?, 'platform', '', 'rev-1', ?, '2026-11-20T00:00:00.000Z')`
+      )
+      .run(
+        router,
+        JSON.stringify({
+          entries: [PLAIN, STEADY].map(model => ({
+            model,
+            pairs: [{ model, variant: null }],
+            servingPairs: [{ model, variant: null }],
+            resolutionError: null,
+          })),
+          previousEntries: [],
+        })
+      );
+    seedReady(PLAIN, 'run-astra-plain', 0.9);
+    seedReady(STEADY, 'run-astra-steady', 0.9);
+    expect(await publishPlatformRoutingTable(env, catalogFetch, router)).not.toBeNull();
+    const liveVersion = (await getLatestRoutingTable(env.BENCH_DB, router))?.table.version;
+
+    // The pair failed BEFORE the durable cutover instant (a copied legacy row), and later its
+    // retry timer moves on while the artefact is already serving without it.
+    sqlite
+      .prepare(
+        `UPDATE benchmark_profiles SET status = 'unavailable', failure_class = 'catalog_absent',
+          completed_at = '2026-11-19T00:00:00.000Z', retry_after = '2026-12-01T00:00:00.000Z'
+         WHERE router = ? AND model = ?`
+      )
+      .run(router, PLAIN);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // First tick: the legacy artifact is untouched.
+    expect(await publishPlatformRoutingTable(env, catalogFetch, router)).toBeNull();
+    expect((await getLatestRoutingTable(env.BENCH_DB, router))?.table.version).toBe(liveVersion);
+    // Second tick, after `desiredPairs` bootstrapped: still untouched, and no drop is claimed.
+    expect(await publishPlatformRoutingTable(env, catalogFetch, router)).toBeNull();
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
+    expect(events.some(entry => entry.event === 'routing_table_publish_dropped_failed_pairs')).toBe(
+      false
+    );
+    const live = await getLatestRoutingTable(env.BENCH_DB, router);
+    expect(live?.table.version).toBe(liveVersion);
+    expect((live?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([
+      PLAIN,
+      STEADY,
+    ]);
+  });
+
+  it('leaves an unchanged legacy artifact alone when a permanently failed pair was never served', async () => {
+    const liveVersion = await bootstrapLiveTable();
+    // A pair the artifact never contained settles into a permanent failure. It is not a served
+    // pair, so it cannot license a rewrite of the live table on the next publish pass.
+    await configure();
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status,
+          run_id, requested_at, updated_at, completed_at, platform_requested, user_requested,
+          failure_class, failure_reason)
+         VALUES (?, 'vendor/astra-retired', '', ?, 1, 'unavailable', NULL, '2026-11-20',
+           '2026-11-20', '2026-11-20', 1, 0, 'catalog_absent', 'gone')`
+      )
+      .run(router, engine);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const published = await publishPlatformRoutingTable(env, catalogFetch, router);
+    const events = log.mock.calls.map(([message]) => JSON.parse(String(message)));
+    log.mockRestore();
+
+    expect(published).toBeNull();
+    expect(events.some(entry => entry.event === 'routing_table_publish_dropped_failed_pairs')).toBe(
+      false
+    );
+    const live = await getLatestRoutingTable(env.BENCH_DB, router);
+    expect(live?.table.version).toBe(liveVersion);
+    expect((live?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([LIVE]);
+  });
+
+  it('does not rewrite the artifact twice after a settled pair already left it', async () => {
+    const PLAIN = 'vendor/astra-plain';
+    const STEADY = 'vendor/astra-steady';
+    catalogFetch.mockImplementation(async () =>
+      Response.json({
+        data: [PLAIN, STEADY].map(id => ({
+          id,
+          pricing: { prompt: '0.000001', completion: '0.000002' },
+        })),
+      })
+    );
+    await replaceConfig(
+      env.BENCH_DB,
+      {
+        min_accuracy: 0.7,
+        benchmark_user_id: null,
+        benchmark_org_id: null,
+        updated_at: '2026-11-20',
+        updated_by: null,
+      },
+      ['classifier/a'],
+      [
+        { model: PLAIN, variant: null, reasoning_effort: null },
+        { model: STEADY, variant: null, reasoning_effort: null },
+      ],
+      router
+    );
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_subscriptions (router, owner_type, owner_id, revision, snapshot, updated_at)
+         VALUES (?, 'platform', '', 'rev-1', ?, '2026-11-20T00:00:00.000Z')`
+      )
+      .run(
+        router,
+        JSON.stringify({
+          entries: [PLAIN, STEADY].map(model => ({
+            model,
+            pairs: [{ model, variant: null }],
+            servingPairs: [{ model, variant: null }],
+            resolutionError: null,
+          })),
+          previousEntries: [],
+        })
+      );
+    seedReady(PLAIN, 'run-astra-plain', 0.9);
+    seedReady(STEADY, 'run-astra-steady', 0.9);
+    expect(await publishPlatformRoutingTable(env, catalogFetch, router)).not.toBeNull();
+
+    // The failure settles AFTER the cutover marker, which is what makes the drop publishable.
+    sqlite
+      .prepare(
+        `UPDATE benchmark_profiles SET status = 'unavailable', failure_class = 'catalog_absent',
+          completed_at = '2026-11-20T01:00:00.000Z' WHERE router = ? AND model = ?`
+      )
+      .run(router, PLAIN);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const dropped = await publishPlatformRoutingTable(env, catalogFetch, router);
+    const afterDrop = await getLatestRoutingTable(env.BENCH_DB, router);
+    log.mockClear();
+
+    // The pair already left the live table, so the next pass is a no-op even though the registry
+    // still carries its permanent failure.
+    const second = await publishPlatformRoutingTable(env, catalogFetch, router);
+    const afterSecond = await getLatestRoutingTable(env.BENCH_DB, router);
+    log.mockRestore();
+    expect(dropped).not.toBeNull();
+    expect(second).toBeNull();
+    expect(afterSecond?.table.version).toBe(afterDrop?.table.version);
+    expect((afterDrop?.table.routes[ROUTE] ?? []).map(candidate => candidate.model)).toEqual([
+      STEADY,
+    ]);
   });
 
   it('names the reason when the platform row has no configuration', async () => {

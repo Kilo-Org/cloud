@@ -2,10 +2,11 @@
 /**
  * Explicit, guarded pre-deploy cancel of every live legacy benchmark run.
  *
- * Target schema: the LIVE benchmark D1 as deployed today — migrations through 0037, i.e.
- * BEFORE the user-paid cutover migration 0038. Nothing here may reference a 0038 table
- * (`benchmark_cutover`, `paid_benchmark_*`, `benchmark_case_runs`, `benchmark_case_payers`,
- * `paid_model_requests`, `profile_attempt_history`), because those do not exist yet.
+ * Target schema: ONLY the pre-cutover benchmark D1 — migrations through 0037. The write modes
+ * refuse to run on a post-cutover database (migration 0038), because on that schema a
+ * `status = 'running'` cancel cannot tell a legacy run from one a user explicitly confirmed
+ * through the paid flow. `--legacy-residue` is the read-only post-cutover check: it exists
+ * precisely so the post-deploy step never re-runs the cancel.
  *
  * Why a standalone script: `scripts/deploy.mjs` stays unchanged. The operator runs this
  * under the retained operator lease, reviews the dry run, applies, and
@@ -53,26 +54,23 @@
  *
  * ### Operator sequence, including the post-new-worker check
  *
- * 1. Before the migration, under the retained operator lease:
+ * 1. Before the migration, under the retained `operator-pause-userpay` lease:
  *      --dry-run  (review the exact statements)
  *      --apply --baseline-out <path>
  *      --verify  --baseline <path>      -> exit 0 required, else do NOT deploy
  * 2. Deploy. The new worker's first `dispatchScheduler` retires any pre-cutover run and
  *    parks its claims; then the migration adds 0038.
- * 3. After the new worker is live and BEFORE releasing the pause, re-run the read-only
- *    checks below. Both are legacy-shaped (`status`/`scheduler_chunks` counts), so they work
- *    on the 0037 surface and after 0038 without editing this script:
- *    a. LATE LEGACY: `benchmark_runs` rows with `status='running'` must be 0, and
- *       `scheduler_chunks` in pending/queued/active must be 0. A nonzero count means the old
- *       writer admitted work after the apply; do not release the pause — cancel it again
- *       with `--apply` (still idempotent, still guarded) and re-verify.
- *    b. NEW NO-BILLING ACTIVATION: no paid request is live and no paid case is running.
- *       On the post-0038 schema that is `SELECT COUNT(*) FROM paid_benchmark_requests
- *       WHERE status IN ('preparing','active')` and the equivalent on
- *       `benchmark_case_runs`; both must be 0 before the pause is released, because
- *       releasing the pause is what lets the new scheduler spend. This script does not
- *       query them: they do not exist pre-0038, and inventing a query for them here would
- *       either break the pre-deploy run or silently pass on a missing table.
+ * 3. After the new worker is live and BEFORE releasing the pause: run
+ *    `--legacy-residue`, never `--apply`. It is the only mode defined for the post-cutover
+ *    schema and is read-only. A legacy run is one with `benchmark_runs.admission_marker IS
+ *    NULL`; the check exits 4 if any such run is `running` or owns an unfinished chunk, and
+ *    reports paid work separately. Keep the hold and escalate on a nonzero legacy count; do
+ *    not re-run the legacy cancel. A paid request or paid run live under the hold is an
+ *    expected user confirmation, never a reason to cancel.
+ *
+ * `--dry-run`, `--apply` and `--verify` refuse on a post-cutover database (exit 4, no
+ * writes): every table they need survives migration 0038, so that schema cannot tell a
+ * legacy run from a run a user explicitly confirmed through the paid flow.
  *
  * Classifiers are outside the chunk/lease path: a classifier run is enqueued straight to
  * the queue by `startRun` and its `processJob` returns immediately unless
@@ -113,6 +111,8 @@ export const CANCEL_ERROR =
 export const EXIT = { ok: 0, usage: 2, guardRefused: 3, verifyFailed: 4, d1Error: 5 };
 
 const OPERATOR_PREFIX = 'operator-pause-';
+/** Every accepted mode. `legacy-residue` is the read-only post-cutover one. */
+const MODES = new Set(['--dry-run', '--apply', '--verify', '--legacy-residue']);
 /** Bounded re-reads, so a run admitted mid-apply is cancelled in the same invocation. */
 const MAX_PASSES = 5;
 
@@ -129,15 +129,17 @@ class D1Error extends Error {}
 
 function usage() {
   return [
-    'usage: legacy-cancel.mjs <--dry-run|--apply|--verify> <--remote|--local-file <path>>',
+    'usage: legacy-cancel.mjs <--dry-run|--apply|--verify|--legacy-residue>',
+    '         <--remote|--local-file <path>>',
     '         --expect-token <operator-pause-...> --min-remaining-ms <n>',
     '         [--baseline-out <path>] [--baseline <path>]',
     '',
-    '  --dry-run     read only: print the lease guard, the before state and the exact SQL',
-    '  --apply       run the guarded statements, re-read, and prove the result',
-    '  --verify      mandatory last pre-deploy gate: exact lease, zero live work, unchanged digests',
-    '  --remote      live D1 through `wrangler d1 execute BENCH_DB --remote`',
-    '  --local-file  local SQLite file (fixture proof only; no network, no credentials)',
+    '  --dry-run         read only: print the lease guard, the before state and the exact SQL',
+    '  --apply           run the guarded statements, re-read, and prove the result',
+    '  --verify          mandatory last pre-deploy gate: exact lease, zero live work, unchanged digests',
+    '  --legacy-residue  read only, post-cutover only: report unmarked legacy work; never cancels',
+    '  --remote          live D1 through `wrangler d1 execute BENCH_DB --remote`',
+    '  --local-file      local SQLite file (fixture proof only; no network, no credentials)',
   ].join('\n');
 }
 
@@ -165,10 +167,10 @@ export function parseArgs(argv) {
       args.help = true;
     } else if (argument === '--remote') {
       args.remote = true;
-    } else if (argument === '--dry-run' || argument === '--apply' || argument === '--verify') {
+    } else if (MODES.has(argument)) {
       const mode = argument.slice(2);
       if (args.mode !== undefined && args.mode !== mode) {
-        throw new UsageError('choose exactly one of --dry-run, --apply, --verify');
+        throw new UsageError('choose exactly one mode');
       }
       args.mode = mode;
     } else if (argument === '--local-file') {
@@ -334,6 +336,57 @@ export const SCHEMA_TABLES_EXPECTED = OPERATION_TABLES.length;
 
 export function schemaCheckSql() {
   return `SELECT COUNT(*) AS present FROM sqlite_master WHERE type = 'table' AND name IN (${OPERATION_TABLES.map(sqlString).join(', ')})`;
+}
+
+/**
+ * The post-cutover detector. This operation cancels by `status = 'running'`, which cannot tell a
+ * legacy run from a run a user explicitly confirmed through the paid flow — so on a
+ * post-migration database it would cancel real work. Both probes must therefore be absent
+ * before any write:
+ *
+ * - `benchmark_cutover`, created only by migration 0038, is the paid-flow marker's home. Its
+ *   presence means the schema is post-cutover.
+ * - `benchmark_runs.admission_marker`, added by the same migration, is the durable positive
+ *   proof the new Worker writes and a legacy writer never does
+ *   (`SCHEDULER_LANE_HEADS_SQL` claims only `admission_marker IS NOT NULL`;
+ *   `initializeScheduledRun` makes an unmarked run terminal). Checking the column, not only its
+ *   values, is what makes this independent of whether a cutover row exists yet.
+ *
+ * A probe rather than a migration-name read on purpose: `d1_migrations` records what was applied,
+ * while this asks the database what shape it actually has — the same thing the write statements
+ * are about to run against. Both probes are ordinary reads, so `--dry-run` reports the refusal
+ * instead of throwing.
+ */
+const CUTOVER_TABLE = 'benchmark_cutover';
+const CUTOVER_COLUMN = 'admission_marker';
+
+export function cutoverProbeSql() {
+  return `SELECT
+  (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ${sqlString(CUTOVER_TABLE)}) AS cutover_table,
+  (SELECT COUNT(*) FROM pragma_table_info('benchmark_runs') WHERE name = ${sqlString(CUTOVER_COLUMN)}) AS cutover_column`;
+}
+
+/**
+ * Read-only inspection of legacy work after the cutover. `admission_marker IS NULL` is the exact
+ * legacy predicate the new Worker itself uses (`retireLegacyRuns`), so this reports only work the
+ * paid flow does not own: a run the new Worker admitted is never "unexpected" here, and a
+ * user-confirmed paid run while the hold is retained is expected and is explicitly NOT a reason
+ * to cancel anything.
+ */
+export function legacyResidueSql() {
+  return `SELECT
+  (SELECT COUNT(*) FROM benchmark_runs AS run
+    WHERE run.status = 'running' AND run.admission_marker IS NULL) AS legacy_running_runs,
+  (SELECT COUNT(*) FROM scheduler_chunks AS chunk
+    WHERE chunk.status IN ('pending', 'queued', 'active')
+      AND EXISTS (SELECT 1 FROM benchmark_runs AS owner
+        WHERE owner.id = chunk.run_id AND owner.admission_marker IS NULL)) AS legacy_unfinished_chunks,
+  (SELECT COUNT(*) FROM benchmark_runs AS run
+    WHERE run.status = 'running' AND run.admission_marker IS NOT NULL) AS paid_running_runs,
+  (SELECT COUNT(*) FROM scheduler_chunks AS chunk
+    WHERE chunk.status IN ('pending', 'queued', 'active')
+      AND EXISTS (SELECT 1 FROM benchmark_runs AS owner
+        WHERE owner.id = chunk.run_id AND owner.admission_marker IS NOT NULL)) AS paid_unfinished_chunks`;
 }
 
 /**
@@ -667,6 +720,57 @@ export async function runLegacyCancel({
           'it targets the live legacy schema (through migration 0037) and refuses to guess'
       );
     }
+    /**
+     * Fail closed on a post-cutover database. Every table this operation needs survives
+     * migration 0038, so the table count cannot tell the two schemas apart — and cancelling by
+     * `status = 'running'` would then take a run a user explicitly confirmed through the paid
+     * flow. The probe runs before the lease check and before any statement is built, for every
+     * mode; `--legacy-residue` is the one mode defined for the post-cutover schema, and
+     * `--dry-run`/`--apply`/`--verify` refuse.
+     */
+    const [cutover] = await executor.read(cutoverProbeSql());
+    const postCutover =
+      Number(cutover?.cutover_table) !== 0 || Number(cutover?.cutover_column) !== 0;
+    if (args.mode !== 'legacy-residue' && postCutover) {
+      throw new VerifyFailed(
+        'this database is post-cutover (paid benchmark flow): ' +
+          `${CUTOVER_TABLE}=${cutover?.cutover_table ?? '?'}, ${CUTOVER_COLUMN}=${cutover?.cutover_column ?? '?'}. ` +
+          'The legacy cancel applies only before migration 0038 and refuses to touch paid runs. ' +
+          'Use --legacy-residue for the read-only post-deploy check instead.'
+      );
+    }
+    if (args.mode === 'legacy-residue' && !postCutover) {
+      throw new VerifyFailed(
+        'this database is pre-cutover: --legacy-residue reports legacy work after migration 0038. ' +
+          'Before the cutover use --dry-run, --apply and --verify.'
+      );
+    }
+
+    if (args.mode === 'legacy-residue') {
+      // Read-only, post-cutover only. Reports legacy (unmarked) work the paid flow does not own
+      // and separately counts paid work so an operator can see the hold is doing its job without
+      // treating an expected user confirmation as a reason to cancel anything.
+      const [lock] = await executor.read(lockSql());
+      const remainingMs = assertLease(lock, args);
+      const [residue] = await executor.read(legacyResidueSql());
+      report(log, 'legacy_residue', residue);
+      const legacyLive =
+        Number(residue?.legacy_running_runs) !== 0 ||
+        Number(residue?.legacy_unfinished_chunks) !== 0;
+      report(log, legacyLive ? 'legacy_residue_unexpected' : 'legacy_residue_ok', {
+        token: lock.token,
+        remainingSeconds: Math.trunc(remainingMs / 1000),
+        legacyRunningRuns: Number(residue?.legacy_running_runs),
+        legacyUnfinishedChunks: Number(residue?.legacy_unfinished_chunks),
+        paidRunningRuns: Number(residue?.paid_running_runs),
+        paidUnfinishedChunks: Number(residue?.paid_unfinished_chunks),
+        action: legacyLive
+          ? 'keep the hold and escalate; do not re-run the legacy cancel and do not cancel paid runs'
+          : 'none',
+      });
+      return legacyLive ? EXIT.verifyFailed : EXIT.ok;
+    }
+
     const [lock] = await executor.read(lockSql());
     const remainingMs = assertLease(lock, args);
     report(log, 'lease_ok', {

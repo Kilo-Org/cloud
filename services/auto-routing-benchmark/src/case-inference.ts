@@ -170,14 +170,31 @@ export type CaseInferencePayerRefusal = { refused: string };
  * benchmark itself diagnosed as permanently failed cannot be admitted by any payer, so the
  * case pauses instead of spending: no detach, no charge, and unaffected pairs keep running.
  */
-async function permanentFailureReason(db: D1Database, key: PaidCaseKey): Promise<string | null> {
+export async function permanentFailureVetoes(
+  db: D1Database,
+  key: PaidCaseKey,
+  scope: { router: string; repetitions: number }
+): Promise<boolean> {
+  return (await permanentFailureReason(db, key, scope)) !== null;
+}
+
+async function permanentFailureReason(
+  db: D1Database,
+  key: PaidCaseKey,
+  scope: { router: string; repetitions: number }
+): Promise<string | null> {
+  // The veto is scoped to the exact authoritative row for this measurement: another router's
+  // or another engine's verdict says nothing about this one, and a matching row at a
+  // different repetition count is a different measurement. A neighbouring engine's failure
+  // must never block a pair that is still permitted here.
   const row = await db
     .prepare(
       `SELECT status, failure_class, failure_reason FROM benchmark_profiles
-      WHERE model = ? AND variant = ? AND status = 'unavailable'
+      WHERE router = ? AND engine_identity = ? AND model = ? AND variant = ?
+        AND repetitions = ? AND status = 'unavailable'
       LIMIT 1`
     )
-    .bind(key.model, key.variant)
+    .bind(scope.router, key.engineIdentity, key.model, key.variant, scope.repetitions)
     .first<{ status: string; failure_class: string | null; failure_reason: string | null }>();
   return row ? (row.failure_reason ?? 'permanently_failed') : null;
 }
@@ -703,6 +720,20 @@ export async function handleCaseInference(
         failure('case_not_live', 'This case is no longer running its admitted generation.'),
         409
       );
+    // The signed envelope itself was rejected: missing, unsigned, malformed or expired. That
+    // proves nothing about the payer — the gateway never resolved it — so this must never
+    // rotate to another account, detach one, or charge anything. Nothing was dispatched, so
+    // the model request is not fenced as ambiguous either. It is a bug in the credential this
+    // Worker minted, so it surfaces as infrastructure rather than a funding or model verdict.
+    if (refusal === 'assignment_invalid')
+      return stopResponse(
+        'infra_unavailable',
+        failure(
+          'assignment_invalid',
+          'This Worker signed an assignment the gateway rejected; check the signing secret and envelope.'
+        ),
+        503
+      );
     // The admit callback itself was unreachable or answered 5xx: a proven pre-provider
     // infrastructure stop. Nothing was dispatched, so the lane retries through normal
     // admission under the usual fence rather than grading or pausing the case.
@@ -790,13 +821,31 @@ async function readPoolProjectFor(db: D1Database, poolRequestId: string): Promis
 async function readRunBenchmarkIdentity(
   db: D1Database,
   runId: string
-): Promise<{ benchmarkUserId: string | null; benchmarkOrgId: string | null } | null> {
+): Promise<{
+  benchmarkUserId: string | null;
+  benchmarkOrgId: string | null;
+  router: string;
+  repetitions: number;
+} | null> {
   const row = await db
-    .prepare(`SELECT benchmark_user_id, benchmark_org_id FROM benchmark_runs WHERE id = ?`)
+    .prepare(
+      `SELECT benchmark_user_id, benchmark_org_id, router, repetitions
+      FROM benchmark_runs WHERE id = ?`
+    )
     .bind(runId)
-    .first<{ benchmark_user_id: string | null; benchmark_org_id: string | null }>();
+    .first<{
+      benchmark_user_id: string | null;
+      benchmark_org_id: string | null;
+      router: string;
+      repetitions: number;
+    }>();
   return row
-    ? { benchmarkUserId: row.benchmark_user_id, benchmarkOrgId: row.benchmark_org_id }
+    ? {
+        benchmarkUserId: row.benchmark_user_id,
+        benchmarkOrgId: row.benchmark_org_id,
+        router: row.router,
+        repetitions: row.repetitions,
+      }
     : null;
 }
 
@@ -825,7 +874,6 @@ export async function createCaseInferenceDeps(
     // A pair the registry already diagnosed as terminally failed can never be admitted: no
     // selection, no detach of a solvent payer, no billing-failure count. Only this pair is
     // affected; other lanes of the same case continue.
-    if (await permanentFailureReason(env.BENCH_DB, key)) return refused('permanently_failed');
     if (!run.executor_run_id) return null;
 
     // Select first: only a `selecting` row may be signed, and selection is what copies the
@@ -833,6 +881,13 @@ export async function createCaseInferenceDeps(
     // `/internal/case-admit` is the only consumer of an assignment.
     const identity = await readRunBenchmarkIdentity(env.BENCH_DB, run.executor_run_id);
     if (!identity || !identity.benchmarkUserId) return null;
+    // The veto is evaluated against this run's own router and repetition count, so a verdict
+    // from another measurement never blocks this one.
+    const veto = await permanentFailureReason(env.BENCH_DB, key, {
+      router: identity.router,
+      repetitions: identity.repetitions,
+    });
+    if (veto) return refused('permanently_failed');
     const assignmentId = crypto.randomUUID();
     const usageId = crypto.randomUUID();
     const selected = await env.BENCH_DB.batch(

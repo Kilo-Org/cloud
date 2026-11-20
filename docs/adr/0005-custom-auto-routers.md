@@ -452,7 +452,8 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
    exact statements, `--apply --remote --baseline-out <path>` to cancel, then
    `--verify --remote --baseline <path>` as the last pre-deploy gate. Deploy only on exit `0`:
    `3` means the lease guard refused, `4` means live work remained or a protected artifact moved
-   (re-apply and re-verify), and `5` is a D1/transport error. Pass the exact held token
+   (while still PRE-cutover, re-apply and re-verify; after migration 0038 do not re-run — see
+   step 5), and `5` is a D1/transport error. Pass the exact held token
    (`--expect-token operator-pause-<name>`) and a remaining-lease floor (`--min-remaining-ms`);
    this release does not use a broad `token LIKE 'operator-pause-%'` check, because it would
    accept another operator's pause. The cancel fences every unfinished legacy run and its chunks,
@@ -481,13 +482,19 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
    hold still held, read (do not write) the request, registry, and run tables: every legacy run is
    terminally cancelled (none queued, paused, or resumable), no pre-cutover user run resumes, no
    queued owner subscription becomes a paid request, no legacy profile is pending for the drained
-   queue, and no stored measurement is requeued. Re-check the two late conditions the cancel
-   script cannot query before migration: no decider run is `running` and no chunk is pending,
-   queued or active (re-apply the idempotent cancel if either is nonzero), and no paid request is
-   `preparing` or `active` with a running case, because releasing the pause is what lets the new
-   scheduler spend. Check that a pool save or alias scan creates no request, and that an already
-   correctly benchmarked pool keeps its routing table and model indicators without a quote or
-   click.
+   queue, and no stored measurement is requeued. Use `scripts/legacy-cancel.mjs --legacy-residue
+   --remote` for the late legacy check: it is read-only, defined only for the post-cutover schema,
+   and reports legacy work (a run whose `admission_marker` is `NULL`, the same predicate the paid
+   Worker uses) separately from paid work, exiting `4` if a legacy run is `running` or owns an
+   unfinished chunk. **Do not re-run `--apply`, `--verify` or `--dry-run` after the migration** —
+   they refuse on a post-cutover database (exit `4`, no writes), because on that schema a
+   `status = 'running'` cancel cannot distinguish a legacy run from one a user explicitly
+   confirmed through the paid flow. A nonzero legacy count means keep the hold and escalate. A paid
+   request that is `preparing`/`active` with a running case while the hold is retained is an
+   expected user confirmation — a legitimate click under the hold — and is never a reason to
+   cancel; confirm only that no paid work is spending while the hold is in place. Check that a pool
+   save or alias scan creates no request, and that an already correctly benchmarked pool keeps its
+   routing table and model indicators without a quote or click.
 6. **Release and verify.** Before releasing anything, confirm that the web promotion, the gateway
    promotion, and the benchmark Worker deployment each contain the merged head — they are separate
    jobs and may complete in either order, so one of them being live proves nothing about the

@@ -27,6 +27,8 @@ type Reply = {
   contentType?: string;
   delayMs?: number;
   hold?: 'before-headers' | 'after-headers';
+  /** Extra response headers, so a test can drive the trusted stop marker and its spoofing. */
+  headers?: Record<string, string>;
 };
 
 type Recorded = { url: string; headers: Record<string, string>; body: Record<string, unknown> };
@@ -293,6 +295,7 @@ beforeEach(async () => {
       if (reply.hold === 'before-headers') return;
       res.writeHead(reply.status, {
         'content-type': reply.contentType ?? 'text/event-stream',
+        ...(reply.headers ?? {}),
       });
       res.flushHeaders();
       if (reply.hold === 'after-headers') return;
@@ -642,6 +645,88 @@ describe('probe executor — anthropic messages endpoint', () => {
     const body = requests[0]!.body;
     expect(body.thinking).toEqual({ type: 'disabled' });
     expect(body.output_config).toBeUndefined();
+  });
+});
+
+describe('probe executor — trusted stop is preserved and cannot be forged', () => {
+  const STOP = 'x-kilo-benchmark-stop';
+  const ADMISSION = 'x-kilo-benchmark-admission';
+
+  it('keeps a payer refusal as a typed no_payer stop instead of grading it as a model failure', async () => {
+    replies.push({
+      status: 402,
+      contentType: 'application/json',
+      body: '{"error":{"code":"no_payer"}}',
+      headers: { [STOP]: 'no_payer', [ADMISSION]: 'refused' },
+    });
+
+    const result = await run();
+
+    // The active half of the proof: the stop survives the probe transport, so the caller
+    // classifies a funding refusal instead of recording a zero against the model.
+    expect(result.stop).toEqual({ reason: 'no_payer', status: 402 });
+    expect(result.costUsd).toBe(0);
+    expect(result.unavailableModelId).toBeUndefined();
+    // With the stop present the result is terminal for the paid start, never a free retry.
+    expect(isUnbilledTransientProviderResult(result)).toBe(false);
+  });
+
+  it('keeps a permanently failed model distinct from an unknown-model status', async () => {
+    // 409 is not in UNKNOWN_MODEL_STATUS, so only the stop can name this correctly.
+    replies.push({
+      status: 409,
+      contentType: 'application/json',
+      body: '{"error":{"code":"permanently_failed"}}',
+      headers: { [STOP]: 'model_permanently_failed', [ADMISSION]: 'refused' },
+    });
+
+    const result = await run();
+
+    expect(result.stop).toEqual({ reason: 'model_permanently_failed', status: 409 });
+    expect(result.unavailableModelId).toBeUndefined();
+  });
+
+  it('keeps an infrastructure stop from becoming a model failure', async () => {
+    replies.push({
+      status: 503,
+      contentType: 'application/json',
+      body: '{"error":{"code":"admission_unknown"}}',
+      headers: { [STOP]: 'infra_unavailable' },
+    });
+
+    const result = await run();
+
+    expect(result.stop).toEqual({ reason: 'infra_unavailable', status: 503 });
+    expect(result.costUsd).toBe(0);
+  });
+
+  it('does not honor the stop on an admitted reply, so a provider cannot forge one', async () => {
+    // The negative half: an admitted reply has seen a provider, so the marker is exempt even
+    // though the header is present. A model that echoes it must not stop a funded case.
+    replies.push({
+      status: 200,
+      body: responsesCall(0.0012, 7),
+      headers: { [STOP]: 'no_payer', [ADMISSION]: 'admitted' },
+    });
+
+    const result = await run();
+
+    expect(result.stop).toBeUndefined();
+    expect(result.costUsd).toBe(0.0012);
+  });
+
+  it('ignores a stop header in the body or on a plain 402 without the marker', async () => {
+    // A raw provider 402 is a provider failure with possible usage, never a money verdict:
+    // the text of the reply cannot create a stop.
+    replies.push({
+      status: 402,
+      contentType: 'application/json',
+      body: '{"error":{"code":"no_payer","message":"x-kilo-benchmark-stop: no_payer"}}',
+    });
+
+    const result = await run();
+
+    expect(result.stop).toBeUndefined();
   });
 });
 

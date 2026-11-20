@@ -52,7 +52,12 @@ import {
   type CurrentProfileContext,
   type ProfileRow,
 } from './profiles';
-import { parseProfileState, wireProfileFailure, type ProfileStateRow } from './profile-failure';
+import {
+  parseProfileState,
+  wireProfileFailure,
+  type ProfileState,
+  type ProfileStateRow,
+} from './profile-failure';
 import { loadSubscriptionSnapshot } from './subscriptions';
 import { variantFromStorage } from './reasoning-effort';
 import {
@@ -571,19 +576,54 @@ type MeasurementStatus = {
 
 type MeasurementRow = { status: MeasuredStatus | 'unavailable'; failure_reason: string | null };
 
+/**
+ * The failure state of a client-measured row.
+ *
+ * `client_profiles` stores `status`, `failure_reason` and `updated_at` only — no attempt
+ * counters, no class, no `unavailable` state (that is platform-only). Reusing the platform
+ * reader put `undefined` attempt counts on the wire (NaN), so the failure is built from the
+ * row's own columns: one recorded attempt at its last update, always retryable on a fresh
+ * confirmation.
+ */
+function clientRowProfileState(row: ClientProfileRow): ProfileState {
+  const lastFailedAt = row.updated_at;
+  return {
+    kind: 'retryable_failure',
+    runId: null,
+    failure: {
+      failureClass: 'unknown',
+      attempts: 1,
+      firstFailedAt: lastFailedAt,
+      lastFailedAt,
+      reason: boundFailureReason(row.failure_reason),
+    },
+    retryAfter: lastFailedAt,
+  };
+}
+
 function measurementStatus<T extends MeasurementRow>(
   rows: readonly T[],
   isCurrent: (row: T) => boolean,
   measuredAt: (row: T) => string,
-  isComplete?: (row: T) => boolean
+  isComplete?: (row: T) => boolean,
+  /**
+   * How to read this row's failure state. Platform rows share the full registry shape; client
+   * rows have only status/reason/updated_at, so each call site passes its own reader rather
+   * than forcing one schema onto both.
+   */
+  failureState: (row: T) => ProfileState = row =>
+    parseProfileState(row as unknown as ProfileStateRow)
 ): MeasurementStatus {
   const served = newestReadyMeasurement(rows, isCurrent, measuredAt, isComplete);
   if (served) return { status: served.stale ? 'stale' : 'ready', failureReason: null };
   const currentRow = rows.find(isCurrent);
   if (!currentRow) return { status: 'missing', failureReason: null };
   if (currentRow.status === 'failed' || currentRow.status === 'unavailable') {
-    // Client rows share the failure columns; only platform rows reach 'unavailable'.
-    const failure = wireProfileFailure(parseProfileState(currentRow as unknown as ProfileStateRow));
+    // Client rows carry only `status`, `failure_reason`, `updated_at`: they have no attempt
+    // counters, class or timestamps. Parsing them through the platform state reader yields
+    // undefined attempts (NaN on the wire), so the failure is built from what a client row
+    // actually has — a single failed attempt at its own last update.
+    const failure = wireProfileFailure(failureState(currentRow));
     return {
       status: 'failed',
       failureReason: boundFailureReason(currentRow.failure_reason),
@@ -667,7 +707,8 @@ export async function lookupCustomRouterStatuses(
                   clientRows.get(clientPairKey(ref, variant)) ?? [],
                   row => isCurrentClientProfile(row, current),
                   clientMeasuredAt,
-                  clientProfileComplete(context.baseRouter, current.repetitions)
+                  clientProfileComplete(context.baseRouter, current.repetitions),
+                  clientRowProfileState
                 );
             return {
               variant,

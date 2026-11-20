@@ -1232,37 +1232,36 @@ export async function failPaidCasesForUnavailablePair(
   }
 ): Promise<number> {
   const at = new Date(input.now ?? Date.now()).toISOString();
-  const keyPredicate = `engine_identity = ? AND model = ? AND variant = ?`;
+  const pairPredicate = `engine_identity = ? AND model = ? AND variant = ?`;
+  const pairBindings = [input.engineIdentity, input.model, input.variant];
+  // Both statements are keyed on the exact pair AND on the transition this call writes, so a
+  // request row is only failed when its own case run was failed by this very batch. Every
+  // other row of the pair (settled, completed, a later generation, another rep or case) is
+  // untouched. Rep and case are correlated through the case run itself, never by prefix.
   const [runs] = await db.batch([
     db
       .prepare(
         `UPDATE benchmark_case_runs
         SET status = 'failed', failure_reason = ?, settled_at = ?, settlement_id = ?,
           updated_at = ?
-        WHERE ${keyPredicate} AND status IN ('queued', 'running') AND platform_covered = 0`
+        WHERE ${pairPredicate} AND status IN ('queued', 'running') AND platform_covered = 0`
       )
-      .bind(
-        input.reason,
-        at,
-        input.transitionId,
-        at,
-        input.engineIdentity,
-        input.model,
-        input.variant
-      ),
+      .bind(input.reason, at, input.transitionId, at, ...pairBindings),
     db
       .prepare(
         `UPDATE paid_benchmark_request_cases
         SET status = 'failed', reason = ?, updated_at = ?
-        WHERE ${keyPredicate}
-          AND status IN ('queued', 'running')
+        WHERE status IN ('queued', 'running')
           AND EXISTS (
             SELECT 1 FROM benchmark_case_runs AS case_run
-            WHERE case_run.${keyPredicate.replaceAll(' AND ', ' AND case_run.')}
-              AND case_run.status = 'failed' AND case_run.settlement_id = ?
+            WHERE case_run.engine_identity = ? AND case_run.model = ?
+              AND case_run.variant = ? AND case_run.rep = paid_benchmark_request_cases.rep
+              AND case_run.case_id = paid_benchmark_request_cases.case_id
+              AND case_run.status = 'failed'
+              AND case_run.settlement_id = ?
           )`
       )
-      .bind(input.reason, at, input.engineIdentity, input.model, input.variant, input.transitionId),
+      .bind(input.reason, at, ...pairBindings, input.transitionId),
   ]);
   return runs.meta.changes ?? 0;
 }
@@ -1525,8 +1524,11 @@ export async function listPendingPaidCancellations(
     scopeBindings.push(scope.executorRunId);
   }
   if (scope.createdAfter !== undefined) {
+    // `created_at` is an INTEGER epoch-millisecond column, so the caller's epoch value is
+    // compared as an integer. Comparing it to a text column would compare an epoch number to
+    // an ISO string and silently match nothing.
     predicates.push('cancellation.created_at >= ?');
-    scopeBindings.push(scope.createdAfter);
+    scopeBindings.push(Math.trunc(scope.createdAfter));
   }
   const rows = await db
     .prepare(
@@ -3009,12 +3011,26 @@ export async function countCurrentProfilesByStatus(
 export async function listCurrentPlatformProfileStatuses(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number }
-): Promise<Array<{ model: string; variant: string | null; status: BenchmarkProfileStatus }>> {
+): Promise<
+  Array<{
+    model: string;
+    variant: string | null;
+    status: BenchmarkProfileStatus;
+    /**
+     * When this row's current failure settled, or null. The failure transition writes it, so a
+     * copied or migrated row keeps the original instant while a retry timer only moves
+     * `retry_after`. Always selected, so a null value is a real "no failure instant" and never
+     * evidence that licenses a rewrite.
+     */
+    completed_at: string | null;
+  }>
+> {
   const rows = await drizzle(db)
     .select({
       model: benchmarkProfiles.model,
       variant: benchmarkProfiles.variant,
       status: benchmarkProfiles.status,
+      completed_at: benchmarkProfiles.completed_at,
     })
     .from(benchmarkProfiles)
     .where(
@@ -3030,6 +3046,7 @@ export async function listCurrentPlatformProfileStatuses(
     model: row.model,
     variant: variantFromStorage(row.variant),
     status: row.status === 'unavailable' ? 'failed' : row.status,
+    completed_at: row.completed_at,
   }));
 }
 

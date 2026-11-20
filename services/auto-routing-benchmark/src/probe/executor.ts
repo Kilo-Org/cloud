@@ -3,6 +3,8 @@ import {
   DECIDER_CLI_TIMEOUT_MS,
   PROBE_GATEWAY_ENDPOINTS,
   fetchProbeThroughRunner,
+  trustedCaseStop,
+  type BenchmarkCaseStop,
   type CliRunResult,
   type CaseInferenceProxy,
   type PaidLaunchExecutionKey,
@@ -111,7 +113,11 @@ function emptyTools() {
 }
 
 /** A reply-less result the existing unbilled/transient classification understands. */
-function unbilledFailure(stderr: string, latencyMs: number): CliRunResult {
+function unbilledFailure(
+  stderr: string,
+  latencyMs: number,
+  stop?: BenchmarkCaseStop
+): CliRunResult {
   return {
     text: '',
     costUsd: 0,
@@ -126,6 +132,7 @@ function unbilledFailure(stderr: string, latencyMs: number): CliRunResult {
     lastEventTypes: ['error'],
     tools: emptyTools(),
     timedOut: false,
+    ...(stop === undefined ? {} : { stop }),
   };
 }
 
@@ -248,14 +255,30 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
     if (!isTimeout(error, signal)) throw error;
     return { ...unbilledFailure(PROBE_TIMEOUT_DIAGNOSTIC, Date.now() - startedAt), timedOut: true };
   }
+  // A Worker refusal carries a trusted stop; an admitted upstream reply never does, so a
+  // provider body cannot stop a case. Reading it here is what keeps a payment refusal from
+  // being graded as a model failure: without the stop, the caller below sees an ordinary
+  // unbilled HTTP failure and records a zero against the model.
+  const stop = trustedCaseStop(response);
   if (!response.ok) {
     const detail = (await response.text().catch(() => '')).slice(0, 400);
     const latencyMs = Date.now() - startedAt;
     const stderr = `HTTP ${response.status} ${detail}`;
+    // A stop names why the Worker ended the case, so it wins over the status heuristic:
+    // `model_permanently_failed` must never be reported as an unknown-model retry, and a
+    // refusal must not depend on which status happened to carry it.
+    if (stop !== null) return unbilledFailure(stderr, latencyMs, stop);
     if (UNKNOWN_MODEL_STATUS.has(response.status)) {
       return { ...unbilledFailure(stderr, latencyMs), unavailableModelId: request.model };
     }
     return unbilledFailure(stderr, latencyMs);
+  }
+
+  if (stop !== null) {
+    // A Worker refusal is never a measurement, whatever status carried it. This cannot
+    // happen on the current wire (refusals are non-2xx), but grading it as a reply would
+    // silently convert a funding stop into a model outcome, so it fails closed here too.
+    return unbilledFailure(`HTTP ${response.status}`, Date.now() - startedAt, stop);
   }
 
   const read = await readStream(response);

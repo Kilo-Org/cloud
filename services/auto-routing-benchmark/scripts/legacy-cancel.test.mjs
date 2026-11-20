@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -1213,16 +1213,26 @@ test('the script never reads a cutover, timestamp column or 0038 table', async (
     assert.equal(code, EXIT.ok);
     assert.ok(seen.length > 5);
     for (const sql of seen) {
+      // `benchmark_cutover` may only be PROBED for presence (the fail-closed post-cutover
+      // detector). No paid-flow table or column may be read for data, and nothing from them
+      // may be written.
+      const cutoverProbe = sql.includes("type = 'table' AND name = 'benchmark_cutover'");
+      const cutoverColumnProbe = sql.includes("pragma_table_info('benchmark_runs')");
       for (const forbidden of [
-        'benchmark_cutover',
         'paid_benchmark_',
         'benchmark_case_runs',
         'benchmark_case_payers',
         'paid_model_requests',
         'profile_attempt_history',
+        'admission_marker',
       ]) {
+        if (forbidden === 'admission_marker' && cutoverColumnProbe) continue;
         assert.ok(!sql.includes(forbidden), `${forbidden} must never be read or written`);
       }
+      if (sql.includes('benchmark_cutover') && !cutoverProbe) {
+        assert.fail('benchmark_cutover may only be probed for presence, never read for data');
+      }
+      assert.doesNotMatch(sql, /SELECT[^;]*cutover_at[^;]*FROM benchmark_cutover/i);
       // No decision may be made from a clock or from a stored cutover instant. Comparing a
       // column to the fixed PARKED_REQUESTED_AT sentinel is allowed (it is not a clock), so
       // the ban is specifically on time functions and the cutover marker.
@@ -1232,6 +1242,243 @@ test('the script never reads a cutover, timestamp column or 0038 table', async (
         'no clock or cutover comparison may gate a decision'
       );
     }
+  } finally {
+    f.close();
+  }
+});
+
+// ---- post-cutover refusal: the real 0038 schema must be untouchable -----------------------
+//
+// Every table the legacy cancel needs survives migration 0038, so nothing in the write path can
+// tell the two schemas apart. Cancelling by `status = 'running'` would therefore take a run a user
+// explicitly confirmed through the paid flow — a legitimate click under the hold. These tests
+// migrate a REAL database through 0038, seed a marked run, and prove the script refuses without
+// mutating a byte.
+
+/** Apply every migration including 0038, i.e. the schema after the paid cutover. */
+function migrateThroughCutover(sqlite) {
+  for (const name of readdirSync(migrations)
+    .filter(n => n.endsWith('.sql'))
+    .sort()) {
+    sqlite.exec(readFileSync(new URL(name, migrations), 'utf8'));
+  }
+  const cutover = sqlite
+    .prepare(
+      "SELECT COUNT(*) AS n FROM pragma_table_info('benchmark_runs') WHERE name = 'admission_marker'"
+    )
+    .get();
+  assert.equal(cutover.n, 1, 'migration 0038 must add benchmark_runs.admission_marker');
+}
+
+function cutoverFixture() {
+  const directory = mkdtempSync(join(tmpdir(), 'legacy-cancel-cutover-'));
+  const path = join(directory, 'benchmark.sqlite');
+  const sqlite = new DatabaseSync(path);
+  sqlite.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000');
+  migrateThroughCutover(sqlite);
+  return {
+    directory,
+    path,
+    sqlite,
+    close() {
+      sqlite.close();
+      rmSync(directory, { recursive: true, force: true });
+    },
+  };
+}
+
+function seedPaidRun(sqlite, { id, marker = 'paid:req-1', status = 'running' }) {
+  sqlite
+    .prepare(
+      `INSERT INTO benchmark_runs (id, router, kind, status, started_at, min_accuracy,
+         switch_cost_factor, best_accuracy_switch_threshold, max_concurrency, benchmark_user_id,
+         benchmark_org_id, repetitions, engine_identity, purpose, measurement_revision,
+         accuracy_noise_band, frontier_min_accuracy_delta, admission_marker)
+       VALUES (?, 'efficient', 'decider', ?, '2026-11-20T16:00:00.000Z', 0.9, 1, 0.05, 250,
+         'bench-user', 'bench-org', 1, ?, 'user', 3, 0.05, 0, ?)`
+    )
+    .run(id, status, ENGINE, marker);
+  insertProfile(sqlite, { model: `vendor/${id}`, status: 'running', runId: id });
+  insertChunk(sqlite, { runId: id, model: `vendor/${id}`, chunk: 0, status: 'pending' });
+  insertChunk(sqlite, { runId: id, model: `vendor/${id}`, chunk: 1, status: 'queued' });
+}
+
+test('post-cutover: --apply refuses and mutates nothing while a paid run is live', async () => {
+  const f = cutoverFixture();
+  try {
+    holdOperatorLease(f.sqlite);
+    seedPaidRun(f.sqlite, { id: 'run-paid-1' });
+    const payload = f.sqlite
+      .prepare("SELECT *, 'x' AS untouched FROM benchmark_runs WHERE id = 'run-paid-1'")
+      .get();
+    const before = readAll(f.sqlite);
+
+    const result = await run(f.path, ['--apply', ...BASE_ARGS]);
+    assert.equal(result.code, EXIT.verifyFailed, JSON.stringify(result.events));
+    assert.match(result.last('verify_failed').reason, /post-cutover/);
+    assert.deepEqual(readAll(f.sqlite), before, 'a refused apply must not write');
+    assert.deepEqual(
+      {
+        ...f.sqlite
+          .prepare("SELECT *, 'x' AS untouched FROM benchmark_runs WHERE id = 'run-paid-1'")
+          .get(),
+      },
+      { ...payload }
+    );
+    // The legitimate user click is still running, with its chunks still queued/pending.
+    assert.equal(
+      f.sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM benchmark_runs WHERE status='running' AND admission_marker IS NOT NULL"
+        )
+        .get().n,
+      1
+    );
+    assert.equal(
+      f.sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM scheduler_chunks WHERE status IN ('pending','queued','active')"
+        )
+        .get().n,
+      2
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('post-cutover: --dry-run and --verify also refuse, and never write', async () => {
+  const f = cutoverFixture();
+  try {
+    holdOperatorLease(f.sqlite);
+    seedPaidRun(f.sqlite, { id: 'run-paid-1' });
+    const baseline = join(f.directory, 'baseline.json');
+    const before = readAll(f.sqlite);
+    for (const argv of [
+      ['--dry-run', ...BASE_ARGS],
+      ['--verify', ...BASE_ARGS, '--baseline', baseline],
+    ]) {
+      const result = await run(f.path, argv);
+      assert.equal(
+        result.code,
+        EXIT.verifyFailed,
+        `${argv[0]} must refuse: ${JSON.stringify(result.events)}`
+      );
+      assert.match(result.last('verify_failed').reason, /post-cutover/);
+      assert.deepEqual(readAll(f.sqlite), before);
+    }
+    // No baseline was produced by a refused run.
+    assert.equal(existsSync(baseline), false);
+  } finally {
+    f.close();
+  }
+});
+
+test('post-cutover: the cutover column alone is enough, even with no cutover row yet', async () => {
+  const f = cutoverFixture();
+  try {
+    holdOperatorLease(f.sqlite);
+    // 0038 adds the column; the cutover row is claimed only by the first new-worker pass.
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_cutover').get().n, 0);
+    f.sqlite.exec('DROP TABLE benchmark_cutover');
+    seedPaidRun(f.sqlite, { id: 'run-paid-1' });
+    const before = readAll(f.sqlite);
+    const result = await run(f.path, ['--apply', ...BASE_ARGS]);
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(result.last('verify_failed').reason, /admission_marker=1/);
+    assert.deepEqual(readAll(f.sqlite), before);
+  } finally {
+    f.close();
+  }
+});
+
+test('post-cutover: --legacy-residue is read-only and diffs legacy from paid work', async () => {
+  const f = cutoverFixture();
+  try {
+    holdOperatorLease(f.sqlite);
+    seedPaidRun(f.sqlite, { id: 'run-paid-1' });
+    // A legacy run that survived the cutover: unmarked, still running, with runnable chunks.
+    f.sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, status, started_at, min_accuracy,
+           switch_cost_factor, best_accuracy_switch_threshold, max_concurrency, benchmark_user_id,
+           benchmark_org_id, repetitions, engine_identity, purpose, measurement_revision,
+           accuracy_noise_band, frontier_min_accuracy_delta)
+         VALUES ('run-legacy-1','efficient','decider','running','2026-11-20T06:00:00.000Z',0.9,1,0.05,250,
+           'bench-user','bench-org',1,?, 'platform',3,0.05,0)`
+      )
+      .run(ENGINE);
+    insertChunk(f.sqlite, {
+      runId: 'run-legacy-1',
+      model: 'vendor/legacy',
+      chunk: 0,
+      status: 'pending',
+    });
+    const before = readAll(f.sqlite);
+
+    const result = await run(f.path, ['--legacy-residue', ...BASE_ARGS]);
+    assert.equal(result.code, EXIT.verifyFailed, 'unexpected legacy work must fail the check');
+    const residue = result.last('legacy_residue');
+    assert.equal(residue.legacy_running_runs, 1);
+    assert.equal(residue.legacy_unfinished_chunks, 1);
+    assert.equal(residue.paid_running_runs, 1);
+    assert.equal(residue.paid_unfinished_chunks, 2);
+    assert.match(
+      result.last('legacy_residue_unexpected').action,
+      /do not re-run the legacy cancel/
+    );
+    assert.deepEqual(readAll(f.sqlite), before, 'the residue report must never write');
+
+    // With the legacy run retired, only the expected paid run remains, and the check passes.
+    f.sqlite.prepare("UPDATE benchmark_runs SET status='failed' WHERE id='run-legacy-1'").run();
+    f.sqlite
+      .prepare("UPDATE scheduler_chunks SET status='completed' WHERE run_id='run-legacy-1'")
+      .run();
+    const clean = await run(f.path, ['--legacy-residue', ...BASE_ARGS]);
+    assert.equal(clean.code, EXIT.ok, JSON.stringify(clean.events));
+    assert.equal(
+      clean.last('legacy_residue').paid_running_runs,
+      1,
+      'a user click is expected, not cancelled'
+    );
+    assert.equal(clean.last('legacy_residue_ok').action, 'none');
+  } finally {
+    f.close();
+  }
+});
+
+test('post-cutover: --legacy-residue is refused on a pre-cutover database', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const before = readAll(f.sqlite);
+    const result = await run(f.path, ['--legacy-residue', ...BASE_ARGS]);
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(result.last('verify_failed').reason, /pre-cutover/);
+    assert.deepEqual(readAll(f.sqlite), before);
+  } finally {
+    f.close();
+  }
+});
+
+test('the pre-cutover fixture is unaffected: the guard does not fire on 0037', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const [probe] = f.sqlite
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='benchmark_cutover') AS cutover_table,
+                (SELECT COUNT(*) FROM pragma_table_info('benchmark_runs') WHERE name='admission_marker') AS cutover_column`
+      )
+      .all();
+    assert.equal(probe.cutover_table, 0);
+    assert.equal(probe.cutover_column, 0);
+    const result = await run(f.path, ['--apply', ...BASE_ARGS]);
+    assert.equal(result.code, EXIT.ok, JSON.stringify(result.events));
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_runs WHERE status='running'").get().n,
+      0
+    );
   } finally {
     f.close();
   }

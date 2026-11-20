@@ -760,7 +760,53 @@ export async function publishPlatformRoutingTable(
         .first();
       return rows !== null;
     })());
-  if (!desiredChanged && !freshlyMeasured && !policyChanged && !options.allowConfigOnlyPublish) {
+  // A pair the live table actually serves, that is still a target, and that has no ready row
+  // under this engine would drop out of a rebuild. A measurement in flight is still coming;
+  // a settled failure is not, and holding on it would freeze every other table change for the
+  // router until an operator re-admitted that pair by hand.
+  //
+  // This is read from what the live table serves (`publishedPairs`), never from the desired set,
+  // so a pair the artifact never contained — a legacy permanent failure, or one already omitted
+  // by an earlier post-cutover publish — cannot license a rewrite of an unchanged artifact.
+  // One read carries both the status and the failure instant, so the two facts can never disagree
+  // (a separate query could observe a row mid-transition).
+  const statusesByPair = new Map(
+    (await listCurrentPlatformProfileStatuses(env.BENCH_DB, current)).map(row => [
+      exactPairKey(row.model, row.variant),
+      row,
+    ])
+  );
+  const readyPairKeys = new Set(
+    readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant))
+  );
+  const servedButUnready = [...publishedPairs.values()].filter(pair => {
+    const key = exactPairKey(pair.model, pair.variant);
+    return !readyPairKeys.has(key) && targets.has(key);
+  });
+  // Only a failure that settled *after* the durable cutover marker may trigger a rewrite. A pair
+  // that was already failed when the artifact was carried over keeps its old failure instant
+  // forever, so neither the first tick nor the second (after `desiredPairs` bootstraps) can
+  // reclassify it. `completed_at` is the failure transition's own timestamp, so a retry timer
+  // elapsing moves `retry_after` and never this. A row with no failure instant fails closed.
+  const settledDrops = servedButUnready.filter(pair => {
+    const row = statusesByPair.get(exactPairKey(pair.model, pair.variant));
+    return (
+      row !== undefined &&
+      row.status === 'failed' &&
+      row.completed_at !== null &&
+      row.completed_at > cutoverAt
+    );
+  });
+  // A served pair settling into a failure is a genuine post-cutover change, so it publishes even
+  // though the desired membership did not move. Everything else about an unchanged pool stays a
+  // no-op: a deploy replay or an untouched legacy configuration never rewrites the artifact.
+  if (
+    !desiredChanged &&
+    !freshlyMeasured &&
+    !policyChanged &&
+    settledDrops.length === 0 &&
+    !options.allowConfigOnlyPublish
+  ) {
     // An unchanged pool is never rebuilt (rebuilding could narrow rev3 eligibility), but an
     // admin save still asked for the gateway cache to be repaired: reuse the live artifact,
     // re-point readers at its version and drop exactly the routing-table KV key. No table is
@@ -787,25 +833,14 @@ export async function publishPlatformRoutingTable(
     );
     return null;
   }
-  const readyPairs = new Set(
-    readyEntries.map(({ entry }) => exactPairKey(entry.model, entry.variant))
-  );
-  const statuses = await listCurrentPlatformProfileStatuses(env.BENCH_DB, current);
-  const statusByPair = new Map(
-    statuses.map(row => [exactPairKey(row.model, row.variant), row.status])
-  );
-  const livePairs = publishedPairs;
-  const unreadyLivePairs = [...livePairs.values()].filter(pair => {
-    const key = exactPairKey(pair.model, pair.variant);
-    return !readyPairs.has(key) && targets.has(key);
-  });
   // A settled failure is a row that will not be measured again on its own: `failed` after
   // its retry window, or a permanent `unavailable` — which `listCurrentPlatformProfileStatuses`
   // reports as `failed` (db.ts), so both arrive here in one class. A `pending`/`running` row
   // is a measurement in flight, and a missing row is an engine the registry has not touched
   // yet; those keep holding the table.
   const settledFailure = (pair: { model: string; variant: string | null }) =>
-    statusByPair.get(exactPairKey(pair.model, pair.variant)) === 'failed';
+    statusesByPair.get(exactPairKey(pair.model, pair.variant))?.status === 'failed';
+  const unreadyLivePairs = servedButUnready;
   const dropped = unreadyLivePairs.find(pair => !settledFailure(pair));
   if (dropped) {
     console.log(
@@ -813,12 +848,13 @@ export async function publishPlatformRoutingTable(
         event: 'routing_table_publish_skipped_serving_pair_unready',
         model: dropped.model,
         variant: dropped.variant,
-        status: statusByPair.get(exactPairKey(dropped.model, dropped.variant)) ?? 'missing',
+        status:
+          statusesByPair.get(exactPairKey(dropped.model, dropped.variant))?.status ?? 'missing',
       })
     );
     return null;
   }
-  const leftOut = unreadyLivePairs.filter(settledFailure);
+  const leftOut = settledDrops;
   if (leftOut.length > 0)
     console.log(
       JSON.stringify({
@@ -827,7 +863,7 @@ export async function publishPlatformRoutingTable(
         dropped: leftOut.map(pair => ({
           model: pair.model,
           variant: pair.variant,
-          status: statusByPair.get(exactPairKey(pair.model, pair.variant)),
+          status: statusesByPair.get(exactPairKey(pair.model, pair.variant))?.status,
         })),
       })
     );

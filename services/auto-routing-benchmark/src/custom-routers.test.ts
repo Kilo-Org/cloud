@@ -177,6 +177,31 @@ describe('custom router tables and statuses (real SQLite)', () => {
     ]);
   });
 
+  it('reports a failing client row with a finite attempt count and its reason', async () => {
+    // A genuine failed client row round trip: client_profiles has no attempt counters, class
+    // or `unavailable` state, so the reported failure must be one concrete attempt with the
+    // row's own reason — never `undefined`/NaN on the wire.
+    clientProfile({ id: 'current', accuracy: 0.4, updatedAt: '2026-10-10' });
+    sqlite.exec(`UPDATE client_profiles SET status = 'failed',
+      failure_reason = 'Client evaluation failed on this device.'`);
+    const statuses = await lookupCustomRouterStatuses(db, CONFIG, clientOnly, source);
+    const variant = statuses.entries[0]?.variants[0];
+    expect(variant).toMatchObject({
+      status: 'failed',
+      availability: 'unbenchmarked',
+      failure: {
+        kind: 'retryable',
+        attempts: 1,
+        failureClass: 'unknown',
+        reason: 'Client evaluation failed on this device.',
+      },
+    });
+    expect(Number.isFinite(variant?.failure?.attempts)).toBe(true);
+    // The whole payload stays JSON-clean: a NaN would serialize as null.
+    expect(JSON.parse(JSON.stringify(variant))).toEqual(JSON.parse(JSON.stringify(variant)));
+    expect(JSON.stringify(variant)).not.toContain('null,"attempts"');
+  });
+
   it('serves an older-engine measurement flagged stale', async () => {
     clientProfile({ id: 'old', engine: OLD_ENGINE, accuracy: 0.8, updatedAt: '2026-10-01' });
     const { table } = await assembleCustomRouterTable(db, CONFIG, clientOnly, source);

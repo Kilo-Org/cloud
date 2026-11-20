@@ -902,7 +902,11 @@ const server = createServer(
         }
         const callback = isResultCallback(resultCallback) ? resultCallback : null;
         const context = executionContext(callback, model, variant);
-        const job = createCaseRunJob(callback?.execution);
+        // Validate the case envelope BEFORE registering the job. `createCaseRunJob` inserts
+        // this generation into `activeCases`, and rejecting after that point stranded the
+        // entry with no release and no `not_started` delivery: the generation then looked
+        // active forever, so every later cancel reported 'dequeued' and every retry of the
+        // same case was refused as a duplicate. Nothing here touches state on failure.
         let proxy = null;
         if (inferenceProxy !== undefined && inferenceProxy !== null) {
           proxy = parseCaseProxy(inferenceProxy);
@@ -911,6 +915,7 @@ const server = createServer(
             return;
           }
         }
+        const job = createCaseRunJob(callback?.execution);
         logCaseEvent('benchmark_container_case_accepted', context, {
           outcome: 'pending',
           category: 'queued',

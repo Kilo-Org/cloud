@@ -364,8 +364,8 @@ beforeEach(() => {
   vi.mocked(listCurrentPlatformProfileStatuses)
     .mockReset()
     .mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
-      { model: 'platform/b', variant: 'high', status: 'ready' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
+      { model: 'platform/b', variant: 'high', status: 'ready', completed_at: null },
     ]);
   vi.mocked(fetchExecutableBenchmarkModelCatalog)
     .mockReset()
@@ -1041,10 +1041,10 @@ describe('decider run completion', () => {
     // A newly admitted pair is still measuring: it is not served yet, so it must
     // not hold back the pairs that are.
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
-      { model: 'platform/b', variant: 'high', status: 'ready' },
-      { model: 'platform/c', variant: 'max', status: 'running' },
-      { model: 'platform/d', variant: 'low', status: 'pending' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
+      { model: 'platform/b', variant: 'high', status: 'ready', completed_at: null },
+      { model: 'platform/c', variant: 'max', status: 'running', completed_at: null },
+      { model: 'platform/d', variant: 'low', status: 'pending', completed_at: null },
     ]);
 
     await finalizeVia(runId, 'platform/a', null);
@@ -1090,8 +1090,8 @@ describe('decider run completion', () => {
       { model: 'platform/a', variant: '', run_id: 'decider-publish-2' },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
-      { model: 'platform/b', variant: 'high', status: 'running' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
+      { model: 'platform/b', variant: 'high', status: 'running', completed_at: null },
     ]);
     vi.mocked(getSummariesForRuns).mockResolvedValue(
       TAXONOMY_ROUTE_KEYS.map(routeKey => ({
@@ -1135,7 +1135,7 @@ describe('decider run completion', () => {
       { model: 'platform/a', variant: '', run_id: 'decider-publish-3' },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
     ]);
     vi.mocked(getSummariesForRuns).mockResolvedValue(
       TAXONOMY_ROUTE_KEYS.map(routeKey => ({
@@ -1178,8 +1178,14 @@ describe('decider run completion', () => {
       { model: 'platform/a', variant: '', run_id: 'decider-publish-4' },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
-      { model: 'platform/b', variant: 'high', status: 'failed' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
+      // The failure settled after the stored cutover, so it is a genuine post-cutover drop.
+      {
+        model: 'platform/b',
+        variant: 'high',
+        status: 'failed',
+        completed_at: '2026-02-01T00:00:00.000Z',
+      },
     ]);
     vi.mocked(getSummariesForRuns).mockResolvedValue(
       TAXONOMY_ROUTE_KEYS.map(routeKey => ({
@@ -1268,8 +1274,8 @@ describe('decider run completion', () => {
       { model: 'platform/a', variant: '', run_id: 'bump-a' },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
-      { model: 'platform/b', variant: 'high', status: 'pending' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
+      { model: 'platform/b', variant: 'high', status: 'pending', completed_at: null },
     ]);
     vi.mocked(getSummariesForRuns).mockResolvedValue(summariesFor('platform/a', null, 'bump-a'));
 
@@ -1296,8 +1302,8 @@ describe('decider run completion', () => {
       { model: 'platform/b', variant: 'high', run_id: 'bump-b' },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
-      { model: 'platform/b', variant: 'high', status: 'ready' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
+      { model: 'platform/b', variant: 'high', status: 'ready', completed_at: null },
     ]);
     vi.mocked(getSummariesForRuns).mockResolvedValue([
       ...summariesFor('platform/a', null, 'bump-a'),
@@ -1357,8 +1363,8 @@ describe('decider run completion', () => {
       },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
-      { model: 'platform/b', variant: 'high', status: 'ready' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
+      { model: 'platform/b', variant: 'high', status: 'ready', completed_at: null },
     ]);
     // `a` finished its tool-evidence re-measure; `b` still serves its older measurement.
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
@@ -1549,8 +1555,8 @@ describe('decider run completion', () => {
       },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: 'platform/a', variant: null, status: 'ready' },
-      { model: 'platform/b', variant: 'high', status: 'ready' },
+      { model: 'platform/a', variant: null, status: 'ready', completed_at: null },
+      { model: 'platform/b', variant: 'high', status: 'ready', completed_at: null },
     ]);
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model: 'platform/a', variant: '', run_id: 'frontier-revision-3' },

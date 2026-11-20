@@ -1897,9 +1897,9 @@ describe('GET /admin/registry', () => {
   it('exposes exact current platform-pair coverage separately from aggregate queue counts', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     const platformEntries = [
-      { model: 'model/a', variant: 'thinking', status: 'ready' as const },
-      { model: 'model/a', variant: 'instant', status: 'failed' as const },
-      { model: 'model/b', variant: null, status: 'pending' as const },
+      { model: 'model/a', variant: 'thinking', status: 'ready' as const, completed_at: null },
+      { model: 'model/a', variant: 'instant', status: 'failed' as const, completed_at: null },
+      { model: 'model/b', variant: null, status: 'pending' as const, completed_at: null },
     ];
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue(platformEntries);
     const response = await authedGet('/admin/registry');

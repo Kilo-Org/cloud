@@ -331,8 +331,9 @@ are read-only; step 2 cancels legacy work under the hold before the deploy, as d
    then `--apply --remote --baseline-out <path>`, then `--verify --remote --baseline <path>` as the
    last pre-deploy gate — passing the exact held `--expect-token` and a `--min-remaining-ms` floor.
    Deploy only on exit `0`; exit `3` is a lease-guard refusal (wrong token or too little lease
-   left), `4` means live work remained or a protected artifact moved (re-apply, then re-verify),
-   and `5` is a D1/transport error. The cancel fences every unfinished legacy run and its chunks,
+   left), `4` means live work remained or a protected artifact moved (while still pre-migration,
+   re-apply then re-verify; after migration 0038 never re-run — use step 3), and `5` is a
+   D1/transport error. The cancel fences every unfinished legacy run and its chunks,
    parks profile and re-measure claims, keeps a parked re-measure claim with its `run_id` so no
    claim path (which requires `run_id IS NULL`) can take it, and preserves completed results,
    summaries, lane records, routing artifacts and finished profile rows; a cancelled run is
@@ -341,12 +342,20 @@ are read-only; step 2 cancels legacy work under the hold before the deploy, as d
    Then confirm no run is `running`, no chunk is `pending`, `queued` or `active`, and no paid
    request is `active` with unsettled cases. This is a required verification before merge and
    deploy.
-3. After the deploy and before release: confirm every legacy run is terminally cancelled (none
-   queued, paused, or resumable) and re-run the two late read-only checks — no decider run
-   `running` with chunks in pending/queued/active (re-apply the idempotent cancel if nonzero), and
-   no paid request `preparing`/`active` with a running case — then confirm the engine identity and
-   measurement revision are unchanged, the ready-pair counts did not move, the published versions
-   did not change, no profile moved to `pending`, and no new `benchmark_runs` row exists. Per saved
+3. After the deploy and before release: run the late read-only checks with
+   `scripts/legacy-cancel.mjs --legacy-residue --remote` — the only mode defined for the
+   post-cutover schema. It reports legacy work (a run with `benchmark_runs.admission_marker IS
+   NULL`, the same predicate the paid Worker uses) separately from paid work, is read-only, and
+   exits `4` if any legacy run is `running` or any legacy chunk is `pending`/`queued`/`active`.
+   `--dry-run`, `--apply` and `--verify` all refuse on a post-cutover database (exit `4`, no
+   writes): every table they need survives migration 0038, so on that schema they cannot tell a
+   legacy run from a run a user explicitly confirmed through the paid flow. **Never re-run the
+   legacy cancel after the deploy.** A nonzero legacy count means keep the hold and escalate;
+   canceling anything at that point is wrong. A paid request or paid run that is live while the
+   hold is retained is expected — a user click under the hold is a legitimate confirmation and is
+   never a reason to cancel. Then confirm the engine identity and measurement revision are
+   unchanged, the ready-pair counts did not move, the published versions did not change, no
+   profile moved to `pending`, and no new `benchmark_runs` row exists. Per saved
    pool, compare the routing-table bytes and each model row's classification (active,
    benchmarking, paused, permanently failed, alias re-benchmark needed): an already correctly
    benchmarked pool must keep the same table and need no quote or click.

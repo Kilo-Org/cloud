@@ -496,7 +496,7 @@ beforeEach(async () => {
   vi.mocked(syncSubscriptionSnapshot).mockResolvedValue(snapshot);
   vi.mocked(servingSubscriptionSnapshot).mockResolvedValue(snapshot);
   vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-    { model, variant: 'max', status: 'ready' },
+    { model, variant: 'max', status: 'ready', completed_at: null },
   ]);
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
@@ -3093,8 +3093,15 @@ describe('publishPlatformRoutingTable — a live pair that lost its measurement'
       { model: steady, variant: '', run_id: 'run-steady' },
     ]);
     vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
-      { model: steady, variant: null, status: 'ready' },
-      { model: target, variant: null, status },
+      { model: steady, variant: null, status: 'ready', completed_at: null },
+      {
+        model: target,
+        variant: null,
+        status,
+        // Only a failure that settled after the cutover is a publishable drop; a pending or
+        // running row has no failure instant and must stay a hold.
+        completed_at: status === 'failed' ? '2026-02-01T00:00:00.000Z' : null,
+      },
     ]);
     vi.mocked(getLatestRoutingTable).mockResolvedValue({
       table: {

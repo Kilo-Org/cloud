@@ -743,6 +743,108 @@ describe('a reply that never reached admission', () => {
     expect(await response.json()).toMatchObject({ error: { code: 'admission_unknown' } });
   });
 
+  it('never rotates or detaches a payer for a rejected assignment envelope', async () => {
+    // The gateway answers 401 for an envelope it cannot authenticate. That proves nothing
+    // about the payer, so the route must stop without rotating to another account and
+    // without detaching this one — a detach here would blame an innocent payer for a
+    // Worker signing bug.
+    gatewayReplies = [
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 'benchmark_assignment_invalid',
+            reason: 'assignment_invalid',
+            retryable: false,
+          },
+        }),
+        {
+          status: 401,
+          headers: { 'content-type': 'application/json', ...admissionHeaders('refused') },
+        }
+      ),
+    ];
+    let resolutions = 0;
+    let refusals = 0;
+    const response = await handleCaseInference(
+      deps({
+        resolvePayer: async () => {
+          resolutions += 1;
+          return PAYER;
+        },
+        refusePayer: async () => {
+          refusals += 1;
+          return true;
+        },
+      }),
+      { api: 'chat/completions', request: await request(), db }
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('x-kilo-benchmark-stop')).toBe('infra_unavailable');
+    expect(await response.json()).toMatchObject({ error: { code: 'assignment_invalid' } });
+    // Exactly one attempt, no rotation, and crucially NO detach of the payer.
+    expect(resolutions).toBe(1);
+    expect(refusals).toBe(0);
+    expect(upstream).toHaveLength(1);
+  });
+
+  it('does not mistake a 401 assignment refusal for a funding verdict', async () => {
+    // A status-only check would read 401 as a credential/payment failure. The typed reason
+    // must win: no `no_payer`, no pause of the plan, no charge.
+    gatewayReplies = [
+      new Response(
+        JSON.stringify({
+          error: { code: 'benchmark_assignment_invalid', reason: 'assignment_invalid' },
+        }),
+        {
+          status: 401,
+          headers: { 'content-type': 'application/json', ...admissionHeaders('refused') },
+        }
+      ),
+    ];
+    const response = await handleCaseInference(deps(), {
+      api: 'chat/completions',
+      request: await request(),
+      db,
+    });
+
+    expect(response.headers.get('x-kilo-benchmark-stop')).not.toBe('no_payer');
+    expect(await response.json()).toMatchObject({ error: { code: 'assignment_invalid' } });
+  });
+
+  it('still detaches a payer for a genuine payer_unavailable, unlike a bad envelope', async () => {
+    // The contrast that makes the new reason meaningful: a resolvable-but-unbillable payer IS
+    // this account's problem, so it still detaches. A rejected envelope never does.
+    gatewayReplies = [
+      new Response(
+        JSON.stringify({ error: { code: 'benchmark_payer_refused', reason: 'payer_unavailable' } }),
+        {
+          status: 402,
+          headers: { 'content-type': 'application/json', ...admissionHeaders('refused') },
+        }
+      ),
+      sse(),
+    ];
+    let refusals = 0;
+    let assignments = 0;
+    const response = await handleCaseInference(
+      deps({
+        resolvePayer: async () => {
+          assignments += 1;
+          return { ...PAYER, assignmentId: `assignment-${assignments}` };
+        },
+        refusePayer: async () => {
+          refusals += 1;
+          return true;
+        },
+      }),
+      { api: 'chat/completions', request: await request(), db }
+    );
+
+    expect(response.status).toBe(200);
+    expect(refusals).toBe(1);
+  });
+
   it('classifies a pre-provider admission_unavailable refusal as infrastructure, not a model outcome', async () => {
     gatewayReplies = [
       new Response(

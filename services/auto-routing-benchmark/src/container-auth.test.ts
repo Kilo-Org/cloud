@@ -1196,6 +1196,62 @@ it('refuses a second subprocess for the same paid generation without reporting i
   expect(JSON.parse(fetch.mock.calls[0][1].body as string).outcome.kind).toBe('completed');
 });
 
+it('rejects a malformed inferenceProxy without consuming the generation', async () => {
+  // The regression: validation used to run after `createCaseRunJob`, which registers the
+  // generation in `activeCases`. The early return then left that entry behind with no
+  // release, so the case looked active forever: every later cancel reported 'dequeued' and
+  // a legitimate retry was refused as a duplicate. Nothing below may touch job state.
+  await loadServer();
+  const callback = paidCallback(4_000);
+
+  const malformed = request('/run', {
+    ...runBody,
+    resultCallback: callback,
+    inferenceProxy: { url: 'not a url', authorization: '', invocation: '' },
+  });
+  await flushServer();
+
+  expect(await malformed.done).toEqual({
+    status: 400,
+    body: { error: 'inferenceProxy is malformed' },
+  });
+  // No subprocess started and nothing was reported for this generation.
+  expect(mocks.spawn).not.toHaveBeenCalled();
+
+  // The valid replay of the SAME generation must run, which is only possible if the failed
+  // envelope left no active entry behind.
+  mocks.spawn.mockClear();
+  const valid = request('/run', { ...runBody, resultCallback: callback });
+  await flushServer();
+  expect(mocks.spawn).toHaveBeenCalledOnce();
+  mocks.children[0].emit('close', 0);
+  expect((await valid.done).status).toBe(200);
+});
+
+it('leaves the generation cancellable after a malformed inferenceProxy', async () => {
+  // The second half of the leak: a stranded `activeCases` entry with no `stop` made
+  // `cancelCase` answer 'dequeued' for a case that never ran, so a pause looked applied
+  // while nothing was there to stop.
+  await loadServer();
+  const callback = paidCallback(4_000);
+  const malformed = request('/run', {
+    ...runBody,
+    resultCallback: callback,
+    inferenceProxy: { url: 'not a url', authorization: '', invocation: '' },
+  });
+  await flushServer();
+  await malformed.done;
+
+  const cancel = request('/cancel', { execution: callback.execution });
+  await flushServer();
+  // Nothing of this generation was ever active, so the cancel is stale, not 'dequeued'.
+  // With the leak, the stranded entry would have reported 'dequeued' here.
+  expect(await cancel.done).toEqual({
+    status: 200,
+    body: { state: 'not_running', cancelled: false },
+  });
+});
+
 it('refuses a cancel without the ledger generation', async () => {
   await loadServer();
 

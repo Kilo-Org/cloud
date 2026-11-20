@@ -2141,6 +2141,7 @@ export const createBrowserToolSession = ({
         throw error;
       }
 
+      // Chrome sends no `onDetach` for the extension's own `detach` (only for a closed target or a cancelled infobar), so `detachCount` still counts browser detaches only.
       await detachQuietly();
       await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
     }

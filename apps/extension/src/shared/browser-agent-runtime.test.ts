@@ -5500,6 +5500,35 @@ describe('agent browser calls', () => {
     ]);
   });
 
+  it('reads the stored sessions again after a failed read', async () => {
+    const stored: PersistedTabGroupSession[] = [
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ];
+    let readable = false;
+    const tab: BrowserTabInfo = { id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` };
+    const { runtime } = await createHarness({
+      share: false,
+      tabGroups: createBrowserTabGroupController({
+        api: {},
+        persistence: {
+          read: () =>
+            readable ? Promise.resolve(stored) : Promise.reject(new Error('storage busy')),
+          write: async () => {},
+        },
+      }),
+      tabsApi: { get: async () => tab, query: async () => [tab] },
+    });
+
+    await runtime.restoreSessions();
+    expect(runtime.listSessions()).toStrictEqual([]);
+
+    readable = true;
+    await runtime.restoreSessions();
+    expect(runtime.listSessions()).toStrictEqual([
+      { ended: false, groupId: 42, sessionHandle: 'session-1', tabs: [TAB_ID], title: 'Work' },
+    ]);
+  });
+
   it('drops console entries whose source is a withheld frame origin', async () => {
     const { cdp, runtime } = await createHarness();
 

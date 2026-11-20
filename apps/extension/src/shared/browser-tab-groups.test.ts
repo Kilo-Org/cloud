@@ -590,9 +590,78 @@ describe('browser tab groups across a service-worker restart', () => {
     });
     const garbled = createBrowserTabGroupController({ api: {}, persistence });
 
-    await expect(failing.restore()).resolves.toBeUndefined();
-    await expect(garbled.restore()).resolves.toBeUndefined();
+    await expect(failing.restore()).resolves.toBe(false);
+    await expect(garbled.restore()).resolves.toBe(true);
     expect(failing.listSessions()).toStrictEqual([]);
     expect(garbled.listSessions()).toStrictEqual([]);
+  });
+
+  it('keeps the stored sessions through a failed read: writes wait, and the next call reads again', async () => {
+    let reads = 0;
+    const later = Promise.withResolvers<PersistedTabGroupSession[] | undefined>();
+    const writes: PersistedTabGroupSession[][] = [];
+    const after = createBrowserTabGroupController({
+      api: {},
+      persistence: {
+        read: () => {
+          reads += 1;
+
+          return reads === 1 ? Promise.reject(new Error('storage busy')) : later.promise;
+        },
+        write: async sessions => {
+          writes.push([...sessions]);
+        },
+      },
+    });
+
+    await expect(after.restore()).resolves.toBe(false);
+    // The change asks for a write, and the write asks for the read again.
+    await after.openSession({ controllerId: 'c2', sessionHandle: 's2', title: 'New' });
+    await Promise.resolve();
+
+    // This worker's view alone would erase s1.
+    expect(reads).toBe(2);
+    expect(writes).toStrictEqual([]);
+
+    later.resolve([{ ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' }]);
+    await expect(after.restore()).resolves.toBe(true);
+
+    const expected = [
+      { ended: false, sessionHandle: 's2', tabs: [], title: 'New' },
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' },
+    ];
+
+    expect(after.listSessions()).toStrictEqual(expected);
+    await vi.waitFor(() => {
+      expect(writes.at(-1)).toStrictEqual(expected);
+    });
+  });
+
+  it('keeps only the newest 64 ended sessions', async () => {
+    const store = createSessionStore();
+    const controller = createBrowserTabGroupController({
+      api: {},
+      persistence: store.persistence,
+    });
+
+    for (let index = 0; index < 70; index += 1) {
+      const sessionHandle = `s${index}`;
+
+      // eslint-disable-next-line no-await-in-loop -- sessions end in order
+      await controller.openSession({ controllerId: 'c1', sessionHandle, title: sessionHandle });
+      // eslint-disable-next-line no-await-in-loop -- see above
+      await controller.closeSession({ sessionHandle });
+    }
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'live', title: 'Live' });
+
+    const handles = controller.listSessions().map(session => session.sessionHandle);
+
+    expect(handles).toHaveLength(65);
+    expect(handles).not.toContain('s5');
+    expect(handles).toContain('s6');
+    expect(handles).toContain('live');
+    await vi.waitFor(() => {
+      expect(store.stored()).toHaveLength(65);
+    });
   });
 });

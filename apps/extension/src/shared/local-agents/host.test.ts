@@ -1086,6 +1086,17 @@ describe('disconnecting one CLI', () => {
       sessionHandle,
     });
 
+    // A call that raced the click is told the user stopped it, not that the session was lost.
+    sendSnapshotCall(socket, 2, sessionHandle);
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 2)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(socket.sent, 'id', 2))?.['error']).toStrictEqual({
+      code: -32_004,
+      message: 'The user stopped this agent session.',
+    });
+    expect(harness.bridge.callTool).not.toHaveBeenCalled();
+
     // The hub announces the same CLI again after a reconnect, and its next conversation asks for a session.
     socket.handlers.onText(
       JSON.stringify({ controllerId: CONTROLLER_ID, type: 'controller.connected' })

@@ -3536,7 +3536,11 @@ export const createBrowserRuntime = ({
   const restoreSessions = (): Promise<void> => {
     restoring ??= (async () => {
       try {
-        await groups.restore();
+        if (!(await groups.restore())) {
+          // Storage could not be read: the next session operation reads it again.
+          restoring = undefined;
+          return;
+        }
 
         const stored = new Set(groups.listSessions().flatMap(session => session.tabs));
 

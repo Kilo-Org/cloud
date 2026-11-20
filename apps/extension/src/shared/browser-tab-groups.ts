@@ -93,11 +93,13 @@ export interface BrowserTabGroupController {
   readonly noteTabRemoved: (tabId: number) => void;
   readonly openSession: (input: BrowserOpenSessionInput) => Promise<BrowserTabGroupOpenResult>;
   /**
-   * Reads the sessions an earlier service worker stored, once. A session this
-   * worker already knows wins over its stored copy, and a tab removed before the
-   * read finished stays removed. Never rejects: unreadable storage restores nothing.
+   * Reads the sessions an earlier service worker stored. A session this worker
+   * already knows wins over its stored copy, and a tab removed before the read
+   * finished stays removed. Never rejects: it answers false when storage could
+   * not be read, and the next call reads again; nothing is written until a read
+   * succeeds, so the stored sessions survive a failed read.
    */
-  readonly restore: () => Promise<void>;
+  readonly restore: () => Promise<boolean>;
   readonly sessionForTab: (tabId: number) => string | undefined;
   readonly shareActiveTab: (input: BrowserShareTabInput) => Promise<BrowserShareTabResult>;
   readonly tabsForSession: (sessionHandle: string) => number[];
@@ -105,6 +107,8 @@ export interface BrowserTabGroupController {
 
 /** Where sessions and their groups outlive the service worker (SPEC: state in `storage.session`). */
 export const TAB_GROUP_SESSIONS_STORAGE_KEY = 'session:kiloBrowserTabGroupSessions';
+/** Ended groups kept for `/browser adopt`; every conversation leaves one, and they now outlive the worker. */
+const ENDED_SESSION_LIMIT = 64;
 
 const tabGroupIdSchema = z.number().int().nonnegative();
 const activeTabInfosSchema = z.array(
@@ -178,7 +182,7 @@ export const createBrowserTabGroupController = ({
 }): BrowserTabGroupController => {
   const sessions = new Map<string, SessionState>();
   let clock = 0;
-  let restoring: Promise<void> | undefined = undefined;
+  let restoring: Promise<boolean> | undefined = undefined;
   let restored = persistence === undefined;
   /* Tabs closed while the stored sessions are read: the stored copy must not bring them back. */
   const removedBeforeRestore = new Set<number>();
@@ -206,14 +210,14 @@ export const createBrowserTabGroupController = ({
       return stored;
     });
 
-  const readStored = async (
-    store: BrowserTabGroupPersistence
-  ): Promise<PersistedTabGroupSession[] | undefined> => {
-    try {
-      return await store.read();
-    } catch (error) {
-      console.warn('Failed to read browser tab group sessions:', error);
-      return undefined;
+  /** Only the newest ended sessions stay; adoption always takes the newest first. */
+  const pruneEnded = (): void => {
+    const ended = [...sessions.values()]
+      .filter(session => session.ended)
+      .toSorted((first, second) => (first.endedAt ?? 0) - (second.endedAt ?? 0));
+
+    for (const session of ended.slice(0, Math.max(0, ended.length - ENDED_SESSION_LIMIT))) {
+      sessions.delete(session.sessionHandle);
     }
   };
 
@@ -234,18 +238,30 @@ export const createBrowserTabGroupController = ({
     }
   };
 
-  const restore = (): Promise<void> => {
+  const restore = (): Promise<boolean> => {
     if (persistence === undefined) {
-      return Promise.resolve();
+      return Promise.resolve(true);
     }
 
     restoring ??= (async () => {
       try {
-        merge((await readStored(persistence)) ?? []);
-      } finally {
-        restored = true;
-        removedBeforeRestore.clear();
+        merge((await persistence.read()) ?? []);
+      } catch (error) {
+        console.warn('Failed to read browser tab group sessions:', error);
+        // Unread is not empty: forget this attempt so the next call reads again.
+        restoring = undefined;
+        return false;
       }
+
+      restored = true;
+      removedBeforeRestore.clear();
+
+      // Changes made while the stored sessions were unreadable are written now.
+      if (dirty) {
+        persist();
+      }
+
+      return true;
     })();
 
     return restoring;
@@ -254,7 +270,10 @@ export const createBrowserTabGroupController = ({
   const drain = async (store: BrowserTabGroupPersistence): Promise<void> => {
     try {
       // The first write waits for the read: writing this worker's sessions first would erase the stored ones.
-      await restore();
+      // A failed read writes nothing; `dirty` stays set for the next attempt.
+      if (!(await restore())) {
+        return;
+      }
 
       while (dirty) {
         dirty = false;
@@ -389,6 +408,7 @@ export const createBrowserTabGroupController = ({
     clock = now === undefined ? clock + 1 : Math.max(clock + 1, now());
     session.ended = true;
     session.endedAt = clock;
+    pruneEnded();
     persist();
     const props = {
       collapsed: true,

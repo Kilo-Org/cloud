@@ -1307,6 +1307,71 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     }
   });
 
+  test('a personal request reports a pending request with an unset app type', async () => {
+    const accountId = `acct-legacy-peer-${randomUUID()}`;
+    const peerUserId = `oauth/cb-legacy-peer-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: peerUserId,
+      google_user_email: `cb-legacy-peer-${randomUUID()}@example.com`,
+      google_user_name: 'Legacy Peer',
+      google_user_image_url: '',
+      stripe_customer_id: `cus_cb_legacy_peer_${randomUUID()}`,
+    });
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: peerUserId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: null,
+        platform_account_id: accountId,
+        platform_account_login: 'octocat',
+        platform_requester_account_id: GITHUB_USER_ID,
+        github_app_type: null,
+        integration_status: 'pending',
+      })
+      .returning();
+    const legacyPending = inserted[0];
+    if (!legacyPending) throw new Error('Expected the legacy pending row');
+
+    try {
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: USER_ID,
+        owner_type: 'user',
+        owner_id: USER_ID,
+        github_app_type: 'standard',
+        return_to: '/github-app',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockedFetchGitHubInstallationRequests.mockResolvedValue([
+        {
+          id: `request-${accountId}`,
+          accountId,
+          accountLogin: 'octocat',
+          requesterId: GITHUB_USER_ID,
+          requesterLogin: 'octocat',
+        },
+      ]);
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?setup_action=request&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?error=pending_request_exists');
+      expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, legacyPending.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, peerUserId));
+    }
+  });
+
   test('a personal request reports the existing organization request', async () => {
     const accountId = `acct-org-peer-${randomUUID()}`;
     const organizationRows = await db

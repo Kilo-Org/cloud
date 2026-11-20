@@ -102,7 +102,8 @@ async function seedRequest(
   owner: PaidCreditOwner,
   planCases = 1,
   maximumMicrodollars = 10_000_000,
-  routerId = `router-${id}`
+  routerId = `router-${id}`,
+  projectId = POOL_PROJECT_ID
 ) {
   await createPaidBenchmarkQuote(db, {
     id: `quote-${id}`,
@@ -112,7 +113,7 @@ async function seedRequest(
     poolVersion: 'v1',
     engineIdentity: ENGINE,
     context: '{}',
-    plan: JSON.stringify({ projectId: POOL_PROJECT_ID }),
+    plan: JSON.stringify({ projectId }),
     estimateMicrodollars: maximumMicrodollars,
     maximumMicrodollars,
     planCases,
@@ -779,6 +780,53 @@ describe('per-model request payer selection', () => {
         assignmentId: selected?.assignment_id as string,
       })
     ).toMatchObject({ state: 'admitted' });
+  });
+
+  it('blocks another pool of the same owner until the first native receipt settles', async () => {
+    const secondCase = key({ caseId: 'case-2' });
+    const secondProject = 'Auto-routing benchmarks / user/other-pool/router-2';
+    seedRun(sqlite, 'run-2');
+    seedChunk(sqlite, {
+      chunkId: 'chunk-2',
+      runId: 'run-2',
+      token: 'token-2',
+      slot: 2,
+      caseId: secondCase.caseId,
+    });
+    await seedRequest(db, 'request-b', alice, 1, 100, 'router-2', secondProject);
+    await stage(db, 'request-b', secondCase);
+    await db.batch(activatePaidBenchmarkRequestStatements(db, { requestId: 'request-b' }));
+    await claim(db, { key: secondCase, runId: 'run-2', token: 'token-2' });
+
+    const first = await payModelRequest(db, {
+      generation: (await caseRun(db)).generation,
+      modelRequestId: UUID_1,
+    });
+    expect(first.row).toMatchObject({ state: 'admitted', project_id: POOL_PROJECT_ID });
+    const second = {
+      key: secondCase,
+      generation: (await caseRun(db, secondCase)).generation,
+      modelRequestId: UUID_2,
+      assignmentId: ASSIGNMENT_2,
+      usageId: USAGE_2,
+    };
+    expect(await selectModelRequest(db, second)).toMatchObject({
+      state: 'selecting',
+      project_id: secondProject,
+    });
+    expect(await admitModelRequest(db, second)).toBeNull();
+
+    await acceptUsage(db, {
+      assignmentId: first.assignmentId,
+      usageId: USAGE_1,
+      owner: alice,
+      microdollars: 5,
+      generation: (await caseRun(db)).generation,
+    });
+    expect(await admitModelRequest(db, second)).toMatchObject({
+      state: 'admitted',
+      project_id: secondProject,
+    });
   });
 });
 

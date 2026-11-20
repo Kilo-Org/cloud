@@ -965,6 +965,8 @@
       "pendingComment": "àsọyé tí a kò tíì fi ránṣẹ́",
       "pendingComment_other": "àsọyé tí a kò tíì fi ránṣẹ́",
       "submitCountOfTotal": "Fi àsọyé {{displayFreshCount}} nínú {{displayTotalCount}} ránṣẹ́",
+      "submitCountOfTotal_one": "Fi àsọyé {{displayFreshCount}} nínú {{displayTotalCount}} ránṣẹ́",
+      "submitCountOfTotal_other": "Fi àsọyé {{displayFreshCount}} nínú {{displayTotalCount}} ránṣẹ́",
       "submitReview": "Fi àtúnyẹ̀wò ránṣẹ́",
       "partialPostedFresh": "A ti fi àsọyé {{displayFreshCount}} ránṣẹ́. ",
       "partialPostedFresh_one": "A ti fi àsọyé {{displayFreshCount}} ránṣẹ́. ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "Tẹ̀lé REVIEW.md",
     "followReviewMdSubtitle": "Tẹ̀lé àwọn fáìlì ìtọ́sọ́nà REVIEW.md nínú ibi ìpamọ́ kọ̀ọ̀kan",
     "bitbucket": {
-      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀."
+      "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+      "notConnectedReadOnlyPlan": "Àkókò ìdánwò àjọ náà ti parí, nítorí náà ẹni tó ni àjọ gbọ́dọ̀ ṣe àtúnṣe ìsanwó ní kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Yí orúkọ àjọ padà",
-      "renamePlaceholder": "Orúkọ àjọ",
+      "renamePlaceholder": "Tẹ orúkọ àjọ kan sí i",
       "balance": "Owó tó kù",
       "plan": "Ètò",
       "planTeams": "Teams",

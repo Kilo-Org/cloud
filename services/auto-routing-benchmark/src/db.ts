@@ -182,16 +182,18 @@ const ROLLBACK_SAFE_LEGACY_LANE_BUDGETS = {
 
 // The seven fixed policy columns are legacy: nothing in this worker reads them
 // back, but they are NOT NULL and the previously deployed worker still reads
-// them, so every save writes the canonical fixed policy value.
-const ROLLBACK_SAFE_LEGACY_FIXED_POLICY = {
-  frontier_min_accuracy_delta: POLICY_SETTINGS.frontierMinAccuracyDelta.fixed,
-  switch_cost_factor: POLICY_SETTINGS.switchCostFactor.fixed,
-  best_accuracy_switch_threshold: POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed,
-  low_confidence_threshold: POLICY_SETTINGS.lowConfidenceThreshold.fixed,
-  classifier_repetitions: POLICY_SETTINGS.classifierRepetitions.fixed,
-  decider_repetitions: POLICY_SETTINGS.deciderRepetitions.fixed,
-  classifier_max_p95_latency_ms: POLICY_SETTINGS.classifierMaxP95LatencyMs.fixed,
-};
+// them, so every save writes the canonical fixed policy value for its router.
+function rollbackSafeLegacyFixedPolicy(router: AutoRouter) {
+  return {
+    frontier_min_accuracy_delta: POLICY_SETTINGS.frontierMinAccuracyDelta.fixed,
+    switch_cost_factor: POLICY_SETTINGS.switchCostFactor.fixed,
+    best_accuracy_switch_threshold: POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed,
+    low_confidence_threshold: POLICY_SETTINGS.lowConfidenceThreshold.fixed,
+    classifier_repetitions: POLICY_SETTINGS.classifierRepetitions.fixed,
+    decider_repetitions: POLICY_SETTINGS.deciderRepetitions.fixedByRouter[router],
+    classifier_max_p95_latency_ms: POLICY_SETTINGS.classifierMaxP95LatencyMs.fixed,
+  };
+}
 
 export async function replaceConfig(
   db: D1Database,
@@ -211,6 +213,7 @@ export async function replaceConfig(
   router: AutoRouter = 'efficient'
 ): Promise<void> {
   const orm = drizzle(db);
+  const legacyFixedPolicy = rollbackSafeLegacyFixedPolicy(router);
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm
       .insert(benchmarkConfig)
@@ -218,7 +221,7 @@ export async function replaceConfig(
         id: router === 'efficient' ? 1 : 2,
         ...config,
         ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
-        ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
+        ...legacyFixedPolicy,
         router,
       })
       .onConflictDoUpdate({
@@ -226,7 +229,7 @@ export async function replaceConfig(
         set: {
           ...config,
           ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
-          ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
+          ...legacyFixedPolicy,
         },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),

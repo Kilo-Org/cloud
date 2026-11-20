@@ -965,6 +965,8 @@
       "pendingComment": "په تمه تبصرې",
       "pendingComment_other": "په تمه تبصرې",
       "submitCountOfTotal": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
+      "submitCountOfTotal_one": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
+      "submitCountOfTotal_other": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
       "submitReview": "بیاکتنه وسپارئ",
       "partialPostedFresh": "{{displayFreshCount}} تبصرې خپرې شوې. ",
       "partialPostedFresh_one": "{{displayFreshCount}} تبصره خپره شوه. ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "د REVIEW.md لارښوونې تعقیب کړئ",
     "followReviewMdSubtitle": "د هر زېرمتون د REVIEW.md فایل لارښوونې تعقیب کړئ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي."
+      "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
+      "notConnectedReadOnlyPlan": "د سازمان آزموینه پای ته رسېدلې ده، نو مالک باید په ⁨kilo.ai⁩ کې بیلینګ تازه کړي."
     },
     "bitbucketConnect": {
       "managedOnWeb": "د {{organization}} د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",

@@ -965,6 +965,8 @@
       "pendingComment": "չուղարկված մեկնաբանություն",
       "pendingComment_other": "չուղարկված մեկնաբանություն",
       "submitCountOfTotal": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
+      "submitCountOfTotal_one": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
+      "submitCountOfTotal_other": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
       "submitReview": "Ուղարկել վերանայումը",
       "partialPostedFresh": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
       "partialPostedFresh_one": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "Հետևել REVIEW.md-ին",
     "followReviewMdSubtitle": "Հետևել յուրաքանչյուր պահոցի REVIEW.md ֆայլի հրահանգներին",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։"
+      "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
+      "notConnectedReadOnlyPlan": "Կազմակերպության փորձաշրջանն ավարտվել է, ուստի սեփականատերը պետք է թարմացնի վճարումները kilo.ai-ում։"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ի Bitbucket միացումը կառավարվում է վեբում՝ համակարգչից։",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Վերանվանել կազմակերպությունը",
-      "renamePlaceholder": "Կազմակերպության անունը",
+      "renamePlaceholder": "Մուտքագրեք կազմակերպության անունը",
       "balance": "Մնացորդ",
       "plan": "Պլան",
       "planTeams": "Teams",

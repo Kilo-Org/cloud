@@ -983,6 +983,9 @@
       "pendingComment": "neposlanih komentara",
       "pendingComment_other": "neposlanih komentara",
       "submitCountOfTotal": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_one": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_few": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_other": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
       "submitReview": "Pošalji pregled",
       "partialPostedFresh": "Broj objavljenih komentara: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Broj objavljenih komentara: {{displayFreshCount}}. ",
@@ -1414,7 +1417,8 @@
     "followReviewMd": "Slijedi REVIEW.md",
     "followReviewMdSubtitle": "Slijedi upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati."
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
+      "notConnectedReadOnlyPlan": "Probno razdoblje organizacije je završilo, pa vlasnik mora ažurirati naplatu na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računala.",
@@ -3686,7 +3690,7 @@
     },
     "hub": {
       "renameTitle": "Preimenuj organizaciju",
-      "renamePlaceholder": "Naziv organizacije",
+      "renamePlaceholder": "Unesite naziv organizacije",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

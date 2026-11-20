@@ -1002,6 +1002,10 @@
       "pendingComment_other": "comentários pendentes",
       "pendingComment_zero": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
       "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
@@ -1439,7 +1443,8 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar."
+      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar.",
+      "notConnectedReadOnlyPlan": "O período de teste da organização terminou, por isso um proprietário tem de atualizar a faturação em kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
@@ -3747,7 +3752,7 @@
     },
     "hub": {
       "renameTitle": "Renomear organização",
-      "renamePlaceholder": "Nome da organização",
+      "renamePlaceholder": "Introduza um nome para a organização",
       "balance": "Saldo",
       "plan": "Plano",
       "planTeams": "Teams",

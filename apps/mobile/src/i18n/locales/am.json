@@ -965,6 +965,8 @@
       "pendingComment": "ያልተላኩ አስተያየቶች",
       "pendingComment_other": "ያልተላኩ አስተያየቶች",
       "submitCountOfTotal": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_one": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
+      "submitCountOfTotal_other": "ከ{{displayTotalCount}} አስተያየቶች ውስጥ {{displayFreshCount}} ላክ",
       "submitReview": "ግምገማውን አስገባ",
       "partialPostedFresh": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
       "partialPostedFresh_one": "{{displayFreshCount}} አስተያየቶች ተለጥፈዋል። ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "REVIEW.mdን ይከተሉ",
     "followReviewMdSubtitle": "በእያንዳንዱ ማከማቻ ውስጥ ያሉትን የREVIEW.md መመሪያ ፋይሎች ይከተሉ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።"
+      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "notConnectedReadOnlyPlan": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ስለዚህ ባለቤት በkilo.ai ላይ የክፍያ መረጃውን ማዘመን አለበት።"
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
@@ -1722,7 +1725,7 @@
       "dueThisWeekDetail_one": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "dueThisWeekDetail_other": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "noDeadline": "ምንም ጊዜ ገደብ የለም",
-      "reviewSlaAssignment": "የተወሰኑትን የSLA ጊዜ ገደቦች ይገምግሙ",
+      "reviewSlaAssignment": "የSLA ምደባን ይገምግሙ",
       "allOpenFindingsTracked": "ሁሉም ክፍት ግኝቶች በክትትል ላይ ናቸው"
     },
     "dismiss": {
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "የድርጅቱን ስም ይቀይሩ",
-      "renamePlaceholder": "የድርጅት ስም",
+      "renamePlaceholder": "የድርጅት ስም ያስገቡ",
       "balance": "ቀሪ ሂሳብ",
       "plan": "ዕቅድ",
       "planTeams": "Teams",

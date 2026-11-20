@@ -699,7 +699,8 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
+      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
+      "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
@@ -1251,7 +1252,7 @@
       "dueThisWeekDetail_many": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "dueThisWeekDetail_other": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "noDeadline": "Brak terminu",
-      "reviewSlaAssignment": "Sprawdź przypisane terminy SLA",
+      "reviewSlaAssignment": "Sprawdź przydział SLA",
       "allOpenFindingsTracked": "Wszystkie otwarte problemy są monitorowane"
     },
     "dismiss": {
@@ -3352,6 +3353,10 @@
       "partialPostedStale_many": "Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "partialPostedStale_other": "Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "submitCountOfTotal": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_one": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_few": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_many": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_other": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
       "submitReview": "Prześlij wynik przeglądu",
       "pendingComment_few": "oczekujące komentarze",
       "pendingComment_many": "oczekujących komentarzy",
@@ -3567,7 +3572,7 @@
       "planStatusLapsed": " · Zakończony",
       "planEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu.",
       "manageBilling": "Zarządzaj rozliczeniami",
-      "renamePlaceholder": "Nazwa organizacji",
+      "renamePlaceholder": "Wpisz nazwę organizacji",
       "renameTitle": "Zmień nazwę organizacji"
     },
     "inviteMember": {

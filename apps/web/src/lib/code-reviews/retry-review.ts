@@ -135,7 +135,9 @@ export type CodeReviewRetryRefusalReason =
   /** The owner switched Code Reviewer off. */
   | 'reviewer_disabled'
   /** A manual Code Reviewer job runs only in local development. */
-  | 'local_development_only';
+  | 'local_development_only'
+  /** A newer push replaced this review; its head is not the pull request head. */
+  | 'superseded';
 
 /** The stored reviewer configuration row, as this module reads it. */
 export type ReviewerConfigRow = AgentConfigRow | null;
@@ -156,6 +158,8 @@ async function getRetryRefusal(
   owner: Owner,
   knownAgentConfig?: ReviewerConfigRow
 ): Promise<CodeReviewRetryRefusalReason | null> {
+  if (review.terminal_reason === 'superseded') return 'superseded';
+
   const manualConfig = getManualCodeReviewConfig(review);
   if (manualConfig?.outputMode === 'kilo' && !isLocalCodeReviewDevelopmentEnabled()) {
     return 'local_development_only';
@@ -182,6 +186,9 @@ async function getRetryRefusal(
  * terminal state matches, so a concurrent restart of the same review answers
  * `already_in_flight` instead of dispatching twice.
  *
+ * A zero-row reset can also mean a newer push superseded the review between
+ * the caller's read and this write; the re-read below tells the two apart.
+ *
  * A caller that already read the reviewer configuration for its own gate passes
  * it as `agentConfig`, so one restart reads the configuration once.
  */
@@ -202,6 +209,13 @@ export async function retryFailedCodeReview(params: {
 
   const resetCount = await resetCodeReviewForRetry(review.id);
   if (resetCount === 0) {
+    // A zero-row reset races either a concurrent retrigger that already reset
+    // the review or a newer push that superseded it. Re-read and report which,
+    // so a person is not told a superseded review is merely in flight.
+    const freshReview = await getCodeReviewById(review.id);
+    if (freshReview?.terminal_reason === 'superseded') {
+      return { outcome: 'refused', reason: 'superseded' };
+    }
     return { outcome: 'already_in_flight' };
   }
 

@@ -965,6 +965,8 @@
       "pendingComment": "ósendar athugasemdir",
       "pendingComment_other": "ósendar athugasemdir",
       "submitCountOfTotal": "Senda {{displayFreshCount}} af {{displayTotalCount}} athugasemdum",
+      "submitCountOfTotal_one": "Senda {{displayFreshCount}} af {{displayTotalCount}} athugasemdum",
+      "submitCountOfTotal_other": "Senda {{displayFreshCount}} af {{displayTotalCount}} athugasemdum",
       "submitReview": "Senda rýni",
       "partialPostedFresh": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Fjöldi birtra athugasemda: {{displayFreshCount}}. ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "Fylgja REVIEW.md",
     "followReviewMdSubtitle": "Fylgja leiðbeiningum í REVIEW.md-skrá hverrar geymslu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það."
+      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
+      "notConnectedReadOnlyPlan": "Próftímabili fyrirtækisins er lokið, svo eigandi þarf að uppfæra greiðsluupplýsingar á kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Endurnefna félag",
-      "renamePlaceholder": "Nafn félags",
+      "renamePlaceholder": "Sláðu inn nafn félags",
       "balance": "Inneign",
       "plan": "Áætlun",
       "planTeams": "Teams",

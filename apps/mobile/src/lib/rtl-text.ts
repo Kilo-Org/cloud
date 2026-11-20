@@ -228,9 +228,16 @@ export function contentTextDirection(children: ReactNode): TextStyle | undefined
  * Arabic Extended-B, Arabic Extended-A and the two Arabic Presentation Forms
  * blocks are the ranges a joined Arabic run arrives in. Hebrew is right to
  * left and joins nothing, so it stays out of this range.
+ *
+ * The Brahmic scripts combine instead of joining, with the same effect: a
+ * vowel sign or virama shapes onto its consonant as one cluster, and tracking
+ * pulls the cluster apart («இப்போது» draws as «இ ப் போ து»). U+0900-U+0DFF
+ * covers Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil, Telugu,
+ * Kannada, Malayalam and Sinhala; U+0E00-U+0EFF Thai and Lao; U+1000-U+109F
+ * Myanmar; U+1780-U+17FF Khmer.
  */
 export const JOINED_SCRIPT =
-  /[\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  /[\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0900-\u0DFF\u0E00-\u0EFF\u1000-\u109F\u1780-\u17FF]/;
 
 /**
  * Letter-spacing reset: no added advance between glyphs, what a joined script's

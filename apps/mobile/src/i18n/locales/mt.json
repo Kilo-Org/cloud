@@ -1019,6 +1019,11 @@
       "pendingComment": "kummenti pendenti",
       "pendingComment_other": "kummenti pendenti",
       "submitCountOfTotal": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_one": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_two": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_few": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_many": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
+      "submitCountOfTotal_other": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
       "submitReview": "Ibgħat ir-reviżjoni",
       "partialPostedFresh": "Kummenti ppubblikati: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Kummenti ppubblikati: {{displayFreshCount}}. ",
@@ -1464,7 +1469,8 @@
     "followReviewMd": "Segwi REVIEW.md",
     "followReviewMdSubtitle": "Segwi l-fajls tal-istruzzjonijiet REVIEW.md ta' kull repożitorju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh."
+      "notConnectedReadOnly": "Bitbucket mhux konness. Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
+      "notConnectedReadOnlyPlan": "Il-prova tal-organizzazzjoni ntemmet, għalhekk is-sid irid jaġġorna l-fatturazzjoni fuq kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' {{organization}} tiġi ġestita fuq il-web minn kompjuter.",
@@ -3808,7 +3814,7 @@
     },
     "hub": {
       "renameTitle": "Ibdel l-isem tal-organizzazzjoni",
-      "renamePlaceholder": "Isem l-organizzazzjoni",
+      "renamePlaceholder": "Daħħal isem għall-organizzazzjoni",
       "balance": "Bilanċ",
       "plan": "Pjan",
       "planTeams": "Teams",

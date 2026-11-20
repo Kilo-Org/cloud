@@ -697,7 +697,8 @@
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen."
+      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
+      "notConnectedReadOnlyPlan": "Die Testphase der Organisation ist beendet, daher muss ein Inhaber die Abrechnung unter kilo.ai aktualisieren."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
@@ -3238,6 +3239,8 @@
       "partialPostedStale_one": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "partialPostedStale_other": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "submitCountOfTotal": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitCountOfTotal_one": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitCountOfTotal_other": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
       "submitReview": "Prüfung senden",
       "blockedRequestChanges": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um Änderungen anzufordern.",
       "blockedComment": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um ein Review mit Kommentaren zu senden."
@@ -3447,7 +3450,7 @@
       "planStatusLapsed": " · Beendet",
       "planEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan.",
       "manageBilling": "Abrechnung verwalten",
-      "renamePlaceholder": "Name der Organisation",
+      "renamePlaceholder": "Gib einen Namen für die Organisation ein",
       "renameTitle": "Organisation umbenennen"
     },
     "inviteMember": {

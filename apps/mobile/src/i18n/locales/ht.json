@@ -965,6 +965,8 @@
       "pendingComment": "kòmantè an atant",
       "pendingComment_other": "kòmantè an atant",
       "submitCountOfTotal": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
+      "submitCountOfTotal_one": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
+      "submitCountOfTotal_other": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
       "submitReview": "Soumèt revizyon an",
       "partialPostedFresh": "{{displayFreshCount}} kòmantè pibliye. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kòmantè pibliye. ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "Swiv REVIEW.md",
     "followReviewMdSubtitle": "Respekte fichye enstriksyon REVIEW.md nan chak depo",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li."
+      "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
+      "notConnectedReadOnlyPlan": "Esè òganizasyon an fini, kidonk yon pwopriyetè dwe mete ajou faktirasyon sou kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Chanje non òganizasyon",
-      "renamePlaceholder": "Non òganizasyon an",
+      "renamePlaceholder": "Antre yon non pou òganizasyon an",
       "balance": "Balans",
       "plan": "Plan",
       "planTeams": "Teams",

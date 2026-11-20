@@ -965,6 +965,8 @@
       "pendingComment": "ootel kommentaari",
       "pendingComment_other": "ootel kommentaari",
       "submitCountOfTotal": "Esita {{displayFreshCount}}/{{displayTotalCount}} kommentaari",
+      "submitCountOfTotal_one": "Esita {{displayFreshCount}}/{{displayTotalCount}} kommentaari",
+      "submitCountOfTotal_other": "Esita {{displayFreshCount}}/{{displayTotalCount}} kommentaari",
       "submitReview": "Esita ülevaatus",
       "partialPostedFresh": "Postitatud kommentaare: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Postitatud kommentaare: {{displayFreshCount}}. ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid."
+      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
+      "notConnectedReadOnlyPlan": "Organisatsiooni prooviperiood on lõppenud, seega peab omanik arvelduse kilo.ai keskkonnas uuendama."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Nimeta organisatsioon ümber",
-      "renamePlaceholder": "Organisatsiooni nimi",
+      "renamePlaceholder": "Sisesta organisatsiooni nimi",
       "balance": "Saldo",
       "plan": "Plaan",
       "planTeams": "Teams",

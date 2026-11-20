@@ -697,7 +697,8 @@
     },
     "autoReviews": "Automatische reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen."
+      "notConnectedReadOnly": "Bitbucket is niet gekoppeld. Alleen organisatie-eigenaren, beheerders en factuurbeheerders kunnen de koppeling instellen.",
+      "notConnectedReadOnlyPlan": "De proefperiode van de organisatie is afgelopen, dus een eigenaar moet de facturering bijwerken op kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",
@@ -3238,6 +3239,8 @@
       "partialPostedStale_one": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "partialPostedStale_other": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "submitCountOfTotal": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
+      "submitCountOfTotal_one": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
+      "submitCountOfTotal_other": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
       "submitReview": "Beoordeling verzenden",
       "blockedRequestChanges": "Voeg een samenvatting of minstens één opmerking toe om wijzigingen te vragen.",
       "blockedComment": "Voeg een samenvatting of minstens één opmerking toe om een beoordeling met opmerkingen te verzenden."
@@ -3447,7 +3450,7 @@
       "planStatusLapsed": " · Afgelopen",
       "planEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement.",
       "manageBilling": "Facturering beheren",
-      "renamePlaceholder": "Naam van de organisatie",
+      "renamePlaceholder": "Voer een naam voor de organisatie in",
       "renameTitle": "Organisatie hernoemen"
     },
     "inviteMember": {

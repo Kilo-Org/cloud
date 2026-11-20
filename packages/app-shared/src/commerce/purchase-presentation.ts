@@ -44,13 +44,15 @@ export type KiloPassSubscriptionStatus =
   | 'unpaid'
   | 'paused';
 
-export type PurchaseCtaAction = 'none' | 'open_web';
+/**
+ * A CTA result is a pure value: a `none` CTA carries no web target, and an
+ * `open_web` CTA always carries a relative web path.
+ */
+export type PurchasePresentationCta =
+  | { readonly action: 'none'; readonly webPath: null }
+  | { readonly action: 'open_web'; readonly webPath: string };
 
-export type PurchasePresentationCta = {
-  action: PurchaseCtaAction;
-  /** Relative web path the CTA opens, or null when there is no web target. */
-  webPath: string | null;
-};
+export type PurchaseCtaAction = PurchasePresentationCta['action'];
 
 export type PurchasePresentationReason =
   | 'credits_not_sold_on_ios'
@@ -62,13 +64,13 @@ export type PurchasePresentation =
   | {
       kind: 'web_management';
       reason: null;
-      cta: PurchasePresentationCta;
+      readonly cta: PurchasePresentationCta;
       program: string | null;
     }
   | {
       kind: 'unavailable';
       reason: Exclude<PurchasePresentationReason, null>;
-      cta: PurchasePresentationCta;
+      readonly cta: PurchasePresentationCta;
       program: string | null;
     };
 

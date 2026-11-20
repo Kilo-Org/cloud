@@ -965,6 +965,8 @@
       "pendingComment": "oskickade kommentarer",
       "pendingComment_other": "oskickade kommentarer",
       "submitCountOfTotal": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Skicka granskning",
       "partialPostedFresh": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
@@ -1389,7 +1391,8 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen."
+      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen.",
+      "notConnectedReadOnlyPlan": "Organisationens provperiod har löpt ut, så en ägare måste uppdatera faktureringen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
@@ -3625,7 +3628,7 @@
     },
     "hub": {
       "renameTitle": "Byt namn på organisation",
-      "renamePlaceholder": "Organisationens namn",
+      "renamePlaceholder": "Ange ett namn på organisationen",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

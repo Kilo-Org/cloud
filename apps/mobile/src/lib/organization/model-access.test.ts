@@ -258,4 +258,10 @@ describe('matchesSearch', () => {
     expect(matchesSearch(['anything'], '  ')).toBe(true);
     expect(matchesSearch([undefined, 'openai/gpt'], 'GPT')).toBe(true);
   });
+
+  it('folds diacritics so an unaccented query keeps an accented name', () => {
+    expect(matchesSearch(['Mistrál Large'], 'mistral')).toBe(true);
+    expect(matchesSearch(['Mistrál Large'], 'MISTRAL LARGE')).toBe(true);
+    expect(matchesSearch([undefined, 'Mistrál Large'], 'minstral')).toBe(false);
+  });
 });

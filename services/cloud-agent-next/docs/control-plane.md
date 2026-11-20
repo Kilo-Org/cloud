@@ -791,28 +791,36 @@ keep environment snapshots and existing history/worktree recovery.
   Existing native sessions are reused when their record names this workspace directory; a record
   that names another directory takes history-only recovery, as Kilo v2 already requires.
   Missing native sessions use history-only recovery.
-  A re-pointed record keeps the fields it already carries, including the wider shapes a record may
-  hold: the import accepts a summary that carries file diffs and a revert that carries a patch diff,
-  and the record read back returns the patch diff unchanged and each diff entry with its file,
-  additions, deletions and status. The native import cannot carry a session permission ruleset, so
-  the obligation is remembered beside the wrapper's durable state before the import commits the row,
-  and the ruleset is applied right after it. Writing the marker before the import is what makes the
-  guarantee hold: a marker written only after a failed apply would leave a window where the process
-  dies between the import and the write, and the committed record owes rules that nothing
-  remembers. A create path that finds the obligation already remembered does not rewrite it. Every
-  prepare settles a remembered ruleset before the probe and again after a successful history
-  restore; a settle that finds no record leaves the remembered ruleset in place for the create path,
-  which applies it to the record it imports.
+  A re-pointed record keeps the fields the import body can carry, including the wider shapes a record
+  may hold: the import accepts a summary that carries file diffs and a revert that carries a patch
+  diff, and the record read back returns the patch diff unchanged and each diff entry with its file,
+  additions, deletions and status. The import body cannot carry the record's own `metadata`, `agent`,
+  `model` or `path`: it accepts those keys and silently drops them, and it clears the stored values.
+  The wrapper restores `metadata` with an update right after the import, because it holds the session
+  goal a user sees. `agent` and `model` stay cleared on purpose: every prompt sends its own agent and
+  model from the route payload, so the stored pair is a mirror that no turn reads. `path` stays
+  cleared because the native server derives it.
+  The native import also cannot carry a session permission ruleset, so the obligation is remembered
+  beside the wrapper's durable state before the import commits the row, and the ruleset is applied
+  right after it. Writing the marker before the import is what makes the guarantee hold: a marker
+  written only after a failed apply would leave a window where the process dies between the import
+  and the write, and the committed record owes rules that nothing remembers. A create path that finds
+  the obligation already remembered does not rewrite it. Every prepare settles a remembered ruleset
+  before the probe and again after a successful history restore; a settle that finds no record leaves
+  the remembered ruleset in place for the create path, which applies it to the record it imports.
   The ruleset is cleared only after the apply succeeds, and the apply is skipped when the record
   already holds every rule, because the native update appends rather than replaces; a marker that
   cannot be cleared is therefore not a failure, since the next prepare finds the stored rules and
-  does not repeat them. A record that still names another directory never satisfies the obligation,
-  because the rules it carries belong to that directory; the marker waits for the record the import
-  re-points. The remembered ruleset and a record's own permission are parsed as rulesets before use:
-  a value that is not a ruleset is never applied and never becomes the record's grants, because a
-  ruleset widens what the agent may do. A marker that is present but not a ruleset fails the prepare
-  with a permanent session-import reason instead of reading as nothing owed, since reading it as
-  nothing owed would drop rules the record never received.
+  does not repeat them. The marker ends with the record it describes: a worktree deletion removes the
+  marker of each session it deletes, because no later prepare can apply a ruleset to a record that no
+  longer exists. A release does not remove it, because release only stops the session and the record
+  survives with its obligation. A record that still names another directory never satisfies the
+  obligation, because the rules it carries belong to that directory; the marker waits for the record
+  the import re-points. The remembered ruleset and a record's own permission are parsed as rulesets
+  before use: a value that is not a ruleset is never applied and never becomes the record's grants,
+  because a ruleset widens what the agent may do. A marker that is present but not a ruleset fails the
+  prepare with a permanent session-import reason instead of reading as nothing owed, since reading it
+  as nothing owed would drop rules the record never received.
   A record whose own permission is present but not a ruleset fails the create path the same way,
   before the import, and the record is left unchanged: no rules are applied, so a later prepare in
   the same allocation reads that record again and fails the same way until the record is replaced.

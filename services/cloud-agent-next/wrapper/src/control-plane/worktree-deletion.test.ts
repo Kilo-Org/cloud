@@ -1,9 +1,21 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type {
   ControlPlaneWorktreeDeletionRequestFrame,
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
-import { deleteWorktree, type WorktreeKiloCleanupClient } from '../control/delete-worktree.js';
+import {
+  createWorktreeKiloCleanupClient,
+  deleteWorktree,
+  type WorktreeKiloCleanupClient,
+} from '../control/delete-worktree.js';
+import {
+  forgetOutstandingRuleset,
+  hasOutstandingRuleset,
+  rememberOutstandingRuleset,
+} from '../kilo-api.js';
 import { resetSessionDirectoryState } from '../control/session-directories.js';
 import { resetDirectoryOperationState } from '../control/worktree-operations.js';
 import {
@@ -473,5 +485,127 @@ describe('control-plane wrapper worktree deletion (R2)', () => {
     expect(frames).toMatchObject([
       { type: 'worktree.result', requestId: 'req-invalid', ok: false, error: { retryable: true } },
     ]);
+  });
+});
+
+function startCleanupStub() {
+  const deleted = new Set<string>();
+  const sessions = new Map<string, string>();
+  const server = Bun.serve({
+    port: 0,
+    async fetch(request) {
+      const url = new URL(request.url);
+      const target = /^\/session\/([^/]+)(\/[a-z]+)?$/.exec(url.pathname);
+      if (url.pathname === '/api/session' && request.method === 'GET') {
+        return Response.json({ data: [], cursor: {} });
+      }
+      if (target && request.method === 'GET' && target[2] === '/children') {
+        return Response.json([]);
+      }
+      if (target && request.method === 'GET') {
+        const id = decodeURIComponent(target[1]);
+        const sessionDirectory = sessions.get(id);
+        if (deleted.has(id) || sessionDirectory === undefined) {
+          return Response.json(
+            { _tag: 'SessionNotFoundError', sessionID: id, message: 'not found' },
+            { status: 404 }
+          );
+        }
+        return Response.json({ id, directory: sessionDirectory });
+      }
+      if (target && target[2] === '/abort' && request.method === 'POST') {
+        return Response.json(true);
+      }
+      if (url.pathname === '/pty' && request.method === 'GET') {
+        return Response.json([]);
+      }
+      if (url.pathname === '/instance/dispose' && request.method === 'POST') {
+        return Response.json(true);
+      }
+      if (/^\/background-process\/session\/[^/]+\/stop$/.test(url.pathname)) {
+        return Response.json(true);
+      }
+      if (target && request.method === 'DELETE') {
+        deleted.add(decodeURIComponent(target[1]));
+        return Response.json(true);
+      }
+      return new Response(null, { status: 404 });
+    },
+  });
+  return {
+    server,
+    sessions,
+    deleted,
+    client: createWorktreeKiloCleanupClient({ url: server.url.toString() }),
+  };
+}
+
+describe('worktree deletion clears the session ruleset marker', () => {
+  const homes: string[] = [];
+
+  afterEach(() => {
+    for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
+  });
+
+  test('deleting the worktree removes the marker of its session', async () => {
+    const id = sessionId(0);
+    const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+    // Outstanding markers live under $HOME, so the test owns their directory.
+    const home = mkdtempSync(join(tmpdir(), 'worktree-delete-home-'));
+    homes.push(home);
+    const originalHome = process.env.HOME;
+    process.env.HOME = home;
+    const stub = startCleanupStub();
+    stub.sessions.set(id, directory);
+    try {
+      await rememberOutstandingRuleset(id, permission);
+      expect(await hasOutstandingRuleset(id)).toBe(true);
+
+      await deleteWorktree(
+        { worktreeId, directory, sessionIds: [id] },
+        { clients: [stub.client], removeDirectory: async () => undefined }
+      );
+
+      expect(stub.deleted.has(id)).toBe(true);
+      expect(await hasOutstandingRuleset(id)).toBe(false);
+    } finally {
+      await stub.server.stop(true);
+      await forgetOutstandingRuleset(id).catch(() => undefined);
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+    }
+  });
+
+  test('a marker that cannot be removed does not fail the deletion', async () => {
+    const id = sessionId(1);
+    const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+    const home = mkdtempSync(join(tmpdir(), 'worktree-delete-home-'));
+    homes.push(home);
+    const rulesets = join(home, '.kilo-control', 'rulesets');
+    const originalHome = process.env.HOME;
+    process.env.HOME = home;
+    let readOnly = false;
+    const stub = startCleanupStub();
+    stub.sessions.set(id, directory);
+    try {
+      await rememberOutstandingRuleset(id, permission);
+      chmodSync(rulesets, 0o500);
+      readOnly = true;
+
+      const result = await deleteWorktree(
+        { worktreeId, directory, sessionIds: [id] },
+        { clients: [stub.client], removeDirectory: async () => undefined }
+      );
+
+      expect(result).toEqual({ deleted: true, sessionIds: [id] });
+      expect(stub.deleted.has(id)).toBe(true);
+      expect(await hasOutstandingRuleset(id)).toBe(true);
+    } finally {
+      if (readOnly) chmodSync(rulesets, 0o700);
+      await stub.server.stop(true);
+      await forgetOutstandingRuleset(id).catch(() => undefined);
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+    }
   });
 });

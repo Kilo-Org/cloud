@@ -907,6 +907,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       };
       revert?: { messageID: string; partID?: string; snapshot?: string; diff?: string };
       permission?: unknown;
+      metadata?: Record<string, unknown>;
       time?: { created: number; updated: number; compacting?: number; archived?: number };
     };
 
@@ -932,7 +933,10 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
     type EnsureSessionUpdate = {
       queryDirectory: string | null;
-      body: { permission?: EnsureSessionRecord['permission'] };
+      body: {
+        permission?: EnsureSessionRecord['permission'];
+        metadata?: EnsureSessionRecord['metadata'];
+      };
     };
 
     function startEnsureSessionStub(
@@ -941,15 +945,18 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       options: {
         failUpdates?: number;
         updateStatus?: number;
+        metadataUpdateStatus?: number;
         onImport?: () => void;
       } = {}
     ): { url: string; imports: EnsureSessionImport[]; updates: EnsureSessionUpdate[] } {
       const imports: EnsureSessionImport[] = [];
       const updates: EnsureSessionUpdate[] = [];
       let updatesToFail = options.failUpdates ?? 0;
-      // The native import replaces the row and cannot carry a ruleset, and the
-      // update appends rules instead of replacing them.
+      // The native import replaces the row, cannot carry a ruleset or metadata,
+      // and the update appends rules instead of replacing them while replacing
+      // metadata wholesale.
       let storedPermission = record?.permission;
+      let storedMetadata = record?.metadata;
       const server = Bun.serve({
         port: 0,
         async fetch(request) {
@@ -965,7 +972,11 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
           }
           if (request.method === 'GET' && url.pathname === `/session/${sessionId}`) {
             return record
-              ? Response.json({ ...record, permission: storedPermission })
+              ? Response.json({
+                  ...record,
+                  permission: storedPermission,
+                  metadata: storedMetadata,
+                })
               : Response.json(
                   { name: 'NotFoundError', data: { message: `Session not found: ${sessionId}` } },
                   { status: 404 }
@@ -974,6 +985,12 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
           if (request.method === 'PATCH' && url.pathname === `/session/${sessionId}`) {
             const body = (await request.json()) as EnsureSessionUpdate['body'];
             updates.push({ queryDirectory: url.searchParams.get('directory'), body });
+            if (body.metadata !== undefined && options.metadataUpdateStatus !== undefined) {
+              return Response.json(
+                { error: { message: `update answered ${options.metadataUpdateStatus}` } },
+                { status: options.metadataUpdateStatus }
+              );
+            }
             if (options.updateStatus !== undefined) {
               return Response.json(
                 { error: { message: `update answered ${options.updateStatus}` } },
@@ -989,12 +1006,14 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
               ...(Array.isArray(storedPermission) ? storedPermission : []),
               ...applied,
             ];
+            if (body.metadata !== undefined) storedMetadata = body.metadata;
             return Response.json({ ...record, id: sessionId });
           }
           if (request.method === 'POST' && url.pathname === '/kilocode/session-import/session') {
             const body = (await request.json()) as EnsureSessionImport['body'];
             imports.push({ queryDirectory: url.searchParams.get('directory'), body });
             storedPermission = undefined;
+            storedMetadata = undefined;
             options.onImport?.();
             return Response.json({ ok: true, id: body.id });
           }
@@ -1117,6 +1136,49 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
       expect(stub.updates).toHaveLength(2);
       expect(stub.updates[1]).toEqual({ queryDirectory: directory, body: { permission } });
+    });
+
+    it('restores the metadata a re-point drops, alongside the ruleset', async () => {
+      const sessionId = 'ses_record_metadata';
+      const directory = temporaryDirectory('kilo-api-metadata-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-other-');
+      const metadata = { 'kilo.goal': { text: 'ship the fix', updatedAt: 5 } };
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        metadata,
+        permission,
+      });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      // The import cannot carry metadata, so it is restored after the ruleset.
+      expect(stub.imports).toHaveLength(1);
+      expect(stub.updates).toEqual([
+        { queryDirectory: directory, body: { permission } },
+        { queryDirectory: directory, body: { metadata } },
+      ]);
+    });
+
+    it('keeps the route successful when the metadata restore fails', async () => {
+      const sessionId = 'ses_record_metadata_failure';
+      const directory = temporaryDirectory('kilo-api-metadata-failure-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-failure-other-');
+      const metadata = { 'kilo.goal': { text: 'keep the goal', updatedAt: 6 } };
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, metadata },
+        { metadataUpdateStatus: 500 }
+      );
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      // The import has already committed the record, so a failed restore is
+      // skipped instead of failing the route.
+      expect(stub.imports).toHaveLength(1);
+      expect(stub.imports[0]?.body).toMatchObject({ id: sessionId, directory, force: true });
+      expect(stub.updates).toEqual([{ queryDirectory: directory, body: { metadata } }]);
     });
 
     it('keeps the owed ruleset marker across a fresh process', async () => {

@@ -210,6 +210,12 @@ export class SessionRulesetNotAppliedError extends Error {
 /**
  * The native session update appends rules instead of replacing them, so a
  * ruleset a record already holds must not be sent again.
+ *
+ * `action` stays a plain string because a record or marker may carry an action
+ * VALUE this build does not know, and refusing it would throw away the whole
+ * ruleset instead of the one rule. The keys stay strict: the pinned server
+ * strips unknown rule keys itself, so accepting them here would only widen what
+ * this wrapper treats as a grant.
  */
 const permissionRuleSchema = z.object({
   permission: z.string(),
@@ -225,11 +231,11 @@ const permissionRulesetSchema = z.array(permissionRuleSchema);
 /**
  * The ruleset `value` holds, or `undefined` when it is not a ruleset.
  *
- * The schema keeps `action` a plain string, because a record or marker that
- * carries an action this build does not know must still reach the server
- * unchanged rather than be dropped. That leaves the parsed value wider than the
- * SDK's `'allow' | 'deny' | 'ask'`, so the result is narrowed once here, after
- * validation, instead of widening the schema and losing a rule.
+ * The schema keeps `action` a plain string, because an action this build does
+ * not know must drop nothing: the record's rules still parse, so they can still
+ * be compared and applied. That leaves the parsed value wider than the SDK's
+ * `'allow' | 'deny' | 'ask'`, so the result is narrowed once here, after
+ * validation, instead of widening the schema.
  */
 function parseRuleset(value: unknown): PermissionRuleset | undefined {
   const parsed = permissionRulesetSchema.safeParse(value);
@@ -989,6 +995,26 @@ export function createWrapperKiloClient(
       // retry above would find the record in place and return before reaching
       // this point again.
       if (owed !== undefined) await applyRuleset(owed);
+      // The import body cannot carry metadata: the key is accepted and dropped
+      // silently, which leaves the column NULL. Metadata holds the session goal
+      // the UI shows, so it is restored from the pre-import read. The update
+      // replaces the object wholesale, so the whole value goes back. The
+      // record's agent and model are not restored: they are only a mirror, and
+      // every prompt carries its own from the turn payload. The import has
+      // already committed the record and metadata carries no authorization
+      // decision, so a failed restore is skipped rather than failing the route.
+      if (record?.metadata !== undefined) {
+        try {
+          const restoreTimeout = AbortSignal.timeout(8_000);
+          const restored = await v2Client.session.update(
+            { sessionID: sessionId, directory, metadata: record.metadata },
+            { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
+          );
+          requireSdkData(restored, `Session metadata restore for ${sessionId}`);
+        } catch {
+          // The record is committed and this route may proceed without it.
+        }
+      }
     },
 
     settleOutstandingRuleset: async (sessionId, directory, signal) => {

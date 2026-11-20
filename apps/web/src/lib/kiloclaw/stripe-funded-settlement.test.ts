@@ -11,12 +11,22 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
+import { applyStripeFundedKiloClawPeriod as settleStripeFundedPeriod } from '@/lib/kiloclaw/credit-billing';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const makeStripeSubscriptionNonRenewing =
   jest.fn<(stripeSubscriptionId: string) => Promise<void>>();
 const settlementDependencies = { makeStripeSubscriptionNonRenewing };
+
+type SettlementParams = Parameters<typeof settleStripeFundedPeriod>[0];
+
+function applyStripeFundedKiloClawPeriod(
+  params: Omit<SettlementParams, 'stripeSubscriptionStatus'> &
+    Partial<Pick<SettlementParams, 'stripeSubscriptionStatus'>>,
+  dependencies?: Parameters<typeof settleStripeFundedPeriod>[1]
+) {
+  return settleStripeFundedPeriod({ stripeSubscriptionStatus: 'active', ...params }, dependencies);
+}
 
 async function insertPersonalInstance(params: { id: string; userId: string }) {
   await db.insert(kiloclaw_instances).values({
@@ -196,73 +206,87 @@ describe('Stripe-funded KiloClaw settlement', () => {
     ).toEqual([-55_000_000, 55_000_000]);
   });
 
-  it('settles a late invoice for an ended provider subscription without reactivating the row', async () => {
-    const user = await insertTestUser({ id: 'settlement-ended-provider-user' });
-    const instanceId = crypto.randomUUID();
-    const subscriptionId = crypto.randomUUID();
-    const stripeSubscriptionId = 'sub_ended_final_commit';
-    const suspendedAt = '2026-11-14T06:00:00.000Z';
-    const destructionDeadline = '2026-11-21T06:00:00.000Z';
-    await insertPersonalInstance({ id: instanceId, userId: user.id });
-    // The deleted webhook already canceled the row before the final invoice paid.
-    await db.insert(kiloclaw_subscriptions).values({
-      id: subscriptionId,
-      user_id: user.id,
-      instance_id: instanceId,
-      stripe_subscription_id: stripeSubscriptionId,
-      payment_source: 'credits',
-      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
-      plan: 'commit',
-      status: 'canceled',
-      current_period_start: '2026-05-14T00:00:00.000Z',
-      current_period_end: '2026-10-19T00:00:00.000Z',
-      commit_ends_at: '2026-11-14T00:00:00.000Z',
-      suspended_at: suspendedAt,
-      destruction_deadline: destructionDeadline,
-    });
+  it.each(['authorized', 'forbidden'])(
+    'settles a late %s invoice for an ended provider subscription without reactivating the row',
+    async authorization => {
+      const user = await insertTestUser({ id: 'settlement-ended-provider-user' });
+      const instanceId = crypto.randomUUID();
+      const subscriptionId = crypto.randomUUID();
+      const stripeSubscriptionId = 'sub_ended_final_commit';
+      const suspendedAt = '2026-11-14T06:00:00.000Z';
+      const destructionDeadline = '2026-11-21T06:00:00.000Z';
+      await insertPersonalInstance({ id: instanceId, userId: user.id });
+      await db.insert(kiloclaw_subscriptions).values({
+        id: subscriptionId,
+        user_id: user.id,
+        instance_id: instanceId,
+        stripe_subscription_id: stripeSubscriptionId,
+        payment_source: 'credits',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+        plan: 'commit',
+        status: 'canceled',
+        current_period_start: '2026-05-14T00:00:00.000Z',
+        current_period_end: '2026-11-14T00:00:00.000Z',
+        commit_ends_at: '2026-11-14T00:00:00.000Z',
+        credit_renewal_at: '2026-11-14T00:00:00.000Z',
+        suspended_at: suspendedAt,
+        destruction_deadline: destructionDeadline,
+        auto_resume_attempt_count: 2,
+      });
 
-    await expect(
-      applyStripeFundedKiloClawPeriod(
-        {
-          userId: user.id,
-          metadataInstanceId: instanceId,
-          stripeSubscriptionId,
-          stripePaymentId: 'in_ended_final_commit',
-          plan: 'commit',
-          priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
-          amountMicrodollars: 661_000_000,
-          periodStart: '2026-10-19T00:00:00.000Z',
-          periodEnd: '2026-11-14T00:00:00.000Z',
-        },
-        settlementDependencies
-      )
-    ).resolves.toBe(true);
+      await expect(
+        applyStripeFundedKiloClawPeriod(
+          {
+            userId: user.id,
+            metadataInstanceId: instanceId,
+            stripeSubscriptionId,
+            stripeSubscriptionStatus: 'canceled',
+            stripePaymentId: 'in_ended_final_commit',
+            plan: 'commit',
+            priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+            amountMicrodollars: 661_000_000,
+            periodStart:
+              authorization === 'forbidden'
+                ? '2026-11-14T00:00:00.000Z'
+                : '2026-10-19T00:00:00.000Z',
+            periodEnd:
+              authorization === 'forbidden'
+                ? '2027-05-14T00:00:00.000Z'
+                : '2026-11-14T00:00:00.000Z',
+          },
+          settlementDependencies
+        )
+      ).resolves.toBe(true);
 
-    const row = await readSubscription(subscriptionId);
-    expect(row).toMatchObject({
-      status: 'canceled',
-      stripe_subscription_id: stripeSubscriptionId,
-      current_period_start: '2026-10-19 00:00:00+00',
-      current_period_end: '2026-11-14 00:00:00+00',
-      auto_resume_requested_at: null,
-    });
-    expect(row?.suspended_at && new Date(row.suspended_at).toISOString()).toBe(suspendedAt);
-    expect(row?.destruction_deadline && new Date(row.destruction_deadline).toISOString()).toBe(
-      destructionDeadline
-    );
-    expect(makeStripeSubscriptionNonRenewing).not.toHaveBeenCalled();
-    await expect(readUser(user.id)).resolves.toMatchObject({ total_microdollars_acquired: 0 });
-    const transactions = await db
-      .select()
-      .from(credit_transactions)
-      .where(eq(credit_transactions.kilo_user_id, user.id));
-    expect(
-      transactions.map(transaction => transaction.amount_microdollars).sort((a, b) => a - b)
-    ).toEqual([-661_000_000, 661_000_000]);
-    await expect(
-      db.select().from(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, user.id))
-    ).resolves.toHaveLength(0);
-  });
+      const row = await readSubscription(subscriptionId);
+      expect(row).toMatchObject({
+        status: 'canceled',
+        stripe_subscription_id: stripeSubscriptionId,
+        current_period_start:
+          authorization === 'forbidden' ? '2026-05-14 00:00:00+00' : '2026-10-19 00:00:00+00',
+        current_period_end: '2026-11-14 00:00:00+00',
+        commit_ends_at: '2026-11-14 00:00:00+00',
+        credit_renewal_at: '2026-11-14 00:00:00+00',
+        auto_resume_attempt_count: 2,
+      });
+      expect(row?.suspended_at && new Date(row.suspended_at).toISOString()).toBe(suspendedAt);
+      expect(row?.destruction_deadline && new Date(row.destruction_deadline).toISOString()).toBe(
+        destructionDeadline
+      );
+      expect(makeStripeSubscriptionNonRenewing).not.toHaveBeenCalled();
+      await expect(readUser(user.id)).resolves.toMatchObject({ total_microdollars_acquired: 0 });
+      const transactions = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.kilo_user_id, user.id));
+      expect(
+        transactions.map(transaction => transaction.amount_microdollars).sort((a, b) => a - b)
+      ).toEqual([-661_000_000, 661_000_000]);
+      await expect(
+        db.select().from(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, user.id))
+      ).resolves.toHaveLength(0);
+    }
+  );
 
   it.each(['missing-anchor', 'missing-confirmation', 'invalid-confirmation', 'older-confirmation'])(
     'rejects an unverified canceled-provider replacement (%s)',

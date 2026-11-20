@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, desc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
+import type Stripe from 'stripe';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
@@ -61,6 +62,7 @@ import {
   reportKiloClawCommitRetirementAnomaly,
   type KiloClawCommitEnrollmentQualification,
 } from '@/lib/kiloclaw/commit-retirement';
+import { isEndedStripeSubscriptionStatus } from '@/lib/kiloclaw/ended-stripe-subscription';
 
 const logInfo = sentryLogger('kiloclaw-credit-billing', 'info');
 const logWarning = sentryLogger('kiloclaw-credit-billing', 'warning');
@@ -443,6 +445,7 @@ export async function applyStripeFundedKiloClawPeriod(
     userId: string;
     metadataInstanceId?: string;
     stripeSubscriptionId: string;
+    stripeSubscriptionStatus: Stripe.Subscription.Status;
     stripePaymentId: string;
     plan: 'commit' | 'standard';
     priceVersion: KiloClawPriceVersion;
@@ -469,6 +472,9 @@ export async function applyStripeFundedKiloClawPeriod(
   } = params;
 
   const amountCents = Math.round(amountMicrodollars / 10_000);
+  const providerSubscriptionEnded = isEndedStripeSubscriptionStatus(
+    params.stripeSubscriptionStatus
+  );
 
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
@@ -634,18 +640,6 @@ export async function applyStripeFundedKiloClawPeriod(
       });
     }
 
-    // A paid row stays canceled while it still owns the Stripe ID only after the
-    // provider subscription ended (deleted webhook, terminal subscription.updated, or
-    // admin immediate cancel). Trial expiry cancels Stripe trials locally while the
-    // provider subscription lives on, so trial rows keep reactivating on payment.
-    // Stripe never revives an ended subscription, so a late invoice settles the ledger
-    // and the paid period but must not reactivate the row: nothing would renew or
-    // enforce it again.
-    const providerSubscriptionEnded =
-      targetRow.status === 'canceled' &&
-      targetRow.plan !== 'trial' &&
-      targetRow.stripe_subscription_id === stripeSubscriptionId;
-
     wasSuspended = !providerSubscriptionEnded && !!targetRow.suspended_at;
     resolvedInstanceId = targetRow.instance_id ?? undefined;
     resolvedSubscriptionId = targetRow.id;
@@ -660,7 +654,7 @@ export async function applyStripeFundedKiloClawPeriod(
       checkoutConfirmedAt: params.checkoutConfirmedAt,
       switchQualification: switchQualification ?? undefined,
     });
-    requiresProviderNonRenewal ||=
+    requiresProviderNonRenewal =
       !providerSubscriptionEnded && retirementDecision.anomalyReason !== null;
     if (retirementDecision.anomalyReason) {
       reportKiloClawCommitRetirementAnomaly({
@@ -802,6 +796,10 @@ export async function applyStripeFundedKiloClawPeriod(
         .where(eq(kilocode_users.id, userId));
     }
 
+    applied = true;
+    // Expiry enforcement uses the canonical boundary, not an unauthorized invoice's period.
+    if (providerSubscriptionEnded && retirementDecision.anomalyReason !== null) return;
+
     const periodSet = {
       instance_id: targetRow.instance_id,
       stripe_subscription_id: stripeSubscriptionId,
@@ -858,8 +856,6 @@ export async function applyStripeFundedKiloClawPeriod(
         after,
       });
     }
-
-    applied = true;
   });
 
   if (!applied) {
@@ -933,21 +929,22 @@ export async function applyStripeFundedKiloClawPeriod(
   // expensive `kiloclaw_subscription_change_log` scan (and the subsequent
   // no-op send call) when a matching email-log row already exists.
   const shouldSendSubscriptionStartedEmail =
-    shouldSendSubscriptionStartedEmailForNewSettlement ||
-    (settlementWasDuplicate &&
-      resolvedSubscriptionId !== undefined &&
-      resolvedInstanceId !== undefined &&
-      !(await subscriptionStartedEmailAlreadyLoggedForActivation({
-        userId,
-        instanceId: resolvedInstanceId,
-        periodStart,
-      })) &&
-      (await didPriorSettlementRecordPaidActivation({
-        subscriptionId: resolvedSubscriptionId,
-        plan,
-        periodStart,
-        periodEnd,
-      })));
+    !providerSubscriptionEnded &&
+    (shouldSendSubscriptionStartedEmailForNewSettlement ||
+      (settlementWasDuplicate &&
+        resolvedSubscriptionId !== undefined &&
+        resolvedInstanceId !== undefined &&
+        !(await subscriptionStartedEmailAlreadyLoggedForActivation({
+          userId,
+          instanceId: resolvedInstanceId,
+          periodStart,
+        })) &&
+        (await didPriorSettlementRecordPaidActivation({
+          subscriptionId: resolvedSubscriptionId,
+          plan,
+          periodStart,
+          periodEnd,
+        }))));
 
   // Per KiloClaw billing spec (Stripe-Funded Credit Settlement rule 10),
   // $0 KiloClaw invoices must still run settlement and transition the row

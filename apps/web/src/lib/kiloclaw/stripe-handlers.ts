@@ -19,7 +19,10 @@ import {
   isIntroPriceId,
 } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
-import { cancelSubscriptionForEndedStripeSubscription } from '@/lib/kiloclaw/ended-stripe-subscription';
+import {
+  cancelSubscriptionForEndedStripeSubscription,
+  isEndedStripeSubscriptionStatus,
+} from '@/lib/kiloclaw/ended-stripe-subscription';
 import { classifyKiloClawInvoiceLine } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import { getStripeFundedKiloClawReportingFields } from '@/lib/kiloclaw/stripe-funded-reporting.server';
 import {
@@ -1804,6 +1807,7 @@ export async function handleKiloClawInvoicePaid(params: {
     userId: metadata.kiloUserId,
     metadataInstanceId: metadata.instanceId ?? undefined,
     stripeSubscriptionId,
+    stripeSubscriptionStatus: stripeSubscription.status,
     stripePaymentId,
     plan,
     priceVersion,
@@ -1818,7 +1822,7 @@ export async function handleKiloClawInvoicePaid(params: {
   });
 
   if (!applied) {
-    if (plan === 'commit') {
+    if (plan === 'commit' && !isEndedStripeSubscriptionStatus(stripeSubscription.status)) {
       await containProviderNonRenewal({
         stripeSubscriptionId,
         stripeEventId: eventId,

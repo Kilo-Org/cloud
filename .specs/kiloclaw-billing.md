@@ -824,11 +824,11 @@ rows renew.
    external payment identifier for settlement. When the invoice has no
    charge identifier, the system MUST fall back to the invoice
    identifier so `$0` KiloClaw invoices still settle exactly once.
-6. On successful settlement the system MUST:
+6. On successful settlement the system MUST, subject to rule 11:
    a. Set payment source to `credits`, preserving the payment
    provider subscription ID (converting a legacy Stripe row to
    hybrid, or no-op for an already-hybrid row).
-   b. Set subscription status to active, except as rule 11 states.
+   b. Set subscription status to active.
    c. Advance the billing period and credit renewal timestamp to
    the invoice-derived boundaries.
    d. For an authorized final Commit term, update the active commitment end
@@ -838,8 +838,8 @@ rows renew.
    Commit Retirement fail-closed anomaly handling instead.
    e. Clear past-due state and any auto-top-up marker for the
    prior period.
-7. If a scheduled plan change matches the settled invoice's plan,
-   the system MUST clear the schedule tracking state atomically
+7. Except as rule 11 states, if a scheduled plan change matches the settled
+   invoice's plan, the system MUST clear the schedule tracking state atomically
    with settlement. If the invoice plan differs from the current
    plan and there is no matching scheduled change, the system MUST
    treat the settled invoice as authoritative only when Commit Retirement
@@ -847,7 +847,7 @@ rows renew.
 8. If the subscription was past-due or suspended before settlement,
    the system MUST trigger the auto-resume procedure after the
    settlement transaction commits (see Auto-Resume on Payment
-   Recovery).
+   Recovery), except as rule 11 states.
 9. After the settlement transaction commits, the system MUST
    trigger a bonus credit evaluation as described in Credit
    Enrollment rule 6.
@@ -857,13 +857,14 @@ rows renew.
     Revenue side effects that require a paid amount, such as revenue
     analytics or affiliate sale events, MUST apply their own
     `amount_paid > 0` guard and MUST NOT block settlement.
-11. When a paid-plan subscription is canceled while it still owns the
-    settled payment provider subscription, that provider subscription has
-    ended. Settlement MUST record the ledger entries and the paid period, but
-    MUST NOT reactivate the subscription, clear suspension or destruction
-    state, trigger auto-resume, or send an activation email. The payment
-    provider never revives an ended subscription, so reactivation would leave
-    access with no renewal or enforcement owner.
+11. Determine whether a provider subscription has ended from its live Stripe
+    status (`canceled` or `incomplete_expired`), not from the local status.
+    For an ended provider subscription, settlement MUST record the ledger
+    entries but MUST NOT reactivate the subscription, clear suspension or
+    destruction state, trigger auto-resume, send an activation email, or
+    attempt provider non-renewal. If Commit Retirement finds an ambiguity or
+    forbids the incoming term, settlement MUST leave the subscription row
+    unchanged so expiry enforcement still has the canonical boundary.
 
 ### Revenue and External Reporting
 

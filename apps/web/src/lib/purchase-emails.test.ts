@@ -1214,10 +1214,13 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   });
 
   async function applyStripeFundedKiloClawPeriod(
-    params: Parameters<typeof creditBillingModule.applyStripeFundedKiloClawPeriod>[0]
+    params: Omit<
+      Parameters<typeof creditBillingModule.applyStripeFundedKiloClawPeriod>[0],
+      'stripeSubscriptionStatus'
+    >
   ): Promise<boolean> {
     const mod = await import('@/lib/kiloclaw/credit-billing');
-    return mod.applyStripeFundedKiloClawPeriod(params);
+    return mod.applyStripeFundedKiloClawPeriod({ ...params, stripeSubscriptionStatus: 'active' });
   }
 
   async function enrollWithCredits(

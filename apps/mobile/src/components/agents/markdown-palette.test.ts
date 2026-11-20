@@ -2,56 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import { getPalette } from './markdown-palette';
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
+import { lightColors } from '@/lib/hooks/theme-colors.generated';
 import { compositeOver, tokenSchemeForSurface } from '@/lib/pr-review/diff/syntax-colors';
 
-const colors = {
-  background: '#FBFAF5',
-  foreground: '#14130F',
-  primary: '#4F5A10',
-  primaryForeground: '#FFFFFF',
-  primaryDisabled: '#6F6A61',
-  primaryDisabledAction: '#6F6A61',
-  secondary: '#F0EEE6',
-  secondaryForeground: '#14130F',
-  secondaryFill: '#F0EEE6',
-  muted: '#F0EEE6',
+const colors: ThemeColors = {
+  // The shipped light palette, with the values this fixture deliberately
+  // differs on. Inheriting the palette keeps a new theme token from breaking
+  // this fixture, which only needs the tokens the markdown palette reads.
+  ...lightColors,
   mutedForeground: '#7A756B',
   destructive: '#C25647',
-  destructiveForeground: '#FFFFFF',
   destructiveSolid: '#C25647',
-  destructiveSolidForeground: '#FFFFFF',
-  border: 'rgba(20, 15, 10, 0.09)',
-  card: '#FFFFFF',
-  selection: '#4F5A10',
-  selectionForeground: '#FFFFFF',
-  ink2: '#3C382F',
-  mutedSoft: '#A9A39A',
-  hairSoft: 'rgba(20, 15, 10, 0.05)',
-  controlIdle: '#F0EEE6',
-  skeletonFill: '#F0EEE6',
   ringTrack: 'rgba(20, 15, 10, 0.05)',
-  accentSoft: '#FFDD00',
-  accentSoftForeground: '#1A1A10',
-  accentSoftTint: '#4F5A1029',
-  accentSoftTintForeground: '#4F5A10',
   good: '#2F9A5F',
   warn: '#B27214',
-  warnForeground: '#FFFFFF',
   info: '#2563EB',
-  agentYuki: '#6B4FD6',
-  agentWorkclaw: '#4F5A10',
-  agentCloud: '#2F9A5F',
-  agentKilocode: '#B27214',
-  agentCoral: '#C25647',
-  agentSky: '#2C7FB0',
-  rowHoney: '#7C6C1D',
-  rowGold: '#7A7C1D',
-  rowLime: '#697C1D',
-  rowSage: '#587C1D',
-  rowMoss: '#467C1D',
-  rowFern: '#357C1D',
-  rowPine: '#237C1D',
-} satisfies ThemeColors;
+};
 
 describe('markdown palette', () => {
   it('uses accent-soft-foreground for agent chat user bubbles (bg-accent-soft)', () => {

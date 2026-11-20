@@ -15,6 +15,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const onSelect = vi.hoisted(() => vi.fn());
 const onDone = vi.hoisted(() => vi.fn());
+const onCancel = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', async () => {
   // `vi.mock` factories are hoisted above the file's static imports, so the
@@ -36,7 +37,10 @@ vi.mock('react-i18next', async importOriginal => {
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Info: 'Icon' }));
@@ -44,6 +48,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#F2F0EB' }),
 }));
 vi.mock('@/lib/navigation/route-focus', () => ({ useRouteFocused: () => true }));
+// The choice row haptics and the shared i18n instance are native/bundle-time
+// concerns this row-level harness does not exercise: the selection feedback is
+// asserted by the row primitive's own mounted test.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/i18n', () => ({ i18n: { language: 'en' } }));
 
 const Pressable = 'Pressable' as ElementType;
 const Check = 'Check' as ElementType;
@@ -67,6 +76,9 @@ async function mount(
       onDone: () => {
         onDone();
       },
+      onCancel: () => {
+        onCancel();
+      },
       expired: props.expired ?? false,
     })
   );
@@ -74,33 +86,34 @@ async function mount(
   return ui.renderer;
 }
 
-/** The selected state an account action button carries, if it carries one. */
-function selectedState(node: ReactTestInstance): boolean | undefined {
+/** The checked state an account radio row carries, if it carries one. */
+function checkedState(node: ReactTestInstance): boolean | undefined {
   const state: unknown = node.props.accessibilityState;
-  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+  if (typeof state !== 'object' || state === null || !('checked' in state)) {
     return undefined;
   }
-  return typeof state.selected === 'boolean' ? state.selected : undefined;
+  return typeof state.checked === 'boolean' ? state.checked : undefined;
 }
 
-/** An account action button: the sheet marks every row's selection. */
+/** An account choice row: the sheet marks every row's selection. */
 function accountRow(node: ReactTestInstance) {
   return (
     node.type === Pressable &&
-    node.props.accessibilityRole === 'button' &&
-    selectedState(node) !== undefined
+    node.props.accessibilityRole === 'radio' &&
+    checkedState(node) !== undefined
   );
 }
 
 function rows(renderer: ReactTestRenderer) {
   return renderer.root.findAll(accountRow).map(node => ({
     label: node.props.accessibilityLabel as string,
-    selected: selectedState(node) === true,
+    selected: checkedState(node) === true,
     divider:
       typeof node.props.className === 'string' && node.props.className.includes('border-hair-soft'),
-    check: node.findAll(child => child.type === Check).length > 0,
-    // Every account row reserves one blank gutter View so the labels line up.
-    gutter: node.findAll(child => child.type === View).length === 1,
+    // The mark holds its slot in every row: the check paints only for the
+    // selected row and stays transparent otherwise.
+    check:
+      node.findAll(child => child.type === Check && child.props.color !== 'transparent').length > 0,
   }));
 }
 
@@ -124,19 +137,24 @@ function layOutViewport(renderer: ReactTestRenderer, height: number) {
   });
 }
 
-/** The checked row's one-time reveal: it is the only row carrying `onLayout`. */
+/**
+ * The checked row's one-time reveal: its wrapper View is the only one carrying
+ * `onLayout`, and it wraps the row that renders checked.
+ */
 function revealHandler(renderer: ReactTestRenderer) {
-  const [revealing, ...others] = renderer.root
-    .findAll(accountRow)
-    .filter(node => node.props.onLayout !== undefined);
-  expect(others).toHaveLength(0);
-  if (revealing === undefined) {
+  const revealing = renderer.root.findAll(
+    node => node.type === View && node.props.onLayout !== undefined
+  );
+  expect(revealing).toHaveLength(1);
+  const [wrapper] = revealing;
+  if (wrapper === undefined) {
     throw new Error('the checked account row must reveal itself');
   }
-  expect(selectedState(revealing)).toBe(true);
+  const [row] = wrapper.findAll(accountRow);
+  expect(checkedState(row as ReactTestInstance)).toBe(true);
   return (event: unknown) => {
     act(() => {
-      (revealing.props.onLayout as (event: unknown) => void)(event);
+      (wrapper.props.onLayout as (event: unknown) => void)(event);
     });
   };
 }
@@ -147,6 +165,7 @@ beforeEach(() => {
   }
   onSelect.mockReset();
   onDone.mockReset();
+  onCancel.mockReset();
   scrollTo.mockClear();
 });
 
@@ -158,8 +177,8 @@ describe('ContextPickerSheet', () => {
       'Select account'
     );
     expect(rows(renderer)).toEqual([
-      { label: 'Personal', selected: false, divider: true, check: false, gutter: true },
-      { label: 'Acme Corp', selected: true, divider: false, check: true, gutter: true },
+      { label: 'Personal', selected: false, divider: true, check: false },
+      { label: 'Acme Corp', selected: true, divider: false, check: true },
     ]);
   });
 
@@ -174,7 +193,25 @@ describe('ContextPickerSheet', () => {
     expect(labels).toHaveLength(2);
     for (const label of labels) {
       expect(label.props.ellipsizeMode).toBe('middle');
+      // The shared row title's weight: an Arabic label in an RTL interface
+      // inks like the Latin org names it sits beside.
+      expect(label.props.className).toContain('font-medium');
     }
+  });
+
+  it('brackets the header title with Cancel and Done, like the sibling sheets', async () => {
+    const renderer = await mount();
+    const header = renderer.root.findByType('SheetHeader' as ElementType);
+
+    // A leading Cancel is what centers the title: without it the header lays
+    // the title against the sheet edge and shows no way out but Done.
+    expect(typeof header.props.onCancel).toBe('function');
+    expect(typeof header.props.onDone).toBe('function');
+    act(() => {
+      (header.props.onCancel as () => void)();
+    });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it('checks nothing when the stored account is not in the list', async () => {
@@ -192,8 +229,12 @@ describe('ContextPickerSheet', () => {
   it('checks exactly one row', async () => {
     const renderer = await mount();
 
-    const check = renderer.root.findAll(node => node.type === Check);
+    // Both rows hold the mark's slot; only the checked one paints it.
+    const check = renderer.root.findAll(
+      node => node.type === Check && node.props.color !== 'transparent'
+    );
     expect(check).toHaveLength(1);
+    expect(renderer.root.findAll(node => node.type === Check)).toHaveLength(2);
   });
 
   it('leaves the list at its top when the checked row fits inside the fold', async () => {
@@ -253,7 +294,7 @@ describe('ContextPickerSheet', () => {
     const accounts = renderer.root.findAll(accountRow);
 
     expect(accounts.map(row => row.props.accessibilityLabel)).toEqual(options);
-    expect(accounts.filter(row => selectedState(row) === true)).toHaveLength(1);
+    expect(accounts.filter(row => checkedState(row) === true)).toHaveLength(1);
     act(() => {
       for (const row of accounts) {
         (row.props.onPress as () => void)();

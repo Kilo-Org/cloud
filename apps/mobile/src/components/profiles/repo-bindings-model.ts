@@ -9,6 +9,8 @@
  * directly in `repo-bindings-model.test.ts`.
  */
 
+import { foldForSearch } from '@/i18n/fold-for-search';
+
 /** The two providers a binding can name; Bitbucket has no profile bindings. */
 export type RepoBindingPlatform = 'github' | 'gitlab';
 
@@ -57,16 +59,16 @@ export function repositoryOptionKey(repo: RepoOption): string {
   return `${repo.platform}:${repo.fullName}`;
 }
 
-/** Case-insensitive full-name search; a blank query returns every option. */
+/** Case- and diacritic-insensitive full-name search; a blank query returns every option. */
 export function filterRepositoryOptions(
   repositories: readonly RepoOption[],
   query: string
 ): RepoOption[] {
-  const needle = query.trim().toLowerCase();
+  const needle = foldForSearch(query.trim());
   if (needle === '') {
     return [...repositories];
   }
-  return repositories.filter(repo => repo.fullName.toLowerCase().includes(needle));
+  return repositories.filter(repo => foldForSearch(repo.fullName).includes(needle));
 }
 
 /**

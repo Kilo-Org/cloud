@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ModelStats, Organization } from '@kilocode/db/schema';
 import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
-import type { OpenRouterModel, OpenRouterModelsResponse } from './organization-types';
+import type {
+  OpenRouterModel,
+  OpenRouterModelsResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type {
   OrganizationGroupPolicyContext,
   OrganizationPolicySubject,
@@ -36,7 +39,7 @@ const mockEvaluatePolicy = jest.fn(
 );
 const ALLOWED_MODEL_ROUTES: ReadonlySet<string> = new Set(['groq']);
 const DENIAL_SOURCES: Record<string, string> = {
-  'provider/blocked': 'group_model',
+  'provider/blocked': 'no_grant',
   'provider/ceiling-inference': 'organization_provider',
   'provider/ceiling-catalog': 'organization_provider',
   'provider/ceiling-gateway': 'organization_provider',
@@ -232,6 +235,7 @@ function organization(): Organization {
     directory_group_id: null,
     directory_idp_id: null,
     external_org_id: null,
+    anthropic_user_profile_id: null,
   };
 }
 
@@ -610,6 +614,38 @@ describe('organization model producer publication', () => {
 
     await resultFor({ type: 'defaultAccess' });
     expect(mockTagClaude).toHaveBeenLastCalledWith(owner, expect.any(Array));
+  });
+
+  it('tags Claude billing models on the list the ChatGPT tagger returned', async () => {
+    const tagIds = (ids: string[]) => async (_owner: unknown, models: OpenRouterModel[]) =>
+      models.map(model =>
+        ids.includes(model.id) ? { ...model, hasUserByokAvailable: true, isFree: false } : model
+      );
+    const chatGptResults: OpenRouterModel[][] = [];
+    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterModel[]) => {
+      const tagged = await tagIds(['provider/training'])(owner, models);
+      chatGptResults.push(tagged);
+      return tagged;
+    });
+    mockTagClaude.mockImplementation(async (owner, models: OpenRouterModel[]) =>
+      tagIds(['morph-byok/private'])(owner, models)
+    );
+
+    const result = await resultFor();
+
+    expect(chatGptResults).toHaveLength(1);
+    expect(mockTagClaude).toHaveBeenCalledTimes(1);
+    expect(mockTagClaude.mock.calls[0][1]).toBe(chatGptResults[0]);
+    for (const id of ['provider/training', 'morph-byok/private']) {
+      expect(result.data.find(model => model.id === id)).toMatchObject({
+        hasUserByokAvailable: true,
+        isFree: false,
+      });
+    }
+    const untagged = result.data.find(model => model.id === 'kilo-internal/private');
+    expect(untagged).toBeDefined();
+    expect(untagged?.hasUserByokAvailable).not.toBe(true);
+    expect(untagged?.isFree).toBeUndefined();
   });
 
   it('lists denied models only when an inference provider key the policy admits serves them', async () => {

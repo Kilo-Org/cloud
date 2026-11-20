@@ -10,6 +10,7 @@ import {
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { cloudAgentPromptSchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   sessionIdSchema,
   githubRepoSchema,
@@ -39,6 +40,7 @@ import { SessionMessageCompletionSourceSchema } from '../session/session-message
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
 import { GetEgressAuditInputSchema } from '../shared/egress-audit.js';
+import { mcpServersRecordSchema } from '../shared/prepare-session-limits.js';
 
 export { GetEgressAuditResponseSchema as GetEgressAuditOutput } from '../shared/egress-audit.js';
 export type { GetEgressAuditResponse } from '../shared/egress-audit.js';
@@ -548,11 +550,7 @@ const PrepareSessionSharedFields = {
     .max(Limits.MAX_SETUP_COMMANDS)
     .optional()
     .describe('Setup commands to run during session initialization'),
-  mcpServers: z
-    .record(z.string().max(100), MCPServerConfigSchema)
-    .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
-      message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
-    })
+  mcpServers: mcpServersRecordSchema(MCPServerConfigSchema)
     .optional()
     .describe('MCP server configurations'),
   runtimeSkills: RuntimeSkillsSchema.optional().describe(
@@ -631,7 +629,7 @@ const PrepareSessionSharedFields = {
 };
 
 const PrepareSessionNonCloneVariant = z.object({
-  prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH).describe('The task prompt for Kilo Code'),
+  prompt: cloudAgentPromptSchema.describe('The task prompt for Kilo Code'),
   kiloSessionId: clientKiloSessionIdSchema
     .optional()
     .describe(
@@ -708,6 +706,13 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
+    if (data.initialPayload?.type === 'prompt' && data.initialPayload.prompt.trim().length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['initialPayload', 'prompt'],
+        message: 'Prompt is required',
+      });
+    }
     if (data.baseBranch !== undefined && data.upstreamBranch !== undefined) {
       ctx.addIssue({
         code: 'custom',
@@ -941,12 +946,7 @@ export const ProfileInputSchema = z
           .array(z.string().max(Limits.MAX_SETUP_COMMAND_LENGTH))
           .max(Limits.MAX_SETUP_COMMANDS)
           .optional(),
-        mcpServers: z
-          .record(z.string().max(100), MCPServerConfigSchema)
-          .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
-            message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
-          })
-          .optional(),
+        mcpServers: mcpServersRecordSchema(MCPServerConfigSchema).optional(),
         runtimeSkills: RuntimeSkillsSchema.optional(),
         runtimeAgents: RuntimeAgentsSchema.optional(),
         appendSystemPrompt: z.string().max(10000).optional(),
@@ -968,11 +968,18 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
 export const StartSessionInput = z
   .object({
     operationKey: z.string().uuid().optional(),
-    message: z.object({
-      prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
-      ...AttachmentFieldsSchema,
-      id: MessageIdSchema.optional(),
-    }),
+    message: z
+      .object({
+        prompt: z.string().max(Limits.MAX_PROMPT_LENGTH),
+        ...AttachmentFieldsSchema,
+        id: MessageIdSchema.optional(),
+      })
+      .superRefine((message, ctx) =>
+        rejectEmptyPromptWithoutAttachments(
+          { prompt: message.prompt, attachments: message.attachments },
+          ctx
+        )
+      ),
     agent: z.object({
       mode: ModeSlugSchema,
       model: modelIdSchema,

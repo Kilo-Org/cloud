@@ -8,10 +8,12 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { mergeBlockedReasonIcon } from '@/components/pr-review/merge/pr-merge-icons';
-import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import {
   type MergeBlockedReason,
   prMergeMethodName,
@@ -48,22 +50,21 @@ export function ClosedChip({
   const { t } = useTranslation();
   const label = t(closedLabelKey(nounKey));
   return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.merge.mergeTitle')} />
-      <View className="rounded-lg bg-secondary p-4">
+    <Section label={t('prReview.merge.mergeTitle')}>
+      <Card>
         <Text className="text-sm text-muted-foreground">{label}</Text>
-      </View>
-    </View>
+      </Card>
+    </Section>
   );
 }
 
 export function MergeabilityCheckingRow() {
   const { t } = useTranslation();
   return (
-    <View className="flex-row items-center gap-2 rounded-lg bg-secondary p-4">
+    <Card className="flex-row items-center gap-2">
       <ActivityIndicator size="small" />
       <Text className="text-sm text-muted-foreground">{t('prReview.merge.checking')}</Text>
-    </View>
+    </Card>
   );
 }
 
@@ -74,7 +75,7 @@ export function MergeabilityTimedOutRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-4">
+    <Card className="gap-2">
       <Text className="text-sm text-muted-foreground">{t('prReview.merge.couldNotDetermine')}</Text>
       <Button
         variant="outline"
@@ -90,7 +91,7 @@ export function MergeabilityTimedOutRow({
           <Text>{t('common.refresh')}</Text>
         </View>
       </Button>
-    </View>
+    </Card>
   );
 }
 
@@ -107,7 +108,7 @@ function BlockedReasonRow({ reason }: Readonly<{ reason: MergeBlockedReason }>) 
     return colors.mutedForeground;
   })();
   return (
-    <View className="flex-row items-start gap-3 border-t-[0.5px] border-hair-soft px-4 py-3">
+    <View className="flex-row items-start gap-3 px-4 py-3">
       <Icon size={16} color={tone} />
       <View className="flex-1 gap-0.5">
         <Text className="text-sm font-medium text-foreground">{reason.title}</Text>
@@ -135,24 +136,25 @@ export function BlockedPanel({
   const hasBehindReason = reasons.some(r => r.id === 'behind');
   const { t } = useTranslation();
   return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.merge.blockedTitle')} />
-      <View className="overflow-hidden rounded-lg bg-secondary">
-        {reasons.map(reason => (
-          <BlockedReasonRow key={reason.id} reason={reason} />
-        ))}
+    <Section label={t('prReview.merge.blockedTitle')}>
+      <View className="gap-2">
+        <RowGroup>
+          {reasons.map(reason => (
+            <BlockedReasonRow key={reason.id} reason={reason} />
+          ))}
+        </RowGroup>
+        {hasBehindReason && allowUpdateBranch ? (
+          <Button
+            variant="outline"
+            onPress={onUpdateBranch}
+            loading={isUpdatePending}
+            accessibilityLabel={t('prReview.merge.updateBranchFromBase')}
+          >
+            <Text>{t('prReview.merge.updateBranch')}</Text>
+          </Button>
+        ) : null}
       </View>
-      {hasBehindReason && allowUpdateBranch ? (
-        <Button
-          variant="outline"
-          onPress={onUpdateBranch}
-          loading={isUpdatePending}
-          accessibilityLabel={t('prReview.merge.updateBranchFromBase')}
-        >
-          <Text>{t('prReview.merge.updateBranch')}</Text>
-        </Button>
-      ) : null}
-    </View>
+    </Section>
   );
 }
 

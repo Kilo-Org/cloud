@@ -99,6 +99,7 @@ describe('json-rpc builders', () => {
       needsPermission: -32_010,
       originChanged: -32_012,
       protocolMismatch: -32_020,
+      sessionLost: -32_006,
       tabBusy: -32_002,
       tabTaken: -32_003,
       unsupportedInBrowser: -32_005,

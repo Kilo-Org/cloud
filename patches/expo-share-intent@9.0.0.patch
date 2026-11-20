@@ -1,0 +1,71 @@
+diff --git a/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt b/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
+index ff5b100..06e2692 100644
+--- a/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
++++ b/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
+@@ -60,17 +60,19 @@
+             val resolver: ContentResolver? = instance?.currentActivity?.contentResolver
+                     ?: instance?.context?.contentResolver
+             if (resolver == null) {
+-                notifyError("Cannot get resolver (getFileInfo)")
+-                return mapOf(
+-                    "contentUri" to uri.toString(),
+-                    "filePath" to instance?.getAbsolutePath(uri),
+-                )
++                // Nothing can be read without a resolver, and a file map with no
++                // path only fails again later in JS: report the share instead.
++                throw IllegalStateException("Cannot get resolver (getFileInfo)")
+             }
+-            val queryResult: Cursor = resolver.query(uri, null, null, null, null)!!
+-            queryResult.moveToFirst()
+-            val fileName = queryResult.getString(queryResult.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+-            val fileSize = queryResult.getString(queryResult.getColumnIndex(OpenableColumns.SIZE))
+-            queryResult.close()
++            // A provider can answer with no cursor or an empty one (a deleted
++            // media row, a revoked grant): report it instead of reading row 0.
++            val (fileName, fileSize) = resolver.query(uri, null, null, null, null).use { cursor ->
++                if (cursor == null || !cursor.moveToFirst()) {
++                    throw IllegalStateException("No metadata for shared file $uri")
++                }
++                cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)) to
++                    cursor.getString(cursor.getColumnIndex(OpenableColumns.SIZE))
++            }
+ 
+             val mimeType = resolver.getType(uri)!!
+ 
+@@ -142,14 +144,14 @@
+                 if (intent.action == Intent.ACTION_SEND) {
+                     val uri = intent.parcelable<Uri>(Intent.EXTRA_STREAM);
+                     if (uri != null) {
+-                        notifyShareIntent(mapOf( "files" to arrayOf(getFileInfo(uri), "type" to "file")))
++                        notifyFileShare(listOf(uri))
+                     } else {
+                         notifyError("empty uri for file sharing: " + intent.action)
+                     }
+                 } else if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+                     val uris = intent.parcelableArrayList<Uri>(Intent.EXTRA_STREAM)
+                     if (uris != null) {
+-                        notifyShareIntent(mapOf( "files" to uris.map { getFileInfo(it) }, "type" to "file"))
++                        notifyFileShare(uris)
+                     } else {
+                         notifyError("empty uris array for file sharing: " + intent.action)
+                     }
+@@ -159,6 +161,19 @@
+             }
+         }
+ 
++        // Reading a shared file runs on the main thread inside onNewIntent, so
++        // any provider failure (no resolver, no metadata, no permission, no mime
++        // type) would crash the app. Send it to JS as a share error instead.
++        private fun notifyFileShare(uris: List<Uri>) {
++            val files = try {
++                uris.map { getFileInfo(it) }
++            } catch (e: Exception) {
++                notifyError("Cannot read shared file: ${e.message}")
++                return
++            }
++            notifyShareIntent(mapOf("files" to files, "type" to "file"))
++        }
++
+         /*
+          * https://stackoverflow.com/questions/73019160/the-getparcelableextra-method-is-deprecated
+          */

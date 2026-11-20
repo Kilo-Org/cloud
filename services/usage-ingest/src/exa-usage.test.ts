@@ -8,20 +8,28 @@ import { usage } from './usage.test-fixture';
 const secret = 'synthetic-publish-secret';
 
 let send: ReturnType<typeof vi.fn>;
+let sharedSend: ReturnType<typeof vi.fn>;
 let logs: () => Record<string, unknown>[];
 
 beforeEach(() => {
   send = vi.fn().mockResolvedValue(undefined);
+  sharedSend = vi.fn().mockResolvedValue(undefined);
   const sinks = [vi.spyOn(console, 'info'), vi.spyOn(console, 'warn')];
   sinks.forEach(sink => sink.mockImplementation(() => {}));
   logs = () => sinks.flatMap(sink => sink.mock.calls.map(([line]) => JSON.parse(String(line))));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  // Exa fallback uses the tagged queue only, never the shared queue, including after a failure.
+  expect(sharedSend).not.toHaveBeenCalled();
+  vi.restoreAllMocks();
+});
 
 function env(overrides: Partial<Env> = {}): Env {
   return {
     USAGE_INGEST_PUBLISH_SECRET: secret,
-    USAGE_INGEST_QUEUE: { send },
+    USAGE_INGEST_QUEUE: { send: sharedSend },
+    USAGE_INGEST_ENKRYPT_QUEUE: { send },
+    USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED: 'true',
     ...overrides,
   } as unknown as Env;
 }
@@ -235,6 +243,53 @@ describe('/exa-usage ingress', () => {
       send_duration_ms: expect.any(Number),
     });
     expectNoRecordValues();
+  });
+
+  it('returns 503 without a shared-queue fallback when the tagged binding is missing', async () => {
+    const response = await handleFetch(
+      post('/exa-usage', JSON.stringify(exaRecord), `Bearer ${secret}`),
+      env({ USAGE_INGEST_ENKRYPT_QUEUE: undefined })
+    );
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: 'Queue unavailable' });
+    expect(send).not.toHaveBeenCalled();
+    expect(logs().at(-1)).toMatchObject({
+      event: 'usage_ingest_enqueue',
+      usage_kind: 'exa_usage',
+      outcome: 'unavailable',
+      error_name: 'TypeError',
+    });
+  });
+
+  it.each([undefined, 'false', 'TRUE', '1', ' true'])(
+    'with the cutover switch %j sends once to the shared queue and never the dedicated one',
+    async value => {
+      const offShared = vi.fn().mockResolvedValue(undefined);
+      const response = await handleFetch(
+        post('/exa-usage', JSON.stringify(exaRecord), `Bearer ${secret}`),
+        env({
+          USAGE_INGEST_QUEUE: { send: offShared } as unknown as Env['USAGE_INGEST_QUEUE'],
+          USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED: value,
+        })
+      );
+      expect(response.status).toBe(202);
+      expect(offShared).toHaveBeenCalledExactlyOnceWith(exaMessage, { contentType: 'json' });
+      expect(send).not.toHaveBeenCalled();
+    }
+  );
+
+  it('with the cutover switch off, a failed shared send returns 503 without trying the dedicated queue', async () => {
+    const offShared = vi.fn().mockRejectedValue(new Error(secret));
+    const response = await handleFetch(
+      post('/exa-usage', JSON.stringify(exaRecord), `Bearer ${secret}`),
+      env({
+        USAGE_INGEST_QUEUE: { send: offShared } as unknown as Env['USAGE_INGEST_QUEUE'],
+        USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED: undefined,
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(offShared).toHaveBeenCalledOnce();
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('allows only POST', async () => {

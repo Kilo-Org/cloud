@@ -7,7 +7,7 @@
     "directory": "ورکنگ ڈائریکٹری",
     "createSession": "نیٹو سیشن بنائیں",
     "queueIfOffline": "ہوسٹ آف لائن ہو تو پرامپٹ قطار میں رکھیں",
-    "prompt": "پرامپٹ یا /command",
+    "prompt": "پرامپٹ یا \u2066/command\u2069",
     "localClear": "مقامی منظر صاف کریں",
     "abort": "ٹرن منسوخ کریں",
     "failed": "نیٹو ریموٹ کارروائی ناکام ہو گئی",
@@ -19,7 +19,9 @@
     "presenceStatus": "ہوسٹس: {{connection}}",
     "commandStatus": "کمانڈ کی ترسیل: {{status}}",
     "delivered": "پہنچا دیا گیا",
-    "expired": "میعاد ختم ہو گئی"
+    "expired": "میعاد ختم ہو گئی",
+    "recoveryGaps_one": "اس ٹرانسکرپٹ کا {{displayCount}} حصہ غائب ہے۔",
+    "recoveryGaps_other": "اس ٹرانسکرپٹ کے {{displayCount}} حصے غائب ہیں۔"
   },
   "common": {
     "manageOnWeb": "ویب پر منظم کریں",
@@ -57,6 +59,7 @@
     "link": "لنک",
     "takingLonger": "اس میں توقع سے زیادہ وقت لگ رہا ہے۔ آپ اسے بند کر کے دوبارہ چیک کر سکتے ہیں۔",
     "model": "ماڈل",
+    "notSelected": "منتخب نہیں",
     "accessDenied": "رسائی کی اجازت نہیں ہے۔",
     "allRepositories": "تمام ریپوزٹریز",
     "personal": "ذاتی",
@@ -137,16 +140,19 @@
     "keepRunning": "جاری رہنے دیں",
     "newSession": "نیا سیشن",
     "noModelsAvailable": "کوئی ماڈل دستیاب نہیں",
+    "modelRetires": "{{date}} کو ریٹائر ہوگا",
     "notFound": "نہیں ملا۔",
     "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
+    "viewOnGitHub": "GitHub پر PR دیکھیں",
     "completed": "مکمل",
     "pending": "زیر التوا",
     "running": "چل رہا ہے",
     "performance": "کارکردگی",
     "preferences": "ترجیحات",
     "privacyPolicy": "رازداری کی پالیسی",
+    "termsOfService": "استعمال کی شرائط",
     "profile": "پروفائل",
     "reactions": "ردعمل",
     "recent": "حالیہ",
@@ -170,6 +176,7 @@
     "generating": "بنایا جا رہا ہے…",
     "working": "کام جاری ہے",
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
+    "organizationRepositories": "تنظیم کی ریپوزٹریز",
     "dismissed": "نظر انداز کردہ",
     "agent": "ایجنٹ",
     "durationMinuteShort": "منٹ",
@@ -178,7 +185,8 @@
     "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔",
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
-    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
+    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -201,7 +209,7 @@
     "openSignInPageInBrowser": "براؤزر میں سائن ان کا صفحہ کھولیں",
     "copySignInLink": "سائن ان کا لنک کاپی کریں",
     "cancelSignIn": "سائن ان منسوخ کریں",
-    "startingSignIn": "سائن ان شروع ہو رہا ہے...",
+    "startingSignIn": "سائن ان شروع ہو رہا ہے…",
     "organizationUsesSso": "آپ کی تنظیم سنگل سائن آن استعمال کرتی ہے۔",
     "continueWithSso": "SSO کے ساتھ جاری رکھیں",
     "useDifferentEmail": "دوسرا ای میل پتہ استعمال کریں",
@@ -216,8 +224,8 @@
     "verifyCode": "کوڈ کی تصدیق کریں",
     "resendCode": "کوڈ دوبارہ بھیجیں",
     "termsPrefix": "آگے بڑھنے سے آپ ہماری درج ذیل پالیسیوں سے اتفاق کرتے ہیں: ",
+    "termsInSentence": "سروس کی شرائط",
     "terms": "شرائط",
-    "termsInSentence": "شرائط",
     "termsConnector": " اور ",
     "termsSuffix": "۔",
     "moreSignInOptions": "سائن ان کے مزید اختیارات",
@@ -272,6 +280,9 @@
     "credits": "کریڈٹس",
     "failedToLoadBalance": "بیلنس لوڈ نہیں ہو سکا۔ دوبارہ کوشش کرنے کے لیے ٹیپ کریں۔",
     "balanceLoadFailed": "بیلنس لوڈ نہیں ہو سکا",
+    "balanceUnreachable": "سرور تک رسائی نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+    "balanceAccessDenied": "آپ کو یہ بیلنس دیکھنے کی اجازت نہیں ہے۔",
+    "balanceUnavailable": "بیلنس لوڈ نہیں ہو سکا۔",
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
@@ -311,9 +322,9 @@
     "passkeyVerifyDescription": "اپنی حفاظت کے لیے، رسائی کلیدوں میں تبدیلی کرنے سے پہلے اپنی شناخت کی تصدیق کریں۔",
     "passkeyVerifyWithPasskey": "رسائی کلید سے تصدیق کریں",
     "passkeyVerifySendCode": "مجھے ای میل پر کوڈ بھیجیں",
-    "passkeyVerifySendingCode": "کوڈ بھیجا جا رہا ہے...",
+    "passkeyVerifySendingCode": "کوڈ بھیجا جا رہا ہے…",
     "passkeyVerifyPasskeyPrompt": "جاری رکھنے کے لیے اپنی رسائی کلید سے تصدیق کریں۔",
-    "passkeyVerifyChecking": "آپ کا کوڈ چیک کیا جا رہا ہے...",
+    "passkeyVerifyChecking": "آپ کا کوڈ چیک کیا جا رہا ہے…",
     "passkeyVerifyCodeSent": "{{email}} پر بھیجا گیا کوڈ درج کریں۔",
     "passkeyVerifyCodeRejected": "وہ کوڈ درست نہیں تھا۔ دوبارہ کوشش کریں۔",
     "passkeyVerifyPasskeyFailed": "اس رسائی کلید سے تصدیق نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
@@ -321,8 +332,8 @@
     "passkeyVerifyInProgress": "وہ کوڈ پہلے ہی چیک کیا جا رہا ہے۔ کچھ دیر بعد دوبارہ کوشش کریں۔",
     "passkeyVerifyTooManyAttempts": "بہت زیادہ کوششیں ہو چکی ہیں۔ نیا کوڈ بھیجیں۔",
     "passkeyVerifySsoRequired": "آپ کی تنظیم سنگل سائن آن لازمی قرار دیتی ہے۔ براؤزر میں اس تبدیلی کو منظور کریں، پھر یہاں واپس آئیں۔",
-    "passkeyVerifySsoStarting": "منظوری کا عمل شروع ہو رہا ہے...",
-    "passkeyVerifySsoWaiting": "منظوری کا انتظار ہے...",
+    "passkeyVerifySsoStarting": "منظوری کا عمل شروع ہو رہا ہے…",
+    "passkeyVerifySsoWaiting": "منظوری کا انتظار ہے…",
     "passkeyVerifySsoOpen": "منظوری کا صفحہ کھولیں",
     "passkeyVerifySsoExpired": "اس منظوری کی میعاد ختم ہو گئی یا اسے منسوخ کر دیا گیا۔ دوبارہ کوشش کریں۔",
     "passkeyVerifySsoUnavailable": "سنگل سائن آن کے ذریعے منظوری فی الحال دستیاب نہیں ہے۔ دوبارہ کوشش کریں۔",
@@ -502,7 +513,7 @@
     "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
     "changelogAreas": {
       "signIn": "سائن ان",
-      "profileOrganizations": "پروفائل اور تنظیمیں"
+      "profileOrganizations": "پروفائل و تنظیمیں"
     }
   },
   "preferences": {
@@ -747,6 +758,9 @@
       "couldNotLoadMore": "مزید تبصرے لوڈ نہیں ہو سکے۔",
       "retryLoadingMore": "مزید تبصرے لوڈ کرنے کی دوبارہ کوشش کریں",
       "loadMoreComments": "مزید تبصرے لوڈ کریں",
+      "conversationTruncated": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
+      "conversationTruncated_one": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
+      "conversationTruncated_other": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
       "addReaction": "ردعمل شامل کریں",
       "reactionPill": "{{emoji}} ردعمل، {{displayCount}} {{countLabel}}",
       "reaction_one": "ردعمل",
@@ -762,7 +776,6 @@
       "replyPlaceholder": "جواب…",
       "replyBody": "جواب کا متن",
       "submitReply": "جواب بھیجیں",
-      "termsTitle": "استعمال کی شرائط",
       "termsCopy": "پوسٹ کرنے کے لیے آپ کی عمر کم از کم 13 سال ہونی چاہیے۔",
       "termsAcceptRetry": "شرائط کی منظوری محفوظ نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
       "viewTerms": "شرائط دیکھیں",
@@ -820,7 +833,19 @@
         "fileComment": "فائل پر تبصرہ",
         "outdatedOnPathLines": "{{path}} {{lines}} پر پرانا",
         "outdatedOnLines": "{{lines}} پر پرانا",
-        "outdatedOnPath": "{{path}} پر پرانا"
+        "outdatedOnPath": "{{path}} پر پرانا",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "بائیں جانب",
+        "sideRight": "دائیں جانب",
+        "outdatedOnLinesSide": "{{lines}} پر پرانا ({{side}})",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} پر پرانا ({{side}})",
+        "outdatedSide": "پرانا ({{side}})",
+        "outdatedOnPathSide": "{{path}} پر پرانا ({{side}})"
       },
       "deletedUser": "حذف شدہ صارف",
       "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔",
@@ -865,7 +890,6 @@
       "noAccess": "اس ریپوزٹری کی جانچوں تک آپ کی رسائی نہیں ہے۔",
       "couldNotLoad": "جانچیں لوڈ نہیں ہو سکیں۔",
       "retryChecks": "جانچیں لوڈ کرنے کی دوبارہ کوشش کریں",
-      "viewOnGitHub": "GitHub پر PR دیکھیں",
       "noChecksReported": "کوئی جانچ رپورٹ نہیں ہوئی",
       "passed": "{{displayCount}} کامیاب",
       "passed_one": "{{displayCount}} کامیاب",
@@ -920,9 +944,9 @@
       "checkFailedTitleGitLab": "GitLab کنکشن چیک نہیں ہو سکا۔",
       "checkFailedTitleBitbucket": "Bitbucket کنکشن چیک نہیں ہو سکا۔",
       "providerCheckFailedMessage": "پرووائیڈر تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-      "reconnectTitle": "GitHub سے دوبارہ رابطہ",
-      "reconnectTitleGitLab": "GitLab سے دوبارہ رابطہ",
-      "reconnectTitleBitbucket": "Bitbucket سے دوبارہ رابطہ",
+      "reconnectTitle": "GitHub کو دوبارہ منسلک کریں",
+      "reconnectTitleGitLab": "GitLab کو دوبارہ منسلک کریں",
+      "reconnectTitleBitbucket": "Bitbucket کو دوبارہ منسلک کریں",
       "reconnectDescription": "آپ کا GitHub کنکشن منسوخ کر دیا گیا ہے۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لیں",
       "gitlabInstanceMismatchTitle": "GitLab کنکشن کسی دوسرے انسٹینس کے لیے ہے",
@@ -932,7 +956,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "اس اکاؤنٹ کی ابھی تک کوئی تنظیم نہیں ہے۔ ایک تنظیم بنانے یا اس میں شامل ہونے پر آپ Bitbucket پل ریکویسٹس کا جائزہ لے سکتے ہیں۔",
       "gitlabReconnectAdminOnlyDescription": "ادارے کے کسی مالک، منتظم، یا بلنگ مینیجر سے اسے دوبارہ منسلک کرنے کی درخواست کریں۔",
       "bitbucketNotConnectedTitle": "Bitbucket منسلک نہیں ہے",
-      "bitbucketAdminOnlyDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+      "adminOnlyConnectDescription": "صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
       "contextLine": "{{organization}} کے لیے",
       "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
     },
@@ -949,6 +973,8 @@
       "pendingComment": "زیر التوا تبصرے",
       "pendingComment_other": "زیر التوا تبصرے",
       "submitCountOfTotal": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
+      "submitCountOfTotal_one": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
+      "submitCountOfTotal_other": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
       "submitReview": "جائزہ جمع کریں",
       "partialPostedFresh": "پوسٹ کیے گئے تبصروں کی تعداد: {{displayFreshCount}}۔ ",
       "partialPostedFresh_one": "پوسٹ کیے گئے تبصروں کی تعداد: {{displayFreshCount}}۔ ",
@@ -1013,7 +1039,10 @@
     "tabs": {
       "overview": "خلاصہ",
       "files": "فائلیں",
-      "discussion": "گفتگو"
+      "discussion": "گفتگو",
+      "discussionAccessibility_one": "{{title}}: 1 تبصرہ",
+      "discussionAccessibility": "{{title}}: {{displayCount}} تبصرے",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} تبصرے"
     },
     "fileStatus": {
       "modified": "ترمیم شدہ",
@@ -1210,7 +1239,7 @@
     },
     "instructions": {
       "title": "اپنی ہدایات",
-      "deprecation": "حسبِ ضرورت ہدایات کی سہولت ختم کرنے کا منصوبہ ہے۔ اس کے بجائے یہ ہدایات اپنی ریپوزٹری کی REVIEW.md فائل میں منتقل کریں۔",
+      "deprecation": "حسبِ ضرورت ہدایات کی سہولت ختم کر دی جائے گی۔ اس کے بجائے یہ ہدایات اپنی ریپوزٹری کی REVIEW.md فائل میں منتقل کریں۔",
       "placeholder": "مثلاً خرابیوں سے نمٹنے کے ہمارے اصولوں کی پابندی…",
       "clearTitle": "اپنی ہدایات ہٹائیں؟",
       "clearMessage": "خالی خانہ محفوظ کرنے سے اس جائزہ کار کے لیے محفوظ کی گئی اپنی ہدایات حذف ہو جائیں گی۔"
@@ -1370,11 +1399,16 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔"
+      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے، اس لیے مالک کو ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کرنی ہوگی۔"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "اس تنظیم کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
-      "description": "مطلوبہ اجازتوں کے ساتھ ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
+      "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
+      "managedOnWebTitle": "ویب پر منظم کیا جاتا ہے",
+      "managedOnWebShort": "یہ کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
+      "managedOnWebRepositories": "{{organization}} کے لیے ریپوزٹریز کمپیوٹر سے ویب پر منتخب کریں۔",
+      "description": "{{organization}} کے لیے ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
+      "descriptionReconnect": "{{organization}} کے لیے ورک اسپیس تک رسائی کا نیا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
+      "descriptionOverview": "ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے اگلی اسکرین پر چسپاں کریں۔",
       "scopes": "اکاؤنٹ: پڑھنے کی اجازت · ریپوزٹریز: پڑھنے اور لکھنے کی اجازت · پل ریکویسٹس: پڑھنے کی اجازت · ویب ہکس: پڑھنے اور لکھنے کی اجازت",
       "tokenPlaceholder": "ورک اسپیس تک رسائی کا ٹوکن",
       "tokenRefused": "Bitbucket نے یہ ورک اسپیس تک رسائی کا ٹوکن قبول نہیں کیا۔ چیک کریں کہ اس میں اوپر دی گئی اجازتیں موجود ہیں، پھر دوبارہ کوشش کریں۔"
@@ -1395,6 +1429,7 @@
     "platformList": {
       "checking": "جانچ ہو رہی ہے…",
       "statusUnavailable": "حالت دستیاب نہیں",
+      "needsAttention": "توجہ درکار",
       "platforms": "پلیٹ فارمز",
       "activity": "سرگرمی"
     },
@@ -1816,7 +1851,7 @@
       "couldNotLoadMore": "مزید مسائل لوڈ نہیں ہو سکے۔",
       "noMatchesTitle": "منتخب فلٹرز کے مطابق کوئی مسئلہ نہیں ملا",
       "noMatchesDescription": "منتخب فلٹرز تبدیل کر کے یا ہٹا کر دیکھیں۔",
-      "emptyTitle": "کوئی غیر حل شدہ مسئلہ نہیں",
+      "emptyTitle": "کوئی کھلا مسئلہ نہیں",
       "emptyDescription": "اس وقت کوئی غیر حل شدہ مسئلہ توجہ طلب نہیں ہے۔"
     },
     "findingRow": {
@@ -2007,7 +2042,7 @@
     "remediationUnavailable": {
       "findingNotFound": "سکیورٹی مسئلہ اب موجود نہیں ہے۔",
       "approvalRequired": "خودکار اصلاح کے لیے منظوری درکار ہے۔ منظوری دینے کے لیے اصلاح دستی طور پر شروع کریں۔",
-      "findingNotOpen": "مسئلہ اب غیر حل شدہ حالت میں نہیں ہے۔",
+      "findingNotOpen": "مسئلہ اب کھلا نہیں ہے۔",
       "repoNotInScope": "ریپوزٹری سیکیورٹی ایجنٹ کے لیے منتخب نہیں ہے۔",
       "analysisRequired": "اصلاح شروع کرنے سے پہلے کوڈ بیس کا تجزیہ کریں۔",
       "staleAnalysis": "تجزیے کے بعد مسئلہ تبدیل ہو گیا۔ اصلاح شروع کرنے سے پہلے دوبارہ تجزیہ کریں۔",
@@ -2148,6 +2183,8 @@
       "renameAccessibility": "سیشن کا نام تبدیل کریں: {{title}}",
       "cloningSession": "سیشن کی نقل بن رہی ہے",
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا۔",
+      "historyTooLarge": "اس سیشن کی نقل لوڈ کرنے کے لیے بہت بڑی ہے۔",
+      "historyUnavailable": "اس سیشن کی نقل نہیں پڑھی جا سکتی۔",
       "cloneFailedRetry": "اس سیشن کی نقل نہیں بن سکی۔ دوبارہ کوشش کریں۔",
       "notEnoughCredits": "اس درخواست کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔",
       "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
@@ -2224,6 +2261,7 @@
       "branchDefault": "ڈیفالٹ",
       "branchAccessibility": "برانچ: {{label}}",
       "branchLoading": "برانچز لوڈ ہو رہی ہیں",
+      "branchInactive": "اس کی برانچز لوڈ کرنے کے لیے ریپوزٹری منتخب کریں۔",
       "branchLoadError": "برانچز لوڈ نہیں ہو سکیں",
       "branchUnavailable": "اس ریپوزٹری کے لیے برانچز دستیاب نہیں ہیں۔ پرووائیڈر کے ساتھ اپنی رسائی چیک کریں، پھر کوئی دوسری ریپوزٹری منتخب کریں۔",
       "branchEmpty": "کوئی برانچ دستیاب نہیں",
@@ -2456,7 +2494,8 @@
       "customModes": "حسب ضرورت موڈز"
     },
     "modeSelector": {
-      "accessibility": "موڈ: {{label}}"
+      "accessibility": "موڈ: {{label}}",
+      "customMode": "حسب ضرورت موڈ"
     },
     "modeOptions": {
       "code": "کوڈ لکھیں",
@@ -2477,7 +2516,7 @@
       "noMatches": "کوئی نتیجہ نہیں ملا",
       "noRepositories": "کوئی ریپوزٹری دستیاب نہیں",
       "noRepositoriesDescription": "آپ کے اکاؤنٹ سے کوئی ریپوزٹری منسلک نہیں ہے۔",
-      "loading": "لوڈ ہو رہا ہے...",
+      "loading": "لوڈ ہو رہا ہے…",
       "accessibility": "ریپوزٹری: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2504,8 +2543,8 @@
       "reportAiResponseFailedTerminal": "یہ جواب رپورٹ نہیں کیا جا سکتا۔"
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "{{amount}} سے کم",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} فی {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "تفصیلات دستیاب نہیں ہیں۔",
@@ -2761,6 +2800,8 @@
     "modelPicker": {
       "title": "ماڈل منتخب کریں",
       "noModelsDescription": "منتخب کرنے کے لیے کوئی ماڈل دستیاب نہیں ہے۔",
+      "allUnavailableTitle": "کوئی بھی ماڈل استعمال نہیں کیا جا سکتا",
+      "allUnavailableDescription": "فراہم کنندہ کی کلید شامل کریں اور دوبارہ کوشش کریں۔",
       "favorites": "پسندیدہ"
     },
     "modelSelector": {
@@ -2772,7 +2813,7 @@
       "thinkingEffortAccessibility": "غور کی سطح: {{label}}",
       "thinkingEffortSelected": "غور کی سطح: {{label}}، منتخب شدہ",
       "thinkingEffortWithModel": "{{model}}، غور کی سطح: {{variant}}",
-      "lockedByAgent": "، ایجنٹ \"{{agent}}\" نے مقفل کیا ہے",
+      "lockedByAgent": "ایجنٹ \"{{agent}}\" نے مقفل کیا ہے",
       "addToFavorites": "{{name}} کو پسندیدہ میں شامل کریں",
       "removeFromFavorites": "{{name}} کو پسندیدہ سے ہٹائیں",
       "sessionModel": "سیشن کا ماڈل"
@@ -2808,8 +2849,8 @@
       "pasteFromClipboard": "کلپ بورڈ سے چسپاں کریں",
       "stopGenerating": "جواب تیار کرنا روکیں",
       "selectModelBeforeSending": "پیغام بھیجنے سے پہلے ماڈل منتخب کریں۔",
-      "preparingPlaceholder": "ماحول تیار ہو رہا ہے...",
-      "finalizingPlaceholder": "کام مکمل ہو رہا ہے...",
+      "preparingPlaceholder": "ماحول تیار ہو رہا ہے…",
+      "finalizingPlaceholder": "کام مکمل ہو رہا ہے…",
       "sessionLoadFailed": "سیشن لوڈ نہیں ہو سکا۔ پہلے دوبارہ کوشش کریں۔",
       "cannotReceiveFiles": "یہ سیشن فائلیں وصول نہیں کر سکتا۔ اپنا پیغام بھیجنے کے لیے منسلک فائلیں ہٹائیں۔",
       "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کرنے کے لیے بھیجنے کے بٹن پر ٹیپ کریں۔",
@@ -3003,6 +3044,7 @@
     "noSessions": "کوئی فعال سیشن نہیں",
     "noSessionsDescription": "کسی دوسری ڈیوائس پر Kilo ایپ سے سائن ان کریں۔ اس کا سیشن یہاں نظر آئے گا۔",
     "signedIn": "سائن ان: {{signedIn}} · آخری سرگرمی: {{lastSeen}}",
+    "signedInThisDevice": "سائن ان: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "یہاں Kilo ایپ، Kilo CLI اور ویب براؤزر کے سائن ان ظاہر ہوتے ہیں۔ ایڈیٹر کے سائن ان درج نہیں ہوتے۔",
     "thisDevice": "یہ ڈیوائس",
     "webBrowser": "ویب براؤزر",
@@ -3025,7 +3067,6 @@
   },
   "home": {
     "couldNotLoadSessions": "سیشنز لوڈ نہیں ہو سکے۔",
-    "couldNotLoadActiveSessions": "فعال سیشنز لوڈ نہیں ہو سکے۔",
     "agentSessions": "ابھی جاری",
     "newCodingTask": "کوڈنگ کا نیا کام",
     "newTaskFromPicture": "تصویر سے نیا کام",
@@ -3052,6 +3093,7 @@
   "queryError": {
     "neutralDescription": "براہ کرم دوبارہ کوشش کریں۔",
     "offlineTitle": "لوڈ نہیں ہو سکا۔",
+    "offlineDescription": "سرور تک رسائی نہیں ہو سکی۔",
     "permissionDescription": "آپ کو یہ دیکھنے کی اجازت نہیں ہے۔",
     "notFoundDescription": "ممکن ہے یہ آئٹم ہٹا دیا گیا ہو یا اب دستیاب نہ ہو۔",
     "serverTitle": "لوڈ نہیں ہو سکا۔",
@@ -3072,7 +3114,7 @@
     "scheduled": "شیڈول شدہ"
   },
   "voiceInput": {
-    "listening": "سن رہے ہیں...",
+    "listening": "سن رہے ہیں…",
     "onlineTitle": "آواز کو آن لائن متن میں بدلا جاتا ہے",
     "onlineMessage": "یہ ڈیوائس آف لائن آواز کو متن میں نہیں بدل سکتی۔ آپ کی ریکارڈنگ متن میں بدلنے کے لیے {{provider}} کو بھیجی جاتی ہے۔ Kilo آواز محفوظ نہیں کرتا۔",
     "allow": "اجازت دیں",
@@ -3094,7 +3136,7 @@
     "useOnlineTranscription": "آن لائن بدلنے کی اجازت دیں",
     "offlineModelDownloadScheduled": "آف لائن تقریر کی فائلیں پس منظر میں ڈاؤن لوڈ ہوں گی۔ بعد میں آواز سے لکھنا دوبارہ آزمانے کی کوشش کریں۔",
     "listeningStopped": "سننے کا عمل رک گیا۔",
-    "transcribing": "متن میں بدلا جا رہا ہے...",
+    "transcribing": "متن میں بدلا جا رہا ہے…",
     "gatewayUnreachable": "Kilo Gateway سے رابطہ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
     "gatewayTimeout": "متن میں بدلنے میں بہت وقت لگ گیا۔ دوبارہ کوشش کریں۔",
     "gatewayModelUnavailable": "یہ ماڈل دستیاب نہیں ہے۔ ترجیحات میں دوسرا منتخب کریں۔",
@@ -3134,6 +3176,11 @@
       "billingHistory": "بلنگ کی تاریخچہ",
       "billingHistoryEmpty": "ابھی تک بلنگ کی کوئی تاریخچہ نہیں۔",
       "billingHistoryError": "بلنگ کی تاریخچہ لوڈ نہیں ہو سکا",
+      "billingRowInitial": "پہلا چارج · {{tier}}",
+      "billingRowRenewal": "تجدید · {{tier}}",
+      "billingRowSubscription": "سبسکرپشن · {{tier}}",
+      "billingRowTrial": "مفت آزمائش · {{tier}}",
+      "billingRowUpgrade": "پلان کی تبدیلی · {{tier}}",
       "cancel": "سبسکرپشن منسوخ کریں",
       "cancelDescription": "آپ کا Kilo Pass بلنگ کی مدت کے اختتام تک فعال رہے گا اور اس کی تجدید نہیں ہوگی۔",
       "cancelScheduled": "{{date}} کو منسوخ ہو جائے گی",
@@ -3159,6 +3206,8 @@
     "retryHint": "Kilo Pass کی حالت دوبارہ معلوم کرنے کی کوشش کرتا ہے۔",
     "endedOn": "{{date}} کو ختم ہو گیا",
     "notAvailableInApp": "Kilo Pass ایپ میں دستیاب نہیں ہے۔",
+    "notAvailableTitle": "Kilo Pass ایپ میں نہیں ہے",
+    "noPassDescription": "اس اکاؤنٹ میں کوئی Kilo Pass نہیں ہے۔",
     "statusActive": "فعال",
     "statusTrialing": "آزمائشی",
     "statusPastDue": "ادائیگی میں تاخیر",
@@ -3229,6 +3278,7 @@
     "revokeConsent": "رضامندی ہٹائیں",
     "revokeConsentTitle": "ڈیٹا شیئرنگ کی رضامندی منسوخ کریں؟",
     "acceptAndContinue": "قبول کریں اور جاری رکھیں",
+    "loadingConsentSettings": "آپ کی رضامندی کی ترتیبات لوڈ ہو رہی ہیں…",
     "decline": "مسترد کریں",
     "declineAndSignOut": "مسترد کریں اور سائن آؤٹ کریں",
     "declineTitle": "ڈیٹا شیئرنگ مسترد کریں؟",
@@ -3371,7 +3421,7 @@
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
       "membershipLostNotice": "آپ کو اب اس تنظیم تک رسائی حاصل نہیں ہے۔ {{target}} پر منتقل کر دیا گیا۔",
       "noOrganization": "کوئی تنظیم نہیں",
-      "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ اراکین کو مدعو کرنے اور کم بیلنس کے الرٹس جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ایک تنظیم بنائیں، یا جس تنظیم میں آپ کو مدعو کیا گیا ہے اس میں شامل ہونے کے لیے ویب کھولیں۔",
+      "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ اراکین کو مدعو کرنے اور کم بیلنس کے الرٹس جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ایک تنظیم بنائیں، یا کسی تنظیم کی بھیجی گئی ای میل سے دعوت قبول کریں۔",
       "organizationUnavailable": "تنظیم دستیاب نہیں ہے۔",
       "selectDescriptionWithOrganizations": "آپ ایک یا زیادہ تنظیموں سے تعلق رکھتے ہیں۔ وہ اکاؤنٹ منتخب کریں جو یہ اسکرین استعمال کرے۔",
       "selectOrganization": "ایک تنظیم منتخب کریں",
@@ -3403,7 +3453,8 @@
         "accounting_adjustment": "حساب میں ردوبدل",
         "credits_expired": "کریڈٹس کی میعاد ختم"
       },
-      "truncated": "کریڈٹس کا پرانا ریکارڈ دستیاب ہے۔"
+      "truncated": "کریڈٹس کا پرانا ریکارڈ دستیاب ہے۔",
+      "retentionLimit": "کریڈٹس کا حالیہ ترین ریکارڈ دکھایا جا رہا ہے۔"
     },
     "inviteMember": {
       "emailError": "درست ای میل پتہ درج کریں۔",
@@ -3413,6 +3464,7 @@
       "sendInvite": "دعوت بھیجیں",
       "title": "رکن کو دعوت دیں",
       "alreadyInvited": "انہیں پہلے ہی دعوت دے دی گئی ہے یا وہ پہلے سے ہی رکن ہیں۔",
+      "organizationUnavailable": "یہ تنظیم اب دستیاب نہیں ہے۔",
       "sendError": "دعوت نہیں بھیجی جا سکی۔",
       "pendingInvitation": "اس ای میل کے لیے پہلے ہی ایک زیرِ التوا دعوت موجود ہے۔",
       "alreadyMember": "یہ شخص پہلے ہی اس تنظیم کا رکن ہے۔",
@@ -3434,10 +3486,11 @@
         "void": "منسوخ",
         "uncollectible": "ناقابل وصول"
       },
-      "truncated": "پرانی انوائسیں دستیاب ہیں۔"
+      "truncated": "پرانی انوائسیں دستیاب ہیں۔",
+      "retentionLimit": "حالیہ ترین انوائسیں دکھائی جا رہی ہیں۔"
     },
     "lowBalanceAlert": {
-      "enableA11y": "بیلنس کم ہونے کی اطلاع فعال کریں",
+      "subtitle": "جب اس تنظیم کا بیلنس آپ کی مقرر کردہ رقم سے کم ہو جائے تو آپ کے درج کردہ پتوں پر ای میل کے ذریعے اطلاع بھیجیں۔",
       "notifyEmailsLabel": "اطلاع وصول کرنے والے ای میل پتے",
       "permissionDenied": "آپ کو بلنگ کی اطلاعات کا انتظام کرنے کی اجازت نہیں ہے۔",
       "separateEmailsHint": "ایک سے زیادہ ای میل پتے ہوں تو انہیں کوما سے الگ کریں۔",
@@ -3513,6 +3566,7 @@
       "truncated": "اس گھنٹے میں فہرست میں دکھائی گئی درخواستوں سے زیادہ درخواستیں ہیں۔",
       "emptyTitle": "اس گھنٹے میں کوئی درخواست نہیں",
       "emptyDescription": "پہلے کی درخواستیں دیکھنے کے لیے پچھلا گھنٹہ استعمال کریں۔",
+      "emptyBoundDescription": "درخواستوں کا ریکارڈ بس یہیں تک دستیاب ہے۔",
       "loadError": "درخواست لاگز لوڈ نہیں ہو سکے۔",
       "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔",
       "tokens": "ان پٹ {{input}} · آؤٹ پٹ {{output}}",
@@ -3581,10 +3635,9 @@
     },
     "hub": {
       "renameTitle": "تنظیم کا نام تبدیل کریں",
-      "renamePlaceholder": "تنظیم کا نام",
+      "renamePlaceholder": "تنظیم کا نام درج کریں",
       "balance": "بیلنس",
-      "organizationSeats": "تنظیم کی سیٹیں",
-      "plan": "تنظیم کا پلان",
+      "plan": "پلان",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · ختم شدہ",
@@ -3618,7 +3671,8 @@
     "signupStepUp": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.moreSignInOptions)' استعمال کریں۔",
     "signupStepUpApple": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.signInWithApple)' استعمال کریں۔",
     "signupStepUpGoogle": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.signInWithGoogle)' استعمال کریں۔",
-    "invalidCode": "یہ کوڈ غلط ہے۔ براہ کرم دوبارہ کوشش کریں۔",
+    "signupStepUpBack": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے واپس جائیں اور '$t(login.moreSignInOptions)' استعمال کریں۔",
+    "invalidCode": "یہ کوڈ غلط ہے یا اس کی میعاد ختم ہو چکی ہے۔ براہ کرم دوبارہ کوشش کریں یا '$t(login.resendCode)' استعمال کریں۔",
     "codeInProgress": "آپ کے کوڈ پر کارروائی ہو رہی ہے۔ ذرا انتظار کریں اور دوبارہ کوشش کریں۔",
     "tooManyAttempts": "بہت زیادہ کوششیں ہو چکی ہیں۔ براہ کرم نئے کوڈ کی درخواست کریں۔",
     "invalidToken": "سائن ان ناکام رہا۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -3668,8 +3722,7 @@
     "imagesSectionEmpty": "کوئی قابل اعتماد تصویری ہوسٹ نہیں",
     "revoke": "{{host}} پر اعتماد ختم کریں",
     "revokeMessage": "اس ہوسٹ کے لنکس دوبارہ تصدیق طلب کریں گے۔",
-    "revokeImageMessage": "اس ہوسٹ کی تصاویر دوبارہ تصدیق طلب کریں گی۔",
-    "backToPreferences": "ترجیحات پر واپس جائیں"
+    "revokeImageMessage": "اس ہوسٹ کی تصاویر دوبارہ تصدیق طلب کریں گی۔"
   },
   "glanceable": {
     "waiting": "ایجنٹس کی معلومات اپ ڈیٹ ہو رہی ہیں",
@@ -3683,7 +3736,7 @@
     "newestSession": "تازہ ترین: {{title}}",
     "noneWaiting": "کوئی ایجنٹ انتظار میں نہیں",
     "newAgent": "نیا ایجنٹ",
-    "approving": "منظور کیا جا رہا ہے...",
+    "approving": "منظور کیا جا رہا ہے…",
     "couldNotApprove": "منظور نہیں کیا جا سکا",
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
@@ -3695,6 +3748,7 @@
     "lastKnown": "آخری معلوم حالت",
     "awaitingUpdate": "اپ ڈیٹ کا انتظار",
     "nextRun": "اگلا اجرا",
+    "wasDue": "متوقع تھا",
     "waitingForYou": "آپ کا انتظار",
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
@@ -3747,6 +3801,7 @@
   },
   "modelChat": {
     "offlineFailure": "اس ماڈل کو انٹرنیٹ کنکشن درکار ہے۔ کنیکٹ کریں اور دوبارہ کوشش کریں، یا اس ڈیوائس پر موجود کسی ماڈل پر سوئچ کریں۔",
+    "connectionLost": "ماڈل سے کنکشن منقطع ہو گیا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
     "empty": {
       "title": "چیٹ شروع کریں",
       "description": "کسی ماڈل سے بات کرنے کے لیے پیغام بھیجیں۔"
@@ -3804,6 +3859,8 @@
       "fieldName": "دکھایا جانے والا نام",
       "fieldUrl": "سرور URL",
       "fieldUrlInvalid": "درست سرور URL درج کریں۔",
+      "duplicateUrl": "یہ URL پہلے ہی محفوظ ہے۔",
+      "serverNotFound": "یہ سرور اب مزید محفوظ نہیں ہے۔",
       "enableServer": "اس سرور کو فعال کریں: {{name}}",
       "editServer": "سرور میں ترمیم کریں",
       "deleteServer": "سرور حذف کریں",
@@ -3884,6 +3941,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) منتخب پروٹوکول اور ماڈل استعمال کرتے ہوئے اس اینڈ پوائنٹ کو استدلال کی ایک مختصر درخواست بھیجتا ہے۔ فراہم کنندہ اس کی فیس وصول کر سکتا ہے۔",
       "connectionSucceeded": "ماڈل نے اس پروٹوکول کا استعمال کرتے ہوئے ایک درخواست مکمل کی۔",
       "connectionFailed": "ماڈل درخواست مکمل نہیں کر سکا۔ API کا بنیادی URL، پروٹوکول، اسناد اور ماڈل کی ID چیک کریں۔",
+      "requestTimedOut": "اینڈ پوائنٹ نے مقررہ وقت میں جواب نہیں دیا۔ API کا بنیادی URL اور اپنا کنکشن چیک کریں، پھر دوبارہ کوشش کریں۔",
+      "requestUnauthorized": "اینڈ پوائنٹ نے اسناد مسترد کر دیں۔ API کلید اور کسٹم ہیڈرز چیک کریں، پھر دوبارہ کوشش کریں۔",
+      "requestNotFound": "اینڈ پوائنٹ یا ماڈل نہیں ملا۔ API کا بنیادی URL اور ماڈل کی ID چیک کریں۔",
+      "requestRateLimited": "اینڈ پوائنٹ درخواستوں کو محدود کر رہا ہے۔ تھوڑی دیر انتظار کریں اور دوبارہ کوشش کریں۔",
+      "requestUnavailable": "اینڈ پوائنٹ اس وقت دستیاب نہیں ہے۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔",
+      "requestUnreachable": "اینڈ پوائنٹ تک رسائی نہیں ہو سکی۔ API کا بنیادی URL اور اپنا کنکشن چیک کریں۔",
+      "requestInvalidResponse": "اینڈ پوائنٹ نے جواب تو دیا، لیکن وہ متوقع فارمیٹ میں نہیں تھا۔ چیک کریں کہ API کا بنیادی URL اور پروٹوکول سرور سے مطابقت رکھتے ہیں، پھر دوبارہ کوشش کریں۔",
+      "discoveryNoModels": "اینڈ پوائنٹ نے کوئی ماڈل درج نہیں کیا۔ ماڈلز دستی طور پر درج کریں۔",
+      "connectionIncomplete": "ماڈل نے جواب دیا لیکن مکمل نہیں کیا۔ دوبارہ کوشش کریں، یا ماڈل کی ID اور پروٹوکول چیک کریں۔",
       "invalidInput": "بیک اینڈ کا نام، درست ہیڈرز اور منفرد ID اور نام والا کم از کم ایک ماڈل درج کریں۔ ٹوکنز کی حدیں مثبت صحیح اعداد ہونی چاہئیں۔",
       "invalidUrl": "HTTP یا HTTPS کا بنیادی API URL درج کریں جس میں اسناد، کوئری یا فریگمنٹ نہ ہو۔",
       "publicHttp": "عوامی HTTP اینڈ پوائنٹس کی اجازت نہیں ہے۔ HTTPS یا نجی مقامی اینڈ پوائنٹ استعمال کریں۔",
@@ -3913,6 +3979,8 @@
       "downloading": "ڈاؤن لوڈ ہو رہا ہے: {{written}} از {{total}}",
       "downloadingUnknown": "ڈاؤن لوڈ ہو رہا ہے: {{written}}",
       "paused": "روکا گیا: {{written}} از {{total}}",
+      "retrying": "دوبارہ کوشش ہو رہی ہے: {{written}} از {{total}}",
+      "retryingUnknown": "دوبارہ کوشش ہو رہی ہے: {{written}}",
       "verifying": "ڈاؤن لوڈ شدہ فائل کی جانچ ہو رہی ہے…",
       "downloaded": "ڈاؤن لوڈ ہو گیا · {{size}}",
       "url": "براہ راست ڈاؤن لوڈ لنک",
@@ -4003,7 +4071,9 @@
         "androidModelUnavailable": "یہ ڈیوائس Gemini Nano کو سپورٹ نہیں کرتی، یا AICore سسٹم ایپ ابھی سیٹ اپ ہو رہی ہے۔ بعد میں دوبارہ کوشش کریں۔",
         "aicoreUpdateRequired": "یہ ماڈل استعمال کرنے کے لیے AICore ایپ اور اپنا سسٹم سافٹ ویئر اپ ڈیٹ کریں۔",
         "downloadable": "اس ماڈل کو استعمال کرنے سے پہلے ایک بار ڈاؤن لوڈ کرنا ضروری ہے۔",
-        "downloading": "ماڈل ڈاؤن لوڈ ہو رہا ہے۔ ڈاؤن لوڈ مکمل ہونے پر یہ تیار ہو جائے گا۔"
+        "downloading": "ماڈل ڈاؤن لوڈ ہو رہا ہے۔ ڈاؤن لوڈ مکمل ہونے پر یہ تیار ہو جائے گا۔",
+        "batteryQuota": "ڈیوائس پر چلنے والے ماڈل نے ابھی اپنی بیٹری کی کھپت کی حد استعمال کر لی ہے۔ بعد میں دوبارہ کوشش کریں۔",
+        "checkFailed": "ایپ اس ماڈل کی جانچ نہیں کر سکی۔ دوبارہ کوشش کریں۔"
       },
       "unavailable": "ڈیوائس پر چلنے والا ماڈل اس وقت دستیاب نہیں ہے۔ اس کی حالت $t(modelChat.backends.title) میں چیک کریں۔",
       "busy": "ڈیوائس پر چلنے والا ماڈل ایک اور جواب میں مصروف ہے۔ اس کے مکمل ہونے پر دوبارہ کوشش کریں۔",
@@ -4018,10 +4088,20 @@
     "reasoningEffort": {
       "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
     },
-    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔"
+    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔",
+    "providerKeyRefused": "فراہم کنندہ نے اسناد مسترد کر دیں۔ اس کی API کلید چیک کریں، پھر دوبارہ بھیجیں۔",
+    "providerModelMissing": "یہ بیک اینڈ اب یہ ماڈل فراہم نہیں کرتا۔ کوئی دوسرا منتخب کریں۔",
+    "providerRateLimited": "فراہم کنندہ درخواستوں کو محدود کر رہا ہے۔ تھوڑی دیر انتظار کریں اور دوبارہ بھیجیں۔",
+    "providerUnavailable": "فراہم کنندہ اس وقت دستیاب نہیں ہے۔ تھوڑی دیر بعد دوبارہ بھیجیں۔"
   },
   "settingsTools": {
-    "confirmTitle": "اس تبدیلی کی تصدیق کریں؟"
+    "confirmTitle": "اس تبدیلی کی تصدیق کریں؟",
+    "guarded": {
+      "spendAlertsOff": "اخراجات کے الرٹس بند کریں؟ آپ کو اخراجات کی حد سے تجاوز اور فی گھنٹہ اضافے کے بارے میں اطلاعات ملنا بند ہو جائیں گی۔",
+      "balanceAlertsOff": "بیلنس کے الرٹس بند کریں؟ جب آپ کے کریڈٹس کم ہوں تو آپ کو اطلاعات ملنا بند ہو جائیں گی۔",
+      "securityFindingsOff": "سیکیورٹی فائنڈنگز کے الرٹس بند کریں؟ آپ کو نئی سیکیورٹی فائنڈنگز کے بارے میں اطلاعات ملنا بند ہو جائیں گی۔",
+      "hideBalanceOn": "اپنے بیلنس چھپائیں؟ کریڈٹ بیلنس اب پروفائل اسکرینوں اور آرگنائزیشن ہب پر نظر نہیں آئیں گے۔"
+    }
   },
   "appActions": {
     "start": {
@@ -4166,6 +4246,7 @@
     "instructionsHint": "قواعد کی مارک ڈاؤن جو اس پروفائل استعمال کرنے والے ہر سیشن پر لاگو ہوتی ہے۔",
     "instructionsEmpty": "ابھی کوئی ہدایت فائل نہیں",
     "instructionsEmptyDescription": "ایسی قاعدہ فائلیں شامل کریں جو اس پروفائل استعمال کرنے والا ہر سیشن لاگو کرے۔",
+    "instructionsEmptyDescriptionReadOnly": "یہاں شامل کی گئی رول فائلیں ہر اس سیشن پر لاگو ہوتی ہیں جو یہ پروفائل استعمال کرتا ہے۔",
     "instructionNameRequired": "فائل کا نام درج کریں",
     "instructionNameTooLong": "فائل کا نام {{max}} حروف یا کم ہونا چاہیے",
     "instructionNameInvalid": "حرف یا ہندسے سے شروع کریں اور صرف چھوٹے حروف، ہندسے اور ڈیش استعمال کریں",
@@ -4241,7 +4322,7 @@
       "topPPlaceholder": "مثلاً 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "میرا ایجنٹ",
-      "promptPlaceholder": "آپ ایک...",
+      "promptPlaceholder": "آپ ایک…",
       "tools": "اوزار",
       "wholeToolRule": "یہ ایجنٹ بیک وقت ہر اوزار پر ایک اصول لاگو کرتا ہے: {{rule}}۔ یہ سوئچز صرف پڑھنے کے لیے ہیں۔",
       "visibility": "مرئیت",
@@ -4364,7 +4445,8 @@
       "purchaseFallback": "کریڈٹ کی خریداری",
       "receipt": "رسید",
       "receiptA11y": "{{description}}، {{amount}}، {{date}} کی رسید کھولیں",
-      "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔"
+      "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔",
+      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔"
     },
     "title": "کریڈٹس خریدیں",
     "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",
@@ -4391,6 +4473,7 @@
     "pickPackToBuyAgain": "نئی خریداری شروع کرنے کے لیے اوپر سے ایک پیک منتخب کریں۔",
     "purchasePending": "اسٹور ابھی بھی اس ادائیگی پر کارروائی کر رہا ہے۔ چارج منظور ہوتے ہی آپ کے کریڈٹس آ جائیں گے۔",
     "buyAgain": "دوبارہ خریدیں",
+    "checkPurchase": "خریداری چیک کریں",
     "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
     "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
   },
@@ -4484,7 +4567,9 @@
     },
     "saveSheet": {
       "title": "فہرست میں محفوظ کریں",
-      "saved": "{{list}} میں محفوظ ہو گیا"
+      "saved": "{{list}} میں محفوظ ہو گیا",
+      "saveFailed": "کام محفوظ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "saveRefused": "کام اس فہرست میں محفوظ نہیں ہو سکا۔ کوئی اور فہرست منتخب کریں۔"
     }
   },
   "agentBriefing": {
@@ -4496,17 +4581,24 @@
     "empty": "اس بریفنگ کی مدت میں کوئی سرگرمی نہیں",
     "emptyHint": "جب کسی شیڈول شدہ بریفنگ میں سرگرمی ہو تو آپ کے کلاؤڈ اور CLI کوڈنگ سیشنز یہاں ظاہر ہوں گے۔",
     "loadError": "بریفنگز لوڈ نہیں ہو سکیں",
+    "estimateLoadError": "تخمینہ لوڈ نہیں ہو سکا۔",
     "view": "بریفنگ پڑھیں",
     "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
+    "filterByContext": "سیاق کے مطابق فلٹر کریں",
+    "contextAll": "تمام سیاقات",
     "dismiss": "بریفنگ نظر انداز کریں",
+    "dismissFailed": "اس بریفنگ کو ابھی نظر انداز نہیں کیا جا سکا۔ پس منظر میں دوبارہ کوشش کی جائے گی۔",
     "offline": "آف لائن · محفوظ شدہ بریفنگ",
-    "cached": "محفوظ شدہ رپورٹ · ریفریش دستیاب نہیں",
+    "cached": "محفوظ شدہ بریفنگ · ریفریش دستیاب نہیں",
     "summary": "AI خلاصہ",
     "summaryPending": "AI خلاصہ تیار ہو رہا ہے۔ تیار ہونے پر یہاں منسلک ہو جائے گا۔",
-    "summaryUnavailable": "AI خلاصہ دستیاب نہیں۔ آپ کی منظم رپورٹ اب بھی دستیاب ہے۔",
+    "summaryUnavailable": "AI خلاصہ دستیاب نہیں۔ آپ کی منظم بریفنگ اب بھی دستیاب ہے۔",
+    "summaryNotAdmitted": "AI خلاصہ اس بریفنگ کے لیے تیار نہیں ہوا۔ آپ کی منظم بریفنگ اب بھی دستیاب ہے۔",
     "summaryCharge": "AI چارج {{cost}}",
     "summaryChargePending": "AI چارج کی تصدیق زیر التوا ہے",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "شواہد اور آرٹیفیکٹس",
     "timezone": "بریفنگ کا ٹائم زون",
     "deviceTimezone": "ڈیوائس کا ٹائم زون استعمال کریں",
@@ -4518,22 +4610,22 @@
     "timeHint": "بریفنگ کی مدت ختم ہونے پر ہوم کارڈ لائیو اسٹیٹس بحال کر دیتا ہے، آف لائن بھی۔",
     "invalidSchedule": "درست ٹائم زون اور بریفنگ کے لیے ایسی مدت منتخب کریں جس کا اختتام آغاز کے بعد ہو۔",
     "notificationsHint": "ہر شیڈول شدہ بریفنگ پر ایک عمومی اطلاع۔ ادائیگی والے AI خلاصوں سے آزاد۔",
-    "notificationPermission": "اپنی بریفنگ وصول کرنے کے لیے $t(common.notifications) میں ڈیوائس اطلاعات فعال کریں۔",
+    "notificationPermission": "اپنی بریفنگ وصول کرنے کے لیے پش اطلاعات فعال کریں۔",
     "defaultModel": "Kilo کا ڈیفالٹ ماڈل استعمال کریں",
     "duration": "وقت کی حد (منٹ)",
     "spendLimit": "خرچ کی حد (USD)",
     "invalidSafeguards": "مثبت اور محدود وقت اور خرچ کی حدیں درج کریں۔",
     "estimate": "تخمینہ {{estimate}} · زیادہ سے زیادہ {{maximum}}",
-    "estimateUnavailable": "ان ترتیبات کے لیے ادائیگی والا خلاصہ دستیاب نہیں ہے۔",
+    "estimateUnavailable": "ان ترتیبات کے لیے ادائیگی والا خلاصہ دستیاب نہیں ہے۔ ماڈل یا حدود تبدیل کریں، یا بعد میں دوبارہ کوشش کریں۔",
     "confirmPaid": "{{context}} کے لیے ادائیگی والے خلاصے فعال کریں؟",
     "paidDisclosure": "تخمینہ {{estimate}}، زیادہ سے زیادہ {{maximum}}، {{minutes}} منٹ کی حد کے ساتھ۔ تیاری ناکام ہونے پر بھی چارجز لاگو ہوں گے۔",
     "enable": "ادائیگی والے خلاصے فعال کریں",
     "allContexts": "ذاتی اور تنظیمی بریفنگز الگ الگ رہتی ہیں۔",
     "emptyHistory": "کوئی محفوظ شدہ بریفنگ نہیں",
-    "estimatePermissionUnavailable": "آپ کو اس سیاق کا بیلنس استعمال کرنے کی اجازت نہیں ہے۔",
-    "estimatePricingUnavailable": "اس ماڈل کی قیمت دستیاب نہیں ہے۔",
-    "estimateBalanceUnavailable": "ادائیگی والے خلاصے کے لیے بیلنس کافی نہیں ہے۔",
-    "estimateModelNotAllowed": "اس ماڈل کو یہاں استعمال کرنے کی اجازت نہیں ہے۔",
+    "estimatePermissionUnavailable": "آپ کو اس سیاق کا بیلنس استعمال کرنے کی اجازت نہیں ہے۔ اسے فعال کروانے کے لیے تنظیم کے مالک سے کہیں۔",
+    "estimatePricingUnavailable": "اس ماڈل کی قیمت دستیاب نہیں ہے۔ کوئی اور ماڈل منتخب کریں۔",
+    "estimateBalanceUnavailable": "ادائیگی والے خلاصے کے لیے بیلنس کافی نہیں ہے۔ اس سیاق کے بیلنس میں کریڈٹ شامل کریں۔",
+    "estimateModelNotAllowed": "اس ماڈل کو اس سیاق میں استعمال کرنے کی اجازت نہیں ہے۔ کوئی اور ماڈل منتخب کریں۔",
     "estimateSpendLimitTooLow": "اس خلاصے کی اجازت کے لیے خرچ کی حفاظتی حد بڑھائیں۔",
     "saved": "بریفنگ کی ترتیبات محفوظ کر لی گئیں۔",
     "selectedSessions": "منتخب سیشنز",
@@ -4542,16 +4634,35 @@
     "capturedAt": "{{time}} کو محفوظ کیا گیا",
     "snapshotHint": "صبح کے مقررہ وقت پر سیشنز کی تازہ ترین دستیاب حالت کا حتی الامکان مکمل اسنیپ شاٹ۔ تعداد منتخب سیشنز کی عکاسی کرتی ہے، رات بھر کی مکمل سرگرمی کی نہیں۔",
     "snapshotTruncated": "اس اسنیپ شاٹ کو محدود رکھنے کے لیے کچھ سیشنز یا شواہد شامل نہیں کیے گئے۔",
-    "snapshotSummaryFailed": "AI خلاصہ ناکام ہو گیا۔ آپ کا منظم اسنیپ شاٹ اب بھی دستیاب ہے۔",
+    "snapshotSummaryFailed": "AI خلاصہ ناکام ہو گیا۔ آپ کی منظم بریفنگ اب بھی دستیاب ہے۔",
     "scheduledContextEnabled": "شیڈول شدہ بریفنگز",
     "scheduledContextSettings": "شیڈول شدہ بریفنگز · {{context}}",
     "scheduledContextHint": "صرف اس سیاق کے لیے شیڈول کے مطابق اسنیپ شاٹ محفوظ کرنا اور ادائیگی والے AI خلاصے فعال کریں۔ منتخب اقتباسات، جن سے حساس معلومات ہٹا دی گئی ہیں، اور منظم حقائق آپ کے ماڈل کو بھیجے جاتے ہیں۔ خلاصوں کے لیے ایپ کی وہ زبان استعمال ہوتی ہے جو آپ کے بریفنگ کی ترتیبات میں تبدیلی کرنے پر محفوظ کی جاتی ہے۔ چارجز اس سیاق کے بیلنس سے کٹتے ہیں۔ جن اسنیپ شاٹس میں کوئی سرگرمی منتخب نہ ہو، ان میں AI استعمال نہیں ہوتا۔",
     "snapshotSafeguards": "فی خلاصہ وقت اور خرچ کی حدیں ہر شیڈول شدہ اسنیپ شاٹ پر لاگو ہوتی ہیں، یہ روزانہ کا بجٹ نہیں ہیں۔",
-    "snapshotEstimateInputTooLarge": "اس اسنیپ شاٹ میں منتخب ماڈل کی گنجائش سے زیادہ شواہد ہیں۔",
+    "snapshotEstimateInputTooLarge": "اس اسنیپ شاٹ میں منتخب ماڈل کی گنجائش سے زیادہ شواہد ہیں۔ ایسا ماڈل منتخب کریں جس کی ان پٹ ونڈو بڑی ہو۔",
     "quietSnapshot": "اس اسنیپ شاٹ کے لیے سیشن کی کوئی سرگرمی منتخب نہیں ہوئی۔ کوئی AI خلاصہ طلب نہیں کیا گیا، نہ کوئی چارج لیا گیا۔",
     "noEnabledContexts": "شیڈول شدہ بریفنگز کے لیے کوئی سیاق فعال نہیں ہے",
     "sourceBlocker": "سیشن کو توجہ درکار ہے",
-    "sourceMetadata": "محفوظ کردہ سیشن میٹا ڈیٹا"
+    "sourceMetadata": "محفوظ کردہ سیشن میٹا ڈیٹا",
+    "metadataPlan_one": "منصوبہ: {{displayTotal}} میں سے {{displayDone}} مرحلہ مکمل",
+    "metadataPlan_other": "منصوبہ: {{displayTotal}} میں سے {{displayDone}} مرحلے مکمل",
+    "metadataPlan": "منصوبہ: {{displayTotal}} میں سے {{displayDone}} مرحلے مکمل",
+    "metadataFiles_one": "{{displayCount}} فائل تبدیل ہوئی",
+    "metadataFiles_other": "{{displayCount}} فائلیں تبدیل ہوئیں",
+    "metadataFiles": "{{displayCount}} فائلیں تبدیل ہوئیں",
+    "metadataLinesAdded_one": "{{displayCount}} لائن شامل کی گئی",
+    "metadataLinesAdded_other": "{{displayCount}} لائنیں شامل کی گئیں",
+    "metadataLinesAdded": "{{displayCount}} لائنیں شامل کی گئیں",
+    "metadataLinesRemoved_one": "{{displayCount}} لائن ہٹائی گئی",
+    "metadataLinesRemoved_other": "{{displayCount}} لائنیں ہٹائی گئیں",
+    "metadataLinesRemoved": "{{displayCount}} لائنیں ہٹائی گئیں",
+    "metadataPlanCurrent": "موجودہ مرحلہ: {{current}}",
+    "metadataFailure": "پچھلا ٹرن ناکام: {{kind}}",
+    "sourceActivity": "بلا عنوان سرگرمی",
+    "metadataFailureProvider": "پرووائیڈر کی خرابی",
+    "metadataFailureTool": "ٹول کی خرابی",
+    "metadataFailureCancelled": "منسوخ",
+    "metadataFailureOther": "غیر متعین خرابی"
   },
   "systemSearch": {
     "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"
@@ -4569,7 +4680,7 @@
     "topFeatures": "سرفہرست فیچرز",
     "emptyTitle": "اس مدت میں کوئی استعمال نہیں",
     "unavailableTitle": "استعمال دستیاب نہیں",
-    "unavailableDescription": "یہ ورک اسپیس استعمال کی رپورٹ نہیں کر رہا۔ دوبارہ کوشش کرنے سے فائدہ نہیں ہوگا۔",
+    "unavailableDescription": "اس ورک اسپیس کے لیے استعمال ترتیب نہیں دیا گیا۔ اگر آپ کو یہاں استعمال نظر آنے کی توقع ہے تو معاونت سے رابطہ کریں۔",
     "orgSelfNotice": "آپ اس تنظیم میں اپنا استعمال دیکھ رہے ہیں۔",
     "viewDetails": "استعمال کی تفصیلات دیکھیں"
   },
@@ -4577,7 +4688,7 @@
     "title": "انٹیگریشنز",
     "sectionTitle": "منسلک سروسز",
     "entrySubtitle": "GitHub، Slack، Linear اور مزید",
-    "subtitle": "اپنے ڈیولپمنٹ ٹولز اور ورک فلوز کو Kilo سے منسلک کریں",
+    "subtitle": "اپنے ڈیولپمنٹ ٹولز اور ورک فلوز کو Kilo سے منسلک کریں۔",
     "disconnect": "منقطع کریں",
     "disconnectTitle": "{{provider}} کو منقطع کریں؟",
     "disconnectMessage": "Kilo اب {{provider}} میں جواب نہیں دے گا۔ آپ کسی بھی وقت دوبارہ منسلک کر سکتے ہیں۔",
@@ -4587,10 +4698,14 @@
     "couldNotLoad": "انٹیگریشنز لوڈ نہیں ہو سکیں",
     "permissionDenied": "آپ کو ان انٹیگریشنز کا انتظام کرنے کی اجازت نہیں ہے۔",
     "managedByOwner": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے تنظیم کے کسی مالک سے کہیں۔",
+    "managedByOwnerOrAdmin": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے تنظیم کے کسی مالک یا منتظم سے کہیں۔",
+    "managedByOwnerOrBilling": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے تنظیم کے کسی مالک یا بلنگ مینیجر سے کہیں۔",
+    "managedByOwnerAdminOrBilling": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے تنظیم کے کسی مالک، منتظم، یا بلنگ مینیجر سے کہیں۔",
     "connectFailed": "کنکشن کا صفحہ نہیں کھل سکا"
   },
   "invoices": {
-    "personalEmptyDescription": "بل بننے کے بعد آپ کی اپنی خریداریوں کے انوائسز یہاں نظر آئیں گے۔"
+    "personalEmptyDescription": "بل بننے کے بعد آپ کی اپنی خریداریوں کے انوائسز یہاں نظر آتے ہیں۔ App Store اور Google Play کی رسیدیں کریڈٹ کی تاریخچہ میں ہیں۔",
+    "personalPeriod": "پچھلے 12 ماہ"
   },
   "cloudAgent": {
     "compute": {
@@ -4622,7 +4737,7 @@
       "new": "نیا ٹرگر",
       "create": "ٹرگر بنائیں",
       "emptyTitle": "ابھی کوئی ٹرگر نہیں",
-      "emptyDescription": "ویب ہک کال یا شیڈول پر Cloud Agent رن شروع کرنے کے لیے ٹرگر بنائیں۔",
+      "emptyDescription": "اپنا پہلا ٹرگر بنائیں۔",
       "loadFailedTitle": "ٹرگرز لوڈ نہیں ہو سکے",
       "loadFailedDescription": "کنکشن ہونے پر دوبارہ کوشش کریں۔",
       "detailLoadFailedTitle": "یہ ٹرگر لوڈ نہیں ہو سکا",
@@ -4645,7 +4760,6 @@
       "nameLocked": "ٹرگر بننے کے بعد نام تبدیل نہیں ہو سکتا۔",
       "repositoryLocked": "ٹرگر بننے کے بعد ریپوزٹری تبدیل نہیں ہو سکتی۔",
       "environmentAutomatic": "ریپوزٹری کے مطابق خودکار",
-      "notSelected": "منتخب نہیں",
       "profileDefaults": "ڈیفالٹس استعمال کریں",
       "profileHelp": "ٹرگر چلنے پر پروفائل کی ترتیبات لاگو ہوتی ہیں۔ اس کے سیکرٹس اسی وقت دستیاب ہوتے ہیں۔",
       "customAgent": "کسٹم ایجنٹ",
@@ -4735,8 +4849,10 @@
   },
   "organizationGuardrails": {
     "title": "مصنوعی ذہانت گارڈ ریلز",
-    "permissionDenied": "صرف تنظیم کے مالکان اور منتظمین مصنوعی ذہانت گارڈ ریلز کا انتظام کر سکتے ہیں۔",
-    "unavailable": "مصنوعی ذہانت گارڈ ریلز اس تنظیم کے لیے دستیاب نہیں ہیں۔",
+    "permissionDenied": "صرف تنظیم کے مالکان اور منتظمین مصنوعی ذہانت گارڈ ریلز کا انتظام کر سکتے ہیں۔ $t(organization.boundary.accessDeniedDescription)",
+    "unavailableTitle": "مصنوعی ذہانت گارڈ ریلز فعال نہیں ہیں",
+    "unavailable": "Kilo درخواست پر کسی تنظیم کے لیے مصنوعی ذہانت گارڈ ریلز فعال کرتا ہے۔ {{supportEmail}} سے رابطہ کریں، اور Kilo ٹیم آپ کی تنظیم کے لیے انہیں فعال کر دے گی۔",
+    "contactSupport": "معاونت کی ٹیم سے رابطہ کریں",
     "loadError": "مصنوعی ذہانت گارڈ ریلز لوڈ نہیں ہو سکیں",
     "statusSaving": "محفوظ کیا جا رہا ہے…",
     "statusSaved": "محفوظ ہو گیا",
@@ -4745,12 +4861,15 @@
     "inputDescription": "Enkrypt AI کے ساتھ ہر ان پٹ اسکین کرتا ہے، بشمول ٹول کے نتائج۔ جب Enkrypt دستیاب نہ ہو تو درخواستیں مسترد کیے جانے کے بجائے اسکین کیے بغیر بھیج دی جاتی ہیں۔",
     "outputTitle": "آؤٹ پٹ گارڈ ریلز",
     "outputDescription": "اراکین کو ملنے سے پہلے Enkrypt AI کے ساتھ جوابات اسکین کرتا ہے۔ جب تک آپ اسے آن نہ کریں یہ بند رہتا ہے۔",
+    "outputUnavailable": "Kilo نے اس تنظیم کے لیے آؤٹ پٹ اسکیننگ فعال نہیں کی، اس لیے جوابات کی جانچ نہیں ہوتی اور یہاں مقرر کرنے کے لیے کچھ نہیں ہے۔ اس کی درخواست کے لیے {{supportEmail}} سے رابطہ کریں۔",
     "detectorsHint": "بلاک نشان زدہ درخواست مسترد کرتا ہے۔ صرف لاگ کرنا درخواست میں تاخیر کیے بغیر اسے ریکارڈ کرتا ہے۔",
     "detectorsHintOutput": "بلاک نشان زدہ جواب کو ناکام کرتا ہے۔ صرف لاگ کرنا جواب میں تاخیر کیے بغیر اسے ریکارڈ کرتا ہے۔",
     "choiceLog": "صرف لاگ",
     "applyTo": "کس پر لاگو کریں",
     "applyToAllMembers": "تمام اراکین",
     "applyKiloDefault": "Kilo ڈیفالٹ لاگو کریں",
+    "applyKiloDefaultEnglishNote": "Kilo کی ڈیفالٹ پالیسی کا متن انگریزی میں ہے، کیونکہ Kilo Gateway اسے بالکل ویسے ہی لاگو کرتا ہے جیسے لکھا گیا ہے۔",
+    "applyKiloDefaultReplaceMessage": "Kilo کی ڈیفالٹ پالیسی انگریزی میں لکھی گئی ہے اور پالیسی کی خلاف ورزی میں آپ کا مقرر کردہ بدل دیتی ہے۔ پالیسی متن والے خانے میں آپ کا درج کردہ متن واپس نہیں لایا جا سکتا۔",
     "invalidSavedTitle": "محفوظ شدہ ان پٹ ڈیٹیکٹر کی ترتیبات پڑھی نہیں جا سکتیں",
     "invalidSavedBody": "جب تک ان پٹ ڈیٹیکٹرز دوبارہ محفوظ نہ ہوں درخواستیں بلاک رہتی ہیں۔ نیچے دیے گئے ڈیٹیکٹرز Kilo ڈیفالٹ سے شروع ہوتے ہیں۔",
     "invalidSavedOutputTitle": "محفوظ شدہ آؤٹ پٹ ڈیٹیکٹر کی ترتیبات پڑھی نہیں جا سکتیں",
@@ -4871,7 +4990,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "انٹرپرائز خصوصیت",
-    "enterpriseOnly": "یہ خصوصیت صرف انٹرپرائز کے لیے ہے۔",
+    "enterpriseOnly": "پرووائیڈرز اور ماڈلز انٹرپرائز پلان میں دستیاب ہیں۔",
     "readOnly": "صرف تنظیم کے مالکان اور منتظمین یہ ترتیبات تبدیل کر سکتے ہیں۔",
     "loadError": "پرووائیڈرز اور ماڈلز لوڈ نہیں ہو سکے",
     "tabModels": "ماڈلز",
@@ -4885,6 +5004,8 @@
     "providersDescription": "پرووائیڈر کو بند کریں تاکہ Kilo اس تنظیم کے لیے اس کی طرف روٹنگ بند کر دے۔",
     "providersNeedCatalog": "مکمل ماڈل کیٹلاگ لوڈ ہونے تک پرووائیڈر سوئچز صرف پڑھنے کے لیے رہیں گے۔ انہیں تبدیل کرنے کے لیے اوپر دوبارہ کوشش کریں پر ٹیپ کریں۔",
     "providersEmpty": "اس تلاش سے کوئی پرووائیڈر مطابقت نہیں رکھتا۔",
+    "providersNone": "اس تنظیم کے لیے کوئی پرووائیڈر دستیاب نہیں ہے۔",
+    "providersUnavailable": "پرووائیڈر کی فہرست لوڈ نہیں ہو سکی۔",
     "allowAllShown": "دکھائے گئے سب کی اجازت دیں",
     "denyAllShown": "دکھائے گئے سب کو مسترد کریں",
     "gatewaysDescription": "Kilo ماڈل کی درخواستیں Vercel AI Gateway یا OpenRouter کے ذریعے روٹ کرتا ہے۔ غیر فعال گیٹ وے ان درخواستوں کو ناکام کر دیتا ہے۔",

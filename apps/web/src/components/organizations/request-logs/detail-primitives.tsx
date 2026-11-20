@@ -1,5 +1,7 @@
+import { Info } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { CopyButton } from '@/components/shared/CopyButton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { ABSENT } from './format';
 import type { StepTone } from './routing-labels';
@@ -24,15 +26,52 @@ export function DetailSection({
   );
 }
 
-/** `copyValue` adds a copy button and a tooltip with the full value, for values that truncate. */
-export type DetailItem = { label: string; value: ReactNode; mono?: boolean; copyValue?: string };
+/**
+ * `copyValue` adds a copy button and a tooltip with the full value, for values that truncate.
+ * `hint` explains the label in a tooltip.
+ */
+export type DetailItem = {
+  label: string;
+  value: ReactNode;
+  mono?: boolean;
+  copyValue?: string;
+  hint?: string;
+};
+
+/** An info button whose tooltip explains `label`. */
+export function LabelHint({ label, hint }: { label: string; hint: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={`About ${label.toLowerCase()}`}
+          className="hover:text-foreground focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <Info className="size-3" aria-hidden />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{hint}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function DetailLabel({ label, hint }: Pick<DetailItem, 'label' | 'hint'>) {
+  if (!hint) return <dt className="text-muted-foreground text-xs">{label}</dt>;
+  return (
+    <dt className="text-muted-foreground flex items-center gap-1 text-xs">
+      {label}
+      <LabelHint label={label} hint={hint} />
+    </dt>
+  );
+}
 
 export function DetailGrid({ items }: { items: DetailItem[] }) {
   return (
     <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
       {items.map(item => (
         <div key={item.label} className="group flex min-w-0 flex-col gap-0.5">
-          <dt className="text-muted-foreground text-xs">{item.label}</dt>
+          <DetailLabel label={item.label} hint={item.hint} />
           <dd className="flex min-w-0 items-center gap-1">
             <span
               className={cn(

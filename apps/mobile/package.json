@@ -15,7 +15,7 @@
     "assert:config": "node scripts/assert-expo-config.mjs",
     "eas-build-post-install": "pnpm --filter @kilocode/harness-sdk run build",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src",
+    "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src apps/mobile/modules",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
     "reusables": "cli",
@@ -23,7 +23,7 @@
     "check:i18n": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.i18n.json apps/mobile/src packages/app-shared/src && node ../../tools/i18n/check-catalogs.mjs",
     "check:plurals": "node ../../tools/i18n/check-plurals.mjs --source-only",
     "check:classes": "node ../../tools/nativewind/check-classes.mjs",
-    "test": "node scripts/assert-theme-colors.mjs && vitest run",
+    "test": "node scripts/assert-theme-colors.mjs && node scripts/assert-language-search-names.mjs && node scripts/assert-react-native-resolution.mjs && node scripts/assert-expo-config.mjs && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {

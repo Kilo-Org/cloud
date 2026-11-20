@@ -90,6 +90,51 @@ function ensureLocale(): void {
   Object.defineProperty(Intl, 'Locale', { value: Locale, configurable: true, writable: true });
 }
 
+/**
+ * Register the root-shaped plural dataset the `ht` loader just required under
+ * `ht` itself.
+ *
+ * The polyfill resolves a requested locale against whichever data modules have
+ * registered so far, so with only an `en` entry `Intl.PluralRules('ht')` stops
+ * answering `ht` the moment French data registers (a language switch loads it
+ * in the same process) and follows the French categories instead — including a
+ * `many` form no ht catalog family carries. CLDR gives `ht` no rule block, so
+ * the root selection IS Haitian; the pin keeps it so regardless of order.
+ */
+let haitianPluralRulesPinned = false;
+function pinHaitianPluralRules(): void {
+  // One registration is the whole contract: the dataset it publishes under
+  // `ht` is frozen at pin time, so re-running it on every formatter call
+  // would only re-add the identical entry.
+  if (haitianPluralRulesPinned) {
+    return;
+  }
+  // Polyfill internals the ambient globals omit; the shape is the package's
+  // own `polyfill-force.js` (`localeData` entries, the raw `__addLocaleData`
+  // entry), read through one named `unknown` widening.
+  type RawLocaleEntry = {
+    locale: string;
+    data: unknown;
+    pluralRanges?: unknown;
+  };
+  type PluralRulesInternals = {
+    localeData?: Record<string, unknown>;
+    __addLocaleData?: (entry: RawLocaleEntry) => void;
+  };
+  const polyfill: unknown = Intl.PluralRules;
+  const internals = polyfill as PluralRulesInternals;
+  const processed = internals.localeData?.en;
+  // Present whenever the data file registered through the polyfill.
+  if (processed && internals.__addLocaleData) {
+    internals.__addLocaleData({ locale: 'ht', data: processed });
+    haitianPluralRulesPinned = true;
+  }
+  // Without the polyfill (a runtime whose native `Intl.PluralRules` answers
+  // for `ht`, or the plain Node projects) there is nothing to pin: the native
+  // constructor resolves `ht` by its own rules and the entry the data file
+  // queued for the polyfill's bootstrap buffer is consumed on install.
+}
+
 // Hermes ships without Intl.PluralRules, and the NumberFormat and
 // RelativeTimeFormat polyfills construct one.
 function ensurePluralRules(language: SupportedLanguage): void {
@@ -101,6 +146,9 @@ function ensurePluralRules(language: SupportedLanguage): void {
   if (usesPluralRulesPolyfill) {
     ensureLocale();
     loadPluralRulesLocaleData(language);
+    if (language === 'ht') {
+      pinHaitianPluralRules();
+    }
   }
 }
 
@@ -201,9 +249,10 @@ export function deviceDecimalSeparator(): string | null {
  * device is in now, so one probe per second detects the move and drops the
  * cached formatters; the next caller builds them in the new zone. The interval
  * keeps the probe (one formatter construction) away from every format call a
- * list makes inside that second.
+ * list makes inside that second. The device clock setting below reads on the
+ * same interval, for the same reason.
  */
-const DEVICE_TIME_ZONE_CHECK_MS = 1000;
+const DEVICE_PROBE_INTERVAL_MS = 1000;
 
 /** The zone the cached date formatters were built in; `null` before the first check. */
 let cachedDeviceTimeZone: string | null = null;
@@ -220,7 +269,7 @@ function dropDateFormattersForNewDeviceZone(): void {
   if (
     cachedDeviceTimeZone !== null &&
     sinceLastCheck >= 0 &&
-    sinceLastCheck < DEVICE_TIME_ZONE_CHECK_MS
+    sinceLastCheck < DEVICE_PROBE_INTERVAL_MS
   ) {
     return;
   }
@@ -246,6 +295,46 @@ function dropDateFormattersForNewDeviceZone(): void {
 export function deviceTimeZone(): string {
   dropDateFormattersForNewDeviceZone();
   return cachedDeviceTimeZone ?? new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+}
+
+/** The device's 12/24-hour setting; `undefined` until the first probe. */
+let deviceUses24hourClockValue: boolean | null | undefined = undefined;
+let deviceUses24hourClockCheckedAt = 0;
+
+/**
+ * Whether the device is set to a twenty-four-hour clock, or `null` when it
+ * cannot answer.
+ *
+ * `null` is not `false`: the Node test projects have no native module and a
+ * device can report no setting at all, and both must leave the caller on the
+ * language's own clock rather than pin a twelve-hour one. The read goes through
+ * the native module, which a list would pay per row, so the answer is memoized;
+ * it is re-probed once per interval because a person who flips the system's
+ * 24-hour switch while the app runs should see the new form on the next render.
+ * A clock that stepped backwards reads as a stale probe, so the next call probes
+ * again instead of waiting for the clock to catch up.
+ */
+export function deviceUses24hourClock(): boolean | null {
+  const now = Date.now();
+  const sinceLastCheck = now - deviceUses24hourClockCheckedAt;
+  if (
+    deviceUses24hourClockValue !== undefined &&
+    sinceLastCheck >= 0 &&
+    sinceLastCheck < DEVICE_PROBE_INTERVAL_MS
+  ) {
+    return deviceUses24hourClockValue;
+  }
+  deviceUses24hourClockCheckedAt = now;
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, unicorn/prefer-module -- the native module is absent from the Node test projects, so it cannot be a top-level import
+    const { getCalendars } = require('expo-localization') as {
+      getCalendars: () => readonly { uses24hourClock: boolean | null }[];
+    };
+    deviceUses24hourClockValue = getCalendars()[0]?.uses24hourClock ?? null;
+  } catch {
+    deviceUses24hourClockValue = null;
+  }
+  return deviceUses24hourClockValue;
 }
 
 export function dateTimeFormat(

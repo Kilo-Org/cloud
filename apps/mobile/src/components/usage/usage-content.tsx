@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { Card } from '@/components/ui/card';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -64,15 +65,18 @@ function StatTile({
   subtext?: string;
 }>) {
   return (
-    <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
-      <Text className="text-lg font-bold text-foreground">{value}</Text>
-      <Text className="text-xs text-muted-foreground">{label}</Text>
+    <Card className="flex-1">
+      <Text variant="figure">{value}</Text>
+      <Text variant="caption">{label}</Text>
       {subtext !== undefined && (
-        <View className="min-h-[28px]">
-          <Text className="text-xs text-muted-foreground">{subtext}</Text>
+        // Two caption lines' floor (28pt on the spacing scale): a one-line
+        // detail keeps the caption's gap, and a detail that needs more lines
+        // grows the tile instead of clipping the tokens breakdown.
+        <View className="min-h-8">
+          <Text variant="caption">{subtext}</Text>
         </View>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -113,6 +117,9 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
   const retryAll = () => {
     usage.refetch();
   };
+  // No range a reader picks can change a workspace that reports no usage, so
+  // the control is fixed with the state instead of inviting a dead change.
+  const unavailable = summaryErrorView?.name === 'unavailable';
 
   return (
     <View className="gap-6">
@@ -122,9 +129,10 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
           value={range}
           onChange={setRange}
           accessibilityLabel={t('usage.rangePicker')}
+          disabled={unavailable}
         />
         {scope.kind === 'organization' && !scope.orgWide && (
-          <Text className="text-xs text-muted-foreground">{t('usage.orgSelfNotice')}</Text>
+          <Text variant="caption">{t('usage.orgSelfNotice')}</Text>
         )}
       </View>
 
@@ -142,23 +150,43 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
       )}
 
       {loading && (
+        // The four tiles and the chart at their loaded size: a tile is a
+        // `Card` stack of a figure line, the tokens tile's caption and the
+        // label line, so the skeleton prints the same bars in the same order.
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Skeleton className="h-[63px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[63px] flex-1 rounded-lg bg-muted-soft" />
+              <Card className="flex-1">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
+              <Card className="flex-1">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[95px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[95px] flex-1 rounded-lg bg-muted-soft" />
+              <Card className="flex-1">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+                <View className="min-h-8">
+                  <Skeleton className="h-3 w-20" />
+                </View>
+              </Card>
+              <Card className="flex-1">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
             </View>
           </View>
-          <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />
+          <Card>
+            <Skeleton className="h-32 w-full rounded-lg" />
+          </Card>
         </View>
       )}
 
       {!loading && !failed && empty && (
-        <EmptyState icon={LineChart} title={t('usage.emptyTitle')} placement="static" />
+        <EmptyState icon={LineChart} title={t('usage.emptyTitle')} placement="top" />
       )}
 
       {!loading && !failed && summary !== undefined && !empty && (

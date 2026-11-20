@@ -25,6 +25,11 @@ import { BuilderRetryableError } from '../../src/environment-build/builder-error
 import { MAX_BUILD_LOG_BYTES } from '../../src/environment-build/policy.js';
 import type { BuildTargetResolution } from '../../src/environment-build/target.js';
 import { vercelSnapshotBaseImage } from '../../src/byoc/vercel-snapshot-compatibility.js';
+import { networkSecretsSchema, type NetworkSecrets } from '@kilocode/worker-utils/network-secrets';
+import { networkSecretFixture } from '../helpers/network-secrets.js';
+import { builderSandboxId } from '../../src/environment-build/builder-provider.js';
+import { resolveOutboundCredential } from '../../src/sandbox-control/resolve-outbound-credential.js';
+import { environmentSnapshotDecision } from '../../src/control-plane/sandbox/environment-snapshot-launch.js';
 
 const OWNER = { type: 'organization' as const, id: '22222222-2222-4222-8222-222222222222' };
 const REPOSITORY = { platform: 'github' as const, repoFullName: 'acme/widgets' };
@@ -33,13 +38,18 @@ type Namespace = DurableObjectNamespace<EnvironmentBuild>;
 const namespace = (env as unknown as { ENVIRONMENT_BUILD: Namespace }).ENVIRONMENT_BUILD;
 
 type Harness = {
+  networkSecrets?: NetworkSecrets;
   /** Each test gets its own coordinator: `reset()` wipes storage under a reused instance. */
   environmentId: string;
   stub: DurableObjectStub<EnvironmentBuild>;
   environment: { revision: number; deleted: boolean; access: 'manage' | 'read' | 'none' };
   /** The repositories of a multi-repository environment; null for a one-repository one. */
   repositories: EnvironmentReferenceRepository[] | null;
-  launches: Array<{ allocation: BuilderAllocation; runner: { url: string; credential: string } }>;
+  launches: Array<{
+    allocation: BuilderAllocation;
+    runner: { url: string; credential: string };
+    networkSecretHosts?: string[];
+  }>;
   captures: Array<{ captureId: string }>;
   snapshotsTaken: Map<string, number>;
   stops: BuilderAllocation[];
@@ -114,7 +124,11 @@ async function setup(): Promise<Harness> {
     },
     launch: async (allocation, launch) => {
       if (harness.launchError) throw harness.launchError;
-      harness.launches.push({ allocation, runner: launch.runner });
+      harness.launches.push({
+        allocation,
+        runner: launch.runner,
+        networkSecretHosts: launch.networkSecretHosts,
+      });
     },
     capture: async (_allocation, captureId) => {
       harness.captures.push({ captureId });
@@ -138,6 +152,7 @@ async function setup(): Promise<Harness> {
     };
     await host.initialized;
     const deps: CoordinatorDeps = {
+      networkSecretExcludedUrls: () => [],
       now: () => Date.now(),
       uuid: () => crypto.randomUUID(),
       store: host.store,
@@ -158,7 +173,9 @@ async function setup(): Promise<Harness> {
                   : { repositories: harness.repositories }),
                 commands: ['pnpm install'],
                 plainVars: { PLAIN: 'value' },
+                networkSecrets: harness.networkSecrets,
                 sandboxAllocation: null,
+                egressMode: null,
                 encryptedSecrets: {
                   TOKEN: {
                     encryptedData: 'x',
@@ -269,6 +286,139 @@ async function readyBuild(harness: Harness) {
 
 afterEach(async () => {
   await reset();
+});
+
+describe('network secrets for environment builds', () => {
+  it('returns a fixed configuration failure for both manual and automatic admission', async () => {
+    const fixture = await networkSecretFixture();
+    const h = await setup();
+    h.repositories = [
+      {
+        identity: {
+          platform: 'gitlab',
+          cloneUrl: 'https://gitlab.example.com/team/repository.git',
+        },
+        repoFullName: 'team/repository',
+        leaf: 'repository',
+      },
+    ];
+    h.networkSecrets = networkSecretsSchema.parse(fixture.snapshot);
+    h.networkSecrets.SERVICE_TOKEN.allowedHosts = ['gitlab.example.com'];
+    expect(await manualBuild(h)).toEqual({
+      status: 'rejected',
+      reason: 'network_secret_configuration_invalid',
+    });
+    const session = reference(h);
+    const resolution = await h.stub.resolveSnapshot({
+      reference: session,
+      actorUserId: 'user-1',
+      provider: 'cloudflare-containers',
+    });
+    expect(resolution.admission).toEqual({
+      status: 'skipped',
+      reason: 'network_secret_configuration_invalid',
+    });
+    const decision = environmentSnapshotDecision(
+      { reference: session, actorUserId: 'user-1', buildCommands: 1 },
+      { kind: 'resolved', resolution }
+    );
+    expect(decision).toMatchObject({
+      kind: 'blocked',
+      block: {
+        reason: 'environment_build_failed',
+        detail:
+          'Network secret configuration is invalid. Check the allowed domains before rebuilding.',
+      },
+    });
+    expect(h.launches).toHaveLength(0);
+  });
+  it('projects aliases, resolves through the real builder DO, and revokes before capture', async () => {
+    const fixture = await networkSecretFixture();
+    const h = await setup();
+    h.networkSecrets = networkSecretsSchema.parse(fixture.snapshot);
+    const { buildId, auth } = await readyBuild(h);
+    const input = await h.stub.runnerInput(auth);
+    if ('refused' in input) throw new Error('Builder input refused');
+    const alias = input.env.SERVICE_TOKEN;
+    expect(alias).toMatch(/^kcp1\.[A-Za-z0-9_-]+\.secret\.[a-f0-9]{64}$/);
+    expect(JSON.stringify(input)).not.toContain(fixture.value);
+    expect(input.secretKeys).toContain('SERVICE_TOKEN');
+    expect(h.launches[0].networkSecretHosts).toEqual(['api.example.com']);
+    await runInDurableObject(h.stub, async instance => {
+      const host = instance as unknown as {
+        env: {
+          AGENT_ENV_VARS_PRIVATE_KEY?: string;
+          WORKER_URL?: string;
+          KILOCODE_BACKEND_BASE_URL?: string;
+          KILO_OPENROUTER_BASE?: string;
+          KILO_SESSION_INGEST_URL?: string;
+        };
+      };
+      Object.assign(host.env, {
+        AGENT_ENV_VARS_PRIVATE_KEY: fixture.privateKeyPem,
+        WORKER_URL: 'https://worker.example.com',
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
+        KILO_OPENROUTER_BASE: 'https://provider.example.com',
+        KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
+      });
+    });
+    const request = {
+      credential: alias,
+      outboundContainerId: env.SANDBOX_CONTAINERS.idFromName(
+        await builderSandboxId(h.environmentId)
+      ).toString(),
+      url: 'https://api.example.com/',
+      method: 'GET',
+    };
+    expect(await resolveOutboundCredential(env, request)).toMatchObject({
+      type: 'network',
+      key: 'SERVICE_TOKEN',
+      value: fixture.value,
+    });
+    expect(
+      await resolveOutboundCredential(env, { ...request, outboundContainerId: 'another-container' })
+    ).toBeNull();
+    expect(
+      await resolveOutboundCredential(env, { ...request, url: 'https://other.example.com/' })
+    ).toEqual({ type: 'network-denied', key: 'SERVICE_TOKEN', reason: 'host_mismatch' });
+    await h.stub.runnerResult(auth, {
+      outcome: 'ready',
+      commit: 'a'.repeat(40),
+      branch: 'main',
+      setupDurationMs: 1,
+    });
+    expect(await resolveOutboundCredential(env, request)).toBeNull();
+    await drive(h);
+    const retained = await runInDurableObject(
+      h.stub,
+      async instance =>
+        (instance as unknown as { store: BuildStore }).store.build(buildId)?.network_secret_grants
+    );
+    expect(retained).toBeNull();
+  });
+
+  it('refuses a Vercel builder instead of using environment delivery', async () => {
+    const fixture = await networkSecretFixture();
+    const h = await setup();
+    h.networkSecrets = networkSecretsSchema.parse(fixture.snapshot);
+    h.target = {
+      ok: true,
+      target: {
+        provider: 'vercel',
+        credentialId: '44444444-4444-4444-8444-444444444444',
+        teamId: 'synthetic-team',
+        projectId: 'synthetic-project',
+        runtimeBuildId: 'synthetic-runtime',
+        baseSnapshotId: 'synthetic-base',
+        instance: 'vercel-small',
+      },
+    };
+    expect(await manualBuild(h)).toEqual({
+      status: 'rejected',
+      reason: 'network_secrets_require_cloudflare',
+    });
+    expect(h.launches).toHaveLength(0);
+  });
 });
 
 describe('environment build lifecycle', () => {

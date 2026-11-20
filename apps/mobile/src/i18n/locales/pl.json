@@ -19,7 +19,11 @@
     "presenceStatus": "Hosty: {{connection}}",
     "commandStatus": "Dostarczenie polecenia: {{status}}",
     "delivered": "Dostarczono",
-    "expired": "Wygasło"
+    "expired": "Wygasło",
+    "recoveryGaps_one": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_few": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_many": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_other": "Brakuje {{displayCount}} części tego transkryptu."
   },
   "common": {
     "manageOnWeb": "Zarządzaj w przeglądarce",
@@ -57,6 +61,7 @@
     "link": "odnośnik",
     "takingLonger": "To trwa dłużej niż zwykle. Możesz zamknąć ten ekran i sprawdzić ponownie później.",
     "model": "Model AI",
+    "notSelected": "Nie wybrano",
     "accessDenied": "Odmowa dostępu",
     "allRepositories": "Wszystkie repozytoria",
     "personal": "Konto osobiste",
@@ -66,7 +71,7 @@
     "discardChangesMessage": "Twoje zmiany zostaną utracone.",
     "discardChangesTitle": "Odrzuć zmiany?",
     "findings": "Wykryte problemy",
-    "mergeRequest": "merge request",
+    "mergeRequest": "żądanie scalenia",
     "notConnected": "Brak połączenia",
     "notifications": "Powiadomienia",
     "pullRequest": "PR",
@@ -137,6 +142,7 @@
     "keepRunning": "Nie przerywaj",
     "newSession": "Nowa sesja",
     "noModelsAvailable": "Brak dostępnych modeli",
+    "modelRetires": "Wycofany {{date}}",
     "notFound": "Nie znaleziono elementu.",
     "online": "W sieci",
     "open": "Otwórz {{name}}",
@@ -147,6 +153,7 @@
     "performance": "Wydajność",
     "preferences": "Preferencje",
     "privacyPolicy": "Polityka prywatności",
+    "termsOfService": "Regulamin",
     "profile": "Profil",
     "reactions": "Reakcje",
     "recent": "Ostatnie",
@@ -170,6 +177,7 @@
     "generating": "Generowanie…",
     "working": "W toku",
     "yourOwnRepositories": "Twoje repozytoria",
+    "organizationRepositories": "Repozytoria organizacji",
     "dismissed": "Odrzucone",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -178,7 +186,9 @@
     "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
     "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
-    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie."
+    "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
+    "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "viewOnGitHub": "Zobacz PR w serwisie GitHub"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -201,7 +211,7 @@
     "openSignInPageInBrowser": "Otwórz stronę logowania w przeglądarce",
     "copySignInLink": "Skopiuj link do logowania",
     "cancelSignIn": "Anuluj logowanie",
-    "startingSignIn": "Rozpoczynanie logowania...",
+    "startingSignIn": "Rozpoczynanie logowania…",
     "organizationUsesSso": "Twoja organizacja korzysta z logowania jednokrotnego.",
     "continueWithSso": "Kontynuuj przez SSO",
     "useDifferentEmail": "Użyj innego adresu e-mail",
@@ -216,8 +226,8 @@
     "verifyCode": "Zweryfikuj kod",
     "resendCode": "Wyślij kod ponownie",
     "termsPrefix": "Kontynuując, akceptujesz nasze ",
+    "termsInSentence": "Warunki świadczenia usług",
     "terms": "Warunki",
-    "termsInSentence": "Warunki",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Więcej opcji logowania",
@@ -272,6 +282,9 @@
     "credits": "Środki",
     "failedToLoadBalance": "Nie udało się wczytać salda. Dotknij, aby spróbować ponownie.",
     "balanceLoadFailed": "Nie udało się wczytać salda",
+    "balanceUnreachable": "Nie można połączyć się z serwerem. Spróbuj ponownie.",
+    "balanceAccessDenied": "Nie masz uprawnień do wyświetlenia tego salda.",
+    "balanceUnavailable": "Nie udało się wczytać salda.",
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
@@ -311,9 +324,9 @@
     "passkeyVerifyDescription": "Dla swojego bezpieczeństwa potwierdź swoją tożsamość przed wprowadzeniem zmian w kluczach dostępu.",
     "passkeyVerifyWithPasskey": "Potwierdź kluczem dostępu",
     "passkeyVerifySendCode": "Wyślij mi kod e-mailem",
-    "passkeyVerifySendingCode": "Wysyłanie kodu...",
+    "passkeyVerifySendingCode": "Wysyłanie kodu…",
     "passkeyVerifyPasskeyPrompt": "Potwierdź swoją tożsamość kluczem dostępu, aby kontynuować.",
-    "passkeyVerifyChecking": "Sprawdzanie kodu...",
+    "passkeyVerifyChecking": "Sprawdzanie kodu…",
     "passkeyVerifyCodeSent": "Wpisz kod wysłany na adres {{email}}.",
     "passkeyVerifyCodeRejected": "Ten kod jest nieprawidłowy. Spróbuj ponownie.",
     "passkeyVerifyPasskeyFailed": "Nie udało się potwierdzić tożsamości tym kluczem dostępu. Spróbuj ponownie.",
@@ -321,8 +334,8 @@
     "passkeyVerifyInProgress": "Ten kod jest już sprawdzany. Spróbuj ponownie za chwilę.",
     "passkeyVerifyTooManyAttempts": "Zbyt wiele prób. Wyślij nowy kod.",
     "passkeyVerifySsoRequired": "Twoja organizacja wymaga logowania jednokrotnego. Zatwierdź tę zmianę w przeglądarce, a następnie wróć tutaj.",
-    "passkeyVerifySsoStarting": "Rozpoczynanie zatwierdzania...",
-    "passkeyVerifySsoWaiting": "Oczekiwanie na zatwierdzenie...",
+    "passkeyVerifySsoStarting": "Rozpoczynanie zatwierdzania…",
+    "passkeyVerifySsoWaiting": "Oczekiwanie na zatwierdzenie…",
     "passkeyVerifySsoOpen": "Otwórz stronę zatwierdzania",
     "passkeyVerifySsoExpired": "Zatwierdzenie wygasło lub zostało anulowane. Spróbuj ponownie.",
     "passkeyVerifySsoUnavailable": "Zatwierdzanie przez logowanie jednokrotne jest teraz niedostępne. Spróbuj ponownie.",
@@ -502,7 +515,7 @@
     "changelogFixesPolish": "Poprawki i ulepszenia w całej aplikacji.",
     "changelogAreas": {
       "signIn": "Logowanie",
-      "profileOrganizations": "Profil i organizacje"
+      "profileOrganizations": "Profil oraz organizacje"
     }
   },
   "preferences": {
@@ -576,16 +589,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agent czeka na reakcję",
-      "agentAttentionSubtitle": "pytania, prośby o zgodę lub dodatkowe informacje",
+      "agentAttentionSubtitle": "Pytania, prośby o zgodę lub dodatkowe informacje",
       "agentUpdatesTitle": "Wiadomości od agenta",
-      "agentUpdatesSubtitle": "wiadomości agenta w trakcie zadania",
+      "agentUpdatesSubtitle": "Wiadomości agenta w trakcie zadania",
       "sessionStatusTitle": "Status sesji",
-      "sessionStatusSubtitle": "zakończona / nieudana / gotowa do sterowania",
-      "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
+      "sessionStatusSubtitle": "Zakończona / nieudana / gotowa do sterowania",
+      "balanceAlertsSubtitle": "Ostrzeżenia o niskim saldzie organizacji",
       "balanceAlertsUnavailable": "Dołącz do organizacji, aby otrzymywać ostrzeżenia o saldzie.",
-      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA",
+      "securityFindingsSubtitle": "Nowe wykryte problemy i przypomnienia o terminach SLA",
       "securityFindingsUnavailable": "Włącz Agenta bezpieczeństwa Kilo w zakresie, aby otrzymywać problemy z bezpieczeństwem.",
-      "spendAlertsSubtitle": "przekroczenia progów i skoki godzinowe",
+      "spendAlertsSubtitle": "Przekroczenia progów i skoki godzinowe",
       "spendAlertsToggle": "Kategoria alertów o wydatkach"
     },
     "history": {
@@ -667,7 +680,7 @@
     },
     "instructions": {
       "title": "Własne instrukcje",
-      "deprecation": "Planowane jest wycofanie obsługi niestandardowych instrukcji. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
+      "deprecation": "Niestandardowe instrukcje zostaną usunięte. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
       "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…",
       "clearTitle": "Usunąć własne instrukcje?",
       "clearMessage": "Zapisanie pustego pola usuwa własne instrukcje zapisane dla tego recenzenta."
@@ -692,11 +705,16 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
+      "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Połączeniem tej organizacji z Bitbucket zarządza się w przeglądarce na komputerze.",
-      "description": "Utwórz token dostępu do obszaru roboczego z wymaganymi uprawnieniami i wklej go poniżej.",
+      "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
+      "managedOnWebTitle": "Zarządzane w przeglądarce",
+      "managedOnWebShort": "To połączenie jest zarządzane w przeglądarce na komputerze.",
+      "managedOnWebRepositories": "Wybierz repozytoria dla {{organization}} w przeglądarce na komputerze.",
+      "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
+      "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
+      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego i wklej go na następnym ekranie.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego",
       "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
@@ -704,8 +722,8 @@
     "followReviewMd": "Postępuj zgodnie z REVIEW.md",
     "followReviewMdSubtitle": "Przestrzegaj instrukcji z pliku REVIEW.md w każdym repozytorium",
     "manualReview": {
-      "invalidMergeRequestUrl": "Wpisz prawidłowy adres URL merge request.",
-      "mergeRequestUrl": "Adres URL merge request",
+      "invalidMergeRequestUrl": "Wpisz prawidłowy adres URL żądania scalenia.",
+      "mergeRequestUrl": "Adres URL żądania scalenia",
       "instructionsAtLimit": "Instrukcje mogą mieć maksymalnie {{max}} znaków",
       "couldNotCheckProviderStatus": "Nie udało się sprawdzić statusu dostawcy.",
       "couldNotLoadProviders": "Nie udało się wczytać połączonych dostawców. Spróbuj ponownie.",
@@ -732,14 +750,15 @@
     "platformList": {
       "activity": "Aktywność",
       "checking": "Sprawdzanie…",
+      "needsAttention": "Wymaga uwagi",
       "platforms": "Platformy",
       "statusUnavailable": "Status niedostępny"
     },
     "providerConnect": {
       "description": "Skonfiguruj połączenie z Kilo ({{label}}), aby automatycznie przeglądać PR.",
-      "githubApp": "Aplikacja GitHub",
+      "githubApp": "aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
-      "gitlabAccount": "Konto GitLab",
+      "gitlabAccount": "konto GitLab",
       "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie."
     },
     "reviewDetail": {
@@ -781,7 +800,7 @@
       "transcriptRetry": "Nie udało się wczytać zapisu przeglądu.",
       "transcriptLive": "Na żywo",
       "agentIdle": "Agent czeka",
-      "agentWorking": "Agent pracuje...",
+      "agentWorking": "Agent pracuje…",
       "anErrorOccurred": "Wystąpił błąd",
       "errorWithMessage": "Wystąpił błąd: {{message}}.",
       "executionStarted": "Rozpoczęto wykonywanie",
@@ -1238,7 +1257,7 @@
       "dueThisWeekDetail_many": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "dueThisWeekDetail_other": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "noDeadline": "Brak terminu",
-      "reviewSlaAssignment": "Sprawdź przypisane terminy SLA",
+      "reviewSlaAssignment": "Sprawdź przydział SLA",
       "allOpenFindingsTracked": "Wszystkie otwarte problemy są monitorowane"
     },
     "dismiss": {
@@ -1647,6 +1666,8 @@
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
+      "historyTooLarge": "Zapis tej sesji jest zbyt duży, żeby go wczytać.",
+      "historyUnavailable": "Nie można odczytać zapisu tej sesji.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
       "notEnoughCredits": "Brakuje środków na to żądanie. Doładuj konto i spróbuj ponownie.",
       "previousTaskFinishing": "Trwa kończenie poprzedniego zadania. Poczekaj chwilę.",
@@ -1723,6 +1744,7 @@
       "branchDefault": "Domyślna",
       "branchAccessibility": "Gałąź: {{label}}",
       "branchLoading": "Wczytywanie gałęzi",
+      "branchInactive": "Wybierz repozytorium, aby wczytać jego gałęzie.",
       "branchLoadError": "Nie udało się wczytać gałęzi",
       "branchUnavailable": "Gałęzie nie są dostępne dla tego repozytorium. Sprawdź swój dostęp u dostawcy, a potem wybierz inne repozytorium.",
       "branchEmpty": "Brak dostępnych gałęzi",
@@ -1963,7 +1985,8 @@
       "customModes": "Tryby niestandardowe"
     },
     "modeSelector": {
-      "accessibility": "Tryb: {{label}}"
+      "accessibility": "Tryb: {{label}}",
+      "customMode": "Tryb niestandardowy"
     },
     "modeOptions": {
       "code": "Programowanie",
@@ -2270,7 +2293,9 @@
     "modelPicker": {
       "title": "Wybór modelu",
       "favorites": "Ulubione",
-      "noModelsDescription": "Brak modeli do wyboru."
+      "noModelsDescription": "Brak modeli do wyboru.",
+      "allUnavailableTitle": "Nie można użyć żadnego modelu",
+      "allUnavailableDescription": "Dodaj klucz dostawcy, a następnie spróbuj ponownie."
     },
     "modelSelector": {
       "provider": "Dostawca {{id}}",
@@ -2281,7 +2306,7 @@
       "thinkingEffortAccessibility": "Poziom rozumowania: {{label}}",
       "thinkingEffortSelected": "Poziom rozumowania: {{label}}, wybrany",
       "thinkingEffortWithModel": "{{model}}, poziom rozumowania: {{variant}}",
-      "lockedByAgent": ", Zablokowane przez agenta „{{agent}}”",
+      "lockedByAgent": "Zablokowane przez agenta „{{agent}}”",
       "addToFavorites": "Dodaj {{name}} do ulubionych",
       "removeFromFavorites": "Usuń {{name}} z ulubionych",
       "sessionModel": "Model sesji"
@@ -2527,6 +2552,7 @@
     "noSessionsDescription": "Zaloguj się w aplikacji Kilo na innym urządzeniu, a zobaczysz je tutaj.",
     "signInScopeNote": "Na tej liście pojawiają się logowania w aplikacji Kilo, w Kilo CLI i w przeglądarce internetowej. Logowania w edytorze nie są uwzględniane.",
     "signedIn": "Logowanie: {{signedIn}} · Ostatnia aktywność: {{lastSeen}}",
+    "signedInThisDevice": "Logowanie: {{signedIn}} · {{thisDevice}}",
     "thisDevice": "To urządzenie",
     "viewProfile": "Wyświetl profil",
     "signOutThisDevice": "Wyloguj to urządzenie",
@@ -2548,7 +2574,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nie udało się wczytać sesji.",
-    "couldNotLoadActiveSessions": "Nie udało się wczytać aktywnych sesji.",
     "agentSessions": "Teraz aktywne",
     "newCodingTask": "Nowe zadanie programistyczne",
     "newTaskFromPicture": "Nowe zadanie ze zdjęcia",
@@ -2575,6 +2600,7 @@
   "queryError": {
     "neutralDescription": "Spróbuj ponownie.",
     "offlineTitle": "Nie udało się wczytać danych.",
+    "offlineDescription": "Nie udało się połączyć z serwerem.",
     "permissionDescription": "Nie masz uprawnień, aby to wyświetlić.",
     "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny.",
     "serverTitle": "Nie udało się wczytać danych.",
@@ -2595,7 +2621,7 @@
     "scheduled": "ZAPLANOWANO"
   },
   "voiceInput": {
-    "listening": "Nasłuchiwanie...",
+    "listening": "Nasłuchiwanie…",
     "allow": "Zezwól",
     "onlineMessage": "To urządzenie nie obsługuje transkrypcji bez połączenia z internetem. Nagranie jest wysyłane do {{provider}} w celu zamiany na tekst. Kilo nie przechowuje nagrania.",
     "onlineTitle": "Mowa jest przetwarzana przez internet",
@@ -2617,7 +2643,7 @@
     "useOnlineTranscription": "Zezwól na transkrypcję online",
     "offlineModelDownloadScheduled": "Pliki mowy offline zostaną pobrane w tle. Spróbuj dyktowania ponownie później.",
     "listeningStopped": "Nasłuchiwanie zostało zatrzymane.",
-    "transcribing": "Transkrypcja...",
+    "transcribing": "Transkrypcja…",
     "gatewayUnreachable": "Nie udało się połączyć z Kilo Gateway. Sprawdź połączenie i spróbuj ponownie.",
     "gatewayTimeout": "Transkrypcja trwała zbyt długo. Spróbuj ponownie.",
     "gatewayModelUnavailable": "Ten model transkrypcji jest niedostępny. Wybierz inny w Preferencjach.",
@@ -2661,6 +2687,11 @@
       "billingHistory": "Historia płatności",
       "billingHistoryEmpty": "Brak historii płatności.",
       "billingHistoryError": "Nie udało się wczytać historii płatności",
+      "billingRowInitial": "Pierwsza opłata · {{tier}}",
+      "billingRowRenewal": "Odnowienie · {{tier}}",
+      "billingRowSubscription": "Subskrypcja · {{tier}}",
+      "billingRowTrial": "Bezpłatny okres próbny · {{tier}}",
+      "billingRowUpgrade": "Zmiana planu · {{tier}}",
       "cancel": "Anuluj subskrypcję",
       "cancelDescription": "Twój Kilo Pass pozostanie aktywny do końca okresu rozliczeniowego i nie zostanie odnowiony.",
       "cancelScheduled": "Wygasa {{date}}",
@@ -2686,6 +2717,8 @@
     "retryHint": "Ponownie sprawdza stan Kilo Pass.",
     "endedOn": "Zakończono {{date}}",
     "notAvailableInApp": "Kilo Pass nie jest dostępny w aplikacji.",
+    "notAvailableTitle": "Kilo Pass nie jest oferowany w aplikacji",
+    "noPassDescription": "To konto nie ma Kilo Pass.",
     "statusActive": "Aktywny",
     "statusTrialing": "Okres próbny",
     "statusPastDue": "Płatność zaległa",
@@ -2756,6 +2789,7 @@
     "revokeConsent": "Cofnij zgodę",
     "revokeConsentTitle": "Cofnąć zgodę na udostępnianie danych?",
     "acceptAndContinue": "Zaakceptuj i kontynuuj",
+    "loadingConsentSettings": "Wczytywanie ustawień zgody…",
     "decline": "Nie wyrażaj zgody",
     "declineAndSignOut": "Odmów i wyloguj się",
     "declineTitle": "Odmówić udostępniania danych?",
@@ -2835,7 +2869,6 @@
       "skipped_few": "pominięte: {{displayCount}}",
       "skipped_many": "pominięte: {{displayCount}}",
       "title": "Kontrole",
-      "viewOnGitHub": "Zobacz PR w serwisie GitHub",
       "checkDetails": "szczegóły kontroli"
     },
     "composer": {
@@ -2868,15 +2901,15 @@
       "reconnectTitleGitLab": "Połącz ponownie konto GitLab",
       "reconnectTitleBitbucket": "Połącz ponownie konto Bitbucket",
       "reconnectDescription": "Cofnięto dostęp do konta GitHub.",
-      "gitlabDescription": "Przeglądaj merge requesty na telefonie",
+      "gitlabDescription": "Przeglądaj żądania scalenia na telefonie",
       "gitlabInstanceMismatchTitle": "Połączenie z GitLabem dotyczy innej instancji",
-      "gitlabInstanceMismatchDescription": "Twoje połączenie z GitLabem dotyczy {{connected}}, ale ten merge request znajduje się na {{requested}}. Połącz GitLab na tej instancji, aby go przejrzeć.",
+      "gitlabInstanceMismatchDescription": "Twoje połączenie z GitLabem dotyczy {{connected}}, ale to żądanie scalenia znajduje się na {{requested}}. Połącz GitLab na tej instancji, aby je przejrzeć.",
       "checkActiveConnection": "Połączenie jest aktywne, ale nadal nie można wczytać tego elementu.",
       "bitbucketOrgOnlyDescription": "Przełącz konto powyżej na organizację, aby przeglądać jej PR-y na Bitbucketu.",
       "bitbucketOrgOnlyNoOrganizationDescription": "To konto nie ma jeszcze żadnych organizacji. PR-y na Bitbucketu będzie można przeglądać po utworzeniu organizacji lub dołączeniu do niej.",
       "gitlabReconnectAdminOnlyDescription": "Poproś Właściciela, Administratora lub Osobę zarządzającą rozliczeniami w organizacji, aby je ponownie połączyć.",
       "bitbucketNotConnectedTitle": "Brak połączenia z Bitbucket",
-      "bitbucketAdminOnlyDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
+      "adminOnlyConnectDescription": "Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
       "contextLine": "Dla {{organization}}",
       "contextLinePersonal": "Dla konta osobistego"
     },
@@ -2896,6 +2929,11 @@
       "commentActions": "Opcje komentarza",
       "comment": "{{displayCount}} komentarza",
       "comment_other": "{{displayCount}} komentarza",
+      "conversationTruncated": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_one": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_few": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_many": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
+      "conversationTruncated_other": "Widoczne są tylko pierwsze {{displayCount}} komentarze.",
       "couldNotLoad": "Nie udało się wczytać dyskusji.",
       "couldNotLoadMore": "Nie udało się wczytać kolejnych komentarzy.",
       "loadMoreComments": "Wczytaj kolejne komentarze",
@@ -2949,7 +2987,6 @@
       "submitReply": "Wyślij odpowiedź",
       "termsAcceptRetry": "Nie udało się zaakceptować regulaminu. Sprawdź połączenie i spróbuj ponownie.",
       "termsCopy": "Aby publikować, musisz mieć co najmniej 13 lat.",
-      "termsTitle": "Regulamin",
       "threadAccessibilityLabel": "Wątek dyskusji {{anchorLabel}}",
       "unavailable": "Dyskusja jest niedostępna.",
       "unavailableMessage": "Ten PR mógł zostać usunięty.",
@@ -2977,7 +3014,19 @@
         "fileComment": "Komentarz do pliku",
         "outdatedOnPathLines": "Nieaktualny: {{path}}, {{lines}}",
         "outdatedOnLines": "Nieaktualny: {{lines}}",
-        "outdatedOnPath": "Nieaktualny: {{path}}"
+        "outdatedOnPath": "Nieaktualny: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}}, L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}}, {{lineRange}} ({{side}})",
+        "sideLeft": "Lewa strona",
+        "sideRight": "Prawa strona",
+        "outdatedOnLinesSide": "Nieaktualny: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Nieaktualny: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Nieaktualny ({{side}})",
+        "outdatedOnPathSide": "Nieaktualny: {{path}} ({{side}})"
       },
       "deletedUser": "usunięty użytkownik",
       "replyForbiddenTerm": "Nie masz uprawnień do odpowiadania w tym {{term}}.",
@@ -2999,11 +3048,11 @@
       "removeFromRecentsTitle": "Usunąć z listy ostatnio otwieranych?",
       "removeFromRecentsMessage": "Ta recenzja zostanie usunięta z listy ostatnich.",
       "removeRecentAccessibility": "Usuń {{repo}} z listy ostatnio otwieranych",
-      "urlAccessibility": "Wpisz adres URL PR lub merge requestu",
-      "urlPlaceholder": "URL PR lub merge requesta",
-      "openAccessibility": "Otwórz PR lub merge request",
+      "urlAccessibility": "Wpisz adres URL PR lub żądania scalenia",
+      "urlPlaceholder": "URL PR lub żądania scalenia",
+      "openAccessibility": "Otwórz PR lub żądanie scalenia",
       "clearLink": "Wyczyść odnośnik",
-      "pasteLink": "Wklej odnośnik do PR lub merge requestu",
+      "pasteLink": "Wklej odnośnik do PR lub żądania scalenia",
       "open": "Otwórz"
     },
     "eventChips": {
@@ -3174,7 +3223,7 @@
       },
       "terminal": {
         "closed": "PR zamknięty",
-        "closedMergeRequest": "Merge request zamknięty"
+        "closedMergeRequest": "Żądanie scalenia zamknięte"
       },
       "partialSuccessBanner": {
         "accessibility": "Scalono. Nie udało się usunąć gałęzi: {{reason}}",
@@ -3313,6 +3362,10 @@
       "partialPostedStale_many": "Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "partialPostedStale_other": "Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "submitCountOfTotal": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_one": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_few": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_many": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
+      "submitCountOfTotal_other": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
       "submitReview": "Prześlij wynik przeglądu",
       "pendingComment_few": "oczekujące komentarze",
       "pendingComment_many": "oczekujących komentarzy",
@@ -3327,6 +3380,11 @@
     },
     "tabs": {
       "discussion": "Dyskusja",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_one": "{{title}}: 1 komentarz",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarze",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentarzy",
       "files": "Pliki",
       "overview": "Podsumowanie"
     },
@@ -3345,7 +3403,7 @@
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty.",
     "linkPasteDenied": "Odmówiono dostępu do wklejania. Zezwól na wklejanie i spróbuj ponownie.",
-    "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",
+    "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani żądania scalenia",
     "announce": {
       "commentPosted": "Opublikowano komentarz",
       "commentUpdated": "Komentarz zaktualizowany",
@@ -3378,18 +3436,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Udostępnij merge request",
+      "mergeRequest": "Żądanie scalenia",
+      "mergeRequestNumber": "Żądanie scalenia !{{number}}",
+      "shareMergeRequest": "Udostępnij żądanie scalenia",
       "viewOnProvider": "Zobacz w {{provider}}",
-      "mergeRequestUnavailable": "Merge request niedostępny",
+      "mergeRequestUnavailable": "Żądanie scalenia niedostępne",
       "unavailableDescription": "Połączenie mogło się nie udać, a element mógł zostać usunięty lub być niedostępny.",
-      "accessDeniedMergeRequest": "Nie masz uprawnień do wyświetlenia tego merge request.",
-      "couldNotLoadMergeRequest": "Nie udało się wczytać merge request.",
-      "discussionAccessDenied": "Nie masz uprawnień do wyświetlenia dyskusji w tym merge request.",
-      "discussionUnavailableMessage": "Połączenie mogło się nie udać albo merge request mógł zostać usunięty.",
-      "noDiscussionDescription": "W tym merge request nie ma jeszcze wątków przeglądu ani komentarzy w dyskusji.",
-      "noFilesChangedDescription": "Ten merge request nie zawiera zmian w plikach."
+      "accessDeniedMergeRequest": "Nie masz uprawnień do wyświetlenia tego żądania scalenia.",
+      "couldNotLoadMergeRequest": "Nie udało się wczytać żądania scalenia.",
+      "discussionAccessDenied": "Nie masz uprawnień do wyświetlenia dyskusji w tym żądaniu scalenia.",
+      "discussionUnavailableMessage": "Połączenie mogło się nie udać albo żądanie scalenia mogło zostać usunięte.",
+      "noDiscussionDescription": "W tym żądaniu scalenia nie ma jeszcze wątków przeglądu ani komentarzy w dyskusji.",
+      "noFilesChangedDescription": "To żądanie scalenia nie zawiera zmian w plikach."
     }
   },
   "organization": {
@@ -3479,7 +3537,7 @@
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
       "membershipLostNotice": "Nie masz już dostępu do tej organizacji. Przełączono na {{target}}.",
       "noOrganization": "Brak organizacji",
-      "noOrganizationDescription": "To konto nie należy do żadnej organizacji. Utwórz organizację, aby korzystać z funkcji takich jak zapraszanie członków i alerty o niskim saldzie, lub otwórz wersję internetową, aby dołączyć do organizacji, do której Cię zaproszono.",
+      "noOrganizationDescription": "To konto nie należy do żadnej organizacji. Utwórz organizację, aby korzystać z funkcji takich jak zapraszanie członków i alerty o niskim saldzie, lub zaakceptuj zaproszenie z e-maila wysłanego przez organizację.",
       "organizationUnavailable": "Organizacja jest niedostępna.",
       "selectDescriptionWithOrganizations": "Należysz do jednej lub więcej organizacji. Wybierz konto, którego ma używać ten ekran.",
       "selectOrganization": "Wybierz organizację",
@@ -3511,19 +3569,19 @@
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Wygaśnięcie środków"
       },
-      "truncated": "Dostępne są wcześniejsze operacje na saldzie."
+      "truncated": "Dostępne są wcześniejsze operacje na saldzie.",
+      "retentionLimit": "Wyświetlane są najnowsze operacje na saldzie."
     },
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Poniżej {{amount}}",
-      "organizationSeats": "Miejsca w organizacji",
-      "plan": "Plan organizacji",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Zakończony",
       "planEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu.",
       "manageBilling": "Zarządzaj rozliczeniami",
-      "renamePlaceholder": "Nazwa organizacji",
+      "renamePlaceholder": "Wpisz nazwę organizacji",
       "renameTitle": "Zmień nazwę organizacji"
     },
     "inviteMember": {
@@ -3534,6 +3592,7 @@
       "sendInvite": "Wyślij zaproszenie",
       "title": "Zaproś członka",
       "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
+      "organizationUnavailable": "Ta organizacja nie jest już dostępna.",
       "sendError": "Nie udało się wysłać zaproszenia.",
       "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
       "alreadyMember": "Ta osoba jest już członkiem tej organizacji.",
@@ -3555,10 +3614,11 @@
         "void": "Unieważniona",
         "uncollectible": "Nieściągalna"
       },
-      "truncated": "Dostępne są starsze faktury."
+      "truncated": "Dostępne są starsze faktury.",
+      "retentionLimit": "Wyświetlane są najnowsze faktury."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Włącz powiadomienie o niskim saldzie",
+      "subtitle": "Wyślij alert e-mailem na podane adresy, gdy saldo tej organizacji spadnie poniżej ustawionej kwoty.",
       "notifyEmailsLabel": "Adresy e-mail odbiorców",
       "permissionDenied": "Nie masz uprawnień do zarządzania powiadomieniami o rozliczeniach.",
       "separateEmailsHint": "Oddziel adresy e-mail przecinkami.",
@@ -3634,6 +3694,7 @@
       "truncated": "W tej godzinie jest więcej żądań, niż pokazuje lista.",
       "emptyTitle": "Brak żądań w tej godzinie",
       "emptyDescription": "Użyj przycisku Wcześniejsza godzina, aby wyświetlić wcześniejsze żądania.",
+      "emptyBoundDescription": "Dzienniki żądań nie sięgają dalej wstecz.",
       "loadError": "Nie udało się wczytać dzienników żądań.",
       "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
       "tokens": "{{input}} wej. · {{output}} wyj.",
@@ -3738,7 +3799,8 @@
     "signupStepUp": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Aby dokończyć tworzenie konta, użyj opcji „$t(login.signInWithGoogle)”.",
-    "invalidCode": "Ten kod jest nieprawidłowy. Spróbuj ponownie.",
+    "signupStepUpBack": "Aby dokończyć tworzenie konta, wróć i użyj opcji „$t(login.moreSignInOptions)”.",
+    "invalidCode": "Ten kod jest nieprawidłowy lub wygasł. Spróbuj ponownie albo użyj opcji „$t(login.resendCode)”.",
     "codeInProgress": "Trwa sprawdzanie twojego kodu. Poczekaj chwilę i spróbuj ponownie.",
     "tooManyAttempts": "Zbyt wiele prób. Poproś o nowy kod.",
     "invalidToken": "Logowanie nie powiodło się. Spróbuj ponownie.",
@@ -3788,8 +3850,7 @@
     "imagesSectionEmpty": "Brak zaufanych hostów obrazów",
     "revoke": "Cofnij zaufanie do {{host}}",
     "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
-    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie.",
-    "backToPreferences": "Wróć do preferencji"
+    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie."
   },
   "glanceable": {
     "waiting": "Aktualizowanie stanu agentów",
@@ -3803,7 +3864,7 @@
     "newestSession": "Najnowsza: {{title}}",
     "noneWaiting": "Żaden agent nie czeka",
     "newAgent": "Nowy agent",
-    "approving": "Zatwierdzanie...",
+    "approving": "Zatwierdzanie…",
     "couldNotApprove": "Nie udało się zatwierdzić",
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
@@ -3815,6 +3876,7 @@
     "lastKnown": "Ostatni znany stan",
     "awaitingUpdate": "Czeka na aktualizację",
     "nextRun": "Następne uruchomienie",
+    "wasDue": "Oczekiwano",
     "waitingForYou": "Czeka na ciebie",
     "nextScheduled": "Najbliższe zaplanowane",
     "answerNeeded": "Czeka na odpowiedź",
@@ -3867,6 +3929,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ten model wymaga połączenia z internetem. Połącz się i spróbuj ponownie lub przełącz się na model na tym urządzeniu.",
+    "connectionLost": "Połączenie z modelem zostało przerwane. Sprawdź połączenie i spróbuj ponownie.",
     "empty": {
       "title": "Rozpocznij czat",
       "description": "Wyślij wiadomość, aby porozmawiać z modelem."
@@ -3924,6 +3987,8 @@
       "fieldName": "Wyświetlana nazwa",
       "fieldUrl": "Adres URL serwera",
       "fieldUrlInvalid": "Wprowadź prawidłowy adres URL serwera.",
+      "duplicateUrl": "Ten adres URL jest już zapisany.",
+      "serverNotFound": "Ten serwer nie jest już zapisany.",
       "enableServer": "Włącz ten serwer: {{name}}",
       "editServer": "Edytuj serwer",
       "deleteServer": "Usuń serwer",
@@ -4006,6 +4071,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) wysyła krótkie żądanie wnioskowania do tego punktu końcowego, używając wybranego protokołu i modelu. Dostawca może za to naliczyć opłatę.",
       "connectionSucceeded": "Model ukończył żądanie przy użyciu tego protokołu.",
       "connectionFailed": "Model nie mógł ukończyć żądania. Sprawdź główny adres API, protokół, dane uwierzytelniające i ID modelu.",
+      "requestTimedOut": "Punkt końcowy nie odpowiedział na czas. Sprawdź główny adres API i połączenie, a następnie spróbuj ponownie.",
+      "requestUnauthorized": "Punkt końcowy odrzucił dane uwierzytelniające. Sprawdź klucz API i niestandardowe nagłówki, a następnie spróbuj ponownie.",
+      "requestNotFound": "Nie znaleziono punktu końcowego lub modelu. Sprawdź główny adres API i ID modelu.",
+      "requestRateLimited": "Punkt końcowy ogranicza liczbę żądań. Odczekaj chwilę i spróbuj ponownie.",
+      "requestUnavailable": "Punkt końcowy jest teraz niedostępny. Spróbuj ponownie za chwilę.",
+      "requestUnreachable": "Nie udało się połączyć z punktem końcowym. Sprawdź główny adres API i połączenie.",
+      "requestInvalidResponse": "Punkt końcowy odpowiedział w nieoczekiwanym formacie. Sprawdź, czy główny adres API i protokół są zgodne z serwerem, a następnie spróbuj ponownie.",
+      "discoveryNoModels": "Punkt końcowy nie zwrócił żadnych modeli. Wprowadź modele ręcznie.",
+      "connectionIncomplete": "Model odpowiedział, ale nie ukończył żądania. Spróbuj ponownie lub sprawdź ID modelu i protokół.",
       "invalidInput": "Wprowadź nazwę backendu, prawidłowe nagłówki i co najmniej jeden model z unikalnym ID i nazwą. Limity tokenów muszą być dodatnimi liczbami całkowitymi.",
       "invalidUrl": "Wprowadź główny adres API HTTP lub HTTPS bez danych uwierzytelniających, zapytania ani fragmentu.",
       "publicHttp": "Publiczne punkty końcowe HTTP są niedozwolone. Użyj HTTPS lub prywatnego lokalnego punktu końcowego.",
@@ -4035,6 +4109,8 @@
       "downloading": "Pobieranie: {{written}} z {{total}}",
       "downloadingUnknown": "Pobieranie: {{written}}",
       "paused": "Wstrzymano: {{written}} z {{total}}",
+      "retrying": "Ponowna próba: {{written}} z {{total}}",
+      "retryingUnknown": "Ponowna próba: {{written}}",
       "verifying": "Sprawdzanie pobranego pliku…",
       "downloaded": "Pobrano · {{size}}",
       "url": "Bezpośredni link do pobrania",
@@ -4125,7 +4201,9 @@
         "androidModelUnavailable": "To urządzenie nie obsługuje Gemini Nano albo aplikacja systemowa AICore jest jeszcze konfigurowana. Spróbuj ponownie później.",
         "aicoreUpdateRequired": "Zaktualizuj aplikację AICore i oprogramowanie systemowe, aby korzystać z tego modelu.",
         "downloadable": "Przed użyciem ten model trzeba jednorazowo pobrać.",
-        "downloading": "Model jest pobierany. Będzie gotowy po zakończeniu pobierania."
+        "downloading": "Model jest pobierany. Będzie gotowy po zakończeniu pobierania.",
+        "batteryQuota": "Model na urządzeniu wykorzystał na razie swój limit baterii. Spróbuj ponownie później.",
+        "checkFailed": "Aplikacja nie mogła sprawdzić tego modelu. Spróbuj ponownie."
       },
       "unavailable": "Model na urządzeniu jest teraz niedostępny. Sprawdź jego stan w sekcji $t(modelChat.backends.title).",
       "busy": "Model na urządzeniu generuje inną odpowiedź. Spróbuj ponownie, gdy skończy.",
@@ -4140,10 +4218,20 @@
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
     },
-    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość."
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość.",
+    "providerKeyRefused": "Dostawca odrzucił dane uwierzytelniające. Sprawdź jego klucz API, a następnie wyślij ponownie.",
+    "providerModelMissing": "Ten backend nie obsługuje już tego modelu. Wybierz inny.",
+    "providerRateLimited": "Dostawca ogranicza liczbę żądań. Odczekaj chwilę i wyślij ponownie.",
+    "providerUnavailable": "Dostawca jest teraz niedostępny. Wyślij ponownie za chwilę."
   },
   "settingsTools": {
-    "confirmTitle": "Potwierdzić tę zmianę?"
+    "confirmTitle": "Potwierdzić tę zmianę?",
+    "guarded": {
+      "spendAlertsOff": "Wyłączyć alerty wydatków? Przestaniesz otrzymywać powiadomienia o przekroczeniu progów wydatków i skokach godzinowych.",
+      "balanceAlertsOff": "Wyłączyć alerty salda? Przestaniesz otrzymywać powiadomienia, gdy środki będą się kończyć.",
+      "securityFindingsOff": "Wyłączyć ustalenia dotyczące bezpieczeństwa? Przestaniesz otrzymywać powiadomienia o nowych ustaleniach dotyczących bezpieczeństwa.",
+      "hideBalanceOn": "Ukryć Twoje salda? Salda środków nie będą już wyświetlane na ekranach profilu i w centrum organizacji."
+    }
   },
   "appActions": {
     "start": {
@@ -4298,6 +4386,7 @@
     "instructionsHint": "Reguły w formacie markdown stosowane w każdej sesji używającej tego profilu.",
     "instructionsEmpty": "Brak plików instrukcji",
     "instructionsEmptyDescription": "Dodaj pliki reguł stosowane w każdej sesji używającej tego profilu.",
+    "instructionsEmptyDescriptionReadOnly": "Dodane tutaj pliki reguł są stosowane w każdej sesji korzystającej z tego profilu.",
     "instructionNameRequired": "Podaj nazwę pliku",
     "instructionNameTooLong": "Nazwa pliku może mieć maksymalnie {{max}} znaków",
     "instructionNameInvalid": "Zacznij od litery lub cyfry i używaj tylko małych liter, cyfr i myślników",
@@ -4375,7 +4464,7 @@
       "topPPlaceholder": "np. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Mój agent",
-      "promptPlaceholder": "Jesteś...",
+      "promptPlaceholder": "Jesteś…",
       "tools": "Narzędzia",
       "wholeToolRule": "Ten agent stosuje jedną regułę do wszystkich narzędzi jednocześnie: {{rule}}. Te przełączniki są tylko do odczytu.",
       "visibility": "Widoczność",
@@ -4498,7 +4587,8 @@
       "purchaseFallback": "Zakup kredytów",
       "receipt": "Potwierdzenie",
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne."
+      "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
+      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów."
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
@@ -4525,6 +4615,7 @@
     "pickPackToBuyAgain": "Wybierz pakiet powyżej, aby rozpocząć nowy zakup.",
     "purchasePending": "Sklep wciąż przetwarza tę płatność. Kredyty pojawią się, gdy tylko zatwierdzi obciążenie.",
     "buyAgain": "Kup ponownie",
+    "checkPurchase": "Sprawdź zakup",
     "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
     "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
   },
@@ -4626,7 +4717,9 @@
     },
     "saveSheet": {
       "title": "Zapisz na liście",
-      "saved": "Zapisano na liście {{list}}"
+      "saved": "Zapisano na liście {{list}}",
+      "saveFailed": "Nie udało się zapisać zadania. Sprawdź połączenie i spróbuj ponownie.",
+      "saveRefused": "Nie udało się zapisać zadania na tej liście. Wybierz inną listę."
     }
   },
   "agentBriefing": {
@@ -4638,17 +4731,24 @@
     "empty": "Brak aktywności w tym oknie raportu",
     "emptyHint": "Twoje sesje kodowania w chmurze i CLI pojawią się tutaj, gdy zaplanowany raport ma aktywność.",
     "loadError": "Nie udało się wczytać raportów",
+    "estimateLoadError": "Nie udało się wczytać szacunku.",
     "view": "Przeczytaj raport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Filtruj według kontekstu",
+    "contextAll": "Wszystkie konteksty",
     "dismiss": "Odrzuć raport",
+    "dismissFailed": "Nie udało się jeszcze odrzucić tego raportu. Zostanie to ponowione w tle.",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
     "summary": "Podsumowanie AI",
     "summaryPending": "Trwa tworzenie podsumowania AI. Pojawi się tutaj, gdy będzie gotowe.",
-    "summaryUnavailable": "Podsumowanie AI niedostępne. Raport ustrukturyzowany jest nadal dostępny.",
+    "summaryUnavailable": "Podsumowanie AI niedostępne. Ustrukturyzowany raport jest nadal dostępny.",
+    "summaryNotAdmitted": "Podsumowanie AI nie zostało wygenerowane dla tego raportu. Ustrukturyzowany raport jest nadal dostępny.",
     "summaryCharge": "Opłata za AI: {{cost}}",
     "summaryChargePending": "Opłata za AI oczekuje na rozliczenie",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Dowody i artefakty",
     "timezone": "Strefa czasowa raportu",
     "deviceTimezone": "Użyj strefy czasowej urządzenia",
@@ -4660,22 +4760,22 @@
     "timeHint": "Karta na ekranie głównym wraca do bieżącego stanu po zakończeniu okna raportu, nawet offline.",
     "invalidSchedule": "Wybierz prawidłową strefę czasową oraz niepuste okno raportu.",
     "notificationsHint": "Jedno ogólne powiadomienie na zaplanowany raport. Niezależne od płatnych podsumowań AI.",
-    "notificationPermission": "Włącz powiadomienia urządzenia w sekcji $t(common.notifications), aby otrzymywać raport.",
+    "notificationPermission": "Włącz powiadomienia push, aby otrzymywać raport.",
     "defaultModel": "Użyj domyślnego modelu Kilo",
     "duration": "Limit czasu (minuty)",
     "spendLimit": "Limit wydatków (USD)",
     "invalidSafeguards": "Wpisz dodatnie, skończone limity czasu i wydatków.",
     "estimate": "Szacunek {{estimate}} · maksymalnie {{maximum}}",
-    "estimateUnavailable": "Płatne podsumowanie nie jest dostępne dla tych ustawień.",
+    "estimateUnavailable": "Płatne podsumowanie nie jest dostępne dla tych ustawień. Zmień model lub limity albo spróbuj ponownie później.",
     "confirmPaid": "Włączyć płatne podsumowania dla {{context}}?",
     "paidDisclosure": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit {{minutes}} min. Opłata obowiązuje nawet w razie niepowodzenia.",
     "enable": "Włącz płatne podsumowania",
     "allContexts": "Raporty osobiste i organizacji pozostają oddzielne.",
     "emptyHistory": "Brak zapisanych raportów",
-    "estimatePermissionUnavailable": "Nie masz uprawnień do korzystania ze środków w tym kontekście.",
-    "estimatePricingUnavailable": "Cennik tego modelu jest niedostępny.",
-    "estimateBalanceUnavailable": "Brak wystarczających środków na płatne podsumowanie.",
-    "estimateModelNotAllowed": "Ten model nie jest tu dozwolony.",
+    "estimatePermissionUnavailable": "Nie masz uprawnień do korzystania ze środków w tym kontekście. Poproś właściciela organizacji o włączenie tej opcji.",
+    "estimatePricingUnavailable": "Cennik tego modelu jest niedostępny. Wybierz inny model.",
+    "estimateBalanceUnavailable": "Brak wystarczających środków na płatne podsumowanie. Dodaj środki do salda tego kontekstu.",
+    "estimateModelNotAllowed": "Ten model nie jest dozwolony w tym kontekście. Wybierz inny model.",
     "estimateSpendLimitTooLow": "Zwiększ limit wydatków, aby umożliwić to podsumowanie.",
     "saved": "Zapisano ustawienia raportu",
     "selectedSessions": "Wybrane sesje",
@@ -4684,16 +4784,43 @@
     "capturedAt": "Zapisano {{time}}",
     "snapshotHint": "Migawka najnowszego dostępnego stanu sesji zapisana o zaplanowanej porannej porze. Może być niepełna. Liczby dotyczą wybranych sesji, a nie całej nocnej aktywności.",
     "snapshotTruncated": "Pominięto część sesji lub materiałów, aby ograniczyć rozmiar migawki.",
-    "snapshotSummaryFailed": "Nie udało się utworzyć podsumowania AI. Ustrukturyzowana migawka jest nadal dostępna.",
+    "snapshotSummaryFailed": "Nie udało się utworzyć podsumowania AI. Ustrukturyzowany raport jest nadal dostępny.",
     "scheduledContextEnabled": "Zaplanowane raporty",
     "scheduledContextSettings": "Zaplanowane raporty · {{context}}",
     "scheduledContextHint": "Włącz zaplanowane zapisywanie migawek i płatne podsumowania AI tylko dla tego kontekstu. Wybrane fragmenty z usuniętymi danymi wrażliwymi i ustrukturyzowane fakty są wysyłane do Twojego modelu. Podsumowania korzystają z języka aplikacji zapisanego przy aktualizacji ustawień raportu. Opłaty pobierane są z salda tego kontekstu. Migawki bez aktywności nie korzystają z AI.",
     "snapshotSafeguards": "Limity czasu i wydatków na podsumowanie dotyczą każdej zaplanowanej migawki osobno — nie są budżetem dziennym.",
-    "snapshotEstimateInputTooLarge": "Ta migawka zawiera zbyt dużo materiałów dla wybranego modelu.",
+    "snapshotEstimateInputTooLarge": "Ta migawka zawiera zbyt dużo materiałów dla wybranego modelu. Wybierz model z większym oknem wejściowym.",
     "quietSnapshot": "Do tej migawki nie wybrano żadnej aktywności sesji. Nie zlecono podsumowania AI ani nie naliczono opłaty.",
     "noEnabledContexts": "Brak kontekstów z włączonymi zaplanowanymi raportami",
     "sourceBlocker": "Sesja wymaga uwagi",
-    "sourceMetadata": "Zapisane metadane sesji"
+    "sourceMetadata": "Zapisane metadane sesji",
+    "metadataPlan_one": "Plan: {{displayDone}} z {{displayTotal}} kroku ukończonego",
+    "metadataPlan_few": "Plan: {{displayDone}} z {{displayTotal}} kroków ukończonych",
+    "metadataPlan_many": "Plan: {{displayDone}} z {{displayTotal}} kroków ukończonych",
+    "metadataPlan_other": "Plan: {{displayDone}} z {{displayTotal}} kroku ukończonego",
+    "metadataPlan": "Plan: {{displayDone}} z {{displayTotal}} kroku ukończonego",
+    "metadataFiles_one": "Zmieniono {{displayCount}} plik",
+    "metadataFiles_few": "Zmieniono {{displayCount}} pliki",
+    "metadataFiles_many": "Zmieniono {{displayCount}} plików",
+    "metadataFiles_other": "Zmieniono {{displayCount}} pliku",
+    "metadataFiles": "Zmieniono {{displayCount}} pliku",
+    "metadataLinesAdded_one": "Dodano {{displayCount}} linię",
+    "metadataLinesAdded_few": "Dodano {{displayCount}} linie",
+    "metadataLinesAdded_many": "Dodano {{displayCount}} linii",
+    "metadataLinesAdded_other": "Dodano {{displayCount}} linii",
+    "metadataLinesAdded": "Dodano {{displayCount}} linii",
+    "metadataLinesRemoved_one": "Usunięto {{displayCount}} linię",
+    "metadataLinesRemoved_few": "Usunięto {{displayCount}} linie",
+    "metadataLinesRemoved_many": "Usunięto {{displayCount}} linii",
+    "metadataLinesRemoved_other": "Usunięto {{displayCount}} linii",
+    "metadataLinesRemoved": "Usunięto {{displayCount}} linii",
+    "metadataPlanCurrent": "Bieżący krok: {{current}}",
+    "metadataFailure": "Ostatnia tura nieudana: {{kind}}",
+    "sourceActivity": "Aktywność bez tytułu",
+    "metadataFailureProvider": "błąd dostawcy",
+    "metadataFailureTool": "błąd narzędzia",
+    "metadataFailureCancelled": "Anulowano",
+    "metadataFailureOther": "nieokreślony błąd"
   },
   "systemSearch": {
     "couldNotOpenResult": "Nie udało się otworzyć tego wyniku wyszukiwania"
@@ -4711,7 +4838,7 @@
     "topFeatures": "Najczęściej używane funkcje",
     "emptyTitle": "Brak użycia w tym okresie",
     "unavailableTitle": "Użycie niedostępne",
-    "unavailableDescription": "Ta przestrzeń robocza nie raportuje użycia. Ponowna próba nie pomoże.",
+    "unavailableDescription": "Użycie nie jest skonfigurowane dla tej przestrzeni roboczej. Skontaktuj się z pomocą techniczną, jeśli spodziewasz się zobaczyć tutaj użycie.",
     "orgSelfNotice": "Widzisz własne użycie w tej organizacji.",
     "viewDetails": "Wyświetl szczegóły użycia"
   },
@@ -4719,7 +4846,7 @@
     "title": "Integracje",
     "sectionTitle": "Połączone usługi",
     "entrySubtitle": "GitHub, Slack, Linear i inne",
-    "subtitle": "Połącz swoje narzędzia programistyczne i procesy pracy z Kilo",
+    "subtitle": "Połącz swoje narzędzia programistyczne i procesy pracy z Kilo.",
     "disconnect": "Odłącz",
     "disconnectTitle": "Odłączyć usługę {{provider}}?",
     "disconnectMessage": "Kilo przestanie odpowiadać w usłudze {{provider}}. W każdej chwili możesz połączyć ją ponownie.",
@@ -4729,10 +4856,14 @@
     "couldNotLoad": "Nie udało się wczytać integracji",
     "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
     "managedByOwner": "Poproś właściciela organizacji o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerOrAdmin": "Poproś właściciela organizacji lub administratora o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerOrBilling": "Poproś właściciela organizacji lub osobę zarządzającą rozliczeniami o zmianę połączenia, którego nie możesz zmienić.",
+    "managedByOwnerAdminOrBilling": "Poproś właściciela organizacji, administratora lub osobę zarządzającą rozliczeniami o zmianę połączenia, którego nie możesz zmienić.",
     "connectFailed": "Nie udało się otworzyć strony połączenia"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktury za Twoje zakupy pojawią się tutaj po pierwszym obciążeniu."
+    "personalEmptyDescription": "Faktury za Twoje zakupy pojawiają się tutaj po pierwszym obciążeniu. Potwierdzenia w App Store i Google Play znajdują się w sekcji Historia kredytów.",
+    "personalPeriod": "Ostatnie 12 miesięcy"
   },
   "cloudAgent": {
     "compute": {
@@ -4764,7 +4895,7 @@
       "new": "Nowy wyzwalacz",
       "create": "Utwórz wyzwalacz",
       "emptyTitle": "Brak wyzwalaczy",
-      "emptyDescription": "Utwórz wyzwalacz, aby uruchomić Cloud Agent przez wywołanie webhooka lub według harmonogramu.",
+      "emptyDescription": "Utwórz swój pierwszy wyzwalacz.",
       "loadFailedTitle": "Nie udało się wczytać wyzwalaczy",
       "loadFailedDescription": "Spróbuj ponownie po nawiązaniu połączenia.",
       "detailLoadFailedTitle": "Nie udało się wczytać tego wyzwalacza",
@@ -4787,7 +4918,6 @@
       "nameLocked": "Nie można zmienić nazwy po utworzeniu wyzwalacza.",
       "repositoryLocked": "Nie można zmienić repozytorium po utworzeniu wyzwalacza.",
       "environmentAutomatic": "Automatycznie według repozytorium",
-      "notSelected": "Nie wybrano",
       "profileDefaults": "Użyj wartości domyślnych",
       "profileHelp": "Ustawienia profilu obowiązują, gdy wyzwalacz jest uruchamiany. Wtedy rozwiązywane są jego sekrety.",
       "customAgent": "Agent niestandardowy",
@@ -4877,8 +5007,10 @@
   },
   "organizationGuardrails": {
     "title": "Zabezpieczenia AI",
-    "permissionDenied": "Tylko właściciele i administratorzy organizacji mogą zarządzać Zabezpieczeniami AI.",
-    "unavailable": "Zabezpieczenia AI nie są dostępne dla tej organizacji.",
+    "permissionDenied": "Tylko właściciele i administratorzy organizacji mogą zarządzać Zabezpieczeniami AI. $t(organization.boundary.accessDeniedDescription)",
+    "unavailableTitle": "Zabezpieczenia AI nie są włączone",
+    "unavailable": "Kilo włącza Zabezpieczenia AI dla organizacji na życzenie. Skontaktuj się z {{supportEmail}}, a zespół Kilo włącza je dla Twojej organizacji.",
+    "contactSupport": "Skontaktuj się z pomocą techniczną",
     "loadError": "Nie udało się załadować Zabezpieczeń AI",
     "statusSaving": "Zapisywanie…",
     "statusSaved": "Zapisano",
@@ -4887,12 +5019,15 @@
     "inputDescription": "Skanuje wszystkie dane wejściowe za pomocą Enkrypt AI, w tym wyniki narzędzi. Gdy Enkrypt jest niedostępny, żądania są wysyłane bez skanowania zamiast być odrzucane.",
     "outputTitle": "Zabezpieczenia danych wyjściowych",
     "outputDescription": "Skanuje odpowiedzi za pomocą Enkrypt AI, zanim członkowie je otrzymają. Wyłączone, chyba że je włączysz.",
+    "outputUnavailable": "Kilo nie włączył skanowania danych wyjściowych dla tej organizacji, więc odpowiedzi nie są sprawdzane i nie ma tu nic do ustawienia. Skontaktuj się z {{supportEmail}}, aby o to poprosić.",
     "detectorsHint": "Blokuj odrzuca oznaczone żądanie. Tylko rejestruj zapisuje je bez opóźniania żądania.",
     "detectorsHintOutput": "Blokuj powoduje niepowodzenie oznaczonej odpowiedzi. Tylko rejestruj zapisuje ją bez opóźniania odpowiedzi.",
     "choiceLog": "Tylko rejestruj",
     "applyTo": "Zastosuj do",
     "applyToAllMembers": "Wszyscy członkowie",
     "applyKiloDefault": "Zastosuj domyślne ustawienia Kilo",
+    "applyKiloDefaultEnglishNote": "Tekst domyślnej polityki Kilo jest w języku angielskim, ponieważ Kilo Gateway stosuje go dokładnie tak, jak został zapisany.",
+    "applyKiloDefaultReplaceMessage": "Domyślna polityka Kilo jest napisana w języku angielskim i zastępuje to, co ustawiono w Naruszenie polityki. Tekstu wpisanego w polu tekstu polityki nie można odzyskać.",
     "invalidSavedTitle": "Nie można odczytać zapisanych ustawień detektora danych wejściowych",
     "invalidSavedBody": "Żądania są blokowane, dopóki detektory danych wejściowych nie zostaną zapisane ponownie. Poniższe detektory zaczynają od domyślnych ustawień Kilo.",
     "invalidSavedOutputTitle": "Nie można odczytać zapisanych ustawień detektora danych wyjściowych",
@@ -5013,7 +5148,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funkcja dla przedsiębiorstw",
-    "enterpriseOnly": "Ta funkcja jest dostępna tylko dla przedsiębiorstw.",
+    "enterpriseOnly": "Dostawcy i modele to funkcja dostępna w planie Enterprise.",
     "readOnly": "Tylko właściciele i administratorzy organizacji mogą zmieniać te ustawienia.",
     "loadError": "Nie udało się załadować dostawców i modeli",
     "tabModels": "Modele",
@@ -5027,6 +5162,8 @@
     "providersDescription": "Wyłącz dostawcę, aby Kilo przestało kierować do niego żądania w tej organizacji.",
     "providersNeedCatalog": "Przełączniki dostawców pozostają tylko do odczytu, dopóki nie wczyta się pełny katalog modeli. Aby je edytować, dotknij przycisku Spróbuj ponownie powyżej.",
     "providersEmpty": "Żaden dostawca nie pasuje do tego wyszukiwania.",
+    "providersNone": "Żaden dostawca nie jest dostępny dla tej organizacji.",
+    "providersUnavailable": "Nie udało się załadować listy dostawców.",
     "allowAllShown": "Zezwól na wszystkie widoczne",
     "denyAllShown": "Zablokuj wszystkie widoczne",
     "gatewaysDescription": "Kilo kieruje żądania modeli przez Vercel AI Gateway lub OpenRouter. Wyłączona brama powoduje niepowodzenie tych żądań.",

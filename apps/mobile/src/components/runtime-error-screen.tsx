@@ -20,7 +20,7 @@ type RuntimeErrorScreenProps = {
 export function RuntimeErrorScreen({ onRetry }: RuntimeErrorScreenProps) {
   return (
     <View className="flex-1 items-center justify-center bg-background">
-      <QueryError placement="static" className="w-full" onRetry={onRetry} />
+      <QueryError placement="static" inset="gutter" className="w-full" onRetry={onRetry} />
     </View>
   );
 }

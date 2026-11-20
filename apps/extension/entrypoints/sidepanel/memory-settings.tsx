@@ -4,9 +4,9 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteAgentMemory } from '@/src/shared/agent-memories-storage';
 import { loadMemorySettings, saveMemorySettings } from '@/src/shared/agent-memory-settings';
+import { createSerialAsyncChain } from '@/src/shared/serial-async-chain';
 import { deriveMemoriesSettingsView, MEMORY_FILTER_MIN_COUNT } from './memory-settings-state';
 import { useAgentMemories } from './use-agent-memories';
-import { createSerialAsyncChain } from './model-preferences-state';
 import { SettingsToggle } from './workflow-settings';
 
 const EMPTY_MESSAGE =

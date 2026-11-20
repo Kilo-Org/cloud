@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { type NativePendingQuestion } from '@kilocode/cloud-agent-sdk';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 type QuestionField = NativePendingQuestion['fields'][number];
 
@@ -69,9 +70,7 @@ function NativeQuestionField({
   return (
     <View className="gap-2">
       <Text>{label}</Text>
-      {field.description && field.title ? (
-        <Text className="text-muted-foreground">{field.description}</Text>
-      ) : null}
+      {field.description && field.title ? <Text variant="muted">{field.description}</Text> : null}
       {field.options?.map(option => (
         <Button
           key={option.value}
@@ -104,8 +103,12 @@ function NativeQuestionField({
           placeholder={t('agentChat.questionCard.typeYourOwnAnswerPlaceholder')}
           defaultValue=""
           editable={!disabled}
+          // Picking a preset option clears this field, so Android keeps the
+          // framework suggestion popup off — it crashes against rewritten
+          // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+          autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
           multiline={multiple}
-          className={multiple ? 'min-h-[88px] leading-[1.25rem]' : undefined}
+          className={multiple ? 'min-h-24 leading-tight' : undefined}
           onChangeText={text => {
             if (!multiple) {
               setSelected([]);

@@ -11,11 +11,9 @@ type PendingExternalAuth = {
   deviceCode: string;
   userCode: string;
   verificationUrl: string;
-  startedAt: number;
+  /** When the server's code expires, in `Date.now()` milliseconds. */
+  expiresAt: number;
 };
-
-// Matches POLL_OVERALL_TIMEOUT_MS so the record never outlives the server code.
-export const PENDING_EXTERNAL_AUTH_TTL_MS = 5 * 60 * 1000;
 
 // Serializes every SecureStore write and clear to PENDING_EXTERNAL_AUTH_KEY
 // through one FIFO chain so a later clear always lands after an earlier write.
@@ -78,7 +76,8 @@ export async function readPendingExternalAuth(): Promise<PendingExternalAuthRead
     return { kind: 'none' };
   }
   const record = parsePendingExternalAuth(raw);
-  if (!record || Date.now() - record.startedAt > PENDING_EXTERNAL_AUTH_TTL_MS) {
+  // The record never outlives the server code it names.
+  if (!record || Date.now() >= record.expiresAt) {
     return { kind: 'stale' };
   }
   return { kind: 'valid', record };
@@ -99,7 +98,7 @@ const pendingExternalAuthSchema = z.object({
   deviceCode: z.string(),
   userCode: z.string(),
   verificationUrl: z.string(),
-  startedAt: z.number(),
+  expiresAt: z.number(),
 });
 
 function parsePendingExternalAuth(raw: string): PendingExternalAuth | null {

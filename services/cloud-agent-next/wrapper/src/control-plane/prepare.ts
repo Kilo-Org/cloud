@@ -51,6 +51,7 @@ import { createSecretRedactor, redactSecrets } from '../redact-output.js';
 import {
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  KiloWorktreePolicyMismatchError,
 } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import type { RestoreRoots } from '../restore-roots.js';
@@ -81,6 +82,7 @@ import {
   reconcileRoots,
   rootProgressDetail,
   routeRoots,
+  sameRouteRoots,
   type PrepareRoot,
   type RouteRoot,
 } from './workspace-roots.js';
@@ -152,6 +154,11 @@ export type PrepareDeps = {
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   onPreparedRoute?: (spec: ControlPlaneRouteSpec) => void;
+  /**
+   * Called with the binding a prepared route is leaving, before that route's
+   * runtime is released, so work attached to it settles first.
+   */
+  onSupersededRoute?: (spec: ControlPlaneRouteSpec) => void;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   runSetup?: (
     command: string,
@@ -182,7 +189,6 @@ type PreparedRoute = {
   directory: string;
   home: string;
   kilo: WorktreeKiloAuth;
-  env: Record<string, string>;
 };
 
 type PreparingRoute = {
@@ -253,6 +259,22 @@ export function runtimeKey(spec: ControlPlaneRouteSpec): string {
   return workspaceConfigRuntimeKey(spec);
 }
 
+/**
+ * Whether a prepared route may answer a later `prepare` with `workspace: 'same'`:
+ * only when the incoming spec names the same workspace binding — the native
+ * session it serves, the checkout it runs in and the runtime that holds it.
+ */
+export function sameRouteBinding(
+  stored: ControlPlaneRouteSpec,
+  incoming: ControlPlaneRouteSpec
+): boolean {
+  return (
+    stored.kiloSessionId === incoming.kiloSessionId &&
+    stored.directory === incoming.directory &&
+    runtimeKey(stored) === runtimeKey(incoming)
+  );
+}
+
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
   return error instanceof Error && error.message === `${step} timed out`;
 }
@@ -260,6 +282,10 @@ function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): bo
 type InflightCleanup = {
   promise: Promise<void>;
   controller: AbortController;
+  /** The binding this walk releases: the runtime key, directory and native session. */
+  key: string;
+  directory: string;
+  kiloSessionId: string;
 };
 
 export function createPreparationManager(deps: PrepareDeps): PreparationManager {
@@ -324,7 +350,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const homeRoots = deps.homeRoots ?? defaultHomeRoots();
   const prepared = new Map<string, PreparedRoute>();
   const preparing = new Map<string, PreparingRoute>();
-  const releaseCleanups = new Map<string, InflightCleanup>();
+  // Every in-flight walk of a session, kept per binding: after a rapid
+  // binding change several walks of one session can still be running, and one
+  // must never replace another before it settles.
+  const releaseCleanups = new Map<string, Set<InflightCleanup>>();
   const releaseCleanupDeadlineMs = deps.releaseCleanupDeadlineMs ?? RELEASE_CLEANUP_DEADLINE_MS;
   // Spec §7: clone/checkout/setup mutate one shared worktree, so they must not
   // run concurrently for two sessions on the same directory. The lock is keyed
@@ -375,7 +404,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       type: 'session.failed',
       sessionId,
       reason:
-        error instanceof RuntimeProfileMismatchError
+        error instanceof RuntimeProfileMismatchError ||
+        error instanceof KiloWorktreePolicyMismatchError
           ? 'invalid_configuration'
           : 'workspace_setup_failed',
       step,
@@ -796,7 +826,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     env: Record<string, string>,
     redact: (text: string) => string,
     setStep: (step: ControlPlanePreparationStep) => void,
-    onReplacementWorkspace?: () => Promise<boolean>
+    onReplacementWorkspace?: () => Promise<boolean>,
+    /**
+     * The roots the stored prepared route already prepared, when this
+     * preparation re-prepares that route. Empty for a fresh preparation.
+     */
+    preparedRoots: readonly RouteRoot[] = []
   ): Promise<{
     outcome: ControlPlaneWorkspaceOutcome;
     deferredStamps: Array<{ directory: string; commit: string; workspacePrepared?: false }> | null;
@@ -923,9 +958,33 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace inspect session=${spec.sessionId} inspection=${reconciled.inspections.join(',')} elapsedMs=${Date.now() - inspectStartedAt}`
     );
-    if (reconciled.kind === 'same')
+    // The skip is only for a re-prepare that keeps every prepared root unchanged
+    // and adds roots: every stored prepared root is still there and inspected
+    // `same` (nothing adopted or cloned it), with its branch unchanged, and every
+    // root that needed work is one the stored route never prepared. A removed
+    // root, a changed branch, or a re-cloned checkout runs the commands again.
+    const keptPreparedRoots = preparedRoots.every(stored => {
+      // A route without `roots` prepares its one repository at the route
+      // directory, which is the workspace itself: a re-prepare keeps that root
+      // by keeping the route directory, even when its roots now live inside it.
+      if (stored.repoFullName === undefined) return stored.directory === spec.directory;
+      const index = roots.findIndex(root => root.directory === stored.directory);
+      const incoming = index < 0 ? undefined : roots[index];
+      if (incoming === undefined) return false;
+      const requestedBranch =
+        incoming.spec.branchMode === 'working' ? undefined : incoming.spec.branch;
+      return reconciled.inspections[index] === 'same' && requestedBranch === stored.requestedBranch;
+    });
+    const preparedDirectories = new Set(preparedRoots.map(root => root.directory));
+    const addedOnlyNewRoots = roots.every(
+      (root, index) =>
+        reconciled.inspections[index] === 'same' || !preparedDirectories.has(root.directory)
+    );
+    const skipCommands = preparedRoots.length > 0 && keptPreparedRoots && addedOnlyNewRoots;
+    if (reconciled.kind === 'same' && keptPreparedRoots)
       return { outcome: 'same', deferredStamps: null, commandFailures: [] };
-    const { adopted, cloning } = reconciled;
+    const adopted = reconciled.kind === 'prepared' ? reconciled.adopted : false;
+    const cloning = reconciled.kind === 'prepared' ? reconciled.cloning : false;
     setStep('setup');
     const fromEnvironmentSnapshot = reconciled.inspections.every(
       inspection => inspection === 'foreign'
@@ -936,22 +995,37 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const setupCommands = (spec.setupCommands ?? []).slice(skippedSetupCommands);
     const startCommands = spec.startCommands ?? [];
     log(
-      `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} environmentBuildCommands=${skippedSetupCommands} sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
+      skipCommands
+        ? `control-plane workspace setup skipped session=${spec.sessionId} reason=prepared_workspace_roots_added sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
+        : `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} preparedWorkspaceReused=${preparedRoots.length > 0} environmentBuildCommands=${skippedSetupCommands} sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
     );
+    if (!skipCommands && preparedRoots.length > 0) {
+      // A prepared workspace whose roots changed: the commands run as a fresh
+      // preparation does, because that workspace is no longer the one prepared.
+      log(
+        `control-plane workspace setup repeated session=${spec.sessionId} reason=prepared_roots_changed sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
+      );
+    }
     const commandFailures: ControlPlaneCommandFailure[] = [];
-    await runPreparationCommands(
-      spec,
-      setupCommands,
-      'session_setup',
-      env,
-      redact,
-      commandFailures
-    );
-    await runPreparationCommands(spec, startCommands, 'start', env, redact, commandFailures);
+    if (!skipCommands) {
+      await runPreparationCommands(
+        spec,
+        setupCommands,
+        'session_setup',
+        env,
+        redact,
+        commandFailures
+      );
+      await runPreparationCommands(spec, startCommands, 'start', env, redact, commandFailures);
+    }
     // The callback reports whether the recovery steps actually applied. A clone
     // with no `.git` yet, or a surviving workspace, never runs it.
     const recoveryApplied =
       cloning || adopted ? ((await onReplacementWorkspace?.()) ?? false) : false;
+    // A surviving workspace whose prepared root set changed runs its commands
+    // again but is still the same workspace: nothing was cloned or adopted.
+    const preparedOutcome: ControlPlaneWorkspaceOutcome =
+      reconciled.kind === 'same' ? 'same' : adopted ? 'adopted' : 'cloned';
     const stamps: Array<{ directory: string; commit: string }> = [];
     for (const root of roots) {
       stamps.push({ directory: root.directory, commit: await headCommit(root.directory, env) });
@@ -964,7 +1038,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         `control-plane workspace stamp deferred session=${spec.sessionId} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
       return {
-        outcome: adopted ? 'adopted' : 'cloned',
+        outcome: preparedOutcome,
         deferredStamps: stamps,
         commandFailures: commandFailures.slice(0, CONTROL_PLANE_COMMAND_FAILURES_MAX),
       };
@@ -973,10 +1047,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       await writeStamp(stamp.directory, { allocationId: deps.allocationId, commit: stamp.commit });
     }
     log(
-      `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
+      `control-plane workspace prepared session=${spec.sessionId} outcome=${preparedOutcome} elapsedMs=${Date.now() - workspaceStartedAt}`
     );
     return {
-      outcome: adopted ? 'adopted' : 'cloned',
+      outcome: preparedOutcome,
       deferredStamps: null,
       commandFailures: commandFailures.slice(0, CONTROL_PLANE_COMMAND_FAILURES_MAX),
     };
@@ -1058,12 +1132,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation();
       } catch (error) {
-        // An MCP or credential-class drift against the shared runtime is permanent for this key;
-        // retrying would drop the existing runtime and accept the changed configuration.
+        // An MCP, credential-class, or authorization-policy drift against the shared runtime is
+        // permanent for this key; retrying would drop the existing runtime and accept the changed
+        // configuration.
         if (
           !isCurrent() ||
           error instanceof KiloWorktreeMcpMismatchError ||
-          error instanceof KiloWorktreeCredentialClassMismatchError
+          error instanceof KiloWorktreeCredentialClassMismatchError ||
+          error instanceof KiloWorktreePolicyMismatchError
         ) {
           throw error;
         }
@@ -1132,6 +1208,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const entry: InflightCleanup = {
       controller: new AbortController(),
       promise: Promise.resolve(),
+      key: input.key,
+      directory: input.spec.directory,
+      kiloSessionId: input.spec.kiloSessionId,
     };
     entry.promise = client
       .release({
@@ -1158,21 +1237,39 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         });
       })
       .catch(() => undefined);
-    releaseCleanups.set(input.sessionId, entry);
+    const walkers = releaseCleanups.get(input.sessionId) ?? new Set<InflightCleanup>();
+    releaseCleanups.set(input.sessionId, walkers);
+    walkers.add(entry);
     void entry.promise.finally(() => {
-      if (releaseCleanups.get(input.sessionId) === entry) releaseCleanups.delete(input.sessionId);
+      walkers.delete(entry);
+      if (walkers.size === 0) releaseCleanups.delete(input.sessionId);
     });
   }
 
   /**
-   * Stop any release cleanup still walking `sessionId` before a re-prepare
-   * resolves the same Kilo session. Bounded by the cleanup's own deadline.
+   * Stop any release cleanup still walking the binding being prepared before it
+   * resolves the same Kilo session. Cleanups for another binding — a superseded
+   * native session on a shared runtime, or an older binding of this session
+   * still walking — are left to finish on their own. Bounded by each cleanup's
+   * own deadline.
    */
-  async function settleReleaseCleanup(sessionId: string): Promise<void> {
-    const entry = releaseCleanups.get(sessionId);
-    if (!entry) return;
-    entry.controller.abort();
-    await entry.promise;
+  async function settleReleaseCleanup(binding: {
+    sessionId: string;
+    key: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<void> {
+    const walkers = releaseCleanups.get(binding.sessionId);
+    if (!walkers) return;
+    const matching = [...walkers].filter(
+      entry =>
+        entry.key === binding.key &&
+        entry.directory === binding.directory &&
+        entry.kiloSessionId === binding.kiloSessionId
+    );
+    if (matching.length === 0) return;
+    for (const entry of matching) entry.controller.abort();
+    await Promise.all(matching.map(entry => entry.promise));
   }
 
   /**
@@ -1194,7 +1291,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   async function runPrepare(
     spec: ControlPlaneRouteSpec,
     credentials: ControlPlaneSessionCredentialsPayload | undefined,
-    owner: PreparingRoute
+    owner: PreparingRoute,
+    /**
+     * The roots the stored prepared route already prepared, when this
+     * preparation re-prepares that route. Empty for a fresh preparation.
+     */
+    preparedRoots: readonly RouteRoot[] = []
   ): Promise<void> {
     const sessionId = spec.sessionId;
     let currentStep: ControlPlanePreparationStep = 'kilo_runtime';
@@ -1322,7 +1424,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         if (owner.released) return;
         currentStep = 'kilo_session';
         emitProgress(sessionId, 'kilo_session');
-        await settleReleaseCleanup(sessionId);
+        await settleReleaseCleanup({
+          sessionId,
+          key,
+          directory,
+          kiloSessionId: spec.kiloSessionId,
+        });
         await withOneRetry(
           async attempt => {
             const snapshotRestore: NonNullable<Parameters<Harness['open']>[0]['snapshotRestore']> =
@@ -1434,7 +1541,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               );
               return false;
             }
-          }
+          },
+          preparedRoots
         );
         workspace = preparedWorkspace.outcome;
         workspaceCommandFailures = preparedWorkspace.commandFailures;
@@ -1505,7 +1613,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         directory,
         home,
         kilo: kiloAuth,
-        env: builtEnv,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
@@ -1600,7 +1707,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       ),
       route.spec
     );
-    route.env = nextEnv;
     await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
     commitWorkspaceMcpGrant(route.key, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
@@ -1669,11 +1775,57 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       };
       const route = prepared.get(spec.sessionId);
       if (route) {
+        // A prepared route reuses its runtime without a new policy check: the
+        // route spec is fixed when the session registers and the runtime
+        // contract is pinned per allocation, so a re-prepare offers the
+        // permission map and review target that `ensure` already admitted.
         // M2: a failed route (spent restart budget / dead runtime) must start
         // fresh (spec §7), not short-circuit to `ready`.
         if (deps.runtimes.isUnavailable(route.key)) {
           prepared.delete(spec.sessionId);
+        } else if (!sameRouteBinding(route.spec, spec)) {
+          // The acknowledgement belongs to the binding that was prepared. A
+          // prepare that names another binding first settles the work still
+          // attached to the old one, then prepares the new binding.
+          log(
+            `control-plane re-prepare binding changed session=${spec.sessionId} runtimeKey=${
+              route.key
+            }->${runtimeKey(spec)} nativeSession=${route.spec.kiloSessionId}->${
+              spec.kiloSessionId
+            } directory=${route.directory}->${spec.directory}`
+          );
+          deps.onSupersededRoute?.(route.spec);
+          prepared.delete(spec.sessionId);
+          finishReleasedRoute({
+            key: route.key,
+            sessionId: spec.sessionId,
+            spec: route.spec,
+          });
         } else {
+          // The binding matched, so the fast path serves exactly this runtime.
+          owner.runtimeKey = route.key;
+          // A root this route never prepared is not on disk, so the roots are
+          // inspected, adopted or cloned on the full path. The runtime and the
+          // acknowledgement stay the route's own.
+          const rootsAdded = !sameRouteRoots(route.spec, spec);
+          if (rootsAdded) {
+            // The roots the stored route prepared: a re-prepare that keeps them
+            // unchanged and only adds roots skips the setup and start commands.
+            const preparedRoots = routeRoots(route.spec);
+            log(
+              `control-plane re-prepare prepares new roots session=${spec.sessionId} directory=${route.directory}`
+            );
+            prepared.delete(spec.sessionId);
+            const running = runPrepare(spec, credentials, owner, preparedRoots).finally(() =>
+              finalizePreparingOwner(owner, spec)
+            );
+            owner.promise = running;
+            preparing.set(spec.sessionId, owner);
+            return running;
+          }
+          // Any other field of the incoming spec (review target, platform
+          // origin, …) is the binding the turn now runs.
+          route.spec = spec;
           const running = (async () => {
             if (credentials) {
               try {
@@ -1687,7 +1839,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               }
             }
             if (!owner.released) {
-              deps.onPreparedRoute?.(route.spec);
+              deps.onPreparedRoute?.(spec);
               emitSessionReadyNative(spec.sessionId);
               deps.emit({ type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' });
             }

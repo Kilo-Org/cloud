@@ -12,10 +12,11 @@
  * here too, so two audits cannot drift apart on which files they read, how they
  * spell a path in a diagnostic, or how they report a file with a syntax error.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative as relativePath, sep } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative as relativePath, resolve, sep } from 'node:path';
 
 import { lineIndex, parseProblems, parseSourceFile } from './ast.mjs';
+import { regularFileState } from './fs-entries.mjs';
 
 /**
  * Whether a file name is test scaffolding rather than app code: a suite
@@ -70,25 +71,21 @@ function collect(dir, skip, files) {
 /**
  * Whether the entry at `path` leads to a regular file. `readdirSync` reports a
  * symlink as the link itself, so the link has to be followed to see a file
- * behind it; `throwIfNoEntry: false` makes a link with no target report no
- * stat, which leaves it out of the walk instead of throwing on it.
+ * behind it; `regularFileState` makes that call, following links and reporting
+ * a link with no target as unreadable rather than throwing on it.
  *
- * A stat the filesystem refuses leaves the path out the same way. A pair of
- * links that point at each other fails with `ELOOP`, which `throwIfNoEntry`
- * does not cover; admitting the path would hand every audit a file nobody can
+ * A Dirent that already answers the question is taken at its word, so a plain
+ * file costs no stat. An entry it does not settle is left out unless
+ * `regularFileState` calls it a file: a dangling link, a path the filesystem
+ * refuses, and a pair of links that point at each other and fail with `ELOOP`
+ * all stay out, because admitting one would hand every audit a file nobody can
  * read, and letting the error out would end the walk the audit was making.
  */
 function isRegularFile(path, entry) {
   if (entry.isFile()) {
     return true;
   }
-  let target;
-  try {
-    target = statSync(path, { throwIfNoEntry: false });
-  } catch {
-    return false;
-  }
-  return target?.isFile() === true;
+  return regularFileState(path) === 'file';
 }
 
 /**
@@ -100,18 +97,24 @@ function isRegularFile(path, entry) {
  *
  * `text` is the caller's, so a caller that already holds the text — an audit
  * whose rules take the source it was given — parses it through the same step
- * the walk uses. Paths are named from `root`; a file outside it — a fixture
- * tree in a temporary directory — is named from `dir`.
+ * the walk uses. `file` is the absolute path, whichever way the caller spelled
+ * it; `path` names it from `root`, and a file outside `root` — a fixture tree
+ * in a temporary directory — is named from `dir` instead. All three arguments
+ * are resolved once here, so a caller that spells `dir` or `root` relative
+ * still gets the same absolute `file` and the same root-relative `path`.
  */
 export function parseSourceEntry(dir, root, file, text) {
-  const { program, errors } = parseSourceFile(file, text);
-  const fromRoot = relativePath(root, file);
-  const path = (fromRoot.startsWith('..') ? relativePath(dir, file) : fromRoot)
+  const base = resolve(dir);
+  const from = resolve(root);
+  const target = resolve(file);
+  const { program, errors } = parseSourceFile(target, text);
+  const fromRoot = relativePath(from, target);
+  const path = (fromRoot.startsWith('..') ? relativePath(base, target) : fromRoot)
     .split(sep)
     .join('/');
   const lineOf = lineIndex(text);
   return {
-    file,
+    file: target,
     path,
     text,
     program,
@@ -122,12 +125,11 @@ export function parseSourceEntry(dir, root, file, text) {
 
 /**
  * Every source file below `dir`, read and parsed once, one file at a time, each
- * as one `parseSourceEntry`: its absolute path `file`, the normalised path
- * `path` a diagnostic names it by, its `text`, its syntax tree `program`, the
- * `lineOf` lookup, and one `problems` line per parse error.
+ * as one `parseSourceEntry`.
  *
  * The walk is a generator, so a caller's `for … of` holds one file's text and
- * one syntax tree at a time and peak memory does not grow with the tree.
+ * one syntax tree at a time. The matched path list is collected before the
+ * first yield, so memory is the parsed file plus that list.
  *
  * A file the parser refused has an empty tree, so the keys or calls it holds
  * would leave an audit without a word. `problems` says what the parser stopped
@@ -139,13 +141,21 @@ export function parseSourceEntry(dir, root, file, text) {
  * it could not read rather than drop it, and one refusal must not discard the
  * findings the walk already collected.
  *
- * Paths are named from `root`. A file outside it — a fixture tree in a
- * temporary directory — is named from `dir`, so it still reads from its own
- * root.
+ * The walk reads through `read`, which defaults to `readFileSync`, so a caller
+ * can supply the read itself and a test can fail one file without the
+ * filesystem's help. A throw from it is reported exactly like a throw from the
+ * filesystem, so the contract has one name whichever reader refused.
+ *
+ * `dir` is the subtree walked and `root` the base every entry's `path` is named
+ * from; they differ when an audit reads a fixture tree outside the repository,
+ * and a file outside `root` is then named from `dir`. A relative `dir` or
+ * `root` is resolved against the process directory first, so an entry's `file`
+ * is absolute either way and its `path` is the same spelling a caller that
+ * passed absolute paths has always seen.
  */
-export function* parseSourceTree(dir, root, skip) {
+export function* parseSourceTree(dir, root, skip, read = readFileSync) {
   for (const file of sourceFiles(dir, skip)) {
-    yield readSourceEntry(dir, root, file);
+    yield readSourceEntry(dir, root, file, read);
   }
 }
 
@@ -153,11 +163,15 @@ export function* parseSourceTree(dir, root, skip) {
  * One walked file read and parsed. A refused read still yields the entry's
  * shared shape — the path, an empty text, and an empty tree — so the caller
  * meets one problem line where it would have read the file's own findings.
+ *
+ * The text comes from `read`, which defaults to `readFileSync`, so a caller can
+ * supply the read itself. A throw from it lands in the same catch as one from
+ * the filesystem, so a failure reports the same single problem line either way.
  */
-function readSourceEntry(dir, root, file) {
+export function readSourceEntry(dir, root, file, read = readFileSync) {
   let text;
   try {
-    text = readFileSync(file, 'utf8');
+    text = read(file, 'utf8');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const entry = parseSourceEntry(dir, root, file, '');

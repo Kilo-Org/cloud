@@ -28,6 +28,7 @@ export function selectGitHubReviewEvents(args: {
 export function selectSubmitCtaLabel(args: { freshCount: number; totalCount: number }): string {
   if (args.totalCount > args.freshCount) {
     return i18n.t('prReview.submit.submitCountOfTotal', {
+      count: args.freshCount,
       freshCount: args.freshCount,
       totalCount: args.totalCount,
       displayFreshCount: formatNumber(args.freshCount, i18n.language),

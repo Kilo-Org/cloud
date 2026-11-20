@@ -3,17 +3,26 @@ export type { EncryptedData } from '@kilocode/db/schema-types';
 import type { EncryptedData } from '@kilocode/db/schema-types';
 
 /**
+ * Decodes a base64-encoded key and enforces the shared 32-byte key contract.
+ */
+function decodeEncryptionKey(keyBase64: string): Buffer {
+  const key = Buffer.from(keyBase64, 'base64');
+
+  if (key.length !== 32) {
+    throw new Error('Encryption key must be 32 bytes (256 bits)');
+  }
+
+  return key;
+}
+
+/**
  * Encrypts a string using AES-256-GCM with the provided key
  *
  * @param keyBase64 - Base64-encoded 32-byte encryption key
  * @returns EncryptedData object containing IV, encrypted data, and auth tag
  */
 export function encryptApiKey(plaintext: string, keyBase64: string): EncryptedData {
-  const key = Buffer.from(keyBase64, 'base64');
-
-  if (key.length !== 32) {
-    throw new Error('Encryption key must be 32 bytes (256 bits)');
-  }
+  const key = decodeEncryptionKey(keyBase64);
 
   // Generate random IV (12 bytes is recommended for GCM)
   const iv = randomBytes(12);
@@ -38,11 +47,7 @@ export function encryptApiKey(plaintext: string, keyBase64: string): EncryptedDa
  * @param keyBase64 - Base64-encoded 32-byte encryption key
  */
 export function decryptApiKey(encrypted: EncryptedData, keyBase64: string): string {
-  const key = Buffer.from(keyBase64, 'base64');
-
-  if (key.length !== 32) {
-    throw new Error('Encryption key must be 32 bytes (256 bits)');
-  }
+  const key = decodeEncryptionKey(keyBase64);
 
   const iv = Buffer.from(encrypted.iv, 'base64');
   const encryptedData = Buffer.from(encrypted.data, 'base64');

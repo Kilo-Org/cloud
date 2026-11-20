@@ -247,7 +247,7 @@ export function useOrganizationMutations(
       scope: { id: `organization:${organizationId}` },
     }),
 
-    // No onMutationError toast here: low-balance-alert-sheet (the only
+    // No onMutationError toast here: low-balance-alert-screen (the only
     // caller) shows the error inline while it stays open (see Pattern P2).
     // onError policy: roll back the onMutate snapshot (latest generation only);
     // the caller renders the error inline (no toast).

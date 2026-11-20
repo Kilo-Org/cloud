@@ -33,9 +33,9 @@ describe('startup-timing', () => {
     const payload = takeStartupTimings();
 
     expect(payload).not.toBeNull();
-    expect((payload as Record<string, unknown>).theme_ready).toBe(0);
-    expect((payload as Record<string, unknown>).fonts_ready).toBe(120);
-    expect((payload as Record<string, unknown>).splash_hidden).toBe(150);
+    expect(payload?.theme_ready).toBe(0);
+    expect(payload?.fonts_ready).toBe(120);
+    expect(payload?.splash_hidden).toBe(150);
   });
 
   it('returns null for an unfinished launch and is taken exactly once', async () => {
@@ -52,7 +52,7 @@ describe('startup-timing', () => {
     markStartupComplete('app');
     const first = takeStartupTimings();
     expect(first).not.toBeNull();
-    expect((first as Record<string, unknown>).outcome).toBe('app');
+    expect(first?.outcome).toBe('app');
 
     const second = takeStartupTimings();
     expect(second).toBeNull();
@@ -70,8 +70,8 @@ describe('startup-timing', () => {
 
     const payload = takeStartupTimings();
     expect(payload).not.toBeNull();
-    expect((payload as Record<string, unknown>).outcome).toBe('consent');
-    expect((payload as Record<string, unknown>).splash_hidden).toBe(0);
+    expect(payload?.outcome).toBe('consent');
+    expect(payload?.splash_hidden).toBe(0);
   });
 
   it('notifies listeners exactly once on the first completion only', async () => {

@@ -790,7 +790,13 @@ describe('verifyAdmissionAsync', () => {
       keyId: 'unknownKey',
     };
     const result = await verifyAdmissionAsync(admission);
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    // The only refusal that names a client-side recovery: this device asserted
+    // with a key id this database has never stored.
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+    });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
 
     now.mockReturnValue(6_121_000);
@@ -800,41 +806,41 @@ describe('verifyAdmissionAsync', () => {
     expect(lines[0]).toMatchObject({ count: 1 });
   });
 
-  test('ios assertion fails with provider error and counts one per-cause metric', async () => {
-    const setMock = jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue({
-        returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
-      }),
-    });
-    jest.mocked(db.update).mockReturnValue({ set: setMock } as any);
-
+  test('names no recovery for an invalid assertion against a stored key', async () => {
     const existingKey = {
       key_id: 'key1',
       kilo_user_id: 'user1',
       platform: 'ios',
       public_key: 'base64pubkey',
-      sign_count: 10,
+      sign_count: 0,
       attested_at: '2026-01-01T00:00:00.000Z',
       created_at: '2026-01-01T00:00:00.000Z',
       last_used_at: null,
     };
     jest.mocked(db.query.native_attested_keys.findFirst).mockResolvedValue(existingKey as any);
+    jest.mocked(db.update).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ challenge: 'ch123' }]),
+        }),
+      }),
+    } as any);
     mockVerifyAppleAssertion.mockResolvedValue({ ok: false, error: 'INVALID_ASSERTION' });
 
-    const admission: AdmissionPayload = {
+    const result = await verifyAdmissionAsync({
       platform: 'ios',
       kind: 'assertion',
       challenge: 'ch123',
       payload: 'base64assertion',
       keyId: 'key1',
-    };
-    const result = await verifyAdmissionAsync(admission);
+    });
+
+    // A key this database knows, refused on its merits, gets no recovery: a
+    // new key would not repair an invalid assertion.
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
 
-    // The verifier's fixed enum value lands in the metric name, so the cause
-    // is one bounded metric like the Play Integrity counters.
-    now.mockReturnValue(6_241_000);
+    now.mockReturnValue(6_303_000);
     countAdmissionCondition('native_admission_missing');
     const lines = aggregateLines().filter(
       line => line.metric === 'apple_assertion_failed:INVALID_ASSERTION'

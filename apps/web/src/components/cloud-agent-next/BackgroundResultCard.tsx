@@ -21,7 +21,7 @@ export function BackgroundResultCard({
   part,
   result,
 }: {
-  part: ToolPart;
+  part: Pick<ToolPart, 'id' | 'sessionID'>;
   result: BackgroundResult;
 }) {
   const actions = useContext(CloudPresentationContext);
@@ -66,7 +66,7 @@ export function BackgroundResultCard({
     >
       <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
         <span>
-          {result.kind === 'subagent'
+          {result.kind === 'subagent' && result.agent
             ? `${result.agent} · ${result.state}`
             : `State: ${result.state}`}
         </span>

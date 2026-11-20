@@ -42,6 +42,12 @@ describe('filterRepoPickerOptions', () => {
     expect(filterRepoPickerOptions({ repositories: rows, search: 'cloud' })).toEqual(rows);
   });
 
+  it('matches an accented query against an unaccented full name', () => {
+    const rows = [{ fullName: 'acme/repo-1' }];
+    expect(filterRepoPickerOptions({ repositories: rows, search: 'rëpo' })).toEqual(rows);
+    expect(filterRepoPickerOptions({ repositories: rows, search: 'repo' })).toEqual(rows);
+  });
+
   it('matches nothing when no full name contains the query', () => {
     expect(filterRepoPickerOptions({ repositories, search: 'missing' })).toEqual([]);
   });

@@ -1461,7 +1461,7 @@ describe('FilePartRenderer mounted', () => {
     const statuses = accessibleStatusNodes(root);
     expect(statuses).toHaveLength(1);
     expect(statuses[0]?.props.message).toBe('Share failed');
-    expect(statuses[0]?.props.className).toBe('px-6 pt-2 text-sm');
+    expect(statuses[0]?.props.className).toBe('px-4 pt-2 text-sm');
     const statusText = findByType(first(statuses), 'Text');
     expect(statusText[0]?.props.className).toContain('text-destructive');
 

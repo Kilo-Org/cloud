@@ -14,9 +14,10 @@ import {
   cloud_agent_code_reviews,
   kilocode_users,
 } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { and, eq, sql, gte, lte, not, inArray, count } from 'drizzle-orm';
+import { and, eq, sql, gte, lte, not, inArray, count, exists } from 'drizzle-orm';
+import type { AnyColumn } from 'drizzle-orm';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -83,7 +84,10 @@ export async function getBalanceAndOrgSettings(
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
   let result: BalanceAndOrgSettings;
   if (organizationId) {
-    result = await getBalanceForOrganizationUser(organizationId, user.id, { fromDb, funding });
+    result = await getBalanceForOrganizationUser(organizationId, user.id, {
+      fromDb,
+      funding,
+    });
   } else {
     const { balance, microdollars_used, total_microdollars_acquired } =
       await getBalanceForUser(user);
@@ -98,7 +102,11 @@ export async function getBalanceAndOrgSettings(
     };
     if (funding === 'usage' && user.auto_top_up_enabled) {
       after(() =>
-        maybePerformAutoTopUp({ ...user, microdollars_used, total_microdollars_acquired })
+        maybePerformAutoTopUp({
+          ...user,
+          microdollars_used,
+          total_microdollars_acquired,
+        })
       );
     }
   }
@@ -373,15 +381,41 @@ export async function updateOrganizationUserLimit(
 }
 
 /**
- * Fetch agent interactions (non-autocomplete usage) per day for given users
+ * The same members `getOrganizationMembers` reports as active: a membership of the organization
+ * held by a non-bot user. Written as a semi-join so the per-day reads need no member id list;
+ * the organization filter alone does not exclude former members' usage rows.
+ */
+function isActiveHumanMemberOf(
+  organizationId: Organization['id'],
+  userId: AnyColumn,
+  fromDb: DrizzleConnection
+) {
+  return exists(
+    fromDb
+      .select({ one: sql`1` })
+      .from(organization_memberships)
+      .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organizationId),
+          eq(organization_memberships.kilo_user_id, userId),
+          eq(kilocode_users.is_bot, false)
+        )
+      )
+  );
+}
+
+/**
+ * Fetch agent interactions (non-autocomplete usage) per day for the organization's active members
+ * @param fromDb - Database instance to use (defaults to primary db, pass a replica connection for reads that tolerate lag)
  */
 export async function getAgentInteractionsPerDay(
   organizationId: Organization['id'],
-  userIds: string[],
   startDate: string,
-  endDate: string
+  endDate: string,
+  fromDb: DrizzleConnection = db
 ) {
-  return await db
+  return await fromDb
     .select({
       userId: microdollar_usage.kilo_user_id,
       date: sql<string>`DATE(${microdollar_usage.created_at})`.as('date'),
@@ -394,18 +428,24 @@ export async function getAgentInteractionsPerDay(
         gte(microdollar_usage.created_at, startDate),
         lte(microdollar_usage.created_at, endDate),
         not(eq(microdollar_usage.model, AUTOCOMPLETE_MODEL)),
-        inArray(microdollar_usage.kilo_user_id, userIds)
+        isActiveHumanMemberOf(organizationId, microdollar_usage.kilo_user_id, fromDb)
       )
     )
     .groupBy(microdollar_usage.kilo_user_id, sql`DATE(${microdollar_usage.created_at})`);
 }
 
+/**
+ * Fetch shared CLI sessions per day for the organization's active members. Sessions carry no
+ * organization, so the count covers each member's sessions wherever they were created.
+ * @param fromDb - Database instance to use (defaults to primary db, pass a replica connection for reads that tolerate lag)
+ */
 export async function getCloudAgentSessionsPerDay(
-  userIds: string[],
+  organizationId: Organization['id'],
   startDate: string,
-  endDate: string
+  endDate: string,
+  fromDb: DrizzleConnection = db
 ) {
-  return await db
+  return await fromDb
     .select({
       userId: sharedCliSessions.kilo_user_id,
       date: sql<string>`DATE(${sharedCliSessions.created_at})`.as('date'),
@@ -416,19 +456,23 @@ export async function getCloudAgentSessionsPerDay(
       and(
         gte(sharedCliSessions.created_at, startDate),
         lte(sharedCliSessions.created_at, endDate),
-        inArray(sharedCliSessions.kilo_user_id, userIds)
+        isActiveHumanMemberOf(organizationId, sharedCliSessions.kilo_user_id, fromDb)
       )
     )
     .groupBy(sharedCliSessions.kilo_user_id, sql`DATE(${sharedCliSessions.created_at})`);
 }
 
+/**
+ * Fetch code reviews per day for the organization's active members
+ * @param fromDb - Database instance to use (defaults to primary db, pass a replica connection for reads that tolerate lag)
+ */
 export async function getCodeReviewsPerDay(
   organizationId: Organization['id'],
-  userIds: string[],
   startDate: string,
-  endDate: string
+  endDate: string,
+  fromDb: DrizzleConnection = db
 ) {
-  return await db
+  return await fromDb
     .select({
       userId: cloud_agent_code_reviews.owned_by_user_id,
       date: sql<string>`DATE(${cloud_agent_code_reviews.created_at})`.as('date'),
@@ -440,7 +484,7 @@ export async function getCodeReviewsPerDay(
         eq(cloud_agent_code_reviews.owned_by_organization_id, organizationId),
         gte(cloud_agent_code_reviews.created_at, startDate),
         lte(cloud_agent_code_reviews.created_at, endDate),
-        inArray(cloud_agent_code_reviews.owned_by_user_id, userIds)
+        isActiveHumanMemberOf(organizationId, cloud_agent_code_reviews.owned_by_user_id, fromDb)
       )
     )
     .groupBy(

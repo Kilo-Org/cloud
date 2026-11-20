@@ -236,7 +236,7 @@ export function CommentRow({
             // Android's minimum; the slop only extends the reach.
             className={cn(ICON_TARGET_BOX_CLASS, 'rounded-full active:bg-muted')}
           >
-            <View className="h-[28px] w-[28px] items-center justify-center">
+            <View className="h-8 w-8 items-center justify-center">
               <MoreHorizontal size={16} color={colors.mutedForeground} />
             </View>
           </Pressable>

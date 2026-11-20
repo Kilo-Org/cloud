@@ -6,12 +6,10 @@ import {
   useSegments,
 } from 'expo-router';
 import { useCallback, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { ScreenHeader } from '@/components/screen-header';
 import { useRefetchBeforeRemount } from '@/lib/hooks/use-refetch-before-remount';
 import { getRouteRecoveryScope } from '@/lib/navigation/route-recovery-scope';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
@@ -52,19 +50,18 @@ function fingerprintPart(error: unknown, part: 'name' | 'message'): string {
  * Render-recovery fallback for one screen of the authenticated stack.
  *
  * Expo Router's screen boundary replaces the route component only, not the
- * navigator around it, so the stack keeps its state: the header above the
- * screen (when the route shows the native one) and the back stack survive, and
- * Back still reaches the previous screen. Routes that render their own header
- * inside the screen lose it with the failed subtree, so this fallback carries
- * its own way out: `Go back` pops, or, when a cold deep link left no history,
- * replaces the route with the authenticated entry. The app's root boundary
- * stays the last resort for anything that escapes this one.
+ * navigator around it, so the stack keeps its state: the back stack survives,
+ * and Back still reaches the previous screen. Routes render their own header
+ * inside the screen and lose it with the failed subtree, so this fallback draws
+ * the shared header back in: its Back is the one way out (it pops, or, when a
+ * cold deep link left no history, replaces the route with the authenticated
+ * entry), and Retry is the state's one action. The app's root boundary stays
+ * the last resort for anything that escapes this one.
  */
 export function ScreenErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const router = useRouter();
   const navigation = useNavigation();
   const segments = useSegments();
-  const { t } = useTranslation();
   const subsystem = routeSubsystem(segments);
   // The reads this route declared for itself. `Retry` refetches them before the
   // screen remounts, so a payload that poisoned the render is replaced rather
@@ -114,11 +111,9 @@ export function ScreenErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   }, [router]);
 
   return (
-    <View className="flex-1 items-center justify-center bg-background px-6">
-      <QueryError placement="static" onRetry={retryAfterRefetch} isRetrying={isRetrying} />
-      <Button variant="ghost" className="mt-2" onPress={goBack}>
-        <Text>{t('common.goBack')}</Text>
-      </Button>
+    <View className="flex-1 bg-background">
+      <ScreenHeader showBackButton onBack={goBack} />
+      <QueryError onRetry={retryAfterRefetch} isRetrying={isRetrying} />
     </View>
   );
 }

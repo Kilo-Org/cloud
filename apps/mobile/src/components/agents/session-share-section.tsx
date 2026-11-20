@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Share, View } from 'react-native';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { notificationHaptic } from '@/lib/haptics';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
@@ -333,42 +334,43 @@ export function SessionShareSection({
   };
 
   return (
-    <View className="gap-3" testID="session-share-section">
-      <Text className="text-sm font-semibold text-foreground">{t('sessionShare.title')}</Text>
-      <Text variant="muted" className="text-xs">
-        {t('sessionShare.subtitle')}
-      </Text>
+    <View testID="session-share-section">
+      <Section
+        label={t('sessionShare.title')}
+        notice={<Text variant="caption">{t('sessionShare.subtitle')}</Text>}
+      >
+        <SharePanelBody
+          panel={panel}
+          duration={duration}
+          includeNewMessages={includeNewMessages}
+          onDurationChange={setDuration}
+          onIncludeNewMessagesChange={setIncludeNewMessages}
+          busy={busy}
+          creating={shareMutation.isPending}
+          revoking={unshareMutation.isPending}
+          distribution={distribution}
+          retrying={shareStateQuery.isFetching}
+          onCopy={() => {
+            void distribute('copy');
+          }}
+          onShare={() => {
+            void distribute('share');
+          }}
+          onCreate={createLink}
+          onRetry={() => {
+            void retryRead();
+          }}
+          onRevoke={revokeLink}
+        />
 
-      <SharePanelBody
-        panel={panel}
-        duration={duration}
-        includeNewMessages={includeNewMessages}
-        onDurationChange={setDuration}
-        onIncludeNewMessagesChange={setIncludeNewMessages}
-        busy={busy}
-        creating={shareMutation.isPending}
-        revoking={unshareMutation.isPending}
-        distribution={distribution}
-        retrying={shareStateQuery.isFetching}
-        onCopy={() => {
-          void distribute('copy');
-        }}
-        onShare={() => {
-          void distribute('share');
-        }}
-        onCreate={createLink}
-        onRetry={() => {
-          void retryRead();
-        }}
-        onRevoke={revokeLink}
-      />
+        {actionError !== null ? (
+          <Text variant="caption" className="text-destructive" testID="session-share-error">
+            {actionError}
+          </Text>
+        ) : null}
+      </Section>
 
       {dialog}
-      {actionError !== null ? (
-        <Text className="text-xs text-destructive" testID="session-share-error">
-          {actionError}
-        </Text>
-      ) : null}
     </View>
   );
 }

@@ -38,7 +38,7 @@ import {
 } from '@kilocode/db/schema';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
-import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
+import { fetchSessionTranscript } from '@/lib/session-transcript';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
 import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { postTestMetadataCacheStaleAlert } from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
@@ -65,6 +65,7 @@ import { contributorChampionsRouter } from '@/routers/admin/contributor-champion
 import { salesDemoRouter } from '@/routers/admin/sales-demo-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
+import { pullAnthropicUserProfileStatus } from '@/lib/admin/anthropic-user-profile-status';
 import { adminInternalBotUsersRouter } from '@/routers/admin/internal-bot-users-router';
 import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
@@ -351,6 +352,10 @@ const ResetAPIKeySchema = z.object({
 });
 
 const CheckKiloPassSchema = z.object({
+  userId: z.string(),
+});
+
+const PullAnthropicUserProfileStatusSchema = z.object({
   userId: z.string(),
 });
 
@@ -714,6 +719,19 @@ export const adminRouter = createTRPCRouter({
         });
 
         return successResult();
+      }),
+
+    pullAnthropicUserProfileStatus: adminProcedure
+      .input(PullAnthropicUserProfileStatusSchema)
+      .query(async ({ input }) => {
+        const user = await db.query.kilocode_users.findFirst({
+          columns: { anthropic_user_profile_id: true },
+          where: eq(kilocode_users.id, input.userId),
+        });
+        if (!user) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+        return pullAnthropicUserProfileStatus(user.anthropic_user_profile_id);
       }),
 
     checkKiloPass: adminProcedure.input(CheckKiloPassSchema).mutation(async ({ input }) => {
@@ -2752,10 +2770,13 @@ export const adminRouter = createTRPCRouter({
       .input(z.object({ session_id: sessionIdSchema }))
       .query(async ({ input, ctx }) => {
         if (isNewSession(input.session_id)) {
-          // V2 session — fetch messages from the session-ingest worker.
-          // We need the owner's kilo_user_id to generate a service token.
           const [session] = await db
-            .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
+            .select({
+              sessionId: cli_sessions_v2.session_id,
+              userId: cli_sessions_v2.kilo_user_id,
+              organizationId: cli_sessions_v2.organization_id,
+              version: cli_sessions_v2.version,
+            })
             .from(cli_sessions_v2)
             .where(eq(cli_sessions_v2.session_id, input.session_id))
             .limit(1);
@@ -2769,15 +2790,19 @@ export const adminRouter = createTRPCRouter({
 
           await recordSessionContentView(ctx, 'cloud_agent_session.messages.view', {
             sessionId: input.session_id,
-            ownerKiloUserId: session.kilo_user_id,
+            ownerKiloUserId: session.userId,
           });
 
           try {
-            const snapshot = await fetchSessionSnapshot(input.session_id, session.kilo_user_id);
-            // The export streams messages/parts in ingest order; re-sort in the
-            // transcript's turn order so the trace matches the cloud-agent-next UI.
+            const transcript = await fetchSessionTranscript(session);
             return {
-              messages: sortSessionMessagesForDisplay(snapshot?.messages ?? []),
+              messages:
+                transcript?.source === 'ingest'
+                  ? sortSessionMessagesForDisplay(transcript.messages)
+                  : (transcript?.messages ?? []),
+              ...(transcript?.source === 'sync' && transcript.incompleteMessageCount > 0
+                ? { incompleteMessageCount: transcript.incompleteMessageCount }
+                : {}),
               format: 'v2' as const,
             };
           } catch (error) {

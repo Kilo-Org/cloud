@@ -10,12 +10,11 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Mic } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { useTranscriptionModels } from '@/lib/hooks/use-transcription-models';
 import { useOrganization } from '@/lib/organization-context';
-import { cn } from '@/lib/utils';
 import {
   useGatewayTranscriptionModel,
   useGatewayTranscriptionModelLoaded,
@@ -23,33 +22,25 @@ import {
 } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
-// the list fills the sheet's body.
+// the list fills the sheet's body. Rows own the page gutter, so the list adds
+// none of its own.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingBottom: 16,
-} satisfies ViewStyle;
+const listContentContainerStyle = { paddingBottom: 16 } satisfies ViewStyle;
 
-// Static skeleton rows: count and shape match the real ChoiceRow rows
-// (name line + id caption; the final row's trailing check is transparent
-// unless selected, so the skeleton carries no trailing control) so the swap
-// never moves layout and never shows a shape the loaded row will not have.
+// Static skeleton rows: count and shape match the real ChoiceRow rows so the
+// swap never moves layout and never shows a shape the loaded row will not have.
 const SKELETON_ROW_COUNT = 6;
 
 function SkeletonRows() {
   return (
-    <View className="px-4 pb-4 pt-1">
+    <View className="pt-1">
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-        // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
-        <View
+        <RowSkeleton
+          // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
           key={index}
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between py-3')}
-        >
-          <View className="flex-1 gap-1.5 pr-3">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-28" />
-          </View>
-        </View>
+          subtitle
+          className={index < SKELETON_ROW_COUNT - 1 ? 'border-b-[0.5px] border-hair-soft' : ''}
+        />
       ))}
     </View>
   );
@@ -65,6 +56,7 @@ export function TranscriptionModelPickerSheet() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { organizationId } = useOrganization();
   // Scope the catalogue to the selected organization so the picker cannot
   // offer, or check-mark, a model the scoped upload then rejects.
@@ -102,7 +94,7 @@ export function TranscriptionModelPickerSheet() {
     content = (
       <FlashList
         nestedScrollEnabled
-        style={[listStyle, { backgroundColor: colors.background }]}
+        style={[listStyle, { backgroundColor: colors.background }, sideInsetMarginStyle]}
         contentContainerStyle={listContentContainerStyle}
         data={models}
         keyExtractor={item => item.id}

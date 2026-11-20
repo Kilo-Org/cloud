@@ -3,7 +3,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { type AgentsView, AgentsViewSegment } from './agents-view-segment';
+import { type AgentsView } from '@/lib/agents-view';
+import { AgentsViewSegment } from './agents-view-segment';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -43,6 +44,12 @@ describe('Agents view tabs', () => {
     expect(tabs).toHaveLength(2);
     expect(tabs[0]?.props.accessibilityState).toEqual({ selected: true });
     expect(tabs[1]?.props.accessibilityState).toEqual({ selected: false });
+    // Each tab carries the shared tab floor on both axes: a label shorter than
+    // the floor (25dp in RTL, 40dp in English) still offers a 44pt target.
+    for (const tab of tabs) {
+      expect(String(tab.props.className)).toContain('min-w-[48px]');
+      expect(String(tab.props.className)).toContain('min-h-[48px]');
+    }
 
     act(() => {
       (sessions.props.onPress as () => void)();

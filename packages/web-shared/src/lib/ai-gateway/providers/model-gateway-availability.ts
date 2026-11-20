@@ -1,6 +1,6 @@
 import {
-  getOpenRouterModelsFromDatabase,
-  getVercelModelsFromDatabase,
+  getOpenRouterChatModelIdsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
@@ -10,8 +10,8 @@ export type ModelGateway = 'vercel' | 'openrouter';
 export async function getModelGateways(modelId: string): Promise<ModelGateway[]> {
   const [vercelModelId, vercelModels, openRouterModels] = await Promise.all([
     mapModelIdToVercel(modelId),
-    getVercelModelsFromDatabase(),
-    getOpenRouterModelsFromDatabase(),
+    getVercelLanguageModelIdsFromDatabase(),
+    getOpenRouterChatModelIdsFromDatabase(),
   ]);
 
   return [

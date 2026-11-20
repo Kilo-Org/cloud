@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeRemoteMcpUrl, sameRemoteMcpEndpoint } from './remote-mcp-url';
+import {
+  normalizeRemoteMcpUrl,
+  RemoteMcpUrlError,
+  type RemoteMcpUrlProblem,
+  sameRemoteMcpEndpoint,
+} from './remote-mcp-url';
+
+/** The refusal with its problem, so every check names why the URL was refused. */
+function problemOf(raw: string): RemoteMcpUrlProblem {
+  try {
+    normalizeRemoteMcpUrl(raw);
+  } catch (error) {
+    if (error instanceof RemoteMcpUrlError) {
+      return error.problem;
+    }
+    throw error;
+  }
+  throw new Error(`expected ${raw} to be refused`);
+}
 
 describe('normalizeRemoteMcpUrl', () => {
   it('trims whitespace and drops a trailing slash', () => {
@@ -20,34 +38,31 @@ describe('normalizeRemoteMcpUrl', () => {
     expect(normalizeRemoteMcpUrl('http://localhost:80/mcp')).toBe('http://localhost/mcp');
   });
 
+  it('refuses with the typed error whose message is the problem tag', () => {
+    // The message is the tag, never prose: the toast picks words elsewhere.
+    expect(() => normalizeRemoteMcpUrl('ftp://remote.example/mcp')).toThrow(RemoteMcpUrlError);
+    expect(() => normalizeRemoteMcpUrl('ftp://remote.example/mcp')).toThrow('insecureEndpoint');
+    expect(problemOf('ftp://remote.example/mcp')).toBe('insecureEndpoint');
+  });
+
   it('rejects a non-http protocol', () => {
-    expect(() => normalizeRemoteMcpUrl('ftp://remote.example/mcp')).toThrow(
-      'Remote MCP URL must use HTTPS unless it points to localhost.'
-    );
+    expect(problemOf('ftp://remote.example/mcp')).toBe('insecureEndpoint');
   });
 
   it('rejects garbage', () => {
-    expect(() => normalizeRemoteMcpUrl('not a url')).toThrow('Remote MCP URL must be a valid URL.');
+    expect(problemOf('not a url')).toBe('invalidUrl');
   });
 
   it('allows plain HTTP only on localhost', () => {
     expect(normalizeRemoteMcpUrl('http://localhost:8787/mcp')).toBe('http://localhost:8787/mcp');
     expect(normalizeRemoteMcpUrl('http://127.0.0.1:8787/mcp')).toBe('http://127.0.0.1:8787/mcp');
-    expect(() => normalizeRemoteMcpUrl('http://remote.example/mcp')).toThrow(
-      'Remote MCP URL must use HTTPS unless it points to localhost.'
-    );
+    expect(problemOf('http://remote.example/mcp')).toBe('insecureEndpoint');
   });
 
   it('rejects credentials and fragments', () => {
-    expect(() => normalizeRemoteMcpUrl('https://token@remote.example/mcp')).toThrow(
-      'Remote MCP URL must not include credentials.'
-    );
-    expect(() => normalizeRemoteMcpUrl('https://remote.example/mcp#tools')).toThrow(
-      'Remote MCP URL must not include a fragment.'
-    );
-    expect(() => normalizeRemoteMcpUrl('https://remote.example/mcp#')).toThrow(
-      'Remote MCP URL must not include a fragment.'
-    );
+    expect(problemOf('https://token@remote.example/mcp')).toBe('credentials');
+    expect(problemOf('https://remote.example/mcp#tools')).toBe('fragment');
+    expect(problemOf('https://remote.example/mcp#')).toBe('fragment');
   });
 
   it('preserves a query string while normalizing the path', () => {

@@ -3,6 +3,7 @@ import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
 import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
 import {
   countUnresolvedTerminalRenewalFailures,
   findLatestPreCutoffUserCommitSwitchQualification,
@@ -1887,14 +1888,36 @@ async function processCreditRenewalRow(
     }
 
     const userId = current.user_id;
+    const hostingEnded = !isKiloClawPaidHostingAvailable();
+    if (hostingEnded) {
+      const paidPeriodEnd = Date.parse(current.current_period_end ?? '');
+      if (!Number.isFinite(paidPeriodEnd)) {
+        logSkippedSubscriptionRow(
+          'Skipping credit expiry without a valid paid period end',
+          current,
+          {
+            reason: 'invalid_current_period_end',
+            currentPeriodEnd: current.current_period_end,
+            renewalBoundary: renewalAt,
+          }
+        );
+        return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+      }
+      if (paidPeriodEnd > Date.now()) {
+        return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+      }
+    }
     const pendingSwitchQualification =
-      current.plan === 'standard' && current.scheduled_plan === 'commit'
+      !hostingEnded && current.plan === 'standard' && current.scheduled_plan === 'commit'
         ? await findLatestPreCutoffUserCommitSwitchQualification(tx, current.id)
         : null;
-    const retirementDecision = decideCommitRetirementCreditRenewal(
-      current,
-      pendingSwitchQualification !== null
-    );
+    const hasAmbiguousCommitEnd =
+      hostingEnded &&
+      current.plan === 'commit' &&
+      current.commit_ends_at !== current.current_period_end;
+    const retirementDecision: CommitRetirementRenewalDecision = hostingEnded
+      ? { kind: hasAmbiguousCommitEnd ? 'ambiguous' : 'ordinary' }
+      : decideCommitRetirementCreditRenewal(current, pendingSwitchQualification !== null);
     if (retirementDecision.kind === 'ambiguous') {
       log('error', 'Skipping ambiguous Commit credit renewal', {
         event: 'commit_credit_renewal_ambiguous',
@@ -1918,7 +1941,7 @@ async function processCreditRenewalRow(
     }
 
     const cancelAtFinalCommitBoundary = retirementDecision.kind === 'cancel_final_commit';
-    if (current.cancel_at_period_end || cancelAtFinalCommitBoundary) {
+    if (hostingEnded || current.cancel_at_period_end || cancelAtFinalCommitBoundary) {
       const before = await getSubscriptionById(tx, current.id);
       const [updated] = await tx
         .update(kiloclaw_subscriptions)
@@ -1926,6 +1949,7 @@ async function processCreditRenewalRow(
           status: 'canceled',
           cancel_at_period_end: false,
           auto_top_up_triggered_for_period: null,
+          ...(hostingEnded ? { scheduled_plan: null, scheduled_by: null } : {}),
           ...(cancelAtFinalCommitBoundary
             ? { commit_ends_at: current.commit_ends_at ?? current.current_period_end }
             : {}),
@@ -1938,9 +1962,11 @@ async function processCreditRenewalRow(
           subscriptionId: current.id,
           actor: LIFECYCLE_ACTOR,
           action: 'canceled',
-          reason: cancelAtFinalCommitBoundary
-            ? 'commit_retirement_final_boundary_canceled'
-            : 'credit_renewal_cancel_at_period_end',
+          reason: hostingEnded
+            ? 'credit_renewal_hosting_ended'
+            : cancelAtFinalCommitBoundary
+              ? 'commit_retirement_final_boundary_canceled'
+              : 'credit_renewal_cancel_at_period_end',
           before,
           after: updated,
         });
@@ -4644,6 +4670,7 @@ async function runIntroScheduleRepairSweep(
   context: SweepExecutionContext,
   summary: BillingSummary
 ): Promise<void> {
+  if (!isKiloClawPaidHostingAvailable()) return;
   const strandedIntroRows = await database
     .select({
       user_id: kiloclaw_subscriptions.user_id,

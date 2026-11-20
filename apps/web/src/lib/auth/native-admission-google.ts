@@ -46,7 +46,6 @@ const REQUIRED_INTEGRITY_LABEL = 'MEETS_DEVICE_INTEGRITY';
 
 export type PlayIntegrityError =
   | 'INVALID_TOKEN'
-  | 'INTEGRITY_API_FAILURE'
   | 'DEVICE_NOT_RECOGNIZED'
   | 'APP_NOT_RECOGNIZED'
   | 'NONCE_MISMATCH'
@@ -138,6 +137,18 @@ async function getAccessToken(
 }
 
 /**
+ * Drop the cache entry for this client email, but only while it still holds the
+ * token the caller sent. A concurrent caller may already have replaced the
+ * entry with a fresh token; that entry must survive.
+ */
+function dropRejectedAccessToken(clientEmail: string, rejectedToken: string): void {
+  const entry = accessTokenCache.get(clientEmail);
+  if (entry && entry.inflight === undefined && entry.token === rejectedToken) {
+    accessTokenCache.delete(clientEmail);
+  }
+}
+
+/**
  * Required server-side environment variables for Play Integrity.
  */
 interface PlayIntegrityConfig {
@@ -207,10 +218,12 @@ export async function verifyPlayIntegrity(
 
   // Decode and verify the integrity token
   let accessToken: string;
+  let clientEmail: string;
   try {
     const saKey = JSON.parse(config.serviceAccountKey);
+    clientEmail = saKey.client_email;
     accessToken = await getAccessToken(
-      saKey.client_email,
+      clientEmail,
       saKey.private_key,
       saKey.token_uri || 'https://oauth2.googleapis.com/token'
     );
@@ -235,6 +248,13 @@ export async function verifyPlayIntegrity(
   );
 
   if (!response.ok) {
+    // A refused credential (401/403) must not be replayed: the next admission
+    // mints a fresh access token instead of resending a rejected one for the
+    // rest of its lifetime. Every other status is a verdict or provider
+    // condition, so its token stays cached.
+    if (response.status === 401 || response.status === 403) {
+      dropRejectedAccessToken(clientEmail, accessToken);
+    }
     captureMessage(`play_integrity_api_status: ${response.status}`);
     throw new Error(`Play Integrity API returned ${response.status}`);
   }
@@ -293,6 +313,13 @@ export async function verifyPlayIntegrity(
     return { ok: false, error: 'PACKAGE_MISMATCH' };
   }
 
+  // ── App recognition ─────────────────────────────────────────────────────
+  const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
+  if (appVerdict !== 'PLAY_RECOGNIZED') {
+    countAdmissionCondition('play_integrity_app_unrecognized');
+    return { ok: false, error: 'APP_NOT_RECOGNIZED' };
+  }
+
   // ── Signing certificate digest ──────────────────────────────────────────
   const certDigests = payload.appIntegrity?.certificateSha256Digest ?? [];
   const hasMatch = config.expectedCertDigests.some(expected =>
@@ -301,13 +328,6 @@ export async function verifyPlayIntegrity(
   if (!hasMatch) {
     countAdmissionCondition('play_integrity_cert_digest_mismatch');
     return { ok: false, error: 'CERT_DIGEST_MISMATCH' };
-  }
-
-  // ── App recognition ─────────────────────────────────────────────────────
-  const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
-  if (appVerdict !== 'PLAY_RECOGNIZED') {
-    countAdmissionCondition('play_integrity_app_unrecognized');
-    return { ok: false, error: 'APP_NOT_RECOGNIZED' };
   }
 
   // ── Device integrity: must contain MEETS_DEVICE_INTEGRITY in the array ──

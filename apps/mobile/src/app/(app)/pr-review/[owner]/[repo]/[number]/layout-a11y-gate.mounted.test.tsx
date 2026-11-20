@@ -30,8 +30,10 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
   pendingReviewDraftKey: (...parts: string[]) => parts.join(':'),
   PendingReviewProvider: ({ children }: { children: ReactElement }) => children,
 }));
-vi.mock('@/lib/form-sheet', () => ({ useFormSheetScreenOptions: () => ({}) }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetScreenOptions: () => ({ sheetAllowedDetents: [0.5, 1] }),
+}));
+vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View' }));
 
 /**
  * The scene's own navigation object: the nested Stack hands it to the layout,
@@ -79,7 +81,11 @@ vi.mock('expo-router', () => ({
       createElement(
         'NestedNavigator',
         null,
-        screenLayout({ navigation: scene.navigation, children: createElement('SceneBody') }),
+        screenLayout({
+          navigation: scene.navigation,
+          options: {},
+          children: createElement('SceneBody'),
+        }),
         children
       ),
     { Screen: ({ name }: { name: string }) => createElement('RegisteredScreen', { name }) }

@@ -13,7 +13,9 @@ import { matchesKiloPermissionPattern } from '../../shared/profile-permission-po
 import { buildGitHubReviewBashRules } from '../../shared/github-review-bash-rules.js';
 import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
+import { parseSessionAttachMcpServers } from '../../mcp-config.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
+import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
 import { controlPlaneSandboxSelectionSchema } from './sandbox-selection.js';
 
 function generateKeyPair() {
@@ -835,17 +837,19 @@ describe('buildControlPlaneSessionRegistration MCP materialization', () => {
   });
 
   it('rejects a materialized config over the 80 KiB protocol limit with a static reason', () => {
+    // The profile schema applies the same budget, so build the materialized map
+    // directly: the attach frame keeps its own check for every other producer.
     const environment = Object.fromEntries(
       Array.from({ length: 50 }, (_, index) => [`KEY_${index}`, 'x'.repeat(2048)])
     );
-    expect(() =>
-      buildControlPlaneSessionRegistration(
-        metadata({
-          profile: { mcpServers: { local: { type: 'local', command: ['node'], environment } } },
-        }),
-        selection
-      )
-    ).toThrow(/Serialized MCP configuration exceeds the 80 KiB limit/);
+    const materialized = parseSessionAttachMcpServers({
+      local: { type: 'local', command: ['node'], environment },
+    });
+    expect(materialized).toEqual({
+      success: false,
+      reason:
+        'Invalid session.attach payload: Serialized MCP configuration exceeds the 80 KiB limit',
+    });
   });
 });
 
@@ -1386,5 +1390,38 @@ describe('continuation marker projection', () => {
   it('omits the marker for a normal session', () => {
     const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
     expect(spec.continuation).toBeUndefined();
+  });
+});
+
+describe('stored runtime skill projection', () => {
+  const storedSkills = [
+    {
+      name: 'review',
+      rawMarkdown: 'Review',
+      files: { 'legacy/./notes.md': 'legacy', 'scripts/run.sh': 'echo ok' },
+    },
+  ];
+
+  it('keeps the accepted companion entries when a stored route spec is parsed', () => {
+    const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
+    const parsed = controlPlaneRouteSpecSchema.parse(
+      projectStoredRouteSpecSkills({ ...spec, runtimeSkills: storedSkills })
+    );
+    expect(parsed.runtimeSkills).toEqual([
+      { name: 'review', rawMarkdown: 'Review', files: { 'scripts/run.sh': 'echo ok' } },
+    ]);
+  });
+
+  it('keeps the wire schemas strict for the same skills', () => {
+    const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
+    expect(
+      controlPlaneRouteSpecSchema.safeParse({ ...spec, runtimeSkills: storedSkills }).success
+    ).toBe(false);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({
+        spec: { ...spec, runtimeSkills: storedSkills },
+        credentials: buildControlPlaneSessionRegistration(metadata(), selection).credentials,
+      }).success
+    ).toBe(false);
   });
 });

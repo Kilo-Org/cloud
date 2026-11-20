@@ -65,6 +65,16 @@ it.each([undefined, 'staging'])(
         dead_letter_queue:
           env === 'staging' ? 'usage-ingest-processing-dlq-staging' : 'usage-ingest-processing-dlq',
       }),
+      expect.objectContaining({
+        max_retries: 20,
+        retry_delay: 60,
+        max_concurrency: env === 'staging' ? 10 : 50,
+        max_batch_timeout: 0,
+        max_batch_size: 1,
+        queue: env === 'staging' ? 'usage-ingest-enkrypt-staging-eu' : 'usage-ingest-enkrypt-eu',
+        dead_letter_queue:
+          env === 'staging' ? 'usage-ingest-enkrypt-dlq-staging-eu' : 'usage-ingest-enkrypt-dlq-eu',
+      }),
     ]);
     expect(config.vars.USAGE_INGEST_PARALLELISM).toBe('2');
   }

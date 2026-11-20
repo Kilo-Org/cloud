@@ -3,10 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import type {
-  SandboxControlV2,
-  StoredProviderPin,
-} from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { StoredProviderPin } from '../../src/control-plane/sandbox/provider-adapters.js';
 import { allocation } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { createVercelJwksCache } from '../../src/scm-broker/vercel-jwks.js';
 import { authenticateVercelForwardToken } from '../../src/scm-broker/vercel-identity.js';

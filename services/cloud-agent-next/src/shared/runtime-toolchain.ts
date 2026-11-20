@@ -1,5 +1,10 @@
 import { shellQuote } from '../kilo/utils.js';
-import { RUNTIME_DISTRIBUTION } from './runtime-distribution.js';
+import {
+  BASE_REQUIRED_BINARIES,
+  GH_STACK_INSTALL_PATH,
+  RUNTIME_DISTRIBUTION,
+  RUNTIME_PROCESS_PATH,
+} from './runtime-distribution.js';
 
 /**
  * Base-image toolchain pins.
@@ -174,6 +179,23 @@ export function installPinnedArchiveScript(tool: ToolchainTool): string {
 }
 
 /**
+ * Downloads one pinned npm tarball, checks its digest, installs it globally from
+ * that file (its install script runs, because the package needs it to place its
+ * binary), and checks the bytes the install left behind.
+ */
+export function installPinnedNpmPackageScript(tool: ToolchainTool): string {
+  const pin = RUNTIME_TOOLCHAIN[tool];
+  if (pin.kind !== 'npm') throw new Error(`${tool} is not installed from an npm tarball`);
+  return scriptBlock([
+    SHA256_GUARD,
+    `fetch_verified ${shellQuote(pin.url)} ${shellQuote(pin.sha256)} "$work/package.tgz"`,
+    'sudo npm install -g --loglevel=error "$work/package.tgz"',
+    'npm_root=$(sudo npm root -g)',
+    `check_sha256 "$npm_root/${pin.installedPath}" ${quotedDigests(pin)}`,
+  ]);
+}
+
+/**
  * Exact version and installed-binary digest checks for the requested tools. An npm
  * package is resolved through the npm global root, so the check follows the same
  * install the command does.
@@ -193,4 +215,21 @@ export function toolchainVerificationScript(tools: readonly ToolchainTool[]): st
     );
   }
   return lines.join('\n');
+}
+
+/**
+ * POSIX `sh` check that a base resolves every required command on the process
+ * `PATH` and has the `gh-stack` extension. It runs in a subshell, so the caller's
+ * `PATH` does not change, and it fails with the name of the first missing item.
+ */
+export function baseBinaryCheckScript(): string {
+  return [
+    '(',
+    `PATH=${shellQuote(RUNTIME_PROCESS_PATH)}`,
+    `for binary in ${BASE_REQUIRED_BINARIES.join(' ')}; do`,
+    '  command -v "$binary" >/dev/null || { echo "base binary missing: $binary" >&2; exit 1; }',
+    'done',
+    `test -x ${shellQuote(GH_STACK_INSTALL_PATH)} || { echo "gh-stack extension missing" >&2; exit 1; }`,
+    ')',
+  ].join('\n');
 }

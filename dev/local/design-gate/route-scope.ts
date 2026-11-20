@@ -4,16 +4,19 @@ import type { ProbeDump, ProbeNode } from './tree';
 const ROUTE_FILE = /\.[jt]sx?$/;
 
 /**
- * A route's path below the app directory, as both the focused screen key and a
- * node's route file name it: file suffix dropped, and the `index` and `_layout`
- * steps with it, so a path names the screen rather than the file. The key
- * `(app)/(tabs)/history` and the file `./(app)/(tabs)/history.tsx` are one screen.
+ * A route file's path below the app directory, as both the focused screen key
+ * and a node's route file name it: file suffix dropped, and the `index` and
+ * `_layout` steps with it, so a path names the screen rather than the file. The
+ * key `(app)/(tabs)/history` and the file `./(app)/(tabs)/history.tsx` are one
+ * screen. `layout` tells a `_layout` file, which wraps the screens below its
+ * path, from an `index` screen, which wraps nothing.
  */
-function routePath(route: string): string {
-  return route
-    .replace(/^\.\//, '')
-    .replace(ROUTE_FILE, '')
-    .replace(/(^|\/)(index|_layout)$/, '');
+function routePath(route: string): { path: string; layout: boolean } {
+  const file = route.replace(/^\.\//, '').replace(ROUTE_FILE, '');
+  return {
+    path: file.replace(/(^|\/)(index|_layout)$/, ''),
+    layout: /(^|\/)_layout$/.test(file),
+  };
 }
 
 /**
@@ -31,8 +34,11 @@ function routePath(route: string): string {
  * directory, so a screen is told from the tab behind it by its own path. The
  * navigator's route name cannot do that: a navigator names a route relative to
  * itself, so a screen on a pushed route and a background tab can carry the same
- * name. Screen subtrees above the focused one stay, because they are chrome the
- * cell still measures — the root view, the tab bar.
+ * name. Layout subtrees above the focused screen stay, because they are chrome
+ * the cell still measures — the root view, the tab bar. Every other screen is
+ * background, including the stack's own root under a pushed route: the Profile
+ * tab's `index` shares its path with the `triggers/[trigger-id]` route pushed
+ * over it, but only a layout wraps the routes below its path.
  *
  * Fails open, so no screen is ever measured differently merely because this rule
  * could not read it: when no node names the focused screen, or when every screen
@@ -42,7 +48,7 @@ export function scopeToFocusedRoute(dump: ProbeDump): ProbeDump {
   if (dump.nodes.length === 0 || dump.env.screen === undefined) {
     return dump;
   }
-  const focused = routePath(dump.env.screen);
+  const focused = routePath(dump.env.screen).path;
   const backgroundScreens = new Set<number>();
   let focusedScreens = 0;
   for (const [index, node] of dump.nodes.entries()) {
@@ -50,9 +56,9 @@ export function scopeToFocusedRoute(dump: ProbeDump): ProbeDump {
       continue;
     }
     const screen = routePath(node.screen);
-    if (screen === focused) {
+    if (screen.path === focused) {
       focusedScreens += 1;
-    } else if (screen !== '' && !focused.startsWith(`${screen}/`)) {
+    } else if (!screen.layout || (screen.path !== '' && !focused.startsWith(`${screen.path}/`))) {
       backgroundScreens.add(index);
     }
   }

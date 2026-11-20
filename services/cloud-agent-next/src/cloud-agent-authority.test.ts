@@ -2,35 +2,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import {
   CloudAgentAuthoritySchema,
+  validateCloudAgentAuthorityClaims,
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
-import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
-import type * as RuntimeAuthorizationModule from '@kilocode/worker-utils/runtime-authorization';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
-  assertCloudAgentParentAuthority,
-  authorizeCloudAgentChild,
-  authorizeCloudAgentWorkspaceSibling,
-  issueCloudAgentMcpGrant,
+  CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
+  assertWorkspaceAuthority,
+  deriveWorkspaceRuntimeAuthorization,
+  isWorkspaceAnchorMetadata,
+  matchesWorkspaceMcpBinding,
   resolveCloudAgentMcpUrl,
+  signWorkspaceMcpGrant,
   validateScopedWorkerPreparation,
-  workspaceMcpAnchorSessionId,
+  workspaceAuthorityFromAnchor,
+  workspaceAuthorityScope,
+  workspaceAuthorityUnavailableReason,
+  workspaceSessionIdForScope,
+  type WorkspaceAuthorityRecord,
 } from './cloud-agent-authority.js';
-import { logger } from './logger.js';
-
-const { renew, seal } = vi.hoisted(() => ({ renew: vi.fn(), seal: vi.fn() }));
-vi.mock('@kilocode/worker-utils/runtime-authorization', async importActual => ({
-  ...(await importActual<typeof RuntimeAuthorizationModule>()),
-  renewRuntimeAuthorization: renew,
-  sealRuntimeAuthorization: seal,
-}));
 
 const secret = 'cloud-agent-authority-fixture-secret';
 const now = new Date('2026-10-13T19:00:00Z');
 const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
 const childSessionId = 'workspace_12345678-1234-4234-8234-123456789abd';
+const worktreeId = 'worktree_12345678-1234-4234-8234-123456789abc';
 const scope: CloudAgentAuthority = {
   version: 1,
   ownerId: 'oauth/fixture-user',
@@ -57,150 +55,297 @@ const webForwardedLaunch = {
   githubIntegrationId,
 };
 
-function fixture() {
-  const authorization: RuntimeAuthorization = {
+function authorization(overrides: Partial<RuntimeAuthorization> = {}): RuntimeAuthorization {
+  return {
     version: 1,
-    id: '12345678-1234-4234-8234-123456789abc',
+    id: scope.authorizationId,
     resourceKind: 'cloud-agent-next',
     resourceId: parentSessionId,
     userId: scope.ownerId,
-    authorizationUserId: 'trusted-authorizing-user',
+    authorizationUserId: scope.ownerId,
     issuedAt: now.toISOString(),
     delegationExpiresAt: new Date(now.getTime() + 24 * 3600_000).toISOString(),
     state: 'active',
     bindings: { userPepperDigest: 'a'.repeat(64), authorizationPepperDigest: 'b'.repeat(64) },
-    source: {
-      admissionSource: 'automation',
-      tokenSource: 'trusted-automation',
-      botId: 'trusted-bot',
-    },
+    source: { admissionSource: 'user', createdOnPlatform: 'cloud-agent-web' },
     env: 'production',
+    ...overrides,
   };
-  const metadata: SessionMetadata = {
-    metadataSchemaVersion: 2,
-    identity: { sessionId: parentSessionId, userId: scope.ownerId },
-    auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'private-model-token' },
-    allowSubagentSessions: true,
-    lifecycle: { version: now.getTime(), timestamp: now.getTime() },
-  };
-  const context = {
-    metadata: vi.fn(async () => metadata),
-    authorization: vi.fn(async () => authorization),
-    secret,
-    connectionString: 'postgres://fixture',
-  };
-  return { context, authorization, metadata };
 }
 
-describe('Cloud Agent spawn authority', () => {
-  it('resolves every sibling to the original workspace root without electing another chat', () => {
-    const worktreeId = parentSessionId.replace('workspace_', 'worktree_');
-    expect(workspaceMcpAnchorSessionId(worktreeId, parentSessionId)).toBe(parentSessionId);
-    expect(workspaceMcpAnchorSessionId(worktreeId, childSessionId)).toBe(parentSessionId);
-    expect(workspaceMcpAnchorSessionId(undefined, childSessionId)).toBe(childSessionId);
-    expect(workspaceMcpAnchorSessionId('worktree_invalid', childSessionId)).toBeUndefined();
+function anchorMetadata(overrides: Partial<SessionMetadata> = {}): SessionMetadata {
+  return {
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: parentSessionId,
+      userId: scope.ownerId,
+      createdOnPlatform: 'cloud-agent-web',
+    },
+    auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'private-model-token' },
+    allowSubagentSessions: true,
+    workspace: { worktreeId },
+    lifecycle: { version: now.getTime(), timestamp: now.getTime() },
+    ...overrides,
+  };
+}
+
+function record(overrides: Partial<RuntimeAuthorization> = {}): WorkspaceAuthorityRecord {
+  const adopted = workspaceAuthorityFromAnchor(
+    { metadata: anchorMetadata(), authorization: authorization(overrides) },
+    now.getTime()
+  );
+  if (adopted === undefined) throw new Error('fixture did not adopt');
+  return adopted;
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(now);
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('workspace identity', () => {
+  it('names one workspace for every chat in a worktree without electing a chat', () => {
+    expect(workspaceSessionIdForScope(worktreeId, parentSessionId)).toBe(parentSessionId);
+    expect(workspaceSessionIdForScope(worktreeId, childSessionId)).toBe(parentSessionId);
+    expect(workspaceSessionIdForScope(undefined, childSessionId)).toBe(childSessionId);
+    expect(workspaceSessionIdForScope('worktree_invalid', childSessionId)).toBeUndefined();
+    expect(isWorkspaceAnchorMetadata(anchorMetadata())).toBe(true);
+    expect(
+      isWorkspaceAnchorMetadata(
+        anchorMetadata({ identity: { sessionId: childSessionId, userId: scope.ownerId } })
+      )
+    ).toBe(false);
+  });
+});
+
+describe('workspace authority adoption', () => {
+  it('adopts the creating chat authorization once, bound to the workspace, owner and organization', () => {
+    expect(record()).toMatchObject({
+      workspaceSessionId: parentSessionId,
+      worktreeId,
+      ownerId: scope.ownerId,
+      organizationId: null,
+      createdOnPlatform: 'cloud-agent-web',
+      authorization: { id: scope.authorizationId, resourceId: parentSessionId },
+    });
   });
 
-  it('refuses grants from already-persisted shared sandbox parents', () => {
-    const { metadata, authorization } = fixture();
-    metadata.workspace = { sandboxAllocation: 'cloudflare-shared' };
-    expect(() => assertCloudAgentParentAuthority(metadata, authorization, scope)).toThrow();
-  });
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(now);
-    vi.clearAllMocks();
-    renew.mockImplementation(async ({ authorization }: { authorization: RuntimeAuthorization }) =>
-      signModernKiloToken({
-        userId: authorization.userId,
-        pepper: 'current-account-pepper',
-        secret,
-        audience: ['kilo-api', 'kilo-gateway', 'session-ingest'],
-        tokenPurpose: 'delegated-workload',
-        credentialExchange: false,
-        expiresInSeconds: 3600,
-        extra: {
-          ...(authorization.organizationId ? { organizationId: authorization.organizationId } : {}),
-          runtimeAuthorization: {
-            id: authorization.id,
-            resourceKind: authorization.resourceKind,
-            resourceId: authorization.resourceId,
-          },
-        },
-      })
+  it('records the workspace egress policy for its children', () => {
+    const adopted = workspaceAuthorityFromAnchor(
+      {
+        metadata: anchorMetadata({
+          workspace: { worktreeId, egressMode: 'allowlist', egressAllowlist: ['example.com'] },
+        }),
+        authorization: authorization(),
+      },
+      now.getTime()
     );
-    seal.mockResolvedValue('private-child-authorization-seal');
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.useRealTimers();
+    expect(adopted?.egress).toEqual({ egressMode: 'allowlist', egressAllowlist: ['example.com'] });
   });
 
-  it('does not issue or inspect credentials without explicit opt-in, including scoped children', async () => {
-    const { context, metadata } = fixture();
-    delete metadata.allowSubagentSessions;
-    await expect(issueCloudAgentMcpGrant(context)).resolves.toBeUndefined();
-    metadata.allowSubagentSessions = false;
-    metadata.parentCloudAgentSessionId = parentSessionId;
-    await expect(issueCloudAgentMcpGrant(context)).resolves.toBeUndefined();
-    expect(context.authorization).not.toHaveBeenCalled();
-    expect(renew).not.toHaveBeenCalled();
+  it.each([
+    ['a sibling chat', { identity: { sessionId: childSessionId, userId: scope.ownerId } }],
+    ['a chat without launch permission', { allowSubagentSessions: false }],
+    [
+      'a legacy shared sandbox',
+      { workspace: { worktreeId, sandboxAllocation: 'cloudflare-shared' } },
+    ],
+  ] as const)('refuses to adopt from %s', (_name, overrides) => {
+    expect(
+      workspaceAuthorityFromAnchor(
+        {
+          metadata: anchorMetadata(overrides as Partial<SessionMetadata>),
+          authorization: authorization(),
+        },
+        now.getTime()
+      )
+    ).toBeUndefined();
   });
 
-  it('issues workspace authority only from its original root with the matching owner and organization', async () => {
-    const { context, metadata } = fixture();
-    const workspace = {
-      worktreeId: `worktree_${parentSessionId.slice('workspace_'.length)}` as const,
+  it.each([
+    ['owner', { userId: 'other-user' }],
+    ['organization', { organizationId: 'other-org' }],
+    ['resource', { resourceId: childSessionId }],
+  ] as const)('refuses an authorization for another %s', (_name, mismatch) => {
+    expect(
+      workspaceAuthorityFromAnchor(
+        { metadata: anchorMetadata(), authorization: authorization(mismatch) },
+        now.getTime()
+      )
+    ).toBeUndefined();
+  });
+
+  it('keeps an expired or revoked authorization as stored, so adoption restores nothing', () => {
+    const expired = record({
+      issuedAt: new Date(now.getTime() - 25 * 3600_000).toISOString(),
+      delegationExpiresAt: new Date(now.getTime() - 3600_000).toISOString(),
+    });
+    expect(workspaceAuthorityUnavailableReason(expired, now.getTime())).toBe('delegation_expired');
+    expect(workspaceAuthorityUnavailableReason(record({ state: 'revoked' }), now.getTime())).toBe(
+      'stored_authorization_revoked'
+    );
+  });
+});
+
+describe('workspace authority checks', () => {
+  it('accepts only the current workspace authorization', () => {
+    const current = record();
+    expect(() => assertWorkspaceAuthority(current, scope, now.getTime())).not.toThrow();
+    for (const mismatch of [
+      { parentSessionId: childSessionId },
+      { ownerId: 'other-user' },
+      { organizationId: '22345678-1234-4234-8234-123456789abc' },
+      { authorizationId: '12345678-1234-4234-8234-123456789abd' },
+      { expiresAt: scope.expiresAt + 1 },
+    ]) {
+      expect(() =>
+        assertWorkspaceAuthority(current, { ...scope, ...mismatch }, now.getTime())
+      ).toThrow(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    }
+    expect(() => assertWorkspaceAuthority(undefined, scope, now.getTime())).toThrow(
+      CLOUD_AGENT_PARENT_AUTHORITY_DENIED
+    );
+    expect(() =>
+      assertWorkspaceAuthority(current, { ...scope, extra: true }, now.getTime())
+    ).toThrow(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+  });
+
+  it('rejects a revoked, expired or last-second workspace delegation', () => {
+    expect(() =>
+      assertWorkspaceAuthority(record({ state: 'revoked' }), scope, now.getTime())
+    ).toThrow();
+    expect(() => assertWorkspaceAuthority(record(), scope, scope.expiresAt * 1000)).toThrow();
+    const lastSecond = record({ delegationExpiresAt: new Date(now.getTime() + 500).toISOString() });
+    expect(workspaceAuthorityUnavailableReason(lastSecond, now.getTime())).toBe(
+      'delegation_expired'
+    );
+  });
+
+  it('rejects an authority presented after the workspace renewed its authorization', () => {
+    const renewed = record({ id: '12345678-1234-4234-8234-123456789abd' });
+    expect(() => assertWorkspaceAuthority(renewed, scope, now.getTime())).toThrow();
+    expect(() =>
+      assertWorkspaceAuthority(renewed, workspaceAuthorityScope(renewed), now.getTime())
+    ).not.toThrow();
+  });
+
+  it('binds the MCP credential to the route workspace, owner and organization', () => {
+    const binding = {
+      workspaceSessionId: parentSessionId,
+      worktreeId,
       ownerId: scope.ownerId,
       organizationId: null,
     };
-    metadata.workspace = { worktreeId: workspace.worktreeId };
-    const issued = await issueCloudAgentMcpGrant({ ...context, workspace });
-    expect(jwt.decode(issued?.token ?? '')).toMatchObject({
-      cloudAgentAuthority: { parentSessionId },
-    });
+    expect(matchesWorkspaceMcpBinding(record(), binding)).toBe(true);
     for (const mismatch of [
+      { workspaceSessionId: childSessionId },
       { worktreeId: childSessionId.replace('workspace_', 'worktree_') },
       { ownerId: 'other-user' },
       { organizationId: 'other-organization' },
     ]) {
-      await expect(
-        issueCloudAgentMcpGrant({
-          ...context,
-          workspace: { ...workspace, ...mismatch },
-        })
-      ).resolves.toBeUndefined();
+      expect(matchesWorkspaceMcpBinding(record(), { ...binding, ...mismatch })).toBe(false);
     }
-    metadata.identity.sessionId = childSessionId;
-    await expect(issueCloudAgentMcpGrant({ ...context, workspace })).resolves.toBeUndefined();
-    expect(renew).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('workspace MCP credential', () => {
+  it('carries the workspace authority and ends with the workspace delegation', async () => {
+    const issued = await signWorkspaceMcpGrant({
+      record: record(),
+      pepper: 'current-account-pepper',
+      secret,
+      now: now.getTime(),
+    });
+    expect(issued).toMatchObject({
+      url: 'https://mcp.kiloapps.io/mcp',
+      expiresAt: scope.expiresAt,
+    });
+    const claims = jwt.verify(issued.token, secret);
+    expect(claims).toMatchObject({
+      kiloUserId: scope.ownerId,
+      aud: 'kilo-api',
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+      cloudAgentAuthority: scope,
+      exp: scope.expiresAt,
+    });
+    expect(claims).not.toHaveProperty('runtimeAuthorization');
+    expect(claims).not.toHaveProperty('runtimeAdmission');
+    expect(validateCloudAgentAuthorityClaims(claims)).toEqual(scope);
   });
 
-  it('binds organization grants and Worker request metadata to exactly one organization', async () => {
-    const { context, metadata, authorization } = fixture();
+  it('binds an organization credential to exactly one organization', async () => {
     const organizationId = '22345678-1234-4234-8234-123456789abc';
-    authorization.organizationId = organizationId;
-    metadata.identity.orgId = organizationId;
-    const issued = await issueCloudAgentMcpGrant(context);
-    const claims = jwt.decode(issued?.token ?? '');
-    const organizationScope: CloudAgentAuthority = {
-      ...scope,
+    const adopted = workspaceAuthorityFromAnchor(
+      {
+        metadata: anchorMetadata({
+          identity: { sessionId: parentSessionId, userId: scope.ownerId, orgId: organizationId },
+        }),
+        authorization: authorization({ organizationId }),
+      },
+      now.getTime()
+    );
+    if (adopted === undefined) throw new Error('fixture did not adopt');
+    const issued = await signWorkspaceMcpGrant({
+      record: adopted,
+      pepper: null,
+      secret,
+      now: now.getTime(),
+    });
+    expect(jwt.decode(issued.token)).toMatchObject({
       organizationId,
-    };
-    expect(claims).toMatchObject({ organizationId, cloudAgentAuthority: organizationScope });
-    expect(
-      validateScopedWorkerPreparation(organizationScope, {
-        ...launch,
-        kilocodeOrganizationId: organizationId,
-      })
-    ).toMatchObject({ organizationId });
-    expect(() => validateScopedWorkerPreparation(organizationScope, launch)).toThrow();
+      cloudAgentAuthority: { ...scope, organizationId },
+    });
+  });
+
+  it('uses a valid local MCP override only', async () => {
+    const issued = await signWorkspaceMcpGrant({
+      record: record(),
+      pepper: null,
+      secret,
+      mcpUrl: 'http://localhost:11715/mcp',
+      now: now.getTime(),
+    });
+    expect(issued.url).toBe('http://host.docker.internal:11715/mcp');
+  });
+});
+
+describe('workspace delegation', () => {
+  it('derives an independent authorization for a direct child or a new chat', () => {
+    const delegated = deriveWorkspaceRuntimeAuthorization(record(), childSessionId, now.getTime());
+    expect(delegated).toMatchObject({
+      resourceId: childSessionId,
+      userId: scope.ownerId,
+      bindings: authorization().bindings,
+      delegationExpiresAt: authorization().delegationExpiresAt,
+    });
+    expect(delegated.id).not.toBe(scope.authorizationId);
+  });
+
+  it('refuses the workspace itself and non-workspace targets', () => {
     expect(() =>
-      validateScopedWorkerPreparation(organizationScope, {
-        ...launch,
-        kilocodeOrganizationId: 'other',
-      })
+      deriveWorkspaceRuntimeAuthorization(record(), parentSessionId, now.getTime())
     ).toThrow();
+    expect(() =>
+      deriveWorkspaceRuntimeAuthorization(record(), 'agent_legacy', now.getTime())
+    ).toThrow();
+  });
+});
+
+describe('scoped worker preparation', () => {
+  it('pins the production MCP URL unless a valid local override is configured', () => {
+    expect(resolveCloudAgentMcpUrl()).toBe('https://mcp.kiloapps.io/mcp');
+    expect(resolveCloudAgentMcpUrl('not a url')).toBe('https://mcp.kiloapps.io/mcp');
+    expect(resolveCloudAgentMcpUrl('ftp://localhost:8815/mcp')).toBe('https://mcp.kiloapps.io/mcp');
+    expect(resolveCloudAgentMcpUrl('http://localhost:8815/mcp')).toBe(
+      'http://host.docker.internal:8815/mcp'
+    );
+    expect(resolveCloudAgentMcpUrl('http://host.docker.internal:8815/mcp')).toBe(
+      'http://host.docker.internal:8815/mcp'
+    );
   });
 
   it('accepts the full web-forwarded personal preparation input without widening the public scoped schema', () => {
@@ -287,259 +432,6 @@ describe('Cloud Agent spawn authority', () => {
         githubIntegrationId: 'not-a-uuid',
       })
     ).toThrow();
-  });
-
-  it('pins the production MCP URL unless a valid local override is configured', async () => {
-    expect(resolveCloudAgentMcpUrl()).toBe('https://mcp.kiloapps.io/mcp');
-    expect(resolveCloudAgentMcpUrl('not a url')).toBe('https://mcp.kiloapps.io/mcp');
-    expect(resolveCloudAgentMcpUrl('ftp://localhost:8815/mcp')).toBe('https://mcp.kiloapps.io/mcp');
-    expect(resolveCloudAgentMcpUrl('http://localhost:8815/mcp')).toBe(
-      'http://host.docker.internal:8815/mcp'
-    );
-    expect(resolveCloudAgentMcpUrl('http://host.docker.internal:8815/mcp')).toBe(
-      'http://host.docker.internal:8815/mcp'
-    );
-    const { context } = fixture();
-    const issued = await issueCloudAgentMcpGrant({
-      ...context,
-      mcpUrl: 'http://localhost:11715/mcp',
-    });
-    expect(issued).toMatchObject({ url: 'http://host.docker.internal:11715/mcp' });
-  });
-
-  it('uses the normal parent delegation expiry, never account/model/control authority', async () => {
-    const { context, metadata } = fixture();
-    const issued = await issueCloudAgentMcpGrant(context);
-    expect(issued).toMatchObject({
-      url: 'https://mcp.kiloapps.io/mcp',
-      expiresAt: scope.expiresAt,
-    });
-    const claims = jwt.decode(issued?.token ?? '');
-    expect(claims).toMatchObject({
-      kiloUserId: scope.ownerId,
-      aud: 'kilo-api',
-      tokenPurpose: 'delegated-workload',
-      credentialExchange: false,
-      cloudAgentAuthority: scope,
-      exp: scope.expiresAt,
-    });
-    expect(claims).not.toHaveProperty('runtimeAuthorization');
-    expect(claims).not.toHaveProperty('runtimeAdmission');
-    expect(claims).not.toHaveProperty('botId');
-    expect(issued?.token).not.toBe(metadata.auth.kilocodeToken);
-    expect(jwt.verify(issued?.token ?? '', secret)).toMatchObject({ cloudAgentAuthority: scope });
-    expect(metadata).not.toHaveProperty('cloudAgentMcp');
-    expect(JSON.stringify(metadata)).not.toContain(issued?.token);
-  });
-
-  it('still launches after fifteen minutes without any sandbox or wrapper liveness dependency', async () => {
-    const { context } = fixture();
-    const first = await issueCloudAgentMcpGrant(context);
-    vi.setSystemTime(now.getTime() + 45 * 60_000);
-    expect(jwt.verify(first?.token ?? '', secret)).toMatchObject({ cloudAgentAuthority: scope });
-    await expect(
-      authorizeCloudAgentChild({ ...context, authority: scope, childSessionId })
-    ).resolves.toMatchObject({ seal: 'private-child-authorization-seal' });
-    const renewed = await issueCloudAgentMcpGrant(context);
-    expect(renewed?.expiresAt).toBe(scope.expiresAt);
-    expect(renewed?.token).not.toBe(first?.token);
-  });
-
-  it('does not reset expiry after an issuance dependency failure', async () => {
-    const { context } = fixture();
-    renew.mockRejectedValueOnce(new Error('membership unavailable'));
-    await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('membership unavailable');
-    vi.setSystemTime(now.getTime() + 5 * 60_000);
-    expect(await issueCloudAgentMcpGrant(context)).toMatchObject({ expiresAt: scope.expiresAt });
-  });
-
-  it('derives child model authority exclusively from the trusted parent record', async () => {
-    const { context, authorization } = fixture();
-    const result = await authorizeCloudAgentChild({
-      ...context,
-      authority: scope,
-      childSessionId,
-    });
-    const record = renew.mock.calls[0][0].authorization;
-    expect(record).toMatchObject({
-      ...authorization,
-      id: expect.any(String),
-      resourceId: childSessionId,
-      issuedAt: now.toISOString(),
-      delegationExpiresAt: authorization.delegationExpiresAt,
-    });
-    expect(record.id).not.toBe(authorization.id);
-    expect(record.bindings).toEqual(authorization.bindings);
-    expect(record.source).toEqual(authorization.source);
-    expect(result.seal).toBe('private-child-authorization-seal');
-    expect(jwt.decode(result.token)).not.toHaveProperty('cloudAgentAuthority');
-  });
-
-  it('mints an independent sibling authorization in the parent workspace only', async () => {
-    const { context, authorization } = fixture();
-    const result = await authorizeCloudAgentWorkspaceSibling({
-      parentSessionId,
-      siblingSessionId: childSessionId,
-      ...context,
-    });
-    const record = renew.mock.calls[0][0].authorization;
-    expect(record).toMatchObject({
-      ...authorization,
-      id: expect.any(String),
-      resourceId: childSessionId,
-      issuedAt: now.toISOString(),
-      delegationExpiresAt: authorization.delegationExpiresAt,
-    });
-    expect(record.id).not.toBe(authorization.id);
-    expect(record.bindings).toEqual(authorization.bindings);
-    expect(result.seal).toBe('private-child-authorization-seal');
-    expect(jwt.decode(result.token)).not.toHaveProperty('cloudAgentAuthority');
-    expect(jwt.decode(result.token)).not.toHaveProperty('parentCloudAgentSessionId');
-  });
-
-  it('refuses sibling authorization for a self target or a disabled parent', async () => {
-    const { context, metadata } = fixture();
-    await expect(
-      authorizeCloudAgentWorkspaceSibling({
-        parentSessionId,
-        siblingSessionId: parentSessionId,
-        ...context,
-      })
-    ).rejects.toThrow('independent workspace session');
-    metadata.allowSubagentSessions = false;
-    await expect(
-      authorizeCloudAgentWorkspaceSibling({
-        parentSessionId,
-        siblingSessionId: childSessionId,
-        ...context,
-      })
-    ).rejects.toThrow('parent authority denied');
-    expect(renew).not.toHaveBeenCalled();
-  });
-
-  it('refuses sibling authorization when the parent is revoked during minting', async () => {
-    const { context, authorization } = fixture();
-    renew.mockImplementationOnce(async () => {
-      authorization.state = 'revoked';
-      return { token: 'must-not-escape' };
-    });
-    await expect(
-      authorizeCloudAgentWorkspaceSibling({
-        parentSessionId,
-        siblingSessionId: childSessionId,
-        ...context,
-      })
-    ).rejects.toThrow('parent authority denied');
-    expect(seal).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ['owner', { ownerId: 'other' }],
-    ['parent', { parentSessionId: childSessionId }],
-    ['organization', { organizationId: 'other-org' }],
-    ['authorization', { authorizationId: '12345678-1234-4234-8234-123456789abd' }],
-    ['expiry', { expiresAt: Math.floor(now.getTime() / 1000) }],
-    ['scope exceeding the delegation', { expiresAt: scope.expiresAt + 1 }],
-  ])('rejects mismatched %s before minting', (_name, changes) => {
-    const { metadata, authorization } = fixture();
-    expect(() =>
-      assertCloudAgentParentAuthority(metadata, authorization, {
-        ...scope,
-        ...changes,
-      } as CloudAgentAuthority)
-    ).toThrow();
-  });
-
-  it('fails disabled, revoked and current account or membership checks', async () => {
-    const { context, authorization, metadata } = fixture();
-    const input = {
-      ...context,
-      authority: scope,
-      childSessionId,
-    };
-    metadata.allowSubagentSessions = false;
-    await expect(authorizeCloudAgentChild(input)).rejects.toThrow('parent authority denied');
-    metadata.allowSubagentSessions = true;
-    renew.mockRejectedValueOnce(new Error('membership revoked'));
-    await expect(authorizeCloudAgentChild(input)).rejects.toThrow('membership revoked');
-    authorization.state = 'revoked';
-    await expect(authorizeCloudAgentChild(input)).rejects.toThrow('parent authority denied');
-  });
-
-  it.each(['account blocked', 'membership revoked', 'pepper changed'])(
-    'preserves normal %s validation on minting and launch',
-    async reason => {
-      const { context } = fixture();
-      renew.mockRejectedValue(new Error(reason));
-      await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow(reason);
-      await expect(
-        authorizeCloudAgentChild({ ...context, authority: scope, childSessionId })
-      ).rejects.toThrow(reason);
-      expect(seal).not.toHaveBeenCalled();
-    }
-  );
-
-  it('rejects stale grants after parent authorization replacement', async () => {
-    const { context, authorization } = fixture();
-    authorization.id = crypto.randomUUID();
-    await expect(
-      authorizeCloudAgentChild({
-        ...context,
-        authority: scope,
-        childSessionId,
-      })
-    ).rejects.toThrow('parent authority denied');
-  });
-
-  it('refreshes scope after normal runtime authorization recovery without replaying expired grants', async () => {
-    const { context, authorization } = fixture();
-    const first = await issueCloudAgentMcpGrant(context);
-    vi.setSystemTime(now.getTime() + 25 * 3600_000);
-    authorization.id = crypto.randomUUID();
-    authorization.issuedAt = new Date().toISOString();
-    authorization.delegationExpiresAt = new Date(Date.now() + 24 * 3600_000).toISOString();
-    const renewed = await issueCloudAgentMcpGrant(context);
-    expect(renewed?.token).not.toBe(first?.token);
-    expect(jwt.verify(renewed?.token ?? '', secret)).toMatchObject({
-      cloudAgentAuthority: {
-        authorizationId: authorization.id,
-        expiresAt: Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000),
-      },
-    });
-    expect(() => jwt.verify(first?.token ?? '', secret)).toThrow(/expired/);
-    await expect(
-      authorizeCloudAgentChild({
-        ...context,
-        authority: scope,
-        childSessionId,
-      })
-    ).rejects.toThrow('parent authority denied');
-    expect(renew).toHaveBeenCalledTimes(2);
-  });
-
-  it('rejects a parent changed during current-binding validation', async () => {
-    const { context, authorization } = fixture();
-    renew.mockImplementationOnce(async () => {
-      authorization.state = 'revoked';
-      return { token: 'must-not-escape' };
-    });
-    await expect(
-      authorizeCloudAgentChild({
-        ...context,
-        authority: scope,
-        childSessionId,
-      })
-    ).rejects.toThrow('parent authority denied');
-    expect(seal).not.toHaveBeenCalled();
-  });
-
-  it('rejects legacy parents but permits an opted-in child to launch its own child', async () => {
-    const { metadata, authorization } = fixture();
-    metadata.identity.sessionId = 'agent_legacy';
-    expect(() => assertCloudAgentParentAuthority(metadata, authorization, scope)).toThrow();
-    metadata.identity.sessionId = parentSessionId;
-    metadata.parentCloudAgentSessionId = 'workspace_grandparent';
-    expect(() => assertCloudAgentParentAuthority(metadata, authorization, scope)).not.toThrow();
   });
 
   it('validates scoped raw input before unsafe fields can be stripped', () => {
@@ -638,57 +530,21 @@ describe('Cloud Agent spawn authority', () => {
     expect(() => validateScopedWorkerPreparation(scope, { ...launch, ...metadata })).toThrow();
   });
 
-  it.each([
-    { state: 'active', time: scope.expiresAt * 1000, reason: 'delegation_expired' },
-    { state: 'revoked', time: now.getTime(), reason: 'stored_authorization_revoked' },
-  ] as const)('skips MCP grant issuance for $reason', async ({ state, time, reason }) => {
-    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-    const { context, authorization } = fixture();
-    vi.setSystemTime(time);
-    authorization.state = state;
-
-    await expect(issueCloudAgentMcpGrant(context)).resolves.toBeUndefined();
-    expect(renew).not.toHaveBeenCalled();
-    expect(fields).toHaveBeenCalledWith({ sessionId: parentSessionId, stage: 'mcp_grant', reason });
-    expect(warn).toHaveBeenCalledWith('Runtime authorization diagnostic');
-  });
-
-  it.each([
-    ['owner', { userId: 'other-user' }],
-    ['organization', { organizationId: 'other-org' }],
-    ['resource session', { resourceId: childSessionId }],
-  ] as const)(
-    'throws for a mismatched parent %s even when the delegation is unavailable',
-    async (_name, mismatch) => {
-      const { context, authorization } = fixture();
-      Object.assign(authorization, mismatch);
-      await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
-      vi.setSystemTime(scope.expiresAt * 1000);
-      await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
-      vi.setSystemTime(now);
-      authorization.state = 'revoked';
-      await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
-      expect(renew).not.toHaveBeenCalled();
-    }
-  );
-
-  it('still rejects an expired scope when the delegation has a fraction of a second left', async () => {
-    const { context, authorization } = fixture();
-    authorization.delegationExpiresAt = new Date(now.getTime() + 500).toISOString();
-
-    await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
-    expect(renew).not.toHaveBeenCalled();
-  });
-
-  it('rejects an authorization replaced during grant minting', async () => {
-    const { context, authorization } = fixture();
-    context.authorization.mockResolvedValueOnce(authorization).mockResolvedValueOnce({
-      ...authorization,
-      id: '12345678-1234-4234-8234-123456789abd',
-    });
-
-    await expect(issueCloudAgentMcpGrant(context)).rejects.toThrow('parent authority denied');
-    expect(renew).toHaveBeenCalledTimes(1);
+  it('binds organization worker preparation to exactly one organization', () => {
+    const organizationId = '22345678-1234-4234-8234-123456789abc';
+    const organizationScope: CloudAgentAuthority = { ...scope, organizationId };
+    expect(
+      validateScopedWorkerPreparation(organizationScope, {
+        ...launch,
+        kilocodeOrganizationId: organizationId,
+      })
+    ).toMatchObject({ organizationId });
+    expect(() => validateScopedWorkerPreparation(organizationScope, launch)).toThrow();
+    expect(() =>
+      validateScopedWorkerPreparation(organizationScope, {
+        ...launch,
+        kilocodeOrganizationId: 'other',
+      })
+    ).toThrow();
   });
 });

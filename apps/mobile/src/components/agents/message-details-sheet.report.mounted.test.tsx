@@ -18,6 +18,14 @@ type ReportCall = { targetId: string; settle: (ok: boolean) => void };
 
 const native = vi.hoisted(() => ({ announce: vi.fn() }));
 
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  LogOut: 'LogOut',
+}));
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: native.announce },
   ActivityIndicator: 'ActivityIndicator',

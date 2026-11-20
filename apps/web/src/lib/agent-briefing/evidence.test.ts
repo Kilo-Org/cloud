@@ -48,7 +48,8 @@ it('screens snapshot titles with the excerpt rules', () => {
     { ...session(1), title: 'Plan for client_' + 'secret: "' + secretKey },
   ]);
   expect(facts.sessions[0]?.title).toBe('Deploy [redacted credential]');
-  expect(facts.sessions[1]?.title).toBe('Agent session');
+  expect(facts.sessions[1]?.title).toBeUndefined();
+  expect(facts.sessions[1]?.sources[0]?.title).toBeUndefined();
   expect(JSON.stringify(facts)).not.toContain(secretKey);
 });
 it('bounds serialized snapshots including duplicate source rendering and multibyte excerpts', () => {
@@ -120,8 +121,31 @@ it('includes bounded plan, changes and failure metadata without duplicating fina
   expect(facts.scorecard.blockers).toBe(1);
   expect(facts.sources.find(source => source.kind === 'blocker')?.excerpt).toBeUndefined();
   const metadata = facts.sources.find(source => source.kind === 'artifact');
-  expect(metadata?.excerpt).toContain('[redacted credential]');
-  expect(metadata?.excerpt).not.toMatch(/private-value|thinking/);
+  expect(metadata?.excerpt).toBeUndefined();
+  expect(metadata?.title).toBeUndefined();
+  expect(metadata?.metadata).toEqual({
+    plan: { done: 1, total: 3, current: 'Check changes [redacted credential]' },
+    changes: { files: 2, added: 5, removed: 1 },
+    failure: { kind: 'tool' },
+  });
+  expect(JSON.stringify(facts)).not.toMatch(/private-value|thinking/);
+});
+
+it('carries a plan step that screening clears and omits absent metadata members', () => {
+  const facts = buildBriefingSnapshot([
+    {
+      ...session(0),
+      live_summary: {
+        step: null,
+        plan: { done: 4, total: 6, current: 'Run tests' },
+        changes: null,
+        failure: null,
+      },
+    },
+  ]);
+  expect(facts.sources.find(source => source.kind === 'artifact')?.metadata).toEqual({
+    plan: { done: 4, total: 6, current: 'Run tests' },
+  });
 });
 
 it('withholds an excerpt that screening cannot clear and keeps a cleared one', () => {

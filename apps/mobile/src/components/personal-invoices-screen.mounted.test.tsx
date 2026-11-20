@@ -3,9 +3,10 @@
 // a membership's name into the title. The scope reads are mocked, the same way
 // the organization suite drives its states.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
@@ -26,6 +27,7 @@ const pageQuery = vi.hoisted(() => ({
 const pageHook = vi.hoisted(() => ({
   entries: [] as unknown[],
   hasMore: false,
+  isRetentionLimited: false,
 }));
 
 const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
@@ -33,8 +35,19 @@ const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline'
 const screenHeaders = vi.hoisted(() => ({
   rendered: [] as {
     title?: string;
+    subtitle?: string;
     eyebrow?: string;
     reserveEyebrow?: boolean;
+  }[],
+}));
+
+const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+
+const emptyStates = vi.hoisted(() => ({
+  rendered: [] as {
+    title?: string;
+    placement?: string;
+    action?: unknown;
   }[],
 }));
 
@@ -43,6 +56,7 @@ vi.mock('@/lib/hooks/use-personal-credits', () => ({
     query: pageQuery,
     entries: pageHook.entries,
     hasMore: pageHook.hasMore,
+    isRetentionLimited: pageHook.isRetentionLimited,
   }),
 }));
 
@@ -82,16 +96,25 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { title: string; placement?: string }) =>
-    createElement('EmptyState', props, `EMPTY_STATE:${props.title}`),
+  EmptyState: (props: { title: string; placement?: string; action?: unknown }) => {
+    emptyStates.rendered.push(props);
+    return createElement('EmptyState', props, `EMPTY_STATE:${props.title}`);
+  },
 }));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: navigation.push }) }));
 
 vi.mock('@/components/query-error', () => ({
   QueryError: () => null,
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
+  ScreenHeader: (props: {
+    title?: string;
+    subtitle?: string;
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+  }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -124,7 +147,8 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('@shopify/flash-list', () => ({
-  FlashList: 'FlashList',
+  FlashList: (props: { ListFooterComponent?: ReactElement }) =>
+    createElement('FlashList', props, props.ListFooterComponent ?? null),
 }));
 
 vi.mock('@/components/tab-screen', () => ({
@@ -145,8 +169,11 @@ beforeEach(() => {
   pageQuery.data = null;
   pageHook.entries = [];
   pageHook.hasMore = false;
+  pageHook.isRetentionLimited = false;
   connectivity.value = 'online';
   screenHeaders.rendered = [];
+  emptyStates.rendered = [];
+  navigation.push.mockClear();
 });
 
 describe('PersonalInvoicesScreen header', () => {
@@ -155,10 +182,105 @@ describe('PersonalInvoicesScreen header', () => {
     pageHook.entries = [INVOICE];
 
     await renderWithProviders(createElement(PersonalInvoicesScreen));
-
     expect(screenHeaders.rendered).toHaveLength(1);
     expect(screenHeaders.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+  });
+
+  it("labels the header with the list's fixed one-year window", async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+
+    await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    expect(screenHeaders.rendered).toHaveLength(1);
+    expect(screenHeaders.rendered[0]?.subtitle).toBe(i18n.t('invoices.personalPeriod'));
+  });
+
+  it("routes the empty state's action to the credit history screen", async () => {
+    // No pages: the read settled with zero invoices, so the empty state with
+    // its action renders in the centered branch.
+    pageQuery.data = { pages: [] };
+    pageHook.entries = [];
+
+    await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    expect(emptyStates.rendered).toHaveLength(1);
+    // The action is the screen's own outline Button element: its Text child
+    // reads the credit-history screen's name, and its press pushes the route.
+    const action = emptyStates.rendered[0]?.action as {
+      props?: { onPress?: () => void; children?: { props?: { children?: string } } };
+    };
+    expect(action).toBeDefined();
+    expect(action.props?.children?.props?.children).toBe(i18n.t('common.creditHistory'));
+
+    const onPress = action.props?.onPress;
+    expect(onPress).toBeDefined();
+    await act(() => {
+      onPress?.();
+    });
+    expect(navigation.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/credit-history');
+  });
+});
+
+/** Every string the screen paints, so a footer note is visible to a test. */
+function flattenText(node: ReactTestInstance): string[] {
+  const collected: string[] = [];
+  const walk = (instance: ReactTestInstance): void => {
+    for (const child of instance.children) {
+      if (typeof child === 'string') {
+        collected.push(child);
+      } else if (typeof child !== 'number') {
+        walk(child);
+      }
+    }
+  };
+  walk(node);
+  return collected;
+}
+
+describe('PersonalInvoicesScreen retention-limit footer', () => {
+  it('names the retention bound with no Load more at the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+    pageHook.isRetentionLimited = true;
+
+    const { renderer } = await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    const texts = flattenText(renderer.root);
+    // This suite renders the real catalogs, so the assertions read the copy.
+    expect(texts).toContain(i18n.t('organization.invoices.retentionLimit'));
+    // The bound note replaces the Load more block, so its label never renders.
+    expect(texts).not.toContain(i18n.t('common.loadMore'));
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    const { renderer } = await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    const texts = flattenText(renderer.root);
+    expect(texts).toContain(i18n.t('organization.invoices.truncated'));
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).toContain(i18n.t('common.loadMore'));
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return bound flag and `hasMore` together, so force
+    // the pairing from the mock side and hold the footer to one note.
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+    pageHook.isRetentionLimited = true;
+
+    const { renderer } = await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    const texts = flattenText(renderer.root);
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).toContain(i18n.t('organization.invoices.truncated'));
+    expect(texts).toContain(i18n.t('common.loadMore'));
   });
 });

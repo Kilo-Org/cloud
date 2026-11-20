@@ -70,6 +70,20 @@ describe('deepStrict', () => {
     expect(schema.safeParse({ by_id: { x: { name: 'a' } } }).success).toBe(true);
   });
 
+  test('keeps enum-keyed partial records sparse', () => {
+    const effort = z.enum(['low', 'high']);
+    const schema = deepStrict(z.object({ map: z.partialRecord(effort, effort) }));
+    expect(schema.safeParse({ map: { high: 'low' } }).success).toBe(true);
+    expect(schema.safeParse({ map: { medium: 'low' } }).success).toBe(false);
+    expect(deepStrict(z.record(effort, effort)).safeParse({ high: 'low' }).success).toBe(false);
+  });
+
+  test('keeps loose records loose', () => {
+    const schema = deepStrict(z.looseRecord(z.string().regex(/^a/), z.object({ n: z.number() })));
+    expect(schema.safeParse({ a1: { n: 1 }, other: 'kept' }).success).toBe(true);
+    expect(schema.safeParse({ a1: { n: 1, typo: 1 } }).success).toBe(false);
+  });
+
   test('rejects unknown keys inside union members', () => {
     const schema = deepStrict(
       z.union([

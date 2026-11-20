@@ -699,7 +699,10 @@ function parseGitHubPullRequestUrl(url: string): ParsedGitHubPullRequestUrl {
   }
 
   const segments = pathSegments(parsed);
-  if (segments.length !== 4 || segments[2] !== 'pull') {
+  // The review number is followed by an optional sub-page (`/files`,
+  // `/commits`) when the link was copied from a sub-tab; the provider read
+  // below stays the authority on the review.
+  if (segments.length < 4 || segments[2] !== 'pull') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Enter a GitHub URL like https://github.com/owner/repo/pull/123.',
@@ -717,10 +720,13 @@ function parseGitLabMergeRequestUrl(url: string): ParsedGitLabMergeRequestUrl {
   const parsed = parseHttpsUrl(url);
   const segments = pathSegments(parsed);
   const markerIndex = segments.findIndex(segment => segment === '-');
+  // A merge request URL copied from a sub-tab (`/diffs`, `/commits`) carries
+  // trailing segments; the provider read below stays the authority on the
+  // merge request.
   if (
     markerIndex < 1 ||
     segments[markerIndex + 1] !== 'merge_requests' ||
-    markerIndex + 3 !== segments.length
+    markerIndex + 3 > segments.length
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',

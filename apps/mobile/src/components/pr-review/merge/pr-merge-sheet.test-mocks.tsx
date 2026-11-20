@@ -21,6 +21,7 @@ type Confirmation = {
 };
 
 const state = vi.hoisted(() => ({
+  insets: { left: 0, right: 0 },
   identity: { userId: 'u1' as string | undefined, isLoading: false },
   merge: {
     mutateAsync: vi.fn<(input: MergeVars) => Promise<MergeResult>>(),
@@ -42,7 +43,7 @@ export { state };
 vi.mock('react-native', () => ({
   // The commit fields render the shared Input, whose alignment helper reads
   // `I18nManager.isRTL` on every render.
-  I18nManager: { isRTL: false },
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   ScrollView: 'ScrollView',
   View: 'View',
   TextInput: 'TextInput',
@@ -58,6 +59,16 @@ vi.mock('react-native', () => ({
     },
   },
   useWindowDimensions: () => ({ height: 800, width: 400 }),
+}));
+// The merge body clears the window's side insets itself; a sheet on Android
+// reports none, and the suite asserts the landscape padding from this state.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: state.insets.left,
+    right: state.insets.right,
+  }),
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
@@ -142,3 +153,7 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
+// The delete-branch row is a PreferenceRow, whose pending state draws the
+// shared ActivityIndicator; that reads the reduced-motion policy, which loads
+// `expo-battery` and with it the Expo runtime Node has no `__DEV__` for.
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));

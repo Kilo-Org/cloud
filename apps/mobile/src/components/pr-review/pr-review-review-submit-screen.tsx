@@ -70,7 +70,11 @@ export function PrReviewReviewSubmitScreen() {
   const number = Number.parseInt(rawNumber, 10);
 
   const title = t('prReview.submit.submitReview');
-  const eyebrow = providerRef ? providerPrRefLabel(providerRef) : `${owner}/${repo}#${rawNumber}`;
+  const paramsValid = Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0;
+  // A route that names no request has no reference to show: an empty
+  // `owner/repo#number` would paint as "/#" under the title.
+  const githubEyebrow = paramsValid ? `${owner}/${repo}#${rawNumber}` : undefined;
+  const eyebrow = providerRef ? providerPrRefLabel(providerRef) : githubEyebrow;
   const dismiss = () => {
     router.back();
   };
@@ -86,7 +90,6 @@ export function PrReviewReviewSubmitScreen() {
 
   const trpc = useTRPC();
   const overviewOptions = useMemo(() => buildPrOverviewQueryOptions(trpc, scope), [trpc, scope]);
-  const paramsValid = Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0;
   const pr = useQuery({
     ...overviewOptions,
     enabled: paramsValid && isProviderScopeReady(scope),

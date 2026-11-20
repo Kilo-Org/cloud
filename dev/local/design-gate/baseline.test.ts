@@ -37,7 +37,295 @@ const TARGET = {
 };
 const manifest = ProofManifestSchema.parse({ version: 1, targets: [TARGET] });
 
-function syntheticRepo(t: TestContext, proofManifest = manifest) {
+const SLOT_TARGET = { ...TARGET, diagnostic: { component: PRODUCT, props: {} } };
+
+test('a bare string in a node slot is refused with the descriptor guidance', () => {
+  for (const slot of [
+    'headerRight',
+    'inlineActions',
+    'titleContent',
+    'titleAccessory',
+    'subtitlePlaceholder',
+    'eyebrowPlaceholder',
+  ]) {
+    const result = ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...SLOT_TARGET, diagnostic: { component: PRODUCT, props: { [slot]: 'Save' } } }],
+    });
+    assert.equal(result.success, false);
+    const issue = result.error.issues.find(
+      candidate => !candidate.message.includes('Invalid input')
+    );
+    assert.ok(issue !== undefined, `no refusal for ${slot}`);
+    assert.match(issue.message, /"headerRight"|Save|"\$element"/);
+    assert.match(issue.path.join('/'), new RegExp(slot));
+  }
+  // A string slot outside the node-slot list is the component's own data.
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...SLOT_TARGET, diagnostic: { component: PRODUCT, props: { title: 'Save' } } }],
+    }).success,
+    true
+  );
+});
+
+test('a descriptor is legal only under a documented node slot', () => {
+  // A prop outside the node-slot list (`title`, an unknown key) is component
+  // data: a descriptor there would silently paint a Save cluster the
+  // component never asked for.
+  for (const props of [
+    { title: { $element: 'save-cluster' }, headerRight: { $element: 'save-cluster' } },
+    { heading: { $element: 'save-cluster' } },
+  ]) {
+    const result = ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...SLOT_TARGET, diagnostic: { component: PRODUCT, props: props as object } }],
+    });
+    assert.equal(result.success, false, JSON.stringify(props));
+    assert.match(
+      result.error.issues.map(issue => issue.message).join('\n'),
+      /is not a node-slot prop name; the diagnostic rule matches these prop names on any component/u
+    );
+  }
+  // The rule is keyed on the prop name, not on the component: a descriptor on
+  // a non-slot prop of a component other than ScreenHeader is refused the same
+  // way, and the message names the prop-name scope rather than one component.
+  const foreign = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...SLOT_TARGET,
+        diagnostic: { component: PRODUCT, props: { trailing: { $element: 'save-cluster' } } },
+      },
+    ],
+  });
+  assert.equal(foreign.success, false);
+  const foreignMessage = foreign.error.issues.map(issue => issue.message).join('\n');
+  assert.match(foreignMessage, /"trailing" is not a node-slot prop name/u);
+  assert.match(foreignMessage, /matches these prop names on any component/u);
+  // A plain object under a slot is refused even when the descriptor sits inside
+  // it: the slot paints its value directly in a `View`, so a shell object with a
+  // descriptor anywhere below it renders as an object child, not as the cluster.
+  for (const props of [
+    { headerRight: { row: [{ $element: 'save-cluster' }] } },
+    { headerRight: {} },
+  ]) {
+    const shell = ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...SLOT_TARGET, diagnostic: { component: PRODUCT, props } }],
+    });
+    assert.equal(shell.success, false, JSON.stringify(props));
+    assert.match(
+      shell.error.issues[0]?.message ?? '',
+      /"headerRight" must be \{ "\$element": "save-cluster" \}/u
+    );
+  }
+  // An array of descriptors is the allowed composition, so the same descriptor
+  // in a list stays legal.
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [
+        {
+          ...SLOT_TARGET,
+          diagnostic: {
+            component: PRODUCT,
+            props: { headerRight: [{ $element: 'save-cluster' }, null], title: 'Review' },
+          },
+        },
+      ],
+    }).success,
+    true
+  );
+});
+
+test('a descriptor at the root of props is refused', () => {
+  const result = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...SLOT_TARGET,
+        diagnostic: { component: PRODUCT, props: { $element: 'save-cluster' } },
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+  assert.match(
+    result.error.issues.map(issue => issue.message).join('\n'),
+    /A diagnostic's props must be an object of prop names/u
+  );
+});
+
+test('a node slot accepts only descriptors, arrays of them, or null/false', () => {
+  for (const [label, value] of [
+    ['string', 'Save'],
+    ['number', 42],
+    ['true-boolean', true],
+    ['bare-object', { width: 140 }],
+  ] as const) {
+    const result = ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [
+        {
+          ...SLOT_TARGET,
+          diagnostic: { component: PRODUCT, props: { headerRight: value as object } },
+        },
+      ],
+    });
+    assert.equal(result.success, false, label);
+    assert.match(
+      result.error.issues[0]?.message ?? '',
+      /"headerRight" must be \{ "\$element": "save-cluster" \}, an array of those, or null\/false/u,
+      label
+    );
+  }
+  for (const value of [null, false]) {
+    // Both render nothing and are in the slot type, so both pass.
+    assert.equal(
+      ProofManifestSchema.safeParse({
+        version: 1,
+        targets: [
+          { ...SLOT_TARGET, diagnostic: { component: PRODUCT, props: { headerRight: value } } },
+        ],
+      }).success,
+      true
+    );
+  }
+});
+
+test('a save-cluster descriptor prepares and the generated route splices the element', async t => {
+  const fixture = syntheticRepo(
+    t,
+    ProofManifestSchema.parse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          diagnostic: {
+            component: PRODUCT,
+            props: { title: 'Review', headerRight: { $element: 'save-cluster' } },
+          },
+        },
+      ],
+    })
+  );
+  const preparation = await prepareProof(fixture);
+  const route = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/(auth)/design-proof-card.tsx'),
+    'utf8'
+  );
+  // The descriptor never reaches the component as data: the cluster is a
+  // createElement expansion, the string slot example of the LogBox defect is
+  // gone, and the helper carries the two accessibility labels the fixture has.
+  assert.match(route, /const saveCluster = React\.createElement\(/u);
+  assert.match(route, /accessibilityLabel: 'Fixture save'/u);
+  assert.match(route, /accessibilityLabel: 'Fixture secondary'/u);
+  assert.match(route, /"headerRight": saveCluster/u);
+  assert.doesNotMatch(route, /"headerRight":"Save"/u);
+  assert.match(route, /import \{ Pressable, View \} from 'react-native';/u);
+  assert.match(route, /import \{ Text \} from '@\/components\/ui\/text';/u);
+  const intent = fs.readFileSync(path.join(preparation.base.directory, INTENT), 'utf8');
+  assert.match(intent, /design-proof-card/u);
+});
+
+test('a descriptor of an unknown kind is refused', () => {
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          diagnostic: {
+            component: PRODUCT,
+            props: { headerRight: { $element: 'rocket' }, title: 'Review' },
+          },
+        },
+      ],
+    }).success,
+    false
+  );
+});
+
+test('an element descriptor in a picker-sheet diagnostic is refused at the schema', () => {
+  const result = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...TARGET,
+        screen: '(app)/design-proof-card',
+        diagnostic: {
+          component: PRODUCT,
+          presentation: 'picker-sheet',
+          props: { headerRight: { $element: 'save-cluster' }, title: 'Review' },
+        },
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+  const issue = result.error.issues.find(candidate => !candidate.message.includes('Invalid input'));
+  assert.ok(issue !== undefined);
+  assert.match(
+    issue.message,
+    /An element descriptor needs the bare card presentation, not picker-sheet/u
+  );
+  // An array is the allowed composition under a slot, so only the inner string
+  // is refused here; the expansion still splices the descriptor beside it.
+  const nested = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...TARGET,
+        diagnostic: {
+          component: PRODUCT,
+          props: { headerRight: [{ $element: 'save-cluster' }, ['Save']] },
+        },
+      },
+    ],
+  });
+  assert.equal(nested.success, false);
+  assert.match(
+    nested.error.issues.map(entry => entry.message).join('\n'),
+    /"headerRight" must be \{ "\$element": "save-cluster" \}/u
+  );
+});
+
+test('a plain object under a node slot names the slot path', () => {
+  const result = ProofManifestSchema.safeParse({
+    version: 1,
+    targets: [
+      {
+        ...TARGET,
+        diagnostic: { component: PRODUCT, props: { headerRight: { row: ['Save'] } } },
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.error.issues[0]?.path.join('/'), 'targets/0/diagnostic/props/headerRight');
+  assert.match(result.error.issues[0]?.message ?? '', /"headerRight" must be/u);
+});
+
+// The wrapped declaration form is covered by the formatted-intent test above;
+// this pins the other half, that a declaration the tool cannot find fails.
+test('an intent with neither declaration form is refused', async t => {
+  const fixture = syntheticRepo(t);
+  fs.writeFileSync(
+    path.join(fixture.repo, INTENT),
+    'export function otherRedirect({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n'
+  );
+  fixture.git('add', '.');
+  fixture.git('commit', '-m', 'unrelated intent');
+  await assert.rejects(() => prepareProof({ ...fixture, head: fixture.git('rev-parse', 'HEAD') }), {
+    message: 'Unsupported native-intent diagnostic insertion point',
+  });
+});
+
+const INLINE_INTENT =
+  'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n';
+const FORMATTED_INTENT =
+  'export function redirectSystemPath({\n  path,\n  initial,\n}: {\n  path: string;\n  initial: boolean;\n}): string | null {\n  return initial ? path : null;\n}\n';
+
+function syntheticRepo(t: TestContext, proofManifest = manifest, intent = INLINE_INTENT) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-proof-git-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, 'repo');
@@ -51,10 +339,7 @@ function syntheticRepo(t: TestContext, proofManifest = manifest) {
   git('config', 'user.email', 'synthetic@example.invalid');
   git('config', 'user.name', 'Synthetic design proof');
   for (const [file, content] of [
-    [
-      INTENT,
-      'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {\n  return initial ? path : null;\n}\n',
-    ],
+    [INTENT, intent],
     [PRODUCT, 'export default function Card() { return "base product"; }\n'],
   ]) {
     fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
@@ -115,6 +400,22 @@ test('real git preparation keeps true base/head product and generates identical 
   validatePreparedSource(preparation, 'base', preparation.base.directory);
   validatePreparedSource(preparation, 'head', preparation.head.directory);
   await assert.rejects(() => prepareProof(fixture), /EEXIST/);
+});
+
+test('a formatted native-intent declaration still receives the generated diagnostic branch', async t => {
+  const fixture = syntheticRepo(t, manifest, FORMATTED_INTENT);
+  const preparation = await prepareProof(fixture);
+  validatePreparedSource(preparation, 'head', preparation.head.directory);
+  const generated = fs.readFileSync(path.join(preparation.head.directory, INTENT), 'utf8');
+  assert.match(
+    generated,
+    /export function redirectSystemPath\(\{\n {2}path,\n {2}initial,\n\}: \{/
+  );
+  const returned = generated.indexOf('return "/(auth)/design-proof-card"');
+  assert.ok(returned > generated.indexOf('export function redirectSystemPath('));
+  // The branch is the branch's own line inside the body, not a rewrite of the
+  // formatted declaration around it.
+  assert.match(generated, /\{\n {2}if \(__DEV__ && !initial/);
 });
 
 test('preparation rejects symbolic refs, unrelated histories and unsafe executable-source manifests', async t => {
@@ -391,7 +692,14 @@ function capture(
         : [
             {
               id: 'base',
-              config: { id: 'base', dark: false, rtl: false, compact: false, landscape: false },
+              config: {
+                id: 'base',
+                dark: false,
+                rtl: false,
+                compact: false,
+                landscape: false,
+                fontMax: false,
+              },
               screens: [
                 {
                   target: (options.target ?? TARGET).id,
@@ -494,6 +802,72 @@ test('pre-existing findings are not attributed to head', async t => {
       .introduced.length,
     0
   );
+});
+
+/** The finding the dev-overlay rule writes for a LogBox error over a screen. */
+function logBoxOverlay(text: string): Finding {
+  return {
+    rule: 'dev-overlay',
+    severity: 'error',
+    cell: 'base',
+    target: TARGET.id,
+    element: {
+      index: 0,
+      path: 'testID:logbox_notification_message_text',
+      tag: 'Paragraph',
+      testID: 'logbox_notification_message_text',
+      text,
+      rect: [60.95, 830.48, 303.62, 22.86],
+    },
+    measured: 22.86,
+    expected: 'no LogBox toast painted over the screen',
+    unit: 'dp',
+    message: `LogBox painted "${text}" over this screen`,
+  };
+}
+
+test('a screen captured under a LogBox error makes the pair inconclusive, never introduced', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  const message = 'Text strings must be rendered within a <Text> component.';
+  capture(preparation, 'base', baseRun);
+  capture(preparation, 'head', headRun, { findings: [logBoxOverlay(message)] });
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  // The capture shows the toast, not the screen, so the screens were never
+  // compared and the overlay is never head's regression.
+  assert.equal(result.status, 'inconclusive');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, [
+    `head: a LogBox error painted over base/${TARGET.id}: ${message}`,
+  ]);
+});
+
+test('a LogBox error only in the base is a fix, not a blocked pair', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const baseRun = path.join(fixture.root, 'base-run');
+  const headRun = path.join(fixture.root, 'head-run');
+  const message = 'Text strings must be rendered within a <Text> component.';
+  // The base run's own report and exit status carry its overlay error; the head
+  // is what a critic reads, so a clean head means the screens were compared.
+  capture(preparation, 'base', baseRun, { findings: [logBoxOverlay(message)] });
+  capture(preparation, 'head', headRun);
+  const result = await compareProof(
+    preparation,
+    baseRun,
+    headRun,
+    path.join(fixture.root, 'comparison')
+  );
+  assert.equal(result.status, 'comparable');
+  assert.deepEqual(result.introduced, []);
+  assert.deepEqual(result.reasons, []);
 });
 
 test('a landing notice persisted in both findings artifacts still compares', async t => {

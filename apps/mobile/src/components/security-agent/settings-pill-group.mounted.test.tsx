@@ -68,8 +68,10 @@ describe('PillGroup disabled cue', () => {
     expect(rows).toHaveLength(OPTIONS.length);
     for (const row of rows) {
       const tokens = String(row.props.className).split(/\s+/);
-      expect(tokens).toContain('active:opacity-70');
-      expect(tokens).not.toContain('opacity-50');
+      // The muted label token is the whole cue. An opacity utility on the row
+      // would halve it a second time, and the pressed cue is not due either:
+      // a row with nothing to press does not light up.
+      expect(tokens.filter(token => token.includes('opacity-'))).toEqual([]);
     }
   });
 
@@ -92,8 +94,12 @@ describe('PillGroup disabled cue', () => {
   });
 
   it('mutes the check of a read-only group off the accent', () => {
-    const [check] = renderGroup(true).findAll(node => Object.is(node.type, 'Check'));
+    const row = renderGroup(true).find(
+      node => Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'High'
+    );
+    const [check] = row.findAll(node => Object.is(node.type, 'Check'));
 
+    // `RowCheck` holds the slot on every row: only the selected row paints ink.
     expect(check?.props.color).toBe('#222222');
   });
 
@@ -102,7 +108,11 @@ describe('PillGroup disabled cue', () => {
       node => Object.is(node.type, 'Text') && Object.is(node.props.children, 'High')
     );
 
-    expect(String(label?.props.className).split(/\s+/)).toContain('text-foreground');
+    // The editable label carries no muted token, so it stays on the row's
+    // default ink beside the read-only group's dimmed copy.
+    const tokens = String(label?.props.className).split(/\s+/);
+    expect(tokens).toContain('font-medium');
+    expect(tokens).not.toContain('text-muted-foreground');
   });
 });
 

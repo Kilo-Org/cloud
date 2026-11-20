@@ -72,6 +72,9 @@ export function glanceableLayoutCopy() {
     lastKnown: i18n.t('glanceable.lastKnown'),
     awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
     nextRun: i18n.t('glanceable.nextRun'),
+    // The overdue twin of `nextRun`: the clock time the wake was supposed to
+    // happen, shown after the retry window closes.
+    wasDue: i18n.t('glanceable.wasDue'),
     agent: i18n.t('common.agent'),
     // The Home tile's empty state reads the key the Android Home widget and the
     // in-app Home card read, so an empty account is worded the same everywhere.

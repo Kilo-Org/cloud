@@ -34,8 +34,8 @@ import {
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
 import {
-  createDeviceSession,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   issueSessionCredentials,
 } from '@/lib/auth/device-sessions';
 import {
@@ -51,8 +51,8 @@ import type { User } from '@kilocode/db/schema';
 
 const mockGetUserFromBearer = jest.mocked(getUserFromBearerForCredentialExchange);
 const mockGetUserFromSession = jest.mocked(getUserFromSessionForCredentialIssuance);
-const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
+const mockCreateDeviceSessionWithCredentials = jest.mocked(createDeviceSessionWithCredentials);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
@@ -109,7 +109,7 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
     expect(mockGetUserFromBearer).not.toHaveBeenCalled();
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
   });
 
   it('refuses a device the verifier rejects', async () => {
@@ -139,11 +139,11 @@ describe('POST /api/auth/native/exchange', () => {
       user: fakeUser,
       authFailedResponse: null,
     });
-    mockCreateDeviceSession.mockResolvedValue('session-1');
-    mockIssueSessionCredentials.mockResolvedValue({
+    mockCreateDeviceSessionWithCredentials.mockResolvedValue({
       token: 'short-jwt',
       refreshToken: 'refresh-abc',
       expiresIn: 3600,
+      sessionId: 'session-1',
     });
 
     const response = await POST(createRequest(bearerHeaders));
@@ -153,11 +153,12 @@ describe('POST /api/auth/native/exchange', () => {
       refreshToken: 'refresh-abc',
       expiresIn: 3600,
     });
-    expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+    expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
       userId: fakeUser.id,
       userAgent: undefined,
+      user: fakeUser,
     });
-    expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1');
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(mockGetUserFromBearer).toHaveBeenCalledWith(expect.any(Headers), {
       legacy: 'five-year-api',
@@ -174,7 +175,7 @@ describe('POST /api/auth/native/exchange', () => {
     const response = await POST(createRequest(bearerHeaders));
     expect(response.status).toBe(401);
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -186,7 +187,7 @@ describe('POST /api/auth/native/exchange', () => {
 
     const response = await POST(createRequest(bearerHeaders));
     expect(response.status).toBe(403);
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -195,7 +196,7 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(403);
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -204,7 +205,7 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(403);
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -239,12 +240,11 @@ describe('POST /api/auth/native/exchange', () => {
       expiresIn: 3600,
     });
     expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
-      userId: fakeUser.id,
       userAgent: undefined,
       user: fakeUser,
       verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },
     });
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
@@ -262,7 +262,7 @@ describe('POST /api/auth/native/exchange', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
     expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
     // The ownership mismatch is an expected refusal: it is counted.
@@ -284,7 +284,7 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     // The collision is counted and reported once per interval, so the
     // per-event report survives a window this instance never closes.
@@ -311,17 +311,17 @@ describe('POST /api/auth/native/exchange', () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'INTERNAL_ERROR' });
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 
   it('issues credentials for a same-origin authenticated browser session', async () => {
     mockGetUserFromSession.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
-    mockCreateDeviceSession.mockResolvedValue('session-1');
-    mockIssueSessionCredentials.mockResolvedValue({
+    mockCreateDeviceSessionWithCredentials.mockResolvedValue({
       token: 'short-jwt',
       refreshToken: 'refresh-abc',
       expiresIn: 3600,
+      sessionId: 'session-1',
     });
 
     const response = await POST(createRequest(sessionHeaders));
@@ -329,10 +329,11 @@ describe('POST /api/auth/native/exchange', () => {
     expect(response.status).toBe(200);
     expect(mockGetUserFromSession).toHaveBeenCalledWith();
     expect(mockGetUserFromBearer).not.toHaveBeenCalled();
-    expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+    expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
       userId: fakeUser.id,
       userAgent: undefined,
+      user: fakeUser,
     });
-    expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1');
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
   });
 });

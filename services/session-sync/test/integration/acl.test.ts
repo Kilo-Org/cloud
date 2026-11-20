@@ -1,10 +1,17 @@
-import { runInDurableObject } from 'cloudflare:test';
+import { runInDurableObject, SELF } from 'cloudflare:test';
+import {
+  SESSION_TRANSCRIPT_TOKEN_AUDIENCE,
+  SESSION_TRANSCRIPT_TOKEN_ISSUER,
+  SESSION_TRANSCRIPT_TOKEN_SCHEME,
+} from '@kilocode/worker-utils/cloud-agent-session-sync';
+import { SignJWT } from 'jose';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { describe, expect, it } from 'vitest';
 
 import migrations from '../../drizzle/migrations';
+import { AUTH_CLOCK_SKEW_SECONDS } from '../../src/auth';
 import { session, sessionRoles } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { errorBodySchema, sessionStateSchema, type Principal } from '../../src/protocol';
@@ -39,6 +46,45 @@ async function expectDenied(response: Response) {
   expect(response.status).toBe(403);
   expect(errorBodySchema.parse(await response.json()).error.code).toBe('creator_mismatch');
 }
+
+it('accepts a session-scoped web transcript credential for reads only and checks the creator ACL', async () => {
+  const { owner, other, id, hash } = await setup();
+  const binding = testEnv.NEXTAUTH_SECRET;
+  const secret = typeof binding === 'string' ? binding : await binding.get();
+  if (!secret) throw new Error('Missing test signing secret');
+  const token = (user: Principal, ttl = 60, iat = Math.floor(Date.now() / 1000)) =>
+    new SignJWT({ sessionID: id, organizationID: user.tenant.id, env: testEnv.ENVIRONMENT })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setAudience(SESSION_TRANSCRIPT_TOKEN_AUDIENCE)
+      .setIssuer(SESSION_TRANSCRIPT_TOKEN_ISSUER)
+      .setSubject(user.userID)
+      .setIssuedAt(iat)
+      .setExpirationTime(iat + ttl)
+      .sign(new TextEncoder().encode(secret));
+  const path = `/v1/sessions/${id}`;
+  const read = (path: string, token: string, method = 'GET') =>
+    SELF.fetch(`https://session-sync.test${path}`, {
+      method,
+      headers: { authorization: `${SESSION_TRANSCRIPT_TOKEN_SCHEME} ${token}` },
+    });
+  const credential = await token(owner);
+  expect((await read(path, credential)).status).toBe(200);
+  expect((await read(`${path}/entities?revision=1`, credential)).status).toBe(200);
+  expect((await read(`${path}/blobs/${hash}`, credential)).status).toBe(200);
+  expect((await read(path, credential, 'DELETE')).status).toBe(403);
+  expect((await read(`${path}/batches`, credential, 'POST')).status).toBe(403);
+  expect((await read('/v1/auth/exchange', credential, 'POST')).status).toBe(401);
+  expect((await read(`/v1/sessions/${newSessionID()}`, credential)).status).toBe(401);
+  expect((await read(path, await token(owner, 120))).status).toBe(401);
+  const now = Math.floor(Date.now() / 1000);
+  expect((await read(path, await token(owner, 60, now + AUTH_CLOCK_SKEW_SECONDS))).status).toBe(
+    200
+  );
+  expect(
+    (await read(path, await token(owner, 60, now + AUTH_CLOCK_SKEW_SECONDS + 30))).status
+  ).toBe(401);
+  await expectDenied(await read(path, await token(other)));
+});
 
 describe('session creator ACL', () => {
   it.each([

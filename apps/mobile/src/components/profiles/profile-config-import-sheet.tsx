@@ -23,12 +23,16 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { ClipboardPaste } from '@/components/ui/icons';
-import { Switch } from '@/components/ui/switch';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { configImportArchiveFromText } from '@/lib/config-import-archive';
 import { useConfigImportMutations } from '@/lib/hooks/use-config-import-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 type ProfileConfigImportSheetProps = Readonly<{
   profileId: string;
@@ -204,7 +208,7 @@ export function ProfileConfigImportSheet({
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -266,51 +270,56 @@ export function ProfileConfigImportSheet({
         ) : null}
 
         {views.map(section => (
-          <View key={section.category} className="gap-1">
-            <View className="flex-row items-center gap-2">
-              <Text className="min-w-0 flex-1" numberOfLines={2}>
-                {t(section.titleKey)}
-              </Text>
-              <Switch
-                value={selection[section.category]}
-                accessibilityLabel={t('profiles.importConfigIncludeSection', {
-                  name: t(section.titleKey),
-                })}
-                disabled={busy}
-                onValueChange={selected => {
-                  setSelection(current => ({ ...current, [section.category]: selected }));
-                }}
-              />
-            </View>
-            {section.items.map(item => (
-              <View key={`${section.category}:${item.id}`} className="flex-row gap-2 pl-2">
-                <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
-                  {item.label}
-                </Text>
-                <Text variant="muted" className="text-xs">
-                  {t(
-                    item.status === 'added'
-                      ? 'profiles.importConfigAdded'
-                      : 'profiles.importConfigChanged'
-                  )}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <Section
+            key={section.category}
+            label={t(section.titleKey)}
+            notice={renderRowTrailing({
+              kind: 'switch',
+              value: selection[section.category],
+              accessibilityLabel: t('profiles.importConfigIncludeSection', {
+                name: t(section.titleKey),
+              }),
+              disabled: busy,
+              onValueChange: selected => {
+                setSelection(current => ({ ...current, [section.category]: selected }));
+              },
+            })}
+          >
+            <RowGroup>
+              {section.items.map(item => (
+                <RowFrame
+                  key={`${section.category}:${item.id}`}
+                  title={item.label}
+                  // A long skill or agent name truncates instead of pushing the
+                  // status out of the row: the value holds its own width.
+                  trailing={{
+                    kind: 'value',
+                    text: t(
+                      item.status === 'added'
+                        ? 'profiles.importConfigAdded'
+                        : 'profiles.importConfigChanged'
+                    ),
+                    face: 'text',
+                    shrink: false,
+                  }}
+                />
+              ))}
+            </RowGroup>
+          </Section>
         ))}
 
         {issues.length === 0 ? null : (
-          <View className="gap-1">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profiles.importConfigIssuesTitle')}
-            </Text>
-            {issues.map((issue, index) => (
-              <Text key={`${issue.severity}:${String(index)}`} variant="muted" className="text-xs">
-                {`${issue.severity === 'error' ? '●' : '○'} ${issue.message}`}
-              </Text>
-            ))}
-          </View>
+          <Section label={t('profiles.importConfigIssuesTitle')}>
+            <View className="gap-1">
+              {issues.map((issue, index) => (
+                <Text key={`${issue.severity}:${String(index)}`} variant="caption">
+                  {`${issue.severity === 'error' ? '●' : '○'} ${issue.message}`}
+                </Text>
+              ))}
+            </View>
+          </Section>
         )}
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

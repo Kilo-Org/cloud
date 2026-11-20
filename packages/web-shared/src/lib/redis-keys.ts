@@ -13,12 +13,9 @@ export type RedisKey = string & {
 
 const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as Key & RedisKey;
 
-/** Signup TLD blocklist and audit fields; the domains themselves live in Postgres. */
+/** Legacy signup settings key; persistent values are cleaned up best-effort after an admin save. */
 export const BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY = redisKey('admin:blacklisted-domains:settings');
-/**
- * The former combined settings and domain list. Read once to migrate its settings, and deleted
- * with its companion key by the next admin save.
- */
+/** Legacy combined settings and domain-list keys; current signup settings reads ignore them. */
 export const LEGACY_BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
 export const LEGACY_BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY = redisKey(
   'admin:blacklisted-domains:updated-at'
@@ -48,6 +45,16 @@ export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderbo
 
 export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
   redisKey(`organization:non-trial-enterprise:${organizationId}`);
+
+/** Anonymized AI-adoption aggregates for an organization over one rounded date range. */
+export const organizationAIAdoptionRedisKey = (input: {
+  organizationId: string;
+  startDate: string;
+  endDate: string;
+}) =>
+  redisKey(
+    `organization:ai-adoption:v1:${input.organizationId}:${input.startDate}:${input.endDate}`
+  );
 
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);

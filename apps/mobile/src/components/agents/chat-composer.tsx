@@ -36,7 +36,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture } from 'react-native-gesture-handler';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import Animated, {
   FadeIn,
@@ -120,6 +120,7 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { createFrameCoalescer, type FrameCoalescer } from '@/lib/coalesce-frame';
@@ -364,6 +365,7 @@ export function ChatComposer({
   const { height: windowHeight } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const insets = useSafeAreaInsets();
+  const sideInsets = useStyleSideInsets();
   const { reducedMotion } = useMotionPolicy();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
   // Draft persistence is fenced on identity: while the user id is unknown,
@@ -1093,6 +1095,11 @@ export function ChatComposer({
   }, []);
 
   const inputScrollable = shouldEnableComposerInputScroll(measureHeight, inputMaxHeight);
+  // Swipe down on the message field to dismiss the keyboard. The detector is
+  // attached to the field only (inside the row), never to the whole row: a pan
+  // recognizer wrapped around the send control cancels its press whenever a
+  // tap drifts down past the activation offset before release, so the tap
+  // dismissed the keyboard instead of sending and the reader had to tap again.
   const dismissKeyboardPan = useMemo(
     () =>
       // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
@@ -1546,7 +1553,7 @@ export function ChatComposer({
   // remount, so the uncontrolled input keeps its text.
   return (
     <BlurBar className={barClassName}>
-      <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+      <View style={{ paddingLeft: sideInsets.left, paddingRight: sideInsets.right }}>
         <ChatComposerMeasure
           handleRef={measureHandleRef}
           fontSize={TEXT_INPUT_FONT_SIZE}
@@ -1671,57 +1678,55 @@ export function ChatComposer({
           <RemainingCharactersCounter remaining={counterRemaining} className="px-4 pb-1" />
         ) : null}
 
-        <GestureDetector gesture={dismissKeyboardPan}>
-          <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
-            <ChatComposerInputRow
-              key={inputEpoch}
-              attachmentsEnabled={attachmentsEnabled}
-              canSend={control.canSend}
-              // The row's `disabled` only gates the Stop control, which keeps
-              // the merged gate it had before the send gate was split out.
-              disabled={disabled || sendDisabled}
-              hasSendableContent={control.hasSendableContent}
-              inputAccessibilityDisabled={control.inputAccessibilityDisabled}
-              inputEditable={control.inputEditable}
-              inputEmpty={inputEmpty}
-              inputRef={inputRef}
-              isSending={isSending}
-              isStreaming={isStreaming}
-              maxInputHeight={inputMaxHeight}
-              measureHeight={measureHeight}
-              onAddAttachment={() => {
-                void handleAddAttachment();
-              }}
-              onChangeText={handleChangeText}
-              onInputBlur={() => {
-                inputFocusedRef.current = false;
-                setIsFocused(false);
-              }}
-              onInputFocus={() => {
-                inputFocusedRef.current = true;
-                setIsFocused(true);
-              }}
-              onInputLayout={handleInputLayout}
-              onInputContentSizeChange={handleInputContentSizeChange}
-              onInsertNewline={handleInsertNewline}
-              onSelectionChange={handleSelectionChange}
-              onStop={handleStop}
-              onSubmit={() => {
-                void runSubmit(submit);
-              }}
-              onToggleVoice={() => {
-                void voiceInput.toggle();
-              }}
-              paperclipDisabled={control.paperclipDisabled}
-              placeholder={voiceStatusMessage ?? placeholder}
-              returnSendsMessage={returnSendsMessage}
-              sendDisabledReason={sendDisabledReason}
-              textInputStyle={textInputStyle}
-              voiceDisabled={control.voiceDisabled}
-              voiceInputStatus={voiceInput.status}
-            />
-          </View>
-        </GestureDetector>
+        <ChatComposerInputRow
+          key={inputEpoch}
+          dismissKeyboardPan={dismissKeyboardPan}
+          androidDismissTouchProps={androidDismissKeyboardTouchProps}
+          attachmentsEnabled={attachmentsEnabled}
+          canSend={control.canSend}
+          // The row's `disabled` only gates the Stop control, which keeps
+          // the merged gate it had before the send gate was split out.
+          disabled={disabled || sendDisabled}
+          hasSendableContent={control.hasSendableContent}
+          inputAccessibilityDisabled={control.inputAccessibilityDisabled}
+          inputEditable={control.inputEditable}
+          inputEmpty={inputEmpty}
+          inputRef={inputRef}
+          isSending={isSending}
+          isStreaming={isStreaming}
+          maxInputHeight={inputMaxHeight}
+          measureHeight={measureHeight}
+          onAddAttachment={() => {
+            void handleAddAttachment();
+          }}
+          onChangeText={handleChangeText}
+          onInputBlur={() => {
+            inputFocusedRef.current = false;
+            setIsFocused(false);
+          }}
+          onInputFocus={() => {
+            inputFocusedRef.current = true;
+            setIsFocused(true);
+          }}
+          onInputLayout={handleInputLayout}
+          onInputContentSizeChange={handleInputContentSizeChange}
+          onInsertNewline={handleInsertNewline}
+          onSelectionChange={handleSelectionChange}
+          onStop={handleStop}
+          onSubmit={() => {
+            void runSubmit(submit);
+          }}
+          onToggleVoice={() => {
+            void voiceInput.toggle();
+          }}
+          paperclipDisabled={control.paperclipDisabled}
+          placeholder={voiceStatusMessage ?? placeholder}
+          returnSendsMessage={returnSendsMessage}
+          sendDisabledReason={sendDisabledReason}
+          textInputStyle={textInputStyle}
+          voiceDisabled={control.voiceDisabled}
+          voiceInputStatus={voiceInput.status}
+        />
       </View>
       {dialog}
       {exitDialog}

@@ -8,9 +8,13 @@ import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
 
 import {
   containsJoinedScript,
+  contentTextDirection,
   hasRtlScript,
+  keepsLatinDisplay,
   NATURAL_LETTER_SPACING,
+  pinsTextDirection,
   RTL_WRITING_DIRECTION,
+  rtlBaseMarkedChildren,
   withoutMonoFamily,
 } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
@@ -19,17 +23,17 @@ const textVariants = cva('text-foreground text-base font-medium', {
   variants: {
     variant: {
       default: '',
-      h1: 'text-center text-4xl font-bold tracking-tight',
       h2: 'border-border border-b pb-2 text-3xl font-semibold tracking-tight',
       h3: 'text-2xl font-semibold tracking-tight',
-      h4: 'text-xl font-semibold tracking-tight',
-      p: 'mt-3 leading-[1.75rem]',
-      blockquote: 'mt-4 border-l-2 pl-3 italic',
-      code: 'bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono-semibold text-sm',
-      lead: 'text-muted-foreground text-xl',
       large: 'text-lg font-semibold',
+      heading: 'text-base font-semibold',
       small: 'text-sm font-medium leading-none',
+      figure: 'text-2xl font-bold tabular-nums',
+      // A half-width stat tile's number: one step under `figure`, and still
+      // tabular so two tiles' digits line up down the row.
+      stat: 'text-lg font-bold tabular-nums',
       muted: 'text-muted-foreground text-sm',
+      caption: 'text-xs text-muted-foreground',
       mono: 'font-mono-medium text-sm',
       eyebrow: 'font-mono-medium text-[10px] text-muted-foreground',
     },
@@ -51,10 +55,9 @@ type TextVariant = NonNullable<TextVariantProps['variant']>;
  * non-heading variant reads `undefined` without an unchecked key cast.
  */
 const HEADING_A11Y = new Map<TextVariant, { role: Role; level: string }>([
-  ['h1', { role: 'heading', level: '1' }],
   ['h2', { role: 'heading', level: '2' }],
   ['h3', { role: 'heading', level: '3' }],
-  ['h4', { role: 'heading', level: '4' }],
+  ['heading', { role: 'heading', level: '2' }],
 ]);
 
 /**
@@ -75,7 +78,7 @@ export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
 
 /**
  * The RTL-script twin of the eyebrow's size. The Latin display treatment leans
- * on full capitals and letterspacing, and a joined/Arabic-script label can take
+ * on full capitals and letterspacing, and an Arabic-script label can take
  * neither: its tracking is reset (`NATURAL_LETTER_SPACING`) and its capitals do
  * not exist, so without them the label kept only the 10px size — measured in an
  * Arabic interface, `الفواتير` inked 25.9 x 9.14 dp against the Latin
@@ -84,7 +87,9 @@ export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
  * Latin capitals' cap height. The script is the copy's, not the interface's,
  * exactly like `withoutMonoFamily`. Kept in step with the reserved eyebrow twin
  * in `screen-header.tsx`, which holds this same line box before the label
- * arrives.
+ * arrives. The Brahmic and Southeast Asian scripts in `JOINED_SCRIPT` lose the
+ * tracking but keep the 10px size: their stacked vowel signs already ink taller
+ * than the Latin capitals (a Tamil eyebrow inked 12.19 dp tall at 10px).
  */
 export const EYEBROW_RTL_SCRIPT_DISPLAY = 'text-[13px]';
 
@@ -107,10 +112,20 @@ function Text({
   className,
   asChild = false,
   variant = 'default',
+  direction,
   ...props
 }: React.ComponentProps<typeof RNText> &
   TextVariantProps & {
     asChild?: boolean;
+    /**
+     * The paragraph's base direction. App copy omits it and names the
+     * interface's. `auto` is for copy the app did not write — a server's
+     * message, a finding's description, a user's own text — which names its
+     * own direction, so English content keeps its left edge and the
+     * punctuation that ends it inside a right-to-left interface
+     * (`contentTextDirection`).
+     */
+    direction?: 'auto';
   }) {
   const textClass = React.useContext(TextClassContext);
   const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), props.maxFontSizeMultiplier);
@@ -151,29 +166,54 @@ function Text({
   const headingA11y = HEADING_A11Y.get(variant ?? 'default');
   const classes = cn(
     textVariants({ variant }),
-    variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
+    variant === 'eyebrow' && keepsLatinDisplay(isRtlScript) && EYEBROW_LATIN_DISPLAY,
     // `cn` merges last-wins, so the script's 13px replaces the variant's 10px
     // and a caller's own `text-*` still has the final word after it.
     variant === 'eyebrow' && isRtlScript && EYEBROW_RTL_SCRIPT_DISPLAY,
     textClass,
     className
   );
+  // The paragraph's base direction: the interface's for app copy, and the
+  // copy's own first letter's for content (`direction="auto"`), named for the
+  // node's layout as well, which is what makes a Latin sentence keep its left
+  // edge and the punctuation that ends it inside a right-to-left interface.
+  const interfaceDirection: TextStyle | undefined = isRTL ? RTL_WRITING_DIRECTION : undefined;
+  const writingDirection =
+    direction === 'auto'
+      ? (contentTextDirection(props.children) ?? interfaceDirection)
+      : interfaceDirection;
+  // A style direction does not move the paragraph itself: React Native never
+  // sets a text view's own direction, and Android resolves a paragraph from its
+  // first strong character, so app copy that opens on a Latin product name
+  // needs a right-to-left mark in front of it (`rtlBaseMarkedChildren`).
+  // Content names its own first letter's direction and gets no mark; `asChild`
+  // passes one element child through, which `Slot.Text` takes unchanged
+  // (`asChild` has no call site in the app today); and a caller that names a
+  // base direction of its own — a path, a command, an identifier pinned with
+  // `LTR_TEXT_DIRECTION` — has said what that direction is, so its copy keeps
+  // the base direction it asked for (`pinsTextDirection`).
+  //
+  // Cached against the child tree, the caller's style and the script flag the
+  // scan above already computed, so a re-render with unchanged props reads no
+  // character of the copy.
+  const renderedChildren = React.useMemo(() => {
+    if (asChild || direction === 'auto' || pinsTextDirection(props.style)) {
+      return props.children;
+    }
+    return rtlBaseMarkedChildren(props.children, isRtlScript);
+  }, [asChild, direction, isRtlScript, props.children, props.style]);
   // The direction and reset land in the same array the component has always
   // built, so a non-eyebrow text node's style never grows an empty entry; the
   // eyebrow's line box leads its own array, before `props.style`, so a caller's
   // `lineHeight` still wins (`ownStyles` reads the last entry).
   const directionStyle =
-    isRTL || resetsTracking
-      ? [
-          isRTL ? RTL_WRITING_DIRECTION : undefined,
-          resetsTracking ? NATURAL_LETTER_SPACING : undefined,
-          props.style,
-        ]
+    writingDirection !== undefined || resetsTracking
+      ? [writingDirection, resetsTracking ? NATURAL_LETTER_SPACING : undefined, props.style]
       : props.style;
   const resolvedStyle = eyebrowLineHeight
     ? [
         eyebrowLineHeight,
-        isRTL ? RTL_WRITING_DIRECTION : undefined,
+        writingDirection,
         resetsTracking ? NATURAL_LETTER_SPACING : undefined,
         props.style,
       ]
@@ -186,7 +226,9 @@ function Text({
       {...props}
       maxFontSizeMultiplier={fontScaleCap ?? props.maxFontSizeMultiplier}
       style={resolvedStyle}
-    />
+    >
+      {renderedChildren}
+    </Component>
   );
 }
 

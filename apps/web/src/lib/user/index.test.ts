@@ -132,6 +132,7 @@ import {
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
+  webhook_events_v2,
   bouncer_usage_event_outbox,
   external_side_effect_outbox,
   user_data_exports,
@@ -209,7 +210,6 @@ import {
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
 import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
-import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -912,43 +912,6 @@ describe('User', () => {
 
     afterEach(() => {
       jest.restoreAllMocks();
-    });
-
-    it.each<WatchwoodSignupAssessment>([
-      {
-        status: 'assessed',
-        riskScore: 1,
-        safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
-        latencyMs: 10,
-        assessedAt: 1,
-      },
-      { status: 'unavailable', latencyMs: 1000, assessedAt: 1 },
-      { status: 'missing', latencyMs: 0, assessedAt: 1 },
-    ])('creates an account with a $status shadow assessment', async watchwood => {
-      const email = `watchwood-${watchwood.status}@example.com`;
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: email,
-          google_user_name: 'Shadow Signup',
-          google_user_image_url: '',
-          hosted_domain: null,
-          provider: 'google',
-          provider_account_id: `watchwood-${watchwood.status}`,
-        },
-        undefined,
-        false,
-        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
-        null,
-        { watchwood }
-      );
-
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.isNew).toBe(true);
-      expect(await findUserById(result.user.id)).toMatchObject({ google_user_email: email });
-      expect(await getUserAuthProviders(result.user.id)).toMatchObject([
-        { provider: 'google', provider_account_id: `watchwood-${watchwood.status}` },
-      ]);
     });
 
     it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {
@@ -2538,6 +2501,14 @@ describe('User', () => {
         release();
         await writer;
       }
+    });
+
+    it('clears the Anthropic user profile id', async () => {
+      const user = await insertTestUser({ anthropic_user_profile_id: 'uprof_test_soft_delete' });
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(await findUserById(user.id)).toMatchObject({ anthropic_user_profile_id: null });
     });
 
     it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
@@ -5327,6 +5298,34 @@ describe('User', () => {
       const remainingOutbox = await db.select().from(external_side_effect_outbox);
       expect(remainingOutbox).toHaveLength(1);
       expect(remainingOutbox[0].invitation_id).toBe(forUser2.id);
+    });
+
+    it("deletes the user's partitioned webhook events, which no foreign key cascades into", async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+      await db.insert(webhook_events_v2).values(
+        [user1.id, user2.id].map(userId => ({
+          owned_by_user_id: userId,
+          platform: 'github',
+          event_type: 'pull_request',
+          payload: { sender: { login: `login-${userId}` } },
+          headers: {},
+          event_signature: `delivery-${crypto.randomUUID()}`,
+        }))
+      );
+
+      await softDeleteUser(user1.id);
+
+      const remainingForDeletedUser = await db
+        .select({ id: webhook_events_v2.id })
+        .from(webhook_events_v2)
+        .where(eq(webhook_events_v2.owned_by_user_id, user1.id));
+      expect(remainingForDeletedUser).toHaveLength(0);
+      const remainingForOtherUser = await db
+        .select({ id: webhook_events_v2.id })
+        .from(webhook_events_v2)
+        .where(eq(webhook_events_v2.owned_by_user_id, user2.id));
+      expect(remainingForOtherUser).toHaveLength(1);
     });
 
     it('deletes the bouncer credit-event outbox rows for the deleted user', async () => {

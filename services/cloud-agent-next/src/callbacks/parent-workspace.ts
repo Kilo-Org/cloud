@@ -1,15 +1,15 @@
 import { TRPCError } from '@trpc/server';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { PARENT_WORKSPACE_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
 import { formatChildSessionCallbackPrompt } from '@kilocode/worker-utils/cloud-agent-child-callback';
 import { sha256Hex } from '@kilocode/worker-utils';
-import { isWorkspaceAnchorMetadata } from '../cloud-agent-authority.js';
 import { isCanonicalMessageId } from '../session/message-id.js';
-import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
+import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import { createWorkspaceCallbackSession } from '../router/handlers/session-worktree.js';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { classifyCallbackError, type DeliveryResult } from './delivery.js';
-import { callbackResultInfo, resolveParentCallbackSession } from './parent-session.js';
+import { callbackResultInfo, resolveCallbackWorkspace } from './parent-session.js';
 import type { CallbackJob, ExecutionCallbackPayload } from './types.js';
 
 /** Deterministic creation conflicts cannot recover through redelivery. */
@@ -74,13 +74,13 @@ export async function deliverParentWorkspaceCallback(
   }
 
   try {
-    const { parent, parentSessionId } = await resolveParentCallbackSession(
+    const workspace = await resolveCallbackWorkspace(
       env,
       source.userId,
       job.payload.cloudAgentSessionId
     );
-    const workspaceId = parent.workspace?.worktreeId;
-    if (!isWorkspaceAnchorMetadata(parent) || !workspaceId) {
+    const workspaceId = cloudAgentWorktreeIdSchema.safeParse(workspace.worktreeId).data;
+    if (workspaceId === undefined) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Parent workspace callback denied' });
     }
 
@@ -89,16 +89,20 @@ export async function deliverParentWorkspaceCallback(
       job.payload,
       source.messageId
     );
-    const runtimeAuthorization = await withDORetry(
-      () => getSandboxSessionStub(env, source.userId, parentSessionId),
-      stub => stub.authorizeCloudAgentWorkspaceSibling({ siblingSessionId }),
-      'authorizeCloudAgentWorkspaceSibling'
+    const delegated = await withDORetry(
+      () => getWorkspaceStub(env, source.userId, workspace.workspaceSessionId),
+      stub => stub.authorizeChat({ chatSessionId: siblingSessionId }),
+      'authorizeChat'
     );
+    if (delegated.worktreeId !== workspaceId) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Parent workspace callback denied' });
+    }
+    const runtimeAuthorization = { token: delegated.token, seal: delegated.seal };
     const created = await createWorkspaceCallbackSession({
       env,
       userId: source.userId,
       authToken: runtimeAuthorization.token,
-      organizationId: parent.identity.orgId ?? undefined,
+      organizationId: delegated.organizationId ?? undefined,
       workspaceId,
       operationKey,
       siblingSessionId,

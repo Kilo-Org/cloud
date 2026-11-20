@@ -16,12 +16,15 @@ import {
   GLANCEABLE_STATUS_KINDS,
   GLANCEABLE_TITLE_LIMIT,
   glanceableStatusKind,
+  isScheduledSessionRow,
   isStartableGlanceableWork,
+  isApprovableGlanceableStatus,
   isTerminalGlanceableStatus,
   type BuildGlanceableSnapshotInput,
   type GlanceableNeedsInputKind,
   type GlanceableSessionRow,
   type GlanceableStatusKind,
+  type GlanceableTerminalStatus,
   compareSessionInstant,
 } from './glanceable-agents-snapshot';
 import { timestampMs, timestampToIso } from './utils';
@@ -88,7 +91,7 @@ export const homeWidgetPresentationSchema = z.object({
   primaryCount: z.number().int().min(0),
   secondaryCounts: z
     .array(z.object({ kind: kindSchema, count: z.number().int().positive() }))
-    .max(3),
+    .max(GLANCEABLE_STATUS_KINDS.length - 1),
   checkedAt: z.string().nullable(),
   stale: z.boolean(),
   scheduledAt: z.string().nullable(),
@@ -110,12 +113,18 @@ export type HomeWidgetTimelineEntry = z.infer<typeof homeWidgetTimelineEntrySche
 export const homeWidgetResponseSchema = homeWidgetDataSchema.extend({
   home: homeWidgetPresentationSchema,
   refreshAt: z.number().finite(),
-  /** Optional for persisted older responses; current server producers always supply it. */
-  presentationTimeline: z.array(homeWidgetTimelineEntrySchema).max(3).optional(),
+  /**
+   * Optional for persisted older responses; current server producers always
+   * supply it. Four is the most the policy can build: the request instant, the
+   * wake, its one retry, and the stale instant. A cap below that would refuse a
+   * payload the producers are entitled to send.
+   */
+  presentationTimeline: z.array(homeWidgetTimelineEntrySchema).max(4).optional(),
 });
 export type HomeWidgetResponse = z.infer<typeof homeWidgetResponseSchema>;
 export type HomeWidgetSessionRow = GlanceableSessionRow & {
   title?: string | null;
+  /** Raw candidate value; buildHomeWidgetDetails keeps it only when approvalKeySchema accepts it. */
   approvalKey?: string | null;
 };
 
@@ -141,8 +150,17 @@ function primaryKindOf(counts: GlanceableCounts): GlanceableStatusKind | null {
 
 const ACTIVE_REFRESH_MS = 30 * 60 * 1000;
 const QUIET_REFRESH_MS = 2 * 60 * 60 * 1000;
+// Both native schedulers clamp a request to a 15-minute floor, so a retry that
+// asks for the wake plus this delay is the instant the widget can fetch.
+const WAKE_RETRY_MS = 15 * 60 * 1000;
 
+/**
+ * The one cadence rule: every caller that needs a snapshot's refresh interval
+ * reads this function. A terminal snapshot is quiet regardless of the counts
+ * that survive beside it, so auth/privacy termination cannot keep polling.
+ */
 function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
+  if (isTerminalGlanceableStatus(snapshot.status)) return QUIET_REFRESH_MS;
   return snapshot.status === 'waiting' ||
     snapshot.status === 'stale' ||
     snapshot.status === 'expired' ||
@@ -185,18 +203,29 @@ export function buildHomeWidgetDetails(
   const byStatusUpdatedAt = compareSessionInstant(row => row.statusUpdatedAt, 'earliest');
   // One status predicate owns both membership and the kind, so a needs-input
   // row and the label drawn for it cannot disagree.
-  const waiting: { row: HomeWidgetSessionRow; kind: GlanceableNeedsInputKind }[] = [];
+  // The schema is the one representation every payload enforces, so a row's key
+  // counts only when it parses; anything else reads as none.
+  const waiting: {
+    row: HomeWidgetSessionRow;
+    kind: GlanceableNeedsInputKind;
+    /** The schema-valid key the row carries, or null when it carries none. */
+    key: string | null;
+  }[] = [];
   for (const row of sessions) {
     const kind = glanceableNeedsInputKind(row.status);
-    if (kind !== null) waiting.push({ row, kind });
+    if (kind !== null) {
+      waiting.push({
+        row,
+        kind,
+        key: approvalKeySchema.safeParse(row.approvalKey).data ?? null,
+      });
+    }
   }
   waiting.sort(
-    (a, b) =>
-      Number(b.row.approvalKey != null) - Number(a.row.approvalKey != null) ||
-      byStatusUpdatedAt(a.row, b.row)
+    (a, b) => Number(b.key !== null) - Number(a.key !== null) || byStatusUpdatedAt(a.row, b.row)
   );
   const scheduled = sessions
-    .filter(row => glanceableStatusKind(row.status) === 'scheduled')
+    .filter(isScheduledSessionRow)
     .sort(compareSessionInstant(row => row.scheduledAt, 'earliest'));
   const primaryKind = primaryKindOf(countGlanceableSessions(sessions));
   const primary =
@@ -207,10 +236,14 @@ export function buildHomeWidgetDetails(
         : sessions
             .filter(row => glanceableStatusKind(row.status) === primaryKind)
             .sort(compareSessionInstant(row => row.statusUpdatedAt, 'latest'))[0];
+  // The list still ranks any row carrying a valid key first, but the key handed
+  // to Approve comes only from a permission row: a question or retry row's key
+  // is ignored, so that entry may not be waiting[0].
+  const approvalRow = waiting.find(
+    entry => entry.key !== null && isApprovableGlanceableStatus(entry.row.status)
+  );
   return {
-    // The sort put the approvable row first, so the key belongs to the same
-    // row the needs-input primary title reads.
-    approvalKey: waiting[0]?.row.approvalKey ?? null,
+    approvalKey: approvalRow?.key ?? null,
     primaryKind: primaryKind ?? null,
     primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting
@@ -243,16 +276,23 @@ export function buildHomeWidgetData(
  * boundary both read `staleAt`, so native aging cannot disagree with the flag.
  */
 function staleness(data: HomeWidgetData): {
-  terminal: boolean;
+  /**
+   * The narrowed terminal status, or null when the snapshot is not terminal.
+   * One value, so no caller keeps a boolean beside a status a later branch can
+   * contradict.
+   */
+  terminal: GlanceableTerminalStatus | null;
   primaryKind: GlanceableStatusKind | null;
   checkedAt: string | null;
   staleAt: number | null;
 } {
   const { snapshot } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status);
-  const primaryKind = terminal ? null : primaryKindOf(snapshot);
+  const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
+  const primaryKind = terminal === null ? primaryKindOf(snapshot) : null;
   const checkedAt =
-    terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
+    terminal !== null || (primaryKind === null && snapshot.status !== 'empty')
+      ? null
+      : snapshot.updatedAt;
   const confirmedAt = timestampMs(checkedAt);
   return {
     terminal,
@@ -270,23 +310,34 @@ function staleness(data: HomeWidgetData): {
  */
 function scheduledWake(
   snapshot: GlanceableAgentsSnapshot,
-  terminal: boolean
+  terminal: GlanceableTerminalStatus | null
 ): { at: number | null; iso: string | null } {
-  if (terminal || snapshot.scheduled <= 0) return { at: null, iso: null };
+  if (terminal !== null || snapshot.scheduled <= 0) return { at: null, iso: null };
   return { at: timestampMs(snapshot.scheduledAt), iso: timestampToIso(snapshot.scheduledAt) };
+}
+
+/** One retry after the wake's own schedule; a snapshot with no wake has no retry. */
+function wakeRetryAt(
+  snapshot: GlanceableAgentsSnapshot,
+  terminal: GlanceableTerminalStatus | null
+): number | null {
+  const wake = scheduledWake(snapshot, terminal).at;
+  return wake === null ? null : wake + WAKE_RETRY_MS;
 }
 
 /**
  * The one status precedence: a terminal snapshot outranks content, content
  * outranks a request for input, and an acknowledged snapshot that is neither is
- * either empty or unavailable.
+ * either empty or unavailable. A terminal status is returned as it is, so a
+ * terminal member the presentation status enum lacks fails to compile here
+ * instead of being reported as another terminal state.
  */
 function presentationStatus(
+  terminal: GlanceableTerminalStatus | null,
   snapshot: GlanceableAgentsSnapshot,
-  terminal: boolean,
   primaryKind: GlanceableStatusKind | null
 ): HomeWidgetPresentation['status'] {
-  if (terminal) return snapshot.status === 'privacy' ? 'privacy' : 'signed_out';
+  if (terminal !== null) return terminal;
   if (primaryKind !== null) return 'content';
   if (snapshot.status === 'waiting') return 'waiting';
   if (snapshot.status === 'empty') return 'empty';
@@ -302,46 +353,60 @@ export function buildHomeWidgetPresentation(
   const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
-  const status = presentationStatus(snapshot, terminal, primaryKind);
+  const retry = wakeRetryAt(snapshot, terminal);
+  const status = presentationStatus(terminal, snapshot, primaryKind);
+  // One approval availability: the same value decides the key the native action
+  // submits and whether Approve is offered, so the card cannot advertise Approve
+  // without a request key. This is visibility, not approval authority. Every
+  // action revalidates the exact current request.
+  const approvalAvailable =
+    terminal === null && snapshot.needsApproval > 0 && details.approvalKey !== null;
   return {
     status,
     primaryKind,
     primaryCount: primaryKind === null ? 0 : snapshot[primaryKind],
-    secondaryCounts: terminal
-      ? []
-      : KIND_ORDER.filter(kind => kind !== primaryKind && snapshot[kind] > 0).map(kind => ({
-          kind,
-          count: snapshot[kind],
-        })),
+    secondaryCounts:
+      terminal !== null
+        ? []
+        : KIND_ORDER.filter(kind => kind !== primaryKind && snapshot[kind] > 0).map(kind => ({
+            kind,
+            count: snapshot[kind],
+          })),
     checkedAt,
     stale:
-      !terminal &&
+      terminal === null &&
       (snapshot.status === 'stale' ||
         snapshot.status === 'expired' ||
         (staleAt !== null && now >= staleAt)),
     scheduledAt: wake.iso,
-    approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
-    awaitingUpdate: wake.at !== null && now >= wake.at,
+    approvalKey: approvalAvailable ? details.approvalKey : null,
+    // The card never advertises an update past the retry deadline.
+    awaitingUpdate: wake.at !== null && now >= wake.at && (retry === null || now < retry),
     primaryTitle:
-      terminal || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
+      terminal !== null || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
         ? null
         : details.primaryTitle,
-    waitingAgents: terminal || snapshot.needsInput === 0 ? [] : details.waitingAgents,
-    scheduledAgents: terminal || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
+    waitingAgents: terminal !== null || snapshot.needsInput === 0 ? [] : details.waitingAgents,
+    scheduledAgents: terminal !== null || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
     canCreate: status === 'content' || status === 'empty' || status === 'unavailable',
-    // This is visibility, not approval authority. Every action revalidates the exact current request.
-    canApprove: !terminal && snapshot.needsApproval > 0 && details.approvalKey !== null,
+    canApprove: approvalAvailable,
   };
 }
 
-/** Requested refresh only; native minimum intervals and OS budgets still apply. */
+/**
+ * Requested refresh only; native minimum intervals and OS budgets still apply.
+ * A wake that just passed retries once shortly after its wake, then backs off.
+ */
 export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status);
-  const next = now + (terminal ? QUIET_REFRESH_MS : refreshInterval(snapshot));
+  const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
+  const next = now + refreshInterval(snapshot);
   const wake = scheduledWake(snapshot, terminal).at;
-  // An overdue wake is not proof of running and must not create a busy refresh loop.
-  return wake !== null && wake > now ? Math.min(next, wake) : next;
+  const retry = wakeRetryAt(snapshot, terminal);
+  // Both instants come from the snapshot, so a passed wake cannot create a busy refresh loop.
+  const requested =
+    wake !== null && wake > now ? wake : retry !== null && retry > now ? retry : null;
+  return requested !== null ? Math.min(next, requested) : next;
 }
 
 /** Native offline aging uses these server/shared-derived boundaries, not a second policy. */
@@ -352,10 +417,12 @@ export function buildHomeWidgetPresentationTimeline(
   const times = [now];
   const { snapshot } = data;
   const { terminal, staleAt } = staleness(data);
-  if (!terminal) {
+  if (terminal === null) {
     if (staleAt !== null && staleAt > now) times.push(staleAt);
     const wake = scheduledWake(snapshot, terminal).at;
     if (wake !== null && wake > now && wake !== staleAt) times.push(wake);
+    const retry = wakeRetryAt(snapshot, terminal);
+    if (retry !== null && retry > now && retry !== staleAt && retry !== wake) times.push(retry);
   }
   return times
     .sort((a, b) => a - b)

@@ -1,4 +1,4 @@
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   AUTO_SMALL_TARGET_MODELS,
   customRouterAutoModel,

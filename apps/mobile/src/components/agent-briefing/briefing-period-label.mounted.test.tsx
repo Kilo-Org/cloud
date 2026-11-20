@@ -74,6 +74,16 @@ it('shows each window endpoint in the briefing zone and no separate date line', 
       'Europe/Berlin',
       'agentBriefing.capturedAt 2026-10-20T08:00:00Z pt-BR Europe/Berlin',
     ]);
+    // The zone shares the range's line, and the range gives up width first:
+    // the zone never wraps onto a line of its own.
+    const row = mounted.root
+      .findAll(node => (node.type as string) === 'View')
+      .find(node => node.findAll(child => (child.type as string) === 'Text').length === 2);
+    expect(row?.findAll(child => (child.type as string) === 'Text').length).toBe(2);
+    const range = mounted.root
+      .findAll(node => (node.type as string) === 'Text')
+      .find(node => String(node.props.children).startsWith('common.timeRange'));
+    expect(range?.props.numberOfLines).toBe(1);
   } finally {
     act(() => {
       mounted.unmount();

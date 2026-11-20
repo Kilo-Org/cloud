@@ -12,10 +12,17 @@ import { EYEBROW_LINE_HEIGHT_DP, Text } from './text';
 import { hostText, mountTextTree, unmountTextTree } from './text.mounted.test-helpers';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({
-  I18nManager: i18nManager,
-  Text: 'Text',
-}));
+vi.mock('react-native', async () => {
+  // A `vi.mock` factory runs before this file's imports are initialised, so the
+  // shared flatten comes in dynamically. The primitive reads a caller's own base
+  // direction through `StyleSheet.flatten` (`pinsTextDirection`).
+  const { flattenStyle: flatten } = await import('@/test/style-sheet-mock');
+  return {
+    I18nManager: i18nManager,
+    StyleSheet: { create: (styles: unknown) => styles, flatten },
+    Text: 'Text',
+  };
+});
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
 /** The suite's own mount: the shared tree, wrapped in the tracked class it asserts on. */
@@ -150,6 +157,41 @@ describe('Text mounted letter spacing', () => {
 
     expect(text.props.style).toContainEqual({ writingDirection: 'rtl' });
     expect(text.props.style).not.toContainEqual({ letterSpacing: 0 });
+  });
+});
+
+// Content copy (`direction="auto"`) names its own first letter's direction,
+// for the node's layout and its paragraph; app copy names the interface's.
+describe('Text content direction', () => {
+  it('lays English content out left to right in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(
+      mountTextTree(createElement(Text, { direction: 'auto' }, 'Prototype pollution.'))
+    );
+
+    expect(ownStyles(text)).toContainEqual({ direction: 'ltr', writingDirection: 'ltr' });
+    expect(ownStyles(text)).not.toContainEqual({ writingDirection: 'rtl' });
+  });
+
+  it('keeps app copy on the interface direction in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(mountTextTree(createElement(Text, {}, 'Prototype pollution.')));
+
+    expect(ownStyles(text)).toContainEqual({ writingDirection: 'rtl' });
+    expect(ownStyles(text)).not.toContainEqual({ direction: 'ltr', writingDirection: 'ltr' });
+  });
+
+  it('lays Arabic content out right to left in an LTR interface', () => {
+    const text = hostText(mountTextTree(createElement(Text, { direction: 'auto' }, 'نص')));
+
+    expect(ownStyles(text)).toContainEqual({ direction: 'rtl', writingDirection: 'rtl' });
+  });
+
+  it('keeps content with no letter on the interface direction', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(mountTextTree(createElement(Text, { direction: 'auto' }, '42')));
+
+    expect(ownStyles(text)).toContainEqual({ writingDirection: 'rtl' });
   });
 });
 
@@ -297,10 +339,9 @@ describe('Text eyebrow line box', () => {
 // other, and a non-heading variant announces neither.
 describe('Text heading accessibility', () => {
   it.each([
-    ['h1', '1'],
     ['h2', '2'],
     ['h3', '3'],
-    ['h4', '4'],
+    ['heading', '2'],
   ] as const)('announces %s as a heading with level %s', (variant, level) => {
     const node = hostText(mountTextTree(createElement(Text, { variant }, 'Section')));
 
@@ -336,5 +377,16 @@ describe('Text mono variant in either interface', () => {
     );
 
     expect(classes).toContain('font-mono-medium');
+  });
+});
+
+// A half-width stat tile pairs with the big `figure` on the other half of the
+// row: one step smaller, and tabular so the two numbers' digits line up.
+describe('Text stat variant', () => {
+  it('draws the tile size with tabular digits', () => {
+    const classes = hostClasses(mountTextTree(createElement(Text, { variant: 'stat' }, '1,204')));
+
+    expect(classes).toEqual(expect.arrayContaining(['text-lg', 'font-bold', 'tabular-nums']));
+    expect(classes).not.toContain('text-2xl');
   });
 });

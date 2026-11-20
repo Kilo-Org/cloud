@@ -77,13 +77,38 @@ function hasResponse(error: unknown): boolean {
 export type VerifiedAppleIdToken = { sub: string; email: string };
 
 /**
- * Lifetime of an acceptance record: as long as the identity token it binds,
- * bounded by the longest Apple ID-token lifetime.
+ * Lifetime of a single-use acceptance record: as long as the identity token it
+ * binds, clamped to [1, capSeconds]. Both providers share this rule.
  */
-function recordTtlSeconds(exp: number | undefined): number {
-  if (typeof exp !== 'number') return NONCE_TTL_CAP_SECONDS;
+function recordTtlSeconds(exp: number | undefined, capSeconds: number): number {
+  if (typeof exp !== 'number') return capSeconds;
   const remaining = Math.floor(exp - Date.now() / 1000);
-  return Math.max(1, Math.min(remaining, NONCE_TTL_CAP_SECONDS));
+  return Math.max(1, Math.min(remaining, capSeconds));
+}
+
+/**
+ * Consume one single-use record so its token is accepted exactly once. A store
+ * write that cannot complete refuses the request with the retryable error, so
+ * the acceptance rule never depends on the store being reachable.
+ */
+async function recordSingleUseToken(params: {
+  recordKey: string;
+  ttlSeconds: number;
+  storeUnavailableMessage: string;
+  alreadyUsedMessage: string;
+}): Promise<void> {
+  let recorded: string | null = null;
+  try {
+    recorded = await redisClient.set(params.recordKey, '1', {
+      nx: true,
+      ex: params.ttlSeconds,
+    });
+  } catch {
+    throw new NonceStoreUnavailableError(params.storeUnavailableMessage);
+  }
+  if (recorded !== 'OK') {
+    throw new NativeIdTokenError(params.alreadyUsedMessage);
+  }
 }
 
 /** The claims every native Apple path requires from a verified identity token. */
@@ -112,18 +137,12 @@ function appleTokenRecordKey(idToken: string): string {
  * never depends on the store being reachable.
  */
 async function recordSingleUseAppleToken(idToken: string, exp: number | undefined): Promise<void> {
-  let recorded: string | null = null;
-  try {
-    recorded = await redisClient.set(appleTokenRecordKey(idToken), '1', {
-      nx: true,
-      ex: recordTtlSeconds(exp),
-    });
-  } catch {
-    throw new NonceStoreUnavailableError('Apple token record unavailable');
-  }
-  if (recorded !== 'OK') {
-    throw new NativeIdTokenError('Apple ID token already used');
-  }
+  await recordSingleUseToken({
+    recordKey: appleTokenRecordKey(idToken),
+    ttlSeconds: recordTtlSeconds(exp, NONCE_TTL_CAP_SECONDS),
+    storeUnavailableMessage: 'Apple token record unavailable',
+    alreadyUsedMessage: 'Apple ID token already used',
+  });
 }
 
 /**
@@ -137,7 +156,7 @@ async function recordSingleUseAppleNonceAcceptance(
   idToken: string,
   exp: number | undefined
 ): Promise<void> {
-  const ex = recordTtlSeconds(exp);
+  const ex = recordTtlSeconds(exp, NONCE_TTL_CAP_SECONDS);
   let results: [string | null, string | null] = [null, null];
   try {
     results = (await redisClient
@@ -229,24 +248,12 @@ async function recordSingleUseGoogleToken(
   idToken: string,
   expiresAt: number | undefined
 ): Promise<void> {
-  const digest = createHash('sha256').update(idToken).digest('hex');
-  const ttlSeconds = (() => {
-    if (typeof expiresAt !== 'number') return GOOGLE_TOKEN_TTL_CAP_SECONDS;
-    const remaining = Math.floor(expiresAt - Date.now() / 1000);
-    return Math.max(1, Math.min(remaining, GOOGLE_TOKEN_TTL_CAP_SECONDS));
-  })();
-  let recorded: string | null = null;
-  try {
-    recorded = await redisClient.set(`auth:google-signin-token:${digest}`, '1', {
-      nx: true,
-      ex: ttlSeconds,
-    });
-  } catch {
-    throw new NonceStoreUnavailableError('Google token record unavailable');
-  }
-  if (recorded !== 'OK') {
-    throw new NativeIdTokenError('Google ID token already used');
-  }
+  await recordSingleUseToken({
+    recordKey: `auth:google-signin-token:${createHash('sha256').update(idToken).digest('hex')}`,
+    ttlSeconds: recordTtlSeconds(expiresAt, GOOGLE_TOKEN_TTL_CAP_SECONDS),
+    storeUnavailableMessage: 'Google token record unavailable',
+    alreadyUsedMessage: 'Google ID token already used',
+  });
 }
 
 type GoogleVerificationMessages = {

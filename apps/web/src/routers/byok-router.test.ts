@@ -14,7 +14,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
       actual.getOpenRouterModelsMetadataFromDatabase
     ),
     getVercelModelsMetadataFromDatabase: jest.fn(actual.getVercelModelsMetadataFromDatabase),
-    getVercelModelsFromDatabase: jest.fn(actual.getVercelModelsFromDatabase),
+    getVercelLanguageModelIdsFromDatabase: jest.fn(actual.getVercelLanguageModelIdsFromDatabase),
   };
 });
 
@@ -31,7 +31,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getOpenRouterModelsMetadataFromDatabase,
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
@@ -1641,7 +1641,7 @@ describe('BYOK Router', () => {
 
       const zai = await caller.byok.create({ provider_id: 'zai-coding', api_key: 'zai-key' });
       const morph = await caller.byok.create({ provider_id: 'morph-byok', api_key: 'morph-key' });
-      const martian = await caller.byok.create({ provider_id: 'martian', api_key: 'martian-key' });
+      const kimi = await caller.byok.create({ provider_id: 'kimi-coding', api_key: 'kimi-key' });
       const vercel = await caller.byok.create({ provider_id: 'openai', api_key: 'sk-test-key' });
 
       expect(zai).toMatchObject({
@@ -1649,7 +1649,7 @@ describe('BYOK Router', () => {
         supports_catalog_mode: true,
         can_change_catalog_mode: true,
       });
-      for (const key of [morph, martian, vercel]) {
+      for (const key of [morph, kimi, vercel]) {
         expect(key).toMatchObject({
           serve_catalog_models: false,
           supports_catalog_mode: false,
@@ -1673,7 +1673,7 @@ describe('BYOK Router', () => {
 
       expect(result['zai-coding']).toEqual(['GLM-4.7 (z-ai/glm-4.7)', 'GLM-5.2 (z-ai/glm-5.2)']);
       expect(result).not.toHaveProperty('morph-byok');
-      expect(result).not.toHaveProperty('martian');
+      expect(result).not.toHaveProperty('kimi-coding');
     });
 
     test('stores catalog mode in the key settings', async () => {
@@ -1767,7 +1767,7 @@ describe('BYOK Router', () => {
       // the listSupportedModels test.
       beforeEach(() => {
         jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({});
-        jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+        jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set());
       });
 
       afterEach(() => {
@@ -1778,8 +1778,8 @@ describe('BYOK Router', () => {
           .mocked(getVercelModelsMetadataFromDatabase)
           .mockImplementation(actual.getVercelModelsMetadataFromDatabase);
         jest
-          .mocked(getVercelModelsFromDatabase)
-          .mockImplementation(actual.getVercelModelsFromDatabase);
+          .mocked(getVercelLanguageModelIdsFromDatabase)
+          .mockImplementation(actual.getVercelLanguageModelIdsFromDatabase);
       });
 
       async function createCatalogKey(
@@ -2177,7 +2177,7 @@ describe('BYOK Router', () => {
         };
         jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(openRouterMetadata);
         jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue(vercelMetadata);
-        jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+        jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set());
         jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue({
           defaultModel: embedding.id,
           models: [embedding, { id: 'acme/embedding-free:free', name: 'Embedding Free' }],
@@ -2199,8 +2199,8 @@ describe('BYOK Router', () => {
           .mocked(getVercelModelsMetadataFromDatabase)
           .mockImplementation(actual.getVercelModelsMetadataFromDatabase);
         jest
-          .mocked(getVercelModelsFromDatabase)
-          .mockImplementation(actual.getVercelModelsFromDatabase);
+          .mocked(getVercelLanguageModelIdsFromDatabase)
+          .mockImplementation(actual.getVercelLanguageModelIdsFromDatabase);
         jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue(null);
         jest.mocked(getOpenRouterTranscriptionModels).mockResolvedValue({ data: [] });
       });

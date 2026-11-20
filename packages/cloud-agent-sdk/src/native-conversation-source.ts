@@ -1,8 +1,16 @@
 import { z } from 'zod';
-import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
+import {
+  hasUndisplayableKilo2Assets,
+  hasUnresolvedKilo2Assets,
+  readKilo2Messages,
+} from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
-import type { NativeSnapshotMessage, NativeSnapshotSession } from './native-sync-snapshot';
-import { upsertByRequestId } from './pending-requests';
+import {
+  withDisplayLocation,
+  type NativeSnapshotMessage,
+  type NativeSnapshotSession,
+} from './native-sync-snapshot';
+import { upsertByKey, upsertByRequestId } from './pending-requests';
 import { permissionAskedIdentitySchema } from './schemas';
 import type { SessionSnapshot, UnreadablePermissionState } from './types';
 
@@ -34,13 +42,19 @@ const questionSchema = z
     fields: z.array(fieldSchema),
   })
   .passthrough();
+// A card can only be answered for an identity the runner can match, so an entry
+// with an empty `requestID` falls through to the identity rule below.
+const inventoryPermissionSchema = z
+  .object({ requestID: z.string().min(1), tool: z.string(), summary: z.string() })
+  .passthrough();
+const inventoryQuestionSchema = z
+  .object({ requestID: z.string().min(1), fields: z.array(fieldSchema) })
+  .passthrough();
+/** What an entry still says about itself when its scope cannot be read. */
+const inventoryIdentitySchema = z.object({ requestID: z.string().min(1) }).passthrough();
 const inventorySchema = z.object({
-  permissions: z.array(
-    z.object({ requestID: z.string(), tool: z.string(), summary: z.string() }).passthrough()
-  ),
-  questions: z.array(
-    z.object({ requestID: z.string(), fields: z.array(fieldSchema) }).passthrough()
-  ),
+  permissions: z.array(z.unknown()).optional(),
+  questions: z.array(z.unknown()).optional(),
 });
 const recordSchema = z.record(z.string(), z.unknown());
 export type NativePendingRequests = {
@@ -56,6 +70,8 @@ export type NativeConversation = {
   nativeMessages: NativeSnapshotMessage[];
   messages: SessionSnapshot['messages'];
   incompleteMessageIDs: string[];
+  /** Count of transcript parts still missing after recovery; zero when whole. */
+  recoveryGaps: number;
   pending: NativePendingRequests;
   loading: boolean;
   error: string | undefined;
@@ -68,25 +84,48 @@ export function reduceNativePendingRequests(
 ): NativePendingRequests {
   const wrapper = recordSchema.safeParse(event.body);
   if (event.type === 'remote.state') {
+    // Entries are optional so one unreadable card no longer decides the whole
+    // inventory; a `pending` that is absent, null or wrongly shaped is still
+    // unreadable as a whole and clears every list.
     const inventory = inventorySchema.safeParse(
       wrapper.success ? wrapper.data['pending'] : undefined
     );
     if (!inventory.success) return { permissions: [], questions: [], unreadablePermissions: [] };
+    const permissions: NativePendingRequests['permissions'] = [];
+    const unreadable = new Set<string>();
+    for (const entry of inventory.data.permissions ?? []) {
+      const parsed = inventoryPermissionSchema.safeParse(entry);
+      if (parsed.success) {
+        permissions.push({
+          ...parsed.data,
+          id: parsed.data.requestID,
+          action: parsed.data.tool,
+          resources: [parsed.data.summary],
+        });
+        continue;
+      }
+      // No card may stand for a scope this app cannot read, but it can still
+      // name the request; an entry with no readable identity is dropped.
+      const identity = inventoryIdentitySchema.safeParse(entry);
+      if (identity.success) unreadable.add(identity.data.requestID);
+    }
+    const questions: NativePendingRequests['questions'] = [];
+    for (const entry of inventory.data.questions ?? []) {
+      const parsed = inventoryQuestionSchema.safeParse(entry);
+      if (parsed.success)
+        questions.push({
+          ...parsed.data,
+          id: parsed.data.requestID,
+          metadata: { kind: 'question' as const },
+        });
+    }
     return {
-      permissions: inventory.data.permissions.map(item => ({
-        ...item,
-        id: item.requestID,
-        action: item.tool,
-        resources: [item.summary],
-      })),
-      questions: inventory.data.questions.map(item => ({
-        ...item,
-        id: item.requestID,
-        metadata: { kind: 'question' as const },
-      })),
-      // The runner inventory is the authoritative snapshot, so it also clears
-      // unreadable notices: it knows every request still pending for the CLI.
-      unreadablePermissions: [],
+      permissions,
+      questions,
+      // The runner inventory is the authoritative snapshot, so it also rebuilds
+      // unreadable notices from this frame alone: a request it no longer lists
+      // is settled, and one it lists readably has a card instead.
+      unreadablePermissions: [...unreadable].map(requestId => ({ requestId })),
     };
   }
   const native = recordSchema.safeParse(wrapper.success ? wrapper.data['data'] : undefined);
@@ -98,7 +137,8 @@ export function reduceNativePendingRequests(
       const permission = parsed.data;
       return {
         ...pending,
-        permissions: [...pending.permissions.filter(item => item.id !== permission.id), permission],
+        // In place, so a replayed request keeps its place in the oldest-first list.
+        permissions: [...upsertByKey(pending.permissions, permission, item => item.id)],
         // A readable request supersedes an unreadable notice for the same id.
         unreadablePermissions: pending.unreadablePermissions.filter(
           item => item.requestId !== permission.id
@@ -131,7 +171,8 @@ export function reduceNativePendingRequests(
     if (form.success)
       return {
         ...pending,
-        questions: [...pending.questions.filter(item => item.id !== form.data.id), form.data],
+        // In place, so a replayed form keeps its place in the oldest-first list.
+        questions: [...upsertByKey(pending.questions, form.data, item => item.id)],
       };
   }
   if (event.type === 'form.replied' || event.type === 'form.cancelled')
@@ -139,9 +180,43 @@ export function reduceNativePendingRequests(
   return pending;
 }
 
+/**
+ * Parts the recovery snapshot can still fill, deduplicated by identity. A
+ * projection failure changes nothing here: those parts leave the transcript
+ * through `error`, and counting them as gaps would promise a Retry the
+ * recovery loop cannot deliver.
+ */
+export function retryableGapCount(
+  messages: NativeSnapshotMessage[],
+  pendingSnapshotMessageIDs: string[] | undefined,
+  unresolvedMessageIDs: ReadonlySet<string>,
+  projectionFailed: boolean
+): number {
+  // The same identities the projector would have consumed: when the
+  // projection itself fails, none of them is a recoverable gap — recovery
+  // fills missing transports, not a broken projector.
+  if (projectionFailed) {
+    return new Set([
+      ...messages.filter(item => item.incomplete).map(item => item.message.id),
+      ...(pendingSnapshotMessageIDs ?? []),
+    ]).size;
+  }
+  return new Set([
+    ...messages.filter(item => item.incomplete).map(item => item.message.id),
+    ...(pendingSnapshotMessageIDs ?? []),
+    ...unresolvedMessageIDs,
+  ]).size;
+}
+
 /** Shared native display boundary. It never opens a socket or owns replay/recovery. */
 export function readNativeConversation(state: NativeSessionState): NativeConversation {
   const complete = state.messages.filter(item => !item.incomplete);
+  // No authorized bytes means no projection either way. A reference that a later
+  // snapshot may still authorize is a recovery gap and stays explicit; one that no
+  // snapshot can ever authorize is simply not displayed, as live and history do.
+  const undisplayable = complete.filter(item =>
+    hasUndisplayableKilo2Assets(item.message, state.assetURLs)
+  );
   const unresolved = complete.filter(item =>
     hasUnresolvedKilo2Assets(item.message, state.assetURLs)
   );
@@ -152,18 +227,20 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
       ...unresolved.map(item => item.message.id),
     ]),
   ];
-  const session = state.session && {
-    ...state.session,
-    location: { directory: state.session.origin.directory },
-  };
+  const session = state.session && withDisplayLocation(state.session);
   const last = state.messages.at(-1)?.message;
   let messages: SessionSnapshot['messages'] = [];
   let projectionError: string | undefined;
+  const unresolvedByProjection = new Set(unresolved.map(item => item.message.id));
   if (session) {
     try {
       messages = readKilo2Messages(
         session,
-        complete.filter(item => !unresolved.includes(item)).map(item => item.message),
+        complete
+          .filter(
+            item => !undisplayable.includes(item) && !unresolvedByProjection.has(item.message.id)
+          )
+          .map(item => item.message),
         { assetURLs: state.assetURLs }
       );
     } catch (error) {
@@ -174,6 +251,15 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
           incompleteMessageIDs.push(item.message.id);
     }
   }
+  // Retryable gap count: parts the recovery snapshot can still fill. A
+  // projection failure is a real error below, not more gaps to charge the
+  // banner with.
+  const recoveryGaps = retryableGapCount(
+    state.messages,
+    state.pendingSnapshotMessageIDs,
+    unresolvedByProjection,
+    projectionError !== undefined
+  );
   return {
     source: { version: 'v2' as const, runtime: 'native' as const },
     // Keep the exact canonical values available to details, usage and export consumers.
@@ -181,17 +267,18 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
     nativeMessages: state.messages,
     messages,
     incompleteMessageIDs,
+    recoveryGaps,
     pending: state.pending,
-    loading: !session && !state.snapshot && !state.error && state.connection !== 'disconnected',
+    // A disconnected pre-snapshot window still shows progress, not a blank screen.
+    loading: !session && !state.snapshot && !state.error,
+    // Only real failures: a missing transcript part is a recovery gap, not an error.
     error:
       state.error ??
       projectionError ??
-      (incompleteMessageIDs.length
-        ? `Native transcript recovery is incomplete: ${incompleteMessageIDs.join(', ')}.`
-        : !session && state.snapshot
-          ? 'The native snapshot has no session metadata.'
-          : last?.type === 'idle' && last.error
-            ? last.error.message
-            : undefined),
+      (!session && state.snapshot
+        ? 'The native snapshot has no session metadata.'
+        : last?.type === 'idle' && last.error
+          ? last.error.message
+          : undefined),
   };
 }

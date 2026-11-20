@@ -42,25 +42,36 @@ export function projectPrivateWorktreePaths<T extends object>(
     }
   }
 
-  const project = (target: object) => {
+  // The directory set is complete before the walk: escape every collected
+  // directory once, combine them into one pattern with the longest directory
+  // first, and reuse that pattern for the whole walk.
+  const orderedDirectories = [...privateDirectories].sort((a, b) => b.length - a.length);
+  const privatePattern =
+    orderedDirectories.length === 0
+      ? undefined
+      : new RegExp(
+          orderedDirectories
+            .map(directory => directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('|'),
+          'gi'
+        );
+
+  const project = (target: object, pattern: RegExp) => {
     const entries: [string, unknown][] = Object.entries(target);
     for (const [key, current] of entries) {
       if (typeof current === 'string') {
-        let projected = current;
-        for (const directory of privateDirectories) {
-          projected = projected.replace(
-            new RegExp(directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-            () => publicDirectory
-          );
-        }
-        Reflect.set(target, key, projected);
+        Reflect.set(
+          target,
+          key,
+          current.replace(pattern, () => publicDirectory)
+        );
       } else if (typeof current === 'object' && current !== null) {
-        project(current);
+        project(current, pattern);
       }
     }
   };
 
   const projected = structuredClone(value);
-  if (privateDirectories.size > 0) project(projected);
+  if (privatePattern) project(projected, privatePattern);
   return projected;
 }

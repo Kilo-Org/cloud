@@ -1,5 +1,10 @@
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import jwt from 'jsonwebtoken';
+import {
+  networkSecretGrantsSchema,
+  networkSecretEnvironment,
+  type NetworkSecretGrant,
+} from '../network-secrets/grants.js';
 import { z } from 'zod';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
@@ -8,7 +13,10 @@ import {
   requiresContainmentSandbox,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
-import { providerUsesOutboundCredentialProxy } from '../agent-sandbox/capabilities.js';
+import {
+  PROVIDER_DESCRIPTORS,
+  providerUsesOutboundCredentialProxy,
+} from '../shared/sandbox-provider.js';
 import { addVercelScmForwarding } from '../scm-broker/vercel-policy.js';
 import { isValidSandboxId } from '../sandbox-id.js';
 import { buildSessionAttachPayload } from '../sandbox-session/attach-payload.js';
@@ -237,6 +245,7 @@ const sessionCredentialGrantShape = z
       })
       .strict(),
     scm: scmSchema.optional(),
+    networkSecrets: networkSecretGrantsSchema.optional(),
     preparedAt: timestampSchema,
     expiresAt: timestampSchema,
   })
@@ -321,6 +330,19 @@ function refinePersistedSessionCredentialGrant(
     }
   }
   const contained = grant.containmentEnabled !== false;
+  if (
+    grant.networkSecrets?.length &&
+    (!contained ||
+      grant.provider !== 'cloudflare-containers' ||
+      grant.networkSecrets.some(
+        secret => parseControlPlaneCredential(secret.alias)?.sandboxId !== grant.sandboxId
+      ) ||
+      new Set(grant.networkSecrets.map(secret => secret.key)).size !==
+        grant.networkSecrets.length ||
+      new Set(grant.networkSecrets.map(secret => secret.alias)).size !==
+        grant.networkSecrets.length)
+  )
+    reject();
   if (grant.repository && grant.repository.type !== 'git') {
     if (grant.scm?.purpose !== grant.repository.type) reject();
   } else if (grant.scm) {
@@ -342,9 +364,9 @@ function refinePersistedSessionCredentialGrant(
   };
   assertScmGrantValid(grant.scm, grant.repository, scmContext, reject, options);
   if (grant.additionalRepositories) {
-    // Only a contained grant that the outbound proxy serves can hold several
-    // repositories. Vercel forwards the launch capability only.
-    if (!contained || grant.provider === 'vercel') reject();
+    // Only a contained grant can hold several repositories: the proxy selects
+    // each one's capability from the request URL.
+    if (!contained) reject();
     const aliasByPurpose = new Map([[grant.scm.purpose, grant.scm.alias]]);
     for (const { repository, scm } of grant.additionalRepositories) {
       if (scm.purpose !== repository.type) reject();
@@ -986,11 +1008,18 @@ function preparedPayload(input: {
     ])
   );
   env.KILOCODE_TOKEN = kiloToken;
+  const networkEnv = networkSecretEnvironment(grant.networkSecrets);
+  Object.assign(env, networkEnv);
   if (grant.scm?.purpose === 'github' && scmToken) {
     if (input.source.createdOnPlatform === 'code-review') {
       env.GH_TOKEN = scmToken;
     } else {
-      if (env.GITHUB_TOKEN && env.GH_TOKEN === undefined) env.GH_TOKEN = env.GITHUB_TOKEN;
+      if (
+        env.GITHUB_TOKEN &&
+        !Object.hasOwn(networkEnv, 'GITHUB_TOKEN') &&
+        env.GH_TOKEN === undefined
+      )
+        env.GH_TOKEN = env.GITHUB_TOKEN;
       env.GH_TOKEN ??= scmToken;
     }
   } else if (grant.scm?.purpose === 'gitlab' && scmToken) {
@@ -1103,6 +1132,7 @@ function additionalRepositoryOf(
  * place.
  */
 export type CredentialGrantPreparation = {
+  networkSecrets?: NetworkSecretGrant[];
   env: CredentialEnv;
   source: ControlPlaneCredentialSource;
   sessionId: string;
@@ -1160,6 +1190,9 @@ export async function prepareCredentialGrant(
     throw new SessionCredentialUpgradeRequiredError();
   }
   const provider = input.provider;
+  if ((input.networkSecrets?.length ?? 0) > 0 && provider !== 'cloudflare-containers') {
+    throw new Error('Network secrets require a Cloudflare sandbox');
+  }
   if (!input.containmentEnabled) throw new SessionCredentialUpgradeRequiredError();
   // Upstream requests run in the control plane. The runtime uses the separately
   // validated runtime-proxy facade, including for Vercel.
@@ -1195,11 +1228,6 @@ export async function prepareCredentialGrant(
     diagnostic
   );
   const additionalMembers = additionalEnvironmentMembers(input.environment, source.repository);
-  if (additionalMembers.length > 0 && !providerUsesOutboundCredentialProxy(provider)) {
-    // Several repositories need the proxy to select each one's capability.
-    diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_grant' });
-    invalidCredentials();
-  }
   const additionalEntries = additionalMembers.map(member => ({
     repoFullName: member.repoFullName,
     repository: additionalRepositoryOf(member, existing, source, diagnostic),
@@ -1277,6 +1305,7 @@ export async function prepareCredentialGrant(
       capabilities: {},
     },
     ...(existing?.scm ? { scm: existing.scm } : {}),
+    ...(input.networkSecrets?.length ? { networkSecrets: input.networkSecrets } : {}),
     preparedAt: now,
     expiresAt: now + (input.leaseMs ?? WORKTREE_LEASE_MS),
   };
@@ -1327,7 +1356,8 @@ export async function prepareCredentialGrant(
     }
   }
   grant = validateGrant(grant, diagnostic);
-  if (provider === 'vercel') buildControlNetworkPolicy([grant], undefined, env);
+  if (PROVIDER_DESCRIPTORS[provider].credentialTransport === 'network-policy')
+    buildControlNetworkPolicy([grant], undefined, env);
   return {
     grant,
     payload: preparedPayload({
@@ -1559,7 +1589,8 @@ export function removeSessionCredentialMembership(
 export function buildControlNetworkPolicy(
   grants: readonly SessionCredentialGrant[],
   acceptedHandlesByScopeId?: ReadonlyMap<string, readonly string[]>,
-  env: { WORKER_URL?: string } = {}
+  env: { WORKER_URL?: string } = {},
+  originProof?: string
 ): VercelSandboxNetworkPolicy {
   const policies = grants.map(value => {
     const grant = validateGrant(value);
@@ -1574,6 +1605,7 @@ export function buildControlNetworkPolicy(
     return buildVercelCredentialNetworkPolicy({
       rootSessionIds: grant.members.map(member => member.kiloSessionId),
       organizationId: grant.orgId,
+      originProof,
       runtimeProxy: {
         ...grant.kilo.runtimeProxy,
         handles: acceptedHandlesByScopeId?.get(grant.scopeId) ?? [],

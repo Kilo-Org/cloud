@@ -22,6 +22,7 @@ import {
   type UpsertEventParams,
 } from '../../session/queries/events.js';
 import type { StoredEvent } from '../../websocket/types.js';
+import { createSessionCostTotals } from './cost-total.js';
 import { eventMutationCursor, events } from './sqlite-schema.js';
 
 // Nearly every row is `kilocode`, so its index matches the whole table. The unary `+`
@@ -74,6 +75,7 @@ export function createSessionEventQueries(
   db: DrizzleSqliteDODatabase,
   storage: DurableObjectStorage
 ) {
+  const costTotals = createSessionCostTotals(db, storage);
   const read = (filters: EventQueryFilters) =>
     db
       .select(columns)
@@ -107,7 +109,12 @@ export function createSessionEventQueries(
         if (existing !== undefined) return null;
       }
       const cursor = advanceCursor();
-      return db
+      const costEntityId =
+        params.entityId !== undefined && params.entityId.startsWith('message/')
+          ? params.entityId
+          : null;
+      const before = costEntityId === null ? null : costTotals.readRow(costEntityId);
+      const id = db
         .insert(events)
         .values({
           execution_id: params.executionId,
@@ -124,6 +131,8 @@ export function createSessionEventQueries(
         })
         .returning({ id: events.id })
         .get().id;
+      if (costEntityId !== null) costTotals.recordWrite(id, before);
+      return id;
     });
 
   return {
@@ -209,37 +218,7 @@ export function createSessionEventQueries(
       );
     },
     getTotalCostMicrodollars(sessionId: string, kiloSessionId: string): number {
-      const native = sql`json_extract(${events.payload}, '$.event') = 'conversation.message.updated'`;
-      const amount = sql`case when ${native} then json_extract(${events.payload}, '$.properties.message.cost') else json_extract(${events.payload}, '$.properties.info.cost') end`;
-      const cost = sql<number>`coalesce(sum(case when typeof(${amount}) in ('integer', 'real') then max(0, ${amount}) else 0 end), 0)`;
-      const dollars =
-        db
-          .select({ cost })
-          .from(events)
-          .where(
-            and(
-              eq(events.session_id, sessionId),
-              isKilocodeRow,
-              gte(events.entity_id, 'message/'),
-              lt(events.entity_id, 'message0'),
-              inArray(sql<string>`json_extract(${events.payload}, '$.event')`, [
-                'message.updated',
-                'conversation.message.updated',
-              ]),
-              eq(
-                sql<string>`case when ${native} then json_extract(${events.payload}, '$.properties.sessionID') else json_extract(${events.payload}, '$.properties.info.sessionID') end`,
-                kiloSessionId
-              ),
-              eq(
-                sql<string>`case when ${native} then json_extract(${events.payload}, '$.properties.message.type') else json_extract(${events.payload}, '$.properties.info.role') end`,
-                'assistant'
-              )
-            )
-          )
-          .get()?.cost ?? 0;
-      return Number.isFinite(dollars)
-        ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(dollars * 1_000_000)))
-        : 0;
+      return costTotals.totalCostMicrodollars(sessionId, kiloSessionId);
     },
     readAncillaryBootstrap(
       maximumBytes = 1_048_576,

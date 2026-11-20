@@ -233,6 +233,7 @@ test('parseCliArgs parses run with repeated links and defaults', () => {
       links: ['kiloapp://sessions', 'kiloapp://profile'],
       targets: undefined,
       matrix: 'standard',
+      cells: [],
       platform: undefined,
       device: undefined,
       metro: 'http://127.0.0.1:8081',
@@ -325,6 +326,39 @@ test('targets resolve to unique slug ids', () => {
     { id: 'a', link: 'kiloapp://a' },
   ]);
   assert.throws(() => resolveTargets([], '[{"id":"x"}]'), /string link/);
+});
+
+test('a held target keeps its release link and its hold', () => {
+  assert.deepEqual(
+    resolveTargets(
+      [],
+      JSON.stringify([
+        {
+          id: 'agents',
+          link: 'kiloapp:///dev/force-state/loading?next=kiloapp%3A%2F%2F%2F(app)',
+          after: 'kiloapp:///dev/force-state/clear?next=kiloapp%3A%2F%2F%2F(app)',
+          hold: true,
+        },
+      ])
+    ),
+    [
+      {
+        id: 'agents',
+        link: 'kiloapp:///dev/force-state/loading?next=kiloapp%3A%2F%2F%2F(app)',
+        after: 'kiloapp:///dev/force-state/clear?next=kiloapp%3A%2F%2F%2F(app)',
+        hold: true,
+      },
+    ]
+  );
+  // A hold without a release would leave the screen held for every later target.
+  assert.throws(
+    () => resolveTargets([], JSON.stringify([{ link: 'kiloapp://a', hold: true }])),
+    /after link to release/
+  );
+  assert.throws(
+    () => resolveTargets([], JSON.stringify([{ link: 'kiloapp://a', after: 'x', hold: 'yes' }])),
+    /hold must be true or false/
+  );
 });
 
 test('detectPlatform prefers a connected adb device', () => {

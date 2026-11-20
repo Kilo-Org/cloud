@@ -52,6 +52,12 @@ describe('Line box per script', () => {
 
   it('never shrinks a script the old 1.62em box covered', () => {
     expect(lineBox('काम करत आहे', EM)).toBe(EM * TALL_LINE);
+    // The floor is a calibrated design box, not a font measurement, so the
+    // font padding is added to the measured box first and the floor is applied
+    // to the result: a script that shipped at exactly 1.62em stays there.
+    for (const value of ['কাজ চলছে', 'ਕੰਮ ਕਰ ਰਿਹਾ', 'કામ ચાલુ', 'കാം ചെയ്യുന്നു']) {
+      expect(lineBox(value, EM)).toBe(EM * TALL_LINE);
+    }
     // Arabic measures taller than the floor it shipped with.
     expect(lineBox('جارٍ العمل', EM)).toBe(184);
     expect(lineBox('العمل', 11)).toBe(Math.ceil(11 * (1.703 + 0.128)));

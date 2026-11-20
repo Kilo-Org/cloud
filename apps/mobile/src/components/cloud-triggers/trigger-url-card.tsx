@@ -20,22 +20,26 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export function TriggerUrlCard({ url }: Readonly<{ url: string }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // The copy control is a 48 dp target, so it sits beside the whole pair
+  // rather than on the value's line: a control inside that line would centre
+  // the URL in 48 dp and push it further from its label than the pairs below
+  // it. The label and the URL stay one column with the field's pair gap.
   return (
-    <View className="gap-1.5">
-      <FormFieldLabel label={t('cloudAgent.triggers.webhookUrl')} />
-      <View className="flex-row items-center gap-2">
-        <Text variant="mono" className="min-w-0 flex-1 self-start text-xs">
+    <View className="flex-row items-center gap-2">
+      <View className="min-w-0 flex-1 gap-1.5">
+        <FormFieldLabel label={t('cloudAgent.triggers.webhookUrl')} />
+        <Text variant="mono" className="text-xs">
           {url}
         </Text>
-        <IconButton
-          accessibilityLabel={t('common.copyLink')}
-          onPress={() => {
-            void copyWebhookUrl(url);
-          }}
-        >
-          <Copy size={16} color={colors.mutedForeground} />
-        </IconButton>
       </View>
+      <IconButton
+        accessibilityLabel={t('common.copyLink')}
+        onPress={() => {
+          void copyWebhookUrl(url);
+        }}
+      >
+        <Copy size={16} color={colors.mutedForeground} />
+      </IconButton>
     </View>
   );
 }

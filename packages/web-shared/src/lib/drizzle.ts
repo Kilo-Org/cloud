@@ -60,10 +60,32 @@ export function selectReplicaUrls({
   usReplicaUrl: string | undefined;
   euReplicaUrls: string[];
 }): string[] {
-  if (nodeEnv === 'development') return [primaryUrl];
-  if (isUSRegion(vercelRegion)) return [usReplicaUrl || primaryUrl];
-  if (euReplicaUrls.length === 0) return [primaryUrl];
-  return euReplicaUrls;
+  return selectRegionalReplicas({
+    primary: primaryUrl,
+    nodeEnv,
+    vercelRegion,
+    usReplica: usReplicaUrl || undefined,
+    euReplicas: euReplicaUrls,
+  });
+}
+
+function selectRegionalReplicas<T>({
+  primary,
+  nodeEnv,
+  vercelRegion,
+  usReplica,
+  euReplicas,
+}: {
+  primary: T;
+  nodeEnv: string | undefined;
+  vercelRegion: string | undefined;
+  usReplica: T | undefined;
+  euReplicas: T[];
+}): T[] {
+  if (nodeEnv === 'development') return [primary];
+  if (isUSRegion(vercelRegion)) return [usReplica ?? primary];
+  if (euReplicas.length === 0) return [primary];
+  return euReplicas;
 }
 
 /**
@@ -158,7 +180,7 @@ function requestIp(headers: Record<string, string>): string | null {
  *   module from loading now that every EU replica gets a pool
  * - Falls back to primary if no enabled replica is configured for the region
  */
-function getReplicaUrls(): string[] {
+function getReplicaTargets() {
   const inventory = readReplicaInventory();
   if (inventory.unknownDisabled.length > 0) {
     console.warn(
@@ -176,12 +198,12 @@ function getReplicaUrls(): string[] {
       return false;
     }
   });
-  return selectReplicaUrls({
-    primaryUrl: postgresUrl,
+  return selectRegionalReplicas<{ name: string; url: string }>({
+    primary: { name: 'primary', url: postgresUrl },
     nodeEnv: NODE_ENV,
     vercelRegion: VERCEL_REGION,
-    usReplicaUrl: enabled.find(replica => replica.side === 'us')?.url,
-    euReplicaUrls: enabled.filter(replica => replica.side === 'eu').map(replica => replica.url),
+    usReplica: enabled.find(replica => replica.side === 'us'),
+    euReplicas: enabled.filter(replica => replica.side === 'eu'),
   });
 }
 
@@ -226,18 +248,19 @@ taggedWriterPool.on('error', (error: Error) => {
 // EU replica, with the primary only as fallback. Each pool keeps the full `max`,
 // because a request reads from one replica only and needs the capacity it had
 // before.
-const replicaUrls = getReplicaUrls();
-export const usesSeparateReplica = replicaUrls[0] !== postgresUrl;
+const replicaTargets = getReplicaTargets();
+export const usesSeparateReplica = replicaTargets[0]?.url !== postgresUrl;
 
 const replicas = usesSeparateReplica
-  ? replicaUrls.map(connectionString =>
-      createDrizzleClient({
-        connectionString,
+  ? replicaTargets.map(({ url, name }) => ({
+      ...createDrizzleClient({
+        connectionString: url,
         poolConfig: { ...sharedPoolConfig, application_name: `${appName}-replica` },
         logger: !!DEBUG_QUERY_LOGGING,
-      })
-    )
-  : [primary];
+      }),
+      name,
+    }))
+  : [{ ...primary, name: 'primary' }];
 const replicaPools = usesSeparateReplica ? replicas.map(replica => replica.pool) : [];
 
 // Attach pools to ensure idle connections close before suspension
@@ -317,35 +340,48 @@ const primaryDb = primary.db;
  * `selectReplicaIndex` picks for the current request.
  * Falls back to the primary if no replica URL is configured for the region.
  */
-export const readDb = createReadDb(replicas.map(replica => replica.db));
+const readDbSelector = createReadDbSelector(
+  replicas.map(replica => ({ db: replica.db, name: replica.name }))
+);
+export const readDb = readDbSelector.readDb;
+
+/** The concrete database selected by readDb for this request, and its safe inventory name. */
+export function getReadDbTarget(): { db: DrizzleDatabase; name: string } {
+  return { ...readDbSelector.currentTarget() };
+}
 
 export function createReadDb(dbs: DrizzleDatabase[]): DrizzleDatabase {
-  const [first] = dbs;
+  return createReadDbSelector(dbs.map(db => ({ db }))).readDb;
+}
+
+function createReadDbSelector<T extends { db: DrizzleDatabase }>(targets: T[]) {
+  const [first] = targets;
   if (!first) throw new Error('readDb needs at least one database');
-  if (dbs.length === 1) return first;
-  const fallbackIndex = Math.floor(Math.random() * dbs.length);
+  if (targets.length === 1) return { readDb: first.db, currentTarget: () => first };
+  const fallbackIndex = Math.floor(Math.random() * targets.length);
   // Vercel keeps one headers object per request, so each request hashes its address once.
   const indexByHeaders = new WeakMap<object, number>();
-  const currentDb = () => {
+  const currentTarget = () => {
     const headers = vercelRequestHeaders();
-    if (!headers) return dbs[fallbackIndex] ?? first;
+    if (!headers) return targets[fallbackIndex] ?? first;
     let index = indexByHeaders.get(headers);
     if (index === undefined) {
-      index = selectReplicaIndex(requestIp(headers), dbs.length, fallbackIndex);
+      index = selectReplicaIndex(requestIp(headers), targets.length, fallbackIndex);
       indexByHeaders.set(headers, index);
     }
-    return dbs[index] ?? first;
+    return targets[index] ?? first;
   };
   // One stable object, so callers that key on `readDb` (the model-stats cache) still see one client.
-  return new Proxy(first, {
+  const readDb = new Proxy(first.db, {
     get(_target, property) {
-      const target = currentDb();
+      const target = currentTarget().db;
       const value: unknown = Reflect.get(target, property, target);
       if (typeof value !== 'function') return value;
       const method = value as (...args: unknown[]) => unknown;
       return method.bind(target);
     },
   });
+  return { readDb, currentTarget };
 }
 
 /**

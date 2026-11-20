@@ -5,7 +5,8 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   BOUNDED_READ_LOCK_TIMEOUT_MS,
   BOUNDED_READ_STATEMENT_TIMEOUT_MS,
-  isBoundedReadError,
+  BoundedReplicaReadError,
+  classifyBoundedReadError,
   withBoundedReplicaRead,
 } from './bounded-replica-read';
 
@@ -33,7 +34,7 @@ describe('withBoundedReplicaRead', () => {
         }) as never
     );
 
-    const result = await withBoundedReplicaRead(async tx => {
+    const result = await withBoundedReplicaRead('agent_interactions', async tx => {
       statements.push('read');
       const rows = await tx.execute(
         sql`select current_setting('statement_timeout') as statement_timeout, current_setting('lock_timeout') as lock_timeout`
@@ -51,44 +52,74 @@ describe('withBoundedReplicaRead', () => {
   });
 
   test('does not leak the bounds to the connection after the transaction', async () => {
-    await withBoundedReplicaRead(async () => undefined);
+    await withBoundedReplicaRead('members', async () => undefined);
     const rows = await readDb.execute(sql`select current_setting('statement_timeout') as value`);
     expect(rows.rows[0]).not.toEqual({ value: '10s' });
   });
 
   test('recognizes a real statement timeout wrapped by Drizzle', async () => {
-    const error = await withBoundedReplicaRead(async tx => {
-      await tx.execute(sql`SET LOCAL statement_timeout = 50`);
-      return tx.execute(sql`select pg_sleep(2)`);
-    }).then(
-      () => null,
-      (e: unknown) => e
-    );
+    await expect(
+      withBoundedReplicaRead('agent_interactions', async tx => {
+        await tx.execute(sql`SET LOCAL statement_timeout = 50`);
+        return tx.execute(sql`select pg_sleep(2)`);
+      })
+    ).rejects.toMatchObject({
+      diagnostics: {
+        sqlstate: '57014',
+        reason: 'statement_timeout',
+        query: 'agent_interactions',
+        replica: 'primary',
+        elapsedMs: expect.any(Number),
+      },
+    });
+  });
 
-    expect(error).not.toBeNull();
-    expect(isBoundedReadError(error)).toBe(true);
+  test('propagates unrecognized failures unchanged', async () => {
+    const error = new Error('unexpected');
+    await expect(
+      withBoundedReplicaRead('members', async () => {
+        throw error;
+      })
+    ).rejects.toBe(error);
+  });
+
+  test('wraps an expected failure without attaching its raw cause', async () => {
+    const error = new Error('Failed query: private SQL and params', { cause: { code: '55P03' } });
+    const result = withBoundedReplicaRead('members', async () => {
+      throw error;
+    });
+    await expect(result).rejects.toBeInstanceOf(BoundedReplicaReadError);
+    await expect(result).rejects.toHaveProperty('message', 'Bounded replica read did not complete');
+    await expect(result).rejects.not.toHaveProperty('cause');
   });
 });
 
-describe('isBoundedReadError', () => {
-  test.each(['57014', '55P03', '40001'])('accepts SQLSTATE %s, also under .cause', code => {
-    expect(isBoundedReadError({ code })).toBe(true);
-    expect(isBoundedReadError(new Error('wrapped', { cause: { code } }))).toBe(true);
-    expect(
-      isBoundedReadError(new Error('outer', { cause: new Error('mid', { cause: { code } }) }))
-    ).toBe(true);
+describe('classifyBoundedReadError', () => {
+  test.each([
+    ['57014', 'canceling statement due to statement timeout', 'statement_timeout'],
+    ['57014', 'canceling statement due to user request', 'query_canceled'],
+    ['55P03', 'canceling statement due to lock timeout', 'lock_timeout'],
+    ['55P03', 'could not obtain lock', 'lock_not_available'],
+    ['40001', 'canceling statement due to conflict with recovery', 'replica_recovery_conflict'],
+    ['40001', 'could not serialize access', 'serialization_failure'],
+  ])('classifies %s: %s through wrapped causes', (code, message, reason) => {
+    const cause = new Error('Failed query', { cause: { code, message } });
+    expect(classifyBoundedReadError(new Error('outer', { cause }))).toEqual({
+      sqlstate: code,
+      reason,
+    });
   });
 
   test('rejects other errors', () => {
-    expect(isBoundedReadError(new Error('boom'))).toBe(false);
-    expect(isBoundedReadError({ code: '23505' })).toBe(false);
-    expect(isBoundedReadError(null)).toBe(false);
-    expect(isBoundedReadError('57014')).toBe(false);
+    expect(classifyBoundedReadError(new Error('boom'))).toBeUndefined();
+    expect(classifyBoundedReadError({ code: '23505' })).toBeUndefined();
+    expect(classifyBoundedReadError(null)).toBeUndefined();
+    expect(classifyBoundedReadError('57014')).toBeUndefined();
   });
 
   test('terminates on a cyclic cause chain', () => {
     const error: { cause?: unknown } = {};
     error.cause = error;
-    expect(isBoundedReadError(error)).toBe(false);
+    expect(classifyBoundedReadError(error)).toBeUndefined();
   });
 });

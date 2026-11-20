@@ -25,7 +25,7 @@ import {
   getCodeReviewsPerDay,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
-  isBoundedReadError,
+  BoundedReplicaReadError,
   withBoundedReplicaRead,
 } from '@kilocode/web-shared/lib/organizations/bounded-replica-read';
 import { roundAIAdoptionDateRange } from '@/lib/organizations/ai-adoption-date-range';
@@ -160,7 +160,9 @@ async function computeAIAdoptionTimeseries(
   response: z.infer<typeof AIAdoptionTimeseriesOutputSchema>;
 }> {
   // Fetch organization members (active only, not invited)
-  const allMembers = await withBoundedReplicaRead(tx => getOrganizationMembers(organizationId, tx));
+  const allMembers = await withBoundedReplicaRead('members', tx =>
+    getOrganizationMembers(organizationId, tx)
+  );
   const members = allMembers
     .filter((m): m is Extract<typeof m, { status: 'active' }> => m.status === 'active')
     .map(m => ({
@@ -192,7 +194,7 @@ async function computeAIAdoptionTimeseries(
   // Fetch all component data in parallel
   const [agentInteractionsData, autocompleteData, cloudAgentSessionsData, codeReviewsData] =
     await Promise.all([
-      withBoundedReplicaRead(tx =>
+      withBoundedReplicaRead('agent_interactions', tx =>
         getAgentInteractionsPerDay(organizationId, extendedStartDateStr, endDate, tx)
       ),
       getAutocompleteAcceptedSuggestionsPerDay({
@@ -201,10 +203,10 @@ async function computeAIAdoptionTimeseries(
         startDate: extendedStartDateStr,
         endDate,
       }),
-      withBoundedReplicaRead(tx =>
+      withBoundedReplicaRead('cloud_agent_sessions', tx =>
         getCloudAgentSessionsPerDay(organizationId, extendedStartDateStr, endDate, tx)
       ),
-      withBoundedReplicaRead(tx =>
+      withBoundedReplicaRead('code_reviews', tx =>
         getCodeReviewsPerDay(organizationId, extendedStartDateStr, endDate, tx)
       ),
     ]);
@@ -333,20 +335,24 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       const { startDate, endDate } = roundAIAdoptionDateRange(input);
       const cacheKey = { organizationId, startDate, endDate };
 
-      const cached = await readCachedAIAdoption(cacheKey, AIAdoptionTimeseriesOutputSchema);
-      if (cached) return cached;
-
+      const event = 'AI adoption timeseries result';
       try {
+        const cached = await readCachedAIAdoption(cacheKey, AIAdoptionTimeseriesOutputSchema);
+        if (cached) {
+          console.info(event, { outcome: 'available', cacheHit: true });
+          return cached;
+        }
         const result = await computeAIAdoptionTimeseries(organizationId, startDate, endDate);
         // The degraded result is never cached, so the next request retries the replica.
         if (result.members > 0) await writeCachedAIAdoption(cacheKey, result.response);
+        console.info(event, { outcome: 'available', cacheHit: false });
         return result.response;
       } catch (error) {
-        if (!isBoundedReadError(error)) throw error;
-        console.warn('AI adoption reads exceeded the replica bounds', {
-          organizationId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        if (!(error instanceof BoundedReplicaReadError)) {
+          console.warn(event, { outcome: 'error' });
+          throw error;
+        }
+        console.warn(event, { outcome: 'unavailable', ...error.diagnostics });
         return UNAVAILABLE_AI_ADOPTION;
       }
     }),

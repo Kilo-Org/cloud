@@ -78,8 +78,8 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
   const closed = new Set<string>();
   /** Tabs this worker forgot before its record was read: restoring one would re-register a page that is gone. */
   const detached = new Set<number>();
-  /** Registrations made before the record was read: applied after it, so neither the record nor the call is lost. */
-  const pending: (() => void)[] = [];
+  /** A registration made before the record was read; a close or detach since then wins over it (see `applyPending`). */
+  const pending: { apply: () => void; session: string; tabId?: number }[] = [];
   /** Restored once, before the first write: a write must not erase a record this worker has not read yet. */
   const { promise: hydration, resolve: hydrated } = Promise.withResolvers<void>();
 
@@ -113,15 +113,24 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
   };
 
   /**
-   * A tab or an approval registered by a call that woke this worker, applied after the record is read: the record is
-   * the session's whole history, and writing this registration into the live entry first would leave its rest behind.
+   * A tab or an approval a waking call registered: written after the record is read, so the record's older copy of the
+   * same fact cannot replace it, and dropped when a close or a detach has since ended what it names.
    */
-  const register = (apply: () => void): void => {
+  const register = (session: string, apply: () => void, tabId?: number): void => {
     if (decision.kind === 'restoring') {
-      pending.push(apply);
+      pending.push(tabId === undefined ? { apply, session } : { apply, session, tabId });
     } else {
       apply();
       void write();
+    }
+  };
+
+  /** Applies what a waking call registered, minus the sessions and tabs a close or a detach has since ended. */
+  const applyPending = (): void => {
+    for (const { apply, session, tabId } of pending.splice(0)) {
+      if (!closed.has(session) && (tabId === undefined || !detached.has(tabId))) {
+        apply();
+      }
     }
   };
 
@@ -172,22 +181,19 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
 
   void (async (): Promise<void> => {
     try {
-      restoreSessions({ closed, detached, hold, state, stored: await readState(storageOf()) });
+      const stored = await readState(storageOf());
+
+      // A registration that arrived while the record was being read is this worker's newest fact, so it lands first
+      // And the record merges into it — never over it. The drain reads `closed`/`detached` again, so a close or a
+      // Detach during the read still wins over a call that started before it.
+      applyPending();
+      restoreSessions({ closed, detached, hold, state, stored });
     } catch {
       // A record that cannot be applied leaves the live hold: fewer tabs are owned, never more.
     } finally {
-      // The registrations made before the read are applied last, so the call that woke this worker is what the hold
-      // And the record both end with — and the merged record is persisted once, now that both halves are in it.
-      if (pending.length > 0) {
-        for (const apply of pending.splice(0)) {
-          apply();
-        }
-
-        void write();
-      }
-
-      // Once the record is read it is the authority: a later detach edits it directly, so the pre-read list is spent.
-      // It clears only now, so a tab detached mid-restore is not re-registered by a registration still waiting here.
+      // Whatever was registered while the record was applied lands last, over the record's older copy.
+      applyPending();
+      void write();
       detached.clear();
 
       // Whatever the record said, the hold is answerable now: a decision may wait no longer than the read, and never
@@ -202,8 +208,11 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
       hold.announce(download);
     },
     arm: need => {
-      hold.arm(need);
-      register(() => {
+      if (!closed.has(need.session)) {
+        hold.arm(need);
+      }
+
+      register(need.session, () => {
         recordOf(need.session).need = need;
       });
     },
@@ -272,12 +281,19 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
 
       // The hold learns the tab now: a download is attributed by it the moment the tool runs. Its mirror waits for
       // The record only when the record has not been read, so the session's other tabs are never replaced by this one.
-      hold.tab(input);
-      register(() => {
-        const record = recordOf(input.session);
+      if (!closed.has(input.session)) {
+        hold.tab(input);
+      }
 
-        record.tabs = [...record.tabs.filter(tab => tab.tabId !== input.tabId), input];
-      });
+      register(
+        input.session,
+        () => {
+          const record = recordOf(input.session);
+
+          record.tabs = [...record.tabs.filter(tab => tab.tabId !== input.tabId), input];
+        },
+        input.tabId
+      );
     },
     tracked: itemId => hold.tracked(itemId),
   };

@@ -78,9 +78,9 @@ export type HoldState = z.infer<typeof stateSchema>;
 /**
  * One session's stored record merged with what this worker already knows about it.
  *
- * A live entry is newer where both carry a fact — the report it queued, the approval it saw spent — so it wins those;
- * the record is the only copy of everything else the session had before the worker slept: its other tabs, an approval
- * a human granted, the reports a previous worker queued. A tab the worker detached is dropped from both.
+ * The live entry is what this worker has seen since it woke — a call's tab registered before the tool ran, the
+ * approval it armed, the report it queued — so it wins every fact both carry. The record is the only copy of
+ * everything else the session had before the worker slept. A tab detached since then survives in neither.
  */
 export const mergeSession = ({
   detached,
@@ -91,22 +91,24 @@ export const mergeSession = ({
   readonly existing: HoldState[string] | undefined;
   readonly stored: HoldState[string];
 }): HoldState[string] => {
-  const tabs = stored.tabs.filter(
+  const recorded = stored.tabs.filter(
     tab =>
       !detached.has(tab.tabId) && existing?.tabs.some(entry => entry.tabId === tab.tabId) !== true
   );
+  const live = (existing?.tabs ?? []).filter(tab => !detached.has(tab.tabId));
 
   return {
     need: existing?.need ?? stored.need,
     owed: [...stored.owed, ...(existing?.owed ?? [])],
-    tabs: [...tabs, ...(existing?.tabs ?? [])],
+    tabs: [...recorded, ...live],
   };
 };
 
 /**
  * Applies a stored record to a session's live mirror and the hold. Each session's record is merged into what the
  * worker already knows (see {@link mergeSession}), a closed session is dropped whole, and only the facts the record
- * alone carried are registered: the tabs the hold does not have, and the approval it has no need for.
+ * alone carried reach the hold: a tab it does not have, and an approval it has no need for. What a waking call
+ * registered and armed before this read is therefore never replaced by the older record.
  */
 export const restoreSessions = ({
   closed,
@@ -117,7 +119,7 @@ export const restoreSessions = ({
 }: {
   readonly closed: ReadonlySet<string>;
   readonly detached: ReadonlySet<number>;
-  readonly hold: Pick<DownloadHold, 'arm' | 'tab'>;
+  readonly hold: Pick<DownloadHold, 'arm' | 'needOf' | 'tab'>;
   readonly state: HoldState;
   readonly stored: HoldState;
 }): void => {
@@ -129,6 +131,8 @@ export const restoreSessions = ({
 
       state[session] = merged;
 
+      // The live mirror is the authority for the tabs this worker registered: one it already holds keeps its page
+      // And step, and the record's older copy of the same tab id is not put back over it.
       for (const tab of merged.tabs) {
         if (existing?.tabs.some(entry => entry.tabId === tab.tabId) !== true) {
           hold.tab({
@@ -140,7 +144,10 @@ export const restoreSessions = ({
         }
       }
 
-      if (merged.need === record.need && record.need !== undefined) {
+      // The hold itself answers an approval the waking call armed: the record's is only the tie when it has none. A
+      // Mirror alone would say nothing, because the call's need is in both by then while the hold may have dropped an
+      // Older token as expired.
+      if (record.need !== undefined && hold.needOf(session) === undefined) {
         hold.arm({
           ...record.need,
           step: record.need.step === undefined ? undefined : { ...record.need.step },

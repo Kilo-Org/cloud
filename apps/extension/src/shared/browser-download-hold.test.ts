@@ -991,6 +991,118 @@ describe('the recorded state', () => {
     expect(downloads.order).toContain('cancel');
   });
 
+  /**
+   * The defect this covers: the hold's `tab` replaces by tab id and its `arm` by session, and the live mirror entry of
+   * a waking call only landed after this read. The record's older page, step and approval were therefore written over
+   * what the call had just registered, so the call's download was attributed to the previous step and the file the
+   * user had just approved was matched against an expired need and refused.
+   */
+  it('keeps the tab and the approval a waking call registered over the record’s older ones', async () => {
+    const otherPage = 'https://app.example/previous';
+    const attachment = 'https://app.example/reports/q4.pdf';
+    const staleNeed: ApprovalNeed = {
+      expiresAt: Date.now() - 1,
+      kind: 'armed',
+      session: 'session-1',
+      step,
+      tabId: 7,
+      target: targetOf(attachment),
+    };
+    const storage = makeStorage({
+      deferred: true,
+      initial: {
+        'session-1': {
+          need: staleNeed,
+          owed: [],
+          tabs: [{ page: otherPage, session: 'session-1', step, tabId: 7 }],
+        },
+      },
+    });
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+    const freshStep = {
+      ...step,
+      description: "click on 'Download invoice'",
+      toolName: 'browser_click',
+    };
+
+    // The waking call registers its tab and arms the approval a human just gave, before the record is read.
+    hold.tab({ ...agentTab(), step: freshStep });
+    hold.arm({
+      expiresAt: Date.now() + 60_000,
+      kind: 'armed',
+      session: 'session-1',
+      step: freshStep,
+      tabId: 7,
+      target: targetOf(attachment),
+    });
+
+    storage.release();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The call's own approval is the live one: the record's expired token never replaced it.
+    expect(hold.needOf('session-1')?.kind).toBe('armed');
+
+    expect(
+      hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(downloads.order).toContain('suggest');
+    expect(hold.tracked(1)?.kind).toBe('allowed');
+  });
+
+  /**
+   * The defect this covers: the applies ran after the restore and never consulted `closed`/`detached`, so a
+   * registration queued before a close re-created the session — and one queued before a detach re-added the tab — and
+   * the next worker restored a session that no longer existed.
+   */
+  it('lets a close during the read win over a queued registration', async () => {
+    const storage = makeStorage({ deferred: true, initial: {} });
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    hold.tab(agentTab());
+    hold.arm(armedNeed({ url: 'https://app.example/reports/q4.pdf' }));
+    hold.closeSession('session-1');
+
+    storage.release();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Nothing the closed session registered comes back, in the mirror or in the record.
+    expect(storage.recordKeys()).toStrictEqual([]);
+    expect(hold.needOf('session-1')).toBeUndefined();
+    expect(
+      hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(downloads.order).toStrictEqual(['suggest']);
+  });
+
+  it('lets a detach during the read win over a queued registration', async () => {
+    const storage = makeStorage({ deferred: true, initial: {} });
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    hold.tab(agentTab());
+    hold.tab({ detach: 7 });
+
+    storage.release();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The forgotten tab is not re-registered by the queue — neither on its page nor on any other.
+    expect(
+      hold.handle({ id: 1, referrer: page, url: 'https://app.example/reports/q4.pdf' }, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(false);
+    expect(downloads.order).toStrictEqual(['suggest']);
+
+    // The record is empty, so only the queue could have brought the tab back: it must not be in the mirror either.
+    expect(storage.recordKeys()).toStrictEqual([]);
+  });
+
   it('keeps what this worker decided when a slower record would say otherwise', async () => {
     const storage = makeStorage({
       deferred: true,

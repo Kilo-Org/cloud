@@ -605,6 +605,42 @@ test('unreadable pending inventory clears controls without blocking later ordere
   connection.close();
 });
 
+test('a mixed pending inventory publishes readable cards and an unreadable notice together', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame(
+    'remote.state',
+    {
+      incarnation: 'runner',
+      runID: 'run',
+      pending: {
+        permissions: [
+          { requestID: 'readable', tool: 'edit', summary: 'file' },
+          { requestID: 'unreadable', tool: 'edit', summary: 7 },
+        ],
+        questions: [
+          { requestID: 'question', fields: [{ type: 'string', key: 'q', title: 'Which?' }] },
+        ],
+      },
+    },
+    1,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.permissions.map(item => item.id)).toEqual(['readable']);
+  expect(state?.pending.unreadablePermissions).toEqual([{ requestId: 'unreadable' }]);
+  expect(state?.pending.questions.map(item => item.id)).toEqual(['question']);
+  expect(state?.connection).toBe('connected');
+  connection.close();
+});
+
 test('an unreadable live permission is published by identity until the runner replies', async () => {
   const { client } = fixture();
   let state: NativeSessionState | undefined;

@@ -1585,6 +1585,50 @@ function seedPublished(sqlite, { runId, publishedAt, tableRun = null }) {
     .run(tableRun ?? runId);
 }
 
+test('the bounded publication lookup includes a republished older row', async () => {
+  const { scopePublishedSql } = await import('./legacy-cancel.mjs');
+  const f = fixture();
+  try {
+    seedPublished(f.sqlite, { runId: 'older-row', publishedAt: '2026-11-19T00:00:00.000Z' });
+    seedPublished(f.sqlite, { runId: 'newer-row', publishedAt: '2026-11-20T00:00:00.000Z' });
+    f.sqlite
+      .prepare("UPDATE routing_tables SET published_at = ? WHERE run_id = 'older-row'")
+      .run('2026-11-21T00:00:00.000Z');
+    const publication = f.sqlite
+      .prepare(scopePublishedSql())
+      .all()
+      .find(row => row.router === 'efficient');
+    assert.equal(publication.run_id, 'older-row');
+    assert.equal(publication.history_rows, 2);
+  } finally {
+    f.close();
+  }
+});
+
+test('oversized publication history stops before legacy cancellation', async () => {
+  const { LEAN_MAX_PUBLICATIONS } = await import('./legacy-cancel.mjs');
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    f.sqlite
+      .prepare(
+        `WITH RECURSIVE rows(n) AS (VALUES (1) UNION ALL SELECT n+1 FROM rows WHERE n<?)
+         INSERT INTO routing_tables (run_id, router, published_at, generated_at, min_accuracy,
+           switch_cost_factor, best_accuracy_switch_threshold, source)
+         SELECT 'old-' || n, 'efficient', '2026-11-19', '2026-11-19', 0.9, 1, 0.05, 'platform'
+           FROM rows`
+      )
+      .run(LEAN_MAX_PUBLICATIONS + 1);
+    const before = snapshot(f.sqlite);
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(result.last('verify_failed').reason, /publication history exceeds/);
+    assert.deepEqual(snapshot(f.sqlite), before);
+  } finally {
+    f.close();
+  }
+});
+
 test('bounded remote path never reads the full-history digest', async () => {
   const f = fixture();
   try {

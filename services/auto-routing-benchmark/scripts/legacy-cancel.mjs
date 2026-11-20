@@ -510,6 +510,7 @@ export const MONOTONE_FIELDS = new Set(['platform_requested_sum', 'user_requeste
  */
 export const LEAN_MAX_RUNS = 50;
 export const LEAN_MAX_SCOPED_ROWS = 50_000;
+export const LEAN_MAX_PUBLICATIONS = 2_000;
 
 /** The routers whose published artifact is compared (`AUTO_ROUTERS` in the contracts package). */
 export const LEAN_ROUTERS = ['efficient', 'frontier'];
@@ -519,21 +520,25 @@ export function scopeRunsSql(limit = LEAN_MAX_RUNS) {
   return `SELECT id FROM benchmark_runs WHERE status = 'running' ORDER BY id LIMIT ${limit + 1}`;
 }
 
-/**
- * Current published artifact per router (newest `published_at`). `routing_tables` has no
- * `(router, published_at)` index, so ask each known router for its newest row instead of
- * scanning that history; the router list is fixed, so this is O(routers).
- */
+/** Read a capped publication history, then select the latest artifact for each router. */
 export function scopePublishedSql(routers = LEAN_ROUTERS) {
-  return routers
+  const current = routers
     .map(
-      router => `SELECT ${sqlString(router)} AS router, (
-      SELECT t.run_id FROM routing_tables AS t
+      router => `SELECT ${sqlString(router)} AS router, history_rows, (
+      SELECT t.run_id FROM publications AS t
       WHERE t.router = ${sqlString(router)}
-      ORDER BY t.published_at DESC, t.rowid DESC
-      LIMIT 1) AS run_id`
+      ORDER BY t.published_at DESC, t.ordinal DESC
+      LIMIT 1) AS run_id
+      FROM publication_count`
     )
     .join('\n  UNION ALL\n  ');
+  // An upsert can republish an older row, so rowid cannot decide which table serves.
+  // This pre-migration schema has no publication index. Refuse partial history.
+  return `WITH publications AS MATERIALIZED (
+    SELECT router, run_id, published_at, rowid AS ordinal FROM routing_tables
+    LIMIT ${LEAN_MAX_PUBLICATIONS + 1}
+  ), publication_count AS (SELECT COUNT(*) AS history_rows FROM publications)
+  ${current}`;
 }
 
 const inList = ids => (ids.length === 0 ? 'IN (NULL)' : `IN (${ids.map(sqlString).join(', ')})`);
@@ -776,6 +781,15 @@ async function resolveLeanScope(executor, previous = null) {
     );
   }
   const publishedRows = await executor.read(scopePublishedSql());
+  if (
+    publishedRows.length !== LEAN_ROUTERS.length ||
+    publishedRows.some(row => !Number.isSafeInteger(row.history_rows) || row.history_rows < 0)
+  ) {
+    throw new VerifyFailed('the publication history probe is incomplete');
+  }
+  if (publishedRows.some(row => row.history_rows > LEAN_MAX_PUBLICATIONS)) {
+    throw new VerifyFailed('publication history exceeds the bounded verification limit');
+  }
   // A router with no publication yet yields NULL; it is not a served artifact and is not
   // compared. Only real run ids enter the scope.
   const publishedRunIds = [

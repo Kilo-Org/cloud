@@ -1,10 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
-import type {
-  BenchmarkConfig,
-  BenchmarkModelSummary,
-  BenchmarkModelTotals,
-  BenchmarkRoutingTableResponse,
-  BenchmarkRun,
+import {
+  BenchmarkConfigResponseSchema,
+  type BenchmarkConfig,
+  type BenchmarkModelSummary,
+  type BenchmarkModelTotals,
+  type BenchmarkRoutingTableResponse,
+  type BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -265,6 +266,25 @@ describe('compact route rankings', () => {
     const html = renderToStaticMarkup(React.createElement(RoutingTableView, { data }));
     expect(html).toContain('legacy · low');
     expect(html).toContain('Below threshold');
+  });
+});
+
+describe('config save drain', () => {
+  it('parses every drain outcome the worker reports', () => {
+    const parse = (drain: unknown) =>
+      BenchmarkConfigResponseSchema.safeParse({
+        config: null,
+        policySettings: null,
+        warnings: [],
+        drain,
+      }).success;
+    // The console rejects the whole save when this schema fails, so each value
+    // the worker can send has to parse here.
+    for (const skipped of ['active_run', 'nothing_pending', 'timeout', 'failed', null]) {
+      expect(parse({ runId: null, entryCount: 0, skipped })).toBe(true);
+    }
+    expect(parse({ runId: 'run-1', entryCount: 3, skipped: null })).toBe(true);
+    expect(parse({ runId: null, entryCount: 0, skipped: 'unknown_reason' })).toBe(false);
   });
 });
 

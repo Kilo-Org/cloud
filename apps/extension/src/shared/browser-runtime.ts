@@ -28,7 +28,7 @@ import type {
 import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
 import type { BrowserSensitiveStep } from './browser-agent-gate';
 import { ATTRIBUTION_WAIT_MS, targetOf } from './browser-download-hold';
-import type { DownloadHold, DownloadStep } from './browser-download-hold';
+import type { DownloadHold, DownloadSettle, DownloadStep } from './browser-download-hold';
 import {
   DOWNLOAD_FAIL_REASON,
   DOWNLOAD_RESPONSE_PATTERNS,
@@ -337,6 +337,11 @@ const DOWNLOAD_OBSERVE_POLLS = 10;
  * bounded.
  */
 const DOWNLOAD_START_GRACE_MS = 40;
+/**
+ * How long a call that saw a sign of a download waits for the browser to create the item it announced. Chrome
+ * creates it a moment after the announcement, and a loaded machine can take a few hundred milliseconds.
+ */
+const DOWNLOAD_ITEM_WAIT_MS = 1500;
 const DOWNLOAD_ANNOUNCE_GRACE_MS = 250;
 const DOWNLOAD_ANNOUNCE_POLL_MS = 10;
 const DOWNLOAD_ANNOUNCE_POLLS = 120;
@@ -2879,6 +2884,12 @@ export const createBrowserRuntime = ({
       let dispatched = false;
       /** The tab this call opened for its step, if any, so a refusal after the open can close it again. */
       let stepOpenedTab: number | null = null;
+      /** The file the browser announced during this call, if it announced one: the item the settle waits for. */
+      let signedFile: { readonly filename: string; readonly url: string | undefined } | null = null;
+      /** A load the browser answered as a file, when this call's step was a navigation. */
+      let navigatedToFile = false;
+      /** How the hold's settle ended, when the hold decided this call's downloads. */
+      let settleState: DownloadSettle | null = null;
       const drivenChain = Promise.withResolvers<void>();
 
       const callerHook = (): void => {
@@ -3458,6 +3469,21 @@ export const createBrowserRuntime = ({
               })
             : undefined;
 
+        // The sign that a download started, which the hold cannot see before its item exists: the browser's own
+        // Announcement on this call's tab. It is what makes a signed call wait for its item instead of answering.
+        const stopSignWatch =
+          holdGuards && agentContext !== undefined
+            ? runSession.watchDownloads(download => {
+                signedFile ??= {
+                  filename:
+                    download.suggestedFilename ??
+                    requestedFileName(download.url ?? '') ??
+                    'the downloaded file',
+                  url: download.url,
+                };
+              })
+            : undefined;
+
         if (downloadGuard !== undefined) {
           // The guard reports the tabs this call opened, so its listener lives exactly as long as the guard does.
           tabsApi.onCreated?.addListener(noteBrowserOpenedTab);
@@ -3526,6 +3552,14 @@ export const createBrowserRuntime = ({
           });
 
           result = await Promise.race([call, takenAway.then(() => null)]);
+
+          // A load the browser answered as a file: the attachment never became a document, and its item follows.
+          navigatedToFile =
+            (runIsTranslation || preflight?.class === 'navigate') &&
+            destination !== undefined &&
+            result !== null &&
+            !result.ok &&
+            result.error.includes('ERR_ABORTED');
         } finally {
           // Every exit — a result, a take-over, a throw — disarms the guard, so no listener or interception outlives the call.
           if (guardDownloads && !downloadApproved) {
@@ -3546,15 +3580,18 @@ export const createBrowserRuntime = ({
           // The announcement for a file no response could stop is read before the watch goes: a blob that lands
           // While the call is still answering is still this call's to report.
           stopUnguardedWatch?.();
+          stopSignWatch?.();
 
           if (holdGuards) {
-            // The call waits only for its own decision: an ordinary click pays the start grace, and a download
-            // The hold is still deciding is read before the call answers, so its refusal is this call's answer.
-            await downloadHold?.settle(sessionKey, {
-              graceMs: DOWNLOAD_START_GRACE_MS,
-              since: callStartedAt,
-              timeoutMs: DOWNLOAD_HOLD_SETTLE_MS,
-            });
+            // A call with no sign of a download answers after the short grace; one that saw its tab announce a file
+            // (or a load the browser answered as one) waits the bounded item wait for the hold's decision.
+            settleState =
+              (await downloadHold?.settle(sessionKey, {
+                graceMs: DOWNLOAD_START_GRACE_MS,
+                sign: () => signedFile !== null || navigatedToFile,
+                since: callStartedAt,
+                timeoutMs: DOWNLOAD_ITEM_WAIT_MS,
+              })) ?? null;
           }
         }
 
@@ -3642,6 +3679,22 @@ export const createBrowserRuntime = ({
             if (owed !== undefined) {
               return owed;
             }
+          }
+
+          // A download started and nothing was decided inside the bound: the file may exist, and the model is told
+          // So instead of receiving "nothing happened" for a step that may have written one.
+          if (settleState === 'waiting_for_item' && ownLate.length === 0) {
+            return downloadRefusal(
+              {
+                filename: signedFile?.filename ?? 'the downloaded file',
+                kept: true,
+                step: downloadStep,
+                tabId: runTabId,
+                ...(signedFile?.url === undefined ? {} : { url: signedFile.url }),
+              },
+              { keptFiles: [], origin: preflight?.ok ? preflight.origin : '' },
+              runTabId
+            );
           }
 
           // An approval that was spent bought its one file: the files the same gesture started besides it are

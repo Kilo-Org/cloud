@@ -703,3 +703,76 @@ describe('the recorded state', () => {
     expect(downloads.order).toContain('suggest');
   });
 });
+
+describe('a sign-gated settle', () => {
+  const attachment = 'https://app.example/reports/q4.pdf';
+  const sign = (signed: () => boolean) => signed;
+
+  it('waits for the item a sign announced, and the call decides the file it names', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+    let signed = false;
+
+    hold.tab(agentTab());
+
+    const settled = hold.settle('session-1', {
+      graceMs: 40,
+      sign: sign(() => signed),
+      since: Date.now(),
+      timeoutMs: 1500,
+    });
+
+    // The browser announces the file inside the grace, and creates the item 300 ms in.
+    await vi.advanceTimersByTimeAsync(20);
+    signed = true;
+    await vi.advanceTimersByTimeAsync(300);
+
+    hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(await settled).toBe('decided');
+    // The item's own decision is the block path every other case covers; here the point is that the call waited
+    // Past the short grace for the item its sign announced.
+    expect(signed).toBe(true);
+  });
+
+  it('answers an unsigned call after the short grace, without waiting for an item', async () => {
+    const downloads = makeDownloads();
+    const { hold } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    const settled = hold.settle('session-1', {
+      graceMs: 40,
+      sign: sign(() => false),
+      since: Date.now(),
+      timeoutMs: 1500,
+    });
+
+    await vi.advanceTimersByTimeAsync(60);
+
+    expect(await settled).toBe('no_sign');
+  });
+
+  it('answers a signed call whose item never arrives as waiting, never as decided', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    const settled = hold.settle('session-1', {
+      graceMs: 40,
+      sign: sign(() => true),
+      since: Date.now(),
+      timeoutMs: 1500,
+    });
+
+    await vi.advanceTimersByTimeAsync(1600);
+
+    // Nothing was decided, and the hold invented no report: the caller decides what the file may have become.
+    expect(await settled).toBe('waiting_for_item');
+    expect(reports).toStrictEqual([]);
+  });
+});

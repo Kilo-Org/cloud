@@ -193,10 +193,23 @@ export interface DownloadHoldTab {
 export interface SettleWindow {
   /** The call's own start: a decision older than this belongs to a call already answered. */
   readonly since: number;
-  /** How long to wait for an item to appear at all: a click's item is created a moment later. */
+  /** How long to wait for an item when nothing suggests a download started: a click's item is created a moment later. */
   readonly graceMs: number;
+  /**
+   * Whether something the call saw says a download started: the tab's own announcement, or a page load the
+   * browser answered as a file. Only a signed call waits the whole {@link timeoutMs} for its item.
+   */
+  readonly sign: () => boolean;
   readonly timeoutMs: number;
 }
+
+/**
+ * How a call's settle ended, as one state rather than a pair of flags:
+ * - `no_sign`: nothing suggested a download, so the call answered after the short grace.
+ * - `waiting_for_item`: a download started and no item was decided inside the bound; the file may exist.
+ * - `decided`: the hold decided the item, and its report is what the call answers with.
+ */
+export type DownloadSettle = 'decided' | 'no_sign' | 'waiting_for_item';
 
 export interface DownloadHold {
   /** The browser announced a download on an agent tab, before its item existed. */
@@ -218,9 +231,10 @@ export interface DownloadHold {
   readonly needOf: (session: string) => ApprovalNeed | undefined;
   /**
    * Waits, at most the window's bounds, for the downloads this call started to be
-   * decided: the call then reads its own answer instead of racing it.
+   * decided: the call then reads its own answer instead of racing it. A call with
+   * no sign answers after the short grace; a signed one waits for its item.
    */
-  readonly settle: (session: string, window: SettleWindow) => Promise<void>;
+  readonly settle: (session: string, window: SettleWindow) => Promise<DownloadSettle>;
   /** Registers an agent tab, or refreshes its page and step; `undefined` forgets it. */
   readonly tab: (input: DownloadHoldTab | { readonly detach: number }) => void;
   /**
@@ -963,19 +977,30 @@ export const createDownloadHold = ({
     settle: async (session, window) => {
       const until = window.since + window.timeoutMs;
       const graceUntil = window.since + window.graceMs;
+      let state: DownloadSettle = 'no_sign';
 
       for (;;) {
         const states = [...tracked.values()].filter(
-          state => state.need.session === session && state.since >= window.since
+          one => one.need.session === session && one.since >= window.since
         );
-        const deciding = states.some(state => state.kind === 'held');
 
-        if (!deciding && (states.length > 0 || now() >= graceUntil)) {
-          return;
+        if (!states.some(one => one.kind === 'held') && states.length > 0) {
+          return 'decided';
         }
 
-        if (now() >= until) {
-          return;
+        // A download started: the browser creates the item a moment after it announces the file, so the call
+        // Waits for that item instead of answering before it exists.
+        if (state === 'no_sign' && window.sign()) {
+          state = 'waiting_for_item';
+        }
+
+        if (state === 'waiting_for_item' && now() >= until) {
+          // Signed, and nothing was decided inside the bound: the caller reports the file as possibly saved.
+          return state;
+        }
+
+        if (state === 'no_sign' && now() >= graceUntil) {
+          return state;
         }
 
         // eslint-disable-next-line no-await-in-loop -- one bounded poll for this call's own decision

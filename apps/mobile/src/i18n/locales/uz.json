@@ -140,10 +140,12 @@
     "keepRunning": "To‘xtatmaslik",
     "newSession": "Yangi seans",
     "noModelsAvailable": "Modellar mavjud emas",
+    "modelRetires": "Tugatiladi {{date}}",
     "notFound": "Topilmadi.",
     "online": "Onlayn",
     "open": "{{name}}ni ochish",
     "openPullRequest": "Ochiq PR",
+    "viewOnGitHub": "PRni GitHubda ko'rish",
     "completed": "Yakunlangan",
     "pending": "Kutilmoqda",
     "running": "Ishlamoqda",
@@ -183,7 +185,8 @@
     "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
     "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya",
     "legalDocumentEnglishOnly": "Ushbu hujjat faqat ingliz tilida mavjud.",
-    "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin."
+    "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
+    "organizationTrialEndedBillingAtKiloAi": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin."
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -277,6 +280,9 @@
     "credits": "Kreditlar",
     "failedToLoadBalance": "Balansni yuklab bo'lmadi. Qayta urinish uchun bosing.",
     "balanceLoadFailed": "Balansni yuklab bo'lmadi",
+    "balanceUnreachable": "Serverga ulanib bo'lmadi. Qayta urinib ko'ring.",
+    "balanceAccessDenied": "Bu balansni ko'rishga ruxsatingiz yo'q.",
+    "balanceUnavailable": "Balans yuklanmadi.",
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
@@ -507,7 +513,7 @@
     "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
       "signIn": "Kirish",
-      "profileOrganizations": "Profil va tashkilotlar"
+      "profileOrganizations": "Profil hamda tashkilotlar"
     }
   },
   "preferences": {
@@ -752,6 +758,9 @@
       "couldNotLoadMore": "Qolgan izohlarni yuklab bo'lmadi.",
       "retryLoadingMore": "Qolgan izohlarni qayta yuklash",
       "loadMoreComments": "Yana izoh yuklash",
+      "conversationTruncated": "Faqat dastlabki {{displayCount}} ta izoh ko'rsatilmoqda.",
+      "conversationTruncated_one": "Faqat dastlabki {{displayCount}} ta izoh ko'rsatilmoqda.",
+      "conversationTruncated_other": "Faqat dastlabki {{displayCount}} ta izoh ko'rsatilmoqda.",
       "addReaction": "Reaksiya qo'shish",
       "reactionPill": "{{emoji}} reaksiyasi, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
@@ -881,7 +890,6 @@
       "noAccess": "Sizda bu ombor tekshiruvlariga kirish huquqi yo'q.",
       "couldNotLoad": "Tekshiruvlarni yuklab bo'lmadi.",
       "retryChecks": "Tekshiruvlarni qayta yuklash",
-      "viewOnGitHub": "PRni GitHubda ko'rish",
       "noChecksReported": "Tekshiruv natijalari yo'q",
       "passed": "{{displayCount}} tasi o'tdi",
       "passed_one": "{{displayCount}} tasi o'tdi",
@@ -936,9 +944,9 @@
       "checkFailedTitleGitLab": "GitLab ulanishini tekshirib bo'lmadi.",
       "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
       "providerCheckFailedMessage": "Provayder bilan bog'lanib bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
-      "reconnectTitle": "GitHubga qayta ulanish",
-      "reconnectTitleGitLab": "GitLabga qayta ulanish",
-      "reconnectTitleBitbucket": "Bitbucketga qayta ulanish",
+      "reconnectTitle": "GitHubni qayta ulash",
+      "reconnectTitleGitLab": "GitLabni qayta ulash",
+      "reconnectTitleBitbucket": "Bitbucketni qayta ulash",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan.",
       "gitlabDescription": "Merge so‘rovlari tekshiruvlarini mobil qurilmada bajarish",
       "gitlabInstanceMismatchTitle": "GitLab ulanishi boshqa instansiya uchun",
@@ -1391,7 +1399,7 @@
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin."
+      "notConnectedReadOnlyPlan": "Tashkilotning sinov muddati tugadi, shuning uchun egasi kilo.ai saytida hisob-kitobni yangilashi kerak."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
@@ -1400,7 +1408,7 @@
       "managedOnWebRepositories": "{{organization}} uchun repozitoriylarni kompyuterdan veb orqali tanlang.",
       "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
-      "descriptionOverview": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni keyingi ekranda joylashtiring.",
+      "descriptionOverview": "Ish maydoniga kirish tokenini yarating va uni keyingi ekranda joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni",
       "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
@@ -1985,7 +1993,7 @@
       "failedDescription": "Xavfsizlik agenti tahlilni yakunlay olmadi.",
       "extractionFailedDescription": "Texnik hisobotni tuzilmali natijaga aylantirib bo'lmadi.",
       "exploitableDescription": "Ilova kodi zaiflik mavjud funksiyani chaqira oladi.",
-      "notExploitable": "Kodga yetib borib bo‘lmaydi",
+      "notExploitable": "Yetib bo'lmaydigan yo'l",
       "notExploitableDescription": "Bu repozitoriyada zaiflik mavjud funksiyaga olib boradigan kod yo'li topilmadi.",
       "unknown": "Ko‘rib chiqish kerak",
       "unknownDescription": "Tahlil zaiflik mavjud funksiyani chaqirish mumkinligini tasdiqlay olmadi.",
@@ -4853,12 +4861,15 @@
     "inputDescription": "Har bir kirishni Enkrypt AI bilan skanerlaydi, jumladan asbob natijalarini. Enkrypt mavjud bo'lmaganda so'rovlar rad etilish o'rniga skanerlanmasdan yuboriladi.",
     "outputTitle": "Chiqish himoya to'siqlari",
     "outputDescription": "A'zolar javoblarni olishidan oldin ularni Enkrypt AI bilan skanerlaydi. Siz yoqmaguningizcha o'chirilgan.",
+    "outputUnavailable": "Kilo bu tashkilot uchun chiqishni skanerlashni yoqmagan, shuning uchun javoblar tekshirilmaydi va bu yerda sozlanadigan hech narsa yo'q. Buni so'rash uchun {{supportEmail}} bilan bog'laning.",
     "detectorsHint": "Bloklash belgilangan so'rovni rad etadi. Faqat jurnalga yozish uni kechiktirmasdan qayd etadi.",
     "detectorsHintOutput": "Bloklash belgilangan javobni rad etadi. Faqat jurnalga yozish uni kechiktirmasdan qayd etadi.",
     "choiceLog": "Faqat jurnalga yozish",
     "applyTo": "Qo'llash",
     "applyToAllMembers": "Barcha a'zolarga",
     "applyKiloDefault": "Kilo standartini qo'llash",
+    "applyKiloDefaultEnglishNote": "Kilo standart siyosatining matni ingliz tilida, chunki Kilo Gateway uni yozilganidek aynan qo'llaydi.",
+    "applyKiloDefaultReplaceMessage": "Kilo standart siyosati ingliz tilida yozilgan va Siyosat buzilishi bo'limida belgilaganlaringizni almashtiradi. Siyosat matni maydoniga kiritgan matnni tiklab bo'lmaydi.",
     "invalidSavedTitle": "Saqlangan kirish detektori sozlamalarini o'qib bo'lmaydi",
     "invalidSavedBody": "Kirish detektorlari qayta saqlanmaguncha so'rovlar bloklanadi. Quyidagi detektorlar Kilo standartidan boshlanadi.",
     "invalidSavedOutputTitle": "Saqlangan chiqish detektori sozlamalarini o'qib bo'lmaydi",
@@ -4994,6 +5005,7 @@
     "providersNeedCatalog": "To'liq modellar katalogi yuklanmaguncha provayder kalitlari faqat o'qish uchun bo'ladi. Ularni tahrirlash uchun yuqoridagi Qayta urinish tugmasini bosing.",
     "providersEmpty": "Bu qidiruvga mos provayder topilmadi.",
     "providersNone": "Bu tashkilot uchun hech qanday provayder mavjud emas.",
+    "providersUnavailable": "Provayderlar ro'yxatini yuklab bo'lmadi.",
     "allowAllShown": "Ko'rsatilganlarning barchasiga ruxsat berish",
     "denyAllShown": "Ko'rsatilganlarning barchasini taqiqlash",
     "gatewaysDescription": "Kilo model so'rovlarini Vercel AI Gateway yoki OpenRouter orqali yo'naltiradi. O'chirilgan shlyuz bu so'rovlarni muvaffaqiyatsiz qiladi.",

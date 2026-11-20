@@ -68,6 +68,11 @@ const OpenRouterModelSchema = z.object({
   opencode: OpenCodeSettingsSchema.optional(),
   alias_target: z.string().optional().catch(undefined),
   inference_provider_ids: z.array(z.string()).optional(),
+  /**
+   * The date this entry retires, as the note date (`yyyy-MM-dd`), set only while the note applies.
+   * The note words it in the reader's own language, so the name carries no English copy.
+   */
+  retires_on: z.string().optional(),
 
   id: z.string(),
   name: z.string(),

@@ -6,7 +6,12 @@ import {
 import { TRPCError } from '@trpc/server';
 import type { ProfileOwner } from './types';
 import { assertValidEnvironmentKey } from './environment-contracts';
-import { MAX_PROFILE_VARS, encryptProfileSecret } from './profile-vars-service';
+import {
+  MAX_PROFILE_VARS,
+  profileVarColumns,
+  type ProfileNetworkSecretPolicy,
+} from './profile-vars-service';
+import { assertNetworkSecretKeySpace } from './network-secret-storage';
 import { applyDefaultProfile, insertProfileRow } from './profile-service';
 
 /** One variable offered at creation, before any at-rest transformation. */
@@ -14,6 +19,7 @@ export type ProfileCreateVar = {
   key: string;
   value: string;
   isSecret: boolean;
+  networkSecret?: ProfileNetworkSecretPolicy;
 };
 
 export type ProfileCreateInput = {
@@ -48,6 +54,13 @@ function assertCreatableVars(vars: readonly ProfileCreateVar[]): void {
     }
     seen.add(variable.key);
   }
+
+  // A network secret and an env variable cannot share a key, in the create or
+  // in the profile's session layer. The setVar path checks the same rule.
+  assertNetworkSecretKeySpace(
+    vars.filter(variable => !variable.networkSecret).map(variable => variable.key),
+    vars.filter(variable => variable.networkSecret).map(variable => variable.key)
+  );
 }
 
 /**
@@ -83,11 +96,7 @@ export async function createProfileWithContent(
       await tx.insert(agent_environment_profile_vars).values(
         vars.map(variable => ({
           profile_id: profileId,
-          key: variable.key,
-          value: variable.isSecret
-            ? encryptProfileSecret(publicKeyBase64, variable.value)
-            : variable.value,
-          is_secret: variable.isSecret,
+          ...profileVarColumns(publicKeyBase64, variable),
         }))
       );
     }

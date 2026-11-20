@@ -3,6 +3,7 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { BillingCardSkeleton } from '@/components/organization/billing-card-skeleton';
 import {
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
@@ -21,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
-import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -42,20 +42,6 @@ import {
   useOrgSeatSubscription,
 } from '@/lib/hooks/use-org-billing-queries';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
-
-/**
- * Two rows' worth of loading shape. A billing readout that grows its card when
- * the answer lands would move every block under it, so the placeholder holds
- * the same height the rows will.
- */
-function BillingCardSkeleton() {
-  return (
-    <RowGroup>
-      <RowSkeleton />
-      <RowSkeleton />
-    </RowGroup>
-  );
-}
 
 /** A block whose read failed, with the retry that asks it again. */
 function BillingCardError({
@@ -213,7 +199,7 @@ export function OrganizationBillingScreen({
 
   const renderAutoTopUpState = (): ReactNode => {
     if (autoTopUp.isPending) {
-      return <BillingCardSkeleton />;
+      return <BillingCardSkeleton rows={3} />;
     }
     if (autoTopUp.isError) {
       return (
@@ -224,7 +210,7 @@ export function OrganizationBillingScreen({
       );
     }
     if (autoTopUpReadout == null) {
-      return <BillingCardSkeleton />;
+      return <BillingCardSkeleton rows={3} />;
     }
     return (
       <RowGroup>
@@ -255,7 +241,7 @@ export function OrganizationBillingScreen({
     return (
       <Section label={t('kiloPass.title')}>
         {kiloPassRowState.loading ? (
-          <BillingCardSkeleton />
+          <BillingCardSkeleton rows={1} />
         ) : (
           <RowGroup>
             <KvRow

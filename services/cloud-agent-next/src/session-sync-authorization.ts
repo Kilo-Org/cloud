@@ -10,11 +10,13 @@ import { z } from 'zod';
 import { getPgDb } from './db/pg.js';
 import { getSandboxSessionStub } from './sandbox-session/session-stub.js';
 import { verifyRuntimeCredentialProxyHandle } from './runtime-credential-proxy.js';
+import { parseRuntimeProxyOriginProof } from './runtime-credential-proxy-origin.js';
 import { withDORetry } from './utils/do-retry.js';
 import type { Env } from './types.js';
 
 const requestSchema = z.strictObject({
   handle: z.string().min(1).max(4096),
+  originProof: z.string().max(256).optional(),
   sessionID: z
     .string()
     .regex(/^ses_[A-Za-z0-9_-]+$/)
@@ -43,11 +45,12 @@ export class SessionSyncAuthorization extends WorkerEntrypoint<Env> {
     const parsed = requestSchema.safeParse(input);
     if (!parsed.success) return null;
     const { handle, sessionID } = parsed.data;
+    const originProof = parseRuntimeProxyOriginProof(parsed.data.originProof);
     const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
     if (!claims) return null;
     const credential = await withDORetry(
       () => getSandboxSessionStub(this.env, claims.userId, claims.sessionId),
-      stub => stub.resolveRuntimeCredentialProxyGrant(handle),
+      stub => stub.resolveRuntimeCredentialProxyGrant(handle, originProof),
       'resolveSessionSyncUploadAuthorization',
       retryConfig
     );

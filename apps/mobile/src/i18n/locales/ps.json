@@ -140,6 +140,7 @@
     "keepRunning": "روان یې پرېږدئ",
     "newSession": "نوې ناسته",
     "noModelsAvailable": "هېڅ ماډل نشته",
+    "modelRetires": "په {{date}} له کاره وځي",
     "notFound": "ونه موندل شو",
     "online": "آنلاین",
     "open": "{{name}} پرانیزئ",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي.",
     "privateRepositoryA11y": "{{name}}، شخصي زېرمتون",
     "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی.",
-    "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ."
+    "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
+    "organizationTrialEndedBillingAtKiloAi": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ په kilo.ai کې بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
+    "viewOnGitHub": "PR په GitHub کې وګورئ"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -277,6 +280,9 @@
     "credits": "کریډیټ",
     "failedToLoadBalance": "بیلانس بار نه شو. د بیا هڅې لپاره ټک وکړئ.",
     "balanceLoadFailed": "بیلانس بار نه شو",
+    "balanceUnreachable": "سرور ته رسیدلی نشو. بیا هڅه وکړئ.",
+    "balanceAccessDenied": "تاسو د دې بیلانس لیدلو اجازه نه لرئ.",
+    "balanceUnavailable": "بیلانس پورته نشو.",
     "hideBalance": "بیلانس پټ کړئ",
     "showBalance": "بیلانس ښکاره کړئ",
     "balanceHidden": "بیلانس پټ دی",
@@ -507,7 +513,7 @@
     "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
     "changelogAreas": {
       "signIn": "ننوتل",
-      "profileOrganizations": "پروفایل او سازمانونه"
+      "profileOrganizations": "پروفایل و سازمانونه"
     }
   },
   "preferences": {
@@ -752,6 +758,9 @@
       "couldNotLoadMore": "نورې تبصرې بار نه شوې.",
       "retryLoadingMore": "د نورو تبصرو د بارولو بیا هڅه وکړئ",
       "loadMoreComments": "نورې تبصرې بار کړئ",
+      "conversationTruncated": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
+      "conversationTruncated_one": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
+      "conversationTruncated_other": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
       "addReaction": "غبرګون ورزیات کړئ",
       "reactionPill": "{{emoji}} غبرګون، {{displayCount}} {{countLabel}}",
       "reaction_one": "غبرګون",
@@ -881,7 +890,6 @@
       "noAccess": "تاسو د دې زېرمتون ازموینو ته لاسرسی نه لرئ.",
       "couldNotLoad": "ازموینې بار نه شوې.",
       "retryChecks": "ازموینې بیا هڅه کړئ",
-      "viewOnGitHub": "PR په GitHub کې وګورئ",
       "noChecksReported": "د هېڅ ازموینې راپور نشته",
       "passed": "{{displayCount}} بریالۍ",
       "passed_one": "{{displayCount}} بریالۍ",
@@ -1391,7 +1399,7 @@
     "followReviewMd": "د REVIEW.md لارښوونې تعقیب کړئ",
     "followReviewMdSubtitle": "د هر زېرمتون د REVIEW.md فایل لارښوونې تعقیب کړئ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket نښلول شوی نه دی. یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي."
+      "notConnectedReadOnlyPlan": "د سازمان آزموینه پای ته رسېدلې ده، نو مالک باید په ⁨kilo.ai⁩ کې بیلینګ تازه کړي."
     },
     "bitbucketConnect": {
       "managedOnWeb": "د {{organization}} د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
@@ -1400,7 +1408,7 @@
       "managedOnWebRepositories": "له کمپیوټر څخه په وېب کې د {{organization}} لپاره مخزنونه وټاکئ.",
       "description": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
       "descriptionReconnect": "د کاري چاپېریال د لاسرسي یو نوی ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
-      "descriptionOverview": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او بیا یې په راتلونکې پاڼه کې پیسټ کړئ.",
+      "descriptionOverview": "د کاري چاپېریال د لاسرسي ټوکن جوړ کړئ او بیا یې په راتلونکې پاڼه کې پیسټ کړئ.",
       "scopes": "حساب: لوستل · زېرمتونونه: لوستل/لیکل · PR: لوستل · وېب هوکونه: لوستل/لیکل",
       "tokenPlaceholder": "د کاري چاپېریال د لاسرسي ټوکن",
       "tokenRefused": "Bitbucket دا د کاري چاپېریال د لاسرسي ټوکن ونه منل. وګورئ چې پورتنۍ اجازې لري، بیاځلي هڅه وکړئ."
@@ -4853,12 +4861,15 @@
     "inputDescription": "هر ننوتل د Enkrypt AI سره څېړي، چې د وسیلې پایلې هم شاملې دي. کله چې Enkrypt شته نه وي، غوښتنې د ردولو پر ځای بې له څېړنې لیږل کېږي.",
     "outputTitle": "د وتلو ساتونکي",
     "outputDescription": "د Enkrypt AI سره ځوابونه څېړي مخکې لدې چې غړي یې ترلاسه کړي. بند دي تر څو چې تاسو یې فعال نه کړئ.",
+    "outputUnavailable": "Kilo دې سازمان لپاره د وتلو سکننګ نه دی فعال کړی، نو ځوابونه نه څېړل کیږي او دلته د تنظیمولو څه نشته. د دې غوښتنې لپاره له {{supportEmail}} سره اړیکه ونیسئ.",
     "detectorsHint": "بندول یوه نښه شوې غوښتنه ردوي. یوازې ثبت یې کوي پرته له دې چې غوښتنه وځنډوي.",
     "detectorsHintOutput": "بندول یو نښه شوی ځواب ناکاموي. یوازې ثبت یې کوي پرته له دې چې ځواب وځنډوي.",
     "choiceLog": "یوازې ثبت",
     "applyTo": "پلي کول په",
     "applyToAllMembers": "ټول غړي",
     "applyKiloDefault": "د Kilo بنسټیز پلي کړه",
+    "applyKiloDefaultEnglishNote": "د Kilo بنسټیزې پالیسۍ متن په انګلیسي ژبه کې دی، ځکه Kilo Gateway یې سم لکه چې لیکل شوی پلي کوي.",
+    "applyKiloDefaultReplaceMessage": "د Kilo بنسټیزه پالیسي په انګلیسي ژبه لیکل شوې او هغه څه بدلوي چې په پالیسۍ سرغړونه کې مو ټاکلي. هغه متن چې په پالیسۍ د متن ساحه کې مو داخل کړی بېرته نشي راوستل کېدای.",
     "invalidSavedTitle": "د خوندي شوو ننوتلو کشف کوونکو تنظیمات لوستل نشي",
     "invalidSavedBody": "غوښتنې بندې دي تر څو چې د ننوتلو کشف کوونکي بیا خوندي شي. لاندې کشف کوونکي د Kilo بنسټیز څخه پیلېږي.",
     "invalidSavedOutputTitle": "د خوندي شوو وتلو کشف کوونکو تنظیمات لوستل نشي",
@@ -4994,6 +5005,7 @@
     "providersNeedCatalog": "تر هغه چې د ماډلونو بشپړ کتلاګ بار نه شي، د عرضه کوونکو سویچونه یوازې د لوستلو لپاره پاتې کېږي. د هغوی د سمولو لپاره پورته د بیا هڅه وکړئ تڼۍ کېکاږئ.",
     "providersEmpty": "هیڅ عرضه کوونکی دې پلټنې سره سمون نه لري.",
     "providersNone": "د دې سازمان لپاره هیڅ عرضه کوونکي شتون نه لري.",
+    "providersUnavailable": "د عرضه کوونکو نوملړ پورته نشو.",
     "allowAllShown": "ټولو ښودل شوو ته اجازه ورکړه",
     "denyAllShown": "ټول ښودل شوي منع کړه",
     "gatewaysDescription": "Kilo د ماډل غوښتنې د Vercel AI Gateway یا OpenRouter له لارې لېږي. یوه غیر فعاله دروازه هغه غوښتنې ناکاموي.",

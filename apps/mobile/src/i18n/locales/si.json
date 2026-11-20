@@ -140,10 +140,12 @@
     "keepRunning": "දිගටම ක්‍රියාත්මක කරන්න",
     "newSession": "නව සැසියක්",
     "noModelsAvailable": "ආකෘති නොමැත",
+    "modelRetires": "{{date}} දින ඉවත් වේ",
     "notFound": "හමු නොවීය.",
     "online": "මාර්ගගත",
     "open": "{{name}} විවෘත කරන්න",
     "openPullRequest": "විවෘත PR",
+    "viewOnGitHub": "GitHub හි PR බලන්න",
     "completed": "සම්පූර්ණයි",
     "pending": "පොරොත්තුවෙන්",
     "running": "ක්‍රියාත්මකයි",
@@ -183,7 +185,8 @@
     "organizationTrialEnded": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. සංවිධාන හිමිකරුවෙකුට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
     "privateRepositoryA11y": "{{name}}, පුද්ගලික කේත ගබඩාව",
     "legalDocumentEnglishOnly": "මෙම ලේඛනය ඉංග්‍රීසි භාෂාවෙන් පමණක් ලබා ගත හැක.",
-    "organizationTrialEndedBilling": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක."
+    "organizationTrialEndedBilling": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
+    "organizationTrialEndedBillingAtKiloAi": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක."
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -277,6 +280,9 @@
     "credits": "ක්‍රෙඩිට්",
     "failedToLoadBalance": "ශේෂය පූරණය කළ නොහැකි විය. නැවත උත්සාහ කිරීමට තට්ටු කරන්න.",
     "balanceLoadFailed": "ශේෂය පූරණය කළ නොහැකි විය",
+    "balanceUnreachable": "සේවාදායකය වෙත ළඟා විය නොහැක. නැවත උත්සාහ කරන්න.",
+    "balanceAccessDenied": "මෙම ශේෂය බැලීමට ඔබට අවසර නැත.",
+    "balanceUnavailable": "ශේෂය පූරණය කළ නොහැක.",
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
@@ -507,7 +513,7 @@
     "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogAreas": {
       "signIn": "පුරනය වීම",
-      "profileOrganizations": "පැතිකඩ සහ සංවිධාන"
+      "profileOrganizations": "පැතිකඩ හා සංවිධාන"
     }
   },
   "preferences": {
@@ -752,6 +758,9 @@
       "couldNotLoadMore": "තවත් අදහස් පූරණය කිරීමට නොහැකි විය.",
       "retryLoadingMore": "තවත් අදහස් පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "loadMoreComments": "තවත් අදහස් පූරණය කරන්න",
+      "conversationTruncated": "පළමු අදහස් {{displayCount}}ක් පමණක් පෙන්වයි.",
+      "conversationTruncated_one": "පළමු අදහස් {{displayCount}}ක් පමණක් පෙන්වයි.",
+      "conversationTruncated_other": "පළමු අදහස් {{displayCount}}ක් පමණක් පෙන්වයි.",
       "addReaction": "ප්‍රතික්‍රියාවක් එක් කරන්න",
       "reactionPill": "{{emoji}} ප්‍රතික්‍රියාව, {{displayCount}} {{countLabel}}",
       "reaction_one": "ප්‍රතික්‍රියාව",
@@ -881,7 +890,6 @@
       "noAccess": "මෙම ගබඩාවේ පරීක්ෂණ වෙත ප්‍රවේශ වීමට ඔබට අවසර නොමැත.",
       "couldNotLoad": "පරීක්ෂණ පූරණය කිරීමට නොහැකි විය.",
       "retryChecks": "පරීක්ෂණ සඳහා නැවත උත්සාහ කරන්න",
-      "viewOnGitHub": "GitHub හි PR බලන්න",
       "noChecksReported": "පරීක්ෂණ වාර්තා වී නොමැත",
       "passed": "{{displayCount}} ක් සමත්",
       "passed_one": "{{displayCount}} ක් සමත්",
@@ -1391,7 +1399,7 @@
     "followReviewMd": "REVIEW.md අනුගමනය කරන්න",
     "followReviewMdSubtitle": "එක් එක් ගබඩාවේ REVIEW.md ගොනුවේ උපදෙස් පිළිපදින්න",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket සම්බන්ධ වී නොමැත. එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි."
+      "notConnectedReadOnlyPlan": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති බැවින් හිමිකරුවෙකු kilo.ai හි බිල්පත් යාවත්කාලීන කළ යුතුය."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
@@ -1400,7 +1408,7 @@
       "managedOnWebRepositories": "{{organization}} සඳහා පරිගණකයකින් වෙබය හරහා රෙපොසිටරි තෝරන්න.",
       "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
-      "descriptionOverview": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා ඊළඟ තිරයේ අලවන්න.",
+      "descriptionOverview": "වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා ඊළඟ තිරයේ අලවන්න.",
       "scopes": "ගිණුම: කියවීම · ගබඩා: කියවීම/ලිවීම · PR: කියවීම · වෙබ්හුක්: කියවීම/ලිවීම",
       "tokenPlaceholder": "වැඩබිම් ප්‍රවේශ ටෝකනය",
       "tokenRefused": "Bitbucket මෙම වැඩබිම් ප්‍රවේශ ටෝකනය පිළිගත්තේ නැත. එහි ඉහත අවසර ඇත්දැයි පරීක්ෂා කර, නැවත උත්සාහ කරන්න."
@@ -4853,12 +4861,15 @@
     "inputDescription": "සෑම ආදානයක්ම Enkrypt AI සමඟ පරිලෝකනය කරයි, මෙවලම් ප්‍රතිඵල ඇතුළුව. Enkrypt නොමැති විට ඉල්ලීම් ප්‍රතික්ෂේප කරනු වෙනුවට පරිලෝකනය නොකර යවනු ලැබේ.",
     "outputTitle": "ප්‍රතිදාන ආරක්ෂක වැටවල්",
     "outputDescription": "සාමාජිකයින්ට ලැබීමට පෙර ප්‍රතිචාර Enkrypt AI සමඟ පරිලෝකනය කරයි. ඔබ එය සක්‍රිය නොකරන්නේ නම් ක්‍රියා විරහිතයි.",
+    "outputUnavailable": "Kilo මෙම සංවිධානය සඳහා ප්‍රතිදාන පරිලෝකනය සබල කර නැත, එබැවින් ප්‍රතිචාර පරීක්ෂා නොවන අතර මෙහි සැකසීමට කිසිවක් නැත. එය ඉල්ලීමට {{supportEmail}} අමතන්න.",
     "detectorsHint": "අවහිර කරන්න යන විකල්පය සලකුණු කළ ඉල්ලීමක් ප්‍රතික්ෂේප කරයි. වාර්තා කරන්න පමණක් යන විකල්පය ඉල්ලීම ප්‍රමාද නොකර එය වාර්තා කරයි.",
     "detectorsHintOutput": "අවහිර කරන්න යන විකල්පය සලකුණු කළ ප්‍රතිචාරයක් අසාර්ථක කරයි. වාර්තා කරන්න පමණක් යන විකල්පය ප්‍රතිචාරය ප්‍රමාද නොකර එය වාර්තා කරයි.",
     "choiceLog": "වාර්තා කරන්න පමණක්",
     "applyTo": "යොදන්න",
     "applyToAllMembers": "සියලුම සාමාජිකයින්ට",
     "applyKiloDefault": "Kilo පෙරනිමිය යොදන්න",
+    "applyKiloDefaultEnglishNote": "Kilo හි පෙරනිමි ප්‍රතිපත්ති පෙළ ඉංග්‍රීසියෙන් ඇත, මන්ද Kilo Gateway එය ලියා ඇති ආකාරයටම යොදයි.",
+    "applyKiloDefaultReplaceMessage": "Kilo හි පෙරනිමි ප්‍රතිපත්තිය ඉංග්‍රීසියෙන් ලියා ඇති අතර ප්‍රතිපත්ති උල්ලංඝනය තුළ ඔබ සකසා ඇති දේ ප්‍රතිස්ථාපනය කරයි. ප්‍රතිපත්ති පෙළ ක්ෂේත්‍රයේ ඔබ ඇතුළත් කළ පෙළ නැවත ලබා ගත නොහැක.",
     "invalidSavedTitle": "සුරකින ලද ආදාන අනාවරක සැකසුම් කියවිය නොහැක",
     "invalidSavedBody": "ආදාන අනාවරක නැවත සුරකින තෙක් ඉල්ලීම් අවහිර කෙරේ. පහත අනාවරක Kilo පෙරනිමියෙන් ආරම්භ වේ.",
     "invalidSavedOutputTitle": "සුරකින ලද ප්‍රතිදාන අනාවරක සැකසුම් කියවිය නොහැක",
@@ -4994,6 +5005,7 @@
     "providersNeedCatalog": "සම්පූර්ණ මාදිලි නාමාවලිය පූරණය වන තුරු සපයන්නන්ගේ ස්විච කියවීමට පමණි. ඒවා සංස්කරණය කිරීමට ඉහත ඇති නැවත උත්සාහ කරන්න බොත්තම තට්ටු කරන්න.",
     "providersEmpty": "මෙම සෙවුමට ගැළපෙන සපයන්නන් නැත.",
     "providersNone": "මෙම සංවිධානය සඳහා ලබා ගත හැකි සපයන්නන් නොමැත.",
+    "providersUnavailable": "සපයන්නන් ලැයිස්තුව පූරණය කළ නොහැකි විය.",
     "allowAllShown": "පෙන්වා ඇති සියල්ලට ඉඩ දෙන්න",
     "denyAllShown": "පෙන්වා ඇති සියල්ල ප්‍රතික්ෂේප කරන්න",
     "gatewaysDescription": "Kilo ආකෘති ඉල්ලීම් Vercel AI Gateway හෝ OpenRouter හරහා මාර්ගගත කරයි. ක්‍රියා විරහිත ද්වාරයක් එම ඉල්ලීම් අසාර්ථක කරයි.",

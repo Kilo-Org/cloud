@@ -140,6 +140,7 @@
     "keepRunning": "Jätka tööd",
     "newSession": "Uus seanss",
     "noModelsAvailable": "Mudeleid pole saadaval",
+    "modelRetires": "Aegub {{date}}",
     "notFound": "Ei leitud",
     "online": "Võrgus",
     "open": "Ava {{name}}",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
     "privateRepositoryA11y": "{{name}}, privaatne repositoorium",
     "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles.",
-    "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida."
+    "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
+    "viewOnGitHub": "Vaata PR-i GitHubis"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -277,6 +280,9 @@
     "credits": "Krediit",
     "failedToLoadBalance": "Saldo laadimine ebaõnnestus. Uuesti proovimiseks puuduta.",
     "balanceLoadFailed": "Saldo laadimine ebaõnnestus",
+    "balanceUnreachable": "Serveriga ei saanud ühendust. Proovi uuesti.",
+    "balanceAccessDenied": "Sul pole õigust seda saldot näha.",
+    "balanceUnavailable": "Saldo laadimine ebaõnnestus.",
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
@@ -507,7 +513,7 @@
     "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
     "changelogAreas": {
       "signIn": "Sisselogimine",
-      "profileOrganizations": "Profiil ja organisatsioonid"
+      "profileOrganizations": "Profiil ning organisatsioonid"
     }
   },
   "preferences": {
@@ -752,6 +758,9 @@
       "couldNotLoadMore": "Lisakommentaare ei õnnestunud laadida.",
       "retryLoadingMore": "Proovi lisakommentaare uuesti laadida",
       "loadMoreComments": "Laadi rohkem kommentaare",
+      "conversationTruncated": "Kuvatakse ainult esimesed {{displayCount}} kommentaari.",
+      "conversationTruncated_one": "Kuvatakse ainult esimesed {{displayCount}} kommentaari.",
+      "conversationTruncated_other": "Kuvatakse ainult esimesed {{displayCount}} kommentaari.",
       "addReaction": "Lisa reaktsioon",
       "reactionPill": "{{emoji}} reaktsioon, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktsioon",
@@ -881,7 +890,6 @@
       "noAccess": "Sul puudub juurdepääs selle hoidla kontrollidele.",
       "couldNotLoad": "Kontrollide laadimine ebaõnnestus.",
       "retryChecks": "Proovi kontrollide laadimist uuesti",
-      "viewOnGitHub": "Vaata PR-i GitHubis",
       "noChecksReported": "Kontrollidest pole teatatud",
       "passed": "{{displayCount}} edukalt läbitud",
       "passed_one": "{{displayCount}} edukalt läbitud",
@@ -1391,7 +1399,7 @@
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid."
+      "notConnectedReadOnlyPlan": "Organisatsiooni prooviperiood on lõppenud, seega peab omanik arvelduse kilo.ai keskkonnas uuendama."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",
@@ -1400,7 +1408,7 @@
       "managedOnWebRepositories": "Vali {{organization}} jaoks hoidlaid veebi kaudu arvutis.",
       "description": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
       "descriptionReconnect": "Loo uus tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
-      "descriptionOverview": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see järgmisel ekraanil.",
+      "descriptionOverview": "Loo tööruumi juurdepääsutunnus ja kleebi see järgmisel ekraanil.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
       "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
       "tokenRefused": "Bitbucket ei võtnud seda tööruumi juurdepääsutunnust vastu. Kontrolli, et sellel oleksid ülaltoodud õigused, ja proovi seejärel uuesti."
@@ -4853,12 +4861,15 @@
     "inputDescription": "Kontrollib Enkrypt AI abil iga sisendit, sh tööriistade tulemusi. Kui Enkrypt pole saadaval, saadetakse päringud kontrollimata, mitte ei lükata neid tagasi.",
     "outputTitle": "Väljundi kaitsepiirangud",
     "outputDescription": "Kontrollib vastuseid Enkrypt AI abil enne, kui liikmed need kätte saavad. On välja lülitatud, kuni selle sisse lülitad.",
+    "outputUnavailable": "Kilo ei ole selle organisatsiooni jaoks väljundi skaneerimist sisse lülitanud, seega vastuseid ei kontrollita ja siin pole midagi seadistada. Selle taotlemiseks võtke ühendust aadressil {{supportEmail}}.",
     "detectorsHint": "„Blokeeri” lükkab märgitud päringu tagasi. „Ainult logi” salvestab selle logisse päringut viivitamata.",
     "detectorsHintOutput": "„Blokeeri” nurjab märgitud vastuse. „Ainult logi” salvestab selle logisse vastust viivitamata.",
     "choiceLog": "Ainult logi",
     "applyTo": "Kehtib",
     "applyToAllMembers": "Kõigile liikmetele",
     "applyKiloDefault": "Rakenda Kilo vaikesätted",
+    "applyKiloDefaultEnglishNote": "Kilo vaikepoliitika tekst on inglise keeles, sest Kilo Gateway rakendab seda täpselt nii, nagu see on kirjutatud.",
+    "applyKiloDefaultReplaceMessage": "Kilo vaikepoliitika on kirjutatud inglise keeles ja asendab selle, mille määrasite jaotises Poliitika rikkumine. Poliitika teksti väljale sisestatud teksti ei saa taastada.",
     "invalidSavedTitle": "Salvestatud sisendidetektorite sätteid ei saa lugeda",
     "invalidSavedBody": "Päringud on blokeeritud, kuni sisendidetektorid uuesti salvestatakse. Allolevad detektorid lähtuvad Kilo vaikesätetest.",
     "invalidSavedOutputTitle": "Salvestatud väljunddetektorite sätteid ei saa lugeda",
@@ -4994,6 +5005,7 @@
     "providersNeedCatalog": "Teenusepakkujate lülitid on kirjutuskaitstud, kuni kogu mudelikataloog on laaditud. Nende muutmiseks puuduta ülal nuppu Proovi uuesti.",
     "providersEmpty": "Sellele otsingule ei vasta ükski teenusepakkuja.",
     "providersNone": "Sellele organisatsioonile ei ole ühtegi teenusepakkujat saadaval.",
+    "providersUnavailable": "Teenusepakkujate nimekirja ei õnnestunud laadida.",
     "allowAllShown": "Luba kõik kuvatud",
     "denyAllShown": "Keela kõik kuvatud",
     "gatewaysDescription": "Kilo suunab mudelipäringud läbi Vercel AI Gateway või OpenRouteri. Kui lüüs on välja lülitatud, need päringud nurjuvad.",

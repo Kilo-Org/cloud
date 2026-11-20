@@ -6,6 +6,12 @@ import { encryptWithPublicKey } from '@kilocode/encryption';
 import type { ProfileOwner, ProfileVarResponse } from './types';
 import { verifyProfileOwnership } from './profile-utils';
 import { ENVIRONMENT_LIMITS, assertValidEnvironmentKey } from './environment-contracts';
+import {
+  assertNetworkSecretKeySpace,
+  networkSecretColumns,
+  validateNetworkSecretChanges,
+} from './network-secret-storage';
+import type { NetworkSecretInput } from '@kilocode/worker-utils/network-secrets';
 
 /**
  * A profile's variable cap, shared with the repository-environment variable cap
@@ -30,6 +36,47 @@ export function encryptProfileSecret(publicKeyBase64: string, value: string): st
 }
 
 /**
+ * A network secret's policy, without the key and value the caller also passes.
+ */
+export type ProfileNetworkSecretPolicy = Omit<NetworkSecretInput, 'key' | 'value'>;
+
+/**
+ * The columns one variable contributes to its row, env variable or network
+ * secret, before the profile id. Every write path builds its rows here so a
+ * payload's delivery mode and its policy cannot be dropped by one path while
+ * another honours them.
+ */
+export function profileVarColumns(
+  publicKeyBase64: string,
+  variable: {
+    key: string;
+    value: string;
+    isSecret: boolean;
+    networkSecret?: ProfileNetworkSecretPolicy;
+  }
+) {
+  if (variable.networkSecret) {
+    const input = {
+      key: variable.key,
+      value: variable.value,
+      ...variable.networkSecret,
+    };
+    validateNetworkSecretChanges([input]);
+    return networkSecretColumns(publicKeyBase64, input);
+  }
+  return {
+    key: variable.key,
+    value: variable.isSecret
+      ? encryptProfileSecret(publicKeyBase64, variable.value)
+      : variable.value,
+    is_secret: variable.isSecret,
+    delivery: 'env' as const,
+    allowed_hosts: null,
+    injection_locations: null,
+  };
+}
+
+/**
  * Set or update an environment variable for a profile.
  * If isSecret is true, the value is encrypted before storage.
  *
@@ -44,11 +91,11 @@ export async function setVar(
   key: string,
   value: string,
   isSecret: boolean,
-  owner: ProfileOwner
+  owner: ProfileOwner,
+  networkSecret?: ProfileNetworkSecretPolicy
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
-
-  const storedValue = isSecret ? encryptProfileSecret(publicKeyBase64, value) : value;
+  const columns = profileVarColumns(publicKeyBase64, { key, value, isSecret, networkSecret });
 
   await db.transaction(async tx => {
     // Lock the owning profile row so the key lookup, the cap check and the
@@ -60,9 +107,26 @@ export async function setVar(
       .for('update');
 
     const heldKeys = await tx
-      .select({ key: agent_environment_profile_vars.key })
+      .select({
+        key: agent_environment_profile_vars.key,
+        delivery: agent_environment_profile_vars.delivery,
+      })
       .from(agent_environment_profile_vars)
       .where(eq(agent_environment_profile_vars.profile_id, profileId));
+    const current = heldKeys.find(row => row.key === key);
+    if (current && current.delivery !== columns.delivery) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `"${key}" cannot be both an environment variable and a network secret`,
+      });
+    }
+    assertNetworkSecretKeySpace(
+      heldKeys.filter(row => row.delivery === 'env').map(row => row.key),
+      [
+        ...heldKeys.filter(row => row.delivery === 'network').map(row => row.key),
+        ...(networkSecret ? [key] : []),
+      ]
+    );
 
     if (!heldKeys.some(row => row.key === key)) {
       assertValidEnvironmentKey(key);
@@ -78,15 +142,12 @@ export async function setVar(
       .insert(agent_environment_profile_vars)
       .values({
         profile_id: profileId,
-        key,
-        value: storedValue,
-        is_secret: isSecret,
+        ...columns,
       })
       .onConflictDoUpdate({
         target: [agent_environment_profile_vars.profile_id, agent_environment_profile_vars.key],
         set: {
-          value: storedValue,
-          is_secret: isSecret,
+          ...columns,
           updated_at: new Date().toISOString(),
         },
       });
@@ -132,18 +193,27 @@ export async function listVars(
   owner: ProfileOwner
 ): Promise<ProfileVarResponse[]> {
   await verifyProfileOwnership(db, profileId, owner);
+  return listVarsForProfile(db, profileId);
+}
 
+export async function listVarsForProfile(
+  db: WorkerDb,
+  profileId: string
+): Promise<ProfileVarResponse[]> {
   const vars = await db
     .select({
       key: agent_environment_profile_vars.key,
       value: sql<string>`
         CASE
-          WHEN ${agent_environment_profile_vars.is_secret} = true
+          WHEN ${agent_environment_profile_vars.is_secret} = true OR ${agent_environment_profile_vars.delivery} = 'network'
           THEN '***'
           ELSE ${agent_environment_profile_vars.value}
         END
       `.as('value'),
       isSecret: agent_environment_profile_vars.is_secret,
+      delivery: agent_environment_profile_vars.delivery,
+      allowedHosts: agent_environment_profile_vars.allowed_hosts,
+      locations: agent_environment_profile_vars.injection_locations,
       createdAt: agent_environment_profile_vars.created_at,
       updatedAt: agent_environment_profile_vars.updated_at,
     })
@@ -161,6 +231,9 @@ export type VarForSession = {
   key: string;
   value: string; // Plaintext for non-secrets, encrypted envelope JSON for secrets
   isSecret: boolean;
+  delivery?: 'env' | 'network';
+  allowedHosts?: string[] | null;
+  locations?: string[] | null;
 };
 
 /**
@@ -174,13 +247,12 @@ export async function getVarsForSession(db: WorkerDb, profileId: string): Promis
       key: agent_environment_profile_vars.key,
       value: agent_environment_profile_vars.value,
       isSecret: agent_environment_profile_vars.is_secret,
+      delivery: agent_environment_profile_vars.delivery,
+      allowedHosts: agent_environment_profile_vars.allowed_hosts,
+      locations: agent_environment_profile_vars.injection_locations,
     })
     .from(agent_environment_profile_vars)
     .where(eq(agent_environment_profile_vars.profile_id, profileId));
 
-  return vars.map(v => ({
-    key: v.key,
-    value: v.value,
-    isSecret: v.isSecret,
-  }));
+  return vars;
 }

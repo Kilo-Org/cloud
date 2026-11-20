@@ -23,6 +23,7 @@ import {
   SyncBenchmarkSubscriptionsRequestSchema,
   type BenchmarkConfig,
   type BenchmarkConfigAdminResponseConfig,
+  type BenchmarkConfigSaveDrain,
   type BenchmarkConfigSaveWarning,
   type BenchmarkRegistryQueue,
   type BenchmarkIdentity,
@@ -37,6 +38,7 @@ import {
   type BenchmarkSchedulerConfigResponse,
   type BenchmarkSchedulerSetting,
   type BenchmarkRunProgress,
+  type BenchmarkRunTotals,
   type CustomRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
@@ -63,20 +65,23 @@ import {
   resolveRunIdentity,
   RunAlreadyActiveError,
   startRun,
-  sweepStaleRuns,
   syncPlatformRegistry,
+  type DrainSkipReason,
 } from './run';
 import {
   countCurrentProfilesByStatus,
-  existsRunningRun,
+  listCurrentFailedProfiles,
   listCurrentPlatformProfileStatuses,
   getClassifierWinner,
-  getLatestRoutingTable,
   getRunSummariesForRouter,
+  listRunModelIds,
+  listRunningRunIds,
   listRuns,
-  requeueFailedCurrentProfiles,
+  requeueRetryableCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
+import { loadRunModelTotals, loadRunTotals } from './run-totals';
+import { loadRoutingTableResponse } from './routing-table-response';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
 import { fetchBenchmarkUserToken } from './benchmark-token';
@@ -96,10 +101,21 @@ import {
   syncSubscriptionSnapshot,
 } from './subscriptions';
 import { planPromptTransportRemeasure } from './remeasure';
+import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
 
 const RemeasureRequestSchema = z.object({
   router: AutoRouterSchema.optional(),
   action: z.enum(['dry-run', 'request', 'cancel']).default('dry-run'),
+  // Exact pairs to measure; absent means every ready pair of the router.
+  pairs: z
+    .array(
+      z.object({
+        model: z.string().trim().min(1),
+        variant: z.string().trim().min(1).nullable().default(null),
+      })
+    )
+    .min(1)
+    .optional(),
 });
 
 const DebugCliRequestSchema = z.object({
@@ -228,6 +244,99 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * How long a save waits for its platform-queue drain to start a run. The drain
+ * is one `startRun` plus its claim; the per-minute scheduler is the backstop, so
+ * a slow drain is deferred rather than allowed to extend the save.
+ */
+const CONFIG_SAVE_DRAIN_DEADLINE_MS = 5_000;
+
+/**
+ * Start the platform queue after a save has persisted its config, registry sync
+ * and publish, so an admin who adds a model gets a run without pressing Run or
+ * waiting for the cron. Best-effort by design: a queue that already holds a run
+ * is left to it, and a drain that is slow or throws is reported in `drain`, never
+ * in `warnings` — the save itself succeeded, and the per-minute scheduler is the
+ * backstop for everything this misses.
+ *
+ * `keepAlive` is the request's `ctx.waitUntil`. A drain that outlives the
+ * deadline is still running when the response goes out, and the runtime may end
+ * that work with the request — right between claiming a run and inserting it.
+ * Handing the promise over lets it finish and record the run it started.
+ */
+async function drainPlatformAfterConfigSave(
+  env: Env,
+  router: AutoRouter,
+  keepAlive: (promise: Promise<unknown>) => void
+): Promise<BenchmarkConfigSaveDrain> {
+  const timedOut = Promise.withResolvers<'timeout'>();
+  const timer = setTimeout(() => timedOut.resolve('timeout'), CONFIG_SAVE_DRAIN_DEADLINE_MS);
+  // A queue drain reports its own failure here instead of throwing: one wedged
+  // queue must not fail the other, and the save must not fail either.
+  const drainErrors: unknown[] = [];
+  // Why the drain started nothing; `active_run` and `nothing_pending` are
+  // different answers for the admin.
+  const skipped: DrainSkipReason[] = [];
+  const drain = drainQueues(env, 'platform', drainErrors, router, {
+    skipPlatformSync: true,
+    skipped,
+  });
+  try {
+    const started = await Promise.race([drain, timedOut.promise]);
+    if (started === 'timeout') {
+      keepAlive(
+        drain.catch((error: unknown) => {
+          console.warn(
+            JSON.stringify({
+              event: 'benchmark_config_save_drain_deferred',
+              afterConfigSave: true,
+              router,
+              reason: 'failed_after_response',
+              ...formatError(error),
+            })
+          );
+        })
+      );
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_config_save_drain_deferred',
+          afterConfigSave: true,
+          router,
+          reason: 'timeout',
+        })
+      );
+      return { runId: null, entryCount: 0, skipped: 'timeout' };
+    }
+    const [run] = started;
+    if (run) return { runId: run.runId, entryCount: run.entryCount, skipped: null };
+    // Nothing started: either the queue already holds a run, nothing was
+    // pending, or the drain threw.
+    return {
+      runId: null,
+      entryCount: 0,
+      skipped:
+        drainErrors.length > 0
+          ? 'failed'
+          : skipped.includes('active_run')
+            ? 'active_run'
+            : 'nothing_pending',
+    };
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_config_save_drain_deferred',
+        afterConfigSave: true,
+        router,
+        reason: 'failed',
+        ...formatError(error),
+      })
+    );
+    return { runId: null, entryCount: 0, skipped: 'failed' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   // Every /admin/* route below requires the worker-wide authMiddleware
   // (./auth), which src/index.ts mounts with app.use('*', ...) before it calls
@@ -282,10 +391,20 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         updatedBy
       );
       const warnings = await syncRegistryAfterConfigSave(c.env, router);
+      // Only a save whose registry sync and publish both landed has new pending
+      // rows to start; a failed sync has no rows and a failed publish is already
+      // reported, so the cron owns that case.
+      const drain =
+        warnings.length === 0
+          ? await drainPlatformAfterConfigSave(c.env, router, promise =>
+              c.executionCtx.waitUntil(promise)
+            )
+          : undefined;
       return c.json({
         config: withLegacyAdminConfigFields(saved),
         policySettings: resolvePolicySettings(saved),
         warnings,
+        ...(drain ? { drain } : {}),
       });
     }
   );
@@ -319,21 +438,19 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   );
 
   app.get('/admin/runs', async c => {
-    // Sweep stale runs first so a dead/wedged run surfaces as 'failed' (and
-    // frees its slot) without needing a new run to be started.
-    await sweepStaleRuns(c.env);
+    // Reads only: the per-minute cron sweeps stale runs, so listing never writes.
     const limit = Math.min(Number(c.req.query('limit') ?? 20) || 20, 100);
     const kind = BenchmarkKindSchema.safeParse(c.req.query('kind'));
     const purpose = BenchmarkRunPurposeSchema.safeParse(c.req.query('purpose'));
     const listRouter =
       kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c);
-    const [runs, hasRunningRun] = await Promise.all([
+    const [runs, runningRunIds] = await Promise.all([
       listRuns(c.env.BENCH_DB, limit, {
         kind: kind.success ? kind.data : undefined,
         purpose: purpose.success ? purpose.data : undefined,
         router: listRouter,
       }),
-      existsRunningRun(c.env.BENCH_DB, requestRouter(c)),
+      listRunningRunIds(c.env.BENCH_DB, requestRouter(c)),
     ]);
     // Progress is display-only: a failed count query must not hide the run list.
     const progressByRunId = await loadRunProgress(
@@ -345,23 +462,55 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       );
       return new Map<string, BenchmarkRunProgress>();
     });
+    // Totals are one bounded aggregate per page of runs, never their summaries.
+    // A failed aggregate leaves the list intact, without the cost columns.
+    const runIds = runs.map(run => run.id);
+    const [totalsByRunId, modelsByRunId] = await Promise.all([
+      loadRunTotals(c.env.BENCH_DB, runIds).catch((error: unknown) => {
+        console.warn(
+          JSON.stringify({ event: 'benchmark_run_totals_failed', ...formatError(error) })
+        );
+        return new Map<string, BenchmarkRunTotals>();
+      }),
+      listRunModelIds(c.env.BENCH_DB, runIds).catch((error: unknown) => {
+        console.warn(
+          JSON.stringify({ event: 'benchmark_run_models_failed', ...formatError(error) })
+        );
+        return new Map<string, string[]>();
+      }),
+    ]);
     return c.json({
       runs: runs.map(run => {
         const progress = progressByRunId.get(run.id);
-        return withLegacyAdminRunFields(progress ? { ...run, progress } : run);
+        const totals = totalsByRunId.get(run.id);
+        const models = modelsByRunId.get(run.id);
+        return withLegacyAdminRunFields({
+          ...run,
+          ...(progress ? { progress } : {}),
+          ...(totals ? { totals } : {}),
+          ...(models ? { models } : {}),
+        });
       }),
-      hasRunningRun,
+      runningRunIds,
     } satisfies BenchmarkRunsResponse);
   });
 
   app.get('/admin/runs/:runId/summaries', async c => {
-    const summaries = await getRunSummariesForRouter(
-      c.env.BENCH_DB,
-      c.req.param('runId'),
-      requestRouter(c)
-    );
+    const runId = c.req.param('runId');
+    const summaries = await getRunSummariesForRouter(c.env.BENCH_DB, runId, requestRouter(c));
     if (summaries === null) return c.json({ error: 'Run not found' }, 404);
-    return c.json({ summaries } satisfies BenchmarkRunSummariesResponse);
+    // The per-pair totals are display-only: a failed aggregate must not hide the
+    // route rows, which carry the same run's detail.
+    const modelTotals = await loadRunModelTotals(c.env.BENCH_DB, runId).catch((error: unknown) => {
+      console.warn(
+        JSON.stringify({ event: 'benchmark_run_model_totals_failed', runId, ...formatError(error) })
+      );
+      return undefined;
+    });
+    return c.json({
+      summaries,
+      ...(modelTotals ? { modelTotals } : {}),
+    } satisfies BenchmarkRunSummariesResponse);
   });
 
   app.post(
@@ -395,15 +544,20 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
             return c.json({ error: first.message }, 400);
           throw first;
         }
-        return c.json({
-          runId: started[0]?.runId ?? null,
-          enqueuedModels: started.reduce((total, run) => total + run.entryCount, 0),
-          skippedModels: [],
-          startedRuns: started,
-          drainErrors: drainErrors.map(error =>
-            error instanceof Error ? error.message : String(error)
-          ),
-        });
+        // A started run is `running` once its row exists; the dispatcher reuses prior
+        // results and materializes its chunks after this response.
+        return c.json(
+          {
+            runId: started[0]?.runId ?? null,
+            enqueuedModels: started.reduce((total, run) => total + run.entryCount, 0),
+            skippedModels: [],
+            startedRuns: started,
+            drainErrors: drainErrors.map(error =>
+              error instanceof Error ? error.message : String(error)
+            ),
+          },
+          started.length > 0 ? 202 : 200
+        );
       }
       try {
         return c.json({ ...(await startRun(c.env, kind, { force, router })), startedRuns: [] });
@@ -434,10 +588,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       engineIdentity: computeEngineIdentity('decider', router),
       repetitions: resolveEffectivePolicy(config).deciderRepetitions,
     };
-    const [platform, user, platformEntries] = await Promise.all([
+    const [platform, user, platformEntries, failedEntries] = await Promise.all([
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform'),
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user'),
       listCurrentPlatformProfileStatuses(c.env.BENCH_DB, current),
+      listCurrentFailedProfiles(c.env.BENCH_DB, current),
     ]);
     const toQueue = (rows: Awaited<ReturnType<typeof countCurrentProfilesByStatus>>) => {
       const queue: BenchmarkRegistryQueue = { pending: 0, running: 0, ready: 0, failed: 0 };
@@ -451,6 +606,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       platform: toQueue(platform),
       user: toQueue(user),
       platformEntries,
+      failedEntries,
     });
   });
 
@@ -460,7 +616,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     '/admin/registry/remeasure-prompt-transport',
     zodJsonValidator(RemeasureRequestSchema, { errorMessage: 'Invalid re-measure request' }),
     async c => {
-      const { router, action } = c.req.valid('json');
+      const { router, action, pairs } = c.req.valid('json');
       const catalog = await fetchBenchmarkModelCatalog(c.env).catch(() => null);
       const prices = catalog ? catalogCandidatePrices(catalog) : new Map();
       const reports = [];
@@ -476,8 +632,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
             router: selected,
             engineIdentity: computeEngineIdentity('decider', selected),
             repetitions: resolveEffectivePolicy(config).deciderRepetitions,
+            revision: ACTIVE_MEASUREMENT_REVISION,
             action,
             prices,
+            ...(pairs ? { pairs } : {}),
           })
         );
       }
@@ -485,8 +643,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  // Admin requeue of failed registry rows. Charges no owner quota — an owner's
-  // own Retry goes through /admin/profiles/register and is quota-charged there.
+  // Admin requeue of retryable failed registry rows whose retry window has passed.
+  // Permanent failures are re-admitted one at a time through /admin/registry/refresh.
+  // Charges no owner quota — an owner's own Retry goes through
+  // /admin/profiles/register and is quota-charged there.
   app.post(
     '/admin/registry/requeue',
     zodJsonValidator(RequeueBenchmarkRegistryRequestSchema, {
@@ -498,7 +658,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       if (!config) {
         return c.json({ error: 'benchmark config not set: save it in the admin panel first' }, 400);
       }
-      const requeued = await requeueFailedCurrentProfiles(
+      const requeued = await requeueRetryableCurrentProfiles(
         c.env.BENCH_DB,
         {
           router,
@@ -511,13 +671,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  app.get('/admin/routing-table', async c => {
-    const latest = await getLatestRoutingTable(c.env.BENCH_DB, requestRouter(c));
-    return c.json({
-      table: latest?.table ?? null,
-      publishedAt: latest?.publishedAt ?? null,
-    });
-  });
+  app.get('/admin/routing-table', async c =>
+    c.body(await loadRoutingTableResponse(c.env, requestRouter(c)), 200, {
+      'Content-Type': 'application/json',
+    })
+  );
 
   app.get('/admin/classifier-winner', async c => {
     const winner = await getClassifierWinner(c.env.BENCH_DB, computeEngineIdentity('classifier'));

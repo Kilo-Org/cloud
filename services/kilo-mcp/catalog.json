@@ -2547,6 +2547,36 @@
         },
         "isSecret": {
           "type": "boolean"
+        },
+        "networkSecret": {
+          "type": "object",
+          "properties": {
+            "allowedHosts": {
+              "minItems": 1,
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 254,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              }
+            },
+            "locations": {
+              "default": [
+                "header"
+              ],
+              "minItems": 1,
+              "maxItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "const": "header"
+              }
+            }
+          },
+          "required": [
+            "allowedHosts"
+          ]
         }
       },
       "required": [
@@ -2563,9 +2593,10 @@
       "organizationid",
       "key",
       "value",
-      "issecret"
+      "issecret",
+      "networksecret"
     ],
-    "searchBlob": "agentProfiles.setVar Set or update an environment variable on an agent profile. Mark a value as secret to have it stored encrypted. agentprofiles setvar profileid organizationid key value issecret profileId organizationId key value isSecret"
+    "searchBlob": "agentProfiles.setVar Set or update an environment variable on an agent profile. Mark a value as secret to have it stored encrypted. agentprofiles setvar profileid organizationid key value issecret networksecret profileId organizationId key value isSecret networkSecret"
   },
   "agentProfiles.skills": {
     "path": "agentProfiles.skills",
@@ -10146,6 +10177,53 @@
             "maxLength": 8192
           }
         },
+        "networkSecrets": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "allowedHosts": {
+                "minItems": 1,
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 254,
+                  "pattern": "^[A-Za-z0-9.-]+$"
+                }
+              },
+              "locations": {
+                "default": [
+                  "header"
+                ],
+                "minItems": 1,
+                "maxItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "const": "header"
+                }
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8192
+              }
+            },
+            "required": [
+              "allowedHosts",
+              "key",
+              "value"
+            ]
+          }
+        },
         "commands": {
           "maxItems": 1,
           "type": "array",
@@ -10215,6 +10293,7 @@
       "repositories",
       "plainvars",
       "secrets",
+      "networksecrets",
       "commands",
       "startcommands",
       "sandboxallocation",
@@ -10222,7 +10301,7 @@
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets networksecrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets networkSecrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "cloudEnvironments.delete": {
     "path": "cloudEnvironments.delete",
@@ -10552,6 +10631,75 @@
             ]
           }
         },
+        "networkSecrets": {
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "allowedHosts": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 254,
+                      "pattern": "^[A-Za-z0-9.-]+$"
+                    }
+                  },
+                  "locations": {
+                    "default": [
+                      "header"
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "const": "header"
+                    }
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "allowedHosts",
+                  "key",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "delete": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "key",
+                  "delete"
+                ]
+              }
+            ]
+          }
+        },
         "commands": {
           "maxItems": 1,
           "type": "array",
@@ -10621,6 +10769,7 @@
       "repositories",
       "plainvars",
       "secrets",
+      "networksecrets",
       "commands",
       "startcommands",
       "sandboxallocation",
@@ -10628,7 +10777,7 @@
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets networksecrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets networkSecrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",

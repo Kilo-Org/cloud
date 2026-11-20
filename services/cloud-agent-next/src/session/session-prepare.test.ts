@@ -2326,6 +2326,49 @@ describe('explicit sandbox session creation', () => {
       );
     });
 
+    it('rejects network secrets for an unpinned V1 environment with a Vercel owner default', async () => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      ctx.env.BYOC_VERCEL_IDS = orgId;
+      fetchByocVercelEnrollmentMock.mockResolvedValue({ setupStatus: 'ready' });
+      getSandboxAllocationCandidatesMock.mockResolvedValueOnce({
+        contextAllocation: 'vercel-small',
+      });
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+
+      await expect(
+        createSessionWithLedger(
+          {
+            ...environmentRequest(v1Environment),
+            profile: {
+              resolved: {
+                networkSecrets: {
+                  SERVICE_TOKEN: {
+                    allowedHosts: ['api.example.com'],
+                    locations: ['header'],
+                    envelope: {
+                      encryptedData: 'abc',
+                      encryptedDEK: 'def',
+                      algorithm: 'rsa-aes-256-gcm',
+                      version: 1,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          ctx,
+          { ...CREATE_OPTIONS, resolveSavedAllocationBeforeAdmission: true }
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Network secrets require a Cloudflare sandbox',
+      });
+      expect(settleOptions(0)?.outboxEvent).toMatchObject({ properties: { outcome: 'failed' } });
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    });
+
     it('skips a retired shared owner default for a V1 environment', async () => {
       getSandboxAllocationCandidatesMock.mockResolvedValue({
         contextAllocation: 'cloudflare-shared',

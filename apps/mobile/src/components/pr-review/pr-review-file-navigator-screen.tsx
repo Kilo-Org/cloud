@@ -153,6 +153,10 @@ function NavigatorError({
       </CenteredState>
     );
   }
+  if (state?.kind === 'offline') {
+    // The read never reached the server: name the connection, not the backend.
+    return <QueryError variant="offline" onRetry={onRetry} isRetrying={isRetrying} />;
+  }
   return (
     <QueryError
       variant="server"

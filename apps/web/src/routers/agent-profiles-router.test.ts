@@ -363,6 +363,96 @@ describe('Agent Profiles Router', () => {
           expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
         });
 
+        test('stores a network secret with its delivery mode and policy', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id } = await caller.agentProfiles.create({
+            name: 'Network Secret Profile',
+            vars: [
+              { key: 'PLAIN_VAR', value: 'plain-value', isSecret: false },
+              {
+                key: 'SERVICE_TOKEN',
+                value: 'the-network-plaintext',
+                isSecret: true,
+                networkSecret: { allowedHosts: ['registry.example.com'], locations: ['header'] },
+              },
+            ],
+          });
+
+          const rows = await db
+            .select({
+              key: agent_environment_profile_vars.key,
+              value: agent_environment_profile_vars.value,
+              isSecret: agent_environment_profile_vars.is_secret,
+              delivery: agent_environment_profile_vars.delivery,
+              allowedHosts: agent_environment_profile_vars.allowed_hosts,
+              locations: agent_environment_profile_vars.injection_locations,
+            })
+            .from(agent_environment_profile_vars)
+            .where(eq(agent_environment_profile_vars.profile_id, id));
+
+          const networkRow = rows.find(row => row.key === 'SERVICE_TOKEN');
+          expect(networkRow).toMatchObject({
+            isSecret: true,
+            delivery: 'network',
+            allowedHosts: ['registry.example.com'],
+            locations: ['header'],
+          });
+          expect(networkRow?.value).not.toBe('the-network-plaintext');
+          expect(JSON.parse(networkRow?.value ?? '{}')).toMatchObject({
+            network: {
+              algorithm: 'rsa-aes-256-gcm',
+              encryptedData: expect.any(String),
+              encryptedDEK: expect.any(String),
+            },
+          });
+
+          // The env variable of the same payload keeps env delivery.
+          expect(rows.find(row => row.key === 'PLAIN_VAR')).toMatchObject({
+            delivery: 'env',
+            allowedHosts: null,
+            locations: null,
+          });
+
+          const profile = await caller.agentProfiles.get({ profileId: id });
+          expect(profile.vars.find(variable => variable.key === 'SERVICE_TOKEN')?.value).toBe(
+            '***'
+          );
+          expect(profile.vars.find(variable => variable.key === 'SERVICE_TOKEN')?.delivery).toBe(
+            'network'
+          );
+        });
+
+        test('refuses a create past the network secret cap without storing a profile', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const varsBefore = await countOwnerVars(ownerUser.id);
+          // The environment var cap is higher than the network secret cap, so a
+          // payload this long reaches the delivery rule instead of the var cap.
+          const tooManySecrets = Array.from({ length: 21 }, (_, index) => ({
+            key: `SECRET_${String(index)}`,
+            value: 'value',
+            isSecret: true,
+            networkSecret: {
+              allowedHosts: ['registry.example.com'],
+              locations: ['header' as const],
+            },
+          }));
+
+          await expect(
+            caller.agentProfiles.create({
+              name: 'Over Cap Network Secrets',
+              vars: tooManySecrets,
+            })
+          ).rejects.toMatchObject({
+            code: 'BAD_REQUEST',
+            message: 'Maximum 20 network secrets allowed',
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Over Cap Network Secrets')).toBe(false);
+          expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
+        });
+
         test('leaves the previous default intact when a var write fails', async () => {
           const caller = await createCallerForUser(ownerUser.id);
 

@@ -3,6 +3,7 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { networkSecretPolicySchema } from '@kilocode/worker-utils/network-secrets';
 import * as profileService from '@kilocode/cloud-agent-profile';
 import * as profileVarsService from '@kilocode/cloud-agent-profile';
 import * as profileCommandsService from '@kilocode/cloud-agent-profile';
@@ -59,6 +60,7 @@ const VarSchema = z.object({
   key: z.string().min(1).max(256),
   value: z.string().max(10000),
   isSecret: z.boolean(),
+  networkSecret: networkSecretPolicySchema.optional(),
 });
 
 const CommandsSchema = z.object({
@@ -90,6 +92,9 @@ const ProfileSummaryWithOwnerSchema = ProfileSummarySchema.extend({
 });
 
 const ProfileVarResponseSchema = z.object({
+  delivery: z.enum(['env', 'network']).optional(),
+  allowedHosts: z.array(z.string()).nullable().optional(),
+  locations: z.array(z.string()).nullable().optional(),
   key: z.string(),
   value: z.string(),
   isSecret: z.boolean(),
@@ -654,7 +659,8 @@ export const agentProfilesRouter = createTRPCRouter({
         input.key,
         input.value,
         input.isSecret,
-        owner
+        owner,
+        input.networkSecret
       );
       return { success: true };
     }),

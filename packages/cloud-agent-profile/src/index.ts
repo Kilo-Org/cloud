@@ -79,10 +79,12 @@ export {
 export {
   MAX_PROFILE_VARS,
   encryptProfileSecret,
+  profileVarColumns,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
+  type ProfileNetworkSecretPolicy,
   type VarForSession,
 } from './profile-vars-service';
 

@@ -427,7 +427,7 @@ describe('environment access for members and managers', () => {
       expect(variables).not.toBeNull();
       expect(variables?.hasAttribute('readOnly')).toBe(true);
       expect(content?.textContent).toContain(
-        'Secret values are hidden. Only their names are shown.'
+        'Saved values are hidden. Only their names are shown.'
       );
 
       clickButton(content!, 'Close');

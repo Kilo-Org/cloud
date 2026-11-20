@@ -140,10 +140,12 @@
     "keepRunning": "Tiếp tục chạy",
     "newSession": "Phiên mới",
     "noModelsAvailable": "Không có mô hình khả dụng",
+    "modelRetires": "Ngừng hoạt động vào {{date}}",
     "notFound": "Không tìm thấy.",
     "online": "Trực tuyến",
     "open": "Mở {{name}}",
     "openPullRequest": "Mở yêu cầu hợp nhất",
+    "viewOnGitHub": "Xem PR trên GitHub",
     "completed": "Đã hoàn tất",
     "pending": "Đang chờ",
     "running": "Đang chạy",
@@ -183,7 +185,8 @@
     "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
     "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư",
     "legalDocumentEnglishOnly": "Tài liệu này chỉ có sẵn bằng tiếng Anh.",
-    "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại."
+    "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại.",
+    "organizationTrialEndedBillingAtKiloAi": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại."
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -277,6 +280,9 @@
     "credits": "Số dư",
     "failedToLoadBalance": "Không thể tải số dư. Chạm để thử lại.",
     "balanceLoadFailed": "Không thể tải số dư",
+    "balanceUnreachable": "Không kết nối được với máy chủ. Hãy thử lại.",
+    "balanceAccessDenied": "Bạn không có quyền xem số dư này.",
+    "balanceUnavailable": "Không tải được số dư.",
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
@@ -507,7 +513,7 @@
     "changelogFixesPolish": "Các bản sửa lỗi và cải tiến trên toàn ứng dụng.",
     "changelogAreas": {
       "signIn": "Đăng nhập",
-      "profileOrganizations": "Hồ sơ và tổ chức"
+      "profileOrganizations": "Hồ sơ & tổ chức"
     }
   },
   "preferences": {
@@ -697,7 +703,7 @@
     },
     "autoReviews": "Rà soát tự động",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket chưa được kết nối. Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối."
+      "notConnectedReadOnlyPlan": "Bản dùng thử của tổ chức đã kết thúc, vì vậy chủ sở hữu phải cập nhật thanh toán tại kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
@@ -706,7 +712,7 @@
       "managedOnWebRepositories": "Chọn kho lưu trữ cho {{organization}} trên web từ máy tính.",
       "description": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào bên dưới.",
       "descriptionReconnect": "Tạo mã truy cập không gian làm việc mới cho {{organization}} rồi dán vào bên dưới.",
-      "descriptionOverview": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào màn hình tiếp theo.",
+      "descriptionOverview": "Tạo mã truy cập không gian làm việc rồi dán vào màn hình tiếp theo.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
       "tokenPlaceholder": "Mã truy cập không gian làm việc",
       "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
@@ -748,9 +754,9 @@
     },
     "providerConnect": {
       "description": "Kết nối {{label}} của Kilo để tự động rà soát các yêu cầu hợp nhất.",
-      "githubApp": "Ứng dụng GitHub",
+      "githubApp": "ứng dụng GitHub",
       "githubError": "Không thể mở trang thiết lập GitHub. Vui lòng thử lại.",
-      "gitlabAccount": "Tài khoản GitLab",
+      "gitlabAccount": "tài khoản GitLab",
       "gitlabError": "Không thể mở trang thiết lập GitLab. Vui lòng thử lại."
     },
     "reviewDetail": {
@@ -1272,7 +1278,7 @@
       "couldNotLoad": "Không thể tải danh sách vấn đề.",
       "couldNotLoadMore": "Không thể tải thêm vấn đề.",
       "emptyDescription": "Hiện không có vấn đề chưa xử lý nào cần chú ý.",
-      "emptyTitle": "Không có vấn đề chưa xử lý",
+      "emptyTitle": "Không có vấn đề đang mở",
       "noMatchesDescription": "Hãy thử điều chỉnh hoặc xóa các bộ lọc đã chọn.",
       "noMatchesTitle": "Không có vấn đề nào khớp với bộ lọc"
     },
@@ -1475,7 +1481,7 @@
     "remediationUnavailable": {
       "findingNotFound": "Vấn đề bảo mật này không còn tồn tại.",
       "approvalRequired": "Tính năng khắc phục tự động cần được phê duyệt. Hãy bắt đầu khắc phục thủ công để phê duyệt.",
-      "findingNotOpen": "Vấn đề này không còn ở trạng thái chưa xử lý.",
+      "findingNotOpen": "Vấn đề này không còn mở nữa.",
       "repoNotInScope": "Kho lưu trữ này chưa được chọn để Trợ lý bảo mật giám sát.",
       "analysisRequired": "Chạy phân tích mã nguồn trước khi bắt đầu khắc phục.",
       "staleAnalysis": "Vấn đề đã thay đổi sau khi phân tích. Hãy chạy lại phân tích trước khi bắt đầu khắc phục.",
@@ -2783,7 +2789,6 @@
       "skipped_one": "{{displayCount}} đã bỏ qua",
       "skipped_other": "{{displayCount}} đã bỏ qua",
       "title": "Các bước kiểm tra",
-      "viewOnGitHub": "Xem PR trên GitHub",
       "checkDetails": "chi tiết bước kiểm tra"
     },
     "composer": {
@@ -2847,6 +2852,9 @@
       "couldNotLoad": "Không thể tải phần thảo luận.",
       "couldNotLoadMore": "Không thể tải thêm bình luận.",
       "loadMoreComments": "Tải thêm bình luận",
+      "conversationTruncated": "Chỉ hiển thị {{displayCount}} bình luận đầu tiên.",
+      "conversationTruncated_one": "Chỉ hiển thị {{displayCount}} bình luận đầu tiên.",
+      "conversationTruncated_other": "Chỉ hiển thị {{displayCount}} bình luận đầu tiên.",
       "loading": "Đang tải thảo luận",
       "moderation": {
         "block": {
@@ -4853,12 +4861,15 @@
     "inputDescription": "Quét mọi đầu vào bằng Enkrypt AI, bao gồm cả kết quả công cụ. Khi Enkrypt không khả dụng, yêu cầu được gửi đi mà không quét thay vì bị từ chối.",
     "outputTitle": "Rào chắn đầu ra",
     "outputDescription": "Quét phản hồi bằng Enkrypt AI trước khi thành viên nhận được. Tắt trừ khi bạn bật.",
+    "outputUnavailable": "Kilo chưa bật quét đầu ra cho tổ chức này, nên phản hồi không được kiểm tra và không có gì để thiết lập ở đây. Liên hệ {{supportEmail}} để yêu cầu.",
     "detectorsHint": "Chặn sẽ từ chối yêu cầu bị gắn cờ. Chỉ ghi nhật ký sẽ ghi lại mà không làm chậm yêu cầu.",
     "detectorsHintOutput": "Chặn sẽ làm phản hồi bị gắn cờ thất bại. Chỉ ghi nhật ký sẽ ghi lại mà không làm chậm phản hồi.",
     "choiceLog": "Chỉ ghi nhật ký",
     "applyTo": "Áp dụng cho",
     "applyToAllMembers": "Tất cả thành viên",
     "applyKiloDefault": "Áp dụng Mặc định của Kilo",
+    "applyKiloDefaultEnglishNote": "Văn bản chính sách mặc định của Kilo là tiếng Anh, vì Kilo Gateway áp dụng nó đúng như đã viết.",
+    "applyKiloDefaultReplaceMessage": "Chính sách mặc định của Kilo được viết bằng tiếng Anh và thay thế nội dung bạn đã đặt trong Vi phạm chính sách. Văn bản bạn đã nhập trong trường văn bản chính sách không thể khôi phục.",
     "invalidSavedTitle": "Không thể đọc cài đặt bộ phát hiện đầu vào đã lưu",
     "invalidSavedBody": "Yêu cầu bị chặn cho đến khi các bộ phát hiện đầu vào được lưu lại. Các bộ phát hiện bên dưới bắt đầu từ Mặc định của Kilo.",
     "invalidSavedOutputTitle": "Không thể đọc cài đặt bộ phát hiện đầu ra đã lưu",
@@ -4994,6 +5005,7 @@
     "providersNeedCatalog": "Các công tắc nhà cung cấp sẽ ở chế độ chỉ đọc cho đến khi danh mục mô hình đầy đủ được tải. Nhấn Thử lại ở trên để chỉnh sửa.",
     "providersEmpty": "Không có nhà cung cấp nào khớp với tìm kiếm này.",
     "providersNone": "Không có nhà cung cấp nào khả dụng cho tổ chức này.",
+    "providersUnavailable": "Không thể tải danh sách nhà cung cấp.",
     "allowAllShown": "Cho phép tất cả mục đang hiển thị",
     "denyAllShown": "Từ chối tất cả mục đang hiển thị",
     "gatewaysDescription": "Kilo định tuyến yêu cầu mô hình qua Vercel AI Gateway hoặc OpenRouter. Cổng kết nối bị tắt sẽ làm các yêu cầu đó thất bại.",

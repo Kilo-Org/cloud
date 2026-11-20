@@ -26,6 +26,9 @@ import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/rend
 const readable = (text: string) =>
   text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
 
+/** One `caption` line at font scale 1, as the card reserves it (gate-measured). */
+const CAPTION_LINE_DP = 14.1;
+
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const getContextBalanceQueryFn = vi.hoisted(() => vi.fn());
@@ -38,6 +41,8 @@ const currentUser = vi.hoisted(() => ({
 }));
 /** Window the card lays out in; a narrow one must stack the credits header. */
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
+/** The safe-area side insets the scroller takes off the card's settled width. */
+const insets = vi.hoisted(() => ({ left: 0, right: 0 }));
 
 // The provider now announces the lost-membership recovery through the
 // toast adapter, whose module graph reaches react-native's Flow source
@@ -134,7 +139,7 @@ vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) 
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ bottom: 0, left: insets.left, right: insets.right, top: 0 }),
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -230,6 +235,20 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function trpcError(code: string): Error {
+  return Object.assign(new Error(code), { data: { code, message: code } });
+}
+
+/**
+ * A read that never reached the server: a fetch rejection carries no tRPC code
+ * and no HTTP status, which is what names the connection rather than the
+ * server.
+ */
+function getConnectionBalanceFailure(): void {
+  getContextBalanceQueryFn.mockRejectedValue(new TypeError('Network request failed'));
+}
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
 
@@ -352,6 +371,9 @@ beforeEach(() => {
   Platform.OS = 'ios';
   balancePreference.loaded = true;
   windowDims.width = 390;
+  windowDims.fontScale = 1;
+  insets.left = 0;
+  insets.right = 0;
   // A test that simulates the app reporting offline must not leak that state.
   onlineManager.setOnline(true);
   savedMetadata.clear();
@@ -1007,15 +1029,18 @@ describe('CreditsCard add-credits entry point', () => {
     onlineManager.setOnline(true);
   });
 
-  it('settles an unreachable balance read to the retry surface while offline', async () => {
+  it('settles an unreachable balance read to the connection state while offline', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
+    getConnectionBalanceFailure();
     onlineManager.setOnline(false);
 
     const { labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    // A read that never reached the server names the connection, not a
+    // server-side failure, and keeps the Retry that a restored network makes
+    // useful.
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
-    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Could not reach the server. Try again.');
     expect(texts()).toContain('Retry');
     expect(texts()).not.toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
@@ -1025,10 +1050,10 @@ describe('CreditsCard add-credits entry point', () => {
 
   it('keeps personal Buy credits actionable when the balance request fails', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+    getConnectionBalanceFailure();
 
     const { renderer, labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
     expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
     expect(texts()).not.toContain('$0.00');
@@ -1037,6 +1062,52 @@ describe('CreditsCard add-credits entry point', () => {
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
 
+    unmount();
+  });
+
+  it('names a permission refusal without offering Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('FORBIDDEN'));
+
+    const { renderer, labels, texts, unmount } = await mountCard();
+    const PERMISSION_COPY = "You don't have permission to view this balance.";
+    await waitFor(() => labels().includes(PERMISSION_COPY));
+
+    expect(texts()).toContain(PERMISSION_COPY);
+    // A refusal cannot be fixed by asking again, so the card offers no action.
+    expect(texts()).not.toContain('Retry');
+    const retrySurface = renderer.root.findAll(
+      node => node.type === Pressable && node.props.accessibilityRole === 'button'
+    );
+    expect(
+      retrySurface.some(node =>
+        String(node.props.accessibilityLabel ?? '').includes('Tap to retry')
+      )
+    ).toBe(false);
+    unmount();
+  });
+
+  it('describes a terminal balance failure as an explanation with no Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('NOT_FOUND'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes("Balance couldn't be loaded."));
+
+    expect(texts()).toContain("Balance couldn't be loaded.");
+    expect(texts()).not.toContain('Retry');
+    unmount();
+  });
+
+  it('keeps the retry line for a transient balance failure', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+
+    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Retry');
     unmount();
   });
 
@@ -1179,13 +1250,38 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
+  /**
+   * The one-row arm's control slot: the row's last child, beside the value column.
+   * The row is reanimated's `Animated.View` (it animates its own layout), which is
+   * not a host `View` in the rendered tree, so it is matched by its classes alone.
+   */
+  function controlSlot(renderer: ReactTestRenderer): ReactTestInstance {
+    const rows = renderer.root.findAll(node =>
+      hasClasses(node, ['min-w-0', 'flex-1', 'flex-row', 'items-center', 'gap-1'])
+    );
+    const row = rows[0];
+    if (rows.length !== 1 || row === undefined) {
+      throw new Error(`Expected one one-row arm, received ${rows.length}`);
+    }
+    const slot = row.children.at(-1);
+    if (slot === undefined || typeof slot === 'string') {
+      throw new Error('The one-row arm has no control slot');
+    }
+    return slot;
+  }
+
   /** The nearest host View above the note: the column the note shares with the amount. */
   function noteColumn(renderer: ReactTestRenderer): ReactTestInstance {
     const [note] = renderer.root.findAll(
       node => typeof node.type === 'string' && node.props.children === 'No expiring credits.'
     );
     let current = note?.parent ?? null;
-    while (current !== null && !Object.is(current.type, 'View')) {
+    // The note sits in its own fixed two-line slot; the column it shares with
+    // the amount is the first `View` above that slot.
+    while (
+      current !== null &&
+      (!Object.is(current.type, 'View') || current.props.testID === 'credits-expiry-slot')
+    ) {
       current = current.parent;
     }
     if (current === null) {
@@ -1202,6 +1298,150 @@ describe('CreditsCard balance row', () => {
     expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
     expect(renders(balanceBlock(renderer), 'ADD_CREDITS_BUTTON')).toBe(false);
     unmount();
+  });
+
+  it('holds the toggle box while the balance loads, so the wide card is the same height after', async () => {
+    currentUser.userId = 'user-a';
+    const pending = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(pending.promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, texts, unmount } = await mountCard();
+    try {
+      const box = cardBox(renderer);
+      await act(() => {
+        (box.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+          nativeEvent: { layout: { width: 383 } },
+        });
+      });
+      // The one-row arm gives the control the row's height: a placeholder that
+      // is not the control's own 48pt box shrinks the card while the read runs
+      // and grows it when the amount lands, moving every row below the card.
+      const loadingControl = controlSlot(renderer);
+      expect(classesOf(loadingControl)).toEqual(
+        expect.arrayContaining(ICON_TARGET_BOX_CLASS.split(' '))
+      );
+
+      await act(async () => {
+        pending.resolve({ balance: 1 });
+        await pending.promise;
+      });
+      await waitFor(() => texts().includes('$1.00'));
+      expect(String(controlSlot(renderer).props.className)).toContain(ICON_TARGET_BOX_CLASS);
+    } finally {
+      unmount();
+      pending.resolve({ balance: 1 });
+    }
+  });
+
+  /** The note's fixed box: the one View the card tags as the expiry slot. */
+  function noteSlot(renderer: ReactTestRenderer): ReactTestInstance {
+    const [slot] = renderer.root.findAll(node => node.props.testID === 'credits-expiry-slot');
+    if (slot === undefined) {
+      throw new Error('The card painted no expiry slot');
+    }
+    return slot;
+  }
+
+  /** The height the slot reserves, in dp, at the test's font scale of 1. */
+  function slotHeight(slot: ReactTestInstance): number {
+    const style: unknown = slot.props.style;
+    if (style === null || typeof style !== 'object' || !('minHeight' in style)) {
+      return 0;
+    }
+    const { minHeight } = style;
+    return typeof minHeight === 'number' ? minHeight : 0;
+  }
+
+  it('reserves the funded note’s two lines while the credits load', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    const pending = Promise.withResolvers<{
+      creditBlocks: { balance_mUsd: number; expiry_date: string | null }[];
+    }>();
+    personalCreditBlocksQueryFn.mockReturnValue(pending.promise);
+    const { renderer, texts, unmount } = await mountCard();
+    try {
+      // A funded note is a sentence that wraps to two `caption` lines at this
+      // card's width (14.1 dp each: the gate device measured the funded
+      // sentence at 28.19 dp), while the bar stands in for one. A slot that only
+      // held the bar grew the card by a line when funded credits landed and
+      // moved every row below it.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(28.2, 5);
+
+      await act(async () => {
+        pending.resolve({
+          creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+        });
+        await pending.promise;
+      });
+      await waitFor(() => texts().some(text => text.includes('in credits expires')));
+      expect(renders(noteSlot(renderer), 'in credits expires')).toBe(true);
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(28.2, 5);
+    } finally {
+      unmount();
+      pending.resolve({ creditBlocks: [] });
+    }
+  });
+
+  it('reserves the wrapped note at a large font scale, not just a scaled two-line box', async () => {
+    // Android's largest scale (2.0) is the gate's `font-max` cell: the column
+    // keeps its dp width while every glyph widens, so the funded sentence takes
+    // about twice as many lines as at scale 1 and the box has to reserve them.
+    windowDims.fontScale = 2;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, renderer, unmount } = await mountCard();
+    try {
+      await waitFor(() => texts().some(text => text.includes('in credits expires')));
+      // Four lines at 28.2 dp each, not the two a scale-multiplied box holds.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(CAPTION_LINE_DP * 2 * 4, 5);
+      expect(slotHeight(noteSlot(renderer))).toBeGreaterThan(CAPTION_LINE_DP * 2 * 2);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the stacked arm on the first frame where the scroller takes landscape insets', async () => {
+    // The review's own case: the landscape insets (47/59) at font scale 2. The
+    // settled width is 800 - 28 - 47 - 59 = 666 card dp, and 666 / 2 = 333
+    // stacks; the window alone (800 - 28 = 772, 386 scaled) would pick the
+    // one-row arm and `onLayout` would flip it.
+    windowDims.width = 800;
+    windowDims.fontScale = 2;
+    insets.left = 47;
+    insets.right = 59;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockReturnValue(Promise.withResolvers<{ balance: number }>().promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, unmount } = await mountCard();
+    try {
+      // No layout event: this is the arm the first frame paints.
+      const shell = balanceBlock(renderer);
+      expect(classesOf(shell)).not.toContain('flex-row');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the one-row arm on the first frame where the insets leave room for it', async () => {
+    // The same window and scale without the cutout: 772 / 2 = 386 scaled dp
+    // keeps the note beside the amount, so the first frame must agree.
+    windowDims.width = 800;
+    windowDims.fontScale = 2;
+    insets.left = 0;
+    insets.right = 0;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockReturnValue(Promise.withResolvers<{ balance: number }>().promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, unmount } = await mountCard();
+    try {
+      expect(classesOf(balanceBlock(renderer))).toContain('flex-row');
+    } finally {
+      unmount();
+    }
   });
 
   it.each<[string, number]>([

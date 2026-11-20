@@ -1,5 +1,5 @@
 import { createContext, use } from 'react';
-import { I18nManager, Platform } from 'react-native';
+import { I18nManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Non-tab detail screens (no tab bar clearance needed) — floors bottom inset
@@ -12,9 +12,12 @@ export function useDetailScreenBottomPadding() {
 /**
  * Set by a surface that clears the window's side insets itself. Android
  * presents an imperative `Sheet` in a dialog window that Material3 caps at
- * 640dp and centres, so the sheet's edges never reach a landscape cutout; the
- * root window's side insets do not describe that surface, and content that
- * added them would sit a whole cutout width off the sheet's own gutter.
+ * 640dp and centres, and iOS presents the same sheet in a surface whose
+ * content host already sits inside the safe area: measured on the simulator at
+ * 874x402 in landscape, the sheet's content spans 62..812 while the window
+ * spans 0..874. In neither case do the sheet's edges reach a landscape cutout,
+ * so the root window's side insets do not describe that surface, and content
+ * that added them would sit a whole cutout width off the sheet's own gutter.
  */
 const SurfaceClearsSideInsetsContext = createContext(false);
 
@@ -36,7 +39,9 @@ export function useScreenInsets() {
           right: Math.max(insets.right, 8),
         }
       : insets;
-  return use(SurfaceClearsSideInsetsContext) && Platform.OS === 'android'
+  // The surface clears the window's side insets itself, on either platform:
+  // what follows from that is the surface's own gutter, not the window's.
+  return use(SurfaceClearsSideInsetsContext)
     ? { ...cornerPadded, left: 0, right: 0 }
     : cornerPadded;
 }

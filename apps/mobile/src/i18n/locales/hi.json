@@ -140,6 +140,7 @@
     "keepRunning": "चालू रखें",
     "newSession": "नया सत्र",
     "noModelsAvailable": "कोई मॉडल उपलब्ध नहीं",
+    "modelRetires": "{{date}} को बंद हो जाएगा",
     "notFound": "यह नहीं मिला।",
     "online": "ऑनलाइन",
     "open": "{{name}} खोलें",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। एक संगठन मालिक kilo.ai पर बिलिंग अपडेट कर सकता है, फिर दोबारा प्रयास करें।",
     "privateRepositoryA11y": "{{name}}, निजी रिपॉज़िटरी",
     "legalDocumentEnglishOnly": "यह दस्तावेज़ केवल अंग्रेज़ी में उपलब्ध है।",
-    "organizationTrialEndedBilling": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। आप बिलिंग अपडेट कर सकते हैं, फिर दोबारा प्रयास करें।"
+    "organizationTrialEndedBilling": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। आप बिलिंग अपडेट कर सकते हैं, फिर दोबारा प्रयास करें।",
+    "organizationTrialEndedBillingAtKiloAi": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। आप kilo.ai पर बिलिंग अपडेट कर सकते हैं, फिर दोबारा प्रयास करें।",
+    "viewOnGitHub": "GitHub पर PR देखें"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -277,6 +280,9 @@
     "credits": "क्रेडिट",
     "failedToLoadBalance": "बैलेंस लोड नहीं हो सका। फिर से कोशिश करने के लिए टैप करें।",
     "balanceLoadFailed": "बैलेंस लोड नहीं हो सका",
+    "balanceUnreachable": "सर्वर से संपर्क नहीं हो सका। फिर से प्रयास करें।",
+    "balanceAccessDenied": "आपके पास यह बैलेंस देखने की अनुमति नहीं है।",
+    "balanceUnavailable": "बैलेंस लोड नहीं हो सका।",
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
@@ -302,8 +308,8 @@
     "passkeysSubtitle": "बिना पासवर्ड साइन इन करें",
     "passkeysEmpty": "अभी तक कोई पासकी नहीं",
     "passkeysEmptyHint": "$t(profile.addPasskey) करके बिना पासवर्ड साइन इन करें।",
-    "passkeysCouldNotLoad": "पासकी लोड नहीं हो सकीं",
-    "passkeysLoadFailed": "यह लोड होने तक पासकी उपलब्ध नहीं हैं।",
+    "passkeysCouldNotLoad": "पासकी लोड नहीं हो सकी",
+    "passkeysLoadFailed": "यह लोड होने तक पासकी उपलब्ध नहीं है।",
     "addPasskey": "पासकी जोड़ें",
     "passkeyDefaultName": "पासकी",
     "passkeyAddedOn": "{{date}} को जोड़ा गया",
@@ -504,10 +510,10 @@
     "changelogVersionPending": "वर्शन {{version}} के नोट्स अगले ऐप अपडेट के साथ आएंगे।",
     "changelogGroupNew": "नया",
     "changelogFixesIn": "{{areas}} में त्रुटि-सुधार और बेहतरी।",
-    "changelogFixesPolish": "पूरे ऐप में त्रुटि-सुधार और बेहतरी।",
+    "changelogFixesPolish": "त्रुटि-सुधार और बेहतरी।",
     "changelogAreas": {
       "signIn": "साइन-इन",
-      "profileOrganizations": "प्रोफ़ाइल और संगठन"
+      "profileOrganizations": "प्रोफ़ाइल व संगठन"
     }
   },
   "preferences": {
@@ -697,7 +703,7 @@
     },
     "autoReviews": "स्वचालित समीक्षाएँ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket कनेक्ट नहीं है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।"
+      "notConnectedReadOnlyPlan": "संगठन का परीक्षण समाप्त हो गया है, इसलिए मालिक को kilo.ai पर बिलिंग अपडेट करनी होगी।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
@@ -706,7 +712,7 @@
       "managedOnWebRepositories": "{{organization}} के लिए कंप्यूटर से वेब पर रिपॉज़िटरी चुनें।",
       "description": "{{organization}} के लिए एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
       "descriptionReconnect": "{{organization}} के लिए एक नया वर्कस्पेस एक्सेस टोकन बनाएँ और उसे नीचे पेस्ट करें।",
-      "descriptionOverview": "{{organization}} के लिए एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे अगली स्क्रीन पर पेस्ट करें।",
+      "descriptionOverview": "एक वर्कस्पेस एक्सेस टोकन बनाएँ और उसे अगली स्क्रीन पर पेस्ट करें।",
       "scopes": "खाता: पढ़ना · रिपॉज़िटरी: पढ़ना/लिखना · पुल रिक्वेस्ट: पढ़ना · वेबहुक: पढ़ना/लिखना",
       "tokenPlaceholder": "वर्कस्पेस एक्सेस टोकन",
       "tokenRefused": "Bitbucket ने इस वर्कस्पेस टोकन को स्वीकार नहीं किया। जाँचें कि इसमें ऊपर दिए गए स्कोप हैं, फिर पुनः प्रयास करें।"
@@ -716,7 +722,7 @@
     "manualReview": {
       "invalidMergeRequestUrl": "मर्ज रिक्वेस्ट का मान्य URL दर्ज करें।",
       "mergeRequestUrl": "मर्ज रिक्वेस्ट का URL",
-      "instructionsAtLimit": "निर्देश {{max}} अक्षरों तक सीमित हैं",
+      "instructionsAtLimit": "निर्देश {{max}} अक्षरों तक सीमित हैं।",
       "couldNotCheckProviderStatus": "प्रदाता की स्थिति की जाँच नहीं हो सकी।",
       "couldNotLoadProviders": "आपके कनेक्ट किए गए प्रदाताओं की जानकारी लोड नहीं हो सकी। कृपया फिर से कोशिश करें।",
       "instructions": "निर्देश (वैकल्पिक)",
@@ -874,10 +880,10 @@
     "webhookSetup": "वेबहुक का सेटअप अधूरा है।",
     "webhookSetupDescription": "हो सकता है कि कुछ रिपॉज़िटरी की स्वचालित समीक्षा न हो।",
     "decision": {
-      "block": "ब्लॉक करें",
+      "block": "ब्लॉक",
       "noDecision": "कोई निर्णय नहीं",
       "noResult": "कोई परिणाम नहीं",
-      "pass": "सफल"
+      "pass": "पास"
     },
     "overview": {
       "allAreas": "सभी क्षेत्र",
@@ -885,11 +891,11 @@
       "nSelected_one": "{{displayCount}} चयनित",
       "nSelected_other": "{{displayCount}} चयनित",
       "proposedReviewMdGuidance": "REVIEW.md के लिए प्रस्तावित दिशानिर्देश",
-      "set": "तय है",
-      "notSet": "तय नहीं है"
+      "set": "सेट है",
+      "notSet": "सेट नहीं है"
     },
     "updateFailed": "समीक्षक अपडेट नहीं हो सका।",
-    "configSaveFailed": "समीक्षा की सेटिंग सहेजी नहीं जा सकीं।",
+    "configSaveFailed": "समीक्षा की सेटिंग सहेजी नहीं जा सकी।",
     "status": {
       "interrupted": "बाधित"
     },
@@ -960,9 +966,9 @@
       "offDescription": "संगठन की बिलिंग भूमिकाएँ (मालिक, एडमिन और बिलिंग मैनेजर) वेब पर संगठन की सेटिंग्स में एनालिटिक्स चालू कर सकती हैं, जिससे पूरी हो चुकी समीक्षाएँ दर्ज हो सकें।",
       "couldNotLoad": "एनालिटिक्स लोड नहीं हो सका",
       "trackedReviewsCaption": "इस अवधि में एनालिटिक्स चालू रहने पर पूरी हो चुकी समीक्षाएँ। चल रही और विफल समीक्षाएँ कभी नहीं गिनी जातीं।",
-      "trackedReviewsUncounted": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।",
-      "trackedReviewsUncounted_one": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।",
-      "trackedReviewsUncounted_other": "गिने नहीं गए: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।"
+      "trackedReviewsUncounted": "गिनी नहीं गईं: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।",
+      "trackedReviewsUncounted_one": "गिनी नहीं गई: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षा का परिणाम कैप्चर नहीं हुआ था।",
+      "trackedReviewsUncounted_other": "गिनी नहीं गईं: संगठन की {{displayTotal}} पूरी हो चुकी समीक्षाओं में से {{displayCount}} समीक्षाएँ जिनका परिणाम कैप्चर नहीं किया गया था।"
     },
     "council": {
       "title": "काउंसिल समीक्षा",
@@ -971,7 +977,7 @@
       "unavailablePersonally": "काउंसिल समीक्षा व्यक्तिगत खाते का हिस्सा नहीं है।",
       "unavailablePersonallyAction": "संगठन बनाएँ",
       "unavailablePersonallySwitchAction": "संगठन बदलें",
-      "unavailableOrganizationTitle": "काउंसिल समीक्षा अभी उपलब्ध नहीं है",
+      "unavailableOrganizationTitle": "काउंसिल समीक्षा उपलब्ध नहीं है",
       "unavailableForOrganization": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। इस संगठन के पास यह अभी नहीं है।",
       "unavailableForOrganizationNeutral": "इस संगठन के लिए काउंसिल समीक्षा अभी उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें।",
       "unavailableOnBitbucket": "काउंसिल समीक्षा Bitbucket रिपॉज़िटरी के लिए उपलब्ध नहीं है।",
@@ -982,7 +988,7 @@
       "labelsDescription": "लेबल को कॉमा से अलग करें। फिर काउंसिल वाली रिपॉज़िटरी सिर्फ़ उन्हीं पुल रिक्वेस्ट पर काउंसिल चलाएगी जिन पर इनमें से कम से कम एक लेबल लगा हो। हर योग्य पुल रिक्वेस्ट के लिए खाली छोड़ें।",
       "tooManyLabels": "काउंसिल लेबल बहुत ज़्यादा हैं। ज़्यादा से ज़्यादा {{maximum}} लेबल इस्तेमाल करें।",
       "labelTooLong": "काउंसिल लेबल बहुत लंबा है। हर लेबल में ज़्यादा से ज़्यादा {{maximum}} अक्षर होने चाहिए।",
-      "minSpecialists": "कम से कम {{minimum}} विशेषज्ञ चुनें। {{selected}} चुने गए।",
+      "minSpecialists": "कम से कम {{minimum}} विशेषज्ञ चुनें। चयनित: {{selected}}।",
       "specialistName": {
         "testCoverage": "टेस्ट कवरेज",
         "correctness": "सटीकता",
@@ -1064,7 +1070,7 @@
     },
     "analysisSettings": {
       "analysisModel": "विश्लेषण का मॉडल",
-      "couldNotLoad": "विश्लेषण की सेटिंग लोड नहीं हो सकीं।",
+      "couldNotLoad": "विश्लेषण की सेटिंग्स लोड नहीं हो सकीं।",
       "depth": "विश्लेषण की गहराई",
       "remediationModel": "सुधार का मॉडल",
       "title": "मॉडल और विश्लेषण",
@@ -1104,7 +1110,7 @@
         "findingDismissed": "खारिज किया गया",
         "findingSeverityChanged": "गंभीरता बदली गई",
         "findingStatusChange": "स्थिति बदली गई",
-        "findingSuperseded": "बदला गया",
+        "findingSuperseded": "प्रतिस्थापित किया गया",
         "remediationBlocked": "सुधार अवरुद्ध हुआ",
         "remediationCancelled": "रद्द किया गया",
         "remediationFailed": "सुधार विफल रहा",
@@ -1124,7 +1130,7 @@
       "confidenceHighOnly": "केवल उच्च विश्वसनीयता",
       "confidenceMediumOrHigher": "मध्यम या अधिक",
       "confidenceThreshold": "विश्वसनीयता का न्यूनतम स्तर",
-      "couldNotLoad": "स्वचालन की सेटिंग लोड नहीं हो सकीं।",
+      "couldNotLoad": "स्वचालन की सेटिंग्स लोड नहीं हो सकीं।",
       "enable": "चालू करें",
       "autoAnalysisDescription": "समस्याएँ सिंक होने पर।",
       "analyzeNewFindings": "नई समस्याओं का विश्लेषण करें",
@@ -1219,7 +1225,7 @@
       "dueThisWeekDetail_one": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "dueThisWeekDetail_other": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "noDeadline": "कोई समय सीमा नहीं",
-      "reviewSlaAssignment": "तय की गई SLA समय सीमाओं की समीक्षा करें",
+      "reviewSlaAssignment": "SLA निर्धारण की समीक्षा करें",
       "allOpenFindingsTracked": "सभी अनसुलझी समस्याओं की निगरानी जारी"
     },
     "dismiss": {
@@ -1272,7 +1278,7 @@
       "couldNotLoad": "समस्याएँ लोड नहीं हो सकीं।",
       "couldNotLoadMore": "और समस्याएँ लोड नहीं हो सकीं।",
       "emptyDescription": "अभी किसी अनसुलझी समस्या पर ध्यान देने की ज़रूरत नहीं है।",
-      "emptyTitle": "कोई अनसुलझी समस्या नहीं",
+      "emptyTitle": "कोई खुली समस्या नहीं",
       "noMatchesDescription": "चुने हुए फ़िल्टर बदलकर या हटाकर देखें।",
       "noMatchesTitle": "फ़िल्टर से मेल खाने वाली कोई समस्या नहीं"
     },
@@ -1289,7 +1295,7 @@
       "viewPr": "PR देखें"
     },
     "notifications": {
-      "couldNotLoad": "सूचनाओं की सेटिंग लोड नहीं हो सकीं।",
+      "couldNotLoad": "सूचनाओं की सेटिंग्स लोड नहीं हो सकीं।",
       "emailOwners": "संगठन के मालिकों को ईमेल करें",
       "newFindingPersonalTitle": "नई समस्याओं के बारे में मुझे ईमेल करें",
       "newFindingSection": "नई समस्या की सूचना",
@@ -1327,7 +1333,7 @@
       "unavailable": "इस समस्या को ठीक करने की सुविधा उपलब्ध नहीं है।"
     },
     "repositories": {
-      "couldNotLoad": "रिपॉज़िटरी की सेटिंग लोड नहीं हो सकीं।",
+      "couldNotLoad": "रिपॉज़िटरी की सेटिंग्स लोड नहीं हो सकीं।",
       "githubAppSettings": "GitHub ऐप की सेटिंग",
       "manageAccess": "GitHub ऐप की पहुँच प्रबंधित करें",
       "noRepositories": "कोई रिपॉज़िटरी नहीं",
@@ -1351,7 +1357,7 @@
       "automationAllOff": "सभी बंद",
       "automationCount": "3 में से {{displayCount}} चालू",
       "couldNotLoadPermissions": "अनुमतियाँ लोड नहीं हो सकीं।",
-      "couldNotLoadSettings": "सुरक्षा एजेंट की सेटिंग लोड नहीं हो सकीं।",
+      "couldNotLoadSettings": "सुरक्षा एजेंट की सेटिंग्स लोड नहीं हो सकीं।",
       "disabledNoManage": "सुरक्षा एजेंट बंद है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे चालू कर सकते हैं।",
       "disabledNoRepo": "सुरक्षा एजेंट चालू करने से पहले कम से कम एक रिपॉज़िटरी चुनें।",
       "disabledPrompt": "Dependabot अलर्ट सिंक करने, रिपॉज़िटरी चुनने और स्वचालन की सेटिंग तय करने के लिए सुरक्षा एजेंट चालू करें।",
@@ -1372,7 +1378,7 @@
       "couldNotOpenGithub": "GitHub नहीं खुल सका। कृपया फिर से कोशिश करें।"
     },
     "sla": {
-      "couldNotLoad": "SLA की सेटिंग लोड नहीं हो सकीं।",
+      "couldNotLoad": "SLA की सेटिंग्स लोड नहीं हो सकीं।",
       "criticalDescription": "बिना प्रमाणीकरण के दूर से हमला संभव।",
       "deadlinesHeading": "सुधार की समय सीमाएँ (दिन)",
       "enableTracking": "SLA की निगरानी चालू करें",
@@ -1395,7 +1401,7 @@
       "findingAlreadyDismissed": "समस्या पहले ही खारिज की जा चुकी है।",
       "findingDismissed": "समस्या खारिज की गई।",
       "noRemediationsQueued": "कोई मौजूदा समस्या कतार में नहीं जोड़ी गई।",
-      "remediationsQueued": "मौजूदा सुधारों के अनुरोध कतार में जोड़े गए।",
+      "remediationsQueued": "मौजूदा सुधार कतार में जोड़े गए।",
       "analysisComplete": "विश्लेषण पूरा हुआ।",
       "syncComplete": "सिंक पूरा हुआ।"
     },
@@ -1426,7 +1432,7 @@
       "failedDescription": "सुरक्षा एजेंट विश्लेषण पूरा नहीं कर सका।",
       "extractionFailedDescription": "तकनीकी रिपोर्ट को संरचित परिणाम में नहीं बदला जा सका।",
       "exploitableDescription": "एप्लिकेशन कोड प्रभावित सुविधा तक पहुँच सकता है।",
-      "notExploitable": "कोड तक पहुँच संभव नहीं",
+      "notExploitable": "पहुँच योग्य पथ नहीं",
       "notExploitableDescription": "इस रिपॉज़िटरी में प्रभावित सुविधा तक पहुँचने वाला कोई कोड पथ नहीं मिला।",
       "unknown": "समीक्षा आवश्यक",
       "unknownDescription": "विश्लेषण से यह पुष्टि नहीं हो सकी कि कोड असुरक्षित सुविधा तक पहुँच सकता है या नहीं।",
@@ -1475,7 +1481,7 @@
     "remediationUnavailable": {
       "findingNotFound": "सुरक्षा समस्या अब मौजूद नहीं है।",
       "approvalRequired": "स्वचालित सुधार के लिए मंज़ूरी ज़रूरी है। मंज़ूरी देने के लिए सुधार खुद शुरू करें।",
-      "findingNotOpen": "समस्या अब अनसुलझी नहीं है।",
+      "findingNotOpen": "समस्या अब खुली नहीं है।",
       "repoNotInScope": "रिपॉज़िटरी को सुरक्षा एजेंट के लिए नहीं चुना गया है।",
       "analysisRequired": "सुधार शुरू करने से पहले कोडबेस का विश्लेषण करें।",
       "staleAnalysis": "विश्लेषण के बाद समस्या बदल गई है। सुधार शुरू करने से पहले विश्लेषण फिर से चलाएँ।",
@@ -1752,7 +1758,7 @@
       "profileSaved": "प्रोफ़ाइल \"{{name}}\" सहेजी गई",
       "organizationProfiles": "संगठन प्रोफ़ाइल",
       "personalProfiles": "व्यक्तिगत प्रोफ़ाइल",
-      "yourProfiles": "आपकी प्रोफ़ाइल",
+      "yourProfiles": "आपकी प्रोफ़ाइलें",
       "nameTooLong": "प्रोफ़ाइल नाम बहुत लंबा है",
       "descriptionTooLong": "विवरण बहुत लंबा है",
       "secretsEncrypted": "भंडारण से पहले रहस्य एन्क्रिप्ट किए जाते हैं।",
@@ -1891,11 +1897,11 @@
       "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
-      "code": "कोड लिखें",
+      "code": "कोड",
       "plan": "योजना",
-      "debug": "डीबग करें",
+      "debug": "डीबग",
       "orchestrator": "समन्वयक",
-      "ask": "पूछें",
+      "ask": "प्रश्न",
       "codeDescription": "कोड लिखें और बदलें",
       "planDescription": "समाधानों की योजना और डिज़ाइन बनाएँ",
       "debugDescription": "समस्याएँ खोजें और ठीक करें",
@@ -1966,7 +1972,7 @@
       "deliveryInterrupted": "आपने यह संदेश रोक दिया।",
       "deliveryExhausted": "कई कोशिशों के बाद भी हम यह संदेश नहीं पहुँचा सके।",
       "deliveryExecution": "एजेंट इस संदेश पर काम नहीं कर सका।",
-      "assistantTitle": "उत्तर नहीं मिल सका।",
+      "assistantTitle": "उत्तर विफल रहा।",
       "assistantProviderRejected": "प्रदाता ने अनुरोध अस्वीकार कर दिया।",
       "assistantStopped": "उत्तर देना रोक दिया गया।",
       "assistantContextOverflow": "मॉडल के लिए बातचीत बहुत लंबी है।",
@@ -1975,7 +1981,7 @@
       "assistantCreditsRefusal": "इस अनुरोध के लिए पर्याप्त क्रेडिट नहीं हैं।",
       "assistantOutputLimit": "उत्तर मॉडल की आउटपुट सीमा तक पहुँच गया।",
       "assistantStructuredOutput": "उत्तर आवश्यक फ़ॉर्मैट से मेल नहीं खाता।",
-      "assistantFailed": "उत्तर नहीं मिल सका।"
+      "assistantFailed": "उत्तर विफल रहा।"
     },
     "filePart": {
       "loadingImage": "छवि लोड हो रही है",
@@ -2053,7 +2059,7 @@
       "detailRestoreIncompleteMore": "{{listed}} और {{omitted}} और",
       "detailReasonPatchFailed": "पैच लागू नहीं हुआ",
       "detailReasonOutsideWorkspace": "पाथ वर्कस्पेस के बाहर है",
-      "detailReasonMissingContent": "स्नैपशॉट में फ़ाइल की कोई कंटेंट नहीं थी",
+      "detailReasonMissingContent": "स्नैपशॉट में फ़ाइल का कोई कंटेंट नहीं था",
       "detailReasonIndexResetFailed": "विफल एप्लाई के बाद इंडेक्स रीसेट नहीं हो सका",
       "detailReasonUnlinkFailed": "फ़ाइल हटाई नहीं जा सकी",
       "detailReasonWriteFailed": "फ़ाइल लिखी नहीं जा सकी",
@@ -2080,10 +2086,10 @@
     "permissionCard": {
       "title": "अनुमति आवश्यक",
       "allowQuestion": "{{permission}} की अनुमति दें?",
-      "subjectExternalDirectory": "प्रोजेक्ट के बाहर की निर्देशिका",
-      "subjectDoomLoop": "एक ही टूल कॉल दोहराना",
+      "subjectExternalDirectory": "प्रोजेक्ट के बाहर की निर्देशिका तक पहुँच",
+      "subjectDoomLoop": "एक ही टूल कॉल का दोहराव",
       "subjectAgentManager": "सबएजेंट प्रबंधन",
-      "subjectSandboxEscalation": "सैंडबॉक्स के बाहर आदेश चलाना",
+      "subjectSandboxEscalation": "होस्ट एक्सेस",
       "appliesTo": "इन पर लागू:",
       "denyPermission": "अनुमति न दें",
       "deny": "अस्वीकार करें",
@@ -2129,7 +2135,7 @@
     },
     "childSession": {
       "accessibilityLabel": "एजेंट {{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "सत्रों के भीतर सत्र बनाने की अधिकतम सीमा पूरी हो गई है।",
+      "maxNestingDepth": "अधिकतम नेस्टिंग गहराई पूरी हो गई है।",
       "modelAccessibility": "मॉडल: {{modelLabel}}",
       "openHint": "सबएजेंट का सत्र खोलें",
       "subagent": "सबएजेंट",
@@ -2219,7 +2225,7 @@
       "onlyAddingFiles": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})",
       "maxFilesAllowed_one": "ज़्यादा से ज़्यादा {{displayCount}} फ़ाइल जोड़ सकते हैं।",
       "maxFilesAllowed_other": "ज़्यादा से ज़्यादा {{displayCount}} फ़ाइलें जोड़ सकते हैं।",
-      "onlyAddingFiles_one": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})",
+      "onlyAddingFiles_one": "{{total}} में से केवल {{accepted}} फ़ाइल जोड़ी जा रही है (अधिकतम {{max}})",
       "onlyAddingFiles_other": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})"
     },
     "composer": {
@@ -2300,7 +2306,7 @@
       "windowUnavailable": "संदर्भ विंडो का आकार उपलब्ध नहीं",
       "tapToViewDetails": " संदर्भ का विवरण देखने के लिए टैप करें।",
       "costClause": ", लागत {{cost}}",
-      "loadingCostSpoken": "लागत {{cost}}।",
+      "loadingCostSpoken": "अब तक की लागत {{cost}}।",
       "tokensWindowUnavailable": "संदर्भ में {{used}} टोकन, विंडो का आकार उपलब्ध नहीं{{costClause}}।",
       "tokensUsage": "संदर्भ में {{window}} में से {{used}} टोकन, {{percentage}} उपयोग हुआ{{costClause}}।",
       "cacheRate": "कैश दर",
@@ -2325,7 +2331,7 @@
       "totalCost": "कुल लागत",
       "usageReflectsLatest": "यह उपयोग सहायक के सबसे हाल में पूरे हुए उत्तर पर आधारित है।",
       "usageUnavailable": "संदर्भ उपयोग अनुपलब्ध है{{costClause}}।",
-      "used": "उपयोग हुआ",
+      "used": "उपयोग किया गया",
       "modelsCount_one": "मॉडल ({{displayCount}})",
       "modelsCount_other": "मॉडल ({{displayCount}})"
     },
@@ -2415,7 +2421,7 @@
       "unavailable": "यह सत्र अनुमति अनुरोध प्राप्त नहीं कर सकता।"
     },
     "prBadge": {
-      "open": "पुल रिक्वेस्ट खोलें",
+      "open": "खुली पुल रिक्वेस्ट",
       "closed": "बंद पुल रिक्वेस्ट",
       "merged": "मर्ज की गई पुल रिक्वेस्ट",
       "draft": "ड्राफ़्ट पुल रिक्वेस्ट",
@@ -2549,7 +2555,7 @@
   "voiceInput": {
     "listening": "सुनना जारी है…",
     "allow": "अनुमति दें",
-    "onlineMessage": "यह डिवाइस आवाज़ को ऑफ़लाइन टेक्स्ट में नहीं बदल सकता। आपकी रिकॉर्डिंग टेक्स्ट में बदलने के लिए {{provider}} को भेजी जाती है। Kilo ऑडियो सहेजकर नहीं रखता।",
+    "onlineMessage": "यह डिवाइस ऑफ़लाइन आवाज़ को टेक्स्ट में नहीं बदल सकता। आपकी रिकॉर्डिंग टेक्स्ट में बदलने के लिए {{provider}} को भेजी जाती है। Kilo ऑडियो सहेजकर नहीं रखता।",
     "onlineTitle": "आवाज़ ऑनलाइन प्रोसेस होती है",
     "start": "वॉइस इनपुट शुरू करें",
     "stop": "वॉइस इनपुट रोकें",
@@ -2562,7 +2568,7 @@
     "busy": "वॉइस इनपुट व्यस्त है। फिर से कोशिश करें।",
     "stopped": "वॉइस इनपुट रुक गया। फिर से कोशिश करने के लिए माइक्रोफ़ोन पर टैप करें।",
     "unavailableDevice": "इस डिवाइस पर वॉइस इनपुट उपलब्ध नहीं है।",
-    "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है।",
+    "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है। इसकी ऑफ़लाइन स्पीच फ़ाइलें इंस्टॉल करें या ऐप की कोई दूसरी भाषा इस्तेमाल करें।",
     "languageNotInstalledTitle": "{{language}} के लिए वॉइस इनपुट अभी तैयार नहीं है",
     "languageNotInstalledMessage": "{{language}} के लिए ऑफ़लाइन स्पीच फ़ाइलें इंस्टॉल नहीं हैं और ऑनलाइन ट्रांसक्रिप्शन बंद है। वॉइस इनपुट इस्तेमाल करने के लिए फ़ाइलें डाउनलोड करें या ऑनलाइन ट्रांसक्रिप्शन दोबारा चालू करें।",
     "downloadOfflineModel": "डाउनलोड",
@@ -2601,7 +2607,7 @@
     "cliCantReceiveFilesMessage": "इस सत्र को चलाने वाला Kilo CLI फ़ाइलें प्राप्त नहीं कर सकता। उस मशीन पर CLI अपडेट करें या किसी नए सत्र में साझा करें।",
     "contentlessMessage": "साझा करने के लिए कुछ नहीं है — कोई टेक्स्ट या फ़ाइल शामिल नहीं थी।",
     "couldNotReadContent": "साझा की गई सामग्री पढ़ी नहीं जा सकी।",
-    "onlyFirstFilesAttached_one": "केवल पहली {{displayCount}} फ़ाइल संलग्न की जाएँगी।",
+    "onlyFirstFilesAttached_one": "केवल पहली {{displayCount}} फ़ाइल संलग्न की जाएगी।",
     "onlyFirstFilesAttached_other": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।"
   },
   "kiloPass": {
@@ -2715,7 +2721,7 @@
     "decline": "अस्वीकार करें",
     "declineAndSignOut": "अस्वीकार करें और साइन आउट करें",
     "declineTitle": "डेटा साझा करने से मना करें?",
-    "couldNotLoadConsentSettings": "आपकी सहमति सेटिंग लोड नहीं हो सकीं। कृपया फिर से कोशिश करें।",
+    "couldNotLoadConsentSettings": "आपकी सहमति सेटिंग्स लोड नहीं हो सकीं। कृपया फिर से कोशिश करें।",
     "couldNotLoadAccount": "आपका खाता लोड नहीं हो सका। कृपया फिर से कोशिश करें।",
     "couldNotSaveConsent": "आपकी सहमति सहेजी नहीं जा सकी। कृपया फिर से कोशिश करें।",
     "couldNotRevokeConsent": "सहमति वापस नहीं ली जा सकी। कृपया फिर से कोशिश करें।",
@@ -2783,7 +2789,6 @@
       "skipped_one": "{{displayCount}} छोड़ी गई",
       "skipped_other": "{{displayCount}} छोड़ी गईं",
       "title": "जाँचें",
-      "viewOnGitHub": "GitHub पर PR देखें",
       "checkDetails": "जाँच का विवरण"
     },
     "composer": {
@@ -2844,6 +2849,9 @@
       "commentActions": "टिप्पणी के विकल्प",
       "comment": "{{displayCount}} टिप्पणियाँ",
       "comment_other": "{{displayCount}} टिप्पणियाँ",
+      "conversationTruncated": "केवल पहली {{displayCount}} टिप्पणियाँ दिखाई जा रही हैं।",
+      "conversationTruncated_one": "केवल पहली {{displayCount}} टिप्पणियाँ दिखाई जा रही हैं।",
+      "conversationTruncated_other": "केवल पहली {{displayCount}} टिप्पणियाँ दिखाई जा रही हैं।",
       "couldNotLoad": "चर्चा लोड नहीं हो सकी।",
       "couldNotLoadMore": "और टिप्पणियाँ लोड नहीं हो सकीं।",
       "loadMoreComments": "और टिप्पणियाँ लोड करें",
@@ -3708,7 +3716,7 @@
     "title": "विश्वसनीय होस्ट",
     "subtitle": "वे होस्ट जिन्हें बिना पूछे खोलने की अनुमति है",
     "emptyTitle": "कोई विश्वसनीय होस्ट नहीं",
-    "emptyDescription": "किसी लिंक के होस्ट पर भरोसा करने के बाद उसके लिंक दोबारा पूछे बिना खुलते हैं।",
+    "emptyDescription": "जब आप किसी लिंक के होस्ट या किसी छवि होस्ट पर भरोसा करते हैं, तो वह बिना दोबारा पूछे खुल जाता है।",
     "imagesSectionTitle": "विश्वसनीय छवि होस्ट",
     "imagesSectionDescription": "इन होस्ट की छवियाँ दोबारा पूछे बिना लोड होती हैं।",
     "imagesSectionEmpty": "कोई विश्वसनीय छवि होस्ट नहीं",
@@ -4134,13 +4142,13 @@
     "thresholdMaxError": "{{max}} या उससे कम की राशि दर्ज करें"
   },
   "profiles": {
-    "title": "प्रोफ़ाइल",
+    "title": "प्रोफ़ाइलें",
     "entrySubtitle": "सभी सत्रों में एनवायरनमेंट सेटिंग्स का पुन: उपयोग करें",
     "newProfile": "नई प्रोफ़ाइल",
     "openHint": "प्रोफ़ाइल खोलता है",
     "emptyTitle": "अभी तक कोई प्रोफ़ाइल नहीं",
     "emptyDescription": "सभी सत्रों में एनवायरनमेंट चर, सेटअप आदेश और कौशल का पुन: उपयोग करने के लिए एक प्रोफ़ाइल बनाएं।",
-    "loadFailed": "प्रोफ़ाइल लोड नहीं हो सकीं",
+    "loadFailed": "प्रोफ़ाइलें लोड नहीं हो सकीं",
     "counts": {
       "vars_one": "{{count}} चर",
       "vars_other": "{{count}} चर",
@@ -4224,7 +4232,7 @@
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
     "skillSourceSkillsSh": "skills.sh",
-    "skillsHint": "एक SKILL.md चिपकाएँ और उसका नाम भरें; अपने फ़ोन से बिना खींचें और छोड़े एक कौशल जोड़ें।",
+    "skillsHint": "एक SKILL.md चिपकाएँ और उसका नाम स्वयं भर जाएगा; अपने फ़ोन से ड्रैग और ड्रॉप के बिना एक कौशल जोड़ें।",
     "skillEditTitle": "कौशल संपादित करें",
     "skillEdit": "कौशल {{name}} संपादित करें",
     "skillDelete": "कौशल {{name}} हटाएँ",
@@ -4366,7 +4374,7 @@
     },
     "repoBindings": {
       "title": "रिपोज़ के लिए डिफ़ॉल्ट प्रोफ़ाइल",
-      "entryLabel": "डिफ़ॉल्ट प्रोफ़ाइल",
+      "entryLabel": "डिफ़ॉल्ट प्रोफ़ाइलें",
       "add": "डिफ़ॉल्ट जोड़ें",
       "empty": "कोई डिफ़ॉल्ट कॉन्फ़िगर नहीं किया गया",
       "emptyDescription": "रेपो के लिए सत्र शुरू करते समय प्रोफ़ाइल को स्वचालित रूप से लागू करने के लिए एक डिफ़ॉल्ट जोड़ें।",
@@ -4381,7 +4389,7 @@
       "pinnedTitle": "रिपॉज़िटरी पर पिन किया गया",
       "pinRepo": "एक रेपो पिन करें",
       "pinnedEmpty": "किसी भी रिपॉज़िटरी पर पिन नहीं किया गया।",
-      "pinnedDescription": "जब भी कोई सत्र इन रिपॉज़िटरी में से किसी एक को लक्षित करता है तो स्वचालित रूप से लोड हो जाता है।",
+      "pinnedDescription": "जब भी कोई सत्र इनमें से किसी रिपॉज़िटरी को लक्षित करता है, तब यह प्रोफ़ाइल स्वचालित रूप से लोड हो जाती है।",
       "pinnedToast": "\"{{repo}}\" पर पिन किया गया",
       "pinFailed": "रेपो पिन नहीं किया जा सका",
       "unboundToast": "रेपो अनबाउंड",
@@ -4404,7 +4412,7 @@
     "importConfigPasteAction": "क्लिपबोर्ड से config पेस्ट करें",
     "importConfigPasteFailed": "क्लिपबोर्ड पढ़ा नहीं जा सका",
     "importConfigPreviewAction": "बदलाव देखें",
-    "importConfigApplyAction": "Import",
+    "importConfigApplyAction": "आयात करें",
     "importConfigEmpty": "देखने के लिए config पेस्ट करें",
     "importConfigTooLarge": "यह config आयात करने के लिए बहुत बड़ा है",
     "importConfigPreviewFailed": "config की झलक नहीं दिखाई जा सकी",
@@ -4482,7 +4490,8 @@
       "couldNotLoad": "सूचियाँ लोड नहीं हो सकीं",
       "noRepository": "कोई रिपॉज़िटरी नहीं",
       "rowA11y": "{{name}}, {{openCount}}",
-      "openCount_one": "{{count}} खुले",
+      "openCount_zero": "{{count}} खुले",
+      "openCount_one": "{{count}} खुला",
       "openCount_other": "{{count}} खुले",
       "archived_one": "संग्रहित ({{count}})",
       "archived_other": "संग्रहित ({{count}})",
@@ -4745,7 +4754,7 @@
       "openSession": "सेशन देखें",
       "activationWebhook": "वेबहुक कॉल",
       "fieldName": "ट्रिगर का नाम",
-      "fieldActivation": "इस पर चलता है",
+      "fieldActivation": "ट्रिगर प्रकार",
       "fieldCron": "क्रॉन एक्सप्रेशन",
       "fieldCronHelp": "पाँच फ़ील्ड: मिनट, घंटा, दिन, महीना और साप्ताहिक दिन। सबसे छोटा अंतराल एक मिनट है।",
       "fieldTimezone": "समय क्षेत्र",
@@ -4753,7 +4762,7 @@
       "repositoryLocked": "ट्रिगर बनने के बाद रिपॉज़िटरी नहीं बदली जा सकती।",
       "environmentAutomatic": "रिपॉज़िटरी के अनुसार स्वचालित",
       "profileDefaults": "डिफ़ॉल्ट उपयोग करें",
-      "profileHelp": "ट्रिगर चलते समय प्रोफ़ाइल की सेटिंग्स लागू होती हैं। इसके सीक्रेट तब हल होते हैं।",
+      "profileHelp": "ट्रिगर चलते समय प्रोफ़ाइल की सेटिंग्स लागू होती हैं। इसके सीक्रेट तब उपलब्ध होते हैं।",
       "customAgent": "कस्टम एजेंट",
       "agentHelp": "रिपॉज़िटरी की .kilo/agent निर्देशिका में मौजूद एजेंट, या कोई अंतर्निहित मोड।",
       "fieldBodySchema": "बॉडी स्कीमा",
@@ -4780,7 +4789,7 @@
       "created": "ट्रिगर बनाया गया",
       "saved": "ट्रिगर सहेजा गया",
       "statusArrived": "पहुँच गया",
-      "defaultPromptWebhook": "इस वेबहुक अनुरोध के बॉडी का वर्णन करें:\n\n{{body}}",
+      "defaultPromptWebhook": "इस वेबहुक अनुरोध की पेलोड (या बॉडी) का वर्णन करें:\n\n{{body}}",
       "defaultPromptScheduled": "निर्धारित कार्य चलाएँ। रन {{scheduledTime}} पर शुरू हुआ।",
       "problems": {
         "nameRequired": "नाम दर्ज करें।",
@@ -4789,10 +4798,10 @@
         "nameCharacters": "लोअरकेस अक्षर, संख्याएँ और हाइफ़न उपयोग करें।",
         "nameReserved": "यह नाम आरक्षित है।",
         "cronRequired": "क्रॉन एक्सप्रेशन दर्ज करें।",
-        "repositoryRequired": "रिपॉज़िटरी चुनें",
+        "repositoryRequired": "रिपॉज़िटरी चुनें।",
         "agentRequired": "एजेंट चुनें।",
         "agentInvalid": "लोअरकेस अक्षर, संख्याएँ और हाइफ़न उपयोग करें, शुरुआत अक्षर से करें।",
-        "modelRequired": "मॉडल चुनें",
+        "modelRequired": "मॉडल चुनें।",
         "promptRequired": "प्रॉम्प्ट दर्ज करें।",
         "bodySchemaInvalid": "जेसन ऑब्जेक्ट दर्ज करें, या इसे खाली छोड़ें।",
         "authHeaderRequired": "हेडर का नाम दर्ज करें।",
@@ -4827,12 +4836,12 @@
     "neverExpires": "कभी समाप्त नहीं होगा",
     "includesNewMessages": "नए संदेश शामिल हैं।",
     "excludesNewMessages": "नए संदेश शामिल नहीं हैं।",
-    "superseded": "इस लिंक को किसी दूसरे डिवाइस से बदल दिया गया है, इसलिए यह अब काम नहीं करता।"
+    "superseded": "यह लिंक कहीं और से बदल दिया गया है, इसलिए यह अब काम नहीं करता।"
   },
   "sharedSession": {
     "startedAt": "{{time}} पर शुरू हुआ",
     "title": "शेयर किया गया सत्र",
-    "someone": "कोई व्यक्ति",
+    "someone": "किसी व्यक्ति",
     "sharedBy": "{{owner}} द्वारा शेयर किया गया",
     "unavailableTitle": "लिंक उपलब्ध नहीं है",
     "unavailableDescription": "यह शेयर लिंक समाप्त हो चुका है या रद्द कर दिया गया है।",
@@ -4852,13 +4861,16 @@
     "inputTitle": "इनपुट गार्डरेल्स",
     "inputDescription": "Enkrypt AI के साथ हर इनपुट को स्कैन करता है, जिसमें टूल परिणाम भी शामिल हैं। Enkrypt उपलब्ध न होने पर अनुरोध अस्वीकार किए जाने के बजाय बिना स्कैन किए भेज दिए जाते हैं।",
     "outputTitle": "आउटपुट गार्डरेल्स",
-    "outputDescription": "सदस्यों को प्राप्त होने से पहले प्रतिक्रियाओं को Enkrypt AI के साथ स्कैन करता है। जब तक आप इसे चालू नहीं करते, यह बंद रहता है।",
-    "detectorsHint": "ब्लॉक करें विकल्प फ़्लैग किए गए अनुरोध को अस्वीकार करता है। केवल लॉग करें विकल्प पहचान को बिना अनुरोध में देरी किए रिकॉर्ड करता है।",
-    "detectorsHintOutput": "ब्लॉक करें विकल्प फ़्लैग की गई प्रतिक्रिया को विफल करता है। केवल लॉग करें विकल्प पहचान को बिना प्रतिक्रिया में देरी किए रिकॉर्ड करता है।",
+    "outputDescription": "सदस्यों को प्राप्त होने से पहले प्रतिक्रियाओं को Enkrypt AI के साथ स्कैन करता है। जब तक आप इसे इनपुट गार्डरेल्स से अलग चालू नहीं करते, यह बंद रहता है।",
+    "outputUnavailable": "Kilo ने इस संगठन के लिए आउटपुट स्कैनिंग सक्षम नहीं की है, इसलिए प्रतिक्रियाओं की जाँच नहीं होती और यहाँ सेट करने के लिए कुछ नहीं है। इसे अनुरोध करने के लिए {{supportEmail}} से संपर्क करें।",
+    "detectorsHint": "ब्लॉक विकल्प फ़्लैग किए गए अनुरोध को अस्वीकार करता है। केवल लॉग करें विकल्प पहचान को बिना अनुरोध में देरी किए रिकॉर्ड करता है।",
+    "detectorsHintOutput": "ब्लॉक विकल्प फ़्लैग की गई प्रतिक्रिया को विफल करता है। केवल लॉग करें विकल्प पहचान को बिना प्रतिक्रिया में देरी किए रिकॉर्ड करता है।",
     "choiceLog": "केवल लॉग करें",
     "applyTo": "इन पर लागू करें",
     "applyToAllMembers": "सभी सदस्य",
     "applyKiloDefault": "Kilo डिफ़ॉल्ट लागू करें",
+    "applyKiloDefaultEnglishNote": "Kilo की डिफ़ॉल्ट नीति का पाठ अंग्रेज़ी में है, क्योंकि Kilo Gateway उसे ठीक वैसे ही लागू करता है जैसे वह लिखा है।",
+    "applyKiloDefaultReplaceMessage": "Kilo की डिफ़ॉल्ट नीति अंग्रेज़ी में लिखी है और नीति उल्लंघन में आपने जो सेट किया है उसे बदल देती है। नीति पाठ फ़ील्ड में आपने जो पाठ दर्ज किया है उसे वापस नहीं पाया जा सकता।",
     "invalidSavedTitle": "सहेजी गई इनपुट डिटेक्टर सेटिंग्स पढ़ी नहीं जा सकतीं",
     "invalidSavedBody": "जब तक इनपुट डिटेक्टर दोबारा सहेजे नहीं जाते, अनुरोध ब्लॉक रहते हैं। नीचे दिए गए डिटेक्टर Kilo डिफ़ॉल्ट से शुरू होते हैं।",
     "invalidSavedOutputTitle": "सहेजी गई आउटपुट डिटेक्टर सेटिंग्स पढ़ी नहीं जा सकतीं",
@@ -4994,6 +5006,7 @@
     "providersNeedCatalog": "पूरा मॉडल कैटलॉग लोड होने तक प्रदाता स्विच केवल पढ़ने योग्य रहते हैं। उन्हें संपादित करने के लिए ऊपर फिर से कोशिश करें।",
     "providersEmpty": "इस खोज से कोई प्रदाता मेल नहीं खाता।",
     "providersNone": "इस संगठन के लिए कोई प्रदाता उपलब्ध नहीं है।",
+    "providersUnavailable": "प्रदाता सूची लोड नहीं हो सकी।",
     "allowAllShown": "दिखाए गए सभी को अनुमति दें",
     "denyAllShown": "दिखाए गए सभी को अस्वीकार करें",
     "gatewaysDescription": "Kilo मॉडल अनुरोधों को Vercel AI Gateway या OpenRouter के माध्यम से रूट करता है। अक्षम गेटवे उन अनुरोधों को विफल कर देता है।",
@@ -5002,7 +5015,7 @@
     "openrouter": "OpenRouter",
     "openrouterNote": "OpenRouter अनुरोध किसी क्षेत्र पर पिन नहीं किए जाते।",
     "inferenceRegion": "इन्फ़रेंस क्षेत्र",
-    "inferenceRegionDescription": "Vercel AI Gateway अनुरोधों को इस क्षेत्र पर पिन करता है। जो मॉडल वहाँ उपलब्ध नहीं है, वह विफल हो जाता है।",
+    "inferenceRegionDescription": "Vercel AI Gateway अनुरोधों को इस क्षेत्र पर पिन करता है। इस क्षेत्र में उपलब्ध नहीं होने वाले मॉडल के अनुरोध त्रुटि के साथ विफल हो जाते हैं।",
     "disableOpenrouterNote": "OpenRouter को अक्षम करने से BYOK कुंजियाँ भी ब्लॉक हो जाती हैं जो उसके माध्यम से अनुरोध रूट करती हैं।",
     "emptyModelList": "कम से कम एक मॉडल चालू रखें। सभी मॉडल अस्वीकार करने पर सदस्यों के पास उपयोग के लिए कुछ नहीं बचता।",
     "catalogUnavailable": "पूरा मॉडल कैटलॉग लोड नहीं हुआ, इसलिए केवल आपकी सहेजी गई सूचियाँ दिखाई जा रही हैं। सभी मॉडल लोड करने के लिए फिर से प्रयास करें।",

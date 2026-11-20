@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite for the mode form's leave guard: the dirty prompt, the in-flight drop and its replay, and the disarmed leave share one mock navigator. */
 import { createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -100,6 +101,19 @@ vi.mock('@/lib/navigation/pop-once', () => ({
 }));
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: h.replace }),
+}));
+// The form keeps its draft in the account-scoped encrypted store, which this
+// Node project cannot import; only the key helper's shape matters here, and
+// no case in this suite asserts a draft.
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+vi.mock('@/lib/persist/drafts', () => ({
+  orgModeFormDraftKey: (organizationId: string, modeId: string | null) =>
+    `org-mode-form:${organizationId}:${modeId ?? 'new'}`,
+}));
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () => ({ kind: 'ready', value: null, save: vi.fn(), clear: vi.fn() }),
 }));
 vi.mock('@/components/organization/mode-tools-fields', () => ({
   ModeToolsFields: 'ModeToolsFields',

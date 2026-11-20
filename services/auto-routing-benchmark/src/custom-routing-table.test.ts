@@ -253,6 +253,7 @@ describe('buildCustomRoutingTable', () => {
 
 describe('assembleCustomRoutingTable', () => {
   const config = {
+    router: 'efficient' as const,
     minAccuracy: 0.7,
     accuracyNoiseBand: 0.05,
     productionTokenProfile: null,
@@ -300,7 +301,7 @@ describe('assembleCustomRoutingTable', () => {
     ]);
     expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ engineIdentity: engine, repetitions: 1 }),
+      expect.objectContaining({ engineIdentity: engine, repetitions: 3 }),
       expect.any(Array)
     );
     expect(result.table).not.toBeNull();

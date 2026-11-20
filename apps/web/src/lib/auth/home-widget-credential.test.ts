@@ -178,4 +178,17 @@ describe('dedicated Home widget credential', () => {
       expect(currentUser).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects a credential that carries no device session before database access', async () => {
+    const issued = await issueHomeWidgetCredential(user, null);
+    const claims = jwt.verify(issued.token, 'widget-contract-test-secret');
+    if (typeof claims === 'string') throw new Error('claims missing');
+    delete claims.deviceSessionId;
+    const token = jwt.sign(claims, 'widget-contract-test-secret');
+    currentUser.mockClear();
+    await expect(authenticateHomeWidget(headers(token))).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+    expect(currentUser).not.toHaveBeenCalled();
+  });
 });

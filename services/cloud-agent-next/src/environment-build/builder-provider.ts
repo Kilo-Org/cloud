@@ -64,6 +64,7 @@ export type BuilderLifecycleState = {
 };
 
 export type BuilderLaunch = {
+  networkSecretHosts?: string[];
   /** Delivered to the running builder by exec or write, never as image environment. */
   runner: EnvironmentBuildRunner;
   deadlineAt: number;
@@ -197,6 +198,9 @@ export function createBuilderProvider(deps: {
         instance: allocation.instance,
         deadlineAt: launch.deadlineAt,
         command,
+        ...(launch.networkSecretHosts?.length
+          ? { networkSecretHosts: launch.networkSecretHosts }
+          : {}),
       });
       await stub(allocation).ensureLeaseAtLeast(ref, leaseAtLeastMs());
     },

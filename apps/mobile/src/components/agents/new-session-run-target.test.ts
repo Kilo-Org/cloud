@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 
 import '@/i18n';
@@ -84,6 +85,24 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
+/** First element of this component type (by reference) in the tree, or null. */
+function findElementByComponent(node: Node, component: unknown): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  if ('type' in node && node.type === component) {
+    return node.props ?? {};
+  }
+  const children = node.props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElementByComponent(child as Node, component);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 const INSTANCE: InstancePickerInstance = {
   connectionId: 'conn-abc',
   name: 'laptop',
@@ -122,7 +141,7 @@ describe('NewSessionRunTarget', () => {
       disabled: false,
       onChange: props.onChangeRunOnInstance,
     });
-    expect(findTextContent(element, t => t === 'Run on')).toBe(true);
+    expect(findElementByComponent(element, FormFieldLabel)?.label).toBe('Run on');
   });
 
   it.each([false, true])(

@@ -269,8 +269,8 @@ test('an element descriptor in a picker-sheet diagnostic is refused at the schem
     issue.message,
     /An element descriptor needs the bare card presentation, not picker-sheet/u
   );
-  // A string nested inside an array under the slot still hits the refusal, and
-  // a plain shell around a descriptor keeps it recoverable by the expansion.
+  // An array is the allowed composition under a slot, so only the inner string
+  // is refused here; the expansion still splices the descriptor beside it.
   const nested = ProofManifestSchema.safeParse({
     version: 1,
     targets: [

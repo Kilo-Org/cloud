@@ -324,7 +324,15 @@ export interface BrowserToolDownload {
 
 export interface BrowserToolDialog {
   readonly defaultValue?: string;
+  /**
+   * The frame that opened the dialog. The browser reports it with the event, and
+   * its `Page.getFrameTree` entry carries the origin the browser computed for
+   * that frame — including an inherited one — so the answer is judged there.
+   */
+  readonly frameId?: string;
   readonly message: string;
+  /** That frame's security origin, read from the frame tree while the dialog opened. */
+  readonly origin?: string;
   readonly type: string;
   readonly url?: string;
 }
@@ -666,14 +674,30 @@ const loadingFailedParamsSchema = z.object({
 });
 const javascriptDialogOpeningParamsSchema = z.object({
   defaultPrompt: z.string().optional(),
+  frameId: z.string().optional(),
   message: z.string().optional(),
   type: z.string().optional(),
   url: z.string().optional(),
 });
+/** One frame of a `Page.getFrameTree` answer: the browser reports its own computed origin. */
+const frameTreeFrameSchema = z.object({
+  id: z.string(),
+  securityOrigin: z.string().optional(),
+});
+/** One level of `Page.getFrameTree`; children stay unknown here and are parsed a level at a time as the walk descends. */
+const frameTreeLevelSchema = z.object({
+  childFrames: z.array(z.unknown()).optional(),
+  frame: frameTreeFrameSchema,
+});
+const frameTreeResponseSchema = z.object({ frameTree: frameTreeLevelSchema });
+/** The one frame-list read whose answer also records each frame's origin. */
+const FRAME_TREE_METHOD = 'Page.getFrameTree';
+
 const frameNavigatedParamsSchema = z.object({
   frame: z.object({
     id: z.string().optional(),
     parentId: z.string().optional(),
+    securityOrigin: z.string().optional(),
     url: z.string().optional(),
   }),
 });
@@ -1672,6 +1696,8 @@ export const createBrowserToolSession = ({
   const frameIdByExecutionContext = new Map<number, string>();
   // Out-of-process iframes auto-attached under this tab, keyed by frame id (for an OOPIF the frame id is the target id). `Page.getFrameTree` omits them, so this map is the tab's only record of them.
   const childFrames = new Map<string, BrowserToolChildFrame>();
+  /** Each frame's security origin, as `Page.frameNavigated` reports it: the browser's own inheritance. */
+  const frameOrigins = new Map<string, string>();
   // The tab's main frame id, learned from `Page.frameNavigated`. A `Document` request in this frame is a page load.
   let mainFrameId: string | undefined = undefined;
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
@@ -1948,6 +1974,30 @@ export const createBrowserToolSession = ({
     return requests.slice(startIndex);
   };
 
+  /** One frame of a `Page.getFrameTree` answer: its id, its origin, and the frames it holds. */
+  const recordFrameTree = (tree: z.infer<typeof frameTreeLevelSchema>): void => {
+    if (tree.frame.securityOrigin !== undefined) {
+      frameOrigins.set(tree.frame.id, tree.frame.securityOrigin);
+    }
+
+    for (const child of tree.childFrames ?? []) {
+      const nested = frameTreeLevelSchema.safeParse(child);
+
+      if (nested.success) {
+        recordFrameTree(nested.data);
+      }
+    }
+  };
+
+  /** Records every frame's security origin from one `Page.getFrameTree` answer, at any depth. */
+  const recordFrameOrigins = (answer: Record<string, unknown> | undefined): void => {
+    const parsed = frameTreeResponseSchema.safeParse(answer);
+
+    if (parsed.success) {
+      recordFrameTree(parsed.data.frameTree);
+    }
+  };
+
   const handleDialogOpening = (params: Record<string, unknown> | undefined): void => {
     const parsed = javascriptDialogOpeningParamsSchema.safeParse(params);
 
@@ -1955,13 +2005,16 @@ export const createBrowserToolSession = ({
       return;
     }
 
-    const { defaultPrompt, message, type, url } = parsed.data;
+    const { defaultPrompt, frameId, message, type, url } = parsed.data;
+    const origin = frameId === undefined ? undefined : frameOrigins.get(frameId);
 
     const opened: BrowserToolDialog = {
       // The page writes this text and every other bounded page text has the same cap: a dialog cannot flood the model.
       message: truncateText(message ?? ''),
       type: type ?? 'alert',
       ...(defaultPrompt === undefined ? {} : { defaultValue: truncateText(defaultPrompt) }),
+      ...(frameId === undefined ? {} : { frameId }),
+      ...(origin === undefined ? {} : { origin }),
       ...(url === undefined ? {} : { url }),
     };
 
@@ -1976,12 +2029,23 @@ export const createBrowserToolSession = ({
   const handleFrameNavigated = (params: Record<string, unknown> | undefined): void => {
     const parsed = frameNavigatedParamsSchema.safeParse(params);
 
-    if (!parsed.success || parsed.data.frame.parentId !== undefined) {
+    if (!parsed.success) {
       return;
     }
 
-    if (parsed.data.frame.id !== undefined) {
-      mainFrameId = parsed.data.frame.id;
+    const { frame } = parsed.data;
+
+    if (frame.id !== undefined && frame.securityOrigin !== undefined) {
+      // The browser computes a frame's origin — an `about:blank` child of a cross-origin frame inherits that frame's — and reports it here.
+      frameOrigins.set(frame.id, frame.securityOrigin);
+    }
+
+    if (frame.parentId !== undefined) {
+      return;
+    }
+
+    if (frame.id !== undefined) {
+      mainFrameId = frame.id;
     }
 
     invalidateDocument();
@@ -2587,7 +2651,18 @@ export const createBrowserToolSession = ({
     }
 
     // A child session runs in its own process, so the tab's input timing rules do not apply to it.
-    return pageCommand(method, params, sessionId === undefined ? target : { ...target, sessionId });
+    const answer = await pageCommand(
+      method,
+      params,
+      sessionId === undefined ? target : { ...target, sessionId }
+    );
+
+    if (method === FRAME_TREE_METHOD) {
+      // Every frame read also refreshes the origins a dialog is judged by: the page cannot be asked again while one is open.
+      recordFrameOrigins(answer);
+    }
+
+    return answer;
   };
 
   const getDocumentNodeId = async (): Promise<number | undefined> => {

@@ -5985,7 +5985,13 @@ const RENDERER_COMMANDS = [
  */
 const pageDialog = (
   cdp: FakeCdp,
-  dialog: { readonly message: string; readonly type: string; readonly url?: string },
+  dialog: {
+    /** `null` emits no frame id, the case where the browser named no frame. */
+    readonly frameId?: string | null;
+    readonly message: string;
+    readonly type: string;
+    readonly url?: string;
+  },
   opener = 'Input.dispatchMouseEvent'
 ) => {
   // The dialog the page holds open, closed by its answer.
@@ -6012,7 +6018,14 @@ const pageDialog = (
     const opened = Promise.withResolvers<void>();
 
     page.open = opened;
-    cdp.emit('Page.javascriptDialogOpening', { url: `${MAIN_ORIGIN}/dashboard`, ...dialog });
+    // Chrome reports the frame that opened the dialog; its origin comes from the frame tree the browser computed.
+    const { frameId = 'main', ...rest } = dialog;
+
+    cdp.emit('Page.javascriptDialogOpening', {
+      ...(frameId === null ? {} : { frameId }),
+      url: `${MAIN_ORIGIN}/dashboard`,
+      ...rest,
+    });
     await opened.promise;
   };
   handlers['Page.handleJavaScriptDialog'] = params => {
@@ -6133,10 +6146,20 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
     const payOrigin = 'https://pay.example.com';
 
     // A confirm opened by a cross-origin frame: its handler resumes in that frame when answered.
-    pageDialog(cdp, {
-      message: 'Pay now?',
-      type: 'confirm',
-      url: `${payOrigin}/checkout`,
+    pageDialog(
+      cdp,
+      { frameId: 'pay', message: 'Pay now?', type: 'confirm', url: `${payOrigin}/checkout` },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
     });
     await call(runtime, 'browser_click', { target: '#pay' });
 
@@ -6155,11 +6178,25 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
     });
   });
 
-  it('answers a dialog from an inheriting frame (about:blank) with the tab’s own grant', async () => {
+  it('answers an about:blank dialog from a frame the top page created with the tab’s own grant', async () => {
     const { cdp, runtime } = await createHarness();
 
-    // The blank iframe inherits the tab document's origin, so answering it acts where the tab already is.
-    pageDialog(cdp, { message: 'Saved', type: 'alert', url: 'about:blank' });
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // A blank frame the top document created inherits the tab's origin; the browser says so in its frame tree.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'blank', securityOrigin: MAIN_ORIGIN, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
     await call(runtime, 'browser_click', { target: '#save' });
 
     await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toMatchObject({
@@ -6168,26 +6205,81 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
     });
   });
 
-  it('answers a dialog from a blob frame whose url names the tab’s origin', async () => {
+  it('requires the cross-origin creator’s grant for an about:blank dialog it opened, not the tab’s', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Pay now?', type: 'confirm', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // The pay frame created the blank frame, so the browser reports the blank frame's origin as the pay one.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+            { frame: { id: 'blank', securityOrigin: payOrigin, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    // The tab's act grant covers nothing here: the answer resumes a handler in the pay origin.
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: payOrigin }],
+      kind: 'needs_permission',
+      result: { error: NEEDS_PERMISSION_ERROR, ok: false },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+
+    // Granted on the creator's origin, the same answer goes through.
+    await expect(
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant, { class: 'act', origin: payOrigin }] },
+        arguments: { accept: true },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_handle_dialog',
+      })
+    ).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'confirm' } },
+    });
+  });
+
+  it('refuses a dialog whose frame the browser never named, rather than guessing from its url', async () => {
     const { cdp, runtime } = await createHarness();
 
-    pageDialog(cdp, {
-      message: 'Saved',
-      type: 'alert',
-      url: `blob:${MAIN_ORIGIN}/1234-5678`,
-    });
+    pageDialog(
+      cdp,
+      // A blank url alone would look like the tab's own origin; without the frame it is unknowable.
+      { frameId: null, message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
     await call(runtime, 'browser_click', { target: '#save' });
 
     await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toMatchObject({
-      kind: 'result',
-      result: { ok: true, value: { accepted: true, type: 'alert' } },
+      items: [{ class: 'act', origin: 'opaque:null' }],
+      kind: 'needs_permission',
     });
   });
 
   it('still refuses a dialog from a genuinely opaque frame, which inherits nothing', async () => {
     const { cdp, runtime } = await createHarness();
 
-    pageDialog(cdp, { message: 'Saved', type: 'alert', url: 'data:text/html,<p>hi</p>' });
+    pageDialog(cdp, {
+      frameId: null,
+      message: 'Saved',
+      type: 'alert',
+      url: 'data:text/html,<p>hi</p>',
+    });
     await call(runtime, 'browser_click', { target: '#save' });
 
     await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
@@ -6205,7 +6297,21 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
     const { cdp, runtime } = await createHarness();
     const payOrigin = 'https://pay.example.com';
 
-    pageDialog(cdp, { message: 'Pay now?', type: 'confirm', url: `${payOrigin}/checkout` });
+    pageDialog(
+      cdp,
+      { frameId: 'pay', message: 'Pay now?', type: 'confirm', url: `${payOrigin}/checkout` },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
     await call(runtime, 'browser_click', { target: '#pay' });
 
     const answered = await runtime.runTool({
@@ -6301,6 +6407,7 @@ describe('agent browser calls on a page with a JavaScript dialog', () => {
     const stepToken = expectStepToken(await type([]));
 
     cdp.emit('Page.javascriptDialogOpening', {
+      frameId: 'main',
       message: 'Saved',
       type: 'alert',
       url: `${MAIN_ORIGIN}/dashboard`,
@@ -7011,9 +7118,10 @@ describe('a download the dialog answer starts', () => {
     return { hold, reports };
   };
 
-  // Chrome always names the frame that opened the dialog, and the answer is judged against that origin.
+  // Chrome always names the frame that opened the dialog, and the answer is judged against that frame's origin.
   const dialogOpened = (cdp: FakeCdp): void => {
     cdp.emit('Page.javascriptDialogOpening', {
+      frameId: 'main',
       message: 'Leave this page?',
       type: 'confirm',
       url: `${MAIN_ORIGIN}/dashboard`,

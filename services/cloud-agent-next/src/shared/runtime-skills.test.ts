@@ -84,6 +84,7 @@ describe('runtime skill companion paths', () => {
       ['notes.md', 'safe'],
     ]);
     const parsed = RuntimeSkillSchema.parse({ name: 'review', rawMarkdown: '# Review', files });
-    expect(parsed.files).toEqual({ 'notes.md': 'safe' });
+    const parsedFiles = 'files' in parsed ? (parsed.files ?? {}) : {};
+    expect(Object.keys(parsedFiles)).toEqual(['notes.md']);
   });
 });

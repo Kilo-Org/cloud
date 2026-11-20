@@ -371,7 +371,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   function emitFailure(sessionId: string, step: ControlPlanePreparationStep, error: unknown): void {
-    const subtype = error instanceof WrapperBootstrapError ? error.subtype : undefined;
+    // The ruleset apply runs inside the same session step that commits the
+    // import, and the failure is permanent, so it reports the session-import
+    // reason instead of the generic workspace one.
+    const subtype =
+      error instanceof SessionRulesetNotAppliedError
+        ? 'kilo_import_failed'
+        : error instanceof WrapperBootstrapError
+          ? error.subtype
+          : undefined;
     deps.emit({
       type: 'session.failed',
       sessionId,

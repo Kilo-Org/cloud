@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1405,6 +1413,58 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       }
     });
 
+    it('fails the route when a marker is present but is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_marker_not_ruleset';
+      const directory = temporaryDirectory('kilo-api-permission-malformed-target-');
+      const home = temporaryDirectory('kilo-api-permission-malformed-home-');
+      // Outstanding markers live under $HOME, so the test owns their directory.
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      const stub = startEnsureSessionStub(sessionId);
+      try {
+        mkdirSync(rulesets, { recursive: true });
+        writeFileSync(
+          join(rulesets, `${encodeURIComponent(sessionId)}.json`),
+          '{"permission":"edit"}'
+        );
+
+        // Present but not a ruleset is still owed: reading it as nothing owed
+        // would drop the rules the record never got.
+        const readError = await readOutstandingRuleset(sessionId).catch((error: unknown) => error);
+        expect(readError).toBeInstanceOf(SessionRulesetNotAppliedError);
+
+        const settleError = await createClient(stub.url)
+          .settleOutstandingRuleset(sessionId, directory)
+          .catch((error: unknown) => error);
+        expect(settleError).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect(stub.updates).toHaveLength(0);
+      } finally {
+        await forgetOutstandingRuleset(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('fails instead of importing when the record permission is not a ruleset', async () => {
+      const sessionId = 'ses_record_permission_not_ruleset';
+      const directory = temporaryDirectory('kilo-api-record-not-ruleset-');
+      const otherDirectory = temporaryDirectory('kilo-api-record-not-ruleset-other-');
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        permission: [{ nope: true }],
+      });
+
+      const error = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+
+      expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      expect(stub.imports).toHaveLength(0);
+      expect(stub.updates).toHaveLength(0);
+    });
+
     it('reports a ruleset application that keeps failing', async () => {
       const sessionId = 'ses_record_permission_failing';
       const directory = temporaryDirectory('kilo-api-permission-fail-target-');
@@ -1447,7 +1507,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       expect((error as SessionRulesetNotAppliedError).sessionId).toBe(sessionId);
     });
 
-    it('does not apply a record permission that is not a ruleset', async () => {
+    it('fails instead of applying a record permission that is not a ruleset', async () => {
       const sessionId = 'ses_record_permission_map';
       const directory = temporaryDirectory('kilo-api-permission-map-target-');
       const otherDirectory = temporaryDirectory('kilo-api-permission-map-other-');
@@ -1457,10 +1517,14 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         permission: { bash: 'deny' },
       });
 
-      await createClient(stub.url).ensureSession(sessionId, directory);
+      const error = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
 
-      expect(stub.imports).toHaveLength(1);
-      expect(stub.imports[0]?.body).not.toHaveProperty('permission');
+      // The record carries permission data that cannot be applied as rules, so
+      // the route fails instead of importing without them.
+      expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
+      expect(stub.imports).toHaveLength(0);
       expect(stub.updates).toHaveLength(0);
     });
 

@@ -208,6 +208,35 @@ export class SessionRulesetNotAppliedError extends Error {
 }
 
 /**
+ * The native session update appends rules instead of replacing them, so a
+ * ruleset a record already holds must not be sent again.
+ */
+const permissionRuleSchema = z.object({
+  permission: z.string(),
+  pattern: z.string(),
+  action: z.string(),
+});
+
+// Parses a ruleset that arrives as JSON (a remembered marker) or as an
+// unvalidated session-read field; a ruleset becomes permission grants, so it is
+// never applied unparsed.
+const permissionRulesetSchema = z.array(permissionRuleSchema);
+
+/**
+ * The ruleset `value` holds, or `undefined` when it is not a ruleset.
+ *
+ * The schema keeps `action` a plain string, because a record or marker that
+ * carries an action this build does not know must still reach the server
+ * unchanged rather than be dropped. That leaves the parsed value wider than the
+ * SDK's `'allow' | 'deny' | 'ask'`, so the result is narrowed once here, after
+ * validation, instead of widening the schema and losing a rule.
+ */
+function parseRuleset(value: unknown): PermissionRuleset | undefined {
+  const parsed = permissionRulesetSchema.safeParse(value);
+  return parsed.success ? (parsed.data as PermissionRuleset) : undefined;
+}
+
+/**
  * Rulesets that a committed record still owes. The native import replaces the
  * row and its body cannot carry a ruleset, so the ruleset is applied right
  * after it. When that call fails, the record stays in place without its
@@ -254,8 +283,11 @@ export async function readOutstandingRuleset(
     const raw = await fsp.readFile(outstandingRulesetPath(sessionId), 'utf8');
     const parsed: unknown = JSON.parse(raw);
     // Present but unreadable is still owed: never treat a damaged marker as
-    // permission to accept the record.
-    if (Array.isArray(parsed)) return parsed as PermissionRuleset;
+    // permission to accept the record. A marker that is present but not a
+    // ruleset fails the route instead of reading as nothing owed, because
+    // reading it as nothing owed would drop a ruleset that is still owed.
+    const ruleset = parseRuleset(parsed);
+    if (ruleset !== undefined) return ruleset;
     throw new Error(`Outstanding ruleset for ${sessionId} is malformed`);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
@@ -268,16 +300,6 @@ export async function readOutstandingRuleset(
 export async function hasOutstandingRuleset(sessionId: string): Promise<boolean> {
   return (await readOutstandingRuleset(sessionId)) !== undefined;
 }
-
-/**
- * The native session update appends rules instead of replacing them, so a
- * ruleset a record already holds must not be sent again.
- */
-const permissionRuleSchema = z.object({
-  permission: z.string(),
-  pattern: z.string(),
-  action: z.string(),
-});
 
 /** The parts of a session read that decide whether an apply is still owed. */
 const storedSessionSchema = z.object({
@@ -879,9 +901,15 @@ export function createWrapperKiloClient(
       const now = Date.now();
       const importTimeout = AbortSignal.timeout(8_000);
       const recordRuleset =
-        record?.permission !== undefined && Array.isArray(record.permission)
-          ? record.permission
-          : undefined;
+        record?.permission === undefined ? undefined : parseRuleset(record.permission);
+      // A record that carries permission data which is not a ruleset cannot have
+      // its rules applied, so the route fails instead of preparing without them.
+      if (record?.permission !== undefined && recordRuleset === undefined) {
+        throw new SessionRulesetNotAppliedError(
+          sessionId,
+          new Error(`Session record for ${sessionId} carries a permission that is not a ruleset`)
+        );
+      }
       // The obligation is already durable when the marker covers what the record
       // carries, so it is not rewritten: a directory that refuses the write must
       // not fail a route whose ruleset is already recorded.

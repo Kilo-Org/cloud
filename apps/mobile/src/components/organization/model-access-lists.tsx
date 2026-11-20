@@ -78,7 +78,7 @@ function NoMatch({ label }: Readonly<{ label: string }>) {
  * A row is titled with the provider's display name and shows the slug under it,
  * the way the deny list titles a model and puts its id beneath. A provider whose
  * name the gateway does not answer for keeps the slug as its title, with no
- * subtitle.
+ * subtitle; an empty name counts as no answer.
  */
 export function ProviderAllowList({
   providers,
@@ -107,21 +107,27 @@ export function ProviderAllowList({
   const showControls = providers.length > 0 || search.trim() !== '';
 
   const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<string>) => (
-      <RowGroupItem
-        position={rowGroupPosition({ first: index === 0, last: index === shown.length - 1 })}
-      >
-        <PreferenceRow
-          title={names[item] ?? item}
-          subtitle={names[item] === undefined ? undefined : item}
-          value={draft.providerAllowList.includes(item)}
-          disabled={disabled}
-          onValueChange={next => {
-            onChange(toggleProvider(draft, item, next));
-          }}
-        />
-      </RowGroupItem>
-    ),
+    ({ item, index }: ListRenderItemInfo<string>) => {
+      const answer = names[item];
+      // An empty or blank answer is no answer: a row titled with it would read
+      // as a blank row rather than as the provider.
+      const name = answer === undefined || answer.trim() === '' ? undefined : answer;
+      return (
+        <RowGroupItem
+          position={rowGroupPosition({ first: index === 0, last: index === shown.length - 1 })}
+        >
+          <PreferenceRow
+            title={name ?? item}
+            subtitle={name === undefined ? undefined : item}
+            value={draft.providerAllowList.includes(item)}
+            disabled={disabled}
+            onValueChange={next => {
+              onChange(toggleProvider(draft, item, next));
+            }}
+          />
+        </RowGroupItem>
+      );
+    },
     [draft, disabled, names, onChange, shown.length]
   );
 

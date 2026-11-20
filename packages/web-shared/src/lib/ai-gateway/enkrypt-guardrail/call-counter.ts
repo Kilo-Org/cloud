@@ -1,4 +1,4 @@
-import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { deferredRedisClient, redisClient } from '@kilocode/web-shared/lib/redis';
 import { enkryptCallsMinuteRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -25,10 +25,14 @@ export function enkryptCallMinute(at: number): number {
   return Math.floor(at / MINUTE_MS);
 }
 
-/** Adds the calls to their minute buckets in one round trip. Never rejects: a failed write only loses the counts. */
+/**
+ * Adds the calls to their minute buckets in one round trip. Never rejects: a failed write only
+ * loses the counts. A timed-out write may still have been applied, since the abort does not stop
+ * a request Redis already received; it is not retried, so the counts are never added twice.
+ */
 export async function recordEnkryptCalls(
   callsByMinute: ReadonlyMap<number, number>,
-  store: EnkryptCallCountStore = redisClient
+  store: EnkryptCallCountStore = deferredRedisClient
 ): Promise<void> {
   if (callsByMinute.size === 0) return;
   try {
@@ -40,10 +44,16 @@ export async function recordEnkryptCalls(
     }
     await pipeline.exec();
   } catch (error) {
-    warnExceptInTest('[enkrypt-guardrail] call count write failed; counts dropped', {
-      calls: [...callsByMinute.values()].reduce((sum, calls) => sum + calls, 0),
-      error: error instanceof Error ? error.message : String(error),
-    });
+    const timedOut = error instanceof Error && error.name === 'TimeoutError';
+    warnExceptInTest(
+      timedOut
+        ? '[enkrypt-guardrail] call count write timed out; counts may be lost'
+        : '[enkrypt-guardrail] call count write failed; counts lost',
+      {
+        calls: [...callsByMinute.values()].reduce((sum, calls) => sum + calls, 0),
+        error: error instanceof Error ? error.message : String(error),
+      }
+    );
   }
 }
 
@@ -60,7 +70,7 @@ export type EnkryptCallCounter = {
 
 export function countEnkryptCalls(
   baseFetch: typeof fetch = fetch,
-  store: EnkryptCallCountStore = redisClient
+  store: EnkryptCallCountStore = deferredRedisClient
 ): EnkryptCallCounter {
   let pending = new Map<number, number>();
   return {

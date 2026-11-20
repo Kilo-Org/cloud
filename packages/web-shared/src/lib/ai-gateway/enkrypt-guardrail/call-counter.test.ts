@@ -7,7 +7,7 @@ import {
   type EnkryptCallCountStore,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter';
 
-jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: {} }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: {}, deferredRedisClient: {} }));
 
 function memoryStore() {
   const counts = new Map<string, number>();
@@ -75,12 +75,15 @@ describe('Enkrypt call counter', () => {
     expect(pipelines()).toBe(0);
   });
 
-  it('never rejects when the write fails', async () => {
+  it.each([
+    ['fails', new Error('redis down')],
+    ['times out', new DOMException('The operation timed out.', 'TimeoutError')],
+  ])('never rejects when the write %s', async (_, error) => {
     const store: EnkryptCallCountStore = {
       pipeline: () => ({
         incrby: () => {},
         expire: () => {},
-        exec: () => Promise.reject(new Error('redis down')),
+        exec: () => Promise.reject(error),
       }),
       mget: async () => [],
     };

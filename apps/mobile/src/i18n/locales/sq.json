@@ -965,6 +965,8 @@
       "pendingComment": "komente në pritje",
       "pendingComment_other": "komente në pritje",
       "submitCountOfTotal": "Dërgo {{displayFreshCount}} nga {{displayTotalCount}} komente",
+      "submitCountOfTotal_one": "Dërgo {{displayFreshCount}} nga {{displayTotalCount}} komente",
+      "submitCountOfTotal_other": "Dërgo {{displayFreshCount}} nga {{displayTotalCount}} komente",
       "submitReview": "Dërgo shqyrtimin",
       "partialPostedFresh": "Komente të postuara: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Komente të postuara: {{displayFreshCount}}. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Riemërto organizatën",
-      "renamePlaceholder": "Emri i organizatës",
+      "renamePlaceholder": "Fut emrin e organizatës",
       "balance": "Gjendja",
       "plan": "Plani",
       "planTeams": "Teams",

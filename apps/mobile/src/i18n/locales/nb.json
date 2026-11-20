@@ -965,6 +965,8 @@
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Send gjennomgang",
       "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er publisert. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er publisert. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Gi organisasjonen nytt navn",
-      "renamePlaceholder": "Organisasjonsnavn",
+      "renamePlaceholder": "Skriv inn et organisasjonsnavn",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",

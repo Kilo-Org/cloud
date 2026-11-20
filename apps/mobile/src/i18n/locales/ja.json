@@ -3238,6 +3238,8 @@
       "partialPostedStale_one": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "partialPostedStale_other": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitCountOfTotal_one": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitCountOfTotal_other": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信",
       "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",
       "blockedComment": "コメントとしてレビューを投稿するには、総評を入力するか、コメントを1件以上追加してください。"
@@ -3447,7 +3449,7 @@
       "planStatusLapsed": " · 終了",
       "planEnded": "組織のトライアルは終了し、有効なプランがありません。",
       "manageBilling": "請求を管理",
-      "renamePlaceholder": "組織名",
+      "renamePlaceholder": "組織名を入力してください",
       "renameTitle": "組織名を変更"
     },
     "inviteMember": {

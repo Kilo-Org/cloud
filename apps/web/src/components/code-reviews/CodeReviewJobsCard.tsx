@@ -83,9 +83,9 @@ import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-rea
 import {
   CODE_REVIEW_STATUS_LABELS,
   MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
+  canRetriggerReview,
   hasInFlightReview,
   isCancellableReviewStatus,
-  isRetriggerableReviewStatus,
   type CodeReviewStatus,
 } from '@kilocode/app-shared/code-review';
 
@@ -962,8 +962,8 @@ export function CodeReviewJobsCard({
                           </Button>
                         )}
 
-                        {/* Retry Button for failed/cancelled/interrupted reviews */}
-                        {isRetriggerableReviewStatus(review.status) &&
+                        {/* Retry Button for failed/cancelled/interrupted reviews, except one a newer commit replaced */}
+                        {canRetriggerReview(review) &&
                           actionRequiredCopy &&
                           actionRequiredRecoveryHref && (
                             <Button variant="outline" size="sm" asChild className="gap-2">
@@ -980,7 +980,7 @@ export function CodeReviewJobsCard({
                               )}
                             </Button>
                           )}
-                        {isRetriggerableReviewStatus(review.status) && !actionRequiredReason && (
+                        {canRetriggerReview(review) && !actionRequiredReason && (
                           <Button
                             variant="outline"
                             size="sm"

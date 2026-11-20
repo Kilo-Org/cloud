@@ -965,6 +965,8 @@
       "pendingComment": "iruzkin bidaltzeko zain",
       "pendingComment_other": "iruzkin bidaltzeko zain",
       "submitCountOfTotal": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
+      "submitCountOfTotal_one": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
+      "submitCountOfTotal_other": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
       "submitReview": "Bidali berrikuspena",
       "partialPostedFresh": "{{displayFreshCount}} iruzkin argitaratu dira. ",
       "partialPostedFresh_one": "{{displayFreshCount}} iruzkin argitaratu dira. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Berrizendatu erakundea",
-      "renamePlaceholder": "Erakundearen izena",
+      "renamePlaceholder": "Idatzi erakundearen izen bat",
       "balance": "Saldoa",
       "plan": "Plana",
       "planTeams": "Teams",

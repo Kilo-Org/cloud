@@ -333,6 +333,27 @@ function deniedAccessError(params: {
 }
 
 /**
+ * The single refusal for a caller that holds no effective membership role: a
+ * soft-deleted organization reads as missing, and a caller that is a member of
+ * a live organization gets the role-specific sentence.
+ */
+async function organizationRoleDeniedError(
+  rows: { role: OrganizationRole }[],
+  organizationId: Organization['id']
+): Promise<TRPCError> {
+  if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
+    return new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  return new TRPCError({
+    code: 'UNAUTHORIZED',
+    message:
+      rows.length > 0
+        ? 'You do not have the required organizational role to access this feature'
+        : 'You do not have access to this organization',
+  });
+}
+
+/**
  * The single support-access decision point for organization access.
  *
  * - A real membership role always passes and never queries a grant.
@@ -372,16 +393,7 @@ export async function resolveOrganizationAccess(
   }
 
   if (!isAdmin) {
-    if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message:
-        rows.length > 0
-          ? 'You do not have the required organizational role to access this feature'
-          : 'You do not have access to this organization',
-    });
+    throw await organizationRoleDeniedError(rows, organizationId);
   }
 
   if (!enabled) {
@@ -571,16 +583,7 @@ export async function ensureMemberOrganizationAccess(
   const rows = await loadEffectiveMembershipRows(user.id, organizationId);
   const role = effectiveMembershipRole(rows, roles);
   if (role) return role;
-  if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
-  throw new TRPCError({
-    code: 'UNAUTHORIZED',
-    message:
-      rows.length > 0
-        ? 'You do not have the required organizational role to access this feature'
-        : 'You do not have access to this organization',
-  });
+  throw await organizationRoleDeniedError(rows, organizationId);
 }
 
 export async function requireLiveOrganization(organizationId: Organization['id']): Promise<void> {
@@ -809,16 +812,7 @@ export async function ensureOrganizationAccessAndFetchOrg(
     return organization;
   }
 
-  if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
-  throw new TRPCError({
-    code: 'UNAUTHORIZED',
-    message:
-      rows.length > 0
-        ? 'You do not have the required organizational role to access this feature'
-        : 'You do not have access to this organization',
-  });
+  throw await organizationRoleDeniedError(rows, organizationId);
 }
 
 /**

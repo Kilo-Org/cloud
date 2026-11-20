@@ -1,5 +1,4 @@
 import type {
-  AutoRouter,
   BenchmarkPair,
   CustomRoutingTable,
   CustomRoutingTableResponse,
@@ -45,7 +44,7 @@ function assertUniqueEntries(entries: readonly BenchmarkPair[]): void {
  */
 export async function assembleCustomRoutingTable(
   db: D1Database,
-  config: PolicySettingSource & { router?: AutoRouter },
+  config: PolicySettingSource,
   entries: readonly BenchmarkPair[],
   options: {
     now?: Date;

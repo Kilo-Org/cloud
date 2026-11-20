@@ -965,6 +965,8 @@
       "pendingComment": "göndərilməmiş şərh",
       "pendingComment_other": "göndərilməmiş şərh",
       "submitCountOfTotal": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Şərhləri göndər: {{displayFreshCount}} / {{displayTotalCount}}",
       "submitReview": "Yoxlamanı göndər",
       "partialPostedFresh": "{{displayFreshCount}} şərh göndərildi. ",
       "partialPostedFresh_one": "{{displayFreshCount}} şərh göndərildi. ",
@@ -3625,7 +3627,7 @@
     },
     "hub": {
       "renameTitle": "Təşkilatın adını dəyiş",
-      "renamePlaceholder": "Təşkilatın adı",
+      "renamePlaceholder": "Təşkilatın adını daxil edin",
       "balance": "Balans",
       "plan": "Plan",
       "planTeams": "Teams",

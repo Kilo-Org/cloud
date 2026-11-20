@@ -931,3 +931,64 @@ describe('PrDiffFileNavigator listed-file progress', () => {
     expect(renderedText(renderer)).toContain('1 sur 1 consulté parmi les fichiers affichés');
   });
 });
+
+describe('PrDiffFileNavigator body side insets', () => {
+  const LANDSCAPE_LEFT = 51;
+
+  beforeEach(() => {
+    rowRenders.length = 0;
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      feedback: { status: 'idle' },
+      loadedFiles: 0,
+      totalFiles: null,
+      failure: null,
+    };
+    insetsState.left = 0;
+    insetsState.right = 0;
+  });
+
+  /** Every `View` that carries the helper's inline side padding. */
+  function paddedViews(renderer: Awaited<ReturnType<typeof mountNavigator>>['renderer']) {
+    return renderer.root.findAll(node => {
+      if (String(node.type) !== 'View') {
+        return false;
+      }
+      const style: unknown = node.props.style;
+      return typeof style === 'object' && style !== null && 'paddingLeft' in style;
+    });
+  }
+
+  it('clears the landscape cutout on the header block and the list together', async () => {
+    insetsState.left = LANDSCAPE_LEFT;
+    const { renderer } = await mountNavigator();
+
+    // The search row, the viewed count and the rows are one column: each sits
+    // inside the inset wrapper, so one padding serves all of them. The 8 dp on
+    // the other side is the shared helper's clearance for a side status area
+    // that leaves the top inset at zero.
+    expect(paddedViews(renderer).map(node => node.props.style)).toEqual([
+      { paddingLeft: LANDSCAPE_LEFT, paddingRight: 8 },
+    ]);
+  });
+
+  it('leaves the portrait body without an inset style', async () => {
+    const { renderer } = await mountNavigator();
+
+    expect(paddedViews(renderer)).toHaveLength(0);
+  });
+});

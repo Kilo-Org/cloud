@@ -25,6 +25,7 @@ import {
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import {
   usePrReviewInboxBack,
   usePrReviewInboxHardwareBack,
@@ -74,6 +75,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
@@ -373,13 +375,15 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         }
       />
       {queries.isReady ? (
-        <View className="px-4 pb-2 pt-3">
-          <PrReviewTabSelector
-            activeTab={tab}
-            onChange={setTab}
-            discussionCount={pr.data?.commentCount}
-            disabledTabs={tabSelectorDisabledTabs}
-          />
+        <View style={sideInsetStyle}>
+          <View className="px-4 pb-2 pt-3">
+            <PrReviewTabSelector
+              activeTab={tab}
+              onChange={setTab}
+              discussionCount={pr.data?.commentCount}
+              disabledTabs={tabSelectorDisabledTabs}
+            />
+          </View>
         </View>
       ) : null}
       <ProviderPrWebUrlProvider value={webUrl}>{body}</ProviderPrWebUrlProvider>

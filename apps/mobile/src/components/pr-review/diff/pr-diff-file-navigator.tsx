@@ -51,6 +51,7 @@ import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
 // and `viewed` are stable across a search re-render, and the callbacks below
@@ -93,6 +94,7 @@ export function PrDiffFileNavigator({
 }: PrDiffFileNavigatorProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const searchRef = useRef<string>('');
   // The navigator is a formSheet whose bottom edge sits on the Android system
@@ -362,68 +364,70 @@ export function PrDiffFileNavigator({
 
   return (
     <>
-      <View collapsable={false} className="bg-background pb-2">
-        {header}
-        <SearchField
-          className="mx-4 mt-2"
-          defaultValue=""
-          editable={!query.isLoading || files.length > 0}
-          placeholder={t('prReview.fileNavigator.filterPlaceholder')}
-          hasText={searchRef.current !== ''}
-          onChangeText={value => {
-            searchRef.current = value;
-            setSearchVersion(version => version + 1);
-          }}
-        />
+      {header}
+      <View className="flex-1" style={sideInsetStyle}>
+        <View collapsable={false} className="bg-background pb-2">
+          <SearchField
+            className="mx-4 mt-2"
+            defaultValue=""
+            editable={!query.isLoading || files.length > 0}
+            placeholder={t('prReview.fileNavigator.filterPlaceholder')}
+            hasText={searchRef.current !== ''}
+            onChangeText={value => {
+              searchRef.current = value;
+              setSearchVersion(version => version + 1);
+            }}
+          />
 
-        {files.length > 0 && (
-          <View className="mx-4 mt-2 flex-row items-center justify-between">
-            <Text variant="muted" className="text-xs">
-              {/* `count` is the listed total: it selects the plural category
+          {files.length > 0 && (
+            <View className="mx-4 mt-2 flex-row items-center justify-between">
+              <Text variant="muted" className="text-xs">
+                {/* `count` is the listed total: it selects the plural category
                   whose participle agrees with it, while `total` carries the
                   locale-grouped figure the catalogs interpolate. */}
-              {isTruncated
-                ? t('prReview.fileNavigator.viewedOfListed', {
-                    count: files.length,
-                    viewed: formatNumber(viewedCount, i18n.language),
-                    total: formatNumber(files.length, i18n.language),
-                  })
-                : t('prReview.fileNavigator.viewedCount', {
-                    count: files.length,
-                    viewed: formatNumber(viewedCount, i18n.language),
-                    total: formatNumber(files.length, i18n.language),
-                  })}
-            </Text>
-            {fetchAll.feedback.status === 'pending' ? (
-              <View className="flex-row items-center gap-1.5">
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
-                <Text variant="muted" className="text-xs">
-                  {t('prReview.fileNavigator.loadingFiles', {
-                    loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
-                    total: formatNumber(changedFiles, i18n.language),
-                  })}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        )}
+                {isTruncated
+                  ? t('prReview.fileNavigator.viewedOfListed', {
+                      count: files.length,
+                      viewed: formatNumber(viewedCount, i18n.language),
+                      total: formatNumber(files.length, i18n.language),
+                    })
+                  : t('prReview.fileNavigator.viewedCount', {
+                      count: files.length,
+                      viewed: formatNumber(viewedCount, i18n.language),
+                      total: formatNumber(files.length, i18n.language),
+                    })}
+              </Text>
+              {fetchAll.feedback.status === 'pending' ? (
+                <View className="flex-row items-center gap-1.5">
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  <Text variant="muted" className="text-xs">
+                    {t('prReview.fileNavigator.loadingFiles', {
+                      loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
+                      total: formatNumber(changedFiles, i18n.language),
+                    })}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
 
-        {showRetry ? (
-          <Card className="mx-4 mt-2 flex-row items-center justify-between gap-3">
-            <Text className="text-xs text-destructive">{retryMessage}</Text>
-            <Button
-              variant="outline"
-              size="sm"
-              className={STATE_ACTION_CLASS}
-              onPress={() => void retryAction()}
-              accessibilityLabel={retryLabel}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </Card>
-        ) : null}
+          {showRetry ? (
+            <Card className="mx-4 mt-2 flex-row items-center justify-between gap-3">
+              <Text className="text-xs text-destructive">{retryMessage}</Text>
+              <Button
+                variant="outline"
+                size="sm"
+                className={STATE_ACTION_CLASS}
+                onPress={() => void retryAction()}
+                accessibilityLabel={retryLabel}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            </Card>
+          ) : null}
+        </View>
+        {body}
       </View>
-      {body}
     </>
   );
 }

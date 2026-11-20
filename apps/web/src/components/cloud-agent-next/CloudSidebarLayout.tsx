@@ -14,7 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { skipToken, useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import {
@@ -29,15 +29,16 @@ import { ChatSidebar } from './ChatSidebar';
 import { SetPageActions } from '@/components/SetPageActions';
 import { CloudAgentSettingsButton } from './settings/CloudAgentSettingsButton';
 import {
-  dbSessionToStoredSession,
   deriveForegroundSessionStatus,
   groupSidebarWorkspaces,
-  mergeWorktreeChatSessions,
   useSidebarSessions,
   type SidebarWorktreeDetails,
 } from './hooks/useSidebarSessions';
 import { useActiveSessions } from './hooks/useActiveSessions';
-import { apiSessionToDbSession, dbSessionsAtom } from './store/db-session-atoms';
+import { dbSessionsAtom } from './store/db-session-atoms';
+import { useWorkspaceSummaryLookup } from './hooks/useWorkspaceSummaries';
+import { mergeWorkspaceChats } from './hooks/useWorkspaceChats';
+import { latestOpenWorkspaceChat, workspaceSummaryChats } from './hooks/sidebar-workspace-model';
 import {
   getDeletionErrorMessage,
   getWorktreeDeletionRedirect,
@@ -71,7 +72,6 @@ import {
   getActiveChatSessionId,
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
-  getLatestOpenChatSessionId,
   getNextOpenChatSessionId,
   getOpenWorktreeChatSessionIds,
   getWorktreeBranch,
@@ -237,7 +237,7 @@ export function CloudSidebarLayout(props: CloudSidebarLayoutProps) {
       const worktreeId = cloudAgentWorktreeIdSchema.safeParse(session.worktreeId);
       if (worktreeId.success) {
         void queryClient.invalidateQueries(
-          trpc.cliSessionsV2.list.queryFilter({ worktreeId: worktreeId.data }),
+          trpc.cliSessionsV2.workspaceChats.queryFilter({ worktreeId: worktreeId.data }),
           { cancelRefetch: false }
         );
       }
@@ -290,14 +290,6 @@ function CloudSidebarLayoutContent({
       organizationId: organizationId ?? null,
     });
   const workspaceFolders = useWorkspaceFolders(currentUserId, organizationId, collapsed);
-  const {
-    closedSessionIds,
-    sessionOrderByWorktree,
-    openChatTab,
-    closeChatTab,
-    replaceChatTab,
-    forgetWorktreeTabs,
-  } = useClosedWorktreeChatTabs(getClosedWorktreeChatTabsStorageKey(currentUserId, organizationId));
   const addressedSessionRef = useRef<{ sessionId: string | null } | null>(null);
   const pendingNavigationRef = useRef<PendingChatNavigation>(null);
 
@@ -373,13 +365,17 @@ function CloudSidebarLayoutContent({
     sessions: listedSessions,
     cachedSessions: listedCachedSessions,
     worktreeDetails,
-    loadingWorktreeIds,
     workspaceRows,
     workspaceOrder,
-    workspaceRowsTruncated,
+    destinationTotals,
+    workspaceError,
+    retryWorkspaces,
+    hasMoreWorkspaces,
+    isLoadingMoreWorkspaces,
+    loadMoreWorkspaces,
+    isSearching,
     isLoading: isLoadingSessions,
     refetchSessions,
-    renameSessionLocally,
   } = useSidebarSessions({
     organizationId: organizationId ?? null,
     updatedSince: sidebarUpdatedSince,
@@ -417,13 +413,6 @@ function CloudSidebarLayoutContent({
         UNTITLED_WORKTREE_DETAILS
       ),
     [localSessions, sessions, worktreeDetails]
-  );
-  const sidebarLoadingWorktreeIds = useMemo(
-    () =>
-      sidebarWorktreeDetails === worktreeDetails
-        ? loadingWorktreeIds
-        : loadingWorktreeIds.filter(id => !(id in sidebarWorktreeDetails) || id in worktreeDetails),
-    [loadingWorktreeIds, sidebarWorktreeDetails, worktreeDetails]
   );
   const sidebarWorkspaceGroups = useMemo(
     () => groupSidebarWorkspaces(sessions, sidebarWorktreeDetails, workspaceRows),
@@ -506,33 +495,43 @@ function CloudSidebarLayoutContent({
     );
     return parsedWorktreeId.success ? parsedWorktreeId.data : null;
   }, [cachedSessions, currentSessionId, fetchedSessionData, organizationId, worktreeIdFromParams]);
-  const { data: worktreeSessionsData } = useQuery({
-    ...trpc.cliSessionsV2.list.queryOptions(
-      selectedWorktreeId
-        ? {
-            organizationId: organizationId ?? null,
-            worktreeId: selectedWorktreeId,
-            limit: 200,
-            orderBy: 'updated_at',
-          }
-        : skipToken
-    ),
-    staleTime: 5000,
+  const selectedWorkspaceIds = useMemo(
+    () => (selectedWorktreeId ? [selectedWorktreeId] : []),
+    [selectedWorktreeId]
+  );
+  const { workspaces: loadedWorkspaceSummaries } = useWorkspaceSummaryLookup({
+    organizationId: organizationId ?? null,
+    worktreeIds: selectedWorkspaceIds,
   });
+  const selectedWorkspace = loadedWorkspaceSummaries.find(
+    workspace => workspace.worktreeId === selectedWorktreeId
+  );
+  const {
+    closedSessionIds,
+    sessionOrderByWorktree,
+    openChatTab,
+    closeChatTab,
+    replaceChatTab,
+    forgetWorktreeTabs,
+    isReady: areChatTabsReady,
+  } = useClosedWorktreeChatTabs(
+    getClosedWorktreeChatTabsStorageKey(currentUserId, organizationId),
+    {
+      organizationId: organizationId ?? null,
+      workspaces: loadedWorkspaceSummaries,
+    }
+  );
+  const serverWorkspaceChats = useMemo(
+    () => (selectedWorkspace ? workspaceSummaryChats(selectedWorkspace) : []),
+    [selectedWorkspace]
+  );
+  const selectedWorkspaceChats = useMemo(
+    () => mergeWorkspaceChats(selectedWorktreeId, serverWorkspaceChats, cachedSessions),
+    [cachedSessions, selectedWorktreeId, serverWorkspaceChats]
+  );
   const worktreeChats = useMemo(() => {
-    if (!selectedWorktreeId) return [];
-
-    const authoritativeSessions =
-      worktreeSessionsData?.cliSessions
-        .filter(session => session.organization_id === (organizationId ?? null))
-        .map(session => dbSessionToStoredSession(apiSessionToDbSession(session))) ?? [];
-    const mergedSessions = mergeWorktreeChatSessions(
-      selectedWorktreeId,
-      authoritativeSessions,
-      cachedSessions
-    );
-    if (foregroundSessionStatus === null) return mergedSessions;
-    return mergedSessions.map(session =>
+    if (foregroundSessionStatus === null) return selectedWorkspaceChats;
+    return selectedWorkspaceChats.map(session =>
       session.sessionId === currentSessionId
         ? {
             ...session,
@@ -542,14 +541,7 @@ function CloudSidebarLayoutContent({
           }
         : session
     );
-  }, [
-    cachedSessions,
-    currentSessionId,
-    foregroundSessionStatus,
-    organizationId,
-    selectedWorktreeId,
-    worktreeSessionsData?.cliSessions,
-  ]);
+  }, [currentSessionId, foregroundSessionStatus, selectedWorkspaceChats]);
   const openWorktreeChats = useMemo(() => {
     const sessionsById = new Map(worktreeChats.map(session => [session.sessionId, session]));
     const openSessionIds = getOpenWorktreeChatSessionIds(
@@ -577,7 +569,7 @@ function CloudSidebarLayoutContent({
     // A filtered-out chat is never listed, so once synced it has nothing to wait for.
     const listedIds = new Set([
       ...listedCachedSessions.map(session => session.sessionId),
-      ...(worktreeSessionsData?.cliSessions.map(session => session.session_id) ?? []),
+      ...serverWorkspaceChats.map(session => session.sessionId),
       ...localSessions
         .filter(
           session => session.sync.state === 'synced' && !filteredLocalSessions.includes(session)
@@ -591,7 +583,7 @@ function CloudSidebarLayoutContent({
     listedCachedSessions,
     localSessions,
     settleLocalSessions,
-    worktreeSessionsData?.cliSessions,
+    serverWorkspaceChats,
   ]);
 
   // The project filter offers the repositories of the sessions this view lists,
@@ -683,21 +675,27 @@ function CloudSidebarLayoutContent({
   );
 
   const openWorktreeFromSidebar = useCallback(
-    (worktreeId: string, sessionIdsByRecency: readonly string[]) => {
-      const sessionId = getLatestOpenChatSessionId(sessionIdsByRecency, closedSessionIds);
+    (worktreeId: string, latestOpenSessionId: string | null) => {
+      const workspace = loadedWorkspaceSummaries.find(row => row.worktreeId === worktreeId);
+      const sessionId = workspace
+        ? latestOpenWorkspaceChat(workspace, closedSessionIds)
+        : latestOpenSessionId && !closedSessionIds.includes(latestOpenSessionId)
+          ? latestOpenSessionId
+          : null;
       if (sessionId) {
         selectSession(sessionId);
       } else {
         openWorktree(worktreeId);
       }
     },
-    [closedSessionIds, openWorktree, selectSession]
+    [closedSessionIds, loadedWorkspaceSummaries, openWorktree, selectSession]
   );
 
   // Arriving at a chat's address from elsewhere (a link, history) reopens its
   // tab. A shown chat that is closed, by another window or while this window
   // was still navigating to it, is left instead, so it cannot come back later.
   useEffect(() => {
+    if (!areChatTabsReady) return;
     const shownSessionId = currentSessionId ?? null;
     const addressed = addressedSessionRef.current;
     if (addressed === null || addressed.sessionId !== shownSessionId) {
@@ -726,6 +724,7 @@ function CloudSidebarLayoutContent({
       openWorktree(selectedWorktreeId, { replace: true });
     }
   }, [
+    areChatTabsReady,
     closedSessionIds,
     currentSessionId,
     openChatTab,
@@ -983,14 +982,14 @@ function CloudSidebarLayoutContent({
   const handleRenameSession = useCallback(
     async (sessionId: string, title: string) => {
       await renameCliSessionV2({ session_id: sessionId, title });
-      renameSessionLocally(sessionId, title);
       void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter());
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceSummaries.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceChats.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
       refetchSessions();
     },
-    [renameCliSessionV2, renameSessionLocally, queryClient, trpc, refetchSessions]
+    [renameCliSessionV2, queryClient, trpc, refetchSessions]
   );
 
   const handleRenameWorktree = useCallback(
@@ -1002,7 +1001,7 @@ function CloudSidebarLayoutContent({
       });
       await Promise.all([
         queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter()),
-        queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
+        queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceSummaries.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.listWorkspaces.pathFilter()),
       ]);
@@ -1150,10 +1149,15 @@ function CloudSidebarLayoutContent({
               onDeleteSession={handleDeleteSession}
               onRenameSession={handleRenameSession}
               worktreeDetails={sidebarWorktreeDetails}
-              loadingWorktreeIds={sidebarLoadingWorktreeIds}
               workspaceGroups={sidebarWorkspaceGroups}
               workspaceOrder={workspaceOrder}
-              workspaceRowsTruncated={workspaceRowsTruncated}
+              destinationTotals={destinationTotals}
+              workspaceError={workspaceError}
+              onRetryWorkspaces={retryWorkspaces}
+              hasMoreWorkspaces={hasMoreWorkspaces}
+              isLoadingMoreWorkspaces={isLoadingMoreWorkspaces}
+              onLoadMoreWorkspaces={loadMoreWorkspaces}
+              isSearching={isSearching}
               isLoading={isLoadingSessions}
               onRenameWorktree={handleRenameWorktree}
               onDeleteWorktree={handleRequestWorktreeDelete}
@@ -1193,10 +1197,15 @@ function CloudSidebarLayoutContent({
             onDeleteSession={handleDeleteSession}
             onRenameSession={handleRenameSession}
             worktreeDetails={sidebarWorktreeDetails}
-            loadingWorktreeIds={sidebarLoadingWorktreeIds}
             workspaceGroups={sidebarWorkspaceGroups}
             workspaceOrder={workspaceOrder}
-            workspaceRowsTruncated={workspaceRowsTruncated}
+            destinationTotals={destinationTotals}
+            workspaceError={workspaceError}
+            onRetryWorkspaces={retryWorkspaces}
+            hasMoreWorkspaces={hasMoreWorkspaces}
+            isLoadingMoreWorkspaces={isLoadingMoreWorkspaces}
+            onLoadMoreWorkspaces={loadMoreWorkspaces}
+            isSearching={isSearching}
             isLoading={isLoadingSessions}
             onRenameWorktree={handleRenameWorktree}
             onDeleteWorktree={handleRequestWorktreeDelete}

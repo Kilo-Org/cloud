@@ -399,6 +399,17 @@ export const workspaceFoldersRouter = createTRPCRouter({
   delete: cloudAgentSidebarScopeProcedure
     .input(folderInputSchema)
     .mutation(async ({ ctx, input }) => {
+      const members = await ctx.sidebarDb
+        .select({ worktreeId: cloud_agent_worktrees.worktree_id })
+        .from(cloud_agent_worktrees)
+        .where(
+          and(
+            ownerScopeCondition(cloud_agent_worktrees, ctx.sidebarScope),
+            eq(cloud_agent_worktrees.folder_id, input.folderId),
+            isNull(cloud_agent_worktrees.deletion_started_at),
+            isNull(cloud_agent_worktrees.deletion_completed_at)
+          )
+        );
       const [folder] = await ctx.sidebarDb
         .delete(cloud_agent_workspace_folders)
         .where(
@@ -409,6 +420,7 @@ export const workspaceFoldersRouter = createTRPCRouter({
         )
         .returning({ id: cloud_agent_workspace_folders.id });
       if (!folder) throw new TRPCError({ code: 'NOT_FOUND', message: 'Folder not found' });
+      for (const member of members) ctx.changedWorktreeIds.add(member.worktreeId);
       return { success: true };
     }),
 
@@ -469,6 +481,7 @@ export const workspaceFoldersRouter = createTRPCRouter({
             eq(cloud_agent_worktrees.worktree_id, input.worktreeId)
           )
         );
+      ctx.changedWorktreeIds.add(input.worktreeId);
       return { success: true };
     }),
 
@@ -502,6 +515,9 @@ export const workspaceFoldersRouter = createTRPCRouter({
         ctx.sidebarDb
           .select({
             createdAt: cli_sessions_v2.created_at,
+            lastActivityAt: cli_sessions_v2.last_activity_at,
+            gitUrl: cli_sessions_v2.git_url,
+            gitBranch: cli_sessions_v2.git_branch,
             cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id,
           })
           .from(cli_sessions_v2)
@@ -550,6 +566,9 @@ export const workspaceFoldersRouter = createTRPCRouter({
             kilo_user_id: ctx.sidebarScope.userId,
             organization_id: ctx.sidebarScope.organizationId,
             created_at: session.createdAt,
+            last_activity_at: session.lastActivityAt ?? session.createdAt,
+            git_url: session.gitUrl,
+            git_branch: session.gitBranch,
             runtime_locations: runtimeLocations,
           })
           .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
@@ -619,6 +638,7 @@ export const workspaceFoldersRouter = createTRPCRouter({
             eq(cloud_agent_worktrees.worktree_id, worktreeId)
           )
         );
+      ctx.changedWorktreeIds.add(worktreeId);
       return { success: true };
     }),
 

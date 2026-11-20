@@ -173,7 +173,6 @@ jest.mock('./hooks/useSidebarSessions', () => ({
     loadingWorktreeIds: [],
     workspaceRows: [],
     workspaceOrder: [],
-    workspaceRowsTruncated: false,
     isLoading: false,
     refetchSessions: jest.fn(),
     renameSessionLocally: jest.fn(),
@@ -186,6 +185,10 @@ jest.mock('./hooks/useSidebarSessions', () => ({
 
 jest.mock('./hooks/useActiveSessions', () => ({
   useActiveSessions: () => ({ activeSessions: [] }),
+}));
+
+jest.mock('./hooks/useWorkspaceSummaries', () => ({
+  useWorkspaceSummaryLookup: () => ({ workspaces: [] }),
 }));
 
 jest.mock('./hooks/useSidebarPreferences', () => ({
@@ -205,6 +208,7 @@ jest.mock('./hooks/useClosedWorktreeChatTabs', () => ({
     closeChatTab: mockCloseChatTab,
     replaceChatTab: mockReplaceChatTab,
     forgetWorktreeTabs: mockForgetWorktreeTabs,
+    isReady: true,
   }),
 }));
 

@@ -26,8 +26,6 @@ import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
   cloud_agent_session_runs,
-  cloud_agent_user_settings,
-  cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
@@ -94,13 +92,17 @@ import {
   claimPrRefresh,
   deferPrRefresh,
 } from '@/lib/integrations/platforms/github/pr-refresh-budget';
-import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
+import { notifyCliSessionRenamed, queueWorkspaceUpdates } from '@/lib/cloud-agent/session-events';
 import {
-  DEFAULT_WORKSPACE_ORDER,
   WORKSPACE_LIST_SEARCH_MAX_LENGTH,
   workspaceOrderSchema,
-  type WorkspaceOrder,
 } from '@/lib/cloud-agent/workspace-folders';
+import {
+  listWorkspaceSummaries,
+  readWorkspaceSummaries,
+  readWorkspaceChatPage,
+} from '@/lib/cloud-agent/workspace-read-model';
+import { workspaceTabProcedures } from '@/lib/cloud-agent/workspace-tab-state';
 import { after } from 'next/server';
 import {
   sessionAssociatedPr,
@@ -569,64 +571,6 @@ function sessionOrderColumn(orderBy: 'created_at' | 'updated_at' | 'activity'): 
   return sql<string>`${cli_sessions_v2.updated_at}`;
 }
 
-type WorkspaceSessionStatusRow = {
-  sessionId: string;
-  sessionStatus: string | null;
-  sessionStatusUpdatedAt: string | null;
-  latestRunStatus: CloudAgentSessionRunStatus | null;
-  latestRunFailureKind: 'failed' | 'system_interrupted' | null;
-  latestRunTerminalAt: string | null;
-  updatedAt: string;
-};
-
-type WorkspaceStatusKind = 'attention' | 'failed' | 'running' | 'idle';
-
-function aggregateWorkspaceStatus(sessions: readonly WorkspaceSessionStatusRow[]) {
-  const normalize = (value: string | null) =>
-    value === null ? null : new Date(value).toISOString();
-  const rows = sessions.map(session => ({
-    ...session,
-    sessionStatusUpdatedAt: normalize(session.sessionStatusUpdatedAt),
-    latestRunTerminalAt: normalize(session.latestRunTerminalAt),
-    updatedAt: normalize(session.updatedAt) ?? session.updatedAt,
-  }));
-  const attention = rows.find(
-    session => session.sessionStatus === 'question' || session.sessionStatus === 'permission'
-  );
-  const failed = rows.find(session => session.latestRunFailureKind !== null);
-  const running = rows.find(
-    session =>
-      session.sessionStatus === 'busy' ||
-      session.sessionStatus === 'retry' ||
-      session.latestRunStatus === 'queued' ||
-      session.latestRunStatus === 'accepted'
-  );
-  const selected =
-    attention ??
-    failed ??
-    running ??
-    [...rows].sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime() ||
-        b.sessionId.localeCompare(a.sessionId)
-    )[0];
-  const kind: WorkspaceStatusKind = attention
-    ? 'attention'
-    : failed
-      ? 'failed'
-      : running
-        ? 'running'
-        : 'idle';
-  return {
-    kind,
-    sessionStatus: selected?.sessionStatus ?? null,
-    statusUpdatedAt: selected?.sessionStatusUpdatedAt ?? null,
-    latestRunStatus: selected?.latestRunStatus ?? null,
-    latestRunFailureKind: selected?.latestRunFailureKind ?? null,
-    latestRunTerminalAt: selected?.latestRunTerminalAt ?? null,
-  };
-}
-
 const WorkspaceListInputSchema = z.object({
   organizationId: z.uuid().nullable(),
   createdOnPlatform: z
@@ -639,24 +583,23 @@ const WorkspaceListInputSchema = z.object({
   search: z.string().max(WORKSPACE_LIST_SEARCH_MAX_LENGTH).optional(),
 });
 
-async function resolveWorkspaceSortMode(
-  userId: string,
-  requested: WorkspaceOrder | undefined
-): Promise<WorkspaceOrder> {
-  if (requested) return requested;
-  const [settings] = await db
-    .select({ workspaceOrder: cloud_agent_user_settings.workspace_order })
-    .from(cloud_agent_user_settings)
-    .where(eq(cloud_agent_user_settings.kilo_user_id, userId))
-    .limit(1);
-  return settings?.workspaceOrder ?? DEFAULT_WORKSPACE_ORDER;
-}
+const WorkspaceSummariesInputSchema = WorktreeDetailsInputSchema.extend({
+  includeAncestors: z.boolean().optional(),
+  createdOnPlatform: WorkspaceListInputSchema.shape.createdOnPlatform,
+  gitUrl: WorkspaceListInputSchema.shape.gitUrl,
+  search: WorkspaceListInputSchema.shape.search,
+});
 
+const WorkspaceChatsInputSchema = WorktreeInputSchema.extend({
+  limit: z.number().int().min(1).max(200).default(50),
+  cursor: z.object({ createdAt: z.iso.datetime(), sessionId: z.string().min(1) }).optional(),
+});
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),
   limit: z.number().min(1).max(RECENT_DAYS_LIMIT).optional().default(PAGE_SIZE),
   orderBy: z.enum(['created_at', 'updated_at', 'activity']).optional().default('updated_at'),
   includeChildren: z.boolean().optional().default(false),
+  standaloneOnly: z.boolean().optional().default(false),
   sharedOnly: z.boolean().optional().default(false),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
@@ -857,6 +800,7 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  ...workspaceTabProcedures,
   getPrWatchOptions: baseProcedure
     .input(watchPrQuerySchema)
     .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
@@ -1137,455 +1081,35 @@ export const cliSessionsV2Router = createTRPCRouter({
   }),
 
   listWorkspaces: baseProcedure.input(WorkspaceListInputSchema).query(async ({ ctx, input }) => {
-    const rawSearch = input.search?.trim().toLowerCase() ?? '';
-    const needle = rawSearch.startsWith('#') ? rawSearch.slice(1) : rawSearch;
-    const searchActive = needle.length > 0;
-    const sortMode = await resolveWorkspaceSortMode(ctx.user.id, input.sortMode);
-    const limit = input.limit ?? 100;
-    const offset = input.cursor ?? 0;
-
-    const scopeConditions: SQL[] = [
-      eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
-      isNotNull(cli_sessions_v2.cloud_agent_worktree_id),
-      isNull(cli_sessions_v2.parent_session_id),
-      or(
-        isNull(cloud_agent_worktrees.worktree_id),
-        and(
-          eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
-          sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}`,
-          isNull(cloud_agent_worktrees.deletion_started_at),
-          isNull(cloud_agent_worktrees.deletion_completed_at)
-        )
-      ) as SQL,
-    ];
-    await addOrganizationCondition(scopeConditions, ctx, input.organizationId);
-    const membership = worktreeMembershipCondition(ctx.user.id, input.organizationId);
-    if (membership) scopeConditions.push(membership);
-    addCreatedOnPlatformConditions(scopeConditions, input.createdOnPlatform);
-    addGitUrlConditions(scopeConditions, input.gitUrl);
-    addHideUningestedPlaceholderCondition(scopeConditions);
-
-    const scoped = db.$with('workspace_scoped').as(
-      db
-        .select({
-          sessionId: sql<string>`${cli_sessions_v2.session_id}`.as('session_id'),
-          worktreeId: sql<string>`${cli_sessions_v2.cloud_agent_worktree_id}`.as('worktree_id'),
-          doneFolderEnabled: sql<boolean>`exists (
-            select 1 from ${cloud_agent_workspace_folders}
-            where ${cloud_agent_workspace_folders.kilo_user_id} = ${ctx.user.id}
-              and ${cloud_agent_workspace_folders.organization_id}
-                is not distinct from ${cli_sessions_v2.organization_id}
-              and ${cloud_agent_workspace_folders.kind} = 'smart'
-              and ${cloud_agent_workspace_folders.smart_preset} = 'done'
-          )`.as('done_folder_enabled'),
-          gitUrl: sql<string | null>`${cli_sessions_v2.git_url}`.as('session_git_url'),
-          gitBranch: sql<string | null>`${cli_sessions_v2.git_branch}`.as('git_branch'),
-          title: sql<string | null>`${cli_sessions_v2.title}`.as('title'),
-          createdAt: sql<string>`${cli_sessions_v2.created_at}`.as('session_created_at'),
-          lastActivityAt: sql<string | null>`${cli_sessions_v2.last_activity_at}`.as(
-            'last_activity_at'
-          ),
-          updatedAt: sql<string>`${cli_sessions_v2.updated_at}`.as('session_updated_at'),
-          status: sql<string | null>`${cli_sessions_v2.status}`.as('session_status'),
-          statusUpdatedAt: sql<string | null>`${cli_sessions_v2.status_updated_at}`.as(
-            'session_status_updated_at'
-          ),
-          platform: sql<string | null>`${cli_sessions_v2.platform}`.as('session_platform'),
-          sessionPrUrl: sql<string | null>`${cli_sessions_v2.pr_url}`.as('session_pr_url'),
-          sessionPrNumber: sql<number | null>`${cli_sessions_v2.pr_number}`.as('session_pr_number'),
-          sessionPrVerifiedAt: sql<string | null>`${cli_sessions_v2.pr_link_verified_at}`.as(
-            'session_pr_verified_at'
-          ),
-          cachePrUrl: sql<string | null>`${sessionAssociatedPr.pr_url}`.as('cache_pr_url'),
-          cachePrNumber: sql<number | null>`${sessionAssociatedPr.pr_number}`.as('cache_pr_number'),
-          cachePrState: sql<string | null>`${sessionAssociatedPr.pr_state}`.as('cache_pr_state'),
-          cachePrTitle: sql<string | null>`${sessionAssociatedPr.pr_title}`.as('cache_pr_title'),
-          cachePrHeadSha: sql<string | null>`${sessionAssociatedPr.pr_head_sha}`.as(
-            'cache_pr_head_sha'
-          ),
-          cachePrLastSyncedAt: sql<string | null>`${sessionAssociatedPr.pr_last_synced_at}`.as(
-            'cache_pr_last_synced_at'
-          ),
-          cachePrReviewDecision: sql<string | null>`${sessionAssociatedPr.pr_review_decision}`.as(
-            'cache_pr_review_decision'
-          ),
-          cacheReviewDecisionPending: sql<
-            boolean | null
-          >`${sessionAssociatedPr.review_decision_pending}`.as('cache_review_decision_pending'),
-          cachePrBaseRef: sql<string | null>`${sessionAssociatedPr.pr_base_ref}`.as(
-            'cache_pr_base_ref'
-          ),
-          cacheStackNumber: sql<number | null>`${sessionAssociatedPr.stack_number}`.as(
-            'cache_stack_number'
-          ),
-          cacheStackPosition: sql<number | null>`${sessionAssociatedPr.stack_position}`.as(
-            'cache_stack_position'
-          ),
-          cacheStackSize: sql<number | null>`${sessionAssociatedPr.stack_size}`.as(
-            'cache_stack_size'
-          ),
-          cachePrFromWorkspace: sql<boolean | null>`${sessionAssociatedPr.pr_from_workspace}`.as(
-            'cache_pr_from_workspace'
-          ),
-          worktreeName: sql<string | null>`${cloud_agent_worktrees.name}`.as('worktree_name'),
-          folderId: sql<string | null>`${cloud_agent_worktrees.folder_id}`.as('folder_id'),
-          sidebarPosition: sql<string | null>`${cloud_agent_worktrees.sidebar_position}`.as(
-            'sidebar_position'
-          ),
-          parentWorktreeId: sql<string | null>`case
-            when ${cloud_agent_worktrees.parent_worktree_id} is null then null
-            when exists (
-              select 1
-              from cloud_agent_worktrees parent
-              where parent.worktree_id = ${cloud_agent_worktrees.parent_worktree_id}
-                and parent.kilo_user_id = ${ctx.user.id}
-                and parent.organization_id is not distinct from ${cli_sessions_v2.organization_id}
-                and parent.deletion_started_at is null
-                and parent.deletion_completed_at is null
-            ) then ${cloud_agent_worktrees.parent_worktree_id}
-            else null
-          end`.as('parent_worktree_id'),
-          baseBranch: sql<string | null>`${cloud_agent_worktrees.base_branch}`.as('base_branch'),
-          worktreeCreatedAt: sql<string | null>`${cloud_agent_worktrees.created_at}`.as(
-            'worktree_created_at'
-          ),
-          latest_run_status: latestRunFields.latest_run_status.as('latest_run_status'),
-          latest_run_failure_kind:
-            latestRunFields.latest_run_failure_kind.as('latest_run_failure_kind'),
-          latest_run_terminal_at:
-            latestRunFields.latest_run_terminal_at.as('latest_run_terminal_at'),
-        })
-        .from(cli_sessions_v2)
-        .leftJoin(
-          cloud_agent_worktrees,
-          eq(cloud_agent_worktrees.worktree_id, cli_sessions_v2.cloud_agent_worktree_id)
-        )
-        .leftJoinLateral(sessionAssociatedPr, sql`true`)
-        .where(and(...scopeConditions))
+    if (input.organizationId !== null) await ensureOrganizationAccess(ctx, input.organizationId);
+    return listWorkspaceSummaries(
+      { userId: ctx.user.id, organizationId: input.organizationId },
+      input
     );
+  }),
 
-    const grouped = db.$with('workspace_grouped').as(
-      db
-        .select({
-          worktreeId: sql<string>`${scoped.worktreeId}`.as('worktree_id'),
-          doneFolderEnabled: sql<boolean>`bool_or(${scoped.doneFolderEnabled})`.as(
-            'done_folder_enabled'
-          ),
-          name: sql<string | null>`${scoped.worktreeName}`.as('name'),
-          folderId: sql<string | null>`${scoped.folderId}`.as('folder_id'),
-          sidebarPosition: sql<string | null>`${scoped.sidebarPosition}`.as('sidebar_position'),
-          parentWorktreeId: sql<string | null>`${scoped.parentWorktreeId}`.as('parent_worktree_id'),
-          baseBranch: sql<string | null>`${scoped.baseBranch}`.as('base_branch'),
-          createdAt:
-            sql<string>`coalesce(max(${scoped.worktreeCreatedAt}), min(${scoped.createdAt}))`.as(
-              'created_at'
-            ),
-          lastActivityAt:
-            sql<string>`max(coalesce(${scoped.lastActivityAt}, ${scoped.createdAt}))`.as(
-              'last_activity_at'
-            ),
-          firstTitle: sql<
-            string | null
-          >`(array_agg(${scoped.title} ORDER BY ${scoped.createdAt} ASC, ${scoped.sessionId} ASC))[1]`.as(
-            'first_title'
-          ),
-          rootSessionId:
-            sql<string>`(array_agg(${scoped.sessionId} ORDER BY ${scoped.createdAt} ASC, ${scoped.sessionId} ASC))[1]`.as(
-              'root_session_id'
-            ),
-          latestSessionId:
-            sql<string>`(array_agg(${scoped.sessionId} ORDER BY coalesce(${scoped.lastActivityAt}, ${scoped.createdAt}) DESC, ${scoped.sessionId} DESC))[1]`.as(
-              'latest_session_id'
-            ),
-          gitUrl: sql<
-            string | null
-          >`(array_agg(${scoped.gitUrl} ORDER BY coalesce(${scoped.lastActivityAt}, ${scoped.createdAt}) DESC, ${scoped.sessionId} DESC) FILTER (WHERE ${scoped.gitUrl} IS NOT NULL))[1]`.as(
-            'git_url'
-          ),
-          branch: sql<
-            string | null
-          >`(array_agg(${scoped.gitBranch} ORDER BY coalesce(${scoped.lastActivityAt}, ${scoped.createdAt}) DESC, ${scoped.sessionId} DESC) FILTER (WHERE ${scoped.gitBranch} IS NOT NULL))[1]`.as(
-            'branch'
-          ),
-          chatCount: sql<number>`count(*)::int`.as('chat_count'),
-          sessions: sql<WorkspaceSessionStatusRow[]>`json_agg(json_build_object(
-              'sessionId', ${scoped.sessionId},
-              'sessionStatus', ${scoped.status},
-              'sessionStatusUpdatedAt', ${scoped.statusUpdatedAt},
-              'latestRunStatus', ${scoped.latest_run_status},
-              'latestRunFailureKind', ${scoped.latest_run_failure_kind},
-              'latestRunTerminalAt', ${scoped.latest_run_terminal_at},
-              'updatedAt', ${scoped.updatedAt}
-            ) ORDER BY ${scoped.sessionId})`.as('sessions'),
-        })
-        .from(scoped)
-        .groupBy(
-          scoped.worktreeId,
-          scoped.worktreeName,
-          scoped.folderId,
-          scoped.sidebarPosition,
-          scoped.parentWorktreeId,
-          scoped.baseBranch
-        )
-    );
-
-    const prSessions = db.$with('workspace_pr_sessions').as(
-      db
-        .selectDistinctOn([scoped.worktreeId], {
-          worktreeId: sql<string>`${scoped.worktreeId}`.as('worktree_id'),
-          sessionId: sql<string>`${scoped.sessionId}`.as('session_id'),
-          prSessionUpdatedAt: sql<string>`${scoped.updatedAt}`.as('pr_session_updated_at'),
-          sessionPrPlatform: sql<string | null>`${scoped.platform}`.as('session_pr_platform'),
-          sessionPrUrl: sql<string | null>`${scoped.sessionPrUrl}`.as('session_pr_url'),
-          sessionPrNumber: sql<number | null>`${scoped.sessionPrNumber}`.as('session_pr_number'),
-          sessionPrVerifiedAt: sql<string | null>`${scoped.sessionPrVerifiedAt}`.as(
-            'session_pr_verified_at'
-          ),
-          sessionGitUrl: sql<string | null>`${scoped.gitUrl}`.as('session_git_url'),
-          pr_url: sql<string | null>`${scoped.cachePrUrl}`.as('pr_url'),
-          pr_number: sql<number | null>`${scoped.cachePrNumber}`.as('pr_number'),
-          pr_state: sql<string | null>`${scoped.cachePrState}`.as('pr_state'),
-          pr_title: sql<string | null>`${scoped.cachePrTitle}`.as('pr_title'),
-          pr_head_sha: sql<string | null>`${scoped.cachePrHeadSha}`.as('pr_head_sha'),
-          pr_last_synced_at: sql<string | null>`${scoped.cachePrLastSyncedAt}`.as(
-            'pr_last_synced_at'
-          ),
-          pr_review_decision: sql<string | null>`${scoped.cachePrReviewDecision}`.as(
-            'pr_review_decision'
-          ),
-          review_decision_pending: sql<boolean | null>`${scoped.cacheReviewDecisionPending}`.as(
-            'review_decision_pending'
-          ),
-          pr_base_ref: sql<string | null>`${scoped.cachePrBaseRef}`.as('pr_base_ref'),
-          stack_number: sql<number | null>`${scoped.cacheStackNumber}`.as('stack_number'),
-          stack_position: sql<number | null>`${scoped.cacheStackPosition}`.as('stack_position'),
-          stack_size: sql<number | null>`${scoped.cacheStackSize}`.as('stack_size'),
-          pr_from_workspace: sql<boolean | null>`${scoped.cachePrFromWorkspace}`.as(
-            'pr_from_workspace'
-          ),
-        })
-        .from(scoped)
-        .where(
-          or(
-            isNotNull(scoped.cachePrNumber),
-            and(isNotNull(scoped.sessionPrUrl), isNotNull(scoped.sessionPrVerifiedAt))
-          )
-        )
-        .orderBy(
-          scoped.worktreeId,
-          sql`${scoped.cachePrFromWorkspace} DESC NULLS LAST`,
-          desc(scoped.updatedAt),
-          asc(scoped.sessionId)
-        )
-    );
-
-    const base = db.$with('workspace_base').as(
-      db
-        .select({
-          worktreeId: sql<string>`"workspace_grouped"."worktree_id"`.as('worktree_id'),
-          doneFolderEnabled: grouped.doneFolderEnabled,
-          name: sql<string | null>`${grouped.name}`.as('name'),
-          folderId: sql<string | null>`${grouped.folderId}`.as('folder_id'),
-          sidebarPosition: sql<string | null>`${grouped.sidebarPosition}`.as('sidebar_position'),
-          parentWorktreeId: sql<string | null>`${grouped.parentWorktreeId}`.as(
-            'parent_worktree_id'
-          ),
-          baseBranch: sql<string | null>`${grouped.baseBranch}`.as('base_branch'),
-          createdAt: sql<string>`${grouped.createdAt}`.as('created_at'),
-          lastActivityAt: sql<string>`${grouped.lastActivityAt}`.as('last_activity_at'),
-          firstTitle: sql<string | null>`${grouped.firstTitle}`.as('first_title'),
-          rootSessionId: sql<string>`${grouped.rootSessionId}`.as('root_session_id'),
-          latestSessionId: sql<string>`${grouped.latestSessionId}`.as('latest_session_id'),
-          gitUrl: sql<string | null>`${grouped.gitUrl}`.as('git_url'),
-          branch: sql<string | null>`${grouped.branch}`.as('branch'),
-          chatCount: sql<number>`${grouped.chatCount}`.as('chat_count'),
-          sessions: sql<WorkspaceSessionStatusRow[]>`${grouped.sessions}`.as('sessions'),
-          prSessionUpdatedAt: sql<string>`${prSessions.prSessionUpdatedAt}`.as(
-            'pr_session_updated_at'
-          ),
-          sessionPrPlatform: sql<string | null>`${prSessions.sessionPrPlatform}`.as(
-            'session_pr_platform'
-          ),
-          sessionPrUrl: sql<string | null>`${prSessions.sessionPrUrl}`.as('session_pr_url'),
-          sessionPrNumber: sql<number | null>`${prSessions.sessionPrNumber}`.as(
-            'session_pr_number'
-          ),
-          sessionPrVerifiedAt: sql<string | null>`${prSessions.sessionPrVerifiedAt}`.as(
-            'session_pr_verified_at'
-          ),
-          sessionGitUrl: sql<string | null>`${prSessions.sessionGitUrl}`.as('session_git_url'),
-          pr_url: sql<string | null>`${prSessions.pr_url}`.as('pr_url'),
-          pr_number: sql<number | null>`${prSessions.pr_number}`.as('pr_number'),
-          pr_state: sql<string | null>`${prSessions.pr_state}`.as('pr_state'),
-          pr_title: sql<string | null>`${prSessions.pr_title}`.as('pr_title'),
-          pr_head_sha: sql<string | null>`${prSessions.pr_head_sha}`.as('pr_head_sha'),
-          pr_last_synced_at: sql<string | null>`${prSessions.pr_last_synced_at}`.as(
-            'pr_last_synced_at'
-          ),
-          pr_review_decision: sql<string | null>`${prSessions.pr_review_decision}`.as(
-            'pr_review_decision'
-          ),
-          review_decision_pending: sql<boolean | null>`${prSessions.review_decision_pending}`.as(
-            'review_decision_pending'
-          ),
-          pr_base_ref: sql<string | null>`${prSessions.pr_base_ref}`.as('pr_base_ref'),
-          stack_number: sql<number | null>`${prSessions.stack_number}`.as('stack_number'),
-          stack_position: sql<number | null>`${prSessions.stack_position}`.as('stack_position'),
-          stack_size: sql<number | null>`${prSessions.stack_size}`.as('stack_size'),
-          pr_from_workspace: sql<boolean | null>`${prSessions.pr_from_workspace}`.as(
-            'pr_from_workspace'
-          ),
-        })
-        .from(grouped)
-        .leftJoin(
-          prSessions,
-          sql`"workspace_grouped"."worktree_id" = "workspace_pr_sessions"."worktree_id"`
-        )
-    );
-
-    const searchCondition = searchActive
-      ? sql`(
-            position(${needle} in lower(coalesce(${base.name}, ''))) > 0
-            OR position(${needle} in lower(coalesce(${base.branch}, ''))) > 0
-            OR position(${needle} in lower(coalesce(${base.firstTitle}, ''))) > 0
-            OR position(${needle} in lower(coalesce(${base.pr_title}, ''))) > 0
-            OR cast(${base.pr_number} as text) = ${needle}
-            OR position(${needle} in lower(coalesce(${base.worktreeId}, ''))) > 0
-          )`
-      : null;
-
-    const orderBy: SQL[] =
-      sortMode === 'manual'
-        ? [
-            sql`case when ${base.sidebarPosition} is null then 0 else 1 end`,
-            sql`${base.sidebarPosition} collate "C"`,
-            desc(base.createdAt),
-            asc(base.worktreeId),
-          ]
-        : sortMode === 'created'
-          ? [desc(base.createdAt), asc(base.worktreeId)]
-          : [desc(base.lastActivityAt), desc(base.createdAt), asc(base.worktreeId)];
-
-    const rows = await db
-      .with(scoped, grouped, prSessions, base)
-      .select({
-        matchingCount: sql<number>`count(*) over ()`.mapWith(Number),
-        worktreeId: base.worktreeId,
-        name: base.name,
-        folderId: base.folderId,
-        sidebarPosition: base.sidebarPosition,
-        parentWorktreeId: base.parentWorktreeId,
-        baseBranch: base.baseBranch,
-        createdAt: base.createdAt,
-        lastActivityAt: base.lastActivityAt,
-        firstTitle: base.firstTitle,
-        rootSessionId: base.rootSessionId,
-        latestSessionId: base.latestSessionId,
-        gitUrl: base.gitUrl,
-        branch: base.branch,
-        chatCount: base.chatCount,
-        sessions: base.sessions,
-        prSessionUpdatedAt: base.prSessionUpdatedAt,
-        sessionPrPlatform: base.sessionPrPlatform,
-        sessionPrUrl: base.sessionPrUrl,
-        sessionPrNumber: base.sessionPrNumber,
-        sessionPrVerifiedAt: base.sessionPrVerifiedAt,
-        sessionGitUrl: base.sessionGitUrl,
-        pr_url: base.pr_url,
-        pr_number: base.pr_number,
-        pr_state: base.pr_state,
-        pr_title: base.pr_title,
-        pr_head_sha: base.pr_head_sha,
-        pr_last_synced_at: base.pr_last_synced_at,
-        pr_review_decision: base.pr_review_decision,
-        review_decision_pending: base.review_decision_pending,
-        pr_base_ref: base.pr_base_ref,
-        stack_number: base.stack_number,
-        stack_position: base.stack_position,
-        stack_size: base.stack_size,
-        pr_from_workspace: base.pr_from_workspace,
-      })
-      .from(base)
-      .where(
-        searchCondition ??
-          (or(
-            isNull(base.pr_state),
-            inArray(base.pr_state, ['open', 'draft']),
-            base.doneFolderEnabled,
-            sql`${base.lastActivityAt} >= now() - interval '5 days'`
-          ) as SQL)
-      )
-      .orderBy(...orderBy)
-      .limit(limit + 1)
-      .offset(offset);
-
-    const hasMore = rows.length > limit;
-    const pageRows = hasMore ? rows.slice(0, limit) : rows;
-    const workspaces = pageRows.map(row => {
-      const associatedPr = formatAssociatedPr(
-        {
-          platform: row.sessionPrPlatform,
-          pr_url: row.sessionPrUrl,
-          pr_number: row.sessionPrNumber,
-          updated_at: row.prSessionUpdatedAt,
-          git_url: row.sessionGitUrl,
-          pr_link_verified_at: row.sessionPrVerifiedAt,
-        },
-        {
-          pr_url: row.pr_url,
-          pr_number: row.pr_number,
-          pr_state: row.pr_state,
-          pr_title: row.pr_title,
-          pr_head_sha: row.pr_head_sha,
-          pr_last_synced_at: row.pr_last_synced_at,
-          pr_review_decision: row.pr_review_decision,
-          review_decision_pending: row.review_decision_pending,
-          pr_base_ref: row.pr_base_ref,
-          stack_number: row.stack_number,
-          stack_position: row.stack_position,
-          stack_size: row.stack_size,
-          pr_from_workspace: row.pr_from_workspace,
-        }
+  workspaceSummaries: baseProcedure
+    .input(WorkspaceSummariesInputSchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId !== null) await ensureOrganizationAccess(ctx, input.organizationId);
+      return readWorkspaceSummaries(
+        { userId: ctx.user.id, organizationId: input.organizationId },
+        input
       );
-      const createdAt = new Date(row.createdAt).toISOString();
-      return {
-        worktreeId: row.worktreeId,
-        name: row.name,
-        defaultTitle:
-          row.firstTitle && !isDefaultSessionTitle(row.firstTitle) ? row.firstTitle : null,
-        branch: row.branch,
-        createdAt,
-        lastActivityAt: new Date(row.lastActivityAt).toISOString(),
-        folderId: row.folderId,
-        sidebarPosition: row.sidebarPosition,
-        parentWorktreeId: row.parentWorktreeId,
-        baseBranch: row.baseBranch,
-        rootSessionId: row.rootSessionId,
-        latestSessionId: row.latestSessionId,
-        gitUrl: row.gitUrl,
-        pr: associatedPr
-          ? {
-              ...associatedPr,
-              lastSyncedAt: new Date(associatedPr.lastSyncedAt).toISOString(),
-            }
-          : null,
-        status: aggregateWorkspaceStatus(row.sessions),
-        chatCount: row.chatCount,
-      };
-    });
+    }),
 
-    return {
-      workspaces,
-      nextCursor: hasMore ? offset + limit : null,
-      // The banner tells the user to search, so only the open list reports truncation.
-      truncated: !searchActive && (rows[0]?.matchingCount ?? 0) > 200,
-    };
+  workspaceChats: baseProcedure.input(WorkspaceChatsInputSchema).query(async ({ ctx, input }) => {
+    if (input.organizationId !== null) await ensureOrganizationAccess(ctx, input.organizationId);
+    return readWorkspaceChatPage(
+      { userId: ctx.user.id, organizationId: input.organizationId },
+      input
+    );
   }),
 
   renameWorktree: baseProcedure
     .input(WorktreeInputSchema.extend({ name: z.string().trim().min(1).max(200) }))
-    .mutation(async ({ ctx, input }) =>
-      db.transaction(async tx => {
+    .mutation(async ({ ctx, input }) => {
+      const result = await db.transaction(async tx => {
         const membershipCondition = worktreeMembershipCondition(ctx.user.id, input.organizationId);
         const [session] = await tx
           .select({ createdAt: cli_sessions_v2.created_at })
@@ -1648,8 +1172,12 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
         }
         return { name: input.name };
-      })
-    ),
+      });
+      queueWorkspaceUpdates({ userId: ctx.user.id, organizationId: input.organizationId }, [
+        input.worktreeId,
+      ]);
+      return result;
+    }),
 
   deleteWorktree: baseProcedure
     .input(WorktreeInputSchema.extend({ onlyIfSoleSessionId: sessionIdField.optional() }))
@@ -1718,6 +1246,9 @@ export const cliSessionsV2Router = createTRPCRouter({
     await addOrganizationCondition(whereConditions, ctx, organizationId);
     if (worktreeId) {
       whereConditions.push(eq(cli_sessions_v2.cloud_agent_worktree_id, worktreeId));
+    }
+    if (input.standaloneOnly) {
+      whereConditions.push(isNull(cli_sessions_v2.cloud_agent_worktree_id));
     }
     addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
     addGitUrlConditions(whereConditions, gitUrl);
@@ -3034,6 +2565,10 @@ export const cliSessionsV2Router = createTRPCRouter({
       });
     }
 
+    if (session.cloud_agent_worktree_id)
+      queueWorkspaceUpdates({ userId: ctx.user.id, organizationId: session.organization_id }, [
+        session.cloud_agent_worktree_id,
+      ]);
     // Input title is validated non-empty; DB column is nullable so prefer input for notify.
     after(() =>
       notifyCliSessionRenamed({

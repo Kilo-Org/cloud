@@ -12,6 +12,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { baseProcedure, type TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { queueWorkspaceUpdates } from '@/lib/cloud-agent/session-events';
 
 export const uuidSchema = z.uuid().transform(id => id.toLowerCase());
 
@@ -111,8 +112,9 @@ export const cloudAgentSidebarScopeProcedure = baseProcedure
   .input(scopeInputSchema)
   .use(async ({ ctx, input, path, type, getRawInput, next }) => {
     await revalidateScopedFolderAccess(ctx, path, input.organizationId, await getRawInput());
-    return db.transaction(async tx => {
-      const scope: SidebarScope = { userId: ctx.user.id, organizationId: input.organizationId };
+    const scope: SidebarScope = { userId: ctx.user.id, organizationId: input.organizationId };
+    const changedWorktreeIds = new Set<string>();
+    const committed = await db.transaction(async tx => {
       const [user] = await tx
         .select({ blockedReason: kilocode_users.blocked_reason })
         .from(kilocode_users)
@@ -141,8 +143,13 @@ export const cloudAgentSidebarScopeProcedure = baseProcedure
         }
       }
 
-      const result = await next({ ctx: { sidebarDb: tx, sidebarScope: scope } });
+      const result = await next({
+        ctx: { sidebarDb: tx, sidebarScope: scope, changedWorktreeIds },
+      });
       if (!result.ok) throw result.error;
       return result;
     });
+    if (type === 'mutation' && changedWorktreeIds.size > 0)
+      queueWorkspaceUpdates(scope, [...changedWorktreeIds]);
+    return committed;
   });

@@ -1,5 +1,9 @@
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
-import { notifyCliSessionRenamed } from './session-events';
+import { notifyCliSessionRenamed, queueWorkspaceUpdates } from './session-events';
+
+const mockAfter = jest.fn();
+jest.mock('next/server', () => ({ after: (callback: () => Promise<void>) => mockAfter(callback) }));
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
@@ -13,6 +17,26 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const mockGenerateBoundedInternalServiceToken = jest.mocked(generateBoundedInternalServiceToken);
+
+it('queues unique workspace events in bounded authenticated batches after the response', async () => {
+  mockAfter.mockClear();
+  mockFetch.mockReset().mockResolvedValue({ ok: true });
+  const worktreeIds = Array.from({ length: 401 }, (_, index) => `worktree_${index}`);
+  queueWorkspaceUpdates({ userId: 'oauth/synthetic-owner', organizationId: null }, [
+    ...worktreeIds,
+    ...worktreeIds,
+  ]);
+  expect(mockFetch).not.toHaveBeenCalled();
+  const callback = mockAfter.mock.calls[0][0];
+  await callback();
+  const bodies = mockFetch.mock.calls.map(([url, options]) => {
+    expect(url).toBe('https://ingest.test.example.com/api/workspaces/notify');
+    expect(options.headers.Authorization).toBe('Bearer mock-jwt-token');
+    return JSON.parse(options.body) as { organizationId: null; worktreeIds: string[] };
+  });
+  expect(bodies.map(body => body.worktreeIds.length)).toEqual([200, 200, 1]);
+  expect(bodies.flatMap(body => body.worktreeIds)).toEqual(worktreeIds);
+});
 
 describe('notifyCliSessionRenamed', () => {
   beforeEach(() => {

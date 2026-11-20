@@ -1762,6 +1762,7 @@ describe('POST /api/auth/native/token', () => {
       });
       expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith(
         expect.objectContaining({
+          user: fakeUser,
           userAgent: undefined, // NextRequest has no user-agent header by default
         })
       );

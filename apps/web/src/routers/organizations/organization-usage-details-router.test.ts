@@ -4,7 +4,7 @@ import {
   createOrganization,
   addUserToOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, getReadDbTarget } from '@kilocode/web-shared/lib/drizzle';
 import {
   getAgentInteractionsPerDay,
   getCloudAgentSessionsPerDay,
@@ -494,7 +494,7 @@ describe('organizations usage details trpc router', () => {
 
     it('reads usage through replica transactions that receive a transaction handle', async () => {
       const info = jest.spyOn(console, 'info').mockImplementation(() => undefined);
-      const transaction = jest.spyOn(readDb, 'transaction');
+      const transaction = jest.spyOn(getReadDbTarget().db, 'transaction');
       const caller = await createCallerForUser(memberUser.id);
 
       const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries(input());
@@ -547,7 +547,7 @@ describe('organizations usage details trpc router', () => {
         unavailable: false,
       };
       jest.mocked(readCachedAIAdoption).mockResolvedValueOnce(cached);
-      const transaction = jest.spyOn(readDb, 'transaction');
+      const transaction = jest.spyOn(getReadDbTarget().db, 'transaction');
       const caller = await createCallerForUser(memberUser.id);
 
       const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries(input());
@@ -592,7 +592,7 @@ describe('organizations usage details trpc router', () => {
           {
             outcome: 'unavailable',
             query: 'agent_interactions',
-            replica: 'primary',
+            replica: getReadDbTarget().name,
             elapsedMs: expect.any(Number),
             sqlstate: code,
             reason,

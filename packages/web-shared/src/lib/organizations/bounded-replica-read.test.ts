@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { sql } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getReadDbTarget } from '@kilocode/web-shared/lib/drizzle';
 import {
   BOUNDED_READ_LOCK_TIMEOUT_MS,
   BOUNDED_READ_STATEMENT_TIMEOUT_MS,
@@ -17,10 +17,11 @@ describe('withBoundedReplicaRead', () => {
 
   test('runs on the read replica and sets both bounds before the read', async () => {
     const statements: string[] = [];
-    const transaction = readDb.transaction.bind(readDb) as (
-      run: (tx: Parameters<Parameters<typeof readDb.transaction>[0]>[0]) => Promise<unknown>
+    const { db } = getReadDbTarget();
+    const transaction = db.transaction.bind(db) as (
+      run: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<unknown>
     ) => Promise<unknown>;
-    const spy = jest.spyOn(readDb, 'transaction').mockImplementation(
+    const spy = jest.spyOn(db, 'transaction').mockImplementation(
       run =>
         transaction(async tx => {
           const execute = tx.execute.bind(tx);
@@ -53,7 +54,9 @@ describe('withBoundedReplicaRead', () => {
 
   test('does not leak the bounds to the connection after the transaction', async () => {
     await withBoundedReplicaRead('members', async () => undefined);
-    const rows = await readDb.execute(sql`select current_setting('statement_timeout') as value`);
+    const rows = await getReadDbTarget().db.execute(
+      sql`select current_setting('statement_timeout') as value`
+    );
     expect(rows.rows[0]).not.toEqual({ value: '10s' });
   });
 
@@ -68,7 +71,7 @@ describe('withBoundedReplicaRead', () => {
         sqlstate: '57014',
         reason: 'statement_timeout',
         query: 'agent_interactions',
-        replica: 'primary',
+        replica: getReadDbTarget().name,
         elapsedMs: expect.any(Number),
       },
     });

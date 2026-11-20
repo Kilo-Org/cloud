@@ -135,6 +135,7 @@ T2-G10b	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/system-search-unres
 T2-G10b	T2	signed-in	base	android,ios	retryable-error	-	kiloapp:///dev/render-recovery-fixture/transient	screen	(app)/render-recovery-fixture
 T2-G10b	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/locked-keychain/release	clean	-
 T2-G10c	T2	signed-in	base	android,ios	non-retryable-error	-	kiloapp:///(app)/report-receipt/not-a-seeded-receipt	not-found	(app)/report-receipt/[receipt-id]
+T2-G10c	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/(tabs)/(3_profile)/report-receipts	screen	(app)/(tabs)/(3_profile)/report-receipts
 T2-G10c	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/session-changes/{{seed:sessions.rootSessionId}}	screen	(app)/session-changes/[session-id]
 T2-G12	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/security-agent/{{seed:security-org-scopes.organizationId}}/settings/notifications	screen	(app)/security-agent/[scope]/settings/notifications
 T2-G12	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/security-agent/{{seed:security-org-scopes.organizationId}}/settings/repositories	screen	(app)/security-agent/[scope]/settings/repositories

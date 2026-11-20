@@ -451,6 +451,57 @@ describe('moderation-router', () => {
       expect(second.items.filter(item => firstPageIds.has(item.receiptId))).toEqual([]);
     });
 
+    it('pages receipts that share a timestamp without repeating or skipping one', async () => {
+      const caller = await createCallerForUser(user.id);
+      const sharedCreatedAt = '2026-03-01T00:00:00.000000Z';
+      const firstInserted = await insertReport({
+        userId: user.id,
+        createdAt: sharedCreatedAt,
+        targetId: 'msg-tie-a',
+      });
+      const secondInserted = await insertReport({
+        userId: user.id,
+        createdAt: sharedCreatedAt,
+        targetId: 'msg-tie-b',
+      });
+      const thirdInserted = await insertReport({
+        userId: user.id,
+        createdAt: sharedCreatedAt,
+        targetId: 'msg-tie-c',
+      });
+
+      // The keyset breaks ties on the row `id`, which is a random uuid unrelated
+      // to `receipt_id`, so read the row ids to derive the expected page order.
+      const rows = await db
+        .select({
+          id: content_moderation_reports.id,
+          receiptId: content_moderation_reports.receipt_id,
+        })
+        .from(content_moderation_reports)
+        .where(eq(content_moderation_reports.kilo_user_id, user.id));
+      const expectedOrder = rows
+        .slice()
+        .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+        .map(row => row.receiptId);
+      expect(expectedOrder.slice().sort()).toEqual(
+        [firstInserted, secondInserted, thirdInserted].sort()
+      );
+
+      const firstPage = await caller.moderation.listReportReceipts({ limit: 2 });
+      expect(firstPage.items).toHaveLength(2);
+      if (!firstPage.nextCursor) throw new Error('expected a next cursor for a partial page');
+
+      const secondPage = await caller.moderation.listReportReceipts({
+        cursor: firstPage.nextCursor,
+        limit: 2,
+      });
+
+      const combinedIds = [...firstPage.items, ...secondPage.items].map(item => item.receiptId);
+      expect(combinedIds).toEqual(expectedOrder);
+      expect(new Set(combinedIds).size).toBe(combinedIds.length);
+      expect(secondPage.nextCursor).toBeNull();
+    });
+
     it('never returns another user receipt', async () => {
       const otherUser = await insertTestUser();
       extraUserIds.push(otherUser.id);

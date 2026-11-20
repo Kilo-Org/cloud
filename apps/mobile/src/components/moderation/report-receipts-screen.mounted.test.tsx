@@ -199,6 +199,9 @@ const PAGE_ROWS = 30;
 /** The footer a list at its retention bound carries (`profile.reportReceipts.capped`). */
 const RETENTION_NOTE = 'Showing your most recent reports.';
 
+/** Every appeal outcome a row could print (`profile.reportReceipt.appeal*`). */
+const APPEAL_LABELS = ['None submitted', 'Under review', 'Accepted', 'Declined'];
+
 /** Page one sends no cursor, exactly as the router's optional `cursor` expects. */
 const FIRST_PAGE_PARAM: string | undefined = undefined;
 
@@ -523,6 +526,62 @@ describe('ReportReceiptsScreen', () => {
       (row.props.onPress as () => void)();
     });
     expect(state.push).toHaveBeenCalledWith('/(app)/report-receipt/receipt-older');
+  });
+
+  it('draws no appeal line for a report that was never appealed', async () => {
+    state.pages = [
+      {
+        items: [
+          {
+            receiptId: 'receipt-unappealed',
+            triageStatus: 'actioned',
+            appealStatus: 'none',
+            createdAt: '2026-11-15T11:00:00.000Z',
+          },
+        ],
+        nextCursor: null,
+      },
+    ];
+    const root = await mount();
+
+    // The row is its triage status and its age, nothing more: an unappealed
+    // report has no outcome to add, not even the receipt's "None submitted",
+    // and the row frame draws no line where none is passed.
+    const row = mustExist(rows(root)[0], 'the report row');
+    expect(rowTexts(row)).toEqual(['Upheld', '1 hour ago']);
+    for (const label of APPEAL_LABELS) {
+      expect(screenTexts(root)).not.toContain(label);
+    }
+  });
+
+  it('reads an appealed report as its triage status, its age and the appeal outcome', async () => {
+    state.pages = [
+      {
+        items: [
+          {
+            receiptId: 'receipt-appealed',
+            triageStatus: 'rejected',
+            appealStatus: 'submitted',
+            createdAt: '2026-11-15T11:00:00.000Z',
+          },
+          {
+            receiptId: 'receipt-decided',
+            triageStatus: 'actioned',
+            appealStatus: 'accepted',
+            createdAt: '2026-11-15T10:00:00.000Z',
+          },
+        ],
+        nextCursor: null,
+      },
+    ];
+    const root = await mount();
+
+    // The same words the receipt screen prints for the appeal, on the row's
+    // second line beneath the title and the age.
+    expect(rows(root).map(row => rowTexts(row))).toEqual([
+      ['Not upheld', '1 hour ago', 'Under review'],
+      ['Upheld', '2 hours ago', 'Accepted'],
+    ]);
   });
 
   it('keeps the retry for a failure that could pass', async () => {

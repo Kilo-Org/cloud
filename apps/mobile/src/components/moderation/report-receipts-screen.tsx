@@ -26,7 +26,7 @@ import {
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { reportReceiptRoute } from '@/lib/report-receipt-route';
-import { statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
+import { APPEAL_KEYS, statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -195,6 +195,13 @@ export function ReportReceiptsScreen() {
                 <RowFrame
                   title={statusLabel(TRIAGE_KEYS, item.triageStatus)}
                   subtitle={{ text: timeAgo(parseTimestamp(item.createdAt), undefined, now) }}
+                  // A second line only when the reader has appealed, so a report
+                  // without one keeps the row it has always had.
+                  secondSubtitle={
+                    item.appealStatus === 'none'
+                      ? undefined
+                      : { text: statusLabel(APPEAL_KEYS, item.appealStatus) }
+                  }
                   onPress={() => {
                     router.push(reportReceiptRoute(item.receiptId));
                   }}

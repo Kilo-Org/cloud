@@ -966,7 +966,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       expect.objectContaining({
         userId: USER_ID,
         githubRequest: expect.objectContaining({ accountId, accountLogin: 'octocat' }),
-      })
+      }),
+      expect.anything()
     );
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
@@ -1135,7 +1136,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
   });
 
-  test('a request for an account that is already claimed reports it as claimed', async () => {
+  test('a request for an account with an existing request reports it', async () => {
     const accountId = `acct-shared-${randomUUID()}`;
     const otherUserId = `oauth/cb-other-${randomUUID()}`;
     await db.insert(kilocode_users).values({
@@ -1192,7 +1193,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       );
 
       expect(response.status).toBe(307);
-      expectRedirectLocation(response, '/github-app?error=installation_already_claimed');
+      expectRedirectLocation(response, '/github-app?error=pending_request_exists');
       expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
     } finally {
       await db.delete(platform_integrations).where(eq(platform_integrations.id, otherPending.id));
@@ -1236,11 +1237,12 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       expect.objectContaining({
         userId: USER_ID,
         githubRequest: expect.objectContaining({ accountId, accountLogin: 'octocat' }),
-      })
+      }),
+      expect.anything()
     );
   });
 
-  test('an app-initiated request for an account that is already claimed reports it as claimed', async () => {
+  test('an app-initiated request with an existing request reports it', async () => {
     const accountId = `acct-shared-app-${randomUUID()}`;
     const otherUserId = `oauth/cb-other-app-${randomUUID()}`;
     await db.insert(kilocode_users).values({
@@ -1297,7 +1299,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       );
 
       expect(response.status).toBe(307);
-      expectRedirectLocation(response, '/github-app?fromApp=1&error=installation_already_claimed');
+      expectRedirectLocation(response, '/github-app?fromApp=1&error=pending_request_exists');
       expect(mockedCreatePendingIntegration).not.toHaveBeenCalled();
     } finally {
       await db.delete(platform_integrations).where(eq(platform_integrations.id, otherPending.id));
@@ -1537,7 +1539,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       expect.objectContaining({
         organizationId: ORG_ID,
         githubRequest: expect.objectContaining({ accountId, accountLogin: 'octocat' }),
-      })
+      }),
+      expect.anything()
     );
   });
 

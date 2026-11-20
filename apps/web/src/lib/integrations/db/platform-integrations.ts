@@ -751,21 +751,24 @@ export async function getIntegrationsByOrganization(
  * Stores requester info for webhook matching
  * Supports both user and organization ownership
  */
-export async function createPendingIntegration({
-  organizationId,
-  userId,
-  requester,
-  githubRequester,
-  githubRequest,
-  githubAppType,
-}: {
-  organizationId?: string;
-  userId?: string;
-  requester: KiloRequester;
-  githubRequester?: GitHubRequester;
-  githubRequest?: { id: string; accountId: string; accountLogin: string };
-  githubAppType?: 'standard' | 'lite';
-}) {
+export async function createPendingIntegration(
+  {
+    organizationId,
+    userId,
+    requester,
+    githubRequester,
+    githubRequest,
+    githubAppType,
+  }: {
+    organizationId?: string;
+    userId?: string;
+    requester: KiloRequester;
+    githubRequester?: GitHubRequester;
+    githubRequest?: { id: string; accountId: string; accountLogin: string };
+    githubAppType?: 'standard' | 'lite';
+  },
+  transaction?: DrizzleTransaction
+) {
   // Ensure exactly one of organizationId or userId is provided
   if (!organizationId && !userId) {
     throw new Error('Either organizationId or userId must be provided');
@@ -783,7 +786,7 @@ export async function createPendingIntegration({
     },
   };
 
-  const [result] = await db
+  const [result] = await (transaction ?? db)
     .insert(platform_integrations)
     .values({
       owned_by_organization_id: organizationId || null,

@@ -415,19 +415,17 @@ async function handleCoreInstallFlow(params: {
         );
       }
 
-      if (recording.kind === 'claimed_elsewhere') {
-        // One GitHub account maps to one pending request, so the callback
-        // reports the account as already claimed.
+      if (recording.kind === 'request_exists') {
         captureMessage('GitHub install request target already claimed', {
           level: 'info',
           tags: {
             endpoint: 'github/callback',
             source: 'github_pending_request',
-            reason: 'claimed_elsewhere',
+            reason: 'request_exists',
           },
           extra: { setupAction, ownerType: owner.type },
         });
-        const claimedQuery = 'error=installation_already_claimed';
+        const claimedQuery = 'error=pending_request_exists';
         if (isAppInitiated) {
           return NextResponse.redirect(new URL(appFallbackPath(claimedQuery), APP_URL));
         }

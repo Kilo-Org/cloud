@@ -152,6 +152,11 @@ function GitHubIntegrationOutcomeToasts({
         'Kilo could not confirm which GitHub account this request is for. Start the GitHub setup again from the account you want to connect.',
         { duration: 8000 }
       );
+    } else if (error === 'pending_request_exists') {
+      toast.error(
+        'A pending GitHub installation request already exists for this account. Finish or cancel it, then try again.',
+        { duration: 8000 }
+      );
     } else if (error) {
       const userConnectionMessage = getGitHubUserConnectionErrorMessage(
         error,
@@ -1060,7 +1065,9 @@ function GitHubIntegrationDetailsContent({
                     </Link>
                   </Button>
                 </>
-              ) : error === 'not_installation_admin' || error === 'installation_already_claimed' ? (
+              ) : error === 'not_installation_admin' ||
+                error === 'installation_already_claimed' ||
+                error === 'pending_request_exists' ? (
                 <>
                   <XCircle className="h-8 w-8 text-destructive" />
                   <div className="space-y-1">
@@ -1068,7 +1075,9 @@ function GitHubIntegrationDetailsContent({
                     <p className="text-muted-foreground text-sm">
                       {error === 'not_installation_admin'
                         ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
-                        : 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'}
+                        : error === 'pending_request_exists'
+                          ? 'A pending GitHub installation request already exists for this account. Finish or cancel it, then try again.'
+                          : 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'}
                     </p>
                   </div>
                   <Button asChild variant="outline" className="mt-2">

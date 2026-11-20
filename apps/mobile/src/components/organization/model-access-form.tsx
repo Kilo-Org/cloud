@@ -335,6 +335,13 @@ export function ModelAccessForm({
             disabled={!dirty || saving}
             onPress={() => {
               clearWhere(() => true);
+              // Cancel is a deliberate discard: the stored copy goes with the
+              // screen's, or a language-direction reload would restore exactly
+              // the edits the person just threw away.
+              touchedRef.current = true;
+              if (formDraft.kind === 'ready') {
+                formDraft.clear();
+              }
               setForm(previous => ({ ...previous, draft: previous.baseline }));
             }}
           >

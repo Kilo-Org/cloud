@@ -21,7 +21,7 @@ import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organization-navigation';
 import { useOrganization } from '@/lib/organization-context';
 import { CREATE_ORGANIZATION_FORM_DRAFT_KEY } from '@/lib/persist/drafts';
-import { useFormDraft } from '@/lib/persist/use-form-draft';
+import { type FormDraftState, useFormDraft } from '@/lib/persist/use-form-draft';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -119,10 +119,6 @@ export function CreateOrganizationScreen() {
     entityKey: CREATE_ORGANIZATION_FORM_DRAFT_KEY,
     validate: isCreateOrganizationFormDraft,
   });
-  // `jsx-handler-names` wants a local binding per handler prop; these forward to
-  // the draft the hook owns.
-  const saveDraftName = draft.kind === 'ready' ? draft.save : undefined;
-  const clearDraftName = draft.kind === 'ready' ? draft.clear : undefined;
 
   return (
     <View className="flex-1 bg-background">
@@ -132,15 +128,31 @@ export function CreateOrganizationScreen() {
           iOS field reads `defaultValue` once). Until then the chrome keeps the
           loaded geometry with the field disabled and empty. */}
       {draft.kind === 'ready' ? (
-        <CreateOrganizationBody
-          initialName={draft.value?.name ?? ''}
-          onDraftChange={saveDraftName}
-          onDraftClear={clearDraftName}
-        />
+        <CreateOrganizationReady draft={draft} />
       ) : (
         <CreateOrganizationLoading />
       )}
     </View>
+  );
+}
+
+/**
+ * The body once the draft answered. Split from the wrapper so the ready branch
+ * is narrowed once here, where both handler props are bound to the draft's own
+ * `save` and `clear`.
+ */
+function CreateOrganizationReady({
+  draft,
+}: Readonly<{ draft: Extract<FormDraftState<CreateOrganizationFormDraft>, { kind: 'ready' }> }>) {
+  // `jsx-handler-names` wants a local binding per handler prop.
+  const saveDraftName = draft.save;
+  const clearDraftName = draft.clear;
+  return (
+    <CreateOrganizationBody
+      initialName={draft.value?.name ?? ''}
+      onDraftChange={saveDraftName}
+      onDraftClear={clearDraftName}
+    />
   );
 }
 

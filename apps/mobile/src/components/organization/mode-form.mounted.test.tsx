@@ -316,9 +316,10 @@ function settleMutation(
   ) {
     throw new Error('the mutation carried no success callback');
   }
-  // Narrowing of a mutable property does not survive into a closure, so the
-  // callback is captured once here.
-  const onSuccess: (value: unknown) => void = options.onSuccess;
+  // Narrowing of a mutable property does not survive into a closure, and the
+  // property's type here is the wide `Function`, so the callback is captured
+  // through a typed cast after the runtime check above.
+  const onSuccess = options.onSuccess as (value: unknown) => void;
   act(() => {
     onSuccess(result);
   });
@@ -345,7 +346,7 @@ function pressDelete(root: ReactTestInstance): void {
   ) {
     throw new Error('the removal confirmation was not raised');
   }
-  const onConfirm: () => void = request.onConfirm;
+  const onConfirm = request.onConfirm as () => void;
   act(() => {
     onConfirm();
   });

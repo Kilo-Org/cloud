@@ -58,8 +58,7 @@ vi.mock('@/lib/persist/use-form-draft', () => ({
 // The real module opens the encrypted SQLCipher store, which this Node project
 // cannot import; the form reads only its key helper.
 vi.mock('@/lib/persist/drafts', () => ({
-  orgModelAccessFormDraftKey: (organizationId: string) =>
-    `org-model-access-form:${organizationId}`,
+  orgModelAccessFormDraftKey: (organizationId: string) => `org-model-access-form:${organizationId}`,
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -201,6 +200,19 @@ async function pressSave(root: ReactTestInstance) {
     await Promise.resolve();
   });
   return save;
+}
+
+/** The Cancel action: the outline button the form draws beside Save. */
+function pressCancel(root: ReactTestInstance) {
+  const cancel = root
+    .findAllByType('Button' as never)
+    .find(node => node.props.variant === 'outline');
+  if (!cancel) {
+    throw new Error('cancel button not found');
+  }
+  act(() => {
+    (cancel.props.onPress as () => void)();
+  });
 }
 
 function statusMessage(root: ReactTestInstance): unknown {
@@ -522,5 +534,29 @@ describe('ModelAccessForm durable draft', () => {
     });
 
     expect(draftStore.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the stored draft when the person cancels their edits', () => {
+    draftStore.kind = 'ready';
+    draftStore.value = null;
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    expect(draftStore.save).toHaveBeenCalledTimes(1);
+    expect(list(root, 'ModelDenyList').props.draft).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: ['openai/gpt'],
+    });
+
+    pressCancel(root);
+
+    // Cancel threw the edit away on purpose, so the durable copy goes with it:
+    // a language-direction reload must not bring the edit back.
+    expect(draftStore.clear).toHaveBeenCalledTimes(1);
+    expect(list(root, 'ModelDenyList').props.draft).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: [],
+    });
   });
 });

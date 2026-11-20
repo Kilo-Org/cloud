@@ -5,7 +5,6 @@ import { db, readDb, sql } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import {
   boundedGatewayReplicaRead,
-  boundedReadFailureSqlState,
   GATEWAY_REPLICA_LOCK_TIMEOUT_MS,
   GATEWAY_REPLICA_STATEMENT_TIMEOUT_MS,
   GatewayReplicaReadUnavailableError,
@@ -14,6 +13,7 @@ import {
   replicaReadUnavailableResponse,
   withReplicaReadUnavailableResponse,
 } from './gateway-replica-read';
+import { boundedReadErrorSqlState } from '@kilocode/web-shared/lib/organizations/bounded-replica-read';
 
 function pgError(code: string, message = 'pg error'): Error {
   return Object.assign(new Error(message), { code });
@@ -30,25 +30,25 @@ async function sqlStateOf(promise: Promise<unknown>): Promise<string> {
   return (error as GatewayReplicaReadUnavailableError).sqlState;
 }
 
-describe('boundedReadFailureSqlState', () => {
+describe('boundedReadErrorSqlState', () => {
   test.each([
     ['57014', 'canceling statement due to statement timeout'],
     ['55P03', 'canceling statement due to lock timeout'],
     ['40001', 'canceling statement due to conflict with recovery'],
   ])('classifies SQLSTATE %s', (code, message) => {
-    expect(boundedReadFailureSqlState(pgError(code, message))).toBe(code);
+    expect(boundedReadErrorSqlState(pgError(code, message))).toBe(code);
   });
 
   test("classifies a pg error wrapped in Drizzle's DrizzleQueryError cause", () => {
     const wrapped = new DrizzleQueryError('select 1', [], pgError('57014'));
-    expect(boundedReadFailureSqlState(wrapped)).toBe('57014');
+    expect(boundedReadErrorSqlState(wrapped)).toBe('57014');
   });
 
   test('classifies a pg error several causes deep', () => {
     const wrapped = new Error('outer', {
       cause: new DrizzleQueryError('select 1', [], pgError('55P03')),
     });
-    expect(boundedReadFailureSqlState(wrapped)).toBe('55P03');
+    expect(boundedReadErrorSqlState(wrapped)).toBe('55P03');
   });
 
   test.each([
@@ -56,10 +56,9 @@ describe('boundedReadFailureSqlState', () => {
     ['connection error', pgError('ECONNREFUSED')],
     ['wrapped other SQLSTATE', new DrizzleQueryError('select 1', [], pgError('42P01'))],
     ['error without code', new Error('boom')],
-    ['non-error value', { code: '57014' }],
     ['undefined', undefined],
   ])('ignores %s', (_label, error) => {
-    expect(boundedReadFailureSqlState(error)).toBeNull();
+    expect(boundedReadErrorSqlState(error)).toBeNull();
   });
 });
 

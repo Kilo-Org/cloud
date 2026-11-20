@@ -1143,7 +1143,7 @@ describe('CreditsCard organization balance source', () => {
     const { renderer, labels, texts, unmount } = await mountCard(
       createTestQueryClient(),
       undefined,
-      { status: 'error', retry: retryOrganizations }
+      { status: 'error', error: trpcError('INTERNAL_SERVER_ERROR'), retry: retryOrganizations }
     );
     try {
       await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
@@ -1169,6 +1169,95 @@ describe('CreditsCard organization balance source', () => {
       await waitFor(() => getContextBalanceQueryFn.mock.calls.length > reads);
     } finally {
       unmount();
+    }
+  });
+
+  it('names a refused membership list instead of offering a retry', async () => {
+    // The list is where this context's balance comes from, so its refusal is
+    // the balance's own refusal: the retryable line beside a Retry could never
+    // succeed on a permission error.
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    listState.payload = billingManagerOrgs;
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
+      status: 'error',
+      error: trpcError('FORBIDDEN'),
+      retry: vi.fn<() => void>(),
+    });
+    try {
+      const REFUSAL_COPY = "You don't have permission to view this balance.";
+      await waitFor(() => texts().includes(REFUSAL_COPY));
+      expect(texts()).toContain(REFUSAL_COPY);
+      expect(texts()).not.toContain('Failed to load balance. Tap to retry.');
+
+      const retryLines = renderer.root.findAll(
+        node =>
+          node.type === Pressable &&
+          node.props.accessibilityLabel === 'Failed to load balance. Tap to retry.'
+      );
+      expect(retryLines).toHaveLength(0);
+      // The refusal is a statement, so no control carries it either.
+      const refusalControls = renderer.root.findAll(
+        node => node.type === Pressable && node.props.accessibilityLabel === REFUSAL_COPY
+      );
+      expect(refusalControls).toHaveLength(0);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the member scope caption out of sight while the amount is a skeleton', async () => {
+    // A member's cold start answers the role from the list before the member
+    // balance lands, and the caption would name a figure that is not on screen.
+    // It stays in the tree for the row's height, hidden from eye and reader.
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    const pendingBalance = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(pendingBalance.promise);
+    const orgs = [
+      {
+        organizationId: 'org-a',
+        organizationName: 'Acme',
+        role: 'member',
+        balance: organizationBalance,
+      },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    try {
+      await waitFor(
+        () =>
+          texts().includes('SKELETON') &&
+          texts().includes('Available to spend in this organization')
+      );
+
+      const captions = renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Text') &&
+          node.children.some(
+            child =>
+              typeof child === 'string' && child === 'Available to spend in this organization'
+          )
+      );
+      // One caption, kept for the row's height, and never painted over the bar.
+      expect(captions).toHaveLength(1);
+      const caption = renderer.root.find(
+        node =>
+          Object.is(node.type, 'Text') &&
+          node.children.some(
+            child =>
+              typeof child === 'string' && child === 'Available to spend in this organization'
+          )
+      );
+      expect(hasClasses(caption, ['text-xs', 'opacity-0'])).toBe(true);
+      expect(caption.props.accessibilityElementsHidden).toBe(true);
+      expect(caption.props.importantForAccessibility).toBe('no');
+    } finally {
+      unmount();
+      pendingBalance.resolve({ balance: 4.2 });
     }
   });
 

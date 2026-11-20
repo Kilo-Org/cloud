@@ -128,6 +128,7 @@ export function ProfileScreen() {
     data: orgs,
     isFetching: organizationsFetching,
     isError: organizationsError,
+    error: organizationsFailure,
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
@@ -169,12 +170,15 @@ export function ProfileScreen() {
   // Rows come first: React Query keeps `data` through a failed background
   // refetch, so a list that already answered keeps painting its balances even
   // while the retry fails, and the error arm is only for a read with no rows.
+  // That arm carries the read's own error, because the card's failure kind
+  // names the cause from it: a refusal must not paint as a retryable failure.
   let creditsOrgList: CreditsCardOrgList = { status: 'loading' };
   if (orgs !== undefined) {
     creditsOrgList = { status: 'ready', orgs };
   } else if (organizationsError) {
     creditsOrgList = {
       status: 'error',
+      error: organizationsFailure,
       retry: () => {
         void refetchOrganizations();
       },

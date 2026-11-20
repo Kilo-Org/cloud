@@ -43,11 +43,13 @@ import { cn } from '@/lib/utils';
  * come from `getContextBalance`, which answers `$0.00` for a
  * `billing_manager`, so an `undefined` list would paint a money role's
  * organization as empty. Keeping "not answered yet" and "could not load" apart
- * lets the card hold its skeleton and its retry surface apart too.
+ * lets the card hold its skeleton and its retry surface apart too. The failed
+ * arm carries the read's own error so the failure kind can name the cause: a
+ * refusal of the list is a refusal of the balance, not a transient failure.
  */
 export type CreditsCardOrgList =
   | { status: 'loading' }
-  | { status: 'error'; retry: () => void }
+  | { status: 'error'; error: unknown; retry: () => void }
   | { status: 'ready'; orgs: OrgListEntry[] };
 
 type CreditsCardProps = {
@@ -223,6 +225,10 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   // balance the context is entitled to.
   const orgListLoading = selectedOrgId != null && orgList.status === 'loading';
   const orgListError = selectedOrgId != null && orgList.status === 'error';
+  // The list's own error, so the failure kind below names the list's cause too:
+  // a refused or terminal list read is not a transient failure, and offering
+  // Retry for one could never succeed.
+  const orgListFailure = orgList.status === 'error' ? orgList.error : undefined;
 
   const balanceFailed =
     orgListError || (!orgListLoading && !paintsOrgListBalance && balanceReadFailed);
@@ -230,10 +236,14 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   // The kind of the failure decides the copy and the action: a refusal is not a
   // transient failure, and a terminal one is the answer. Only a retryable or
   // offline failure offers Retry, because only those can succeed on a second
-  // attempt. The read itself settles regardless of the online manager
+  // attempt. The list read stands for the balance an organization context is
+  // owed, so its own error joins the classification beside the balance and
+  // identity reads. The read itself settles regardless of the online manager
   // (`SETTLE_WHILE_OFFLINE`), so an unreachable one names the connection by
   // having no server answer at all — no separate probe is needed here.
-  const balanceFailureErrors = [balanceError, userIdFailure].filter(failure => failure != null);
+  const balanceFailureErrors = [balanceError, userIdFailure, orgListFailure].filter(
+    failure => failure != null
+  );
   const balanceFailureKind = classifyReadFailureKind({
     errors: balanceFailureErrors,
     isPaused: false,
@@ -293,14 +303,15 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   // is known the caption would claim a scope the amount may not paint.
   //
   // The caption describes the amount it sits under, so it never paints over the
-  // block's own failure. That window keeps the row, invisible to the eye and to
-  // a screen reader, so the card holds the height it has while the amount
-  // paints.
+  // block's own failure or over its skeleton: either window names a figure that
+  // is not on screen. Both keep the row, invisible to the eye and to a screen
+  // reader, so the card holds the height it has while the amount paints.
+  const scopeNoteHidden = balanceFailed || showBalanceSkeleton;
   const organizationScopeNote =
     selectedEntry !== undefined && !isMoneyRole(selectedEntry.role) ? (
       <Text
-        className={cn('text-xs text-muted-foreground', balanceFailed && 'opacity-0')}
-        {...(balanceFailed
+        className={cn('text-xs text-muted-foreground', scopeNoteHidden && 'opacity-0')}
+        {...(scopeNoteHidden
           ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
           : {})}
       >

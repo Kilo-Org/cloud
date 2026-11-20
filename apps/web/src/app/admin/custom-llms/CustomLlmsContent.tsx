@@ -659,6 +659,12 @@ export function CustomLlmsContent() {
                     rejected.
                   </li>
                   <li>
+                    <code>reasoning_effort_map</code> replaces requested reasoning efforts before
+                    they are sent upstream, such as{' '}
+                    <code>{'{ "xhigh": "high", "max": "high" }'}</code>. Partners check the replaced
+                    effort against <code>opencode_settings.reasoning_options</code>.
+                  </li>
+                  <li>
                     <code>api_kinds</code> lists the served APIs (<code>chat_completions</code>,{' '}
                     <code>messages</code>, <code>responses</code>). It must include the one{' '}
                     <code>opencode_settings.ai_sdk_provider</code> picks: Messages for{' '}

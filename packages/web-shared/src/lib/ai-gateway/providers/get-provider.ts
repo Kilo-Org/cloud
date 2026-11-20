@@ -91,6 +91,7 @@ import {
   type PartnerCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
+import { withReasoningEffortMap } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-effort-map';
 import {
   buildDirectProvider,
   type DirectUpstreamAuth,
@@ -105,6 +106,11 @@ import {
   resolveEmbeddingOrDecisionRoute,
   resolveTranscriptionRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
+import {
+  getPartnerSession,
+  hasRecentPartnerUpstreamError,
+  rememberPartnerUpstreamError,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/partner-upstream-error-cache';
 import {
   removePaidServerFeatures,
   requestsPaidServerFeatures,
@@ -135,6 +141,8 @@ export type ProviderRoute = {
   /** The provider the organization policy checks when a direct BYOK key serves the request (see
    *  `getDirectByokPolicyProviderId`). */
   directByokPolicyProviderId?: string;
+  /** Called when the route's upstream answers with a failure the client did not cause by leaving. */
+  onUpstreamFailure?: () => void;
 };
 
 /** Resolves a route. A BYOK key is decrypted only when its route is resolved. */
@@ -395,8 +403,8 @@ function providerSettingsAllowPartner(
  * `reasoning-content` and `reasoning` transforms drop the `reasoning` object and forward only its
  * effort, behind an existing `reasoning_effort`, so `reasoning.enabled: false` does not reach the
  * upstream there and `reasoning_effort` wins over `reasoning.effort`. Null when the request
- * carries no effort, even though `mistral-thinking` then sends `high`: the partner is not skipped
- * for an effort the client did not choose.
+ * carries no effort, even though `mistral-thinking` then sends `high`, after
+ * `reasoning_effort_map`: the partner is not skipped for an effort the client did not choose.
  */
 function getUpstreamReasoningEffort(
   request: GatewayRequest,
@@ -417,7 +425,10 @@ function getUpstreamReasoningEffort(
   return getReasoningEffort(request);
 }
 
-/** Whether the partner declares its supported efforts and the request asks for one it lacks. */
+/**
+ * Whether the partner declares its supported efforts and the request asks for one it lacks, once
+ * the definition's `reasoning_effort_map` has rewritten it.
+ */
 function requestsUnsupportedReasoningEffort(
   partner: PartnerCustomLlm,
   request: GatewayRequest
@@ -426,7 +437,10 @@ function requestsUnsupportedReasoningEffort(
   const supported = getSupportedReasoningEfforts(definition.opencode_settings?.reasoning_options);
   if (!supported) return false;
   const effort = ReasoningEffortSchema.safeParse(
-    getUpstreamReasoningEffort(request, definition.reasoning_details_transform)
+    getUpstreamReasoningEffort(
+      withReasoningEffortMap(request, definition.reasoning_effort_map),
+      definition.reasoning_details_transform
+    )
   );
   return effort.success && !supported.has(effort.data);
 }
@@ -448,6 +462,9 @@ async function resolvePartnerRoute(
   if (input.boundedSpending) return 'bounded-spending';
   // Implied by an inference region, which admits only Kilo's Vercel AI Gateway route.
   if (input.openRouterDisabled) return 'openrouter-disabled';
+  const session = getPartnerSession(input.request, input.taskId, input.user.id, partner.public_id);
+  // Started now so the Redis read overlaps the provider settings lookups. It never rejects.
+  const recentUpstreamError = session ? hasRecentPartnerUpstreamError(session) : null;
   const providerConfig = withIgnoredProviders(
     await input.getRoutingProviderConfig(),
     input.kiloIgnoredProviders ?? []
@@ -459,6 +476,9 @@ async function resolvePartnerRoute(
   if (requestsUnsupportedReasoningEffort(partner, input.request)) {
     return 'unsupported-reasoning-effort';
   }
+  // Once the session's prompt cache sits with Kilo's route, returning to the partner would
+  // discard it, and the partner may still be failing.
+  if (await recentUpstreamError) return 'recent-upstream-error';
   // Unlike a custom LLM that owns its id, a partner has a fallback, so unusable
   // credentials skip it instead of failing the request.
   let auth: DirectUpstreamAuth;
@@ -481,6 +501,7 @@ async function resolvePartnerRoute(
     isFree: isFreeModel(input.requestedModel),
     bypassAccessCheck: false,
     customLlmPricing: definition.pricing,
+    ...(session ? { onUpstreamFailure: () => rememberPartnerUpstreamError(session) } : {}),
   };
 }
 
@@ -531,6 +552,8 @@ export type GetProviderInput = {
   isDirectByokProviderAllowed: (policyProviderId: string) => Promise<boolean>;
   /** The caller's Vercel IP country, for custom LLM country deny lists. */
   countryCode?: string | null;
+  /** The `x-kilocode-taskid` header, from which the upstream prompt cache key is derived. */
+  taskId?: string | null;
   /** Receives the steps and BYOK candidates behind the result, when the call returns. */
   onDecision?: (decision: ProviderRoutingDecision) => void;
 };

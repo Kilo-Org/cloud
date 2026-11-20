@@ -27,6 +27,20 @@ const defaultSettings = {
 };
 const configPath = new URL('../wrangler.jsonc', import.meta.url).pathname;
 
+// Queue names outside the tagged pair, which shared-pair scenarios start with already prepared.
+function sharedNames(f) {
+  return [...f.queues.keys()].filter(name => !name.startsWith('usage-ingest-enkrypt'));
+}
+
+// The shape before the dedicated Enkrypt pair, which earlier revisions deploy.
+function withoutEnkrypt(queues) {
+  return {
+    ...queues,
+    producers: queues.producers.filter(p => !p.binding.startsWith('USAGE_INGEST_ENKRYPT_')),
+    consumers: queues.consumers.filter(c => !c.queue.startsWith('usage-ingest-enkrypt')),
+  };
+}
+
 // The pre-hedge shape (one EU source, its DLQ, one consumer) that historical revisions deploy.
 function withoutHedge(queues) {
   return {
@@ -36,9 +50,10 @@ function withoutHedge(queues) {
   };
 }
 
-function writeConfig(path, environment, { hedged, mutate }) {
+function writeConfig(path, environment, { hedged, enkrypt, mutate }) {
   const config = structuredClone(experimental_readRawConfig({ config: configPath }).rawConfig);
   for (const selected of [config, config.env.staging]) {
+    if (!enkrypt) selected.queues = withoutEnkrypt(selected.queues);
     if (!hedged) selected.queues = withoutHedge(selected.queues);
   }
   mutate?.(environment === 'staging' ? config.env.staging : config);
@@ -47,12 +62,19 @@ function writeConfig(path, environment, { hedged, mutate }) {
   return text;
 }
 
-async function createFixture(t, existing = [], environment, { hedged = false } = {}) {
+async function createFixture(
+  t,
+  existing = [],
+  environment,
+  { hedged = false, enkrypt = true, seedTagged = true } = {}
+) {
   const suffix = environment === 'staging' ? '-staging' : '';
   const globalSource = `usage-ingest-processing${suffix}`;
   const globalDlq = `usage-ingest-processing-dlq${suffix}`;
   const source = `${globalSource}-eu`;
   const dlq = `${globalDlq}-eu`;
+  const enkryptSource = `usage-ingest-enkrypt${suffix}-eu`;
+  const enkryptDlq = `usage-ingest-enkrypt-dlq${suffix}-eu`;
   const worker = `usage-ingest${suffix}`;
   const owned = { type: 'worker', script: worker, consumer_id: 'c'.repeat(32) };
   const directory = realpathSync(mkdtempSync(join(tmpdir(), 'eu-queues-')));
@@ -66,7 +88,7 @@ async function createFixture(t, existing = [], environment, { hedged = false } =
     readFileSync(new URL('./provision-queues.mjs', import.meta.url))
   );
   const configFile = join(directory, 'wrangler.jsonc');
-  const config = writeConfig(configFile, environment, { hedged });
+  const config = writeConfig(configFile, environment, { hedged, enkrypt });
   const queues = new Map();
   const calls = [];
   let nextId = 0;
@@ -82,6 +104,12 @@ async function createFixture(t, existing = [], environment, { hedged = false } =
     return queue;
   };
   existing.forEach(add);
+  // Shared-pair scenarios start with an already prepared tagged pair, so their assertions cover
+  // only the shared and hedge queues. Tagged-pair scenarios opt out and seed it explicitly.
+  if (enkrypt && seedTagged) {
+    if (!queues.has(enkryptDlq)) add(enkryptDlq, { message_retention_period: maxRetention });
+    if (!queues.has(enkryptSource)) add(enkryptSource);
+  }
   const f = {
     rename: () =>
       writeFileSync(
@@ -93,7 +121,8 @@ async function createFixture(t, existing = [], environment, { hedged = false } =
     fault: undefined,
     selectedDlq: dlq,
     hedged,
-    mutate: mutate => writeConfig(configFile, environment, { hedged, mutate }),
+    enkrypt,
+    mutate: mutate => writeConfig(configFile, environment, { hedged, enkrypt, mutate }),
     global: () => {
       f.selectedDlq = globalDlq;
       writeFileSync(
@@ -139,7 +168,9 @@ async function createFixture(t, existing = [], environment, { hedged = false } =
     } else if (req.method === 'PATCH') {
       const queue = [...queues.values()].find(q => q.queue_id === url.pathname.split('/').at(-1));
       assert.ok(
-        queue?.queue_name === f.selectedDlq || (f.hedged && queue?.queue_name === globalDlq),
+        queue?.queue_name === f.selectedDlq ||
+          (f.hedged && queue?.queue_name === globalDlq) ||
+          (f.enkrypt && queue?.queue_name === enkryptDlq),
         'only a selected DLQ is updated'
       );
       assert.deepEqual(Object.keys(body), ['settings']);
@@ -164,7 +195,7 @@ async function createFixture(t, existing = [], environment, { hedged = false } =
       const jurisdiction = global ? {} : { jurisdiction: 'eu' };
       assert.deepEqual(
         body,
-        [dlq, globalDlq].includes(body.queue_name)
+        [dlq, globalDlq, enkryptDlq].includes(body.queue_name)
           ? {
               queue_name: body.queue_name,
               ...jurisdiction,
@@ -173,20 +204,34 @@ async function createFixture(t, existing = [], environment, { hedged = false } =
           : { queue_name: body.queue_name, ...jurisdiction }
       );
       assert.ok(
-        (f.hedged ? [dlq, source, globalDlq, globalSource] : [dlq, source]).includes(
-          body.queue_name
-        ) && !queues.has(body.queue_name)
+        [
+          dlq,
+          source,
+          ...(f.hedged ? [globalDlq, globalSource] : []),
+          ...(f.enkrypt ? [enkryptDlq, enkryptSource] : []),
+        ].includes(body.queue_name) && !queues.has(body.queue_name)
       );
-      if (f.fault === 'unreadable creation' && body.queue_name === globalSource) {
+      if (
+        (f.fault === 'unreadable creation' && body.queue_name === globalSource) ||
+        (f.fault === 'unreadable enkrypt creation' && body.queue_name === enkryptSource)
+      ) {
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ success: true, result: {} }));
         return;
       }
       result = add(body.queue_name, f.fault === 'create ignores retention' ? {} : body.settings);
       if (f.fault === 'ignored jurisdiction') delete result.jurisdiction;
+      if (f.fault === 'created enkrypt dlq consumer' && body.queue_name === enkryptDlq)
+        result.consumers = [{ ...owned }];
+      if (f.fault === 'created enkrypt short retention' && body.queue_name === enkryptSource)
+        result.settings.message_retention_period = 600;
+      if (f.fault === 'created enkrypt paused' && body.queue_name === enkryptSource)
+        result.settings.delivery_paused = true;
+      if (f.fault === 'created enkrypt malformed delivery' && body.queue_name === enkryptSource)
+        result.settings.delivery_paused = null;
       if (
         f.fault === 'created foreign consumer' &&
-        [source, globalSource].includes(body.queue_name)
+        [source, globalSource, enkryptSource].includes(body.queue_name)
       )
         result.consumers = [{ ...owned, script: 'foreign-worker' }];
       if (f.fault === 'lost acceptance' && body.queue_name === source) {
@@ -203,7 +248,13 @@ async function createFixture(t, existing = [], environment, { hedged = false } =
         result_info = { total_pages: result.length ? 1 : 0 };
         if (f.fault === 'ambiguous') result = [result[0], result[0]];
         if (f.fault === 'incomplete') result_info = undefined;
-      } else result = [...queues.values()].find(q => q.queue_id === url.pathname.split('/').at(-1));
+      } else {
+        result = [...queues.values()].find(q => q.queue_id === url.pathname.split('/').at(-1));
+        if (f.fault === 'omitted enkrypt delivery pause' && result?.queue_name === enkryptSource) {
+          result = structuredClone(result);
+          delete result.settings.delivery_paused;
+        }
+      }
     }
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ success: true, result, result_info }));
@@ -274,7 +325,7 @@ for (const environment of ['staging', 'production'])
         f.queues.get(source).jurisdiction = jurisdiction;
         await assert.rejects(f.cli(), error => /not verified EU/.test(error.stderr));
         assert.ok(f.calls.every(c => c.method === 'GET'));
-        assert.equal(f.queues.size, 1);
+        assert.equal(sharedNames(f).length, 1);
       }
     });
 
@@ -301,7 +352,7 @@ for (const environment of ['staging', 'production'])
       const f = await fixture(t);
       f.fault = 'ignored jurisdiction';
       await assert.rejects(f.cli(), error => /not verified EU/.test(error.stderr));
-      assert.deepEqual([...f.queues.keys()], [dlq]);
+      assert.deepEqual(sharedNames(f), [dlq]);
     });
 
     const patches = f => f.calls.filter(c => c.method === 'PATCH');
@@ -440,7 +491,7 @@ for (const environment of ['staging', 'production'])
       const f = await fixture(t);
       f.fault = 'lost acceptance';
       await assert.rejects(f.cli());
-      assert.equal(f.queues.size, 2);
+      assert.equal(sharedNames(f).length, 2);
       f.fault = undefined;
       await f.cli();
       assert.equal(f.calls.filter(c => c.method === 'POST').length, 2);
@@ -507,7 +558,7 @@ for (const environment of ['staging', 'production'])
         await f.cli();
         assert.deepEqual(obsolete.consumers, []);
         assert.deepEqual(selected.consumers, [owned]);
-        assert.equal(f.queues.size, 4);
+        assert.equal(sharedNames(f).length, 4);
         assert.equal(
           f.queues.get(global ? globalDlq : dlq).settings.message_retention_period,
           maxRetention
@@ -552,7 +603,7 @@ for (const environment of ['staging', 'production'])
         [dlq, source, 'DELETE']
       );
       assert.equal(f.queues.get(globalSource), original);
-      assert.equal(f.queues.size, 4);
+      assert.equal(sharedNames(f).length, 4);
     });
 
     test('unverified or foreign ownership fails before any writes', async t => {
@@ -725,7 +776,7 @@ for (const environment of ['staging', 'production'])
         await f.cli();
         assert.deepEqual(hedgeQueue.consumers, []);
         assert.equal(hedgeQueue.backlog, 3);
-        assert.equal(f.queues.size, 4);
+        assert.equal(sharedNames(f).length, 4);
         assert.deepEqual(
           f.calls.filter(c => c.method === 'DELETE').map(c => c.path),
           [
@@ -809,7 +860,7 @@ for (const environment of ['staging', 'production'])
           await assert.rejects(f.cli(), error => /ownership|environment/.test(error.stderr));
           assert.ok(f.calls.every(c => c.method === 'GET'));
           assert.deepEqual(f.queues.get(globalSource).consumers, consumers);
-          assert.equal(f.queues.size, 1);
+          assert.equal(sharedNames(f).length, 1);
         }
       });
 
@@ -892,6 +943,423 @@ for (const environment of ['staging', 'production'])
       ])
         test(`malformed hedge config is rejected before API access: ${name}`, async t => {
           const f = await hedged(t, [source, dlq, globalSource, globalDlq]);
+          f.mutate(mutate);
+          await assert.rejects(f.cli(), error => /Expected matching/.test(error.stderr));
+          assert.deepEqual(f.calls, []);
+        });
+    });
+
+    describe('dedicated tagged queue (Enkrypt and Exa fallback)', () => {
+      const enkryptSource = `usage-ingest-enkrypt${suffix}-eu`;
+      const enkryptDlq = `usage-ingest-enkrypt-dlq${suffix}-eu`;
+      const committed = (t, existing) =>
+        createFixture(t, existing, environment, { hedged: true, seedTagged: false });
+      const writes = f => f.calls.filter(c => c.method !== 'GET');
+      const shared = [dlq, source, globalDlq, globalSource];
+
+      test('the committed config declares the Enkrypt pair beside the EU and hedge pairs', () => {
+        const raw = experimental_readRawConfig({ config: configPath }).rawConfig;
+        const selected = environment === 'staging' ? raw.env.staging : raw;
+        assert.deepEqual(
+          selected.queues.producers.filter(p => p.binding.startsWith('USAGE_INGEST_ENKRYPT_')),
+          [
+            { binding: 'USAGE_INGEST_ENKRYPT_QUEUE', queue: enkryptSource },
+            { binding: 'USAGE_INGEST_ENKRYPT_DLQ', queue: enkryptDlq },
+          ]
+        );
+        assert.deepEqual(
+          selected.queues.consumers.map(c => [c.queue, c.dead_letter_queue]),
+          [
+            [source, dlq],
+            [globalSource, globalDlq],
+            [enkryptSource, enkryptDlq],
+          ]
+        );
+      });
+
+      for (const existing of [[], shared, [...shared, enkryptDlq], [...shared, enkryptSource]])
+        test(`creates only missing queues, the Enkrypt pair in EU after the others (${existing.length} existing)`, async t => {
+          const f = await committed(t, existing);
+          await f.cli();
+          assert.deepEqual(
+            f.calls.filter(c => c.method === 'POST').map(c => c.name),
+            [...shared, enkryptDlq, enkryptSource].filter(name => !existing.includes(name))
+          );
+          assert.equal(f.queues.get(enkryptSource).jurisdiction, 'eu');
+          assert.equal(f.queues.get(enkryptDlq).jurisdiction, 'eu');
+          assert.equal(f.queues.get(enkryptDlq).settings.message_retention_period, maxRetention);
+          assert.deepEqual(f.queues.get(enkryptSource).settings, defaultSettings);
+          assert.ok(f.calls.every(c => c.method !== 'DELETE'));
+          const before = f.calls.length;
+          await f.cli();
+          assert.ok(f.calls.slice(before).every(c => c.method === 'GET'));
+        });
+
+      test('keeps every owned consumer, setting and message and makes no write when all exist', async t => {
+        const f = await committed(t, [...shared, enkryptDlq, enkryptSource]);
+        for (const name of [source, globalSource, enkryptSource])
+          f.queues.get(name).consumers = [{ ...owned }];
+        for (const name of [dlq, globalDlq, enkryptDlq])
+          f.queues.get(name).settings.message_retention_period = maxRetention;
+        f.queues.get(enkryptSource).backlog = 7;
+        f.queues.get(enkryptSource).settings.delivery_delay = 5;
+        const before = structuredClone([...f.queues.values()]);
+        await f.cli();
+        await f.cli();
+        assert.deepEqual(writes(f), []);
+        assert.deepEqual([...f.queues.values()], before);
+      });
+
+      test('raises existing Enkrypt DLQ retention with readback, keeping other settings', async t => {
+        const f = await committed(t, [...shared, enkryptDlq, enkryptSource]);
+        f.queues.get(dlq).settings.message_retention_period = maxRetention;
+        f.queues.get(globalDlq).settings.message_retention_period = maxRetention;
+        f.queues.get(enkryptDlq).settings = { ...defaultSettings, delivery_delay: 9 };
+        await f.cli();
+        assert.deepEqual(
+          f.calls.filter(c => c.method === 'PATCH').map(c => [c.path.split('/').at(-1), c.body]),
+          [
+            [
+              f.queues.get(enkryptDlq).queue_id,
+              {
+                settings: {
+                  ...defaultSettings,
+                  delivery_delay: 9,
+                  message_retention_period: maxRetention,
+                },
+              },
+            ],
+          ]
+        );
+        for (const fault of ['patch ignored', 'patch clobbers settings']) {
+          const g = await committed(t, [...shared, enkryptDlq, enkryptSource]);
+          g.queues.get(dlq).settings.message_retention_period = maxRetention;
+          g.queues.get(globalDlq).settings.message_retention_period = maxRetention;
+          g.fault = fault;
+          await assert.rejects(g.cli(), error =>
+            new RegExp(`${enkryptDlq} retention update was not confirmed`).test(error.stderr)
+          );
+        }
+      });
+
+      test('an existing Enkrypt queue outside EU or with a foreign consumer stops before any write', async t => {
+        for (const name of [enkryptDlq, enkryptSource]) {
+          for (const jurisdiction of ['us', undefined]) {
+            const f = await committed(t, [name]);
+            f.queues.get(name).jurisdiction = jurisdiction;
+            await assert.rejects(f.cli(), error => /not verified EU/.test(error.stderr));
+            assert.ok(f.calls.every(c => c.method === 'GET'));
+            assert.equal(f.queues.size, 1);
+          }
+        }
+        for (const consumers of [
+          undefined,
+          [null],
+          [{ ...owned, script: 'foreign-worker' }],
+          [{ ...owned, type: 'http_pull' }],
+          [owned, owned],
+          [{ ...owned, consumer_id: 'invalid' }],
+          [
+            {
+              type: 'worker',
+              service: worker,
+              environment: 'preview',
+              consumer_id: owned.consumer_id,
+            },
+          ],
+        ]) {
+          const f = await committed(t, [enkryptSource]);
+          f.queues.get(enkryptSource).consumers = consumers;
+          await assert.rejects(f.cli(), error => /ownership|environment/.test(error.stderr));
+          assert.ok(f.calls.every(c => c.method === 'GET'));
+          assert.deepEqual(f.queues.get(enkryptSource).consumers, consumers);
+        }
+      });
+
+      test('an existing Enkrypt DLQ with any consumer stops before any write', async t => {
+        for (const consumers of [
+          undefined,
+          [null],
+          [{ ...owned }],
+          [{ ...owned, script: 'foreign-worker' }],
+        ]) {
+          const f = await committed(t, [...shared, enkryptDlq]);
+          f.queues.get(enkryptDlq).consumers = consumers;
+          await assert.rejects(f.cli(), error => /has or may have a consumer/.test(error.stderr));
+          assert.ok(f.calls.every(c => c.method === 'GET'));
+          assert.deepEqual(f.queues.get(enkryptDlq).consumers, consumers);
+          assert.ok(!f.queues.has(enkryptSource));
+        }
+      });
+
+      test('an existing Enkrypt source below four-day or unreadable retention stops before any write', async t => {
+        for (const settings of [
+          { ...defaultSettings, message_retention_period: 600 },
+          { ...defaultSettings, message_retention_period: '345600' },
+          {},
+          undefined,
+        ]) {
+          const f = await committed(t, [...shared, enkryptSource]);
+          f.queues.get(enkryptSource).settings = settings;
+          await assert.rejects(f.cli(), error =>
+            /Cannot confirm .* four-day retention/.test(error.stderr)
+          );
+          assert.ok(f.calls.every(c => c.method === 'GET'));
+          assert.deepEqual(f.queues.get(enkryptSource).settings, settings);
+        }
+        const longer = await committed(t, [...shared, enkryptSource]);
+        longer.queues.get(enkryptSource).settings.message_retention_period = 1_209_600;
+        await longer.cli();
+        assert.equal(longer.queues.get(enkryptSource).settings.message_retention_period, 1_209_600);
+      });
+
+      test('unreadable Enkrypt DLQ retention stops before any shared-queue write', async t => {
+        for (const settings of [undefined, {}, { message_retention_period: '345600' }]) {
+          const f = await committed(t, [enkryptDlq]);
+          f.queues.get(enkryptDlq).settings = settings;
+          await assert.rejects(f.cli(), error => /Cannot read .* retention/.test(error.stderr));
+          assert.ok(f.calls.every(c => c.method === 'GET'));
+          assert.deepEqual([...f.queues.keys()], [enkryptDlq]);
+        }
+      });
+
+      for (const existingSource of [true, false])
+        test(`omitted delivery_paused in Get Queue permits preparation (${existingSource ? 'existing source' : 'creation readback'})`, async t => {
+          const existing = [...shared, enkryptDlq, ...(existingSource ? [enkryptSource] : [])];
+          const f = await committed(t, existing);
+          for (const name of [dlq, globalDlq, enkryptDlq])
+            f.queues.get(name).settings.message_retention_period = maxRetention;
+          f.fault = 'omitted enkrypt delivery pause';
+          const before = structuredClone([...f.queues.values()]);
+          await f.cli();
+          const tagged = f.queues.get(enkryptSource);
+          assert.equal(tagged.jurisdiction, 'eu');
+          assert.equal(tagged.settings.message_retention_period, 345_600);
+          assert.deepEqual(tagged.consumers, []);
+          assert.deepEqual(
+            writes(f).map(c => [c.method, c.body]),
+            existingSource ? [] : [['POST', { queue_name: enkryptSource, jurisdiction: 'eu' }]]
+          );
+          assert.deepEqual([...f.queues.values()].slice(0, before.length), before);
+          const callsBeforeRerun = f.calls.length;
+          await f.cli();
+          assert.ok(f.calls.slice(callsBeforeRerun).every(c => c.method === 'GET'));
+        });
+
+      test('an existing Enkrypt source with paused or malformed delivery stops before any write', async t => {
+        for (const paused of [true, 'false', 'true', null, 0, 1, {}, []]) {
+          const f = await committed(t, [...shared, enkryptSource]);
+          f.queues.get(enkryptSource).settings.delivery_paused = paused;
+          const before = structuredClone(f.queues.get(enkryptSource));
+          await assert.rejects(f.cli(), error =>
+            /Cannot confirm .* delivery is unpaused/.test(error.stderr)
+          );
+          assert.ok(f.calls.every(c => c.method === 'GET'));
+          assert.deepEqual(f.queues.get(enkryptSource), before);
+        }
+      });
+
+      test('a created Enkrypt queue that reads back with a consumer or short retention stops deployment', async t => {
+        for (const [fault, pattern] of [
+          ['created enkrypt dlq consumer', /has or may have a consumer/],
+          ['created enkrypt short retention', /four-day retention/],
+          ['created enkrypt paused', /delivery is unpaused/],
+          ['created enkrypt malformed delivery', /delivery is unpaused/],
+        ]) {
+          const f = await committed(t, shared);
+          f.fault = fault;
+          await assert.rejects(f.cli(), error => pattern.test(error.stderr));
+          assert.ok(f.calls.every(c => c.method !== 'DELETE'));
+        }
+      });
+
+      test('an unverified created Enkrypt queue stops deployment without deleting anything', async t => {
+        for (const [fault, pattern] of [
+          ['ignored jurisdiction', /not verified EU/],
+          ['created foreign consumer', /ownership mismatch/],
+          ['unreadable enkrypt creation', /not verified EU/],
+        ]) {
+          const f = await committed(t, shared);
+          f.fault = fault;
+          await assert.rejects(f.cli(), error => pattern.test(error.stderr));
+          assert.ok(f.calls.every(c => c.method !== 'DELETE'));
+          if (fault === 'ignored jurisdiction') assert.ok(!f.queues.has(enkryptSource));
+        }
+      });
+
+      for (const [name, options] of [
+        ['with the hedge', { hedged: true }],
+        ['without the hedge', {}],
+      ])
+        test(`a config without the tagged pair is rejected before API access (${name})`, async t => {
+          const f = await createFixture(t, [...shared, enkryptDlq, enkryptSource], environment, {
+            ...options,
+            enkrypt: false,
+          });
+          f.queues.get(enkryptSource).consumers = [{ ...owned }];
+          f.queues.get(enkryptSource).backlog = 3;
+          await assert.rejects(f.cli(), error => /Expected matching/.test(error.stderr));
+          assert.deepEqual(f.calls, []);
+          assert.deepEqual(f.queues.get(enkryptSource).consumers, [owned]);
+        });
+
+      test('config membership ignores list order', async t => {
+        const f = await committed(t, [...shared, enkryptDlq, enkryptSource]);
+        f.mutate(s => {
+          s.queues.producers.reverse();
+          s.queues.consumers.reverse();
+        });
+        for (const name of [dlq, globalDlq, enkryptDlq])
+          f.queues.get(name).settings.message_retention_period = maxRetention;
+        await f.cli();
+        assert.deepEqual(writes(f), []);
+      });
+
+      for (const [name, mutate] of [
+        ['producers missing', s => delete s.queues.producers],
+        ['consumers not a list', s => (s.queues.consumers = {})],
+        ['a null producer entry', s => s.queues.producers.push(null)],
+        ['a consumer without its DLQ', s => delete s.queues.consumers.at(-1).dead_letter_queue],
+        [
+          'an extra unrelated producer',
+          s => s.queues.producers.push({ binding: 'OTHER', queue: 'other' }),
+        ],
+        [
+          'an extra consumer',
+          s => s.queues.consumers.push({ queue: 'other', dead_letter_queue: dlq }),
+        ],
+        ['a duplicated main consumer', s => s.queues.consumers.push({ ...s.queues.consumers[0] })],
+        [
+          'a DLQ name wrapped in an array',
+          s => {
+            const consumer = s.queues.consumers.find(c => c.queue === enkryptSource);
+            consumer.dead_letter_queue = [consumer.dead_letter_queue];
+          },
+        ],
+        [
+          'a producer queue wrapped in an array',
+          s => {
+            const producer = s.queues.producers.find(p => p.binding === 'USAGE_INGEST_DLQ');
+            producer.queue = [producer.queue];
+          },
+        ],
+      ])
+        test(`malformed queue lists are rejected before API access: ${name}`, async t => {
+          const f = await committed(t, [...shared, enkryptDlq, enkryptSource]);
+          f.mutate(mutate);
+          await assert.rejects(f.cli(), error => /Expected matching/.test(error.stderr));
+          assert.deepEqual(f.calls, []);
+        });
+
+      test('a malformed global rollback config stops before detaching anything', async t => {
+        const f = await createFixture(t, [...shared, enkryptDlq, enkryptSource], environment, {
+          enkrypt: true,
+        });
+        f.global();
+        f.mutate(s => {
+          s.queues.producers.find(p => p.binding === 'USAGE_INGEST_QUEUE').queue = globalSource;
+          s.queues.producers.find(p => p.binding === 'USAGE_INGEST_DLQ').queue = globalDlq;
+          s.queues.consumers[0].queue = globalSource;
+          s.queues.consumers[0].dead_letter_queue = globalDlq;
+          const consumer = s.queues.consumers.find(c => c.queue === enkryptSource);
+          consumer.dead_letter_queue = [consumer.dead_letter_queue];
+        });
+        f.queues.get(source).consumers = [{ ...owned }];
+        await assert.rejects(f.cli(), error => /Expected matching/.test(error.stderr));
+        assert.deepEqual(f.calls, []);
+        assert.deepEqual(f.queues.get(source).consumers, [owned]);
+      });
+
+      test('a global routing rollback keeps the Enkrypt pair, its consumer and messages', async t => {
+        const f = await createFixture(t, [...shared, enkryptDlq, enkryptSource], environment, {
+          enkrypt: true,
+        });
+        f.global();
+        f.queues.get(source).consumers = [{ ...owned }];
+        f.queues.get(enkryptSource).consumers = [{ ...owned }];
+        f.queues.get(enkryptSource).backlog = 4;
+        f.queues.get(enkryptDlq).settings.message_retention_period = maxRetention;
+        const untouched = structuredClone([f.queues.get(enkryptDlq), f.queues.get(enkryptSource)]);
+        await f.cli();
+        assert.deepEqual(f.queues.get(source).consumers, []);
+        assert.deepEqual(
+          f.calls.filter(c => c.method === 'DELETE').map(c => c.path.split('/').at(-3)),
+          [f.queues.get(source).queue_id]
+        );
+        assert.deepEqual([f.queues.get(enkryptDlq), f.queues.get(enkryptSource)], untouched);
+        assert.ok(
+          f.calls.every(c => c.method === 'GET' || c.method === 'DELETE' || c.method === 'PATCH')
+        );
+      });
+
+      const otherSuffix = environment === 'staging' ? '' : '-staging';
+      const enkryptProducer = s =>
+        s.queues.producers.find(p => p.binding === 'USAGE_INGEST_ENKRYPT_QUEUE');
+      const enkryptDlqProducer = s =>
+        s.queues.producers.find(p => p.binding === 'USAGE_INGEST_ENKRYPT_DLQ');
+      const enkryptConsumerOf = s => s.queues.consumers.find(c => c.queue === enkryptSource);
+      for (const [name, mutate] of [
+        [
+          'Enkrypt producer without its consumer',
+          s => {
+            s.queues.consumers = s.queues.consumers.filter(c => c !== enkryptConsumerOf(s));
+          },
+        ],
+        [
+          'Enkrypt consumer without its producers',
+          s => {
+            s.queues.producers = s.queues.producers.filter(
+              p => !p.binding.startsWith('USAGE_INGEST_ENKRYPT_')
+            );
+          },
+        ],
+        [
+          'Enkrypt producer without its DLQ binding',
+          s => {
+            s.queues.producers = s.queues.producers.filter(p => p !== enkryptDlqProducer(s));
+          },
+        ],
+        [
+          'Enkrypt producer on the shared EU queue',
+          s => {
+            enkryptProducer(s).queue = source;
+          },
+        ],
+        [
+          "Enkrypt producer and consumer on the other environment's queue",
+          s => {
+            enkryptProducer(s).queue = `usage-ingest-enkrypt${otherSuffix}-eu`;
+            enkryptConsumerOf(s).queue = `usage-ingest-enkrypt${otherSuffix}-eu`;
+          },
+        ],
+        [
+          'Enkrypt queue without the EU suffix',
+          s => {
+            enkryptProducer(s).queue = `usage-ingest-enkrypt${suffix}`;
+            enkryptConsumerOf(s).queue = `usage-ingest-enkrypt${suffix}`;
+          },
+        ],
+        [
+          'Enkrypt consumer dead-lettering into the shared EU DLQ',
+          s => {
+            enkryptConsumerOf(s).dead_letter_queue = dlq;
+          },
+        ],
+        [
+          'Enkrypt DLQ binding on another queue',
+          s => {
+            enkryptDlqProducer(s).queue = `${enkryptDlq}-other`;
+          },
+        ],
+        [
+          'two Enkrypt producers',
+          s => {
+            s.queues.producers.push({ ...enkryptProducer(s) });
+          },
+        ],
+      ])
+        test(`malformed Enkrypt config is rejected before API access: ${name}`, async t => {
+          const f = await committed(t, [...shared, enkryptDlq, enkryptSource]);
           f.mutate(mutate);
           await assert.rejects(f.cli(), error => /Expected matching/.test(error.stderr));
           assert.deepEqual(f.calls, []);

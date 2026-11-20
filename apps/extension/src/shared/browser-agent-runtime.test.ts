@@ -1,5 +1,5 @@
 /* eslint-disable vitest/no-conditional-in-test -- the fake CDP and tabs API answer per method and per tab id */
-/* eslint-disable max-lines, require-await -- the suite drives one fake CDP session and one fake tab-group API through every agent tool path, whose fakes are async by contract. */
+/* eslint-disable import/max-dependencies, max-lines, require-await, vitest/max-expects -- the suite drives one fake CDP session and one fake tab-group API through every agent tool path, whose fakes are async by contract. */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createBrowserTabGroupController } from './browser-tab-groups';
@@ -14,11 +14,12 @@ import { createBrowserRuntime } from './browser-runtime';
 import type {
   BrowserDownloadItem,
   BrowserDownloadsApi,
+  BrowserRuntime,
   BrowserToolRunOutcome,
 } from './browser-runtime';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
-  DOWNLOAD_PERMISSION_MISSING_ERROR,
+  DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
   DOWNLOAD_STEP_TAB_GONE_ERROR,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
@@ -27,6 +28,15 @@ import {
 } from './browser-agent-checks';
 import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
 import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
+import { createDownloadHold } from './browser-download-hold';
+import type {
+  ApprovalNeed,
+  DownloadHold,
+  DownloadHoldNavigation,
+  DownloadHoldReport,
+  SettleWindow,
+  TrackedDownload,
+} from './browser-download-hold';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import type {
@@ -58,7 +68,7 @@ type CdpHandler = (
   params: Record<string, unknown> | undefined,
   /** The tab the command was sent to: a deferred answer can be scoped to the tab a call drives. */
   target?: { readonly tabId: number }
-) => Promise<Record<string, unknown>> | Record<string, unknown> | undefined;
+) => Promise<Record<string, unknown> | undefined> | Record<string, unknown> | undefined;
 
 type AgentResult = Extract<EvalTabResult, { readonly ok: true }>;
 
@@ -105,6 +115,8 @@ interface FakeCdp {
   readonly emit: (method: string, params: Record<string, unknown>) => void;
   /** One event from a child (out-of-process frame) session, the way chrome.debugger reports it. */
   readonly emitFrom: (method: string, params: Record<string, unknown>, sessionId: string) => void;
+  /** One event on a named tab, for a call that drives a tab the call itself opened. */
+  readonly emitOn: (tabId: number, method: string, params: Record<string, unknown>) => void;
   readonly setHandlers: (handlers: Record<string, CdpHandler>) => void;
   readonly setFrameUrl: (url: string) => void;
   readonly setProbe: (probe: Record<string, unknown>) => void;
@@ -353,6 +365,11 @@ const createFakeCdp = (): FakeCdp => {
         listener({ sessionId, tabId: TAB_ID }, method, params);
       }
     },
+    emitOn: (tabId, method, params) => {
+      for (const listener of eventListeners) {
+        listener({ tabId }, method, params);
+      }
+    },
     sent: () => sent,
     setFrameUrl: url => {
       mainUrl = url;
@@ -375,10 +392,26 @@ const createTabsApi = (): BrowserTabsApi => {
   };
 };
 
+/** What the fake `chrome.downloads` hands a test: the API the runtime reads, and the records it left behind. */
+interface FakeDownloads {
+  readonly api: BrowserDownloadsApi;
+  readonly cancelled: readonly number[];
+  /** Records an item and tells the guard, as `chrome.downloads.onCreated` does. */
+  readonly emit: (item: BrowserDownloadItem) => void;
+  readonly erased: readonly { readonly id: number }[];
+  /** How many `onCreated` listeners the guard has installed right now. */
+  readonly live: () => number;
+  /** Records an item without telling the guard: the browser creates one after the call's own command returned. */
+  readonly record: (item: BrowserDownloadItem) => void;
+  readonly removed: readonly number[];
+  /** The history a `startedAfter` search answers with, which a test seeds itself. */
+  readonly searched: BrowserDownloadItem[];
+}
+
 /** `chrome.downloads` as the runtime sees it: the single `onCreated` stream and the erase that deletes the file. */
 const createFakeDownloads = (
   options: { readonly cancelRejects?: boolean; readonly removeRejects?: boolean } = {}
-) => {
+): FakeDownloads => {
   const listeners: ((item: BrowserDownloadItem) => void)[] = [];
   const cancelled: number[] = [];
   const erased: { readonly id: number }[] = [];
@@ -476,6 +509,7 @@ const createFakeDownloads = (
 
 const createHarness = async (
   options: {
+    readonly downloadHold?: DownloadHold | undefined;
     readonly downloadsApi?: BrowserDownloadsApi | undefined;
     readonly downloadsGranted?: boolean;
     readonly downloadsResolver?: () => BrowserDownloadsApi | undefined;
@@ -503,6 +537,7 @@ const createHarness = async (
   const runtime = createBrowserRuntime({
     debuggerApi: cdp.api,
     ...(downloadsApi === undefined ? {} : { downloadsApi }),
+    ...(options.downloadHold === undefined ? {} : { downloadHold: options.downloadHold }),
     leases,
     scriptingApi: undefined,
     ...(options.tabGroups === undefined ? {} : { tabGroups: options.tabGroups }),
@@ -760,12 +795,15 @@ describe('agent browser calls', () => {
       afterAction: true,
       items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
       kind: 'needs_permission',
-      result: { error: NEEDS_PERMISSION_ERROR, ok: false },
     });
+    // The refusal names the file the announcement named, so the one approval is for a file the model can point at.
+    expect(
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : ''
+    ).toContain('invoice.pdf');
     // The click ran once: a click is a press and a release, and nothing ran the action a second time.
     expect(cdp.commands().filter(method => method === 'Input.dispatchMouseEvent')).toHaveLength(2);
-    expect(cdp.downloadsDenied()).toBe(1);
-    expect(cdp.downloadsRestored()).toBe(1);
+    // Denying is what stops an unapproved file; restoring puts the profile back as the human had it.
+    expect([cdp.downloadsDenied(), cdp.downloadsRestored()]).toStrictEqual([1, 1]);
 
     expect(expectStepToken(outcome)).toBeDefined();
   });
@@ -860,6 +898,131 @@ describe('agent browser calls', () => {
     });
     expect(expectStepToken(approved)).toBeDefined();
     expect([downloads.cancelled, downloads.removed]).toStrictEqual([[41, 43], []]);
+  });
+
+  it('reports the browser blocking an approved download, and keeps the approval unspent', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let clicks = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        clicks += 1;
+
+        // Only the press runs the step: the release is the second command of the same click.
+        if (clicks === 1) {
+          // The browser names the file first, and the item it creates is stamped well before either call: the
+          // Refusal is built from the announcement, and neither guard claims the pre-existing item as its own.
+          // No item is created for the approved repeat, which is what Chrome's multiple-downloads limiter does.
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: 'blocked-1',
+            suggestedFilename: 'invoice.pdf',
+            url: `${MAIN_ORIGIN}/invoice.pdf`,
+          });
+          downloads.emit({
+            id: 41,
+            startTime: new Date(Date.now() - 60_000).toISOString(),
+            tabId: TAB_ID,
+            url: `${MAIN_ORIGIN}/invoice.pdf`,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+
+    expect(refused.kind).toBe('needs_permission');
+
+    const approved = await click([expectStepToken(refused)]);
+
+    // Never a plain success: the file the human approved never arrived, and the text says who blocked it.
+    expect(approved).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(
+      approved.kind === 'needs_permission' && !approved.result.ok ? approved.result.error : ''
+    ).toBe(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+
+    // The approval is unspent and a fresh token is offered, so the repeat needs no second decision once the site
+    // Is allowed: a human is never asked again for a file the browser itself refused.
+    expect(expectStepToken(approved)).not.toBe('');
+
+    // The site is still not allowed, so the next repeat is blocked the same way — and still offers an unspent token.
+    const retried = await click([expectStepToken(approved)]);
+
+    expect(
+      retried.kind === 'needs_permission' && !retried.result.ok ? retried.result.error : ''
+    ).toBe(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+  });
+
+  it('names the file in the refusal and in the approval text, and keeps the file it named', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let clicks = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        clicks += 1;
+
+        // One press per click: the release is the second command of the same click, and it starts nothing.
+        if (clicks % 2 === 1) {
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: `download-${String(clicks)}`,
+            suggestedFilename: 'quarterly-report.txt',
+            url: `${MAIN_ORIGIN}/statement`,
+          });
+          downloads.emit({
+            filename: '/home/me/Downloads/quarterly-report.txt',
+            id: clicks === 1 ? 41 : 42,
+            tabId: TAB_ID,
+            url: `${MAIN_ORIGIN}/statement`,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+    const refusalText =
+      refused.kind === 'needs_permission' && !refused.result.ok ? refused.result.error : '';
+
+    // The refusal names the file the announcement named, not the url's last segment.
+    expect(refusalText).toContain('quarterly-report.txt');
+
+    const approved = await click([expectStepToken(refused)]);
+
+    // The success names the same file, once, and it is the item the approval kept.
+    expect(approved).toMatchObject({ kind: 'result', result: { ok: true } });
+    const approvedText =
+      approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : '';
+
+    expect(approvedText).toContain('quarterly-report.txt');
+    expect(approvedText).toContain('The file was downloaded; the page did not change.');
+    // The second item is the approved file; the first was the refused one.
+    expect([downloads.cancelled, downloads.removed]).toStrictEqual([[41], []]);
   });
 
   it('never touches a download on another tab while an approved call runs', async () => {
@@ -1158,42 +1321,152 @@ describe('agent browser calls', () => {
     ).toContain('report.txt: The file was downloaded; the page did not change.');
   });
 
-  it('refuses a download-capable call when the optional permission is missing', async () => {
-    // No downloads API: the guard cannot see a blob download, so the click must not run.
+  it('runs a normal navigate without the optional permission and arms only Document pauses', async () => {
+    // No downloads API: no item can be held, so the response interceptor is the guard a call has.
     const { cdp, runtime } = await createHarness({ downloadsGranted: false });
 
     const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+      arguments: { url: `${MAIN_ORIGIN}/dashboard` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    // An ordinary page load succeeds: a user who declined the permission keeps the browser.
+    expect(outcome).toMatchObject({ kind: 'result', result: { ok: true } });
+    expect(cdp.commands()).toContain('Page.navigate');
+
+    // A catch-all pattern would pause every image, script and font on the tab: only documents are paused.
+    expect(cdp.sent().find(command => command.method === 'Fetch.enable')?.params).toStrictEqual({
+      patterns: [{ requestStage: 'Response', resourceType: 'Document' }],
+    });
+    // The interceptor is released with the call, so an ordinary page keeps its own speed afterwards.
+    expect(cdp.commands()).toContain('Fetch.disable');
+  });
+
+  it('fails a download response and reports the file by the name the response asked for', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        // The browser pauses the response that would become a file, before any byte reaches the disk.
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'interception-1',
+          responseHeaders: [
+            { name: 'Content-Disposition', value: 'attachment; filename="report.txt"' },
+            { name: 'Content-Type', value: 'text/plain' },
+          ],
+          responseStatusCode: 200,
+        });
+
+        return { errorText: 'net::ERR_ABORTED' };
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+      arguments: { url: `${MAIN_ORIGIN}/download` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    // The response is failed, never continued: continuing it would write the file the human never approved.
+    const answers = cdp
+      .sent()
+      .filter(
+        command =>
+          command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+      )
+      .map(command => [command.method, command.params?.['requestId']]);
+
+    expect(answers).toStrictEqual([['Fetch.failRequest', 'interception-1']]);
+
+    // Without the optional permission no approval can be redeemed, so the text names the file and the grant.
+    expect(outcome).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : ''
+    ).toContain('report.txt');
+    // The token is offered only where it can be spent: without `downloads` nothing can honour it.
+    expect(outcome.kind === 'needs_permission' ? outcome.stepToken : 'unexpected').toBeUndefined();
+  });
+
+  it('continues a pdf document response, which is a page Chrome renders rather than a file', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'interception-2',
+          responseHeaders: [{ name: 'Content-Type', value: 'application/pdf' }],
+          responseStatusCode: 200,
+        });
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+      arguments: { url: `${MAIN_ORIGIN}/file.pdf` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    expect(
+      cdp
+        .sent()
+        .filter(
+          command =>
+            command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+        )
+        .map(command => [command.method, command.params?.['requestId']])
+    ).toStrictEqual([['Fetch.continueResponse', 'interception-2']]);
+    // A rendered document is a page load, and it answers as one.
+    expect(outcome).toMatchObject({ kind: 'result', result: { ok: true } });
+  });
+
+  it('reports a blob download, which no response can stop, as possibly saved', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        // No network response exists for a blob: the announcement is the only thing that names the file.
+        cdp.emit('Browser.downloadWillBegin', {
+          guid: 'blob-1',
+          suggestedFilename: 'blob.txt',
+          url: 'blob:https://app.example.com/6f1a',
+        });
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
       agent: { authorized: [readGrant, actGrant] },
-      arguments: { target: '#pay' },
+      arguments: { target: '#export' },
       caller: agent(),
       tabId: TAB_ID,
       toolName: 'browser_click',
     });
 
     expect(outcome).toMatchObject({
-      kind: 'result',
-      result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
     });
-    expect(cdp.commands()).not.toContain('Input.dispatchMouseEvent');
-  });
+    const message =
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : '';
 
-  it('refuses a navigate without the optional permission, and loads nothing', async () => {
-    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
-
-    const outcome = await runtime.runTool({
-      agent: { authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
-      arguments: { url: `${MAIN_ORIGIN}/invoice.pdf` },
-      caller: agent(),
-      tabId: TAB_ID,
-      toolName: 'browser_navigate',
-    });
-
-    // A page can start a download on load: no guard, no load.
-    expect(outcome).toMatchObject({
-      kind: 'result',
-      result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
-    });
-    expect(cdp.commands()).not.toContain('Page.navigate');
+    // Honest, not a claim that nothing was written: the file may exist under the name the page gave it.
+    expect(message).toContain('blob.txt');
+    expect(message).toContain('may have been saved');
   });
 
   it('leaves no tab listener behind when the optional permission is missing', async () => {
@@ -1206,7 +1479,7 @@ describe('agent browser calls', () => {
       },
       query: async () => [{ id: TAB_ID, title: 'Example', url: `${MAIN_ORIGIN}/dashboard` }],
     };
-    const { runtime } = await createHarness({ downloadsGranted: false, tabsApi });
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false, tabsApi });
 
     const click = () =>
       runtime.runTool({
@@ -1217,12 +1490,10 @@ describe('agent browser calls', () => {
         toolName: 'browser_click',
       });
 
-    // The refusal returns before the guard exists, so the tab listener it would have fed is never registered.
-    await expect(click()).resolves.toMatchObject({
-      kind: 'result',
-      result: { error: DOWNLOAD_PERMISSION_MISSING_ERROR, ok: false },
-    });
+    // The response interceptor is the guard, so nothing subscribes to the item stream it cannot read.
+    await expect(click()).resolves.toMatchObject({ kind: 'result', result: { ok: true } });
     expect(created.size).toBe(0);
+    expect(cdp.commands()).toContain('Fetch.disable');
   });
 
   it('runs a download call unguarded once with the approval token, then burns it', async () => {
@@ -3455,6 +3726,10 @@ describe('agent browser calls', () => {
       readonly plain?: boolean;
       /** The Downloads permission is gone by the time the guard is armed: revoked after the pre-open check. */
       readonly revokeAfterOpen?: boolean;
+      /** The opened tab reports an empty url, as Chrome does without the `tabs` permission. */
+      readonly unreadableTabUrl?: boolean;
+      /** No file is in the browser's download history, so the guard's search cannot claim one. */
+      readonly noSeededFile?: boolean;
     } = {}
   ) => {
     const downloads = createFakeDownloads();
@@ -3501,8 +3776,13 @@ describe('agent browser calls', () => {
         }
 
         // A blank tab is one whose navigate never committed a document: the guard cannot see the page move.
-        return options.blankTab === true
-          ? { id: newTab, title: '', url: 'about:blank' }
+        if (options.blankTab === true) {
+          return { id: newTab, title: '', url: 'about:blank' };
+        }
+
+        // A tab Chrome will not describe without the `tabs` permission: the url is empty, not `about:blank`.
+        return options.unreadableTabUrl === true
+          ? { id: newTab, title: '', url: '' }
           : { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt` };
       },
       onCreated: {
@@ -3551,8 +3831,11 @@ describe('agent browser calls', () => {
       tabsApi,
     });
 
-    // The file the approved repeat keeps, as the browser reports it once it is written.
-    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+    // The file the approved repeat keeps, as the browser reports it once it is written. A case about the answer's
+    // Text rather than the download leaves the history empty, so the guard's search cannot claim a file.
+    if (options.noSeededFile !== true) {
+      downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
+    }
 
     /**
      * A navigate the test answers by hand, so two calls can be interleaved on purpose. One waiter per navigate, in
@@ -3932,21 +4215,18 @@ describe('agent browser calls', () => {
     }
   });
 
-  it('closes the tab it opened when the downloads permission is revoked before the guard', async () => {
-    // The pre-open check sees the permission; the guard, armed after the tab exists, does not.
+  it('opens the tab and intercepts its document when the permission is revoked before the guard', async () => {
+    // The pre-open check and the guard read the same permission, so the call runs with the response interceptor
+    // Instead of refusing: the tab it opened is the call's, not a leftover for the next call to inherit.
     const fixture = await tabsNewFixture({ revokeAfterOpen: true });
 
-    const outcome = await fixture.run(agent());
+    await fixture.run(agent());
 
-    if (outcome.kind !== 'result' || outcome.result.ok) {
-      throw new Error(`expected the permission refusal, got ${JSON.stringify(outcome)}`);
-    }
-
-    // The opened tab is not left in the session's group for the next call to inherit.
-    expect([outcome.result.error, fixture.removed]).toStrictEqual([
-      DOWNLOAD_PERMISSION_MISSING_ERROR,
-      [fixture.newTab],
-    ]);
+    expect(fixture.created).toHaveLength(1);
+    expect(fixture.cdp.commands()).toStrictEqual(
+      expect.arrayContaining(['Fetch.enable', 'Fetch.disable'])
+    );
+    expect(fixture.removed).toStrictEqual([]);
   });
 
   it('holds the driven tab until its guard has settled, so the panel download survives', async () => {
@@ -4210,20 +4490,18 @@ describe('agent browser calls', () => {
     }
   });
 
-  it('refuses a guarded tabs-new without the downloads permission before it opens a tab', async () => {
+  it('runs a guarded tabs-new without the downloads permission under the response interceptor', async () => {
     const fixture = await tabsNewFixture({ granted: false });
 
-    const outcome = await fixture.run(agent());
+    await fixture.run(agent());
 
-    // The refusal names the missing permission, and no tab was created, grouped or left for the next call.
-    if (outcome.kind !== 'result' || outcome.result.ok) {
-      throw new Error(`expected the permission refusal, got ${JSON.stringify(outcome)}`);
-    }
-
-    expect([outcome.result.error, fixture.created.length]).toStrictEqual([
-      DOWNLOAD_PERMISSION_MISSING_ERROR,
-      0,
-    ]);
+    // The tab is opened and its document paused rather than the call being refused: a user who declined the
+    // Permission keeps the browser, and a page that starts no download answers as it always did.
+    expect(fixture.created).toHaveLength(1);
+    // The intercept is armed for the call and released with it, so the tab keeps its own speed afterwards.
+    expect(fixture.cdp.commands()).toStrictEqual(
+      expect.arrayContaining(['Fetch.enable', 'Fetch.disable'])
+    );
   });
 
   it('refuses a repeat whose step tab was closed, without burning its token', async () => {
@@ -4264,6 +4542,78 @@ describe('agent browser calls', () => {
     }
 
     expect(outcome.withheldFrames).toStrictEqual([FRAME_ORIGIN]);
+  });
+
+  it('names the tab a guarded tabs-new opened when the navigation leaves a dialog open on it', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+
+    // The destination page opens a dialog as it loads, and nothing answers it.
+    fixture.cdp.setHandlers({
+      'Page.navigate': () => {
+        // The document commits, then its script opens the dialog: the frame tree reports the origin it committed with.
+        fixture.cdp.emitOn(fixture.newTab, 'Page.frameNavigated', {
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/report.txt` },
+        });
+        fixture.cdp.emitOn(fixture.newTab, 'Page.javascriptDialogOpening', {
+          // The frame that opened it is the tab's own document; the harness's frame tree reports its origin.
+          frameId: 'main',
+          message: 'Saved',
+          type: 'alert',
+          // `url` is required by the protocol: the page that opened the dialog.
+          url: `${MAIN_ORIGIN}/report.txt`,
+        });
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await fixture.run(agent());
+
+    if (outcome.kind !== 'result') {
+      throw new Error(`expected a result, got ${outcome.kind}`);
+    }
+
+    // The dialog is what the caller acts on next, and the tab it acted on stays named: its id and url are how the
+    // Caller answers the dialog on that tab.
+    expect(outcome.result.ok ? outcome.result.value : '').toBe(
+      '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by browser_handle_dialog\n\n' +
+        `The call opened tab ${String(fixture.newTab)} (${MAIN_ORIGIN}/report.txt).`
+    );
+    // The page cannot report its frames while its dialog is open, so this answer claims nothing about them.
+    expect(outcome).not.toHaveProperty('withheldFrames');
+  });
+
+  it('falls back to the url the step opened when the tab reports an empty one under its dialog', async () => {
+    const fixture = await tabsNewFixture({
+      noSeededFile: true,
+      plain: true,
+      unreadableTabUrl: true,
+    });
+
+    fixture.cdp.setHandlers({
+      'Page.navigate': () => {
+        fixture.cdp.emitOn(fixture.newTab, 'Page.javascriptDialogOpening', {
+          message: 'Saved',
+          type: 'alert',
+          url: `${MAIN_ORIGIN}/report.txt`,
+        });
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await fixture.run(agent());
+
+    if (outcome.kind !== 'result') {
+      throw new Error(`expected a result, got ${outcome.kind}`);
+    }
+
+    const text = outcome.result.ok ? String(outcome.result.value) : '';
+
+    // A tab Chrome reports without a url must not print an empty pair of brackets: the guarded step opens it blank,
+    // And that url is what the branch below already falls back to.
+    expect(text).toContain(`The call opened tab ${String(fixture.newTab)} (about:blank).`);
+    expect(text).not.toContain('()');
   });
 
   const refusalSchema = z.object({
@@ -5612,5 +5962,1513 @@ describe('agent browser calls', () => {
     expect(String(result.value)).toContain('leaked frame text');
     expect(withheldFrames).toBeUndefined();
     expect(ORIGIN_CHANGED_ERROR).toBeTruthy();
+  });
+});
+
+/** Page commands the renderer cannot answer while a JavaScript dialog is open, as measured on Chromium. */
+const RENDERER_COMMANDS = [
+  'Accessibility.getFullAXTree',
+  'DOM.describeNode',
+  'DOM.getBoxModel',
+  'DOM.getDocument',
+  'DOM.querySelectorAll',
+  'DOM.resolveNode',
+  'DOM.scrollIntoViewIfNeeded',
+  'Emulation.setFocusEmulationEnabled',
+  'Page.captureScreenshot',
+  'Page.getFrameTree',
+  'Page.getLayoutMetrics',
+  'Runtime.callFunctionOn',
+  'Runtime.evaluate',
+  'Target.setAutoAttach',
+] as const;
+
+/**
+ * Chrome around a JavaScript dialog: the page opens it from a click's handler
+ * (or, with `opener`, from another command), and from then on neither that
+ * command nor any renderer command answers until `Page.handleJavaScriptDialog`
+ * closes the dialog.
+ */
+const pageDialog = (
+  cdp: FakeCdp,
+  dialog: {
+    /** `null` emits no frame id, the case where the browser named no frame. */
+    readonly frameId?: string | null;
+    readonly message: string;
+    readonly type: string;
+    readonly url?: string;
+  },
+  opener = 'Input.dispatchMouseEvent'
+) => {
+  // The dialog the page holds open, closed by its answer.
+  const page: { open?: PromiseWithResolvers<void> } = {};
+  const answers: Record<string, unknown>[] = [];
+  const handlers: Record<string, CdpHandler> = {};
+  // Declines to answer itself, so the fake's own answer follows once the dialog is closed.
+  const blocked: CdpHandler = async () => {
+    await page.open?.promise;
+  };
+
+  for (const method of RENDERER_COMMANDS) {
+    handlers[method] = blocked;
+  }
+
+  handlers[opener] = async params => {
+    await page.open?.promise;
+
+    // A click's handler runs on the release; any other opener opens the dialog on its own.
+    if (opener === 'Input.dispatchMouseEvent' && params?.['type'] !== 'mouseReleased') {
+      return;
+    }
+
+    const opened = Promise.withResolvers<void>();
+
+    page.open = opened;
+    // Chrome reports the frame that opened the dialog; its origin comes from the frame tree the browser computed.
+    const { frameId = 'main', ...rest } = dialog;
+
+    cdp.emit('Page.javascriptDialogOpening', {
+      ...(frameId === null ? {} : { frameId }),
+      url: `${MAIN_ORIGIN}/dashboard`,
+      ...rest,
+    });
+    await opened.promise;
+  };
+  handlers['Page.handleJavaScriptDialog'] = params => {
+    answers.push(params ?? {});
+    cdp.emit('Page.javascriptDialogClosed', { result: params?.['accept'] === true });
+    page.open?.resolve();
+    delete page.open;
+
+    return {};
+  };
+  cdp.setHandlers(handlers);
+
+  return { answers, blocked };
+};
+
+const ALERT_STATE =
+  '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by browser_handle_dialog';
+
+describe('agent browser calls on a page with a JavaScript dialog', () => {
+  const call = (runtime: BrowserRuntime, toolName: string, args: Record<string, unknown> = {}) =>
+    runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: args,
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName,
+    });
+
+  it('answers a click that opens a dialog with the modal state instead of waiting for the click', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: { ok: true, value: ALERT_STATE },
+    });
+  });
+
+  it('refuses every other tool on the tab until the dialog is answered, without touching the page', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+    await call(runtime, 'browser_click', { target: '#save' });
+    const sentBefore = cdp.commands().length;
+
+    await expect(call(runtime, 'browser_snapshot')).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        error: `Tool "browser_snapshot" does not handle the modal state.\n\n${ALERT_STATE}`,
+        ok: false,
+      },
+    });
+    await expect(
+      call(runtime, 'browser_navigate', { url: `${MAIN_ORIGIN}/next` })
+    ).resolves.toMatchObject({ result: { ok: false } });
+    expect(cdp.commands()).toHaveLength(sentBefore);
+  });
+
+  it('accepts a prompt with the text given, and the tab takes other tools again', async () => {
+    const { cdp, runtime } = await createHarness();
+    const dialog = pageDialog(cdp, { message: 'Your name?', type: 'prompt' });
+
+    await call(runtime, 'browser_click', { target: '#ask' });
+
+    await expect(
+      call(runtime, 'browser_handle_dialog', { accept: true, promptText: 'Ada' })
+    ).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'prompt' } },
+    });
+    expect(dialog.answers).toStrictEqual([{ accept: true, promptText: 'Ada' }]);
+    expect(String(expectResult(await call(runtime, 'browser_snapshot')).result.value)).toContain(
+      'Pay now'
+    );
+  });
+
+  it('dismisses a confirm', async () => {
+    const { cdp, runtime } = await createHarness();
+    const dialog = pageDialog(cdp, { message: 'Delete it?', type: 'confirm' });
+
+    await call(runtime, 'browser_click', { target: '#delete' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: false })).resolves.toMatchObject({
+      result: { ok: true, value: { accepted: false, type: 'confirm' } },
+    });
+    expect(dialog.answers).toStrictEqual([{ accept: false }]);
+  });
+
+  it('answers any call during which the page opens a dialog, not only a click', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' }, 'Accessibility.getFullAXTree');
+
+    await expect(call(runtime, 'browser_snapshot')).resolves.toStrictEqual({
+      kind: 'result',
+      result: { ok: true, value: ALERT_STATE },
+    });
+  });
+
+  it('withholds the message of a dialog from a frame the agent may not read', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The widget frame (f1) is cross-origin and the agent holds no read grant for it.
+    pageDialog(cdp, {
+      frameId: 'f1',
+      message: 'Card declined',
+      type: 'alert',
+      url: `${FRAME_ORIGIN}/widget`,
+    });
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog (message withheld: no read permission for the frame that opened it)]: can be handled by browser_handle_dialog',
+      },
+    });
+  });
+
+  it('withholds the message of an about:blank dialog whose creating frame is cross-origin', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Pay now?', type: 'confirm', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // The browser reports the blank frame's origin as the pay frame's, which is what decides both the reading and the answer.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+            { frame: { id: 'blank', securityOrigin: payOrigin, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+
+    await expect(call(runtime, 'browser_click', { target: '#pay' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["confirm" dialog (message withheld: no read permission for the frame that opened it)]: can be handled by browser_handle_dialog',
+      },
+    });
+  });
+
+  it('shows an about:blank dialog’s message when its creating frame is an origin the agent may read', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The blank frame the top page created carries the tab's origin, which the harness's read grant covers.
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'blank', securityOrigin: MAIN_ORIGIN, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+
+    const shown = await call(runtime, 'browser_click', { target: '#save' });
+
+    expect(shown.kind === 'result' && shown.result.ok ? String(shown.result.value) : '').toContain(
+      'dialog with message "Saved"'
+    );
+  });
+
+  it('judges a dialog answer by the origin of the frame that opened it, not the tab’s document', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    // A confirm opened by a cross-origin frame: its handler resumes in that frame when answered.
+    pageDialog(
+      cdp,
+      { frameId: 'pay', message: 'Pay now?', type: 'confirm', url: `${payOrigin}/checkout` },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    // The tab's own act grant covers nothing here: the answer acts in the frame's origin.
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: payOrigin }],
+      kind: 'needs_permission',
+      result: {
+        error: NEEDS_PERMISSION_ERROR,
+        ok: false,
+      },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+  });
+
+  it('answers an about:blank dialog from a frame the top page created with the tab’s own grant', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // A blank frame the top document created inherits the tab's origin; the browser says so in its frame tree.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'blank', securityOrigin: MAIN_ORIGIN, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'alert' } },
+    });
+  });
+
+  it('requires the cross-origin creator’s grant for an about:blank dialog it opened, not the tab’s', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(
+      cdp,
+      { frameId: 'blank', message: 'Pay now?', type: 'confirm', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    // The pay frame created the blank frame, so the browser reports the blank frame's origin as the pay one.
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+            { frame: { id: 'blank', securityOrigin: payOrigin, url: 'about:blank' } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    // The tab's act grant covers nothing here: the answer resumes a handler in the pay origin.
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: payOrigin }],
+      kind: 'needs_permission',
+      result: { error: NEEDS_PERMISSION_ERROR, ok: false },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+
+    // Granted on the creator's origin, the same answer goes through.
+    await expect(
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant, { class: 'act', origin: payOrigin }] },
+        arguments: { accept: true },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_handle_dialog',
+      })
+    ).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'confirm' } },
+    });
+  });
+
+  it('refuses a dialog whose frame the browser never named, rather than guessing from its url', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(
+      cdp,
+      // A blank url alone would look like the tab's own origin; without the frame it is unknowable.
+      { frameId: null, message: 'Saved', type: 'alert', url: 'about:blank' },
+      'Runtime.evaluate'
+    );
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toMatchObject({
+      items: [{ class: 'act', origin: 'opaque:null' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('still refuses a dialog from a genuinely opaque frame, which inherits nothing', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, {
+      frameId: null,
+      message: 'Saved',
+      type: 'alert',
+      url: 'data:text/html,<p>hi</p>',
+    });
+    await call(runtime, 'browser_click', { target: '#save' });
+
+    await expect(call(runtime, 'browser_handle_dialog', { accept: true })).resolves.toStrictEqual({
+      items: [{ class: 'act', origin: 'opaque:null' }],
+      kind: 'needs_permission',
+      result: { error: NEEDS_PERMISSION_ERROR, ok: false },
+      step: {
+        argumentsHash: hashBrowserToolArguments({ accept: true }),
+        tool: 'browser_handle_dialog',
+      },
+    });
+  });
+
+  it('answers a dialog a granted frame opened once that frame’s origin is granted', async () => {
+    const { cdp, runtime } = await createHarness();
+    const payOrigin = 'https://pay.example.com';
+
+    pageDialog(
+      cdp,
+      { frameId: 'pay', message: 'Pay now?', type: 'confirm', url: `${payOrigin}/checkout` },
+      'Runtime.evaluate'
+    );
+    cdp.setHandlers({
+      'Page.getFrameTree': () => ({
+        frameTree: {
+          childFrames: [
+            { frame: { id: 'pay', securityOrigin: payOrigin, url: `${payOrigin}/checkout` } },
+          ],
+          frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: `${MAIN_ORIGIN}/dashboard` },
+        },
+      }),
+    });
+    await call(runtime, 'browser_click', { target: '#pay' });
+
+    const answered = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant, { class: 'act', origin: payOrigin }] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+
+    expect(answered).toMatchObject({
+      kind: 'result',
+      result: { ok: true, value: { accepted: true, type: 'confirm' } },
+    });
+  });
+
+  it('tells a safe-mode panel the dialog is the user’s to answer, naming no tool it cannot call', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(
+      runtime.runTool({
+        arguments: { target: '#save' },
+        caller: panel(),
+        safeMode: true,
+        tabId: TAB_ID,
+        // The agent session holds this tab, so the panel's call is a take-over first.
+        takeOver: true,
+        toolName: 'kilo_browser_click',
+      })
+    ).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog with message "Saved"]: answer it on the page; this mode cannot answer dialogs',
+      },
+    });
+  });
+
+  it('names the panel’s own answering tool to the panel', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    pageDialog(cdp, { message: 'Saved', type: 'alert' });
+
+    await expect(
+      runtime.runTool({
+        arguments: { target: '#save' },
+        caller: panel(),
+        tabId: TAB_ID,
+        // The agent session holds this tab, so the panel's call is a take-over first.
+        takeOver: true,
+        toolName: 'kilo_browser_click',
+      })
+    ).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        ok: true,
+        value:
+          '### Modal state\n- ["alert" dialog with message "Saved"]: can be handled by kilo_browser_handle_dialog',
+      },
+    });
+  });
+
+  it('refuses, rather than asks about, a call whose page checks a dialog interrupted', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The page opens the dialog while the call's own checks read it, before the click runs.
+    pageDialog(cdp, { message: 'Saved', type: 'alert' }, 'Runtime.callFunctionOn');
+
+    await expect(call(runtime, 'browser_click', { target: '#save' })).resolves.toStrictEqual({
+      kind: 'result',
+      result: {
+        error: `Tool "browser_click" does not handle the modal state.\n\n${ALERT_STATE}`,
+        ok: false,
+      },
+    });
+  });
+
+  it('keeps the approval of a sensitive step that an open dialog refused', async () => {
+    const { cdp, runtime } = await createHarness();
+    const type = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#cc', text: 'hunter2' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_type',
+      });
+
+    cdp.setProbe({ fields: [{ kind: 'password' }], paymentFormSubmit: false });
+    const stepToken = expectStepToken(await type([]));
+
+    cdp.emit('Page.javascriptDialogOpening', {
+      frameId: 'main',
+      message: 'Saved',
+      type: 'alert',
+      url: `${MAIN_ORIGIN}/dashboard`,
+    });
+    await expect(type([stepToken])).resolves.toMatchObject({ result: { ok: false } });
+    await call(runtime, 'browser_handle_dialog', { accept: true });
+
+    // The refusal ran no check, so the approval is still there for the step it was given for.
+    await expect(type([stepToken])).resolves.toMatchObject({
+      kind: 'result',
+      result: { ok: true },
+    });
+  });
+
+  it('turns frame auto-attach on after a dialog that was open at the session’s first call is answered', async () => {
+    const { cdp, runtime } = await createHarness();
+
+    // The panel's snapshot meets the dialog, so the agent's first call finds it open.
+    const dialog = pageDialog(
+      cdp,
+      { message: 'Saved', type: 'alert' },
+      'Accessibility.getFullAXTree'
+    );
+    await runtime.runTool({
+      arguments: {},
+      caller: panel(),
+      tabId: TAB_ID,
+      toolName: 'kilo_browser_snapshot',
+    });
+    runtime.releaseCaller(panel());
+    await call(runtime, 'browser_handle_dialog', { accept: true });
+    cdp.setHandlers({ 'Accessibility.getFullAXTree': dialog.blocked });
+    await call(runtime, 'browser_snapshot');
+
+    expect(cdp.commands().filter(method => method === 'Target.setAutoAttach')).toHaveLength(1);
+  });
+});
+
+describe('the download hold on a real call', () => {
+  /** A hold over the fake downloads, with the reports it queued in order. */
+  const holdOver = (downloads: FakeDownloads) => {
+    const reports: DownloadHoldReport[] = [];
+    const hold = createDownloadHold({
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      onReport: report => reports.push(report),
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
+    });
+
+    return { hold, reports };
+  };
+
+  it('names browser_tabs new for a file the step’s own tab started, not the earlier navigate on the caller’s', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const created: Record<string, unknown>[] = [];
+    const newTab = TAB_ID + 6;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: dashboard, windowId: 1 },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: () => {},
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: dashboard, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+    const authorized = [readGrant, actGrant, { class: 'navigate' as const, origin: MAIN_ORIGIN }];
+
+    // A navigation downloads with no referrer and no announcement: the item's url, and the call's own
+    // Expectation, are the only ties the hold has to the tab that asked for the file.
+    cdp.setHandlers({
+      'Page.navigate': (_params, target) => {
+        if (target?.tabId === newTab) {
+          hold.handle({ id: 71, url }, () => {});
+        }
+
+        return { frameId: 'main' };
+      },
+    });
+
+    // The caller's tab navigated a moment ago, so its expectation is still live while the tabs call runs.
+    const navigated = await runtime.runTool({
+      agent: { authorized },
+      arguments: { url: dashboard },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    expect(navigated.kind).toBe('result');
+
+    const guarded = await runtime.runTool({
+      agent: { authorized },
+      arguments: { action: 'new', url },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_tabs',
+    });
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    // The file belongs to the tab the step opened, so the step the model repeats is the call it made.
+    expect(guarded.step).toStrictEqual({
+      argumentsHash: hashBrowserToolArguments({ action: 'new', url }),
+      tool: 'browser_tabs',
+    });
+    expect(downloads.cancelled).toStrictEqual([71]);
+    // The tab opens blank, and the url loads through the guarded navigate on it.
+    expect([created.length, created[0]?.['url']]).toStrictEqual([1, 'about:blank']);
+  });
+
+  it('arms the approval before the tool runs, so its file lands and the second file is refused and reported', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const first = { filename: 'report.txt', id: 71, url: `${MAIN_ORIGIN}/report.txt` };
+    const second = { filename: 'second.txt', id: 72, url: `${MAIN_ORIGIN}/second.txt` };
+    const suggested: number[] = [];
+
+    // One click starts two files: the approved target, then the one the approval does not cover. The press is the
+    // Event that starts them, and the release that follows starts nothing.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          for (const file of [first, second]) {
+            hold.handle({ id: file.id, referrer: dashboard, url: file.url }, () => {
+              suggested.push(file.id);
+            });
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const guarded = await click();
+
+    expect(guarded.kind).toBe('needs_permission');
+    expect(suggested).toStrictEqual([71, 72]);
+    // Both files were stopped, and both are named: the approval is for one of them.
+    expect(
+      guarded.kind === 'needs_permission' && !guarded.result.ok ? guarded.result.error : ''
+    ).toContain('second.txt');
+
+    const token = expectStepToken(guarded);
+
+    suggested.length = 0;
+
+    const approved = await click([token]);
+
+    if (approved.kind !== 'result') {
+      throw new Error(`expected the approved file to land, got ${JSON.stringify(approved)}`);
+    }
+
+    // The approved file was let through before the tool ran, and the second was stopped in the same gesture.
+    expect(hold.needOf('session-1')?.kind).toBe('spent');
+    expect(suggested).toStrictEqual([71, 72]);
+    expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
+    expect(downloads.cancelled).toStrictEqual([71, 72, 72]);
+  });
+
+  it('names the step’s own file when the browser stops a second one first', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const own = { filename: 'report.txt', id: 61, url: `${MAIN_ORIGIN}/download` };
+    const extra = { filename: 'second.txt', id: 62, url: `${MAIN_ORIGIN}/download-second` };
+    const suggested: number[] = [];
+    let repeat = false;
+
+    // The click navigates the tab to the link's own attachment; the page script starts a second, different file.
+    // Measured on real Chrome, that second file is refused 8 ms before the link's, so the stop order says nothing.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          const files = repeat
+            ? [
+                { filename: 'second.txt', id: 64, url: extra.url },
+                { filename: 'report.txt', id: 63, url: own.url },
+              ]
+            : [extra, own];
+
+          cdp.emit('Network.requestWillBeSent', {
+            request: { method: 'GET', url: own.url },
+            requestId: repeat ? 'repeat-document' : 'click-document',
+            type: 'Document',
+          });
+
+          for (const file of files) {
+            hold.handle(
+              { filename: file.filename, id: file.id, referrer: dashboard, url: file.url },
+              () => {
+                suggested.push(file.id);
+              }
+            );
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const guarded = await click();
+    const refused =
+      guarded.kind === 'needs_permission' && !guarded.result.ok ? guarded.result.error : '';
+
+    // The one approval is for the link's own file — the document this call asked for — and the second file is named
+    // Beside it, so the human is never asked for a file the model did not ask for.
+    expect(refused).toContain('The download of report.txt was stopped');
+    expect(refused).toContain('second.txt');
+
+    const token = expectStepToken(guarded);
+
+    suggested.length = 0;
+    repeat = true;
+
+    const approved = await click([token]);
+
+    if (approved.kind !== 'result') {
+      throw new Error(`expected the approved file to land, got ${JSON.stringify(approved)}`);
+    }
+
+    // The same gesture again: the approval keeps the link's file and stops the script's, which is reported on this
+    // Very call, and the approval is spent on exactly the file it bought.
+    expect(hold.needOf('session-1')?.kind).toBe('spent');
+    expect(downloads.cancelled).toStrictEqual([62, 61, 64]);
+    expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
+  });
+
+  it('names the step’s own file when both files are documents and the sibling arrives first', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const own = { filename: 'report.txt', id: 81, url: `${MAIN_ORIGIN}/assets/report.txt?click=1` };
+    const extra = {
+      filename: 'second.txt',
+      id: 82,
+      url: `${MAIN_ORIGIN}/assets/second.txt?click=1`,
+    };
+    const suggested: number[] = [];
+    let repeat = false;
+
+    // Both files of the measured gesture are `Document` requests, so the set of this call's documents names neither:
+    // Only their order does. The click's own link is requested first, and the page script's file follows. Here the
+    // Browser stops the script's file first, which is what the failing trace showed.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          for (const url of [own.url, extra.url]) {
+            cdp.emit('Network.requestWillBeSent', {
+              request: { method: 'GET', url },
+              requestId: `${repeat ? 'repeat' : 'click'}-document-${url}`,
+              type: 'Document',
+            });
+          }
+
+          const items = repeat
+            ? [
+                { file: extra, id: 84 },
+                { file: own, id: 83 },
+              ]
+            : [
+                { file: extra, id: 82 },
+                { file: own, id: 81 },
+              ];
+
+          for (const { file, id } of items) {
+            hold.handle({ filename: file.filename, id, referrer: dashboard, url: file.url }, () => {
+              suggested.push(id);
+            });
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const guarded = await click();
+    const refused =
+      guarded.kind === 'needs_permission' && !guarded.result.ok ? guarded.result.error : '';
+
+    // The approval buys the step's own file — the one this call requested first — and the sibling is named beside it.
+    expect(refused).toContain('The download of report.txt was stopped');
+    expect(refused).toContain('second.txt');
+
+    const token = expectStepToken(guarded);
+
+    suggested.length = 0;
+    repeat = true;
+
+    const approved = await click([token]);
+
+    if (approved.kind !== 'result') {
+      throw new Error(`expected the approved file to land, got ${JSON.stringify(approved)}`);
+    }
+
+    // The approval is spent on the file it named, whichever order the browser stopped the two in.
+    expect(hold.needOf('session-1')).toMatchObject({
+      filename: 'report.txt',
+      kind: 'spent',
+      target: { kind: 'url', url: own.url },
+    });
+    // The sibling was stopped on both gestures; the step's own file was cancelled only on the guarded one.
+    expect([...downloads.cancelled].toSorted((left, right) => left - right)).toStrictEqual([
+      81, 82, 84,
+    ]);
+    // The approved file was let through, never stopped, and the sibling was stopped again and reported.
+    expect(suggested).toStrictEqual([83, 84]);
+    expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
+  });
+
+  it('answers an approved call the browser named no item for, and keeps the approval unspent', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    let repeat = false;
+
+    // The guarded click starts the file and the hold stops it. The approved repeat's own file never reaches the
+    // Hold at all: Chrome's multiple-downloads limiter refuses it, so no item is ever named for it.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed' && !repeat) {
+          hold.handle({ filename: 'report.txt', id: 51, referrer: dashboard, url }, () => {});
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    // The guarded click starts the file and the hold stops it, so the refusal asks for the one file an approval buys.
+    const guarded = await click();
+    const token = expectStepToken(guarded);
+
+    repeat = true;
+
+    // The approved call waits the hold's own bound for the item its approval bought; the browser creates none, and
+    // The call answers with what that means.
+    const approved = await click([token]);
+
+    // The one approval bought a file the browser never created: the model is told the browser refused it, and the
+    // Approval is still unspent, so the repeat needs no second decision once the site is allowed.
+    expect(approved).toMatchObject({
+      afterAction: true,
+      kind: 'needs_permission',
+      result: { error: DOWNLOAD_BLOCKED_BY_BROWSER_ERROR, ok: false },
+    });
+    expect(hold.needOf('session-1')?.kind).toBe('armed');
+    expectStepToken(approved);
+    expect(downloads.cancelled).toStrictEqual([51]);
+  });
+
+  /**
+   * The hold's own map of announcements is filled by the start-of-call drains, which are empty for the call that
+   * actually starts the file. A page that hides its referrer leaves the item naming no tab at all, so the
+   * announcement the tab makes while the tool runs is the only thing that can attribute it.
+   */
+  it('claims a no-referrer file the tab announces during the call, instead of letting it go as foreign', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const url = `${MAIN_ORIGIN}/report.txt`;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        // One press per click: the release that follows starts nothing.
+        if (params?.['type'] === 'mousePressed') {
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: 'no-referrer-1',
+            suggestedFilename: 'report.txt',
+            url,
+          });
+          // The item carries no referrer at all, which is what a `no-referrer` page produces.
+          hold.handle({ id: 61, url }, () => {});
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The file belongs to this tab, so it is cancelled and reported as the agent's rather than saved as the user's.
+    await vi.waitFor(() => {
+      expect(downloads.cancelled).toStrictEqual([61]);
+    });
+    expect(outcome.kind).toBe('needs_permission');
+    expect(
+      outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : ''
+    ).toContain('report.txt');
+  });
+
+  it('does not blame the browser for an approved repeat whose own tool call failed', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    let repeat = false;
+
+    // The guarded click starts the file and the hold stops it. The repeat then fails in the tool itself — the page
+    // Is gone when the press is dispatched — which starts no download and says nothing about what the browser allowed.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          if (repeat) {
+            throw new Error('The page was closed before the click could be dispatched.');
+          }
+
+          hold.handle({ filename: 'report.txt', id: 52, referrer: dashboard, url }, () => {});
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const guarded = await click([]);
+    const token = expectStepToken(guarded);
+
+    repeat = true;
+
+    const failed = await click([token]);
+    const error =
+      failed.kind === 'result' && !failed.result.ok
+        ? failed.result.error
+        : `expected the tool's own failure, got ${JSON.stringify(failed)}`;
+
+    // The model is told what actually failed, and the approval it already received is still unspent.
+    expect(error).toContain('The page was closed before the click could be dispatched.');
+    expect(error).not.toContain(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+    expect(hold.needOf('session-1')?.kind).toBe('armed');
+    expect(downloads.cancelled).toStrictEqual([52]);
+  });
+
+  /**
+   * Chrome names a download up to 25 ms after the tool's own command answered, which is the whole reason the hold's
+   * no-referrer wait and the settle's sign grace exist. A watch that stopped with the tool would drop that
+   * announcement: the hold's map stays empty, its attribution wait expires, and a no-referrer file is saved.
+   */
+  it('hears an announcement that lands after the tool answered but inside the settle', async () => {
+    const downloads = createFakeDownloads();
+    const { hold: real } = holdOver(downloads);
+    /** Resolves the first time the runtime opens a settle, so the announcement lands squarely inside it. */
+    const { promise: settling, resolve: settleOpened } = Promise.withResolvers<void>();
+    const hold: DownloadHold = {
+      ...real,
+      settle: async (session, window) => {
+        settleOpened();
+
+        return real.settle(session, window);
+      },
+    };
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const url = `${MAIN_ORIGIN}/report.txt`;
+
+    // The tool answers without naming a file: on real Chrome the announcement follows the command it caused.
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const call = runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // Once the call is in its settle, the browser names the file — the late case a watch stopped with the tool drops.
+    await settling;
+
+    try {
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'late-announcement',
+        suggestedFilename: 'report.txt',
+        url,
+      });
+
+      // The item carries no referrer, so the announcement just emitted is the only attribution it has.
+      hold.handle({ filename: 'report.txt', id: 71, url }, () => {});
+
+      const outcome = await call;
+
+      // The hold claimed the late announcement, so the file was stopped and named rather than saved as the user's.
+      expect(downloads.cancelled).toStrictEqual([71]);
+      expect(outcome.kind).toBe('needs_permission');
+      expect(
+        outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : ''
+      ).toContain('report.txt');
+    } finally {
+      await call;
+    }
+  });
+});
+
+/**
+ * A call that took longer than the window its own download was given. The tool is held open while the wall clock
+ * moves past the span, so a bound counted from the call's start would already be spent by the time the settle runs.
+ */
+describe('a download call slower than its settle window', () => {
+  /** A hold that only records what the runtime tells it: the window is the runtime's own decision. */
+  const recordingHold = () => {
+    /** What this stub was asked to remember: an approval it was armed with, and one item it was handed. */
+    const needs = new Map<string, ApprovalNeed>();
+    const items = new Map<number, TrackedDownload>();
+    const settled: SettleWindow[] = [];
+    const navigations: DownloadHoldNavigation[] = [];
+    const at: number[] = [];
+    const hold: DownloadHold = {
+      announce: () => {},
+      arm: need => {
+        needs.set(need.session, need);
+      },
+      closeSession: session => {
+        needs.delete(session);
+      },
+      drain: () => [],
+      handle: () => false,
+      navigate: navigation => {
+        navigations.push(navigation);
+        at.push(Date.now());
+      },
+      needOf: session => needs.get(session),
+      settle: async (_session, window) => {
+        settled.push(window);
+
+        return 'no_sign';
+      },
+      tab: () => {},
+      tracked: itemId => items.get(itemId),
+    };
+
+    return { at, hold, navigations, settled };
+  };
+
+  it('re-dates the navigation expectation when the tool answers, so a slow navigation still claims its file', async () => {
+    const { at, hold, navigations, settled } = recordingHold();
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: createFakeDownloads().api,
+    });
+    const { promise: gated, resolve: answered } = Promise.withResolvers<void>();
+    const url = `${MAIN_ORIGIN}/reports/q4.pdf`;
+
+    cdp.setHandlers({
+      'Page.navigate': async () => {
+        await gated;
+
+        return { frameId: 'main' };
+      },
+    });
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+
+    try {
+      const call = runtime.runTool({
+        agent: { authorized: [readGrant, { class: 'navigate', origin: MAIN_ORIGIN }] },
+        arguments: { url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_navigate',
+      });
+
+      // Let the call reach its own navigation: the expectation is registered before the tool runs.
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The navigation is still running three seconds later: the expectation registered before it has run out.
+      vi.setSystemTime(Date.now() + 3000);
+      answered();
+
+      await call;
+
+      // Two registrations of one navigation: the one sent with the call, and the one its settle entry re-dates.
+      expect(navigations).toHaveLength(2);
+      expect(settled).toHaveLength(1);
+
+      const [sent, extended] = navigations;
+      const [sentAt, extendedAt] = at;
+
+      // It is the same navigation: the file is claimed against the call that sent it, not a new one.
+      expect(extended?.url).toBe(url);
+      expect(extended?.attempt).toBe(sent?.attempt);
+
+      // The tool's own three seconds are what the second registration buys back: it ends a span later than the first.
+      expect((extended?.until ?? 0) - (sent?.until ?? 0)).toBeGreaterThanOrEqual(3000);
+      expect((extendedAt ?? 0) - (sentAt ?? 0)).toBeGreaterThanOrEqual(3000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('a download the dialog answer starts', () => {
+  /** A hold over the fake downloads, with the reports it queued in order. */
+  const holdOver = (downloads: FakeDownloads) => {
+    const reports: DownloadHoldReport[] = [];
+    const hold = createDownloadHold({
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      onReport: report => reports.push(report),
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
+    });
+
+    return { hold, reports };
+  };
+
+  // Chrome always names the frame that opened the dialog, and the answer is judged against that frame's origin.
+  const dialogOpened = (cdp: FakeCdp): void => {
+    cdp.emit('Page.javascriptDialogOpening', {
+      frameId: 'main',
+      message: 'Leave this page?',
+      type: 'confirm',
+      url: `${MAIN_ORIGIN}/dashboard`,
+    });
+  };
+
+  /** The tab's session records a dialog only once it exists, and a read is what creates it. */
+  const warmSession = (runtime: BrowserRuntime) =>
+    runtime.runTool({
+      agent: { authorized: [readGrant] },
+      arguments: {},
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_snapshot',
+    });
+
+  const answerDialog = (runtime: BrowserRuntime, sensitive: readonly string[] = []) =>
+    runtime.runTool({
+      agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+
+  it('refuses the file it starts, and names the answer as the step to repeat', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const url = `${MAIN_ORIGIN}/report.txt`;
+
+    // The click that opened the dialog answered already; its handler resumes inside the answer.
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        hold.handle({ id: 81, referrer: `${MAIN_ORIGIN}/dashboard`, url }, () => {});
+        return {};
+      },
+    });
+    // The tab records a dialog only once its session exists, and the first call is what creates it.
+    await warmSession(runtime);
+    dialogOpened(cdp);
+
+    const guarded = await answerDialog(runtime);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    expect(guarded.step).toStrictEqual({
+      argumentsHash: hashBrowserToolArguments({ accept: true }),
+      tool: 'browser_handle_dialog',
+    });
+    expect(downloads.cancelled).toStrictEqual([81]);
+    expect(expectStepToken(guarded)).toStrictEqual(expect.any(String));
+  });
+
+  it('fails the attachment response when the response interceptor is the guard', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'dialog-1',
+          responseHeaders: [
+            { name: 'Content-Disposition', value: 'attachment; filename="report.txt"' },
+            { name: 'Content-Type', value: 'text/plain' },
+          ],
+          responseStatusCode: 200,
+        });
+
+        return {};
+      },
+    });
+    // The tab records a dialog only once its session exists, and the first call is what creates it.
+    await warmSession(runtime);
+    dialogOpened(cdp);
+
+    const outcome = await answerDialog(runtime);
+    const answers = cdp
+      .sent()
+      .filter(
+        command =>
+          command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+      )
+      .map(command => [command.method, command.params?.['requestId']]);
+
+    expect(answers).toStrictEqual([['Fetch.failRequest', 'dialog-1']]);
+    expect(outcome).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('keeps exactly its file when the repeat carries the token, and refuses the next one', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const first = { id: 81, url: `${MAIN_ORIGIN}/report.txt` };
+    const second = { id: 82, url: `${MAIN_ORIGIN}/second.txt` };
+    const suggested: number[] = [];
+
+    const answerStarts = (file: { readonly id: number; readonly url: string }) => {
+      hold.handle({ ...file, referrer: dashboard }, () => {
+        suggested.push(file.id);
+      });
+    };
+
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        answerStarts(first);
+        return {};
+      },
+    });
+
+    // The tab records a dialog only once its session exists, and the first call is what creates it.
+    await warmSession(runtime);
+    dialogOpened(cdp);
+
+    const guarded = await answerDialog(runtime);
+
+    expect(guarded.kind).toBe('needs_permission');
+
+    const token = expectStepToken(guarded);
+
+    // A second click reopens the dialog, and the answer that carries the token is the approved one.
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        answerStarts(first);
+        answerStarts(second);
+        return {};
+      },
+    });
+    dialogOpened(cdp);
+
+    const approved = await answerDialog(runtime, [token]);
+
+    if (approved.kind !== 'result') {
+      throw new Error(`expected the approved file to land, got ${JSON.stringify(approved)}`);
+    }
+
+    // The approval bought one file: the other the same answer started is refused and reported.
+    expect(hold.needOf('session-1')?.kind).toBe('spent');
+    expect(downloads.cancelled).toStrictEqual([81, 82]);
+    expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
+    expect(suggested).toStrictEqual([81, 81, 82]);
+  });
+
+  it('holds a file the resumed click handler starts after the click already returned with the modal state', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+
+    // The click returns as soon as the dialog opens; its handler resumes only when the answer lands.
+    pageDialog(cdp, { message: 'Download the report?', type: 'confirm' });
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        hold.handle(
+          { id: 91, referrer: `${MAIN_ORIGIN}/dashboard`, url: `${MAIN_ORIGIN}/report.txt` },
+          () => {}
+        );
+
+        return {};
+      },
+    });
+
+    const clicked = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#report' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect(clicked).toMatchObject({ kind: 'result', result: { ok: true } });
+
+    // Two calls later the answer resumes the handler, and the file it starts is held without an approval.
+    const refused = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    // Held before Chrome named a file: the guard cancelled the item.
+    expect(downloads.cancelled).toStrictEqual([91]);
+  });
+
+  it('holds a file an answered dialog loads as an attachment when the response interceptor is the guard', async () => {
+    const { cdp, runtime } = await createHarness({ downloadsGranted: false });
+
+    // The click returns with the modal state; the answer is what resumes the handler that loads the file.
+    pageDialog(cdp, { message: 'Download the report?', type: 'confirm' });
+    cdp.setHandlers({
+      'Page.handleJavaScriptDialog': () => {
+        cdp.emit('Fetch.requestPaused', {
+          requestId: 'dialog-2',
+          responseHeaders: [
+            { name: 'Content-Disposition', value: 'attachment; filename="report.txt"' },
+            { name: 'Content-Type', value: 'text/plain' },
+          ],
+          responseStatusCode: 200,
+        });
+
+        return {};
+      },
+    });
+
+    await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#report' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    const refused = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { accept: true },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_handle_dialog',
+    });
+    const answers = cdp
+      .sent()
+      .filter(
+        command =>
+          command.method === 'Fetch.failRequest' || command.method === 'Fetch.continueResponse'
+      )
+      .map(command => [command.method, command.params?.['requestId']]);
+
+    // The interceptor armed with the dialog open, so the answer's own attachment is failed rather than kept.
+    expect(answers).toStrictEqual([['Fetch.failRequest', 'dialog-2']]);
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('answers a dialog that starts no download without waiting for the hold’s timeout', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+
+    cdp.setHandlers({ 'Page.handleJavaScriptDialog': () => ({}) });
+
+    // The tab records a dialog only once its session exists, and the first call is what creates it.
+    await warmSession(runtime);
+    dialogOpened(cdp);
+
+    const startedAt = performance.now();
+    const answered = await answerDialog(runtime);
+
+    expect(answered.kind).toBe('result');
+    // Nothing was refused, and the call did not sit on the 2 s a download gets: only the start grace passed.
+    expect(downloads.cancelled).toStrictEqual([]);
+    expect(performance.now() - startedAt).toBeLessThan(1500);
   });
 });

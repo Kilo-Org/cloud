@@ -44,6 +44,26 @@ public final class KiloSurfaceGeometryModule: Module {
       self.probes.removeValue(forKey: tag)?.probe?.stop()
     }.runOnQueue(.main)
 
+    // Where the surface's own origin sits in its window, in points, or a
+    // negative value when the view or its window is gone (no read rather than a
+    // guessed one).
+    //
+    // A sheet's presentation is not part of the React tree: the platform slides
+    // the presented controller down over the window, so every JS read of the
+    // sheet's content (`measureInWindow`, `getBoundingClientRect`, the shadow
+    // tree's root metrics) answers the surface's own origin and cannot see the
+    // offset. This converts the surface's zero point into window coordinates
+    // instead, which is what includes that offset, and it is the one read that
+    // differs between a phone whose sheet presents at the window top and one
+    // whose sheet presents below the status bar.
+    AsyncFunction("presentedSurfaceOriginTop") { (tag: Int) -> Double in
+      guard let view = self.appContext?.findView(withTag: tag, ofType: UIView.self),
+            let window = view.window else {
+        return -1
+      }
+      return Double(view.convert(CGPoint.zero, to: window).y)
+    }.runOnQueue(.main)
+
     OnStopObserving {
       self.stopObserving()
     }

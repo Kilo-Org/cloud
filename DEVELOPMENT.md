@@ -399,6 +399,51 @@ An empty credit block list shows no expiring credits, not an error.
 | `pnpm dev:db:reset` | Drop all app-owned schemas in the local dev database, recreate `public`, and leave the DB truly empty before re-migrating |
 | `pnpm --filter web stripe` | Start Stripe webhook forwarding to localhost |
 | `pnpm test:e2e` | Run Playwright end-to-end tests |
+| `pnpm dev:pixel-diff --before <png> --after <png> --out <new-dir>` | Compare existing proof screenshots without uploading them |
+
+## Browser pixel proof
+
+Use your existing web Playwright probe to reach the same settled state on base and head.
+The comparison command takes its PNG output. It does not start a browser or sign in.
+Keep the browser build, viewport, device scale, theme, fixture data, and screenshot coordinates fixed.
+Use the full viewport or the same fixed clip on both revisions, not independently sized element crops.
+Wait for the expected content and fonts before capture. Keep development overlays out of both frames.
+Capture one revision twice to check that the chosen state is stable.
+
+After the probe asserts that the expected state is visible, capture the viewport or a fixed clip:
+
+```ts
+await page.evaluate(() => document.fonts.ready);
+await page.screenshot({ path: outputPath, animations: 'disabled', caret: 'hide' });
+```
+
+Keep both PNGs outside the checkout. Use fixture data, not a real account.
+
+```sh
+pnpm dev:pixel-diff --before /tmp/proof/base.png --after /tmp/proof/head.png \
+  --out /tmp/proof/compare
+```
+
+Read `pixel-diff.json` for counts and boxes in physical pixels.
+The output keeps `comparison.png` and adds `focus.png` when a focus crop helps.
+An inconclusive result does not establish an unchanged screen.
+The comparison adds visual evidence; keep the Playwright assertions for behavior.
+
+For the extension, capture the signed-out side panel once per unpacked Chrome build:
+
+```sh
+pnpm --filter kilo-extension capture:sidepanel-proof \
+  --extension /tmp/proof/base-build --out /tmp/proof/base-panel.png
+pnpm --filter kilo-extension capture:sidepanel-proof \
+  --extension /tmp/proof/head-build --out /tmp/proof/head-panel.png
+pnpm dev:pixel-diff --before /tmp/proof/base-panel.png --after /tmp/proof/head-panel.png \
+  --out /tmp/proof/extension-compare --scale 2
+```
+
+Use fixture builds and the same Chromium executable for both captures.
+Give each capture a new `--out` path, including a repeat of the same build.
+Set `EXTENSION_E2E_EXECUTABLE_PATH` if you need to select that executable.
+This captures the extension document, not browser-owned dialogs or other browser controls.
 
 ## Git Workflow
 

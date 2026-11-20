@@ -61,6 +61,12 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: jest.fn(),
+  logExceptInTest: jest.fn(),
+  errorExceptInTest: jest.fn(),
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
 
 // eslint-disable-next-line no-var
 var mockPosthogCapture: jest.Mock;
@@ -87,6 +93,8 @@ import {
   verifyAdmissionAsync,
   persistAttestedKey,
   KeyCollisionError,
+  countAdmissionCondition,
+  resetAdmissionCountersForTests,
 } from '@/lib/auth/native-admission';
 import {
   createDeviceSession,
@@ -95,6 +103,7 @@ import {
   createDeviceSessionWithCredentials,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   isNativeTokenAddressRateLimited,
   isNativeTokenUserRateLimited,
@@ -105,6 +114,32 @@ import {
   resolvePendingLinkForUser,
   summarizePendingLink,
 } from '@/lib/auth/pending-link';
+
+const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
+
+/**
+ * The admission aggregate flushes on wall-clock window boundaries, so refusal
+ * tests pin the clock and force a flush at a later instant.
+ */
+const now = jest.spyOn(Date, 'now');
+
+/** The aggregate telemetry line the admission module writes once per window. */
+type AggregateLine = {
+  event: 'native_admission_aggregate';
+  metric: string;
+  count: number;
+  intervalMs: number;
+  windowStart: string;
+  at: string;
+};
+
+/** Aggregate lines written to the warn sink so far, in emission order. */
+function aggregateLines(): AggregateLine[] {
+  return mockWarnExceptInTest.mock.calls.flatMap(([message]: unknown[]) => {
+    const parsed = JSON.parse(String(message)) as { event?: string };
+    return parsed.event === 'native_admission_aggregate' ? [parsed as AggregateLine] : [];
+  });
+}
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
@@ -158,6 +193,8 @@ describe('POST /api/auth/native/token', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    now.mockReturnValue(6_000_000);
+    resetAdmissionCountersForTests();
     mockCreateOrUpdateUser.mockResolvedValue({
       success: true,
       user: fakeUser,
@@ -1359,7 +1396,16 @@ describe('POST /api/auth/native/token', () => {
     });
 
     it('refuses a failed verdict before reserving the sign-in code', async () => {
-      mockVerifyAdmissionAsync.mockResolvedValue({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: false,
+        errorCode: 'ADMISSION_REQUIRED',
+        detail: {
+          reason: 'integrity_device_not_recognized',
+          source: 'play_integrity',
+          proofPlatform: 'android',
+          proofKind: 'assertion',
+        },
+      });
 
       const response = await POST(
         createRequest({
@@ -1444,6 +1490,89 @@ describe('POST /api/auth/native/token', () => {
       }
     );
 
+    it('names the unknown-key recovery on the refusal and nothing else', async () => {
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: false,
+        errorCode: 'ADMISSION_REQUIRED',
+        recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+        detail: {
+          reason: 'assertion_key_unknown',
+          source: 'apple',
+          proofPlatform: 'ios',
+          proofKind: 'assertion',
+        },
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          admission: { platform: 'ios' },
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'ADMISSION_REQUIRED',
+        recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+      });
+      // Answered before any side effect: the retry the hint invites can neither
+      // spend a provider call, an OTP reservation, nor settle an account.
+      expect(mockVerifyNativeAppleIdToken).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockReserveSignInCode).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('adds no recovery field when the proof is missing', async () => {
+      mockRequireAdmissionPayload.mockReturnValue(undefined);
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'new@example.com',
+          code: '123456',
+          admission: { platform: 'android' },
+        })
+      );
+
+      expect(response.status).toBe(403);
+      const body: unknown = await response.json();
+      // The old body, byte for byte: no extra key on any other refusal.
+      expect(body).toEqual({ error: 'ADMISSION_REQUIRED' });
+      expect(Object.keys(body as Record<string, unknown>)).toEqual(['error']);
+    });
+
+    it.each(['ADMISSION_REQUIRED', 'INVALID_CODE'])(
+      'adds no recovery field for a %s refusal that names none',
+      async errorCode => {
+        mockVerifyAdmissionAsync.mockResolvedValue({
+          ok: false,
+          errorCode,
+          detail: {
+            reason: 'assertion_invalid',
+            source: 'apple',
+            proofPlatform: 'ios',
+            proofKind: 'assertion',
+          },
+        });
+
+        const response = await POST(
+          createRequest({
+            provider: 'email',
+            email: 'new@example.com',
+            code: '123456',
+            admission: { platform: 'android' },
+          })
+        );
+
+        expect(response.status).toBe(403);
+        const body: unknown = await response.json();
+        expect(body).toEqual({ error: errorCode });
+        expect(Object.keys(body as Record<string, unknown>)).toEqual(['error']);
+      }
+    );
+
     it('runs admission verification before provider verification', async () => {
       mockVerifyNativeGoogleIdToken.mockResolvedValue({
         sub: 'google-sub-1',
@@ -1491,6 +1620,13 @@ describe('POST /api/auth/native/token', () => {
       // Code must NOT be committed — ownership check happens before commit.
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The ownership mismatch is an expected refusal: counted beside the
+      // per-event report, like the collision refusals.
+      now.mockReturnValue(6_181_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
     });
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
@@ -1525,6 +1661,13 @@ describe('POST /api/auth/native/token', () => {
       // Code must NOT be committed — attestation ownership is checked pre-commit.
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The ownership mismatch is an expected refusal: counted beside the
+      // per-event report, like the collision refusals.
+      now.mockReturnValue(6_241_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
     });
 
     // ── Fix 3: KeyCollisionError during persistence does not burn the code ─
@@ -1564,7 +1707,19 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       // Code must be released so it remains usable.
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The collision is counted and reported once per interval, so the
+      // per-event report survives a window this instance never closes.
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+      now.mockReturnValue(6_061_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_attested_key_cross_user_collision')
+      ).toHaveLength(1);
+      // The collision is also a refusal: both routes count the same pair.
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
     });
 
     it('refuses key collision during persistence without burning the sign-in code (email, no supportsRefresh)', async () => {
@@ -1597,7 +1752,21 @@ describe('POST /api/auth/native/token', () => {
       expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+      // The collision is counted and reported once per interval, so the
+      // per-event report survives a window this instance never closes.
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+      // The refusal lands in the pinned window; the next counted condition
+      // closes it with this refusal as one count on the metric's line.
+      now.mockReturnValue(6_121_000);
+      countAdmissionCondition('native_admission_missing');
+      const collisionLine = aggregateLines().find(
+        line => line.metric === 'native_attested_key_cross_user_collision'
+      );
+      expect(collisionLine).toMatchObject({ count: 1 });
+      // The collision is also a refusal: both routes count the same pair.
+      const refusedLine = aggregateLines().find(line => line.metric === 'native_admission_refused');
+      expect(refusedLine).toMatchObject({ count: 1 });
     });
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
@@ -1670,6 +1839,54 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('counts the apple-path ownership mismatch without touching persistence', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockRequireAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      // The key is bound to another account, so the post-settlement ownership
+      // check refuses this sign-in before any credential is persisted.
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+        existingKeyUserId: 'other-user',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          nonce: 'test-nonce',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      // Refused before any credential persistence runs.
+      expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      // The ownership mismatch keeps its per-event report and is counted.
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
+      // The refusal lands in the pinned window; the next counted condition
+      // closes it with this refusal as one count on the metric's line.
+      now.mockReturnValue(6_121_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
     });
 
     // ── Fix 6: attestation key + session in one transaction ────────────
@@ -2310,6 +2527,289 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(401);
       expect(await response.json()).toEqual({ error: 'INVALID_TOKEN' });
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('mobile admission telemetry', () => {
+    const mobileRequest = (body: unknown, version = '1.0.16') =>
+      new NextRequest('http://localhost:3000/api/auth/native/token', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-kilo-client': 'mobile',
+          'x-kilo-app-platform': 'android',
+          'x-kilo-app-version': version,
+        },
+      });
+
+    let logSpy: jest.SpiedFunction<typeof console.log>;
+
+    beforeEach(() => {
+      logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      logSpy.mockRestore();
+    });
+
+    /**
+     * The records this route emitted for the cohort. The real REST timing
+     * wrapper also logs here, so only the admission record is selected.
+     */
+    const admissionRecords = () =>
+      logSpy.mock.calls
+        .map(call => JSON.parse(String(call[0])) as Record<string, unknown>)
+        .filter(line => line['type'] === 'native_admission');
+
+    it('writes one record for an issued token', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(mobileRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+
+      expect(response.status).toBe(200);
+      expect(admissionRecords()).toEqual([
+        {
+          type: 'native_admission',
+          route: '/api/auth/native/token',
+          headerPlatform: 'android',
+          headerVersion: '1.0.16',
+          admission: 'passed',
+          proofPlatform: 'ios',
+          outcome: 'token_issued',
+        },
+      ]);
+    });
+
+    it('writes nothing for a non-mobile caller', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(
+        new NextRequest('http://localhost:3000/api/auth/native/token', {
+          method: 'POST',
+          body: JSON.stringify({ provider: 'apple', idToken: 'apple-id-token' }),
+          headers: { 'Content-Type': 'application/json', 'x-kilo-client': 'web' },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(admissionRecords()).toEqual([]);
+    });
+
+    it('distinguishes an absent admission field from a supplied malformed one', async () => {
+      mockRequireAdmissionPayload.mockImplementation(actualRequireAdmissionPayload);
+
+      const absent = await POST(mobileRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+      expect(absent.status).toBe(403);
+
+      const malformed = await POST(
+        mobileRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          admission: { platform: 'ios' },
+        })
+      );
+      expect(malformed.status).toBe(403);
+
+      const records = admissionRecords();
+      expect(records).toHaveLength(2);
+      expect(records[0]).toMatchObject({
+        admission: 'missing',
+        reason: 'absent',
+        outcome: 'admission_refused',
+      });
+      expect(records[1]).toMatchObject({
+        admission: 'malformed',
+        reason: 'kind_invalid',
+        outcome: 'admission_refused',
+      });
+    });
+
+    it('separates a body the schema rejected from an admission stage', async () => {
+      const response = await POST(mobileRequest({ provider: 'unknown-provider' }));
+
+      expect(response.status).toBe(400);
+      expect(admissionRecords()).toEqual([
+        {
+          type: 'native_admission',
+          route: '/api/auth/native/token',
+          headerPlatform: 'android',
+          headerVersion: '1.0.16',
+          admission: 'not_attempted',
+          reason: 'invalid_request',
+          outcome: 'request_rejected',
+        },
+      ]);
+      expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    });
+
+    it('records a malformed JSON body as invalid_json', async () => {
+      const response = await POST(
+        new NextRequest('http://localhost:3000/api/auth/native/token', {
+          method: 'POST',
+          body: '{',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-kilo-client': 'mobile',
+            'x-kilo-app-platform': 'android',
+            'x-kilo-app-version': '1.0.16',
+          },
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(admissionRecords()[0]).toMatchObject({
+        reason: 'invalid_json',
+        outcome: 'request_rejected',
+      });
+    });
+
+    it('records a verifier refusal with its fixed reason and diagnostics', async () => {
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: false,
+        errorCode: 'ADMISSION_REQUIRED',
+        detail: {
+          reason: 'integrity_cert_digest_mismatch',
+          source: 'play_integrity',
+          proofPlatform: 'android',
+          proofKind: 'assertion',
+          android: {
+            appRecognition: 'play_recognized',
+            certificatePresent: false,
+            deviceIntegrity: 'meets_device_integrity',
+          },
+        },
+      });
+
+      const response = await POST(
+        mobileRequest({ provider: 'email', email: 'new@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(admissionRecords()[0]).toMatchObject({
+        admission: 'refused',
+        reason: 'integrity_cert_digest_mismatch',
+        admissionSource: 'play_integrity',
+        proofPlatform: 'android',
+        proofKind: 'assertion',
+        android: {
+          appRecognition: 'play_recognized',
+          certificatePresent: false,
+          deviceIntegrity: 'meets_device_integrity',
+        },
+        outcome: 'admission_refused',
+      });
+    });
+
+    it('records a provider fault as a fault, never as a refusal', async () => {
+      mockVerifyAdmissionAsync.mockRejectedValue(new Error('provider unavailable'));
+
+      const response = await POST(
+        mobileRequest({ provider: 'email', email: 'new@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(500);
+      expect(admissionRecords()[0]).toMatchObject({
+        admission: 'provider_fault',
+        outcome: 'admission_provider_fault',
+      });
+    });
+
+    it('does not count a 403 after accepted admission as an admission refusal', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockCheckDomainSignInEligibility.mockResolvedValue({
+        ok: false,
+        status: 403,
+        errorCode: 'SSO_ERROR',
+        ssoOrganizationId: 'org-1',
+      });
+
+      const response = await POST(mobileRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+
+      expect(response.status).toBe(403);
+      expect(admissionRecords()[0]).toMatchObject({
+        admission: 'passed',
+        proofPlatform: 'ios',
+        outcome: 'refused_after_admission',
+      });
+    });
+
+    it('does not count a 429 after accepted admission as an admission refusal', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
+
+      const response = await POST(mobileRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+
+      expect(response.status).toBe(429);
+      expect(admissionRecords()[0]).toMatchObject({
+        admission: 'passed',
+        outcome: 'refused_after_admission',
+      });
+    });
+
+    it('records an address rate limit as pre-admission and touches no proof', async () => {
+      mockIsNativeTokenAddressRateLimited.mockResolvedValue(true);
+
+      const response = await POST(mobileRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+
+      expect(response.status).toBe(429);
+      expect(admissionRecords()[0]).toMatchObject({
+        admission: 'not_attempted',
+        reason: 'address_rate_limited',
+        outcome: 'rate_limited_before_admission',
+      });
+      expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    });
+
+    it('records a thrown request as a 500 failure', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockRejectedValue(new Error('database down'));
+
+      await expect(
+        POST(mobileRequest({ provider: 'apple', idToken: 'apple-id-token' }))
+      ).rejects.toThrow('database down');
+
+      expect(admissionRecords()[0]).toMatchObject({
+        admission: 'passed',
+        outcome: 'failed_after_admission',
+      });
+    });
+
+    it('carries no client-supplied value into the record', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      await POST(
+        mobileRequest({
+          provider: 'apple',
+          idToken: 'sensitive-id-token',
+          nonce: 'sensitive-nonce',
+        })
+      );
+
+      const serialized = JSON.stringify(admissionRecords());
+      for (const secret of ['sensitive-id-token', 'sensitive-nonce', 'appleuser']) {
+        expect(serialized).not.toContain(secret);
+      }
+      // The marketing version identifies a cohort, not a build or install.
+      expect(serialized).toContain('"headerVersion":"1.0.16"');
     });
   });
 });

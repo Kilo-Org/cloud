@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { ReasoningDetailsTransform } from '@kilocode/db/schema-types';
 import { applyReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import {
+  applyMistralDefaultReasoningEffort,
   applyMistralThinkingRequestTransform,
   mapMistralThinkingToReasoningDetails,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
@@ -28,6 +29,22 @@ function messagesOf(request: ChatCompletionsRequest) {
 function thinkingChunk(text: string) {
   return { type: 'thinking', thinking: [{ type: 'text', text }] };
 }
+
+describe('applyMistralDefaultReasoningEffort', () => {
+  it.each([
+    ['no effort', {}, 'high'],
+    ['an enabled reasoning object', { reasoning: { enabled: true } }, 'high'],
+    ['a reasoning object effort', { reasoning: { effort: 'low' } }, undefined],
+    ['a reasoning_effort', { reasoning_effort: 'medium' }, 'medium'],
+    ['a disable', { reasoning: { enabled: false } }, undefined],
+  ])('handles a request with %s', (_name, extra, expected) => {
+    const request = chatRequest(undefined, extra);
+
+    applyMistralDefaultReasoningEffort(request);
+
+    expect(request.body.reasoning_effort).toBe(expected);
+  });
+});
 
 describe('applyMistralThinkingRequestTransform', () => {
   it('defaults the reasoning effort to high', () => {

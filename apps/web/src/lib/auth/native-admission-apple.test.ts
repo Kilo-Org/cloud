@@ -12,12 +12,15 @@
  */
 import { describe, test, expect } from '@jest/globals';
 import { createHash, createSign, generateKeyPairSync } from 'node:crypto';
+import { decode as decodeCbor, decodeSequence } from 'cbor2';
 import {
   appAttestClientDataHash,
   verifyAppleAttestation,
   verifyAppleAssertion,
   extractAppleAttestNonce,
   parseAppleAttestNonceExtension,
+  parseAppleAttestAuthDataTail,
+  coseKeyToPublicKey,
 } from './native-admission-apple';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -65,6 +68,48 @@ const EVIL_LEAF_DER = Buffer.from(
   'base64'
 );
 
+// ── Apple's published sample (Attestation Object Validation Guide) ─────────
+//
+// https://developer.apple.com/documentation/devicecheck/attestation-object-validation-guide
+// Team `1234567890`, bundle `com.example.myapp`, challenge
+// `example_server_challenge`. Its authData appends an Apple extensions map
+// (`apple_bundle_version_01`, `apple_validation_category_01`) after the COSE
+// key, which is exactly the shape the verifier used to reject. The certificate
+// and authData bytes are copied verbatim from the guide; the attestation object
+// is rebuilt from them because only `fmt`, `attStmt.x5c`, and `authData` are
+// read (the guide's `receipt` is unused).
+const APPLE_SAMPLE_LEAF_DER = Buffer.from(
+  'MIIEHTCCA6OgAwIBAgIGAZ2xPwtOMAoGCCqGSM49BAMCME8xIzAhBgNVBAMMGkFwcGxlIEFwcCBBdHRlc3RhdGlvbiBDQSAx' +
+    'MRMwEQYDVQQKDApBcHBsZSBJbmMuMRMwEQYDVQQIDApDYWxpZm9ybmlhMB4XDTI2MDQyMDE4MTMxMloXDTI2MDQyMzE4MTMx' +
+    'MlowgZExSTBHBgNVBAMMQGNlMDQ5OGY1ODQ4M2ZiYjRkYTBkN2IyYzYzYTVhNTM4ZjU1MmQ0YWRjYjlhNGZhOTE2MTk1YzQ5' +
+    'NjEzZTY1NWQxGjAYBgNVBAsMEUFBQSBDZXJ0aWZpY2F0aW9uMRMwEQYDVQQKDApBcHBsZSBJbmMuMRMwEQYDVQQIDApDYWxp' +
+    'Zm9ybmlhMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQzJUSs8yPbd0RDyq8zn1bn6VxyT6wsFCWfNl4kRWULK1+yhbz1Sb' +
+    'y2BZRBLnaCokJ+6tqftS3+0LGrF+0J+pvaOCAiYwggIiMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgTwMBQGA1UdJQQN' +
+    'MAsGCSqGSIb3Y2QEGDB6BgkqhkiG92NkCAUEbTBrpAMCAQq/iTADAgEAv4kxAwIBAL+JMgMCAQC/iTMDAgEAv4k0HgQcMTIz' +
+    'NDU2Nzg5MC5jb20uZXhhbXBsZS5teWFwcL+JNgMCAQS/iTcDAgEAv4k5AwIBAL+JOgMCAQC/iTsDAgEAqgMCAQAwgeAGCSqG' +
+    'SIb3Y2QIBwSB0jCBz7+KeAYEBDI3LjC/iFADAgECv4p5CQQHMS4wLjIxNr+KewkEBzI0QTMyNWK/inwGBAQyNy4wv4p9BgQE' +
+    'MjcuML+KfgMCAQC/in8DAgEAv4sAAwIBAL+LAQMCAQC/iwIDAgEAv4sDAwIBAL+LBAMCAQG/iwUDAgEAv4sKEAQOMjQuMS4z' +
+    'MjUuMC4yLDC/iwsQBA4yNC4xLjMyNS4wLjIsML+LDBAEDjI0LjEuMzI1LjAuMiwwv4gCCgQIaXBob25lb3O/iAUKBAhJbnRl' +
+    'cm5hbDAzBgkqhkiG92NkCAIEJjAkoSIEIIe30G2TpClORvAR5mtsxADwurIHKZdsYZWAtCrmC/9uMFgGCSqGSIb3Y2QIBgRL' +
+    'MEmjRwRFMEMMAjExMD0wCgwDb2tkoQMBAf8wCQwCb2GhAwEB/zALDARvc2duoQMBAf8wCwwEb2RlbKEDAQH/MAoMA29ja6ED' +
+    'AQH/MAoGCCqGSM49BAMCA2gAMGUCMCG8x2j20SnJtrGuCbw1sk1+NMs/VNm8sRcU4aPhyDNB3mMBdxy8gNza6r91g8v1HQIx' +
+    'AKTqMS+83kFdMob2rD3t9fnNWWLhA8RFOqw64XhXFTEWXqb1ddPoRcYCFlTEqULtPQ==',
+  'base64'
+);
+
+// The guide's authData: 226 bytes ending with the extensions map.
+const APPLE_SAMPLE_AUTH_DATA = Buffer.from(
+  '9EZtaPketsEGIMt+Y8coMkRoXuHWRntUFg51MXIFfwNAAAAAAGFwcGF0dGVzdAAAAAAAAAAAIM4EmPWEg/u02g17LGOlpTj1' +
+    'UtSty5pPqRYZXElhPmVdpQECAyYgASFYIEMyVErPMj23dEQ8qvM59W5+lcck+sLBQlnzZeJEVlCyIlggtfsoW89Um8tgWUQS' +
+    '52gqJCfuran7Ut/tCxqxftCfqb2id2FwcGxlX2J1bmRsZV92ZXJzaW9uXzAxYTF4HGFwcGxlX3ZhbGlkYXRpb25fY2F0ZWdv' +
+    'cnlfMDFEAQAAAA==',
+  'base64'
+);
+
+const APPLE_SAMPLE_CHALLENGE = 'example_server_challenge';
+// Guide: keyId for the sample key, standard base64.
+const APPLE_SAMPLE_KEY_ID = 'zgSY9YSD+7TaDXssY6WlOPVS1K3Lmk+pFhlcSWE+ZV0=';
+
 // ── CBOR encoding helpers (the verifier decodes CBOR, so the tests encode) ──
 
 function cborHead(major: number, length: number): Buffer {
@@ -109,7 +154,27 @@ function buildCoseKey(): Buffer {
   ]);
 }
 
-function buildAuthData(opts: { rpIdHash: Buffer; credentialId: Buffer; coseKey: Buffer }): Buffer {
+/** Build an Apple `extensions` map with the two documented keys. */
+function buildAppleExtensions(opts: {
+  bundleVersion?: Buffer;
+  validationCategory?: Buffer;
+}): Buffer {
+  return cborMap([
+    [cborText('apple_bundle_version_01'), opts.bundleVersion ?? cborText('1')],
+    [
+      cborText('apple_validation_category_01'),
+      opts.validationCategory ?? cborBytes(Buffer.from([1, 0, 0, 0])),
+    ],
+  ]);
+}
+
+function buildAuthData(opts: {
+  rpIdHash: Buffer;
+  credentialId: Buffer;
+  coseKey: Buffer;
+  /** Appended after the COSE key, as current iOS does. Omitted for legacy. */
+  extensions?: Buffer;
+}): Buffer {
   const credIdLen = Buffer.alloc(2);
   credIdLen.writeUInt16BE(opts.credentialId.length);
   return Buffer.concat([
@@ -120,6 +185,7 @@ function buildAuthData(opts: { rpIdHash: Buffer; credentialId: Buffer; coseKey: 
     credIdLen,
     opts.credentialId,
     opts.coseKey,
+    opts.extensions ?? Buffer.alloc(0),
   ]);
 }
 
@@ -302,6 +368,211 @@ describe('verifyAppleAttestation certificate chain', () => {
     // `Buffer.from(..., 'base64')` never throws; it drops the characters it
     // cannot decode and yields garbage bytes, which the CBOR decoder refuses.
     const result = await verifyAppleAttestation('not base64 or cbor', challenge, keyId, bundleId);
+    expect(result).toEqual({ ok: false, error: 'INVALID_ATTEST_FORMAT' });
+  });
+});
+
+// ── Apple's published sample and authenticator-data extensions ────────────
+//
+// Current App Attest objects append an `extensions` map after the COSE key, and
+// a single-item decode of the tail throws `Extra data in input` — the failure
+// class behind INVALID_ATTEST_FORMAT. Apple's public sample has that shape;
+// these tests lock the parser to it without changing certificate, nonce, or
+// signature rules.
+
+describe("Apple's published attestation sample", () => {
+  // The guide appends the challenge's UTF-8 bytes to authData and hashes the
+  // concatenation; `verifyAppleAttestation` hashes the challenge it is given
+  // first, per the mobile client. The tail parser, the key conversion, and the
+  // certificate's nonce are therefore checked directly against the sample.
+  const credentialIdOffset = 37 + 16 + 2;
+  const tail = APPLE_SAMPLE_AUTH_DATA.subarray(
+    credentialIdOffset + APPLE_SAMPLE_AUTH_DATA.readUInt16BE(53)
+  );
+
+  test('the tail is a COSE key followed by the Apple extensions map', () => {
+    const items = [...decodeSequence(tail, { preferMap: true })];
+    expect(items).toHaveLength(2);
+
+    const extensions = items[1] as Map<unknown, unknown>;
+    // The guide's prose says `apple_bundle_version_01` is "1.0" for a bundle
+    // version of "1.0", but the signed authData in this same sample carries
+    // "1". The signed bytes are authoritative, so assert them and only require
+    // the documented String type, never a specific version.
+    expect(extensions.get('apple_bundle_version_01')).toBe('1');
+    // The guide's prose calls the category a UInt32 `1`, but the signed bytes
+    // are the four-byte string `01 00 00 00` (little-endian). The verifier only
+    // checks the documented four-byte shape because it does not interpret the
+    // value.
+    expect(extensions.get('apple_validation_category_01')).toEqual(Buffer.from([1, 0, 0, 0]));
+
+    const coseKey = parseAppleAttestAuthDataTail(tail);
+    expect(coseKey).not.toBeNull();
+    expect(
+      coseKeyToPublicKey(coseKey!).export({ type: 'spki', format: 'der' }).toString('base64')
+    ).toBe(
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQzJUSs8yPbd0RDyq8zn1bn6VxyT6wsFCWfNl4kRWULK1+yhbz1Sby2BZRBLnaCokJ+6tqftS3+0LGrF+0J+pvQ=='
+    );
+  });
+
+  test("the guide's keyId is the SHA-256 of the sample public key", () => {
+    const coseKey = parseAppleAttestAuthDataTail(tail);
+    const point = Buffer.concat([
+      Buffer.from([0x04]),
+      Buffer.from(coseKey!.get(-2) as Uint8Array),
+      Buffer.from(coseKey!.get(-3) as Uint8Array),
+    ]);
+    expect(createHash('sha256').update(point).digest('base64')).toBe(APPLE_SAMPLE_KEY_ID);
+  });
+
+  test("the credential certificate carries the guide's nonce over the whole tail", () => {
+    // The nonce is SHA256(authData || challengeBytes) over the *entire*
+    // authData, extensions map included, so the map cannot be swapped without
+    // breaking this check.
+    const nonce = createHash('sha256')
+      .update(Buffer.concat([APPLE_SAMPLE_AUTH_DATA, Buffer.from(APPLE_SAMPLE_CHALLENGE, 'utf8')]))
+      .digest();
+    expect(nonce.toString('base64')).toBe('h7fQbZOkKU5G8BHma2zEAPC6sgcpl2xhlYC0KuYL/24=');
+    expect(extractAppleAttestNonce(APPLE_SAMPLE_LEAF_DER)).toEqual(nonce);
+  });
+
+  test('a single-item decode of the tail reproduces the failure class', () => {
+    // The pre-fix verifier decoded the whole tail as one CBOR item. On this
+    // Apple-produced tail that throws `Extra data in input`, the class of
+    // failure behind INVALID_ATTEST_FORMAT.
+    expect(() => decodeCbor(tail, { preferMap: true })).toThrow(/Extra data in input/);
+    expect(parseAppleAttestAuthDataTail(tail)).not.toBeNull();
+  });
+});
+
+describe('parseAppleAttestAuthDataTail', () => {
+  const tail = APPLE_SAMPLE_AUTH_DATA.subarray(
+    37 + 16 + 2 + APPLE_SAMPLE_AUTH_DATA.readUInt16BE(53)
+  );
+
+  test('accepts a legacy tail that is only the COSE key', () => {
+    // Pre-extension App Attest objects end at the key. Requiring the extension
+    // map would break them, so they must still parse.
+    const legacy = buildCoseKey();
+    expect(parseAppleAttestAuthDataTail(legacy)).not.toBeNull();
+  });
+
+  test('accepts the key plus the documented extensions map', () => {
+    expect(parseAppleAttestAuthDataTail(tail)).not.toBeNull();
+  });
+
+  test('rejects bytes appended after the extension map', () => {
+    for (const trailer of [Buffer.from([0x00]), Buffer.from([0x01]), Buffer.from([0xa0])]) {
+      expect(parseAppleAttestAuthDataTail(Buffer.concat([tail, trailer]))).toBeNull();
+    }
+  });
+
+  test('rejects garbage after the extension map', () => {
+    expect(parseAppleAttestAuthDataTail(Buffer.concat([tail, Buffer.from([0xff])]))).toBeNull();
+  });
+
+  test('rejects a truncated tail', () => {
+    expect(parseAppleAttestAuthDataTail(tail.subarray(0, tail.length - 1))).toBeNull();
+    expect(parseAppleAttestAuthDataTail(tail.subarray(0, 40))).toBeNull();
+  });
+
+  test('rejects a tail that is not a COSE key', () => {
+    expect(parseAppleAttestAuthDataTail(cborText('not a key'))).toBeNull();
+    expect(parseAppleAttestAuthDataTail(cborArray([cborInt(1)]))).toBeNull();
+  });
+
+  test('rejects an extensions map with undocumented value types', () => {
+    const key = buildCoseKey();
+    const badVersion = buildAppleExtensions({ bundleVersion: cborInt(1) });
+    const badCategory = buildAppleExtensions({ validationCategory: cborText('1') });
+    const shortCategory = buildAppleExtensions({
+      validationCategory: cborBytes(Buffer.from([0, 1])),
+    });
+    for (const extensions of [badVersion, badCategory, shortCategory]) {
+      expect(parseAppleAttestAuthDataTail(Buffer.concat([key, extensions]))).toBeNull();
+    }
+  });
+
+  test('accepts an unrecognized extension key without rejecting the attestation', () => {
+    // A future Apple key must not refuse every attestation from that iOS
+    // version; the nonce already covers the map.
+    const key = buildCoseKey();
+    const withFutureKey = cborMap([
+      [cborText('apple_bundle_version_01'), cborText('1.0')],
+      [cborText('apple_validation_category_01'), cborBytes(Buffer.from([0, 0, 0, 1]))],
+      [cborText('apple_new_thing_01'), cborText('x')],
+    ]);
+    expect(parseAppleAttestAuthDataTail(Buffer.concat([key, withFutureKey]))).not.toBeNull();
+  });
+
+  test('rejects a duplicate extension key', () => {
+    const key = buildCoseKey();
+    const dup = cborMap([
+      [cborText('apple_bundle_version_01'), cborText('1.0')],
+      [cborText('apple_bundle_version_01'), cborText('1.0')],
+    ]);
+    expect(parseAppleAttestAuthDataTail(Buffer.concat([key, dup]))).toBeNull();
+  });
+});
+
+describe('verifyAppleAttestation with authenticator-data extensions', () => {
+  const teamId = 'WRPHYY66V6';
+  const bundleId = 'com.reelreel.app.dev';
+  const rpIdHash = createHash('sha256').update(`${teamId}.${bundleId}`).digest();
+  const credentialId = createHash('sha256').update('device-key').digest();
+  const keyId = credentialId.toString('base64');
+  const challenge = 'c2VydmVyLWNoYWxsZW5nZQ';
+
+  function attestationWith(authData: Buffer): string {
+    return buildAttestation([REAL_LEAF_DER, REAL_INTERMEDIATE_DER], authData);
+  }
+
+  test('accepts the extension shape and stops at the fixed nonce', async () => {
+    // The fixture certificate's nonce cannot be reproduced, so NONCE_MISMATCH
+    // is the deepest a signed fixture can go; reaching it proves the tail
+    // parsed instead of failing as INVALID_ATTEST_FORMAT.
+    const authData = buildAuthData({
+      rpIdHash,
+      credentialId,
+      coseKey: buildCoseKey(),
+      extensions: buildAppleExtensions({}),
+    });
+    const result = await verifyAppleAttestation(
+      attestationWith(authData),
+      challenge,
+      keyId,
+      bundleId
+    );
+    expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
+  });
+
+  test('still accepts a legacy key-only authData', async () => {
+    const authData = buildAuthData({ rpIdHash, credentialId, coseKey: buildCoseKey() });
+    const result = await verifyAppleAttestation(
+      attestationWith(authData),
+      challenge,
+      keyId,
+      bundleId
+    );
+    expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
+  });
+
+  test('rejects trailing bytes after the extension map', async () => {
+    const authData = Buffer.concat([
+      buildAuthData({
+        rpIdHash,
+        credentialId,
+        coseKey: buildCoseKey(),
+        extensions: buildAppleExtensions({}),
+      }),
+      Buffer.from([0x00]),
+    ]);
+    const result = await verifyAppleAttestation(
+      attestationWith(authData),
+      challenge,
+      keyId,
+      bundleId
+    );
     expect(result).toEqual({ ok: false, error: 'INVALID_ATTEST_FORMAT' });
   });
 });

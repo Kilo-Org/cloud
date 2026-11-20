@@ -14,6 +14,8 @@ function setup() {
     USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
     USAGE_INGEST_QUEUE: { send, sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_INGEST_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
+    USAGE_INGEST_ENKRYPT_QUEUE: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
+    USAGE_INGEST_ENKRYPT_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
   };
   return { send, env };
 }

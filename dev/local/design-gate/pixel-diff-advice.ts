@@ -53,6 +53,7 @@ export type PixelDiffCellResult = {
   changedPixels?: number;
   changedPercent?: number;
   regions?: PixelDiffReport['regions'];
+  regionsTruncated?: boolean;
   shift?: PixelDiffReport['shift'];
   chrome?: PixelDiffReport['chrome'];
   /** Explanations about the evidence itself, e.g. why no chrome split is claimed. */
@@ -415,6 +416,7 @@ async function diffCell(args: {
     changedPixels: report.changedPixels,
     changedPercent: report.changedPercent,
     regions: report.regions,
+    regionsTruncated: report.regionsTruncated,
     ...(report.shift === undefined ? {} : { shift: report.shift }),
     ...(report.chrome === undefined ? {} : { chrome: report.chrome }),
     ...(bands.note === undefined ? {} : { notes: [bands.note] }),
@@ -437,30 +439,31 @@ async function collect(
 ): Promise<{ cells: PixelDiffCellResult[]; reasons: string[] }> {
   const cells: PixelDiffCellResult[] = [];
   const reasons: string[] = [];
+  const baseCells = new Map(options.base.cells.map(cell => [cell.id, cell]));
+  const headIds = new Set(options.head.cells.map(cell => cell.id));
   // A pair the gate already refused to compare (differing devices, matrix or a
   // failed restore) is not a pair a pixel diff can speak about: every cell would
   // be a comparison across two different captures.
-  if ((options.pairReasons ?? []).length > 0) {
-    const pairBlocked = (options.pairReasons ?? []).join('; ');
-    for (const headCell of options.head.cells) {
-      for (const headScreen of headCell.screens) {
-        cells.push(
-          inconclusive(
-            headCell.id,
-            headScreen.target,
-            `the comparison already called this pair inconclusive: ${pairBlocked}`
-          )
-        );
+  if (options.pairReasons?.length) {
+    const pairReason = `the comparison already called this pair inconclusive: ${options.pairReasons.join('; ')}`;
+    const emitted = new Set<string>();
+    for (const run of [options.head, options.base]) {
+      for (const cell of run.cells) {
+        for (const screen of cell.screens) {
+          const key = `${cell.id}/${screen.target}`;
+          if (emitted.has(key)) continue;
+          emitted.add(key);
+          cells.push(inconclusive(cell.id, screen.target, pairReason));
+        }
       }
     }
+    if (cells.length === 0) reasons.push(pairReason);
     return { cells, reasons };
   }
   const blocked = {
     base: readinessReasons(options.base.readiness),
     head: readinessReasons(options.head.readiness),
   };
-  const baseCells = new Map(options.base.cells.map(cell => [cell.id, cell]));
-  const headIds = new Set(options.head.cells.map(cell => cell.id));
   for (const baseCell of options.base.cells) {
     if (headIds.has(baseCell.id)) continue;
     for (const screen of baseCell.screens) {

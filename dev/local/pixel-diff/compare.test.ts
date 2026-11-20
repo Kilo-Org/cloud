@@ -7,6 +7,7 @@ import test from 'node:test';
 import { PNG } from 'pngjs';
 
 import { comparePngPair, LIMITS, PixelDiffError } from './compare';
+import { diffPngs, MAX_REGIONS } from './diff';
 
 /** A flat image with an optional solid rectangle painted into it. */
 function image(
@@ -218,5 +219,86 @@ void test('a tall capture keeps every coordinate but bounds the written comparis
       written.width <= LIMITS.maxOutputSide && written.height <= LIMITS.maxOutputSide,
       `composite is ${written.width}x${written.height}, above the ${LIMITS.maxOutputSide} px bound`
     );
+  });
+});
+
+void test('diffPngs refuses unequal dimensions before indexing either buffer', async () => {
+  const before = PNG.sync.read(image(30, 20));
+  const after = PNG.sync.read(image(20, 30));
+  assert.throws(() => diffPngs(before, after, 1), /needs same-sized images/);
+  assert.throws(() => diffPngs(after, before, 1), /needs same-sized images/);
+});
+
+void test('many disjoint changes keep a complete count and one region each', async () => {
+  await withOut(async out => {
+    const width = 1200;
+    const height = 400;
+    const step = 64;
+    let patches = 0;
+    const png = new PNG({ width, height });
+    png.data.fill(255);
+    for (let y = 10; y + 4 <= height; y += step) {
+      for (let x = 10; x + 4 <= width; x += step) {
+        for (let dy = 0; dy < 4; dy++) {
+          for (let dx = 0; dx < 4; dx++) {
+            const offset = ((y + dy) * width + (x + dx)) * 4;
+            png.data[offset] = 0;
+            png.data[offset + 1] = 0;
+            png.data[offset + 2] = 0;
+          }
+        }
+        patches++;
+      }
+    }
+    assert.ok(patches > 100 && patches < MAX_REGIONS, `fixture leaves ${patches} disjoint patches`);
+    const report = await comparePngPair({
+      before: image(width, height),
+      after: PNG.sync.write(png, { colorType: 6 }),
+      out,
+    });
+    assert.equal(report.changedPixels, patches * 4 * 4);
+    assert.equal(report.regionsTruncated, false);
+    assert.equal(report.regions.length, patches, 'each patch is its own region');
+    for (const region of report.regions) {
+      assert.ok(
+        region.width <= 16 && region.height <= 16,
+        `region stays patch-sized: ${JSON.stringify(region)}`
+      );
+    }
+  });
+});
+
+void test('a noisy page past the region cap reports truncation with an exact count', async () => {
+  await withOut(async out => {
+    const width = 2000;
+    const height = 1200;
+    // Patches stay disjoint at this spacing (patch 4 px + 2×24 px gap), and there are far more
+    // than the cap.
+    const step = 64;
+    let patches = 0;
+    const png = new PNG({ width, height });
+    png.data.fill(255);
+    for (let y = 10; y + 4 <= height; y += step) {
+      for (let x = 10; x + 4 <= width; x += step) {
+        for (let dy = 0; dy < 4; dy++) {
+          for (let dx = 0; dx < 4; dx++) {
+            const offset = ((y + dy) * width + (x + dx)) * 4;
+            png.data[offset] = 0;
+            png.data[offset + 1] = 0;
+            png.data[offset + 2] = 0;
+          }
+        }
+        patches++;
+      }
+    }
+    assert.ok(patches > MAX_REGIONS, `fixture leaves ${patches} disjoint patches`);
+    const report = await comparePngPair({
+      before: image(width, height),
+      after: PNG.sync.write(png, { colorType: 6 }),
+      out,
+    });
+    assert.equal(report.changedPixels, patches * 4 * 4, 'the count stays exact');
+    assert.equal(report.regionsTruncated, true);
+    assert.equal(report.regions.length, MAX_REGIONS, 'boxes stop at the cap');
   });
 });

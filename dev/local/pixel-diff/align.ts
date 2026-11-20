@@ -8,21 +8,21 @@ import { createHash } from 'node:crypto';
 import type { PNG } from 'pngjs';
 
 /** A run of rows that render identically on both sides, `dy` device pixels apart (after − before). */
-export interface RowBlock {
+export type RowBlock = {
   beforeY: number;
   afterY: number;
   height: number;
   dy: number;
-}
+};
 
-export interface RowAlignment {
+export type RowAlignment = {
   /** For each after row: the before row it is compared with, or -1 when it has no counterpart. */
   source: Int32Array;
   /** Matched runs in page order (dy may be 0). */
   blocks: RowBlock[];
   /** Before rows with no after counterpart (content removed), anchored at an after row. */
   removed: Array<{ afterY: number; rows: number }>;
-}
+};
 
 interface RowInfo {
   hashes: string[];

@@ -218,6 +218,7 @@ The runtime marker binds the loaded source to the preparation receipt.
 Add `--pixel-diff` to `compare` to write an advisory `pixel-diff.json` and before/after/diff images.
 It uses only screenshot pairs that pass the preparation and capture receipt checks.
 The report counts changed pixels at fixed coordinates and lists their bounding boxes.
+If `regionsTruncated` is true, the list is partial. The pixel counts and full comparison still cover the entire capture.
 It retains the full comparison when a focus crop would not help.
 Add `--pixel-diff-explain-shift` to report vertical row moves separately from the fixed-coordinate counts.
 

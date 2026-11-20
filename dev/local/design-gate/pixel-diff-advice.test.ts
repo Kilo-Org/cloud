@@ -152,6 +152,37 @@ function runDir(
   };
 }
 
+/**
+ * Adds a receipt-bound target to a run, the way a real capture lists one: a PNG,
+ * its dump, both digests in the receipt, and the screen under its cell.
+ */
+function bindScreen(run: RunDir, cell: string, target: string): void {
+  const png = `cells/${cell}.${target}.png`;
+  const dump = `cells/${cell}.${target}.json`;
+  fs.writeFileSync(path.join(run.dir, png), pngBytes(400, 400));
+  // The dump's window must describe the capture, exactly as `runDir` writes it.
+  fs.writeFileSync(path.join(run.dir, dump), dumpBytes({ windowHeight: 200 }));
+  for (const relative of [png, dump]) {
+    run.revision.artifacts = [
+      ...run.revision.artifacts,
+      {
+        path: relative,
+        sha256: createHash('sha256')
+          .update(fs.readFileSync(path.join(run.dir, relative)))
+          .digest('hex'),
+      },
+    ];
+  }
+  const screen = { target, dump, screenshot: png };
+  const existing = run.revision.cells.find(entry => entry.id === cell);
+  run.revision.cells =
+    existing === undefined
+      ? [...run.revision.cells, { id: cell, config: CONFIG, screens: [screen] }]
+      : run.revision.cells.map(entry =>
+          entry.id === cell ? { ...entry, screens: [...entry.screens, screen] } : entry
+        );
+}
+
 function report(options: Partial<PixelDiffReport> = {}): PixelDiffReport {
   return {
     width: 400,
@@ -160,6 +191,7 @@ function report(options: Partial<PixelDiffReport> = {}): PixelDiffReport {
     changedPercent: 0,
     changed: false,
     regions: [],
+    regionsTruncated: false,
     artifacts: { comparison: 'comparison.png' },
     ...options,
   };
@@ -801,6 +833,43 @@ test('a pair the gate already called inconclusive is never diffed per cell', asy
     summary.cells[0].reason ?? '',
     /comparison already called this pair inconclusive: Captured device environments differ/
   );
+});
+
+test('a pair-wide inconclusive names base-only cells and targets as well as head ones', async t => {
+  const root = rootDir(t);
+  const out = path.join(root, 'comparison');
+  fs.mkdirSync(out);
+  const base = runDir(root, 'base-run');
+  const head = runDir(root, 'head-run');
+  // `base/card` is shared, but each side also captures a distinct target, and a
+  // cell exists only on one side: a head-only listing would drop three of them.
+  bindScreen(base, 'base', 'sheet');
+  bindScreen(base, 'dark', 'card');
+  bindScreen(head, 'base', 'dialog');
+  bindScreen(head, 'light', 'card');
+  const { compare, calls } = stub(async input => {
+    fs.mkdirSync(input.out, { recursive: true });
+    return report({ changed: true, changedPixels: 5, changedPercent: 0.01 });
+  });
+  const summary = await runPixelDiffAdvisory({
+    out,
+    base: base.revision,
+    head: head.revision,
+    explainShift: false,
+    pairReasons: ['Captured device environments differ', 'Matrix cells/configuration differ'],
+    compare,
+  });
+  assert.equal(summary.status, 'inconclusive');
+  assert.equal(calls.length, 0, 'a pair the gate refused is never diffed');
+  const keys = summary.cells.map(cell => `${cell.cell}/${cell.target}`).sort();
+  assert.deepEqual(keys, ['base/card', 'base/dialog', 'base/sheet', 'dark/card', 'light/card']);
+  const reason =
+    'the comparison already called this pair inconclusive: Captured device environments differ; Matrix cells/configuration differ';
+  for (const cell of summary.cells) {
+    assert.equal(cell.status, 'inconclusive');
+    assert.equal(cell.reason, reason);
+    assert.equal(cell.artifacts, undefined);
+  }
 });
 
 test('a cell directory that is a symbolic link is refused and never written through', async t => {

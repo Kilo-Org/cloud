@@ -24,51 +24,83 @@ import {
 /** Matching threshold for pixelmatch: the maximum OKLab HyAB distance two pixels may differ by. */
 export const THRESHOLD = 0.1;
 
+/**
+ * Most changed regions a comparison reports. Past this, further disjoint regions are counted
+ * but not boxed, and `regionsTruncated` says so; the changed pixel count stays exact.
+ */
+export const MAX_REGIONS = 200;
+
 /** A fixed-coordinate comparison of two same-sized PNGs. */
-export interface DiffOutcome {
+export type DiffOutcome = {
   width: number;
   height: number;
   changedPixels: number;
+  /** Up to `MAX_REGIONS` boxes, largest first. */
   regions: Box[];
+  /** True when more than `MAX_REGIONS` disjoint regions changed; `regions` is then partial. */
+  regionsTruncated: boolean;
   /** One byte per pixel: 1 where the comparison found a changed pixel. */
   mask: Uint8Array;
   /** Faded "after" image with changed pixels highlighted and regions outlined. */
   diffImage: PNG;
-}
+};
 
 function area(box: Box): number {
   return box.width * box.height;
 }
 
-/** Merges boxes that touch or sit within `gap` px of each other. */
-function mergeBoxes(input: Box[], gap: number): Box[] {
-  let boxes = input.slice();
-  let merged = true;
-  while (merged) {
-    merged = false;
-    const next: Box[] = [];
-    for (const box of boxes) {
-      const hit = next.findIndex(other => intersects(box, other, gap));
-      if (hit >= 0) {
-        next[hit] = unionBox(next[hit], box);
-        merged = true;
-      } else {
-        next.push(box);
-      }
+/**
+ * Merges boxes that touch or sit within `gap` px of each other, transitively, keeping at most
+ * `cap` regions.
+ *
+ * The all-pairs version is quadratic in the number of components, which a noisy capture makes
+ * visible: a page of thousands of disjoint changed cells spends its whole budget proving that
+ * far-apart boxes do not touch. Grouping here is size ordered (largest region first) and the
+ * working set is capped, so each incoming box is tested against at most `cap` regions — linear
+ * in the component count for a fixed cap. Each box absorbs every region it reaches, and the
+ * union then absorbs whatever it now reaches, so the nearby merge is complete within the cap.
+ *
+ * A box that reaches no region while the cap is full is dropped from the boxes and reported
+ * through `truncated`. The changed pixel count is unaffected either way: it comes from the pixel
+ * comparison, and the boxes only explain where those pixels are.
+ */
+function mergeBoxes(
+  input: Box[],
+  gap: number,
+  cap: number
+): { regions: Box[]; truncated: boolean } {
+  const boxes = input.slice().sort((left, right) => area(right) - area(left));
+  const regions: Box[] = [];
+  let truncated = false;
+  for (const box of boxes) {
+    let merged = box;
+    for (;;) {
+      const index = regions.findIndex(region => intersects(merged, region, gap));
+      if (index < 0) break;
+      merged = unionBox(regions[index], merged);
+      regions.splice(index, 1);
     }
-    boxes = next;
+    if (regions.length >= cap) {
+      truncated = true;
+      continue;
+    }
+    regions.push(merged);
   }
-  return boxes;
+  return { regions, truncated };
 }
 
-/** Groups changed pixels into rectangles: a coarse grid, 8-connected components, then proximity merging. */
+/**
+ * Groups changed pixels into rectangles: a coarse grid, 8-connected components, then proximity
+ * merging capped at `cap` boxes.
+ */
 function findRegions(
   mask: Uint8Array,
   width: number,
   height: number,
   cell: number,
-  gap: number
-): Box[] {
+  gap: number,
+  cap: number
+): { regions: Box[]; truncated: boolean } {
   const cols = Math.ceil(width / cell);
   const rows = Math.ceil(height / cell);
   const hot = new Uint8Array(cols * rows);
@@ -123,16 +155,26 @@ function findRegions(
       )
     );
   }
-  return mergeBoxes(boxes, gap).sort((left, right) => area(right) - area(left));
+  const merged = mergeBoxes(boxes, gap, cap);
+  return {
+    regions: merged.regions.sort((left, right) => area(right) - area(left)),
+    truncated: merged.truncated,
+  };
 }
 
 /**
  * Compares two same-sized PNGs at fixed coordinates. Every pixel whose colour differs beyond
  * `THRESHOLD` counts once; anti-aliased pixels are excluded, as upstream does.
+ *
+ * Reject unequal dimensions even when the caller does not use the PNG pair wrapper.
  */
 export function diffPngs(before: PNG, after: PNG, scale: number): DiffOutcome {
+  if (before.width !== after.width || before.height !== after.height) {
+    const sizes = `${before.width}x${before.height} and ${after.width}x${after.height}`;
+    throw new Error(`diffPngs needs same-sized images, got ${sizes}`);
+  }
   const width = before.width;
-  const height = after.height;
+  const height = before.height;
   const overlay = new Uint8Array(width * height * 4);
   const changedPixels = pixelmatch(before.data, after.data, overlay, width, height, {
     threshold: THRESHOLD,
@@ -145,12 +187,10 @@ export function diffPngs(before: PNG, after: PNG, scale: number): DiffOutcome {
 
   const cell = Math.max(1, Math.round(8 * scale));
   const gap = Math.max(1, Math.round(24 * scale));
-  const regions =
+  const grouped =
     changedPixels === 0
-      ? []
-      : mergeBoxes(findRegions(mask, width, height, cell, gap), gap).sort(
-          (left, right) => area(right) - area(left)
-        );
+      ? { regions: [] as Box[], truncated: false }
+      : findRegions(mask, width, height, cell, gap, MAX_REGIONS);
 
   const diffImage = fadeToGray(after, 0.28);
   for (let i = 0; i < mask.length; i++) {
@@ -162,8 +202,16 @@ export function diffPngs(before: PNG, after: PNG, scale: number): DiffOutcome {
     diffImage.data[offset + 3] = 255;
   }
   const stroke = Math.max(1, Math.round(2 * scale));
-  for (const region of regions) strokeRect(diffImage, region, COLORS.highlight, stroke);
-  return { width, height, changedPixels, regions, mask, diffImage };
+  for (const region of grouped.regions) strokeRect(diffImage, region, COLORS.highlight, stroke);
+  return {
+    width,
+    height,
+    changedPixels,
+    regions: grouped.regions,
+    regionsTruncated: grouped.truncated,
+    mask,
+    diffImage,
+  };
 }
 
 /** Marks vertically moved content on the left edge of the diff panel. Decoration only. */
@@ -210,17 +258,20 @@ export function focusBoxes(
     if (box.y + box.height > height) box.y = Math.max(0, height - box.height);
     return clampBox(box, width, height);
   });
-  const merged = mergeBoxes(grown, 0).sort((left, right) => area(right) - area(left));
+  // At most MAX_REGIONS arrive here; cap at their count so nothing is dropped.
+  const merged = mergeBoxes(grown, 0, grown.length).regions.sort(
+    (left, right) => area(right) - area(left)
+  );
   const picked = merged.slice(0, opts.max);
   if (picked.length === 1 && area(picked[0]) > 0.7 * width * height) return [];
   return picked;
 }
 
-export interface ComparePanels {
+export type ComparePanels = {
   before: PNG;
   after: PNG;
   diffImage: PNG;
-}
+};
 
 /**
  * Places before, after and diff side by side, optionally around one crop box.

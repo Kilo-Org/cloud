@@ -33,8 +33,10 @@ export type PixelDiffReport = {
   /** `changedPixels` as a percentage of the image area, 0..100. */
   changedPercent: number;
   changed: boolean;
-  /** Changed regions, largest first, in physical pixels. */
+  /** Changed regions, largest first, in physical pixels; capped at the comparator's limit. */
   regions: PixelBox[];
+  /** True when the change split into more regions than reported; `regions` is then partial. */
+  regionsTruncated: boolean;
   /** Artifact file names relative to `out`; the comparison composite is always written. */
   artifacts: { comparison: string; focus?: string };
   /** Vertical movement explanation, present only when `explainShift` found moved rows. */
@@ -203,6 +205,7 @@ export async function comparePngPair(input: ComparePngPairInput): Promise<PixelD
     changedPercent: (comparison.changedPixels / (before.width * before.height)) * 100,
     changed: comparison.changedPixels > 0,
     regions: comparison.regions,
+    regionsTruncated: comparison.regionsTruncated,
     artifacts: focusRegion
       ? { comparison: 'comparison.png', focus: 'focus.png' }
       : { comparison: 'comparison.png' },

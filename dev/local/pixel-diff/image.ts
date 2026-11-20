@@ -8,12 +8,12 @@ import { drawText, fitText, GLYPH_HEIGHT } from './font';
 
 export type RGBA = [number, number, number, number];
 
-export interface Box {
+export type Box = {
   x: number;
   y: number;
   width: number;
   height: number;
-}
+};
 
 export function decodePng(buffer: Buffer): PNG {
   return PNG.sync.read(buffer);
@@ -210,16 +210,16 @@ export function fitWithinBox(src: PNG, maxWidth: number, maxHeight: number): PNG
   );
 }
 
-export interface Panel {
+export type Panel = {
   image: PNG;
   label: string;
   accent: RGBA;
-}
+};
 
-export interface ComposeOptions {
+export type ComposeOptions = {
   /** Gap between panels, in output pixels; derived from the panel width when omitted. */
   gap?: number;
-}
+};
 
 export const COLORS = {
   background: [243, 244, 246, 255] as RGBA,

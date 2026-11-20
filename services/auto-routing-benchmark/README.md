@@ -1750,7 +1750,11 @@ It retries finalization after a canceled completion handler without starting dup
   an absolute run-age timeout, so legitimate backlogs do not discard ongoing measurements.
 
 Retries reuse successful graded cases from compatible terminal runs.
-The router, benchmark engine, repetitions, concrete model, variant, case, and repetition index must match.
+The router, benchmark engine, concrete model, variant, case, and repetition index must match.
+A run's repetition count does not: a prior run's repetition `r` is one valid independent draw for
+repetition `r` of a shorter or longer run, so a one-repetition prior fills the first repetition of a
+three-repetition run and the other two are measured. A stored repetition is never copied to a
+different repetition index.
 The newest compatible case wins; existing destination results and source rows remain unchanged.
 Failed or timed-out CLI cases run again; a successful zero score remains a valid measurement.
 Pending successful CLI outputs also survive terminal transitions so rubric grading can resume without another model call.

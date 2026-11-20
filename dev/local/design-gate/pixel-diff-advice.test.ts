@@ -913,7 +913,9 @@ test('a head overlay blocks only its cell and a real sibling still compares', as
       {
         id: 'dark',
         config: { ...CONFIG, dark: true },
-        screens: [{ target: 'card', dump: 'cells/dark.card.json', screenshot: 'cells/dark.card.png' }],
+        screens: [
+          { target: 'card', dump: 'cells/dark.card.json', screenshot: 'cells/dark.card.png' },
+        ],
       },
     ];
   }

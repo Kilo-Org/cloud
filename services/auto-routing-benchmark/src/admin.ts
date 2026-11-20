@@ -28,6 +28,8 @@ import {
   resolvePolicySettings,
   resolveEffectivePolicy,
   StartBenchmarkRunRequestSchema,
+  type BenchmarkRun,
+  type BenchmarkRunAdminResponseRun,
   type BenchmarkRunsResponse,
   type BenchmarkRunSummariesResponse,
   type BenchmarkSchedulerConfigResponse,
@@ -127,6 +129,16 @@ function withLegacyAdminConfigFields(
     deciderRepetitions: policy.deciderRepetitions,
     classifierMaxP95LatencyMs: policy.classifierMaxP95LatencyMs,
   };
+}
+
+/**
+ * The previous web release parses the run list with a contract that still
+ * requires `summaries` on every run (ADR 0003 invariant 7: workers deploy
+ * before web promotion). Serve an empty array; the per-run summaries route
+ * serves the rows. Remove once that release is promoted.
+ */
+function withLegacyAdminRunFields(run: BenchmarkRun): BenchmarkRunAdminResponseRun {
+  return { ...run, summaries: [] };
 }
 
 const RETRY_AFTER_SAVE = `The scheduled platform sync (${PLATFORM_SYNC_SCHEDULE}) retries it; save again to retry now.`;
@@ -300,7 +312,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     return c.json({
       runs: runs.map(run => {
         const progress = progressByRunId.get(run.id);
-        return progress ? { ...run, progress } : run;
+        return withLegacyAdminRunFields(progress ? { ...run, progress } : run);
       }),
       hasRunningRun,
     } satisfies BenchmarkRunsResponse);

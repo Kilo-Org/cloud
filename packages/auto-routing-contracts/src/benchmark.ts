@@ -302,6 +302,19 @@ export const BenchmarkRunSchema = z.object({
 });
 export type BenchmarkRun = z.infer<typeof BenchmarkRunSchema>;
 
+/**
+ * Field the previous web release still requires on each run of the admin run
+ * list. Production deploys this worker before the web promotion (ADR 0003
+ * invariant 7), so the list keeps an empty `summaries` array per run until that
+ * release is promoted; the per-run summaries route serves the rows. Remove this
+ * schema with the projection in the worker's admin routes.
+ */
+export const BenchmarkRunAdminLegacyFieldsSchema = z.object({ summaries: z.tuple([]) });
+export type BenchmarkRunAdminLegacyFields = z.infer<typeof BenchmarkRunAdminLegacyFieldsSchema>;
+
+/** Admin run list entry: the run plus the transitional fields. */
+export type BenchmarkRunAdminResponseRun = BenchmarkRun & BenchmarkRunAdminLegacyFields;
+
 export const BenchmarkRunsResponseSchema = z.object({
   runs: z.array(BenchmarkRunSchema),
   // Whether any run of the requested router is running, whatever the list

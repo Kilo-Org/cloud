@@ -1,8 +1,11 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createServer } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod';
 import {
+  BenchmarkModelSummarySchema,
   BenchmarkRegistryResponseSchema,
+  BenchmarkRunSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   type BenchmarkConfig,
@@ -850,6 +853,48 @@ describe('GET /admin/runs', () => {
     expect(body.runs.map(run => run.id)).toEqual([running.id]);
     expect(body.runs[0].progress).toBeUndefined();
   });
+
+  it('keeps the previous release’s run fields so it still parses the list', async () => {
+    // The previous web release's run-list contract: every run carries summaries.
+    const PreviousReleaseRunsResponseSchema = z.object({
+      runs: z.array(BenchmarkRunSchema.extend({ summaries: z.array(BenchmarkModelSummarySchema) })),
+    });
+    const running: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'running',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+    };
+    vi.mocked(listRuns).mockResolvedValue([
+      running,
+      { ...running, id: 'classifier-1', kind: 'classifier', status: 'completed' },
+    ]);
+    vi.mocked(listRunProgressCounts).mockResolvedValue([
+      {
+        runId: running.id,
+        kind: 'decider',
+        router: 'efficient',
+        repetitions: 1,
+        engineIdentity: computeEngineIdentity('decider', 'efficient'),
+        enqueuedModels: 1,
+        completedCases: 4,
+        failedCases: 0,
+      },
+    ]);
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const previous = PreviousReleaseRunsResponseSchema.parse(await res.json());
+    expect(previous.runs.map(run => [run.id, run.summaries])).toEqual([
+      [running.id, []],
+      ['classifier-1', []],
+    ]);
+  });
 });
 
 describe('run list and per-run summaries against D1', () => {
@@ -922,7 +967,8 @@ describe('run list and per-run summaries against D1', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { runs: Record<string, unknown>[]; hasRunningRun: boolean };
     expect(body.runs.map(run => run.id)).toEqual(['decider-efficient', 'classifier-shared']);
-    for (const run of body.runs) expect(run).not.toHaveProperty('summaries');
+    // Empty for the previous web release; the summaries route serves the rows.
+    for (const run of body.runs) expect(run.summaries).toEqual([]);
     // Only the frontier router has a running run.
     expect(body.hasRunningRun).toBe(false);
   });

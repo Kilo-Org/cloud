@@ -1571,6 +1571,65 @@ describe('browser tool session scripting backend', () => {
     }
   });
 
+  it('waits for the load of a navigation the browser already reported', async () => {
+    vi.useFakeTimers();
+
+    try {
+      type Updated = (tabId: number, changeInfo: { readonly status?: string }) => void;
+      const listeners: Updated[] = [];
+      let shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+      const tabsApi: BrowserTabsApi = {
+        get: tabId => ({ id: tabId, ...shown }),
+        onUpdated: {
+          addListener: listener => {
+            listeners.push(listener);
+          },
+          removeListener: () => {
+            listeners.length = 0;
+          },
+        },
+        query: () => [],
+        update: tabId => ({ id: tabId }),
+      };
+      const session = createBrowserToolSession({
+        scriptingApi: createScriptingApi().api,
+        tabId: 7,
+        tabsApi,
+      });
+      let settled = false;
+      const navigated = (async () => {
+        const result = await session.callTool('browser_navigate_back', {});
+
+        settled = true;
+
+        return result;
+      })();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(listeners).toHaveLength(1);
+
+      const emit = (status: string) => {
+        for (const listener of listeners) {
+          listener(7, { status });
+        }
+      };
+
+      // The browser reported a load: a slow commit must not be read as nothing happening.
+      emit('loading');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(settled).toBe(false);
+
+      shown = { status: 'complete', title: 'Back', url: 'https://example.com/previous' };
+      emit('complete');
+
+      await expect(navigated).resolves.toStrictEqual({
+        ok: true,
+        value: { title: 'Back', url: 'https://example.com/previous' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not end a cross-document navigation on its first url-only update', async () => {
     type Updated = (
       tabId: number,

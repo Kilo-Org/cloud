@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronDown } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -22,6 +23,7 @@ import {
 } from '@/lib/a11y/tap-target';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { NESTED_SECTION_GAP_CLASS } from '@/lib/layout';
 import { useRepositoryBranches } from '@/lib/use-new-session-repos';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
@@ -108,8 +110,10 @@ export function RepositoryBranchSelector({
   });
 
   return (
-    <View className="mt-3">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">{t('common.branch')}</Text>
+    // The branch block is a nested section inside the repository group, so it
+    // keeps the form's section break above the label in every branch-row state.
+    <View className={cn(NESTED_SECTION_GAP_CLASS, 'gap-2')}>
+      <FormFieldLabel label={t('common.branch')} />
       {/*
         Each state is its own native view. React would otherwise recycle the
         loading wrapper — the only one that carries an accessibility label —
@@ -255,8 +259,10 @@ export function RepositoryBranchSelector({
           <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
             {label}
           </Text>
+          {/* The Default tag is a trigger detail line, so it takes the same
+              secondary size and token as the row's other detail text. */}
           {isDefault ? (
-            <Text className="text-xs text-muted-foreground">
+            <Text className="text-sm text-muted-foreground">
               {t('agentChat.newSession.branchDefault')}
             </Text>
           ) : null}

@@ -12,6 +12,7 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { Mic } from '@/components/ui/icons';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { useTranscriptionModels } from '@/lib/hooks/use-transcription-models';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -55,6 +56,7 @@ export function TranscriptionModelPickerSheet() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { organizationId } = useOrganization();
   // Scope the catalogue to the selected organization so the picker cannot
   // offer, or check-mark, a model the scoped upload then rejects.
@@ -92,7 +94,7 @@ export function TranscriptionModelPickerSheet() {
     content = (
       <FlashList
         nestedScrollEnabled
-        style={[listStyle, { backgroundColor: colors.background }]}
+        style={[listStyle, { backgroundColor: colors.background }, sideInsetMarginStyle]}
         contentContainerStyle={listContentContainerStyle}
         data={models}
         keyExtractor={item => item.id}

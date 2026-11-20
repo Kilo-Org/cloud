@@ -202,14 +202,6 @@ export default function RepoPickerScreen() {
                   ) : (
                     <Unlock size={14} color={colors.mutedForeground} />
                   )}
-                  {item.showPlatform ? (
-                    <Text
-                      className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
-                      numberOfLines={1}
-                    >
-                      {platformName}
-                    </Text>
-                  ) : null}
                   {/* Middle ellipsis keeps both ends of the name: long names in a
                       large organization share a prefix, so a tail cut made every
                       row look identical and hid the distinguishing suffix. The
@@ -220,6 +212,18 @@ export default function RepoPickerScreen() {
                       {repo.fullName}
                     </Text>
                   </View>
+                  {/* A recently-used row mixes providers under a header that
+                      names none, so it names its own — after the name, where the
+                      provider sections put nothing, so every repository name in
+                      this list starts on one edge instead of two. */}
+                  {item.showPlatform ? (
+                    <Text
+                      className="shrink-0 text-xs font-medium text-muted-foreground"
+                      numberOfLines={1}
+                    >
+                      {platformName}
+                    </Text>
+                  ) : null}
                 </View>
               </ChoiceRow>
             );
@@ -246,10 +250,9 @@ export default function RepoPickerScreen() {
       return null;
     }
     return (
-      <Card className="mx-3 mt-3">
-        <Text className="text-sm font-semibold text-foreground">
-          {t('agentChat.repoPicker.platformBitbucket')}
-        </Text>
+      <Card className="mx-4 mt-3">
+        {/* One sentence, which already names the product: the note carried a
+            'Bitbucket' title above it and the body repeated the name. */}
         <Text variant="muted">{t('agentChat.newSession.bitbucketOrganizationsOnly')}</Text>
       </Card>
     );

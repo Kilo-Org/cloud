@@ -1981,6 +1981,11 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
  * The question stays remembered, with the words the answer had reached under
  * it: the person is left with what they asked, what they already read, and a
  * Retry, rather than with a message that vanished.
+ *
+ * What the session counted before the Stop is billed, so it is counted now, as
+ * a failed answer's is in `settle`: a summary, or a round whose end the reading
+ * had not passed on yet. The round the Stop cut off reported no usage, so it
+ * adds nothing.
  */
 export async function stopChat(sessionId: string): Promise<void> {
   const chat = chats.get(sessionId);
@@ -1990,6 +1995,8 @@ export async function stopChat(sessionId: string): Promise<void> {
   const stopped = await halt(sessionId, chat);
   if (stopped !== null) {
     await keepPartialAnswer(sessionId, stopped);
+    const runtime = await runtimeFor(chat);
+    await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
     await drain(sessionId, chat, false);
   }
 }

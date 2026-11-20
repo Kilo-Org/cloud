@@ -21,6 +21,7 @@ import { InputFrame } from '@/components/ui/input-frame';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import {
   COMPOSER_CONTROL_HIT_SLOP_DP,
   COMPOSER_VOICE_SEND_GAP_CLASS,
@@ -254,7 +255,13 @@ export function ChatComposerInputRow({
         onSubmitEditing={returnSendsMessage ? onSubmit : undefined}
         maxFontSizeMultiplier={1}
         autoCapitalize="sentences"
-        autoCorrect
+        // The app rewrites this field's text programmatically (share
+        // prefill, voice transcript, paste, clear-on-send), so Android
+        // keeps the framework suggestion popup off — it crashes against
+        // rewritten text (see REWRITTEN_INPUT_AUTO_CORRECT). On Android
+        // the field stops offering its own corrections; the keyboard app
+        // keeps drawing its prediction bar.
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
       />
     </InputFrame>
   );

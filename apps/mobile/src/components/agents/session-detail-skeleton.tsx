@@ -48,20 +48,26 @@ function shapeFor(sessionId: string) {
  * height. A body shorter than the three bubbles then compresses them, and
  * `overflow-hidden` keeps whatever is left inside the body instead of painting
  * over the row below it — a placeholder is never sliced by the status line.
+ *
+ * The transcript pads its rows by the landscape side insets, so the bubbles sit
+ * inside the same insets, on a wrapper outside their `px-4` gutter.
  */
 export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: string }>) {
   const [first, second, third] = shapeFor(sessionId ?? '');
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className="flex-1 justify-end overflow-hidden px-4 pb-2">
-      <Skeleton
-        className={`my-1 w-3/4 shrink self-start rounded-2xl rounded-tl-sm bg-muted-soft ${first}`}
-      />
-      <Skeleton
-        className={`my-1 w-1/2 shrink self-end rounded-2xl rounded-tr-sm bg-muted-soft ${second}`}
-      />
-      <Skeleton
-        className={`my-1 w-2/3 shrink self-start rounded-2xl rounded-tl-sm bg-muted-soft ${third}`}
-      />
+    <View className="flex-1" style={sideInsetStyle}>
+      <View className="flex-1 justify-end overflow-hidden px-4 pb-2">
+        <Skeleton
+          className={`my-1 w-3/4 shrink self-start rounded-2xl rounded-tl-sm bg-muted-soft ${first}`}
+        />
+        <Skeleton
+          className={`my-1 w-1/2 shrink self-end rounded-2xl rounded-tr-sm bg-muted-soft ${second}`}
+        />
+        <Skeleton
+          className={`my-1 w-2/3 shrink self-start rounded-2xl rounded-tl-sm bg-muted-soft ${third}`}
+        />
+      </View>
     </View>
   );
 }

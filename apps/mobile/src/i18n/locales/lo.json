@@ -19,7 +19,9 @@
     "presenceStatus": "ໂຮສ: {{connection}}",
     "commandStatus": "ການສົ່ງຄຳສັ່ງ: {{status}}",
     "delivered": "ສົ່ງເຖິງແລ້ວ",
-    "expired": "ໝົດອາຍຸແລ້ວ"
+    "expired": "ໝົດອາຍຸແລ້ວ",
+    "recoveryGaps_one": "ພາກສ່ວນ {{displayCount}} ຂອງບັນທຶກນີ້ຂາດຫາຍ.",
+    "recoveryGaps_other": "ພາກສ່ວນ {{displayCount}} ຂອງບັນທຶກນີ້ຂາດຫາຍ."
   },
   "common": {
     "manageOnWeb": "ຈັດການໃນເວັບ",
@@ -138,6 +140,7 @@
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "newSession": "ເຊສຊັນໃໝ່",
     "noModelsAvailable": "ບໍ່ມີໂມເດວໃຫ້ໃຊ້",
+    "modelRetires": "ຢຸດໃຊ້ວັນທີ {{date}}",
     "notFound": "ບໍ່ພົບລາຍການນີ້.",
     "online": "ອອນໄລນ໌",
     "open": "ເປີດ {{name}}",
@@ -172,6 +175,7 @@
     "generating": "ກຳລັງສ້າງ…",
     "working": "ກຳລັງເຮັດວຽກ",
     "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
+    "organizationRepositories": "ຄັງໂຄ້ດຂອງອົງກອນ",
     "dismissed": "ລະເວັ້ນແລ້ວ",
     "agent": "ຕົວແທນ",
     "durationMinuteShort": "min",
@@ -180,7 +184,9 @@
     "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
     "privateRepositoryA11y": "{{name}}, ຄັງໂຄ້ດສ່ວນຕົວ",
     "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ.",
-    "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ."
+    "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ.",
+    "organizationTrialEndedBillingAtKiloAi": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
+    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -512,7 +518,7 @@
     "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
     "changelogAreas": {
       "signIn": "ການເຂົ້າສູ່ລະບົບ",
-      "profileOrganizations": "ໂປຣໄຟລ໌ ແລະ ອົງກອນ"
+      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ"
     }
   },
   "preferences": {
@@ -757,6 +763,9 @@
       "couldNotLoadMore": "ບໍ່ສາມາດໂຫຼດຄຳເຫັນເພີ່ມເຕີມໄດ້.",
       "retryLoadingMore": "ລອງໂຫຼດຄຳເຫັນເພີ່ມເຕີມອີກຄັ້ງ",
       "loadMoreComments": "ໂຫຼດຄຳເຫັນເພີ່ມເຕີມ",
+      "conversationTruncated": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
+      "conversationTruncated_one": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
+      "conversationTruncated_other": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
       "addReaction": "ເພີ່ມການຕອບສະໜອງ",
       "reactionPill": "ການຕອບສະໜອງ {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "ການຕອບສະໜອງ",
@@ -886,7 +895,6 @@
       "noAccess": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງການກວດສອບຂອງຄັງໂຄດນີ້.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການກວດສອບໄດ້.",
       "retryChecks": "ລອງໂຫຼດການກວດສອບອີກຄັ້ງ",
-      "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
       "noChecksReported": "ຍັງບໍ່ມີລາຍງານຜົນການກວດສອບ",
       "passed": "ຜ່ານ {{displayCount}}",
       "passed_one": "ຜ່ານ {{displayCount}}",
@@ -970,6 +978,8 @@
       "pendingComment": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "pendingComment_other": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "submitCountOfTotal": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
+      "submitCountOfTotal_one": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
+      "submitCountOfTotal_other": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
       "submitReview": "ສົ່ງຜົນການກວດສອບ",
       "partialPostedFresh": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
       "partialPostedFresh_one": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
@@ -1034,7 +1044,10 @@
     "tabs": {
       "overview": "ພາບລວມ",
       "files": "ໄຟລ໌",
-      "discussion": "ການສົນທະນາ"
+      "discussion": "ການສົນທະນາ",
+      "discussionAccessibility_one": "{{title}}: ຄຳເຫັນ 1 ລາຍການ",
+      "discussionAccessibility": "{{title}}: ຄຳເຫັນ {{displayCount}} ລາຍການ",
+      "discussionAccessibility_other": "{{title}}: ຄຳເຫັນ {{displayCount}} ລາຍການ"
     },
     "fileStatus": {
       "modified": "ແກ້ໄຂແລ້ວ",
@@ -1231,7 +1244,7 @@
     },
     "instructions": {
       "title": "ຄຳສັ່ງທີ່ກຳນົດເອງ",
-      "deprecation": "ມີແຜນຈະເລີກໃຊ້ຄຳແນະນຳທີ່ກຳນົດເອງ. ຍ້າຍຄຳແນະນຳເຫຼົ່ານີ້ໄປໄວ້ໃນໄຟລ໌ REVIEW.md ໃນຄັງໂຄ້ດຂອງເຈົ້າແທນ.",
+      "deprecation": "ຄຳແນະນຳທີ່ກຳນົດເອງຈະຖືກລຶບອອກ. ຍ້າຍຄຳແນະນຳເຫຼົ່ານີ້ໄປໄວ້ໃນໄຟລ໌ REVIEW.md ໃນຄັງໂຄ້ດຂອງເຈົ້າແທນ.",
       "placeholder": "ເຊັ່ນ: ໃຫ້ປະຕິບັດຕາມມາດຕະຖານການຈັດການຂໍ້ຜິດພາດຂອງທີມ…",
       "clearTitle": "ເອົາຄຳສັ່ງທີ່ກຳນົດເອງອອກບໍ?",
       "clearMessage": "ການບັນທຶກຊ່ອງຫວ່າງເປົ່າຈະລຶບຄຳສັ່ງທີ່ກຳນົດເອງທີ່ເກັບໄວ້ສຳລັບຜູ້ກວດສອບນີ້ອອກ."
@@ -1391,12 +1404,16 @@
     "followReviewMd": "ປະຕິບັດຕາມ REVIEW.md",
     "followReviewMdSubtitle": "ປະຕິບັດຕາມຄຳແນະນຳໃນໄຟລ໌ REVIEW.md ຂອງແຕ່ລະຄັງໂຄ້ດ",
     "bitbucket": {
-      "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
+      "notConnectedReadOnlyPlan": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ດັ່ງນັ້ນເຈົ້າຂອງອົງກອນຕ້ອງອັບເດດການຮຽກເກັບເງິນທີ່ kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງ {{organization}} ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
+      "managedOnWebTitle": "ຈັດການຢູ່ໃນເວັບ",
+      "managedOnWebShort": "ການເຊື່ອມຕໍ່ນີ້ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
+      "managedOnWebRepositories": "ເລືອກບ່ອນເກັບໂຄດສຳລັບ {{organization}} ຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
       "description": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກສຳລັບ {{organization}} ແລ້ວວາງລົງດ້ານລຸ່ມ.",
       "descriptionReconnect": "ສ້າງໂທເຄັນໃໝ່ເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກສຳລັບ {{organization}} ແລ້ວວາງລົງດ້ານລຸ່ມ.",
+      "descriptionOverview": "ສ້າງໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກ ແລ້ວວາງມັນໃນໜ້າຈໍຖັດໄປ.",
       "scopes": "ບັນຊີ: ອ່ານ · ຄັງໂຄ້ດ: ອ່ານ/ຂຽນ · ຄຳຂໍລວມໂຄ້ດ: ອ່ານ · ເວັບຮຸກ: ອ່ານ/ຂຽນ",
       "tokenPlaceholder": "ໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກ",
       "tokenRefused": "Bitbucket ບໍ່ຍອມຮັບໂທເຄັນເຂົ້າເຖິງພື້ນທີ່ເຮັດວຽກນີ້. ກວດສອບວ່າມັນມີສິດຕາມທີ່ກ່າວມາຂ້າງເທິງ ແລ້ວລອງອີກຄັ້ງ."
@@ -1417,6 +1434,7 @@
     "platformList": {
       "checking": "ກຳລັງກວດສອບ…",
       "statusUnavailable": "ບໍ່ສາມາດຮູ້ສະຖານະໄດ້",
+      "needsAttention": "ຕ້ອງການຄວາມສົນໃຈ",
       "platforms": "ແພລດຟອມ",
       "activity": "ກິດຈະກຳ"
     },
@@ -2787,6 +2805,8 @@
     "modelPicker": {
       "title": "ເລືອກໂມເດວ",
       "noModelsDescription": "ບໍ່ມີໂມເດວໃຫ້ເລືອກ.",
+      "allUnavailableTitle": "ບໍ່ມີໂມເດວໃດທີ່ໃຊ້ໄດ້",
+      "allUnavailableDescription": "ເພີ່ມຄີຂອງຜູ້ໃຫ້ບໍລິການ ແລ້ວລອງໃໝ່.",
       "favorites": "ລາຍການທີ່ມັກ"
     },
     "modelSelector": {
@@ -3191,6 +3211,8 @@
     "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ.",
     "endedOn": "ສິ້ນສຸດວັນທີ {{date}}",
     "notAvailableInApp": "ບໍ່ສາມາດໃຊ້ Kilo Pass ໃນແອັບໄດ້.",
+    "notAvailableTitle": "Kilo Pass ບໍ່ມີໃນແອັບ",
+    "noPassDescription": "ບັນຊີນີ້ບໍ່ມີ Kilo Pass.",
     "statusActive": "ເປີດໃຊ້ງານ",
     "statusTrialing": "ກຳລັງທົດລອງ",
     "statusPastDue": "ການຊຳລະເງິນເກີນກຳນົດ",
@@ -3473,7 +3495,7 @@
       "retentionLimit": "ກຳລັງສະແດງໃບແຈ້ງໜີ້ຫຼ້າສຸດ."
     },
     "lowBalanceAlert": {
-      "enableA11y": "ເປີດການແຈ້ງເຕືອນຍອດເງິນຕໍ່າ",
+      "subtitle": "ສົ່ງການແຈ້ງເຕືອນທາງອີເມວໄປຫາທີ່ຢູ່ທີ່ເຈົ້າລະບຸ ເມື່ອຍອດເງິນຂອງອົງກອນນີ້ຕໍ່າກວ່າຈຳນວນທີ່ເຈົ້າກຳນົດ.",
       "notifyEmailsLabel": "ອີເມວທີ່ຮັບການແຈ້ງເຕືອນ",
       "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການແຈ້ງເຕືອນກ່ຽວກັບການຮຽກເກັບເງິນ.",
       "separateEmailsHint": "ແຍກທີ່ຢູ່ອີເມວແຕ່ລະອັນດ້ວຍເຄື່ອງໝາຍຈຸດ (,).",
@@ -3618,10 +3640,9 @@
     },
     "hub": {
       "renameTitle": "ປ່ຽນຊື່ອົງກອນ",
-      "renamePlaceholder": "ຊື່ອົງກອນ",
+      "renamePlaceholder": "ໃສ່ຊື່ອົງກອນ",
       "balance": "ຍອດເງິນຄົງເຫຼືອ",
-      "organizationSeats": "ຈຳນວນສິດຜູ້ໃຊ້ໃນອົງກອນ",
-      "plan": "ແຜນອົງກອນ",
+      "plan": "ແຜນ",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · ສິ້ນສຸດ",
@@ -3655,7 +3676,8 @@
     "signupStepUp": "ໃຊ້ '$t(login.moreSignInOptions)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpApple": "ໃຊ້ '$t(login.signInWithApple)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpGoogle": "ໃຊ້ '$t(login.signInWithGoogle)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
-    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ. ກະລຸນາລອງອີກຄັ້ງ.",
+    "signupStepUpBack": "ກັບຄືນໄປ ແລ້ວໃຊ້ '$t(login.moreSignInOptions)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
+    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ກະລຸນາລອງອີກຄັ້ງ ຫຼື ໃຊ້ '$t(login.resendCode)'.",
     "codeInProgress": "ກຳລັງປະມວນຜົນລະຫັດຂອງທ່ານ. ລໍຖ້າຈັກໜ້ອຍແລ້ວລອງອີກຄັ້ງ.",
     "tooManyAttempts": "ທ່ານລອງຫຼາຍຄັ້ງເກີນໄປແລ້ວ. ກະລຸນາຂໍລະຫັດໃໝ່.",
     "invalidToken": "ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ. ກະລຸນາລອງໃໝ່.",
@@ -3924,6 +3946,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) ສົ່ງຄຳຮ້ອງຂໍປະມວນຜົນສັ້ນໆໄປຫາຈຸດເຊື່ອມຕໍ່ນີ້ ໂດຍໃຊ້ໂປຣໂຕຄອນ ແລະ ໂມເດວທີ່ເລືອກ. ຜູ້ໃຫ້ບໍລິການອາດຄິດຄ່າໃຊ້ຈ່າຍ.",
       "connectionSucceeded": "ໂມເດວປະມວນຜົນຄຳຮ້ອງຂໍສຳເລັດໂດຍໃຊ້ໂປຣໂຕຄອນນີ້.",
       "connectionFailed": "ໂມເດວບໍ່ສາມາດປະມວນຜົນຄຳຮ້ອງຂໍໃຫ້ສຳເລັດໄດ້. ກວດສອບ URL ຮາກຂອງ API, ໂປຣໂຕຄອນ, ຂໍ້ມູນຢືນຢັນຕົວຕົນ ແລະ ລະຫັດໂມເດວ.",
+      "requestTimedOut": "ຈຸດເຊື່ອມຕໍ່ບໍ່ໄດ້ຕອບກັບພາຍໃນເວລາທີ່ກຳນົດ. ກວດສອບ URL ຮາກຂອງ API ແລະ ການເຊື່ອມຕໍ່ຂອງທ່ານ, ແລ້ວລອງໃໝ່ອີກຄັ້ງ.",
+      "requestUnauthorized": "ຈຸດເຊື່ອມຕໍ່ປະຕິເສດຂໍ້ມູນຢືນຢັນຕົວຕົນ. ກວດສອບກະແຈ API ແລະ ສ່ວນຫົວກຳນົດເອງ, ແລ້ວລອງໃໝ່ອີກຄັ້ງ.",
+      "requestNotFound": "ບໍ່ພົບຈຸດເຊື່ອມຕໍ່ ຫຼື ໂມເດວ. ກວດສອບ URL ຮາກຂອງ API ແລະ ລະຫັດໂມເດວ.",
+      "requestRateLimited": "ຈຸດເຊື່ອມຕໍ່ກຳລັງຈຳກັດຄຳຮ້ອງຂໍ. ລໍຖ້າຈັກໜ້ອຍແລ້ວລອງໃໝ່ອີກຄັ້ງ.",
+      "requestUnavailable": "ຈຸດເຊື່ອມຕໍ່ບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ລອງໃໝ່ອີກຄັ້ງໃນຈັກໜ້ອຍ.",
+      "requestUnreachable": "ບໍ່ສາມາດເຂົ້າເຖິງຈຸດເຊື່ອມຕໍ່ໄດ້. ກວດສອບ URL ຮາກຂອງ API ແລະ ການເຊື່ອມຕໍ່ຂອງທ່ານ.",
+      "requestInvalidResponse": "ຈຸດເຊື່ອມຕໍ່ຕອບກັບດ້ວຍຮູບແບບທີ່ບໍ່ແມ່ນຮູບແບບທີ່ຄາດໄວ້. ກວດສອບວ່າ URL ຮາກຂອງ API ແລະ ໂປຣໂຕຄອນກົງກັບເຊີບເວີ, ແລ້ວລອງອີກຄັ້ງ.",
+      "discoveryNoModels": "ຈຸດເຊື່ອມຕໍ່ບໍ່ສະແດງລາຍການໂມເດວ. ປ້ອນໂມເດວດ້ວຍຕົນເອງ.",
+      "connectionIncomplete": "ໂມເດວຕອບກັບແລ້ວ ແຕ່ບໍ່ໄດ້ສຳເລັດ. ລອງໃໝ່ອີກຄັ້ງ, ຫຼື ກວດສອບລະຫັດໂມເດວ ແລະ ໂປຣໂຕຄອນ.",
       "invalidInput": "ປ້ອນຊື່ລະບົບເບື້ອງຫຼັງ, ສ່ວນຫົວທີ່ຖືກຕ້ອງ ແລະ ຢ່າງໜ້ອຍໜຶ່ງໂມເດວທີ່ມີລະຫັດ ແລະ ຊື່ບໍ່ຊ້ຳກັນ. ຂີດຈຳກັດໂທເຄັນຕ້ອງເປັນຈຳນວນເຕັມບວກ.",
       "invalidUrl": "ປ້ອນ URL ຮາກຂອງ API ແບບ HTTP ຫຼື HTTPS ໂດຍບໍ່ມີຂໍ້ມູນຢືນຢັນຕົວຕົນ, ພາລາມິເຕີຄິວຣີ ຫຼື ສ່ວນລະບຸຕຳແໜ່ງພາຍໃນ.",
       "publicHttp": "ບໍ່ອະນຸຍາດໃຫ້ໃຊ້ຈຸດເຊື່ອມຕໍ່ HTTP ສາທາລະນະ. ໃຊ້ HTTPS ຫຼື ຈຸດເຊື່ອມຕໍ່ພາຍໃນເຄືອຂ່າຍສ່ວນຕົວ.",
@@ -4062,10 +4093,20 @@
     "reasoningEffort": {
       "modelFlag": "ໂມເດວນີ້ຮອງຮັບລະດັບການຄິດ"
     },
-    "creditsRequired": "ເຄຣດິດບໍ່ພຽງພໍທີ່ຈະສົ່ງຂໍ້ຄວາມນີ້."
+    "creditsRequired": "ເຄຣດິດບໍ່ພຽງພໍທີ່ຈະສົ່ງຂໍ້ຄວາມນີ້.",
+    "providerKeyRefused": "ຜູ້ໃຫ້ບໍລິການປະຕິເສດຂໍ້ມູນຢືນຢັນຕົວຕົນ. ກວດສອບກະແຈ API ຂອງຕົນ, ແລ້ວສົ່ງອີກຄັ້ງ.",
+    "providerModelMissing": "ລະບົບເບື້ອງຫຼັງນີ້ບໍ່ໃຫ້ບໍລິການໂມເດວນີ້ອີກແລ້ວ. ເລືອກອັນອື່ນ.",
+    "providerRateLimited": "ຜູ້ໃຫ້ບໍລິການກຳລັງຈຳກັດຄຳຮ້ອງຂໍ. ລໍຖ້າຈັກໜ້ອຍແລ້ວສົ່ງອີກຄັ້ງ.",
+    "providerUnavailable": "ຜູ້ໃຫ້ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ສົ່ງອີກຄັ້ງໃນໄວໆນີ້."
   },
   "settingsTools": {
-    "confirmTitle": "ຢືນຢັນການປ່ຽນແປງນີ້ບໍ?"
+    "confirmTitle": "ຢືນຢັນການປ່ຽນແປງນີ້ບໍ?",
+    "guarded": {
+      "spendAlertsOff": "ປິດການແຈ້ງເຕືອນການໃຊ້ຈ່າຍບໍ? ທ່ານຈະບໍ່ໄດ້ຮັບການແຈ້ງເຕືອນເມື່ອເກີນຂອບເຂດການໃຊ້ຈ່າຍ ແລະ ເມື່ອມີການເພີ່ມຂຶ້ນສູງໃນແຕ່ລະຊົ່ວໂມງ.",
+      "balanceAlertsOff": "ປິດການແຈ້ງເຕືອນຍອດເງິນບໍ? ທ່ານຈະບໍ່ໄດ້ຮັບການແຈ້ງເຕືອນເມື່ອເຄຣດິດຂອງທ່ານເຫຼືອໜ້ອຍ.",
+      "securityFindingsOff": "ປິດການແຈ້ງເຕືອນການຄົ້ນພົບດ້ານຄວາມປອດໄພບໍ? ທ່ານຈະບໍ່ໄດ້ຮັບການແຈ້ງເຕືອນກ່ຽວກັບການຄົ້ນພົບດ້ານຄວາມປອດໄພໃໝ່ໆ.",
+      "hideBalanceOn": "ເຊື່ອງຍອດເງິນຂອງທ່ານບໍ? ຍອດເງິນເຄຣດິດຈະບໍ່ສະແດງຢູ່ໃນໜ້າໂປຣໄຟລ໌ ແລະ ສູນກາງຂອງອົງກອນອີກຕໍ່ໄປ."
+    }
   },
   "appActions": {
     "start": {
@@ -4437,6 +4478,7 @@
     "pickPackToBuyAgain": "ເລືອກແພັກເກດຂ້າງເທິງເພື່ອເລີ່ມການຊື້ໃໝ່.",
     "purchasePending": "ຮ້ານຄ້າຍັງກຳລັງດຳເນີນການການຊຳລະເງິນນີ້ຢູ່. ເຄຣດິດຂອງທ່ານຈະມາຮອດທັນທີທີ່ຮ້ານອະນຸມັດການຮຽກເກັບເງິນ.",
     "buyAgain": "ຊື້ອີກຄັ້ງ",
+    "checkPurchase": "ກວດສອບການຊື້",
     "purchaseOwnedByAnotherAccount": "ເຄຣດິດໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ.",
     "purchaseOwnedByAnotherAccountPlay": "ເຄຣດິດໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ."
   },
@@ -4530,7 +4572,9 @@
     },
     "saveSheet": {
       "title": "ບັນທຶກໃສ່ລາຍການ",
-      "saved": "ບັນທຶກໃນ {{list}}"
+      "saved": "ບັນທຶກໃນ {{list}}",
+      "saveFailed": "ບໍ່ສາມາດບັນທຶກວຽກໄດ້. ກວດສອບການເຊື່ອມຕໍ່ຂອງເຈົ້າ ແລະ ລອງອີກຄັ້ງ.",
+      "saveRefused": "ບໍ່ສາມາດບັນທຶກວຽກໃສ່ລາຍການນີ້ໄດ້. ເລືອກລາຍການອື່ນ."
     }
   },
   "agentBriefing": {
@@ -4542,6 +4586,7 @@
     "empty": "ບໍ່ມີກິດຈະກຳໃນຊ່ວງເວລາຂອງລາຍງານນີ້",
     "emptyHint": "ເຊສຊັນຂຽນໂຄດໃນຄລາວ ແລະ CLI ຂອງທ່ານຈະສະແດງຢູ່ນີ້ເມື່ອລາຍງານທີ່ກຳນົດໄວ້ມີກິດຈະກຳ.",
     "loadError": "ບໍ່ສາມາດໂຫຼດລາຍງານໄດ້",
+    "estimateLoadError": "ບໍ່ສາມາດໂຫຼດການປະເມີນໄດ້.",
     "view": "ອ່ານລາຍງານ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4809,7 +4854,7 @@
   },
   "organizationGuardrails": {
     "title": "ລະບົບປ້ອງກັນ AI",
-    "permissionDenied": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ບໍລິຫານເທົ່ານັ້ນທີ່ສາມາດຈັດການລະບົບປ້ອງກັນ AI ໄດ້.",
+    "permissionDenied": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ບໍລິຫານເທົ່ານັ້ນທີ່ສາມາດຈັດການລະບົບປ້ອງກັນ AI ໄດ້. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ລະບົບປ້ອງກັນ AI ຍັງບໍ່ໄດ້ເປີດໃຊ້",
     "unavailable": "Kilo ເປີດໃຊ້ລະບົບປ້ອງກັນ AI ໃຫ້ກັບອົງກອນຕາມການຮ້ອງຂໍ. ຕິດຕໍ່ {{supportEmail}}, ແລະ ທີມ Kilo ຈະເປີດໃຊ້ງານສຳລັບອົງກອນຂອງທ່ານ.",
     "contactSupport": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ",
@@ -4821,12 +4866,15 @@
     "inputDescription": "ສະແກນທຸກຂາເຂົ້າດ້ວຍ Enkrypt AI ລວມທັງຜົນຂອງເຄື່ອງມື. ເມື່ອ Enkrypt ບໍ່ພ້ອມໃຊ້, ຄຳຮ້ອງຂໍຈະຖືກສົ່ງໂດຍບໍ່ສະແກນ ແທນທີ່ຈະຖືກປະຕິເສດ.",
     "outputTitle": "ລະບົບປ້ອງກັນຂາອອກ",
     "outputDescription": "ສະແກນການຕອບສະໜອງດ້ວຍ Enkrypt AI ກ່ອນສະມາຊິກຈະໄດ້ຮັບ. ປິດຢູ່ເວັ້ນແຕ່ທ່ານເປີດໃຊ້ງານ.",
+    "outputUnavailable": "Kilo ຍັງບໍ່ໄດ້ເປີດການສະແກນຂາອອກສຳລັບອົງກອນນີ້ ດັ່ງນັ້ນການຕອບສະໜອງຈະບໍ່ຖືກກວດສອບ ແລະ ບໍ່ມີຫຍັງໃຫ້ຕັ້ງຢູ່ນີ້. ຕິດຕໍ່ {{supportEmail}} ເພື່ອຮ້ອງຂໍ.",
     "detectorsHint": "ບລັອກຈະປະຕິເສດຄຳຮ້ອງຂໍທີ່ຖືກກວດພົບ. ບັນທຶກເທົ່ານັ້ນຈະບັນທຶກໄວ້ໂດຍບໍ່ຊັກຊ້າຄຳຮ້ອງຂໍ.",
     "detectorsHintOutput": "ບລັອກຈະເຮັດໃຫ້ການຕອບສະໜອງທີ່ຖືກກວດພົບລົ້ມເຫຼວ. ບັນທຶກເທົ່ານັ້ນຈະບັນທຶກໄວ້ໂດຍບໍ່ຊັກຊ້າການຕອບສະໜອງ.",
     "choiceLog": "ບັນທຶກເທົ່ານັ້ນ",
     "applyTo": "ນຳໃຊ້ກັບ",
     "applyToAllMembers": "ສະມາຊິກທັງໝົດ",
     "applyKiloDefault": "ນຳໃຊ້ຄ່າເລີ່ມຕົ້ນຂອງ Kilo",
+    "applyKiloDefaultEnglishNote": "ຂໍ້ຄວາມນະໂຍບາຍເລີ່ມຕົ້ນຂອງ Kilo ເປັນພາສາອັງກິດ ເພາະ Kilo Gateway ນຳໃຊ້ມັນຄືກັບທີ່ຂຽນໄວ້ແທ້ໆ.",
+    "applyKiloDefaultReplaceMessage": "ນະໂຍບາຍເລີ່ມຕົ້ນຂອງ Kilo ຖືກຂຽນເປັນພາສາອັງກິດ ແລະ ປ່ຽນແທນສິ່ງທີ່ທ່ານຕັ້ງໄວ້ໃນການລະເມີດນະໂຍບາຍ. ຂໍ້ຄວາມທີ່ທ່ານປ້ອນໃນຊ່ອງຂໍ້ຄວາມນະໂຍບາຍບໍ່ສາມາດກູ້ຄືນໄດ້.",
     "invalidSavedTitle": "ບໍ່ສາມາດອ່ານການຕັ້ງຄ່າຕົວກວດຈັບຂາເຂົ້າທີ່ບັນທຶກໄວ້ໄດ້",
     "invalidSavedBody": "ຄຳຮ້ອງຂໍຈະຖືກບລັອກຈົນກວ່າຕົວກວດຈັບຂາເຂົ້າຈະຖືກບັນທຶກອີກຄັ້ງ. ຕົວກວດຈັບຂ້າງລຸ່ມເລີ່ມຈາກຄ່າເລີ່ມຕົ້ນຂອງ Kilo.",
     "invalidSavedOutputTitle": "ບໍ່ສາມາດອ່ານການຕັ້ງຄ່າຕົວກວດຈັບຂາອອກທີ່ບັນທຶກໄວ້ໄດ້",
@@ -4947,7 +4995,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ຄຸນສົມບັດສຳລັບອົງກອນຂະໜາດໃຫຍ່",
-    "enterpriseOnly": "ນີ້ເປັນຄຸນສົມບັດສຳລັບອົງກອນຂະໜາດໃຫຍ່ເທົ່ານັ້ນ.",
+    "enterpriseOnly": "ຜູ້ໃຫ້ບໍລິການ ແລະ ຕົວແບບມີໃຫ້ໃຊ້ໃນແຜນ Enterprise.",
     "readOnly": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ບໍລິຫານເທົ່ານັ້ນທີ່ສາມາດປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
     "loadError": "ຜູ້ໃຫ້ບໍລິການ ແລະ ຕົວແບບບໍ່ສາມາດໂຫລດໄດ້",
     "tabModels": "ຕົວແບບ",
@@ -4961,6 +5009,7 @@
     "providersDescription": "ປິດຜູ້ໃຫ້ບໍລິການເພື່ອຢຸດການກຳນົດເສັ້ນທາງຂອງ Kilo ໄປຫາຜູ້ນັ້ນສຳລັບອົງກອນນີ້.",
     "providersNeedCatalog": "ສະວິດຜູ້ໃຫ້ບໍລິການຈະອ່ານໄດ້ຢ່າງດຽວຈົນກວ່າລາຍການໂມເດວທັງໝົດຈະໂຫຼດແລ້ວ. ກົດ ລອງໃໝ່ ຂ້າງເທິງເພື່ອແກ້ໄຂ.",
     "providersEmpty": "ບໍ່ມີຜູ້ໃຫ້ບໍລິການທີ່ກົງກັບການຄົ້ນຫານີ້.",
+    "providersNone": "ບໍ່ມີຜູ້ໃຫ້ບໍລິການທີ່ມີຢູ່ສຳລັບອົງກອນນີ້.",
     "allowAllShown": "ອະນຸຍາດທັງໝົດທີ່ສະແດງ",
     "denyAllShown": "ປະຕິເສດທັງໝົດທີ່ສະແດງ",
     "gatewaysDescription": "Kilo ກຳນົດເສັ້ນທາງຄຳຮ້ອງຂໍຕົວແບບຜ່ານ Vercel AI Gateway ຫຼື OpenRouter. ປະຕູເຊື່ອມຕໍ່ທີ່ປິດຈະເຮັດໃຫ້ຄຳຮ້ອງຂໍເຫຼົ່ານັ້ນລົ້ມເຫຼວ.",

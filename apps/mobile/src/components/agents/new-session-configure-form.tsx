@@ -24,6 +24,7 @@ import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
@@ -382,10 +383,8 @@ export function NewSessionConfigureForm({
         (and the rest of the form) down after it has settled.
       */}
       {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
-        <View>
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">
-            {t('common.changes')}
-          </Text>
+        <View className="gap-2">
+          <FormFieldLabel label={t('common.changes')} />
           <SegmentedControl
             accessibilityLabel={t('common.changes')}
             options={[

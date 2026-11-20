@@ -28,6 +28,7 @@ import {
   nativeSessionTitle,
   TRANSCRIPT_EVENT_TYPES,
 } from './list-status.js';
+import { createNativeLiveSummary, type NativeLiveSummary } from './native-live-summary.js';
 import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
 import {
   cloudAgentWorktreeIdSchema,
@@ -137,6 +138,7 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
+import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
 import {
   worktreeBranchOperationResultSchema,
   type ControlPlaneWorktreeGitInput,
@@ -463,6 +465,17 @@ export const controlPlaneSessionRegistrationSchema = z
   })
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
+
+/**
+ * A registration read back from storage carries the runtime skills written
+ * under an earlier path rule; it keeps the entries the current rule accepts so
+ * the session still loads its identity and spec. The registration that arrives
+ * from the Worker is parsed with the strict schema above.
+ */
+const storedControlPlaneSessionRegistrationSchema = z.preprocess(raw => {
+  if (typeof raw !== 'object' || raw === null || !('spec' in raw)) return raw;
+  return { ...raw, spec: projectStoredRouteSpecSkills(raw.spec) };
+}, controlPlaneSessionRegistrationSchema);
 
 function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
   return registration === null
@@ -793,6 +806,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  /** The Kilo v2 root's session card summary, published with the list status. */
+  private readonly nativeLiveSummary: NativeLiveSummary;
   private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
@@ -843,6 +858,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
     });
+    this.nativeLiveSummary = createNativeLiveSummary(ctx.storage);
     this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
       storage: ctx.storage,
       record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
@@ -1238,7 +1254,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await migrate(this.db, migrations);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
-    const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
+    const parsed = storedControlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
     const rawMetadata = await this.ctx.storage.get<unknown>(SESSION_METADATA_KEY);
     if (rawMetadata === undefined) {
@@ -2457,6 +2473,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               queries: this.eventQueries,
               partText: this.partText,
             });
+            if (persisted !== null && persisted.id !== 0 && this.registration !== null)
+              this.nativeLiveSummary.observe(event, this.registration.spec.kiloSessionId);
             if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
             return persisted;
           })
@@ -2636,6 +2654,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         // Registration alone is not a transition. Native work may start without
         // a Cloud message, so do not gate those updates on message admission.
         if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          const liveSummary = this.nativeLiveSummary.settled(status);
           this.listStatusOutbox.record(
             {
               sessionId: this.registration.spec.kiloSessionId,
@@ -2644,7 +2663,21 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             },
             status,
             Date.now(),
-            { activityAt: this.transcriptActivityAt, title: this.pendingRootRename }
+            {
+              activityAt: this.transcriptActivityAt,
+              title: this.pendingRootRename,
+              // Kilo v1 reports its summary and cost through its own ingest client.
+              transcript:
+                liveSummary === undefined
+                  ? undefined
+                  : {
+                      liveSummary,
+                      totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
+                        this.sessionId,
+                        this.registration.spec.kiloSessionId
+                      ),
+                    },
+            }
           );
           this.pendingRootRename = undefined;
         }

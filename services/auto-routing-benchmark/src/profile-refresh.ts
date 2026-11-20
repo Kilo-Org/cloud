@@ -1,8 +1,11 @@
-import type { AutoRouter, BenchmarkPair } from '@kilocode/auto-routing-contracts';
-import { getReasoningVariantKeys } from '@kilocode/auto-routing-contracts';
+import type {
+  AutoRouter,
+  BenchmarkPair,
+  RefreshBenchmarkProfilesResponse,
+} from '@kilocode/auto-routing-contracts';
 import type { z } from 'zod';
 import { isExactModelUnavailableResult } from './cli-runner';
-import type { BenchmarkModelCatalogSchema } from './platform-models';
+import { benchmarkPairUnavailability, type BenchmarkModelCatalogSchema } from './platform-models';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
 type RefreshInput = {
@@ -13,7 +16,11 @@ type RefreshInput = {
   mode: 'refresh' | 'repair_unavailable';
 };
 
-type RefreshedRow = { model: string; variant: string; status: 'pending' | 'failed' };
+type RefreshedRow = {
+  model: string;
+  variant: string;
+  status: 'pending' | 'failed' | 'unavailable';
+};
 
 type RecordedLookupResult = {
   run_id: string;
@@ -37,19 +44,24 @@ export async function refreshCurrentProfiles(
   input: RefreshInput,
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   nowIso = new Date().toISOString()
-): Promise<{ refreshed: BenchmarkPair[]; unavailable: BenchmarkPair[]; skipped: BenchmarkPair[] }> {
-  const models = new Map(catalog.data.map(model => [model.id, model]));
-  const entries = input.entries.map(entry => {
-    const model = models.get(entry.model);
-    const variants = getReasoningVariantKeys(model?.opencode?.variants);
-    return {
-      model: entry.model,
-      variant: variantToStorage(entry.variant),
-      available:
-        Boolean(model) &&
-        (variants.length > 0 ? variants.includes(entry.variant ?? '') : entry.variant === null),
-    };
-  });
+): Promise<RefreshBenchmarkProfilesResponse> {
+  const checked = input.entries.map(entry => ({
+    entry,
+    failure: benchmarkPairUnavailability(catalog, entry),
+  }));
+  const failureByPair = new Map(
+    checked.map(({ entry, failure }) => [
+      JSON.stringify([entry.model, variantToStorage(entry.variant)]),
+      failure,
+    ])
+  );
+  const entries = checked.map(({ entry, failure }) => ({
+    model: entry.model,
+    variant: variantToStorage(entry.variant),
+    available: failure === null,
+    failureClass: failure?.failureClass ?? null,
+    failureReason: failure?.reason ?? null,
+  }));
   const selection = JSON.stringify(entries);
   const bindings = [input.router, input.engineIdentity, input.repetitions, selection] as const;
   const runningSql = `SELECT 1 FROM benchmark_profiles AS running
@@ -101,29 +113,48 @@ export async function refreshCurrentProfiles(
           )
           .map(row => ({ run_id: row.run_id, model: row.model, variant: row.variant }))
       : [];
-  const availableSql = `SELECT json_extract(requested.value, '$.available')
+  const requestedSql = (field: string) => `SELECT json_extract(requested.value, '$.${field}')
     FROM json_each(?4) AS requested
     WHERE json_extract(requested.value, '$.model') = benchmark_profiles.model
       AND json_extract(requested.value, '$.variant') = benchmark_profiles.variant`;
-  const result = await db
-    .prepare(`UPDATE benchmark_profiles SET
-      status = CASE WHEN (${availableSql}) THEN 'pending' ELSE 'failed' END,
-      failure_reason = CASE WHEN (${availableSql}) THEN NULL
-        ELSE 'Model or variant is unavailable to the benchmark CLI.' END,
-      run_id = NULL, requested_at = ?5, updated_at = ?5, completed_at = NULL,
-      invalidated_at = ?5
-    WHERE router = ?1 AND engine_identity = ?2 AND repetitions = ?3
+  const availableSql = requestedSql('available');
+  const failedSql = `status IN ('failed', 'unavailable')`;
+  const selectedSql = `router = ?1 AND engine_identity = ?2 AND repetitions = ?3
       AND EXISTS (${availableSql}) AND status != 'running'
       AND NOT EXISTS (${runningSql})
-      AND (?6 = 'refresh' OR EXISTS (
-        SELECT 1 FROM json_each(?7) AS repairable
+      AND (?5 = 'refresh' OR EXISTS (
+        SELECT 1 FROM json_each(?6) AS repairable
         WHERE json_extract(repairable.value, '$.run_id') = benchmark_profiles.run_id
           AND json_extract(repairable.value, '$.model') = benchmark_profiles.model
           AND json_extract(repairable.value, '$.variant') = benchmark_profiles.variant
-      ))
-    RETURNING model, variant, status`)
-    .bind(...bindings, nowIso, input.mode, JSON.stringify(repairable))
+      ))`;
+  const selectionBindings = [...bindings, input.mode, JSON.stringify(repairable)] as const;
+  // A pair the drain could not run is refused. An already failed row is left exactly as it
+  // is, so its failure history and its previous results stay; any other row fails
+  // permanently with the drain's reason, before any paid call. Re-admitting a runnable pair
+  // clears the failure history, so the retry budgets start over.
+  const refused = await db
+    .prepare(`SELECT model, variant, status FROM benchmark_profiles
+      WHERE ${selectedSql} AND NOT (${availableSql}) AND ${failedSql}`)
+    .bind(...selectionBindings)
     .all<RefreshedRow>();
+  const updated = await db
+    .prepare(`UPDATE benchmark_profiles SET
+      status = CASE WHEN (${availableSql}) THEN 'pending' ELSE 'unavailable' END,
+      failure_reason = CASE WHEN (${availableSql}) THEN NULL ELSE (${requestedSql('failureReason')}) END,
+      failure_class = CASE WHEN (${availableSql}) THEN NULL ELSE (${requestedSql('failureClass')}) END,
+      failure_attempts = CASE WHEN (${availableSql}) THEN 0 ELSE 1 END,
+      model_failure_attempts = 0,
+      first_failed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?7 END,
+      retry_after = NULL,
+      run_id = NULL,
+      completed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?7 END,
+      requested_at = ?7, updated_at = ?7, invalidated_at = ?7
+    WHERE ${selectedSql} AND ((${availableSql}) OR NOT ${failedSql})
+    RETURNING model, variant, status`)
+    .bind(...selectionBindings, nowIso)
+    .all<RefreshedRow>();
+  const result = { results: [...updated.results, ...refused.results] };
   if (
     result.results.length === 0 &&
     (await db
@@ -136,10 +167,16 @@ export async function refreshCurrentProfiles(
   const changed = new Set(result.results.map(row => JSON.stringify([row.model, row.variant])));
   const refreshed: BenchmarkPair[] = [];
   const unavailable: BenchmarkPair[] = [];
+  const refusals: NonNullable<RefreshBenchmarkProfilesResponse['refusals']> = [];
   for (const row of result.results) {
     const pair = { model: row.model, variant: variantFromStorage(row.variant) };
-    if (row.status === 'pending') refreshed.push(pair);
-    else unavailable.push(pair);
+    const failure = failureByPair.get(JSON.stringify([row.model, row.variant]));
+    if (!failure) {
+      refreshed.push(pair);
+      continue;
+    }
+    unavailable.push(pair);
+    refusals.push({ entry: pair, failureClass: failure.failureClass, reason: failure.reason });
   }
   return {
     refreshed,
@@ -147,5 +184,6 @@ export async function refreshCurrentProfiles(
     skipped: input.entries.filter(
       entry => !changed.has(JSON.stringify([entry.model, variantToStorage(entry.variant)]))
     ),
+    refusals,
   };
 }

@@ -94,7 +94,9 @@ export type SharedGatewayRequestProperties = {
   provider?: OpenRouterProviderConfig;
   providerOptions?: VercelProviderConfig;
 
-  // Forwarded as providerOptions.gateway.models on the Vercel path
+  // Fallback models. Not supported on any route: `removeModelsFallback` drops
+  // `models` and `fallbacks` before a provider setting is built, so a fallback
+  // can never be served unpaid.
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
 

@@ -1,9 +1,9 @@
 /**
  * Pure, platform-agnostic purchase presentation and status helpers.
  *
- * Shared by the web and mobile apps so both import one source of truth for
- * which purchase UI a platform, storefront, and product may show. This module
- * performs no I/O and imports no server or mobile code.
+ * Shared by the web and mobile apps so both import one source of truth for the
+ * purchase UI that a platform, a product and the Stripe-managed flag decide. The
+ * module performs no I/O and imports no server or mobile code.
  */
 
 /** Kilo Pass plan title. Consumed by mobile and E2E; keep exact. */
@@ -44,13 +44,15 @@ export type KiloPassSubscriptionStatus =
   | 'unpaid'
   | 'paused';
 
-export type PurchaseCtaAction = 'none' | 'open_web' | 'open_native';
+/**
+ * A CTA result is a pure value: a `none` CTA carries no web target, and an
+ * `open_web` CTA always carries a relative web path.
+ */
+export type PurchasePresentationCta =
+  | { readonly action: 'none'; readonly webPath: null }
+  | { readonly action: 'open_web'; readonly webPath: string };
 
-export type PurchasePresentationCta = {
-  action: PurchaseCtaAction;
-  /** Relative web path the CTA opens, or null when there is no web target. */
-  webPath: string | null;
-};
+export type PurchaseCtaAction = PurchasePresentationCta['action'];
 
 export type PurchasePresentationReason =
   | 'credits_not_sold_on_ios'
@@ -58,16 +60,23 @@ export type PurchasePresentationReason =
   | 'unsupported_combination'
   | null;
 
-export type PurchasePresentation = {
-  kind: PurchasePresentationKind;
-  reason: PurchasePresentationReason;
-  cta: PurchasePresentationCta;
-  /** Echoed from the input. Does not change the presentation kind. */
-  program: string | null;
-};
+export type PurchasePresentation =
+  | {
+      kind: 'web_management';
+      reason: null;
+      readonly cta: PurchasePresentationCta;
+      program: string | null;
+    }
+  | {
+      kind: 'unavailable';
+      reason: Exclude<PurchasePresentationReason, null>;
+      readonly cta: PurchasePresentationCta;
+      program: string | null;
+    };
 
 export type ResolvePurchasePresentationInput = {
   platform: PurchasePlatform | null | undefined;
+  /** Carried for callers; does not affect the resolved outcome today. */
   storefront: PurchaseStorefront | null | undefined;
   product: PurchaseProduct;
   program?: string | null;
@@ -84,8 +93,15 @@ function webCta(webPath: string): PurchasePresentationCta {
   return { action: 'open_web', webPath };
 }
 
+function unavailable(
+  reason: Exclude<PurchasePresentationReason, null>,
+  program: string | null
+): PurchasePresentation {
+  return { kind: 'unavailable', reason, cta: NO_CTA, program };
+}
+
 /**
- * Resolve which purchase UI a platform, storefront, and product may show.
+ * Resolve which purchase UI a platform, product, and the Stripe-managed flag may show.
  *
  * Pure: no I/O, no imports of server or mobile code. `program` is echoed and
  * never changes the kind.
@@ -98,7 +114,7 @@ export function resolvePurchasePresentation(
 
   // Credits are not sold in the iOS app.
   if (product === 'credits' && platform === 'ios') {
-    return { kind: 'unavailable', reason: 'credits_not_sold_on_ios', cta: NO_CTA, program };
+    return unavailable('credits_not_sold_on_ios', program);
   }
 
   // Credits on Android are managed on the web.
@@ -118,11 +134,28 @@ export function resolvePurchasePresentation(
   }
 
   if (product === 'kilo_pass' && (platform === 'ios' || platform === 'android')) {
-    return { kind: 'unavailable', reason: 'kilo_pass_not_sold_in_app', cta: NO_CTA, program };
+    return unavailable('kilo_pass_not_sold_in_app', program);
   }
 
   // Any other combo, including a missing platform, is unavailable.
-  return { kind: 'unavailable', reason: 'unsupported_combination', cta: NO_CTA, program };
+  return unavailable('unsupported_combination', program);
+}
+
+const KILO_PASS_STATUS_CLASSES = {
+  active: 'healthy',
+  incomplete: 'pending',
+  trialing: 'pending',
+  past_due: 'retryable',
+  canceled: 'terminal',
+  incomplete_expired: 'terminal',
+  unpaid: 'terminal',
+  paused: 'inactive',
+} satisfies Record<KiloPassSubscriptionStatus, PurchaseStatusClass>;
+
+function isKiloPassSubscriptionStatus(status: string): status is KiloPassSubscriptionStatus {
+  // Object.hasOwn (not `in`) so inherited keys like 'constructor' fall
+  // through to the inactive fallback instead of leaking prototype members.
+  return Object.hasOwn(KILO_PASS_STATUS_CLASSES, status);
 }
 
 /**
@@ -136,21 +169,5 @@ export function mapKiloPassStatusToClass(
 ): PurchaseStatusClass {
   if (!options.hasSubscription) return 'inactive';
 
-  switch (status) {
-    case 'active':
-      return 'healthy';
-    case 'incomplete':
-    case 'trialing':
-      return 'pending';
-    case 'past_due':
-      return 'retryable';
-    case 'canceled':
-    case 'incomplete_expired':
-    case 'unpaid':
-      return 'terminal';
-    case 'paused':
-      return 'inactive';
-    default:
-      return 'inactive';
-  }
+  return isKiloPassSubscriptionStatus(status) ? KILO_PASS_STATUS_CLASSES[status] : 'inactive';
 }

@@ -40,6 +40,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { IconTile } from '@/components/ui/icon-tile';
 import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -235,13 +236,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
   // A money role whose platform may open the billing page gets the state
   // alone, because the banner's action is the next step. A money role the
-  // storefront rule keeps from linking gets the sentence the rest of the app
-  // shows, which names where billing is changed, exactly as a role that cannot
-  // change the plan does: with no action, the sentence has to carry the step.
-  const planMessage =
-    showMoney && canLinkBilling
+  // storefront rule keeps from linking has no action under the sentence, so the
+  // sentence carries the step and names where billing is changed. A role that
+  // cannot change the plan is told who can.
+  let planMessage = t('common.organizationTrialEnded');
+  if (showMoney) {
+    planMessage = canLinkBilling
       ? t('organization.hub.planEnded')
-      : t('common.organizationTrialEnded');
+      : t('common.organizationTrialEndedBillingAtKiloAi');
+  }
 
   // The rename control's two states. `organizations.update` runs on the
   // organization billing mutation procedure, which refuses every mutation once
@@ -362,7 +365,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
             )}
             <KvRow
-              label={t('organization.hub.organizationSeats')}
+              // The hub is the organization's own screen, so the label does not
+              // repeat "Organization"; it is the Seats label Billing uses.
+              label={t('organization.billing.seats')}
               // `requireSeats` is the enforcement switch; total is the raw
               // purchased capacity and can legitimately be zero, so the shared
               // readout prints the used count alone until seats were bought.
@@ -451,6 +456,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                       return;
                     }
                     void kiloPassSummary.refetch();
+                  }}
+                  onOpen={() => {
+                    router.push(billingHrefFor(organizationId));
                   }}
                 />
               )}
@@ -559,27 +567,31 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
 type OrgKiloPassRowProps = Readonly<{
   state: OrgKiloPassRowState;
   onRetry: () => void;
+  /** The organization's billing page, which carries the pass's own readout. */
+  onOpen: () => void;
 }>;
 
 /**
  * Compact Kilo Pass for Orgs row in the billing configuration group. Mirrors
  * ConfigureRow's layout and divider, but renders KiloPassIcon directly (it is
- * a plain function component, not a LucideIcon) and sets an explicit
- * accessibility role and label for the one action it can offer, the retry.
- * Never the last row — "Low balance alert" always follows it — so the divider
- * is permanent. Its icon tile follows ConfigureRow's rule too: the shared
- * neutral tile unless the state needs attention (warn), never a hue hashed from
- * the title.
+ * a plain function component, not a LucideIcon). Never the last row — "Low
+ * balance alert" always follows it — so the divider is permanent. Its icon tile
+ * follows ConfigureRow's rule too: the shared neutral tile unless the state
+ * needs attention (warn), never a hue hashed from the title.
  *
- * The row opens nothing else: Kilo Pass is no longer sold in either store, so
- * it has no setup or management page to send the reader to and carries no
- * chevron.
+ * The row opens the organization's billing page, the surface that reads the
+ * pass's plan, seats and scheduled change, so it ends in the chevron every
+ * destination row in this card carries; without one it read as loose text in a
+ * card of navigation rows. A state that can only be retried keeps the retry as
+ * its press and shows the retry label in place of the chevron, since that press
+ * does not leave the card.
  */
-function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
+function OrgKiloPassRow({ state, onRetry, onOpen }: OrgKiloPassRowProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const tint: Tint = state.attention ? toneColor('warn') : NEUTRAL_TINT;
-  const onPress = state.action === 'retry' ? onRetry : null;
+  const retries = state.action === 'retry';
+  const onPress = retries ? onRetry : onOpen;
   const accessibilityLabel = state.actionLabel
     ? `${t('kiloPass.title')}. ${state.subtitle}. ${state.actionLabel}`
     : `${t('kiloPass.title')}. ${state.subtitle}`;
@@ -602,26 +614,25 @@ function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
           <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
         )}
       </View>
-      {state.action === 'retry' ? (
+      {retries ? (
         <Text className="shrink-0 text-xs font-medium text-primary">{state.actionLabel}</Text>
-      ) : null}
+      ) : (
+        <View className="shrink-0">{renderRowTrailing({ kind: 'chevron' })}</View>
+      )}
     </View>
   );
-
-  if (onPress == null) {
-    return (
-      <View accessibilityLabel={accessibilityLabel} accessibilityState={{ busy: state.loading }}>
-        {inner}
-      </View>
-    );
-  }
 
   return (
     <Pressable
       onPress={onPress}
+      // A row whose summary is still loading has no read to open, so the press
+      // waits; the state below is what tells assistive tech the row is working
+      // rather than idle.
+      disabled={state.loading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityHint={state.accessibilityHint ?? undefined}
+      accessibilityHint={retries ? (state.accessibilityHint ?? undefined) : undefined}
+      accessibilityState={{ busy: state.loading, disabled: state.loading }}
       className="active:opacity-70"
     >
       {inner}

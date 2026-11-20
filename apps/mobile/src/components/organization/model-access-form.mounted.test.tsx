@@ -25,9 +25,45 @@ import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
 
+/**
+ * What the durable draft answers. Both states carry `save`/`clear`: the real
+ * hook writes through while it still reports `loading`, before the identity or
+ * the store has answered.
+ */
+const draftStore = vi.hoisted(() => ({
+  kind: 'loading' as 'loading' | 'ready',
+  value: null as unknown,
+  save: vi.fn(),
+  clear: vi.fn(),
+}));
+
 vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
   useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
 }));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+// The durable draft is the account-scoped encrypted store, which mounts its own
+// providers; this suite drives the form's use of it, not the store.
+vi.mock('@/lib/persist/use-form-draft', () => ({
+  useFormDraft: () =>
+    draftStore.kind === 'ready'
+      ? {
+          kind: 'ready',
+          value: draftStore.value,
+          save: draftStore.save,
+          clear: draftStore.clear,
+        }
+      : { kind: 'loading', save: draftStore.save, clear: draftStore.clear },
+}));
+// The real module opens the encrypted SQLCipher store, which this Node project
+// cannot import; the form reads only its key helper.
+vi.mock('@/lib/persist/drafts', () => ({
+  orgModelAccessFormDraftKey: (organizationId: string) => `org-model-access-form:${organizationId}`,
+}));
+// The screen hands the form the reader's role; this harness passes the money
+// role, because this suite's subject is the refusal copy a billing role reads
+// and no billing step is rendered here.
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -53,6 +89,16 @@ vi.mock('@/components/organization/model-access-lists', () => ({
 vi.mock('@/components/organization/providers-gateways-section', () => ({
   GatewaySettingsSection: 'GatewaySettingsSection',
 }));
+// The form's leave guard needs a navigator; this suite asserts the save
+// contract, the refusal copy and the draft rules, so it stubs the guard and
+// ignores the `isDirty` derivation the stub takes no part in.
+vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
+  useMetadataLeaveGuard: () => ({
+    handleDirtyChange: vi.fn(),
+    leaveWithoutAsking: vi.fn(),
+    dialog: null,
+  }),
+}));
 
 function model(id: string, providers: readonly string[]): CatalogModel {
   return { id, name: id, inference_provider_ids: [...providers] } satisfies CatalogModel;
@@ -77,6 +123,7 @@ function element(
   return createElement(ModelAccessForm, {
     organizationId: 'org-1',
     canEdit: true,
+    canManageBilling: true,
     models: [],
     catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
     catalogUnavailable: overrides.catalogUnavailable === true,
@@ -128,6 +175,17 @@ function renderWithCatalog(
   return renderer.root;
 }
 
+/** Re-render the same form, so a mocked draft load can land after mount. */
+function rerender(providerAllowList: readonly string[] | undefined) {
+  if (!renderer) {
+    throw new Error('Missing form renderer');
+  }
+  act(() => {
+    renderer?.update(element(providerAllowList));
+  });
+  return renderer.root;
+}
+
 function list(root: ReactTestInstance, type: 'ModelDenyList' | 'ProviderAllowList') {
   return root.findByType(type as never);
 }
@@ -159,6 +217,19 @@ async function pressSave(root: ReactTestInstance) {
   return save;
 }
 
+/** The Cancel action: the outline button the form draws beside Save. */
+function pressCancel(root: ReactTestInstance) {
+  const cancel = root
+    .findAllByType('Button' as never)
+    .find(node => node.props.variant === 'outline');
+  if (!cancel) {
+    throw new Error('cancel button not found');
+  }
+  act(() => {
+    (cancel.props.onPress as () => void)();
+  });
+}
+
 function statusMessage(root: ReactTestInstance): unknown {
   return root.findByType('AccessibleStatus' as never).props.message;
 }
@@ -167,6 +238,10 @@ afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
   saved.mutateAsync.mockReset();
+  draftStore.kind = 'loading';
+  draftStore.value = null;
+  draftStore.save.mockReset();
+  draftStore.clear.mockReset();
 });
 
 describe('ModelAccessForm save', () => {
@@ -381,7 +456,12 @@ describe('ModelAccessForm save copy', () => {
     changeDraft(root, setModelsAllowed(draft, ['anthropic/claude'], true));
     await pressSave(root);
 
-    expect(String(statusMessage(root))).toBe(i18n.t('common.organizationTrialEnded'));
+    // The form renders no billing step beside the failure line, so even the
+    // role that can change the plan reads the sentence that names the
+    // destination instead of one that claims an owner must act.
+    expect(String(statusMessage(root))).toBe(
+      i18n.t('common.organizationTrialEndedBillingAtKiloAi')
+    );
   });
 
   it('falls back to the status-failed line for an unrecognized refusal', async () => {
@@ -397,5 +477,155 @@ describe('ModelAccessForm save copy', () => {
     await pressSave(root);
 
     expect(String(statusMessage(root))).toBe(i18n.t('organizationGuardrails.statusFailed'));
+  });
+});
+
+describe('ModelAccessForm durable draft', () => {
+  it('seeds an untouched form from the stored draft', () => {
+    const stored = { providerAllowList: ['openai'], modelDenyList: ['anthropic/claude'] };
+    draftStore.kind = 'ready';
+    draftStore.value = stored;
+
+    const root = render(['anthropic']);
+
+    expect(list(root, 'ModelDenyList').props.draft).toEqual(stored);
+    // The restored lists differ from the saved ones, so the save is armed.
+    expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+    // Nothing was typed, so nothing is written back over the restored draft.
+    expect(draftStore.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps an edit made before the stored draft lands', () => {
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+
+    // The hook writes through while it still reports `loading`, so the edit
+    // reached the store before the load settled.
+    expect(draftStore.save).toHaveBeenCalledTimes(1);
+    expect(draftStore.save.mock.calls[0]?.[0]).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: ['openai/gpt'],
+    });
+
+    // The load settles after the edit: the person's change wins.
+    draftStore.kind = 'ready';
+    draftStore.value = { providerAllowList: ['anthropic'], modelDenyList: ['anthropic/claude'] };
+    const rerendered = rerender(['anthropic']);
+
+    expect(list(rerendered, 'ModelDenyList').props.draft).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: ['openai/gpt'],
+    });
+  });
+
+  it('keeps the tab the person chose when the stored draft lands afterwards', () => {
+    const root = render(['anthropic']);
+    selectTab(root, 'providers');
+
+    draftStore.kind = 'ready';
+    draftStore.value = { providerAllowList: ['openai'], modelDenyList: [] };
+    const rerendered = rerender(['anthropic']);
+    selectTab(rerendered, 'models');
+
+    expect(list(rerendered, 'ModelDenyList').props.draft).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: [],
+    });
+  });
+
+  it('keeps a restored provider list when the catalog arrives afterwards', () => {
+    // The store answers before the catalog does: the draft restores onto the
+    // provisional rows, and the catalog's arrival must not overwrite it with
+    // the saved list.
+    draftStore.kind = 'ready';
+    draftStore.value = { providerAllowList: ['openai'], modelDenyList: [] };
+    render(['anthropic'], { catalogUnavailable: true });
+
+    const root = renderWithCatalog(['anthropic']);
+    selectTab(root, 'providers');
+    const providers = list(root, 'ProviderAllowList');
+
+    expect(providers.props.providers).toEqual(['anthropic', 'openai']);
+    expect((providers.props.draft as ModelAccessDraft).providerAllowList).toEqual(['openai']);
+  });
+
+  it('saves the whole draft on every edit', () => {
+    draftStore.kind = 'ready';
+    draftStore.value = null;
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+
+    expect(draftStore.save).toHaveBeenCalledTimes(1);
+    expect(draftStore.save.mock.calls[0]?.[0]).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: ['openai/gpt'],
+    });
+  });
+
+  it('clears the stored draft once a save settles', async () => {
+    draftStore.kind = 'ready';
+    draftStore.value = null;
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    await pressSave(root);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(draftStore.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the stored draft when a save settles before the draft answers', async () => {
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    await pressSave(root);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(draftStore.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the stored draft on Cancel before the draft answers', () => {
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    pressCancel(root);
+
+    // The store had not settled yet, and Cancel still drops the durable copy:
+    // the hook writes that clear through while it reports `loading`.
+    expect(draftStore.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the stored draft when the person cancels their edits', () => {
+    draftStore.kind = 'ready';
+    draftStore.value = null;
+    const root = render(['anthropic']);
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    expect(draftStore.save).toHaveBeenCalledTimes(1);
+    expect(list(root, 'ModelDenyList').props.draft).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: ['openai/gpt'],
+    });
+
+    pressCancel(root);
+
+    // Cancel threw the edit away on purpose, so the durable copy goes with it:
+    // a language-direction reload must not bring the edit back.
+    expect(draftStore.clear).toHaveBeenCalledTimes(1);
+    expect(list(root, 'ModelDenyList').props.draft).toEqual({
+      providerAllowList: ['anthropic'],
+      modelDenyList: [],
+    });
   });
 });

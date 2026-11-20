@@ -30,7 +30,13 @@ import {
 // The checker parses with oxc through the shared scanner, so the command
 // fixtures link the repository's dependency tree at their own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_MODULES = [
+  'ast.mjs',
+  'catalogs.mjs',
+  'entry-point.mjs',
+  'fs-entries.mjs',
+  'source-files.mjs',
+];
 // The checker the command fixtures run, read once so a copy is always the text
 // this suite's assertions were written against.
 const CHECKER_SOURCE = readFileSync(new URL('./check-plurals.mjs', import.meta.url), 'utf8');
@@ -293,6 +299,73 @@ test('reports an unreadable declaration module once from the declaration check',
   } finally {
     chmodSync(locked, 0o644);
   }
+});
+
+// The module and declaration the non-object cases stand in for.
+const COUNT_KEYS_SOURCE = 'apps/mobile/src/lib/profile-count-labels.ts';
+
+/**
+ * The standard text of one declaration module with `declaration` replaced by
+ * `text`, so the module's other declarations keep the shape the audit reads.
+ */
+function declarationsWith(source, declaration, text) {
+  const parts = DECLARATIONS[source].split(/(?=^export (?:type|const) )/m);
+  const name = new RegExp(`^export (?:type|const) ${declaration}\\b`);
+  return parts.map(part => (name.test(part) ? `${text}\n` : part)).join('');
+}
+
+test('reports a declaration whose initializer is not a string-key object', () => {
+  const root = fixture({
+    ...standardFiles(),
+    [COUNT_KEYS_SOURCE]: declarationsWith(
+      COUNT_KEYS_SOURCE,
+      'COUNT_KEYS',
+      'export const COUNT_KEYS = keysByKind;'
+    ),
+  });
+  const problems = checkDynamicCountedKeySources(root);
+  assert.equal(problems.length, 1, problems.join('\n'));
+  assert.match(
+    problems[0],
+    /profile-count-labels\.ts: COUNT_KEYS is declared with an identifier, so the string keys COUNT_KEYS\[item\.kind\] relies on cannot be read; COUNT_KEYS\[item\.kind\] is left unchecked$/
+  );
+  assert.doesNotMatch(problems[0], /is not declared in this module/);
+});
+
+test('reports a declaration with no initializer', () => {
+  // `export const COUNT_KEYS;` is a parse error, so the valid `let` form is the
+  // one the parser lets through to this branch.
+  const root = fixture({
+    ...standardFiles(),
+    [COUNT_KEYS_SOURCE]: declarationsWith(
+      COUNT_KEYS_SOURCE,
+      'COUNT_KEYS',
+      'export let COUNT_KEYS;'
+    ),
+  });
+  const problems = checkDynamicCountedKeySources(root);
+  assert.equal(problems.length, 1, problems.join('\n'));
+  assert.match(
+    problems[0],
+    /profile-count-labels\.ts: COUNT_KEYS is declared with no initializer, so the string keys COUNT_KEYS\[item\.kind\] relies on cannot be read; COUNT_KEYS\[item\.kind\] is left unchecked$/
+  );
+  assert.doesNotMatch(problems[0], /is not declared in this module/);
+});
+
+test('still reports a renamed declaration as absent', () => {
+  // The declaration module is intact but no longer declares the name the audit
+  // mirrors, so the absent wording stays the one reported.
+  const root = cliFixture({
+    ...standardFiles(),
+    [COUNT_KEYS_SOURCE]: "export const OTHER = { k0: 'a' };\n",
+  });
+  const result = cli(root);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /profile-count-labels\.ts: COUNT_KEYS is not declared in this module, so .* cannot be checked against it$/m
+  );
+  assert.doesNotMatch(result.stderr, /COUNT_KEYS is declared with/);
 });
 
 test('projects one scan into sorted keys, unlisted calls and countless families', () => {

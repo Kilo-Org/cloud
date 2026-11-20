@@ -19,7 +19,9 @@
     "presenceStatus": "Хостове: {{connection}}",
     "commandStatus": "Доставка на командата: {{status}}",
     "delivered": "Доставено",
-    "expired": "Изтекло"
+    "expired": "Изтекло",
+    "recoveryGaps_one": "Липсва {{displayCount}} част от този транскрипт.",
+    "recoveryGaps_other": "Липсват {{displayCount}} части от този транскрипт."
   },
   "common": {
     "manageOnWeb": "Управлявай в уеб",
@@ -138,6 +140,7 @@
     "keepRunning": "Продължи изпълнението",
     "newSession": "Нова сесия",
     "noModelsAvailable": "Няма налични модели",
+    "modelRetires": "Оттегля се на {{date}}",
     "notFound": "Не е намерено.",
     "online": "Онлайн",
     "open": "Отвори {{name}}",
@@ -172,6 +175,7 @@
     "generating": "Генериране…",
     "working": "В процес",
     "yourOwnRepositories": "Личните ти хранилища",
+    "organizationRepositories": "Хранилища на организацията",
     "dismissed": "Отхвърлено",
     "agent": "агент",
     "durationMinuteShort": "min",
@@ -180,7 +184,9 @@
     "organizationTrialEnded": "Пробният период на организацията е приключил и тя няма активен план. Собственик на организацията може да актуализира фактурирането на kilo.ai и след това да опита отново.",
     "privateRepositoryA11y": "{{name}}, частно хранилище",
     "legalDocumentEnglishOnly": "Този документ е достъпен само на английски.",
-    "organizationTrialEndedBilling": "Пробният период на организацията е приключил и тя няма активен план. Можете да актуализирате фактурирането и след това да опитате отново."
+    "organizationTrialEndedBilling": "Пробният период на организацията е приключил и тя няма активен план. Можете да актуализирате фактурирането и след това да опитате отново.",
+    "organizationTrialEndedBillingAtKiloAi": "Пробният период на организацията е приключил и тя няма активен план. Можете да актуализирате фактурирането на kilo.ai и след това да опитате отново.",
+    "viewOnGitHub": "Прегледай PR в GitHub"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -512,7 +518,7 @@
     "changelogFixesPolish": "Поправки и подобрения в цялото приложение.",
     "changelogAreas": {
       "signIn": "Вход",
-      "profileOrganizations": "Профил и организации"
+      "profileOrganizations": "Профил & организации"
     }
   },
   "preferences": {
@@ -757,6 +763,9 @@
       "couldNotLoadMore": "Не можахме да заредим още коментари.",
       "retryLoadingMore": "Опитай отново да заредиш още коментари",
       "loadMoreComments": "Зареди още коментари",
+      "conversationTruncated": "Показват се само първите {{displayCount}} коментара.",
+      "conversationTruncated_one": "Показват се само първите {{displayCount}} коментара.",
+      "conversationTruncated_other": "Показват се само първите {{displayCount}} коментара.",
       "addReaction": "Добави реакция",
       "reactionPill": "реакция {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакция",
@@ -886,7 +895,6 @@
       "noAccess": "Нямаш достъп до проверките за това хранилище.",
       "couldNotLoad": "Не можахме да заредим проверките.",
       "retryChecks": "Зареди проверките отново",
-      "viewOnGitHub": "Прегледай PR в GitHub",
       "noChecksReported": "Няма данни за проверки",
       "passed": "успешни: {{displayCount}}",
       "passed_one": "успешни: {{displayCount}}",
@@ -941,9 +949,9 @@
       "checkFailedTitleGitLab": "Не можа да се провери връзката с GitLab",
       "checkFailedTitleBitbucket": "Не можа да се провери връзката с Bitbucket",
       "providerCheckFailedMessage": "Не можахме да се свържем с доставчика. Провери връзката си и опитай отново.",
-      "reconnectTitle": "Повторно свързване с GitHub",
-      "reconnectTitleGitLab": "Повторно свързване с GitLab",
-      "reconnectTitleBitbucket": "Повторно свързване с Bitbucket",
+      "reconnectTitle": "Свържи GitHub отново",
+      "reconnectTitleGitLab": "Свържи GitLab отново",
+      "reconnectTitleBitbucket": "Свържи Bitbucket отново",
       "reconnectDescription": "Достъпът ти до GitHub е отнет.",
       "gitlabDescription": "Преглеждай merge заявки от телефона си",
       "gitlabInstanceMismatchTitle": "Връзката с GitLab е за друга инстанция",
@@ -970,6 +978,8 @@
       "pendingComment": "неизпратени коментара",
       "pendingComment_other": "неизпратени коментара",
       "submitCountOfTotal": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
+      "submitCountOfTotal_one": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
+      "submitCountOfTotal_other": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
       "submitReview": "Изпрати прегледа",
       "partialPostedFresh": "Публикувани коментари: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Публикувани коментари: {{displayFreshCount}}. ",
@@ -1034,7 +1044,10 @@
     "tabs": {
       "overview": "Обзор",
       "files": "Файлове",
-      "discussion": "Дискусия"
+      "discussion": "Дискусия",
+      "discussionAccessibility_one": "{{title}}: 1 коментар",
+      "discussionAccessibility": "{{title}}: {{displayCount}} коментара",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} коментара"
     },
     "fileStatus": {
       "modified": "Променен",
@@ -1231,7 +1244,7 @@
     },
     "instructions": {
       "title": "Персонализирани инструкции",
-      "deprecation": "Предстои спиране на поддръжката за персонализираните инструкции. Вместо това премести тези насоки във файл REVIEW.md в хранилището си.",
+      "deprecation": "Персонализираните инструкции ще бъдат премахнати. Вместо това премести тези насоки във файл REVIEW.md в хранилището си.",
       "placeholder": "напр. спазване на правилата ни за обработка на грешки…",
       "clearTitle": "Премахване на персонализираните инструкции?",
       "clearMessage": "Ако запазиш празно поле, ще изтриеш персонализираните инструкции, съхранени за този рецензент."
@@ -1391,12 +1404,16 @@
     "followReviewMd": "Следвай REVIEW.md",
     "followReviewMdSubtitle": "Спазвай инструкциите във файла REVIEW.md на всяко хранилище",
     "bitbucket": {
-      "notConnectedReadOnly": "Няма връзка с Bitbucket. Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят."
+      "notConnectedReadOnlyPlan": "Пробният период на организацията е приключил, затова собственик трябва да актуализира фактурирането на kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Връзката на {{organization}} с Bitbucket се управлява в уеб версията от компютър.",
+      "managedOnWebTitle": "Управлява се в уеб версията",
+      "managedOnWebShort": "Тази връзка се управлява в уеб версията от компютър.",
+      "managedOnWebRepositories": "Избери хранилищата за {{organization}} в уеб версията от компютър.",
       "description": "Създай токен за достъп до работното пространство за {{organization}} и го постави по-долу.",
       "descriptionReconnect": "Създай нов токен за достъп до работното пространство за {{organization}} и го постави по-долу.",
+      "descriptionOverview": "Създай токен за достъп до работното пространство и го постави на следващия екран.",
       "scopes": "Права за достъп: акаунт — четене; хранилища — четене/запис; заявки за сливане — четене; уебкукове — четене/запис.",
       "tokenPlaceholder": "Токен за достъп до работното пространство",
       "tokenRefused": "Bitbucket не прие този токен за достъп до работното пространство. Провери дали има правата за достъп по-горе и опитай отново."
@@ -1417,13 +1434,14 @@
     "platformList": {
       "checking": "Проверка…",
       "statusUnavailable": "Състоянието не е достъпно",
+      "needsAttention": "Изисква намеса",
       "platforms": "Платформи",
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "Приложението за GitHub",
+      "githubApp": "приложението за GitHub",
       "githubError": "Не успяхме да отворим настройката на GitHub. Опитай отново.",
-      "gitlabAccount": "Акаунта в GitLab",
+      "gitlabAccount": "акаунта в GitLab",
       "gitlabError": "Не успяхме да отворим настройката на GitLab. Опитай отново.",
       "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане."
     },
@@ -1719,7 +1737,7 @@
       "dueThisWeekDetail_one": "От тях {{exploitable}} с потвърдена възможност за атака",
       "dueThisWeekDetail_other": "От тях {{exploitable}} с потвърдена възможност за атака",
       "noDeadline": "Няма краен срок",
-      "reviewSlaAssignment": "Прегледай зададените срокове по SLA",
+      "reviewSlaAssignment": "Прегледай задаването на срокове по SLA",
       "allOpenFindingsTracked": "Всички отворени проблеми се проследяват"
     },
     "dismiss": {
@@ -2787,7 +2805,9 @@
     "modelPicker": {
       "title": "Избор на модел",
       "favorites": "Любими",
-      "noModelsDescription": "Няма налични модели за избор."
+      "noModelsDescription": "Няма налични модели за избор.",
+      "allUnavailableTitle": "Няма модели, които могат да се използват",
+      "allUnavailableDescription": "Добави ключ за доставчик и опитай отново."
     },
     "modelSelector": {
       "provider": "Доставчик {{id}}",
@@ -3191,6 +3211,8 @@
     "retryHint": "Повтаря зареждането на състоянието на Kilo Pass.",
     "endedOn": "Приключил на {{date}}",
     "notAvailableInApp": "Kilo Pass не е достъпен в приложението.",
+    "notAvailableTitle": "Kilo Pass не се предлага в приложението",
+    "noPassDescription": "Този акаунт няма Kilo Pass.",
     "statusActive": "Активен",
     "statusTrialing": "Пробен период",
     "statusPastDue": "Просрочено плащане",
@@ -3473,7 +3495,7 @@
       "retentionLimit": "Показват се най-новите фактури."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Включи предупреждението за ниска наличност",
+      "subtitle": "Изпращай предупреждение по имейл до посочените от теб адреси, когато наличността на тази организация падне под зададената от теб сума.",
       "notifyEmailsLabel": "Имейл адреси за известия",
       "permissionDenied": "Нямаш разрешение да управляваш известията за плащания.",
       "separateEmailsHint": "Ако въвеждаш няколко имейл адреса, раздели ги със запетаи.",
@@ -3618,10 +3640,9 @@
     },
     "hub": {
       "renameTitle": "Преименувай организацията",
-      "renamePlaceholder": "Име на организацията",
+      "renamePlaceholder": "Въведете име на организацията",
       "balance": "Наличност",
-      "organizationSeats": "Места в организацията",
-      "plan": "План на организацията",
+      "plan": "План",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Приключил",
@@ -3655,7 +3676,8 @@
     "signupStepUp": "За да завършиш създаването на акаунта си, използвай „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithGoogle)“.",
-    "invalidCode": "Кодът е неправилен. Опитай отново.",
+    "signupStepUpBack": "За да завършиш създаването на акаунта си, върни се назад и използвай „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Кодът е неправилен или е изтекъл. Опитай отново или използвай „$t(login.resendCode)“.",
     "codeInProgress": "Кодът ти се обработва. Изчакай малко и опитай отново.",
     "tooManyAttempts": "Твърде много опити. Поискай нов код.",
     "invalidToken": "Влизането беше неуспешно. Опитай отново.",
@@ -3924,6 +3946,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) изпраща кратка заявка за изпълнение към тази крайна точка чрез избрания протокол и модел. Доставчикът може да начисли такса за нея.",
       "connectionSucceeded": "Моделът изпълни заявка чрез този протокол.",
       "connectionFailed": "Моделът не можа да изпълни заявката. Проверете основния URL на API, протокола, данните за удостоверяване и идентификатора на модела.",
+      "requestTimedOut": "Крайната точка не отговори навреме. Проверете основния URL на API и връзката си, след което опитайте отново.",
+      "requestUnauthorized": "Крайната точка отказа данните за удостоверяване. Проверете API ключа и персонализираните заглавки, след което опитайте отново.",
+      "requestNotFound": "Крайната точка или моделът не са намерени. Проверете основния URL на API и идентификатора на модела.",
+      "requestRateLimited": "Крайната точка ограничава заявките. Изчакайте малко и опитайте отново.",
+      "requestUnavailable": "Крайната точка е недостъпна в момента. Опитайте отново след малко.",
+      "requestUnreachable": "Крайната точка не можа да бъде достигната. Проверете основния URL на API и връзката си.",
+      "requestInvalidResponse": "Крайната точка не отговори в очаквания формат. Проверете дали основният URL на API и протоколът съвпадат със сървъра, след което опитайте отново.",
+      "discoveryNoModels": "Крайната точка не показа никакви модели. Въведете моделите ръчно.",
+      "connectionIncomplete": "Моделът отговори, но не завърши. Опитайте отново или проверете идентификатора на модела и протокола.",
       "invalidInput": "Въведете име на сървъра, валидни заглавки и поне един модел с уникален идентификатор и име. Ограниченията за броя токени трябва да са положителни цели числа.",
       "invalidUrl": "Въведете основен URL на API с HTTP или HTTPS без данни за удостоверяване, параметри на заявката или фрагмент.",
       "publicHttp": "Публичните HTTP крайни точки не са разрешени. Използвайте HTTPS или частна локална крайна точка.",
@@ -4062,10 +4093,20 @@
     "reasoningEffort": {
       "modelFlag": "Този модел поддържа усилие за разсъждение"
     },
-    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение."
+    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение.",
+    "providerKeyRefused": "Доставчикът отказа данните за удостоверяване. Проверете API ключа му, след което изпратете отново.",
+    "providerModelMissing": "Този сървър вече не предлага този модел. Изберете друг.",
+    "providerRateLimited": "Доставчикът ограничава заявките. Изчакайте малко и изпратете отново.",
+    "providerUnavailable": "Доставчикът е недостъпен в момента. Изпратете отново след малко."
   },
   "settingsTools": {
-    "confirmTitle": "Да се потвърди ли тази промяна?"
+    "confirmTitle": "Да се потвърди ли тази промяна?",
+    "guarded": {
+      "spendAlertsOff": "Да се изключат ли известията за разходи? Ще спрете да получавате известия за преминаване на прагове на разходите и за почасови скокове.",
+      "balanceAlertsOff": "Да се изключат ли известията за баланса? Ще спрете да получавате известия, когато кредитите ви намалеят.",
+      "securityFindingsOff": "Да се изключат ли находките за сигурност? Ще спрете да получавате известия за нови находки за сигурност.",
+      "hideBalanceOn": "Да се скрият ли балансите ви? Кредитните баланси вече няма да се показват на екраните на профила и в организационния център."
+    }
   },
   "appActions": {
     "start": {
@@ -4437,6 +4478,7 @@
     "pickPackToBuyAgain": "Изберете пакет по-горе, за да започнете нова покупка.",
     "purchasePending": "Магазинът все още обработва това плащане. Кредитите ви ще пристигнат, щом той одобри таксуването.",
     "buyAgain": "Купи отново",
+    "checkPurchase": "Провери покупката",
     "purchaseOwnedByAnotherAccount": "Кредитите в този Apple Account принадлежат на друг акаунт в Kilo. Влез в съответния акаунт в Kilo, за да ги използваш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на този Google Play акаунт принадлежат на друг Kilo акаунт. Влезте в този Kilo акаунт, за да ги използвате."
   },
@@ -4530,7 +4572,9 @@
     },
     "saveSheet": {
       "title": "Запази в списък",
-      "saved": "Запазено в {{list}}"
+      "saved": "Запазено в {{list}}",
+      "saveFailed": "Задачата не можа да бъде запазена. Провери връзката си и опитай отново.",
+      "saveRefused": "Задачата не можа да бъде запазена в този списък. Избери друг списък."
     }
   },
   "agentBriefing": {
@@ -4542,6 +4586,7 @@
     "empty": "Няма активност в този период на брифинга",
     "emptyHint": "Вашите облачни и CLI сесии за програмиране се появяват тук, когато планиран брифинг има активност.",
     "loadError": "Брифингите не могат да се заредят",
+    "estimateLoadError": "Прогнозата не можа да се зареди.",
     "view": "Прочети брифинга",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4809,7 +4854,7 @@
   },
   "organizationGuardrails": {
     "title": "Защитни ограничения за AI",
-    "permissionDenied": "Само собствениците и администраторите на организацията могат да управляват защитните ограничения за AI.",
+    "permissionDenied": "Само собствениците и администраторите на организацията могат да управляват защитните ограничения за AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Защитните ограничения за AI не са активирани",
     "unavailable": "Kilo активира Защитни ограничения за AI за организация при заявка. Свържете се с {{supportEmail}}, и екипът на Kilo ги включва за вашата организация.",
     "contactSupport": "Свържи се с поддръжката",
@@ -4821,12 +4866,15 @@
     "inputDescription": "Сканира всеки вход с Enkrypt AI, включително резултатите от инструменти. Когато Enkrypt не е достъпен, заявките се изпращат без сканиране, вместо да се отхвърлят.",
     "outputTitle": "Защитни ограничения за изхода",
     "outputDescription": "Сканира отговорите с Enkrypt AI, преди членовете да ги получат. Изключено, освен ако не го включите.",
+    "outputUnavailable": "Kilo не е активирал сканирането на изхода за тази организация, затова отговорите не се проверяват и тук няма какво да се настрои. Свържете се с {{supportEmail}}, за да го заявите.",
     "detectorsHint": "„Блокиране“ отхвърля маркирана заявка. „Само запис“ само я регистрира, без да забавя заявката.",
     "detectorsHintOutput": "„Блокиране“ прекратява маркиран отговор с грешка. „Само запис“ само го регистрира, без да забавя отговора.",
     "choiceLog": "Само запис",
     "applyTo": "Прилагане към",
     "applyToAllMembers": "Всички членове",
     "applyKiloDefault": "Приложи стандартните настройки на Kilo",
+    "applyKiloDefaultEnglishNote": "Текстът на стандартната политика на Kilo е на английски, защото Kilo Gateway я прилага точно както е написана.",
+    "applyKiloDefaultReplaceMessage": "Стандартната политика на Kilo е написана на английски и заменя въведеното от вас в Нарушение на политиката. Текстът, въведен в полето за текст на политиката, не може да бъде възстановен.",
     "invalidSavedTitle": "Запазените настройки на детекторите за вход не могат да бъдат прочетени",
     "invalidSavedBody": "Заявките се блокират, докато детекторите за вход не бъдат запазени отново. Детекторите по-долу започват със стандартните настройки на Kilo.",
     "invalidSavedOutputTitle": "Запазените настройки на детекторите за изход не могат да бъдат прочетени",
@@ -4947,7 +4995,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Функция за Enterprise",
-    "enterpriseOnly": "Тази функция е налична само в Enterprise.",
+    "enterpriseOnly": "Доставчиците и моделите са достъпни в плана Enterprise.",
     "readOnly": "Само собствениците и администраторите на организацията могат да променят тези настройки.",
     "loadError": "Доставчиците и моделите не можаха да се заредят",
     "tabModels": "Модели",
@@ -4961,6 +5009,7 @@
     "providersDescription": "Изключете доставчик, за да спрете Kilo да пренасочва заявки към него за тази организация.",
     "providersNeedCatalog": "Превключвателите на доставчиците остават само за четене, докато не се зареди пълният каталог с модели. Докоснете Опитай отново по-горе, за да ги редактирате.",
     "providersEmpty": "Няма доставчици, отговарящи на това търсене.",
+    "providersNone": "Няма налични доставчици за тази организация.",
     "allowAllShown": "Разреши всички показани",
     "denyAllShown": "Забрани всички показани",
     "gatewaysDescription": "Kilo пренасочва заявките към моделите през Vercel AI Gateway или OpenRouter. Ако шлюзът е изключен, тези заявки са неуспешни.",

@@ -52,6 +52,7 @@ const RuntimeSkillFilesContractSchema = z
         pathInvalidCharacters: path => `Skill file path rejected: ${path}`,
         pathRejected: path => `Skill file path rejected: ${path}`,
         manifestInFiles: 'SKILL.md must be passed as rawMarkdown, not inside files',
+        duplicatePath: path => `Skill companion file path duplicates another file: ${path}`,
         fileTooLarge: () =>
           overLimitMessage(
             'Skill companion file',

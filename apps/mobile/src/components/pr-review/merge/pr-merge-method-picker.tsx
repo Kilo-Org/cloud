@@ -1,11 +1,8 @@
-import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { cn } from '@/lib/utils';
 import {
   type AllowedMergeMethod,
   prMergeDescription,
@@ -27,57 +24,22 @@ export function MethodPicker({
   return (
     <View className="gap-1.5">
       {/* Same label style as the sheet's commit-title and commit-message
-          fields: the chips below are form controls, not a section heading. */}
+          fields: the control below is a form field, not a section heading. */}
       <Text className="text-sm font-medium text-foreground">{t('prReview.merge.methodLabel')}</Text>
-      <RadioGroup label={t('prReview.merge.methodLabel')} className="flex-row flex-wrap gap-2">
-        {methodOptions.map(option => {
-          const active = method === option.value;
-          // Long labels stay readable via accessibilityLabel; chip shows short text.
-          return (
-            <Pressable
-              key={option.value}
-              disabled={isDisabled}
-              onPress={() => {
-                selectionHaptic();
-                onChange(option.value);
-              }}
-              {...radioItemA11y({
-                label: option.accessibilityLabel,
-                checked: active,
-                disabled: isDisabled,
-              })}
-              accessibilityHint={prMergeDescription(option.value)}
-              // `min-h-11` measured 38.5 dp at NativeWind's 14pt rem; the
-              // explicit 44 dp floor is the target it meant.
-              className={cn(
-                TOUCH_TARGET_CLASS,
-                'items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
-                // The selected chip is a selection state, not a call to action:
-                // light fills with `primary`, dark with the muted `selection`
-                // olive, because dark's `primary` is the brand yellow
-                // (#ffdd00), which glares as a full pill on the near-black
-                // page. Dark's `selection` is the same olive hue lifted for the
-                // dark page (global.css), so it still stands 3.6:1 off the
-                // background. The Merge button keeps the brand fill.
-                active && 'border-primary bg-primary dark:border-selection dark:bg-selection',
-                !active && isDisabled && 'border-hair-soft bg-secondary',
-                !active && !isDisabled && 'border-border bg-secondary'
-              )}
-            >
-              <Text
-                className={cn(
-                  'text-sm font-medium',
-                  active && 'text-primary-foreground dark:text-selection-foreground',
-                  !active && isDisabled && 'text-muted-foreground',
-                  !active && !isDisabled && 'text-foreground'
-                )}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </RadioGroup>
+      {/* Each segment shows the method name alone and announces the full
+          sentence the provider words the method with. */}
+      <SegmentedControl
+        accessibilityLabel={t('prReview.merge.methodLabel')}
+        options={methodOptions.map(option => ({
+          value: option.value,
+          label: option.label,
+          accessibilityLabel: option.accessibilityLabel,
+          accessibilityHint: prMergeDescription(option.value),
+        }))}
+        value={method}
+        onChange={onChange}
+        disabled={isDisabled}
+      />
     </View>
   );
 }

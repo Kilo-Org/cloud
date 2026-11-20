@@ -34,7 +34,6 @@
     ],
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "strictPropertyInitialization": false,
     "noErrorTruncation": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true

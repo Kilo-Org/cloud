@@ -12,6 +12,7 @@ import { createKilo2Reads, kilo2LocationQuery as locationQuery } from './kilo2-r
 import { restoreKilo2History } from './kilo2-history.js';
 import type { Kilo2Lifecycle } from './kilo2-lifecycle.js';
 import { readKilo2BackgroundActivity } from './kilo2-background.js';
+import { readKilo2AgentBoard } from './kilo2-board.js';
 
 const ptySchema = z.object({
   id: z.string(),
@@ -471,6 +472,7 @@ export function createKilo2Harness(options: {
       ...reads,
       getBackgroundActivity: (id, directory, signal) =>
         readKilo2BackgroundActivity(api, id, directory, signal),
+      getAgentBoard: (id, directory, signal) => readKilo2AgentBoard(api, id, directory, signal),
     },
     terminals,
     worktree: {

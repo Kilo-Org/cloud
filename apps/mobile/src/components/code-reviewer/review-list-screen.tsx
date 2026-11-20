@@ -1,11 +1,12 @@
 import { type Href } from 'expo-router';
-import { ArrowRight, GitPullRequest, Settings } from '@/components/ui/icons';
+import { DirectionalArrowRight } from '@/components/ui/directional-icons';
+import { GitPullRequest, Settings } from '@/components/ui/icons';
 import { FlashList } from '@shopify/flash-list';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { EmptyState, StateAction } from '@/components/empty-state';
@@ -43,7 +44,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   // it is the same instant the review's detail screen reads.
   const now = useRelativeTimeNow();
   const paddingBottom = useTabBarBottomPadding();
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   // One style for the whole content container: every row keeps the screen's own
   // side insets, and the rows draw the page gutter themselves.
   const listContentContainerStyle = useMemo<ViewStyle>(
@@ -210,7 +211,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                   ? t('codeReviewer.reviewList.startManualReview')
                   : t('codeReviewer.reviewList.configureProvider')
               }
-              icon={hasConnectedProvider ? ArrowRight : Settings}
+              icon={hasConnectedProvider ? DirectionalArrowRight : Settings}
               onPress={() => {
                 pushOnce(
                   (hasConnectedProvider
@@ -315,18 +316,12 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={scopeTitle}
-        // One line on both scopes: the personal and the organization list are
-        // the same header over the same list, so they keep one height, or the
-        // organization one paints its eyebrow lower and leaves a wider gap above
-        // the first review. One line is all the header needs to keep the body
-        // still when the name arrives with the membership read: a longer name
-        // tail-truncates inside the same line instead of wrapping to a second.
-        titleNumberOfLines={1}
-        // The scope now titles the screen, so the eyebrow keeps the screen's own
-        // name where the header's category label goes — the org name is user
-        // prose and must not be uppercased or tail-truncated into it.
-        eyebrow={t('codeReviewer.reviewList.title')}
+        title={t('codeReviewer.reviewList.title')}
+        // The list's own name titles the screen and the scope sits on the
+        // subtitle line below it. The organization name is user prose, so it
+        // reads in the subtitle's body style, and a longer name tail-truncates
+        // inside its one line, so the first review never moves when it arrives.
+        subtitle={scopeTitle}
       />
       {body}
     </View>

@@ -199,7 +199,8 @@ function hasCacheableMessagesContent(message: Anthropic.MessageParam) {
     : message.content.some(isCacheableMessagesContentBlock);
 }
 
-const CACHE_CONTROL_NODE_BUDGET = 100_000;
+/** Bounds the cache-control traversal of a client-supplied request payload. */
+export const CACHE_CONTROL_NODE_BUDGET = 100_000;
 
 function containsCacheControl(value: unknown): boolean {
   const pending: unknown[] = [value];
@@ -412,6 +413,9 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   }
   if (request.body.reasoning?.enabled === true) {
     return false;
+  }
+  if (request.body.reasoning?.enabled === false) {
+    return true;
   }
   return (
     (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none' ||

@@ -93,6 +93,9 @@ export type CommandStatusQueryResult = {
   error?: { data?: { code?: string } | null } | null;
 };
 
+/** One per-command result travelling with the id its query was made for. */
+export type PerCommandStatusResult = { id: string; result: CommandStatusQueryResult };
+
 export type CommandStatusReconciliation = {
   terminalCommands: SecurityCommand[];
   unavailableIds: string[];
@@ -100,20 +103,20 @@ export type CommandStatusReconciliation = {
 
 // Builds a Map<id, command> from the batch array plus per-command results,
 // then splits the tracked ids into terminal commands (present and inactive)
-// and unavailable ids (absent once the source settled, or NOT_FOUND).
+// and unavailable ids (absent once the source settled, or NOT_FOUND). Each
+// per-command result travels with its id, so the purge decision never depends
+// on array position.
 export function reconcileCommandStatuses(args: {
   trackedIds: readonly string[];
   batchIds: readonly string[];
-  perCommandIds: readonly string[];
   batchCommands: SecurityCommandBatch | undefined;
   batchSettled: boolean;
-  perCommandResults: readonly CommandStatusQueryResult[];
+  perCommandResults: readonly PerCommandStatusResult[];
   processedTerminalIds: ReadonlySet<string>;
 }): CommandStatusReconciliation {
   const {
     trackedIds,
     batchIds,
-    perCommandIds,
     batchCommands,
     batchSettled,
     perCommandResults,
@@ -123,9 +126,10 @@ export function reconcileCommandStatuses(args: {
   for (const command of batchCommands ?? []) {
     commandsById.set(command.id, command);
   }
+  const perCommandResultById = new Map(perCommandResults.map(entry => [entry.id, entry.result]));
   for (const result of perCommandResults) {
-    if (result.data) {
-      commandsById.set(result.data.id, result.data);
+    if (result.result.data) {
+      commandsById.set(result.result.data.id, result.result.data);
     }
   }
 
@@ -144,45 +148,10 @@ export function reconcileCommandStatuses(args: {
       // The batch omits unknown ids; purge only once it settled without them.
       return batchSettled ? [id] : [];
     }
-    const index = perCommandIds.indexOf(id);
-    const result = index === -1 ? undefined : perCommandResults.at(index);
-    return result?.error?.data?.code === 'NOT_FOUND' ? [id] : [];
+    return perCommandResultById.get(id)?.error?.data?.code === 'NOT_FOUND' ? [id] : [];
   });
 
   return { terminalCommands, unavailableIds };
-}
-
-/**
- * The remediation fields the stale-analysis action reads, so both detail panels
- * can pass their `getAnalysis` response without reshaping it.
- */
-type SecurityRemediationSignal = Pick<
-  SecurityAnalysis,
-  'remediationAttempts' | 'remediationCapability' | 'remediationSummary'
->;
-
-/** The server's own record that a remediation attempt already exists. */
-function hasRegisteredRemediationAttempt(analysis: SecurityRemediationSignal): boolean {
-  return (
-    analysis.remediationAttempts.length > 0 ||
-    Boolean(
-      analysis.remediationSummary?.latestAttemptId ?? analysis.remediationSummary?.latestAttempt?.id
-    )
-  );
-}
-
-/**
- * Whether a stale analysis is the only thing blocking remediation, mirroring
- * FindingDetailDialog.tsx's `remediationNeedsAnalysisRefresh`: a finding that
- * never registered an attempt, whose capability rejects the start or the retry
- * because the finding changed after the analysis that produced it.
- */
-export function remediationNeedsAnalysisRefresh(analysis: SecurityRemediationSignal): boolean {
-  return (
-    !hasRegisteredRemediationAttempt(analysis) &&
-    (analysis.remediationCapability.startReason === 'stale_analysis' ||
-      analysis.remediationCapability.retryReason === 'stale_analysis')
-  );
 }
 
 /**

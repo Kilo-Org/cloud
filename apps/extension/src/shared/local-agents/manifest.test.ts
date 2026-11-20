@@ -15,6 +15,7 @@ const commandSchema = z.object({
 
 const manifestSchema = z.object({
   commands: z.record(z.string(), commandSchema).optional(),
+  content_security_policy: z.object({ extension_pages: z.string() }).optional(),
   optional_permissions: z.array(z.string()).optional(),
   permissions: z.array(z.string()).optional(),
 });
@@ -58,5 +59,28 @@ describe('extension manifest', () => {
       expect(manifest.permissions).toContain('alarms');
       expect(manifest.optional_permissions).toContain('nativeMessaging');
     }
+  });
+
+  it('keeps downloads optional, so an update never disables the extension', () => {
+    for (const browser of ['chrome', 'firefox'] as const) {
+      const manifest = readManifest(browser);
+
+      // A required permission that adds a warning turns the extension off for every existing user until they accept it.
+      expect(manifest.permissions).not.toContain('downloads');
+      expect(manifest.optional_permissions).toContain('downloads');
+    }
+  });
+
+  it('lets every browser group a session’s tabs', () => {
+    for (const browser of ['chrome', 'firefox'] as const) {
+      expect(readManifest(browser).permissions).toContain('tabGroups');
+    }
+  });
+
+  it('keeps the loopback socket on ws:// in Firefox extension pages', () => {
+    const policy = readManifest('firefox').content_security_policy?.extension_pages;
+
+    expect(policy).toBe("script-src 'self';");
+    expect(policy).not.toContain('upgrade-insecure-requests');
   });
 });

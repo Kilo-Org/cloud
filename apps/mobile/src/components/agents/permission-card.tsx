@@ -220,7 +220,7 @@ export function PermissionCard({
                 )}
               </Button>
               <Button
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 className="flex-1"
                 onPress={() => {
@@ -231,7 +231,7 @@ export function PermissionCard({
                 accessibilityLabel={t('agentChat.permissionCard.allowOnceAccessibility')}
               >
                 {activeResponse === 'once' && isSubmitting ? (
-                  <ActivityIndicator size="small" color={colors.secondaryForeground} />
+                  <ActivityIndicator size="small" color={colors.foreground} />
                 ) : (
                   <Text className={cn('text-xs', activeResponse === 'once' && 'font-medium')}>
                     {t('agentChat.permissionCard.allowOnce')}

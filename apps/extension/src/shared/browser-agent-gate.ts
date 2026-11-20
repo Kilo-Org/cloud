@@ -2,9 +2,12 @@
 import { z } from 'zod';
 import {
   ambiguousSelectorError,
+  looksLikeBrowserRef,
+  STALE_REF_ERROR,
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
+  isScriptTool,
   isUploadTool,
   SENSITIVE_REASON,
   toBrowserOrigin,
@@ -17,11 +20,19 @@ import type {
   BrowserPermissionItem,
   StepTokenBinding,
 } from './browser-agent-checks';
-import { mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
-import type { BrowserAgentFrame } from './browser-agent-frames';
+import {
+  frameWithOwnerNode,
+  mainFrameOf,
+  readAgentFrames,
+  readAgentFrameTree,
+} from './browser-agent-frames';
+import type { AgentFrameInventory, BrowserAgentFrame } from './browser-agent-frames';
+import { readIsolatedHostedFrame } from './browser-agent-isolated-probe';
 import {
   classifyFocusedElement,
   classifyTargetElement,
+  frameExecutionContext,
+  readFrameSensitiveFields,
   sensitiveTargetsOf,
 } from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
@@ -34,7 +45,7 @@ import type { BrowserToolSession } from './browser-tool-session';
  * single-use token bound to this exact call.
  */
 
-type GateSession = Pick<BrowserToolPageSession, 'send' | 'resolveTarget'> &
+type GateSession = Pick<BrowserToolPageSession, 'isolatedProbe' | 'send' | 'resolveTarget'> &
   Pick<BrowserToolSession, 'takeDownloads'>;
 
 export interface BrowserSensitiveStep {
@@ -65,7 +76,13 @@ export type AgentPreflight =
     };
 
 const describeNodeSchema = z.object({
-  node: z.object({ frameId: z.string().optional() }).optional(),
+  node: z
+    .object({
+      backendDOMNodeId: z.number().optional(),
+      localName: z.string().optional(),
+      nodeName: z.string().optional(),
+    })
+    .optional(),
 });
 
 const argumentTextSchema = z.string().min(1);
@@ -93,7 +110,15 @@ const OPAQUE_ORIGIN = 'opaque:null';
 interface TargetFrame {
   /** The target sits in a child frame, not the tab's top-level document. */
   readonly frame: boolean;
+  /** The id of the frame `origin` belongs to, when the gate found it. */
+  readonly frameId?: string;
   readonly origin: string;
+  /**
+   * The document holding a targeted frame element: a tool on an `<iframe>`
+   * runs in, reads or captures its owner's document, so the call needs that
+   * document's grant as well as the hosted frame's.
+   */
+  readonly owner?: { readonly frame: boolean; readonly origin: string };
 }
 
 /**
@@ -153,11 +178,87 @@ const targetTextsOf = (args: Record<string, unknown>): readonly string[] => {
   return [...new Set(texts)];
 };
 
+const resolveNodeSchema = z.object({
+  object: z.object({ objectId: z.string().optional() }).optional(),
+});
+const booleanResultSchema = z.object({
+  result: z.object({ value: z.unknown().optional() }).optional(),
+});
+
 /**
- * The frame one target lives in (`DOM.Node.frameId`). An unresolvable target
- * yields nothing — the tool reports its own missing-element error, which is the
- * accurate outcome; a resolved target whose frame is unknown yields the opaque
- * origin so the call is refused instead of falling back to the tab's origin.
+ * Runs in the candidate frame's isolated world, where `document` is that
+ * frame's own document and page script cannot shadow it, so a node only
+ * matches the frame whose document holds it. A cross-origin child cannot reach
+ * the embedder's document to claim it; a same-origin one shares the grant.
+ */
+const NODE_DOCUMENT_PROBE =
+  'function () { var doc = this.ownerDocument || this; return doc === document; }';
+
+/** Whether this frame's isolated world holds the node's document; a frame that cannot be probed is not the owner. */
+const frameHoldsNode = async (
+  session: GateSession,
+  frameId: string,
+  backendNodeId: number
+): Promise<boolean> => {
+  const executionContextId = await frameExecutionContext(session, frameId);
+
+  if (executionContextId === undefined) {
+    return false;
+  }
+
+  try {
+    const resolved = resolveNodeSchema.safeParse(
+      await session.send('DOM.resolveNode', { backendNodeId, executionContextId })
+    );
+    const objectId = resolved.success ? resolved.data.object?.objectId : undefined;
+
+    if (objectId === undefined) {
+      return false;
+    }
+
+    const owned = booleanResultSchema.safeParse(
+      await session.send('Runtime.callFunctionOn', {
+        functionDeclaration: NODE_DOCUMENT_PROBE,
+        objectId,
+        returnByValue: true,
+      })
+    );
+
+    return owned.success && owned.data.result?.value === true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The frame whose document holds `backendNodeId`. `DOM.describeNode` names a
+ * frame only for frame-owner elements, so an ordinary node is attributed by
+ * resolving it into each candidate frame's isolated world and asking that
+ * world whether the node's document is its own. The tab's frame is tried
+ * first, so the common case costs one world and two commands.
+ */
+const frameOwningNode = async (
+  session: GateSession,
+  frames: readonly BrowserAgentFrame[],
+  backendNodeId: number
+): Promise<BrowserAgentFrame | undefined> => {
+  for (const frame of frames) {
+    // eslint-disable-next-line no-await-in-loop -- one frame's isolated world at a time, the tab's frame first
+    const holds = await frameHoldsNode(session, frame.id, backendNodeId);
+
+    if (holds) {
+      return frame;
+    }
+  }
+
+  return undefined;
+};
+
+/**
+ * The frame one target lives in. An unresolvable target yields nothing — the
+ * tool reports its own missing-element error, which is the accurate outcome; a
+ * resolved target whose frame is unknown yields the opaque origin so the call
+ * is refused instead of falling back to the tab's origin.
  */
 const targetFrameOf = async (
   session: GateSession,
@@ -175,29 +276,90 @@ const targetFrameOf = async (
     return undefined;
   }
 
-  const response = await session.send(
-    'DOM.describeNode',
-    resolved.kind === 'ref'
-      ? { backendNodeId: resolved.backendNodeId }
-      : { nodeId: resolved.nodeId }
-  );
+  // Without a debugger protocol the probe names the frame a frame element hosts (Firefox).
+  if (session.isolatedProbe !== undefined && resolved.kind === 'selector') {
+    const hosted = await readIsolatedHostedFrame(
+      session.isolatedProbe,
+      resolved.selector,
+      resolved.frameId
+    );
+    const frame =
+      hosted === undefined ? undefined : frames.find(candidate => candidate.id === hosted.frameId);
 
-  if (response === undefined) {
-    return { frame: true, origin: OPAQUE_ORIGIN };
+    // The document holding the element: the tab's own, or the spliced child frame a ref came from.
+    const holder =
+      resolved.frameId === undefined
+        ? mainFrameOf(frames)
+        : frames.find(candidate => candidate.id === String(resolved.frameId));
+    const holderFrame: TargetFrame =
+      holder === undefined
+        ? { frame: true, origin: OPAQUE_ORIGIN }
+        : { frame: resolved.frameId !== undefined, frameId: holder.id, origin: holder.origin };
+
+    // A browser that cannot name the hosted frame leaves the element judged by the document that holds it, below.
+    if (frame !== undefined) {
+      return { frame: true, frameId: frame.id, origin: frame.origin, owner: holderFrame };
+    }
+
+    // A ref from a spliced child frame acts in that frame's document, so it needs that frame's grant.
+    if (resolved.frameId !== undefined) {
+      return holderFrame;
+    }
   }
 
-  const parsed = describeNodeSchema.safeParse(response);
-  const frameId = parsed.success ? parsed.data.node?.frameId : undefined;
+  let node: z.infer<typeof describeNodeSchema>['node'] = undefined;
 
-  if (frameId === undefined) {
-    return { frame: true, origin: OPAQUE_ORIGIN };
+  try {
+    const parsed = describeNodeSchema.safeParse(
+      await session.send(
+        'DOM.describeNode',
+        resolved.kind === 'ref'
+          ? { backendNodeId: resolved.backendNodeId }
+          : { nodeId: resolved.nodeId }
+      )
+    );
+
+    node = parsed.success ? parsed.data.node : undefined;
+  } catch {
+    node = undefined;
   }
 
-  const frame = frames.find(candidate => candidate.id === frameId);
+  // An iframe belongs to its parent's document and hosts a child frame: a read or act on that ref needs the hosted frame's origin (how a withheld frame is targeted for its read grant).
+  const nodeName = (node?.nodeName ?? node?.localName ?? '').toUpperCase();
+  const ownerBackendNodeId =
+    node?.backendDOMNodeId ?? (resolved.kind === 'ref' ? resolved.backendNodeId : undefined);
 
-  return frame === undefined
+  if ((nodeName === 'FRAME' || nodeName === 'IFRAME') && ownerBackendNodeId !== undefined) {
+    const hosted = await frameWithOwnerNode(session, frames, ownerBackendNodeId);
+
+    const owning = await frameOwningNode(session, frames, ownerBackendNodeId);
+
+    // A frame owner whose frame this tab cannot see (an out-of-process iframe, a frame still loading) has no origin the gate can judge.
+    return {
+      frame: true,
+      ...(hosted === undefined ? {} : { frameId: hosted.id }),
+      origin: hosted?.origin ?? OPAQUE_ORIGIN,
+      owner:
+        owning === undefined
+          ? { frame: true, origin: OPAQUE_ORIGIN }
+          : { frame: owning.parentId !== undefined, origin: owning.origin },
+    };
+  }
+
+  // A selector is answered by the tab's own document root, so it can only name a node there.
+  if (resolved.kind === 'selector') {
+    const main = mainFrameOf(frames);
+
+    return main === undefined
+      ? { frame: true, origin: OPAQUE_ORIGIN }
+      : { frame: false, origin: main.origin };
+  }
+
+  const owning = await frameOwningNode(session, frames, resolved.backendNodeId);
+
+  return owning === undefined
     ? { frame: true, origin: OPAQUE_ORIGIN }
-    : { frame: frame.parentId !== undefined, origin: frame.origin };
+    : { frame: owning.parentId !== undefined, frameId: owning.id, origin: owning.origin };
 };
 
 const frameOwnerSchema = z.object({ backendNodeId: z.number().optional() });
@@ -235,21 +397,81 @@ const frameOriginForOwner = async (
   return match?.origin ?? OPAQUE_ORIGIN;
 };
 
-/** The origin a navigate is headed for; a `browser_navigate_back` has no URL to read. */
-const navigationOrigin = (args: Record<string, unknown>): string | undefined => {
+type NavigationDestination =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'origin'; readonly origin: string }
+  | { readonly kind: 'unresolvable'; readonly url: string };
+
+/** Where a tab-opening tool is headed: the URL it carries, and nothing for a tool that only goes back. */
+const navigationDestinationOf = (args: Record<string, unknown>): NavigationDestination => {
   const url = argumentString(args, 'url');
 
-  return url === undefined ? undefined : toBrowserOrigin(url);
+  if (url === undefined) {
+    return { kind: 'none' };
+  }
+
+  const origin = toBrowserOrigin(url);
+
+  // `toBrowserOrigin` names http(s) and file pages only: a tab at any other URL is one the debugger cannot attach to, so no grant can cover it.
+  return origin === undefined ? { kind: 'unresolvable', url } : { kind: 'origin', origin };
+};
+
+const unresolvableDestinationError = (url: string): string =>
+  `Opening ${url} is blocked: a session's tab can only be opened at an http(s) or file page, which is the only kind this session can read.`;
+
+export type NavigateDestinationCheck =
+  | { readonly error: string; readonly kind: 'blocked' }
+  | { readonly item: BrowserPermissionItem; readonly kind: 'needs_permission' }
+  | { readonly kind: 'ok' };
+
+/**
+ * The navigate grant a `browser_navigate` needs for its destination, checked
+ * before any tab exists: a session's first navigation opens its own tab at that
+ * URL, so there is no tab to resolve the origin against yet. A destination no
+ * grant can name is refused here, fail closed, exactly as the page path refuses
+ * it for an existing tab.
+ */
+export const navigateDestinationCheck = (
+  args: Record<string, unknown>,
+  authorized: readonly BrowserGrant[]
+): NavigateDestinationCheck => {
+  const destination = navigationDestinationOf(args);
+
+  if (destination.kind === 'unresolvable') {
+    return { error: unresolvableDestinationError(destination.url), kind: 'blocked' };
+  }
+
+  return destination.kind === 'origin' &&
+    !isOriginGranted(authorized, 'navigate', destination.origin)
+    ? { item: { class: 'navigate', origin: destination.origin }, kind: 'needs_permission' }
+    : { kind: 'ok' };
 };
 
 /**
+ * The same check for a `browser_tabs { action: "new" }`, which is the other way
+ * a session's first tab is opened. Every other action opens nothing, so it has
+ * no destination to grant.
+ */
+export const tabsNewDestinationCheck = (
+  args: Record<string, unknown>,
+  authorized: readonly BrowserGrant[]
+): NavigateDestinationCheck =>
+  argumentString(args, 'action') === 'new'
+    ? navigateDestinationCheck(args, authorized)
+    : { kind: 'ok' };
+
+/**
  * Classifies one act call as a sensitive step: a file upload, an OAuth consent
- * page, typing into or submitting a password/one-time-code/payment field. A
- * download that the call starts is classified after it ran, by the runtime.
+ * page, typing into or submitting a password/one-time-code/payment field, or a
+ * script call on a page whose script can reach such a field. A download that the
+ * call starts is classified after it ran, by the runtime.
  */
 const sensitiveStepFor = async (input: {
   readonly args: Record<string, unknown>;
+  readonly authorized: readonly BrowserGrant[];
   readonly frames: readonly BrowserAgentFrame[];
+  /** The target is a frame whose own document this read could not place, so its page is unknown. */
+  readonly framePageUnknown?: boolean;
   readonly origin: string;
   readonly pageUrl: string | undefined;
   readonly session: GateSession;
@@ -261,6 +483,36 @@ const sensitiveStepFor = async (input: {
 
   if (isOAuthConsentUrl(input.pageUrl)) {
     return { origin: input.origin, reason: SENSITIVE_REASON.oauthConsent };
+  }
+
+  // The call acts in a frame this read cannot place, so no page can be ruled out: a consent screen inside it would go unnoticed.
+  if (input.framePageUnknown === true) {
+    return { origin: input.origin, reason: SENSITIVE_REASON.frameUnverified };
+  }
+
+  if (isScriptTool(input.toolName)) {
+    // Model-authored code reaches every field a page script can reach: the tab's own origin, and any frame the extension may read. One probe per such frame.
+    const mainOrigin = mainFrameOf(input.frames)?.origin;
+    const reachable = input.frames.filter(
+      frame =>
+        frame.origin === mainOrigin || isOriginGranted(input.authorized, 'read', frame.origin)
+    );
+
+    for (const frame of reachable) {
+      // eslint-disable-next-line no-await-in-loop -- one frame probe per round trip, in frame-tree order
+      const verdict = await readFrameSensitiveFields(input.session, frame.id);
+
+      if (verdict === 'present') {
+        return { origin: input.origin, reason: SENSITIVE_REASON.script };
+      }
+
+      // A frame that cannot be inspected may hold the field the script wants.
+      if (verdict === 'unknown') {
+        return { origin: input.origin, reason: SENSITIVE_REASON.scriptUnverified };
+      }
+    }
+
+    return undefined;
   }
 
   const targets = sensitiveTargetsOf(input.toolName, input.args);
@@ -275,6 +527,13 @@ const sensitiveStepFor = async (input: {
 
     if (verdict.kind === 'unknown') {
       return { origin: input.origin, reason: SENSITIVE_REASON.unknownField };
+    }
+
+    if (verdict.frameId !== undefined) {
+      const frameOrigin =
+        input.frames.find(frame => frame.id === verdict.frameId)?.origin ?? OPAQUE_ORIGIN;
+
+      return { origin: frameOrigin, reason: `typing into a field inside ${frameOrigin}` };
     }
 
     if (verdict.frameBackendNodeId === undefined) {
@@ -308,31 +567,38 @@ const sensitiveStepFor = async (input: {
   return undefined;
 };
 
+/**
+ * The document the call acts in, for the OAuth-consent check. A frame target
+ * judged by another document's page would hide a consent screen inside it, so
+ * a frame this read cannot place has no page instead of the top page's.
+ */
 const pageUrlFor = async (
-  session: GateSession,
-  frame: { readonly frame: boolean; readonly origin: string } | undefined
+  frame: TargetFrame | undefined,
+  readFrames: () => Promise<AgentFrameInventory>
 ): Promise<string | undefined> => {
-  const frames = await readAgentFrameTree(session);
-  const main = mainFrameOf(frames);
+  const { frames } = await readFrames();
 
-  if (frame !== undefined && frame.frame) {
-    const match = frames.find(candidate => candidate.origin === frame.origin);
-
-    if (match !== undefined) {
-      return match.url;
-    }
+  if (frame === undefined || !frame.frame) {
+    return mainFrameOf(frames)?.url;
   }
 
-  return main?.url;
+  // The frame itself when the gate found it: another document may share its origin.
+  return frames.find(candidate =>
+    frame.frameId === undefined ? candidate.origin === frame.origin : candidate.id === frame.frameId
+  )?.url;
 };
 
 export interface AgentPreflightInput {
   readonly args: Record<string, unknown>;
   /** The pairs the CLI already approved for this session. */
   readonly authorized: readonly BrowserGrant[];
+  /** The call's shared frame inventory, so the preflight and the tool read one tree. */
+  readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
   /** Validates a token against this exact call and burns it; provided by the runtime's store. */
   readonly consumeStepToken: (token: string, binding: StepTokenBinding) => boolean;
   readonly session: GateSession;
+  /** The calling agent session's handle: a step token is bound to it, not just to the tab. */
+  readonly sessionHandle: string;
   /** The step tokens the retry carried. */
   readonly stepTokens: readonly string[];
   readonly tabId: number;
@@ -346,25 +612,39 @@ export interface AgentPreflightInput {
  */
 export const preflightAgentCall = async (input: AgentPreflightInput): Promise<AgentPreflight> => {
   const grantClass = toolGrantClass(input.toolName);
-  const frames = await readAgentFrameTree(input.session);
+  const readFrames = input.readFrames ?? (() => readAgentFrames(input.session));
+  const { frames } = await readFrames();
   const mainOrigin = mainFrameOf(frames)?.origin ?? OPAQUE_ORIGIN;
 
   // `browser_tabs` is one tool over four actions: list filters per tab and select/close are checked by the handler against the group and `act`; only `new` navigates, so it needs the destination's `navigate` grant here.
   if (input.toolName === 'browser_tabs') {
-    const destination = navigationOrigin(input.args);
+    const destination = navigationDestinationOf(input.args);
+    const check = tabsNewDestinationCheck(input.args, input.authorized);
 
-    if (
-      argumentString(input.args, 'action') === 'new' &&
-      destination !== undefined &&
-      !isOriginGranted(input.authorized, 'navigate', destination)
-    ) {
-      return {
-        failure: { items: [{ class: 'navigate', origin: destination }], kind: 'needs_permission' },
-        ok: false,
-      };
+    if (check.kind === 'blocked') {
+      return { failure: { error: check.error, kind: 'blocked' }, ok: false };
     }
 
-    return { class: 'act', ok: true, origin: destination ?? mainOrigin, targetOriginFrame: false };
+    if (check.kind === 'needs_permission') {
+      return { failure: { items: [check.item], kind: 'needs_permission' }, ok: false };
+    }
+
+    return {
+      class: 'act',
+      ok: true,
+      origin: destination.kind === 'origin' ? destination.origin : mainOrigin,
+      targetOriginFrame: false,
+    };
+  }
+
+  const destination = grantClass === 'navigate' ? navigationDestinationOf(input.args) : undefined;
+
+  // A destination no grant can name (a data:, view-source: or chrome: URL) is refused before the tab is touched, matching the page path.
+  if (destination?.kind === 'unresolvable') {
+    return {
+      failure: { error: unresolvableDestinationError(destination.url), kind: 'blocked' },
+      ok: false,
+    };
   }
 
   const targetTexts = grantClass === 'navigate' ? [] : targetTextsOf(input.args);
@@ -380,17 +660,31 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     }
   }
 
-  const destination = grantClass === 'navigate' ? navigationOrigin(input.args) : undefined;
+  const destinationOrigin = destination?.kind === 'origin' ? destination.origin : undefined;
   const [primaryTargetFrame] = targetFrames;
-  const targetFrame =
+  const targetFrame: TargetFrame | undefined =
     primaryTargetFrame === undefined
       ? undefined
-      : { frame: primaryTargetFrame.frame, origin: primaryTargetFrame.origin };
-  const origin = destination ?? targetFrame?.origin ?? mainOrigin;
+      : {
+          frame: primaryTargetFrame.frame,
+          ...(primaryTargetFrame.frameId === undefined
+            ? {}
+            : { frameId: primaryTargetFrame.frameId }),
+          origin: primaryTargetFrame.origin,
+        };
+  const origin = destinationOrigin ?? targetFrame?.origin ?? mainOrigin;
   const targetOriginFrame = grantClass !== 'navigate' && targetFrame?.frame === true;
-  // Every named target's frame needs the grant, not only the tab's top-level origin.
-  const requiredOrigins = new Set<string>(targetFrames.map(frame => frame.origin));
-  const frameByOrigin = new Map(targetFrames.map(frame => [frame.origin, frame.frame]));
+  // Every named target's frame needs the grant, not only the tab's top-level origin, and so does the document a tool on a frame element runs in.
+  const requiredFrames = targetFrames.flatMap(frame =>
+    frame.owner === undefined ? [frame] : [frame.owner, frame]
+  );
+  const requiredOrigins = new Set<string>(requiredFrames.map(frame => frame.origin));
+  // An origin is labelled a frame only when no required document of that origin is the tab's top-level one: a same-site iframe's grant also covers its owner page.
+  const frameByOrigin = new Map<string, boolean>();
+
+  for (const frame of requiredFrames) {
+    frameByOrigin.set(frame.origin, (frameByOrigin.get(frame.origin) ?? true) && frame.frame);
+  }
 
   if (requiredOrigins.size === 0) {
     requiredOrigins.add(origin);
@@ -410,7 +704,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     return { failure: { items, kind: 'needs_permission' }, ok: false };
   }
 
-  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements cannot run, so it is refused plainly before any sensitive-step ask instead of prompting for a call that would fail.
+  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements, or a ref no snapshot holds any more, cannot run, so it is refused plainly with the tool's own error before any sensitive-step ask instead of prompting for a call that would fail.
   for (const text of targetReferencesOf(input.args)) {
     // eslint-disable-next-line no-await-in-loop -- one resolution per reference, in argument order
     const resolved = await input.session.resolveTarget(text);
@@ -421,15 +715,21 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
         ok: false,
       };
     }
+
+    if (resolved === undefined && looksLikeBrowserRef(text)) {
+      return { failure: { error: STALE_REF_ERROR, kind: 'blocked' }, ok: false };
+    }
   }
 
   if (grantClass !== 'act') {
     return { class: grantClass, ok: true, origin, targetOriginFrame };
   }
 
-  const pageUrl = await pageUrlFor(input.session, targetFrame);
+  const pageUrl = await pageUrlFor(targetFrame, readFrames);
   const sensitive = await sensitiveStepFor({
     args: input.args,
+    authorized: input.authorized,
+    ...(targetFrame?.frame === true && pageUrl === undefined ? { framePageUnknown: true } : {}),
     frames,
     origin,
     pageUrl,
@@ -471,6 +771,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     // The refusal reports the element that probed sensitive; the runtime issues the token for that element, so the retry must bind exactly it.
     element: sensitive.element,
     origin: sensitiveOrigin,
+    session: input.sessionHandle,
     tabId: input.tabId,
     toolName: input.toolName,
   };
@@ -492,19 +793,28 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
 
 /**
  * The post-action check for a navigate: a redirect moved the tab to another
- * origin than the one the navigation was approved for. The caller must ask for
- * that origin and decide whether to stay.
+ * origin than the one the navigation was approved for. A landing origin the
+ * call may already open or read is the redirect's answer; any other origin
+ * must be asked for before the tab may stay there.
  */
 export const postAgentNavigate = async (
-  session: Pick<BrowserToolPageSession, 'send'>,
-  approvedOrigin: string
+  session: Pick<BrowserToolPageSession, 'isolatedProbe' | 'send'>,
+  approvedOrigin: string,
+  authorized: readonly BrowserGrant[]
 ): Promise<BrowserOriginChanged | undefined> => {
   const frames = await readAgentFrameTree(session);
   const finalOrigin = mainFrameOf(frames)?.origin;
 
-  return finalOrigin === undefined || finalOrigin === approvedOrigin
-    ? undefined
-    : { from: approvedOrigin, kind: 'origin_changed', to: finalOrigin };
+  if (
+    finalOrigin === undefined ||
+    finalOrigin === approvedOrigin ||
+    isOriginGranted(authorized, 'navigate', finalOrigin) ||
+    isOriginGranted(authorized, 'read', finalOrigin)
+  ) {
+    return undefined;
+  }
+
+  return { from: approvedOrigin, kind: 'origin_changed', to: finalOrigin };
 };
 
 /**

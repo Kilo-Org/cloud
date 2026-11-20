@@ -63,6 +63,12 @@ const keyboardStore = vi.hoisted(() => {
   };
 });
 
+// The header's scope subtitle reads the membership list; this suite tests the
+// form, so the subtitle is a fixed name for each kind of scope.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: (scope: string) => (scope === 'personal' ? 'Personal' : 'Drain Labs'),
+}));
+
 // The screen scrolls the body back to the URL section when Start rejects an
 // empty or malformed URL; the shared mock records those calls so the suite can
 // prove the field is revealed rather than trusting that it happened.
@@ -1015,6 +1021,35 @@ describe('ManualReviewScreen URL validation', () => {
     const [statusText] = findVisibleStatusTexts(renderer.root);
     expect(statusText?.props.children).toBe(i18n.t('codeReviewer.manualReview.invalidUrl'));
     expect(String(findUrlField(renderer.root).props.className)).toContain('border-destructive');
+
+    unmount();
+  });
+
+  it('starts from a pull request link copied from a sub-page', async () => {
+    platformState.OS = 'android';
+    const { renderer, unmount } = await renderScreen();
+
+    const subPageUrl = `${GITHUB_PR_URL}/files`;
+    const { onChangeText } = findUrlField(renderer.root).props as {
+      onChangeText: (value: string) => void;
+    };
+    act(() => {
+      onChangeText(subPageUrl);
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    const { onPress } = action.props as { onPress: () => void };
+    act(() => {
+      onPress();
+    });
+
+    // A sub-tab link names the same review, so it is a valid draft: no status
+    // line and no error border, and the start carries the URL as copied.
+    expect(findVisibleStatusTexts(renderer.root)).toHaveLength(0);
+    expect(String(findUrlField(renderer.root).props.className)).not.toContain('border-destructive');
+    expect(status.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ url: subPageUrl }),
+      expect.anything()
+    );
 
     unmount();
   });

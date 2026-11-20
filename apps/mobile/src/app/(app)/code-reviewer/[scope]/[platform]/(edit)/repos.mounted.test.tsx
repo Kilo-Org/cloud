@@ -182,6 +182,20 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => 'online',
 }));
+// The Bitbucket web-managed notice names the organization from the membership
+// list; this suite never opens that state, so one resolved organization stands
+// in and keeps the real hook's tRPC client (and the expo runtime with it) out
+// of the module graph.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: (organizationIdOverride?: string) => ({
+    org: {
+      organizationId: organizationIdOverride ?? state.scope,
+      organizationName: 'Acme Robotics',
+      role: 'owner',
+    },
+    isResolving: false,
+  }),
+}));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   isPersonal: (scope: string) => scope === 'personal',
@@ -214,6 +228,16 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isFetching: state.readinessFetching,
     refetch: state.readinessRefetch,
     data: state.readiness,
+  }),
+  useBitbucketIntegrationStatus: (_scope: string, enabled = true) => ({
+    isLoading: false,
+    isPending: !enabled,
+    isError: false,
+    isFetching: false,
+    // A token-only organization is the only shape this suite exercises; the
+    // disabled read (any other platform) answers nothing.
+    data: enabled ? { method: 'workspace_access_token', status: 'not_connected' } : undefined,
+    refetch: vi.fn(),
   }),
 }));
 vi.mock('@/lib/hooks/use-bitbucket', () => ({

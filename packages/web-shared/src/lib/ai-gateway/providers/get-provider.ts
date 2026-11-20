@@ -457,11 +457,12 @@ function getUpstreamReasoningEffort(
   if (replacesReasoningObject && request.kind === 'chat_completions') {
     const effort = request.body.reasoning_effort ?? request.body.reasoning?.effort;
     if (effort) return effort;
-    return isReasoningExplicitlyDisabled(request) ? 'none' : null;
+    // The transform drops the reasoning object, so a disable inside it never reaches the upstream.
+    const disabledOutsideReasoningObject =
+      request.body.enable_thinking === false || request.body.thinking?.type === 'disabled';
+    return disabledOutsideReasoningObject ? 'none' : null;
   }
-  const disabledByReasoningObject =
-    request.kind === 'chat_completions' && request.body.reasoning?.enabled === false;
-  if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
+  if (isReasoningExplicitlyDisabled(request)) return 'none';
   return getReasoningEffort(request);
 }
 

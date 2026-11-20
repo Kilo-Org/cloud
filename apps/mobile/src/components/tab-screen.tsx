@@ -15,7 +15,7 @@ import { useKeyboardState } from 'react-native-keyboard-controller';
 import { scrollFocusedInputAboveKeyboard } from '@/lib/keyboard-reveal';
 import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
-import { useScreenInsets } from '@/lib/screen-insets';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
@@ -57,7 +57,7 @@ export function useTabBarBottomPadding() {
  */
 export function useTabScreenFrame() {
   const tabBarHeight = useTabBarHeight();
-  const { left, right } = useScreenInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   // The provider's keyboard height reaches the screen bottom on both platforms.
   const keyboardOcclusion = useKeyboardState(state => state.height);
   const reservedBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
@@ -76,11 +76,7 @@ export function useTabScreenFrame() {
     },
     [frameMargin]
   );
-  const frameStyle = {
-    marginBottom: frameMargin,
-    ...(left > 0 ? { marginLeft: left } : undefined),
-    ...(right > 0 ? { marginRight: right } : undefined),
-  };
+  const frameStyle = { marginBottom: frameMargin, ...sideInsetMarginStyle };
   return { frameStyle, keyboardOcclusion, measureFrame };
 }
 
@@ -98,12 +94,13 @@ export function useTabScreenFrame() {
 export function SheetScrollView({ children, style, ...props }: ScrollViewProps) {
   const tabBarHeight = useTabBarHeight();
   const keyboardOcclusion = useKeyboardState(state => state.height);
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   let frameMargin = 0;
   if (Platform.OS === 'android') {
     frameMargin = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
   }
   return (
-    <ScrollView {...props} style={[style, { marginBottom: frameMargin }]}>
+    <ScrollView {...props} style={[style, { marginBottom: frameMargin, ...sideInsetMarginStyle }]}>
       {children}
       <View style={{ height: TAB_SCREEN_TRAILING_GAP }} pointerEvents="none" />
     </ScrollView>

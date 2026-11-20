@@ -49,15 +49,16 @@ import {
   upstreamRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
-  getOpenRouterModelsFromDatabase,
+  getOpenRouterChatModelIdsFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   accountForMicrodollarUsage,
   INVALID_TOKEN_CODE,
+  RESOLVED_MODEL_HEADER,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   ReasoningDetailsTransform,
@@ -346,15 +347,15 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
-const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
+const mockedGetOpenRouterChatModelIds = jest.mocked(getOpenRouterChatModelIdsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
-const mockedGetVercelModels = jest.mocked(getVercelModelsFromDatabase);
+const mockedGetVercelLanguageModelIds = jest.mocked(getVercelLanguageModelIdsFromDatabase);
 
 /** Like the OpenRouter catalog stub, Vercel's list accepts every model unless a test narrows it. */
 const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
 
 beforeEach(() => {
-  mockedGetVercelModels.mockResolvedValue(everyVercelModel);
+  mockedGetVercelLanguageModelIds.mockResolvedValue(everyVercelModel);
   jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
 });
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
@@ -537,7 +538,7 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -673,6 +674,88 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     });
     expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  describe('Cloud Agent runtime proxy keep-alive', () => {
+    const runtimeToken = jwt.sign(
+      {
+        version: KILO_TOKEN_VERSION,
+        kiloUserId: 'user-123',
+        apiTokenPepper: 'test-pepper',
+        aud: KILO_GATEWAY_AUDIENCE,
+        runtimeAuthorization: {
+          id: '11111111-1111-4111-8111-111111111111',
+          resourceKind: 'cloud-agent-next',
+          resourceId: 'workspace_123',
+        },
+      },
+      NEXTAUTH_SECRET,
+      { algorithm: 'HS256' }
+    );
+    const user = { id: 'user-123', google_user_email: 'test@example.com' } as User;
+
+    /** Mirrors `getUserFromAuth`, which passes its attestation check to the token validation. */
+    function setRuntimeTokenAuth(runtimeProxyAttestationVerified: boolean) {
+      mockedGetUserFromAuth.mockImplementation(async options => {
+        const validation = validateAuthorizationHeader(
+          new Headers({ authorization: `Bearer ${runtimeToken}` }),
+          { expectedAudience: options.expectedAudience, runtimeProxyAttestationVerified }
+        );
+        if ('error' in validation) {
+          return {
+            user: null,
+            authFailedResponse: new Response(validation.error, { status: 401 }),
+            credentialsRejected: isRejectedCredentialReason(validation.reason),
+            organizationId: undefined,
+          } as AuthResult;
+        }
+        return {
+          user,
+          authFailedResponse: null,
+          cloudAgentRuntimeProxied: validation.cloudAgentRuntimeProxied,
+        };
+      });
+    }
+
+    async function send() {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      return handleLlmProxyRequest(
+        makeRequest(makeBody(), { authorization: `Bearer ${runtimeToken}` }) as never
+      );
+    }
+
+    it('rejects a runtime bearer without a verified attestation before any upstream call', async () => {
+      setRuntimeTokenAuth(false);
+
+      const response = await send();
+
+      expect(response.status).toBe(401);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+    });
+
+    it('turns on the first-byte keep-alive for an attested runtime bearer', async () => {
+      setRuntimeTokenAuth(true);
+
+      const response = await send();
+
+      expect(response.status).toBe(200);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ keepAliveUntilFirstByte: true })
+      );
+    });
+
+    it('leaves the keep-alive off for every other caller', async () => {
+      setUserAuth();
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ keepAliveUntilFirstByte: false })
+      );
+    });
   });
 
   it('retains verified gateway-token identity through the provider path', async () => {
@@ -908,7 +991,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedUpstreamRequest.mockResolvedValue({
@@ -2408,9 +2491,8 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
     it.each([
       ['the organization model deny list', 'organization_model'],
+      ['an organization provider restriction', 'organization_provider'],
       ['a missing group grant', 'no_grant'],
-      ['a group model restriction', 'group_model'],
-      ['a group provider restriction', 'group_provider'],
     ] as const)(
       'keeps denying a model excluded by %s through a Vercel BYOK inference provider key',
       async (_name, denialSource) => {
@@ -2520,7 +2602,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     'returns 404 when the %s model id is unknown',
     async providerType => {
       mockedIsValidOpenRouterModelId.mockResolvedValue(false);
-      mockedGetVercelModels.mockResolvedValue(new Set(['vendor/other-model']));
+      mockedGetVercelLanguageModelIds.mockResolvedValue(new Set(['vendor/other-model']));
       mockedGetProvider.mockResolvedValue(
         providerResult({
           provider: { ...provider, type: providerType },
@@ -2913,7 +2995,7 @@ describe.each([
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedGetProvider.mockResolvedValue(
       providerResult({
@@ -3338,7 +3420,7 @@ describe('organization data-collection policy on provider-policy exempt routes',
     setUserAuth();
     mockedFindCustomLlm.mockResolvedValue(null);
     mockedIsCustomLlm.mockResolvedValue(false);
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     // Free route shapes reach the free-model rate limit, so pin its default for this block.
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
@@ -3519,7 +3601,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -4101,7 +4183,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedGetEffectiveModelDecision.mockResolvedValue({
       allowed: false,
-      denialSource: 'group_model',
+      denialSource: 'no_grant',
     });
     mockedApplyResolvedAutoModel.mockImplementation(async params => {
       const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
@@ -4495,7 +4577,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       });
       mockedGetEffectiveModelDecision.mockResolvedValue({
         allowed: false,
-        denialSource: 'group_model',
+        denialSource: 'no_grant',
       });
       mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
@@ -4540,6 +4622,39 @@ describe('kilo-auto/efficient classifier billing', () => {
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     }
   );
+
+  it.each([{ stream: true }, { stream: false }])(
+    'names the model a kilo-auto/efficient request resolved to (stream: $stream)',
+    async ({ stream }) => {
+      mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+      mockedUpstreamRequest.mockResolvedValue({
+        type: 'success',
+        response: stream
+          ? new Response('data: {}\n\n', { headers: { 'content-type': 'text/event-stream' } })
+          : upstreamJsonResponse({
+              id: 'chatcmpl-1',
+              model: 'anthropic/claude-haiku-4',
+              choices: [],
+            }),
+      });
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest({ ...makeBody('kilo-auto/efficient'), stream }) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get(RESOLVED_MODEL_HEADER)).toBe('anthropic/claude-haiku-4');
+    }
+  );
+
+  it('omits the resolved model header for a direct model request', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('openai/gpt-4o')) as never);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get(RESOLVED_MODEL_HEADER)).toBeNull();
+  });
 });
 
 describe('auto-routing shadow classifier', () => {
@@ -4554,7 +4669,7 @@ describe('auto-routing shadow classifier', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -4641,7 +4756,7 @@ describe('custom routers and signed auto decisions', () => {
       })
     );
     mockedGetDirectByokModel.mockResolvedValue(null);
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -5375,7 +5490,7 @@ describe('briefing gateway accounting receipts', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedUpstreamRequest.mockResolvedValue({
@@ -5767,7 +5882,7 @@ describe('Enkrypt output guardrail', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     respondUpstream('chat_completions', false);
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
@@ -6555,7 +6670,7 @@ describe('Enkrypt input guardrail', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -8466,7 +8581,7 @@ describe('BYOK failover', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);

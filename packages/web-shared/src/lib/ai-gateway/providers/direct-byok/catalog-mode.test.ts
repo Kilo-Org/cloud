@@ -13,7 +13,7 @@ import {
   createDirectByokReferenceResolver,
   findDirectByokProvider,
   getDirectByokCatalogModelId,
-  listDirectByokCatalogModels,
+  listCatalogModelsOfProvider,
   offersCatalogMode,
   findDirectByokCatalogModels,
   getDirectByokCatalogModelIds,
@@ -31,7 +31,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   isValidOpenRouterModelId: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
-  getVercelModelsFromDatabase: jest.fn(async () => new Set()),
+  getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set()),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => ({
   getAiSdkProvider: jest.fn(),
@@ -138,7 +138,7 @@ describe('catalog mode support', () => {
   });
 
   test('lists the current catalog ids a provider serves with their primary model', async () => {
-    const entries = await listDirectByokCatalogModels(provider('synthetic'));
+    const entries = await listCatalogModelsOfProvider(provider('synthetic'));
 
     expect(entries.map(({ catalogModelId, model }) => [catalogModelId, model.id])).toEqual([
       ['moonshotai/kimi-k2.6', 'hf:moonshotai/Kimi-K2.6'],
@@ -148,7 +148,7 @@ describe('catalog mode support', () => {
 
 describe('free models in catalog mode', () => {
   test('does not list a free catalog id or the auto small free model', async () => {
-    const entries = await listDirectByokCatalogModels(provider('synthetic'));
+    const entries = await listCatalogModelsOfProvider(provider('synthetic'));
 
     expect(entries.map(({ catalogModelId }) => catalogModelId)).toEqual(['moonshotai/kimi-k2.6']);
   });

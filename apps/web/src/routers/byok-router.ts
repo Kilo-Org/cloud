@@ -72,6 +72,7 @@ import {
   getModelGatewayUserByokProviders,
   readByokPrivateProviderDefinition,
   isGatewayUserByokEligibleModel,
+  parseByokSettings,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -96,7 +97,7 @@ import {
   directByokProviderForKey,
   findDirectByokProvider,
   formatDirectByokModelId,
-  listDirectByokCatalogModels,
+  listCatalogModelsOfProvider,
   offersCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
@@ -239,10 +240,12 @@ const BYOK_KEY_COLUMNS = {
 };
 
 function inRouteOrder<T extends { provider_id: string; settings: unknown }>(keys: T[]): T[] {
-  return sortByokKeysInRouteOrder(keys, key => ({
+  const prioritized = keys.map(key => ({
+    key,
     providerId: key.provider_id,
-    priority: getByokKeyPriority(key.settings),
+    priority: getByokKeyPriority(parseByokSettings(key.settings)),
   }));
+  return sortByokKeysInRouteOrder(prioritized, entry => entry).map(({ key }) => key);
 }
 
 function ownedKeys(owner: ByokOwner) {
@@ -309,7 +312,7 @@ async function toBYOKApiKeyResponse(
     settings,
   });
   const supportsCatalog = await supportsCatalogMode(key.provider_id);
-  const serveCatalogModels = servesCatalogModels(settings);
+  const serveCatalogModels = servesCatalogModels(parseByokSettings(settings));
   return {
     ...key,
     provider_name: definition?.name ?? getByokProviderDisplayName(key.provider_id),
@@ -421,7 +424,7 @@ async function fetchCatalogModeSupportedModels(): Promise<Record<string, string[
   const openRouterModelMetadata = await getOpenRouterModelsMetadataFromDatabase();
   const result: Record<string, string[]> = {};
   for (const provider of DIRECT_BYOK_PROVIDERS) {
-    const entries = await listDirectByokCatalogModels(provider);
+    const entries = await listCatalogModelsOfProvider(provider);
     if (entries.length === 0) continue;
     result[provider.id] = entries
       .map(({ catalogModelId, model }) => {

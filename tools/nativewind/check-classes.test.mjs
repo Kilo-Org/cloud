@@ -15,8 +15,9 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 
-import { checkParsedFile } from './check-classes.mjs';
+import { LAYOUT_RULES, checkParsedFile } from './check-classes.mjs';
 import { parseSourceEntry } from '../lib/source-files.mjs';
 
 // The rule cases read the repository's own files: the checker resolves the app's
@@ -25,7 +26,7 @@ import { parseSourceEntry } from '../lib/source-files.mjs';
 // they build one.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
-const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_SCANNERS = ['ast.mjs', 'entry-point.mjs', 'fs-entries.mjs', 'source-files.mjs'];
 
 /**
  * The diagnostics of one file, straight from the checker's own export. A
@@ -46,12 +47,17 @@ function checkAll(files) {
 /**
  * A root mirroring the repository layout, for the probes and the CLI case.
  *
+ * `globalCss` decides the app's stylesheet: left out, the app's own
+ * `apps/mobile/src/global.css` is copied, so the theme tokens resolve; a string
+ * is written there instead, so a case can break the `@theme inline` block; null
+ * writes no file, so a case can read the missing-file failure.
+ *
  * `mkdtempSync` returns a path under the platform's symlinked temporary
  * directory on macOS (`/var` → `/private/var`), and the entry-point check
  * compares the script's real path with `process.argv[1]`, so the root is
  * canonicalised: a spawned audit then recognises itself and runs.
  */
-function makeFixture(context, files) {
+function makeFixture(context, files, globalCss) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'check-classes-')));
   context.after(() => rmSync(root, { recursive: true, force: true }));
 
@@ -71,7 +77,13 @@ function makeFixture(context, files) {
   for (const name of SHARED_SCANNERS) {
     copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, `tools/lib/${name}`));
   }
-  copyFileSync(join(MOBILE_ROOT, 'src/global.css'), join(root, 'apps/mobile/src/global.css'));
+  const stylesheet = join(root, 'apps/mobile/src/global.css');
+  mkdirSync(dirname(stylesheet), { recursive: true });
+  if (globalCss === undefined) {
+    copyFileSync(join(MOBILE_ROOT, 'src/global.css'), stylesheet);
+  } else if (globalCss !== null) {
+    writeFileSync(stylesheet, globalCss);
+  }
   symlinkSync(join(MOBILE_ROOT, 'node_modules'), join(root, 'apps/mobile/node_modules'), 'dir');
   // The parser is a root dependency, resolved the way the repository resolves it.
   symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
@@ -227,6 +239,23 @@ test('accepts all-side padding moved to contentContainerClassName', () => {
       'export const a = <ScrollView contentContainerClassName="p-4" />;\n'
     ),
     []
+  );
+});
+
+test('flags a variant-prefixed padding on a scroll container own className', () => {
+  // A variant selects when the padding applies and `!` only raises its
+  // specificity, so each of these insets the scroll view itself exactly as a
+  // bare `px-4` does. The tokens come back deduped and sorted, one diagnostic
+  // for the element, and the content container's own classes stay out of it.
+  assert.deepEqual(
+    screenProblems(
+      screen(
+        '<ScrollView className="ios:px-4 ios:px-4 android:pe-3 !pl-2 ios:!pr-2 flex-1" contentContainerClassName="gap-3" />'
+      )
+    ),
+    [
+      'apps/mobile/src/screen.tsx:3: <ScrollView> carries "!pl-2 android:pe-3 ios:!pr-2 ios:px-4" on its own className; move it to contentContainerClassName or the RTL layout offsets by it',
+    ]
   );
 });
 
@@ -482,10 +511,12 @@ test('reports an unreadable file through the CLI and keeps the findings it colle
  * real package.json is resolved through Node, not a package-manager layout
  * path, so the exports map still resolves `./compiler` under any linker.
  */
-function stubbedCompilerFixture(context, entrySource) {
-  const root = makeFixture(context, {
-    'apps/mobile/src/bans.ts': 'const b = "text-start";\n',
-  });
+function stubbedCompilerFixture(
+  context,
+  entrySource,
+  files = { 'apps/mobile/src/bans.ts': 'const b = "text-start";\n' }
+) {
+  const root = makeFixture(context, files);
   const entry = join(root, 'apps/mobile/node_modules/react-native-css');
   rmSync(join(root, 'apps/mobile/node_modules'), { recursive: true, force: true });
   mkdirSync(join(entry, 'dist/commonjs/compiler'), { recursive: true });
@@ -499,31 +530,53 @@ function stubbedCompilerFixture(context, entrySource) {
   return root;
 }
 
-/** A compiler stub whose two reads return the given expression sources. */
-function compilerStub({ warnings, stylesheet }) {
-  return (
-    'module.exports = {\n' +
-    '  compile() {\n' +
-    '    return {\n' +
-    `      warnings() { return ${warnings}; },\n` +
-    `      stylesheet() { return ${stylesheet}; },\n` +
-    '    };\n' +
-    '  },\n' +
-    '};\n'
-  );
-}
-
 /**
  * A stylesheet still holding both declarations the bans warn about: a deferred
- * colorMix for `backgroundColor` and a deferred calc for `lineHeight`. The stub
- * answers every fixture with it, so a case that fails one pin leaves the other
- * pins passing.
+ * colorMix for `backgroundColor` and a deferred calc for `lineHeight`. It
+ * answers every fixture that is not a text-align one, so a case that fails a
+ * text-align pin leaves the other pins passing.
  */
 const HOLDING_STYLESHEET =
   "{ s: [['x', [{ d: [" +
   "[['colorMix', [['color', '#b0483a'], ['percent', 10]]], 'backgroundColor'], " +
   "[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']" +
   '] }]]] }';
+
+/**
+ * A compiler stub that answers each fixture by the CSS it receives.
+ *
+ * The `text-align: left` control fixture emits `{ textAlign: 'left' }` unless
+ * `textAlign.left` is null: it is the literal declaration the pins' read is
+ * proven against. A `start` or `end` key makes that keyword's fixture emit
+ * `{ textAlign: <value> }`; an omitted keyword emits no declaration, which is
+ * what its pin holds on. Every other fixture emits `stylesheet` — the holding
+ * declarations by default.
+ */
+function compilerStub({ textAlign = {}, stylesheet = HOLDING_STYLESHEET } = {}) {
+  const branches = [];
+  if (textAlign.left !== null) {
+    branches.push(['text-align: left', JSON.stringify('left')]);
+  }
+  for (const keyword of ['start', 'end']) {
+    if (textAlign[keyword] !== undefined) {
+      branches.push([`text-align: ${keyword}`, JSON.stringify(textAlign[keyword])]);
+    }
+  }
+  return (
+    'module.exports = {\n' +
+    '  compile(css) {\n' +
+    "    const run = d => ({ stylesheet() { return { s: [['x', [{ d }]]] }; } });\n" +
+    branches
+      .map(
+        ([fixture, value]) =>
+          `    if (css.includes('${fixture}')) return run([{ textAlign: ${value} }]);\n`
+      )
+      .join('') +
+    `    return { stylesheet() { return ${stylesheet}; } };\n` +
+    '  },\n' +
+    '};\n'
+  );
+}
 
 for (const [name, entrySource, expected, absent] of [
   [
@@ -536,8 +589,7 @@ for (const [name, entrySource, expected, absent] of [
     'throws at compile, and every fixture still reports',
     "module.exports = { compile() { throw new Error('stubbed compiler exploded on line one'); } };\n",
     [
-      'the compiler failed on the text-align: start fixture (stubbed compiler exploded on line one)',
-      'the compiler failed on the text-align: end fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the text-align: left control fixture (stubbed compiler exploded on line one)',
       'the compiler failed on the color-mix over an @theme inline variable fixture (stubbed compiler exploded on line one)',
       'the compiler failed on the spacing-scale line-height fixture (stubbed compiler exploded on line one)',
     ],
@@ -551,7 +603,6 @@ for (const [name, entrySource, expected, absent] of [
       '  compile(css) {',
       "    if (css.includes('color-mix')) throw new Error('color-mix fixture exploded');",
       '    return {',
-      "      warnings() { return { values: { 'text-align': ['start', 'end'] } }; },",
       '      stylesheet() {',
       "        return { s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] };",
       '      },',
@@ -561,45 +612,37 @@ for (const [name, entrySource, expected, absent] of [
     ].join('\n') + '\n',
     [
       'the compiler failed on the color-mix over an @theme inline variable fixture (color-mix fixture exploded)',
+      'the text-align: left control fixture emits no textAlign declaration — the text-align pins cannot be verified without it',
     ],
     'drop the numeric leading rule',
   ],
   [
-    'still drops only the text-align: start keyword',
-    compilerStub({
-      warnings: `{ values: { 'text-align': ['start'] } }`,
-      stylesheet: HOLDING_STYLESHEET,
-    }),
-    // `start` still appears in the dropped values, so its rule holds; `end`
-    // no longer does, so only the text-end rule is retired.
-    ['text-align: end is no longer dropped — drop the text-end rule'],
-    'drop the text-start rule',
+    'emits textAlign for the text-align: start fixture only',
+    compilerStub({ textAlign: { start: 'start' } }),
+    // The control and `end` are untouched, so only the start keyword's rule is
+    // retired: the pin fails when a keyword starts being honoured.
+    ['text-align: start is no longer dropped — drop the text-start rule'],
+    'text-align: end is no longer dropped',
   ],
   [
-    'drops neither text-align keyword',
-    compilerStub({ warnings: '{ values: {} }', stylesheet: HOLDING_STYLESHEET }),
+    'emits textAlign for both text-align keyword fixtures',
+    compilerStub({ textAlign: { start: 'start', end: 'end' } }),
     [
       'text-align: start is no longer dropped — drop the text-start rule',
       'text-align: end is no longer dropped — drop the text-end rule',
     ],
   ],
   [
-    'reports prose around the keyword instead of the dropped value',
-    // The words `end` and `start` sit inside longer words of a warning
-    // sentence, so neither pin may read them as the dropped keyword.
-    compilerStub({
-      warnings: `{ values: {}, notes: ['text-align rendered is extended, restart'] }`,
-      stylesheet: HOLDING_STYLESHEET,
-    }),
+    'emits no textAlign for the control fixture',
+    compilerStub({ textAlign: { left: null } }),
     [
-      'text-align: start is no longer dropped — drop the text-start rule',
-      'text-align: end is no longer dropped — drop the text-end rule',
+      'the text-align: left control fixture emits no textAlign declaration — the text-align pins cannot be verified without it',
     ],
+    'is no longer dropped',
   ],
   [
     'emits no backgroundColor declaration for the color-mix fixture',
     compilerStub({
-      warnings: '{ values: {} }',
       stylesheet: `{ s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] }`,
     }),
     [
@@ -610,7 +653,6 @@ for (const [name, entrySource, expected, absent] of [
   [
     'resolves the color-mix at build time',
     compilerStub({
-      warnings: '{ values: {} }',
       stylesheet: `{ s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight'], [{ color: '#b0483a10' }, 'backgroundColor']] }]]] }`,
     }),
     [
@@ -620,7 +662,6 @@ for (const [name, entrySource, expected, absent] of [
   [
     'emits no lineHeight declaration for the spacing-scale fixture',
     compilerStub({
-      warnings: '{ values: {} }',
       stylesheet: `{ s: [['x', [{ d: [[['colorMix', [['var', ['--color-destructive']]]], 'backgroundColor']] }]]] }`,
     }),
     [
@@ -650,6 +691,21 @@ for (const [name, entrySource, expected, absent] of [
     assert.doesNotMatch(result.stderr, /Error:|at /);
   });
 }
+
+test('keeps the pins quiet when the control and the holding declarations compile', context => {
+  const root = stubbedCompilerFixture(context, compilerStub(), {
+    'apps/mobile/src/screen.tsx': screen('<ScrollView contentContainerClassName="px-4" />'),
+  });
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /check-classes: no dropped classes/);
+  assert.doesNotMatch(result.stderr, /text-align/);
+});
 
 test('importing the module neither scans nor runs the compiler probes', context => {
   const root = importOnlyRoot(context);
@@ -855,6 +911,33 @@ function layoutProblems(relative, text) {
   return check(relative, text).filter(problem => /\[L\d+\]/.test(problem));
 }
 
+// The table is the only description of the layout rules, and the header says so.
+// These three properties are what makes that claim hold instead of drift: a new
+// rule cannot arrive with no detector, no two rules can share an id, and no rule
+// can name two detectors and leave the dispatch to pick one.
+test('states every layout rule once, with the detector that finds it', () => {
+  const ids = LAYOUT_RULES.map(rule => rule.id);
+  assert.deepEqual([...ids].sort(), [...new Set(ids)].sort(), 'two layout rules share an id');
+  for (const rule of LAYOUT_RULES) {
+    const detectors = ['patterns', 'detectSurface', 'detect'].filter(
+      field => rule[field] !== undefined
+    );
+    assert.equal(
+      detectors.length,
+      1,
+      `layout rule ${rule.id} must carry exactly one detector, has [${detectors.join(', ')}]`
+    );
+    assert.equal(
+      typeof rule.advice,
+      'string',
+      `layout rule ${rule.id} must name the primitive that replaces it`
+    );
+    if (rule.patterns !== undefined) {
+      assert.ok(rule.patterns.length > 0, `layout rule ${rule.id} has no pattern`);
+    }
+  }
+});
+
 test('flags arbitrary spacing outside the allowlist and passes it inside', () => {
   const found = layoutProblems(SCREEN_FILE, screen('<View className="mt-[6px]" />'));
   assert.equal(found.length, 1);
@@ -921,6 +1004,76 @@ test('accepts px-4 and vertical padding on a scroll body', () => {
     ),
     []
   );
+});
+
+test('flags a variant-prefixed page inset on a scroll body', () => {
+  // The gutter rule reads a token's utility part, so a prefixed or important
+  // inset is the same page inset the bare spelling writes, and the two RTL
+  // rules stay pinned to one spelling.
+  for (const classes of ['ios:px-6', '!ps-8']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    ).filter(problem => problem.includes('[L2]'));
+    assert.equal(found.length, 1, classes);
+    assert.match(
+      found[0],
+      new RegExp(`\\[L2\\] "${classes} on <DetailScreenScrollView> contentContainerClassName"`)
+    );
+  }
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<DetailScreenScrollView contentContainerClassName="px-4" />')
+    ),
+    []
+  );
+});
+
+test('reads every scroll container in both RTL rules', () => {
+  // The two rules read one inventory, so a container the gutter rule used to
+  // miss is judged on its content container and one the className rule used to
+  // miss is judged on its own className.
+  assert.match(
+    layoutProblems(SCREEN_FILE, screen('<FlatList contentContainerClassName="px-6" />')).join('\n'),
+    /\[L2\] "px-6 on <FlatList> contentContainerClassName"/
+  );
+  assert.match(
+    screenProblems(screen('<FlatList className="px-3" />')).join('\n'),
+    /<FlatList> carries "px-3" on its own className/
+  );
+  for (const tag of ['DetailScreenScrollView', 'SheetScrollView']) {
+    assert.match(
+      layoutProblems(SCREEN_FILE, screen(`<${tag} contentContainerClassName="px-6" />`)).join('\n'),
+      new RegExp(`\\[L2\\] "px-6 on <${tag}> contentContainerClassName"`),
+      tag
+    );
+    assert.match(
+      screenProblems(screen(`<${tag} className="px-3" />`)).join('\n'),
+      new RegExp(`<${tag}> carries "px-3" on its own className`),
+      tag
+    );
+  }
+});
+
+test('accepts the px-4 gutter on every scroll container and its Animated form', () => {
+  for (const tag of [
+    'ScrollView',
+    'TabScreenScrollView',
+    'DetailScreenScrollView',
+    'SheetScrollView',
+    'FlatList',
+    'FlashList',
+    'KeyboardAwareScrollView',
+    'Animated.ScrollView',
+    'Animated.FlatList',
+  ]) {
+    assert.deepEqual(
+      layoutProblems(SCREEN_FILE, screen(`<${tag} contentContainerClassName="px-4" />`)),
+      [],
+      tag
+    );
+  }
 });
 
 test('flags a header className that writes the page gutter', () => {
@@ -1290,6 +1443,27 @@ test('follows a local component that draws the sheet header', () => {
   );
 });
 
+test('does not accept a nested sheet header drawn through a local component', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      'function AdvancedContent() {\n' +
+      '  return <SheetHeader title="Advanced" onDone={onClose} />;\n' +
+      '}\n' +
+      'export function Screen() {\n' +
+      '  return (\n' +
+      '    <Sheet visible onClose={onClose}>\n' +
+      '      <Sheet visible={other} onClose={onClose}>\n' +
+      '        <AdvancedContent />\n' +
+      '      </Sheet>\n' +
+      '    </Sheet>\n' +
+      '  );\n' +
+      '}'
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:7: \[L11\] "<Sheet>"/);
+});
+
 test('flags horizontal padding on a CenteredState content container', () => {
   for (const classes of ['px-6', 'ps-3', 'pe-1', 'pl-2', 'pr-2', 'p-3']) {
     const found = layoutProblems(
@@ -1460,5 +1634,169 @@ test('writes the baseline with --write-layout-baseline', context => {
     {
       'apps/mobile/src/screen.tsx': { L1: 1, L3: 1, L4: 1 },
     }
+  );
+});
+
+// A stylesheet the theme read cannot use: the block a moved or renamed
+// global.css would lose. The audit must report why the one theme-dependent
+// rule was skipped instead of ending on that read, and every other rule's
+// findings must still print.
+const THEME_SOURCE = 'export const a = <View className="leading-9 bg-primary/50" />;\n';
+
+test('skips only the theme rule and keeps the other findings when global.css has no @theme block', context => {
+  const root = makeFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    ':root { --x: 1; }\n'
+  );
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(no @theme inline block\)/
+  );
+  // The ban the other rules still make reaches the report.
+  assert.match(result.stderr, /leading-9/);
+  // The skipped rule's own diagnostic must not claim the token was checked.
+  assert.doesNotMatch(result.stderr, /bg-primary\/50/);
+  assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+  assert.doesNotMatch(result.stderr, /Error:/);
+  // A stack trace means the theme read escaped the problem list.
+  assert.doesNotMatch(result.stderr, /\n\s+at /);
+});
+
+test('names the missing global.css and keeps the other findings', context => {
+  const root = makeFixture(context, { 'apps/mobile/src/screen.tsx': THEME_SOURCE }, null);
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(ENOENT/
+  );
+  assert.match(result.stderr, /leading-9/);
+  assert.doesNotMatch(result.stderr, /bg-primary\/50/);
+  assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+  assert.doesNotMatch(result.stderr, /Error:/);
+});
+
+test('--write-layout-baseline reports a theme failure instead of rewriting the baseline', context => {
+  const root = makeFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    ':root { --x: 1; }\n'
+  );
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'tools/nativewind/check-classes.mjs'), '--write-layout-baseline'],
+    { cwd: root, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(
+    result.stderr,
+    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(no @theme inline block\)/
+  );
+  assert.match(result.stderr, /check-classes: 1 problem\(s\)/);
+  assert.doesNotMatch(result.stdout, /wrote/);
+  // A baseline written here would record a tree the audit never checked.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('reports an @theme inline block holding no colour token as the theme failure', context => {
+  const root = makeFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    ':root {}\n@theme inline {\n  --font-sans: var(--font-x);\n}\n'
+  );
+  const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /no --color token in the @theme inline block/);
+  assert.match(result.stderr, /leading-9/);
+  // The rule has no token to build its pattern from, so it must not run.
+  assert.doesNotMatch(result.stderr, /bg-primary\/50/);
+  assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
+});
+
+test('--write-layout-baseline refuses when a walked file cannot be read', async context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />'),
+  });
+  const unreadable = join(root, 'apps/mobile/src/screen.tsx');
+  // The fixture's own copy of the checker, so the run it exposes walks the
+  // fixture and would write there: one file's read fails, every other read is
+  // the filesystem's.
+  const { run } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const errors = [];
+  const originalError = console.error;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.error = message => {
+    errors.push(String(message));
+  };
+  let exitCode;
+  try {
+    run({
+      read: (file, ...rest) => {
+        if (file === unreadable) {
+          throw new Error('EACCES: permission denied');
+        }
+        return readFileSync(file, ...rest);
+      },
+      writeBaseline: true,
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.error = originalError;
+    process.exitCode = previousExitCode;
+  }
+  assert.equal(exitCode, 1, errors.join('\n'));
+  const report = errors.join('\n');
+  assert.match(report, /apps\/mobile\/src\/screen\.tsx: cannot read: EACCES: permission denied/);
+  assert.match(report, /check-classes: 1 problem\(s\)/);
+  // A baseline written here would record a tree the audit never checked.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
+  );
+});
+
+test('--write-layout-baseline refuses when a fixture source does not parse', context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/broken.tsx': 'export const a = <View className=; />;\n',
+  });
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'tools/nativewind/check-classes.mjs'), '--write-layout-baseline'],
+    { cwd: root, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stderr, /broken\.tsx:\d+: cannot parse: /);
+  assert.match(result.stderr, /check-classes: [1-9]\d* problem\(s\)/);
+  assert.doesNotMatch(result.stdout, /wrote/);
+  // The refused file may hold any number of violations, so no count is safe.
+  assert.throws(
+    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
+    /ENOENT/
   );
 });

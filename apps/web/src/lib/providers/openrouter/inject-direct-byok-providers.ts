@@ -3,7 +3,7 @@ import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-util
 import {
   findDirectByokProvider,
   getDirectByokProviderListings,
-  listDirectByokCatalogModels,
+  listCatalogModelsOfProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   getOpenRouterAliasTarget,
@@ -74,7 +74,7 @@ export async function injectDirectByokProviders(
     if (!provider || snapshotSlugs.has(listing.slug)) continue;
     let catalogModels;
     try {
-      catalogModels = await listDirectByokCatalogModels(provider);
+      catalogModels = await listCatalogModelsOfProvider(provider);
     } catch (error) {
       // One provider's model list must not fail the whole sync; it reappears on the next one.
       captureException(error, {

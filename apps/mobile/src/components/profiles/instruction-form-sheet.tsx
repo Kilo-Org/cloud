@@ -199,6 +199,7 @@ export function InstructionFormSheet({
           defaultValue={contentRef.current}
           error={contentError}
           disabled={isSaving}
+          required
           multiline
           textAlignVertical="top"
           className="min-h-40 max-h-56 leading-[1.25rem]"

@@ -447,7 +447,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
 
     expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
-      'That code is incorrect. Please try again.'
+      "That code is incorrect or expired. Try again or use 'Resend code'."
     );
 
     // Editing the code retires the refusal message.

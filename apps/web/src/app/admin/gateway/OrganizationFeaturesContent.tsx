@@ -28,6 +28,7 @@ function toFeatureValues(features: OrganizationFeatures): FeatureValues {
     byok_private_providers: features.byok_private_providers.join('\n'),
     enkrypt_output_guardrail: features.enkrypt_output_guardrail.join('\n'),
     gateway_settings: features.gateway_settings.join('\n'),
+    org_permission_policy: features.org_permission_policy.join('\n'),
   };
 }
 
@@ -51,6 +52,7 @@ function OrganizationFeaturesPreview({
     byok_private_providers: parseOrganizationIds(values.byok_private_providers),
     enkrypt_output_guardrail: parseOrganizationIds(values.enkrypt_output_guardrail),
     gateway_settings: parseOrganizationIds(values.gateway_settings),
+    org_permission_policy: parseOrganizationIds(values.org_permission_policy),
   });
   const features = parsed.success ? parsed.data : DEFAULT_ORGANIZATION_FEATURES;
   const hasOrganizations = ORGANIZATION_FEATURES.some(feature => features[feature].length > 0);
@@ -187,6 +189,7 @@ export function OrganizationFeaturesContent() {
       byok_private_providers: parseOrganizationIds(values.byok_private_providers),
       enkrypt_output_guardrail: parseOrganizationIds(values.enkrypt_output_guardrail),
       gateway_settings: parseOrganizationIds(values.gateway_settings),
+      org_permission_policy: parseOrganizationIds(values.org_permission_policy),
     });
     if (!parsed.success) {
       setValidationError(formatZodError(parsed.error));
@@ -202,8 +205,8 @@ export function OrganizationFeaturesContent() {
         <CardHeader>
           <CardTitle>Organization Features</CardTitle>
           <CardDescription>
-            Enable gateway features for specific organizations, one organization ID per line.
-            Changes apply within about a minute.
+            Enable features for specific organizations, one organization ID per line. Changes apply
+            within about a minute.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">

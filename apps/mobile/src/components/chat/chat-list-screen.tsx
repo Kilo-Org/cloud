@@ -6,7 +6,7 @@ import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
-import { ContextControl } from '@/components/context-control';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -23,11 +23,13 @@ import { useChatBackends } from '@/lib/chat/backend-store';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { useOrganization } from '@/lib/organization-context';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
+import { selectChatListSurface } from './chat-list-surface';
 import { BackendSettingsControl } from './backend-settings-sheet';
 
 /**
@@ -56,11 +58,13 @@ function ScopedChatListScreen() {
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const tabBarHeight = useEffectiveTabBarHeight();
+  const connectivity = useCommittedConnectivityStatus();
 
   const {
     models,
     isLoading: modelsLoading,
     isError: modelsFailed,
+    isFetched: modelsFetched,
     refetch: refetchModels,
   } = useAvailableModels(organizationId ?? undefined);
   const backends = useChatBackends();
@@ -77,7 +81,15 @@ function ScopedChatListScreen() {
     rememberModelFacts(models);
   }, [models]);
 
-  const { chats, isLoading, isError, refetch, remove, rename } = useChatList(place);
+  const {
+    chats,
+    isLoading,
+    isError,
+    isSuccess: listAnswered,
+    refetch,
+    remove,
+    rename,
+  } = useChatList(place);
 
   // There is no picker here: a chat starts on the model the latest one is on,
   // and the conversation's own picker switches it from its next message.
@@ -171,9 +183,27 @@ function ScopedChatListScreen() {
   );
 
   // Nothing to start a chat with is nothing for the button to do, and an empty
-  // list carries its own button, so the corner one would be the second.
-  const empty = !isLoading && chats.length === 0;
-  const failed = isError || (modelsFailed && options.length === 0 && chats.length === 0);
+  // list carries its own button, so the corner one would be the second. The
+  // body is decided by the two reads' own provenance (see
+  // `selectChatListSurface`), so an unanswered read can never read as "no
+  // chats": the corner button follows the same body.
+  const surface = selectChatListSurface({
+    chatCount: chats.length,
+    listAnswered,
+    listFailed: isError,
+    listLoading: isLoading,
+    hasPlace: place !== null,
+    catalogAnswered: modelsFetched && !modelsFailed,
+    catalogLoading: modelsLoading,
+    // The model a New chat would start on. A catalog that cannot load does not
+    // remove a model that is already known (cached rows, a backend, an
+    // on-device model), so an answered list keeps its empty state and its
+    // button instead of a full-screen catalog error.
+    catalogStartable: selectedModel !== undefined,
+    offline: connectivity === 'offline',
+  });
+  const empty = surface.kind === 'empty';
+  const failed = surface.kind === 'list-error' || surface.kind === 'catalog-error';
   const showFab = !empty && !failed && place !== null && selectedModel !== undefined;
 
   const fabStyle = useMemo(
@@ -192,7 +222,7 @@ function ScopedChatListScreen() {
   );
 
   function renderBody() {
-    if (isError) {
+    if (surface.kind === 'list-error') {
       return (
         <QueryError
           variant="server"
@@ -203,18 +233,20 @@ function ScopedChatListScreen() {
         />
       );
     }
-    if (modelsFailed && options.length === 0 && chats.length === 0) {
+    if (surface.kind === 'catalog-error') {
       return (
         <QueryError
-          variant="server"
-          title={t('common.couldNotLoadModels')}
+          // Offline names the connection; anything else is the catalog's own
+          // failure. Retry asks either read again.
+          variant={surface.offline ? 'offline' : 'server'}
+          title={surface.offline ? undefined : t('common.couldNotLoadModels')}
           onRetry={() => {
             void refetchModels();
           }}
         />
       );
     }
-    if (isLoading) {
+    if (surface.kind === 'loading') {
       return (
         <View className="pt-1">
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
@@ -228,7 +260,7 @@ function ScopedChatListScreen() {
         </View>
       );
     }
-    if (empty) {
+    if (surface.kind === 'empty') {
       return (
         <EmptyState
           icon={MessageCircle}
@@ -274,6 +306,7 @@ function ScopedChatListScreen() {
           headerRight={<BackendSettingsControl />}
           inlineActions={<ContextControl />}
           allowInlineActionsStacking={false}
+          inlineActionsMinWidth={CONTEXT_CONTROL_INLINE_MIN_DP}
         />
         <View className="flex-1">{renderBody()}</View>
         {showFab && (

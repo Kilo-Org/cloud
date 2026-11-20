@@ -5,7 +5,7 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
-import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
+import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import {
   compareProof,
   prepareProof,
@@ -339,7 +339,9 @@ export function resolveTargets(
   links: readonly string[],
   targetsJson: string | undefined
 ): Target[] {
-  const entries: { id?: string; link: string; after?: string }[] = links.map(link => ({ link }));
+  const entries: { id?: string; link: string; after?: string; hold?: boolean }[] = links.map(
+    link => ({ link })
+  );
   if (targetsJson !== undefined) {
     const parsed: unknown = JSON.parse(targetsJson);
     const list =
@@ -353,15 +355,24 @@ export function resolveTargets(
         entries.push({ link: entry });
         continue;
       }
-      const { id, name, link, after } = (
+      const { id, name, link, after, hold } = (
         typeof entry === 'object' && entry !== null ? entry : {}
       ) as Record<string, unknown>;
       if (typeof link !== 'string')
         throw new UsageError('Every --targets entry needs a string link');
       if (after !== undefined && typeof after !== 'string')
         throw new UsageError('A --targets entry after must be a string link');
+      if (hold !== undefined && typeof hold !== 'boolean')
+        throw new UsageError('A --targets entry hold must be true or false');
+      if (hold === true && after === undefined)
+        throw new UsageError('A held target needs an after link to release it');
       const explicit = typeof id === 'string' ? id : typeof name === 'string' ? name : undefined;
-      entries.push({ id: explicit, link, ...(after === undefined ? {} : { after }) });
+      entries.push({
+        id: explicit,
+        link,
+        ...(after === undefined ? {} : { after }),
+        ...(hold === true ? { hold: true } : {}),
+      });
     }
   }
   const seen = new Map<string, number>();
@@ -373,6 +384,7 @@ export function resolveTargets(
       id: count === 1 ? base : `${base}-${count}`,
       link: entry.link,
       ...(entry.after === undefined ? {} : { after: entry.after }),
+      ...(entry.hold === true ? { hold: true } : {}),
     };
   });
 }
@@ -631,6 +643,11 @@ async function scanOutcome(
   screenshot.completedMs = deps.clock.now() - started;
   const after = await readTree();
   const image = readRgba(files.absolute(files.screenshot), deps.exec);
+  const scaled = withScreenshotScale(dump, image.width);
+  if (scaled !== dump) {
+    dump = scaled;
+    writeJson(files.absolute(files.dump), dump);
+  }
   const alignment = captureAlignment(
     before,
     screenshot,

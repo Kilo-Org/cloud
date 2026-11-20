@@ -1,7 +1,7 @@
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isValidVercelModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
@@ -13,7 +13,10 @@ import { isValidVercelModelId } from '@kilocode/web-shared/lib/ai-gateway/provid
  */
 export async function isKiloCatalogModelId(modelId: string): Promise<boolean> {
   if (await isValidOpenRouterModelId(modelId)) return true;
-  return (await getVercelModelsFromDatabase()).size > 0 && (await isValidVercelModelId(modelId));
+  return (
+    (await getVercelLanguageModelIdsFromDatabase()).size > 0 &&
+    (await isValidVercelModelId(modelId))
+  );
 }
 
 /**

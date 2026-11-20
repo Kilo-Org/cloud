@@ -27,7 +27,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
     '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
   ).getDirectByokProviderListings,
   findDirectByokProvider: (providerId: string) => ({ id: providerId }),
-  listDirectByokCatalogModels: (provider: { id: string }) => mockListCatalogModels(provider.id),
+  listCatalogModelsOfProvider: (provider: { id: string }) => mockListCatalogModels(provider.id),
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 

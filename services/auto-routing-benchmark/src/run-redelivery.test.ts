@@ -93,7 +93,7 @@ describe('a paid case whose queue invocation is canceled (production migrations 
     }
     await scheduleRunChunks(env.BENCH_DB, {
       runId: RUN_ID,
-      entries: models.map(model => ({ model, variant: null, providers: ['deepinfra'] })),
+      entries: models.map(model => ({ model, variant: null })),
       repetitions: 1,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
@@ -124,7 +124,9 @@ describe('a paid case whose queue invocation is canceled (production migrations 
   }
 
   function laneFailures() {
-    return sqlite.prepare('SELECT model, variant, rep, chunk FROM run_lane_failures').all();
+    return sqlite
+      .prepare('SELECT model, variant, rep, chunk, failure_class FROM run_lane_failures')
+      .all();
   }
 
   function caseResults() {
@@ -274,7 +276,13 @@ describe('a paid case whose queue invocation is canceled (production migrations 
     expect(caseResults()).toEqual([expectedCaseResult()]);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM pending_decider_outputs').get()?.n).toBe(0);
     expect(laneFailures()).toEqual([
-      { model: claim.model, variant: claim.variant, rep: claim.rep, chunk: claim.chunk },
+      {
+        model: claim.model,
+        variant: claim.variant,
+        rep: claim.rep,
+        chunk: claim.chunk,
+        failure_class: 'ambiguous_execution',
+      },
     ]);
     expect(storedChunk(claim.id)).toEqual({ status: 'failed', token: claim.token, slot: null });
     expect(runRequests).toHaveLength(1);
@@ -412,7 +420,13 @@ describe('a paid case whose queue invocation is canceled (production migrations 
 
     await redeliverAt(NOW + PAID_OUTPUT_WAIT_MS);
     expect(laneFailures()).toEqual([
-      { model: claim.model, variant: claim.variant, rep: claim.rep, chunk: claim.chunk },
+      {
+        model: claim.model,
+        variant: claim.variant,
+        rep: claim.rep,
+        chunk: claim.chunk,
+        failure_class: 'ambiguous_execution',
+      },
     ]);
     expect(storedChunk(claim.id)).toEqual({ status: 'failed', token: claim.token, slot: null });
     expect(caseResults()).toEqual([]);
@@ -424,7 +438,13 @@ describe('a paid case whose queue invocation is canceled (production migrations 
 
     await redeliverAt(NOW + PAID_OUTPUT_WAIT_MS + 24 * 60 * 60_000);
     expect(laneFailures()).toEqual([
-      { model: claim.model, variant: claim.variant, rep: claim.rep, chunk: claim.chunk },
+      {
+        model: claim.model,
+        variant: claim.variant,
+        rep: claim.rep,
+        chunk: claim.chunk,
+        failure_class: 'ambiguous_execution',
+      },
     ]);
     expect(storedChunk(claim.id)).toEqual({ status: 'failed', token: claim.token, slot: null });
     expect(sqlite.prepare('SELECT started_at FROM scheduler_executions').all()).toEqual([

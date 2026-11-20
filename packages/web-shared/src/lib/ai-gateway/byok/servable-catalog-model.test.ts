@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isValidVercelModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
@@ -9,7 +9,7 @@ import { isByokServableCatalogModelId, isKiloCatalogModelId } from './servable-c
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   isValidOpenRouterModelId: jest.fn(),
-  getVercelModelsFromDatabase: jest.fn(),
+  getVercelLanguageModelIdsFromDatabase: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   isValidVercelModelId: jest.fn(),
@@ -26,7 +26,9 @@ beforeEach(() => {
   jest
     .mocked(isValidVercelModelId)
     .mockImplementation(async modelId => VERCEL_ONLY_IDS.has(modelId));
-  jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set(['vendor/vercel-only']));
+  jest
+    .mocked(getVercelLanguageModelIdsFromDatabase)
+    .mockResolvedValue(new Set(['vendor/vercel-only']));
 });
 
 describe('isKiloCatalogModelId', () => {
@@ -37,7 +39,7 @@ describe('isKiloCatalogModelId', () => {
   });
 
   test('admits no Vercel-only id while the Vercel model list is unavailable', async () => {
-    jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+    jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set());
     await expect(isKiloCatalogModelId('vendor/vercel-only')).resolves.toBe(false);
     expect(isValidVercelModelId).not.toHaveBeenCalled();
   });

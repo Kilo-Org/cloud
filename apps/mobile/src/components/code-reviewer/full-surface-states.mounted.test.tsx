@@ -73,6 +73,8 @@ const state = vi.hoisted(() => ({
     isFetching: false,
     refetch: vi.fn(),
   },
+  /** The integration-status read beside the readiness read; a case seeds it. */
+  bitbucketStatus: undefined as Record<string, unknown> | undefined,
   reviews: {
     data: { pages: [{ success: true, reviews: [] }], pageParams: [0] } as unknown,
     isLoading: false,
@@ -166,6 +168,11 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+// The token recovery card is a host node here, so a read-only case can assert
+// its absence; an unmocked component's source text never matches a node name.
+vi.mock('@/components/code-reviewer/bitbucket-setup-recovery', () => ({
+  BitbucketSetupRecovery: 'BitbucketSetupRecovery',
+}));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
@@ -194,6 +201,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronLeft: 'ChevronLeft',
   ChevronRight: 'ChevronRight',
   FolderGit2: 'FolderGit2',
+  GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
   Search: 'Search',
   SearchX: 'SearchX',
@@ -258,6 +266,16 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useGitHubRepositories: () => state.repositories,
   useGitLabRepositories: () => state.repositories,
   useBitbucketReadiness: () => state.bitbucket,
+  // The integration status is the second reading of one connection: a case
+  // that seeds it names an OAuth authorization, and the rest answer nothing so
+  // the readiness above decides, exactly as it did when it was the only read.
+  useBitbucketIntegrationStatus: () => ({
+    data: state.bitbucketStatus,
+    isError: false,
+    isFetching: false,
+    isLoading: false,
+    refetch: () => Promise.resolve(),
+  }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
   useRepoSelectionToggle: () => state.toggleRepo,
@@ -297,6 +315,18 @@ vi.mock('@/lib/hooks/use-reviewer-permission', async () => {
   };
 });
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
+// The Bitbucket overview paints its header subtitle from the membership list;
+// it resolves against the same `organizations` rows this suite seeds, so the
+// real hook's tRPC client (and the expo runtime with it) stays out of the
+// module graph.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: (organizationIdOverride?: string) => ({
+    org: state.organizations.find(
+      entry => entry.organizationId === (organizationIdOverride ?? state.scope)
+    ),
+    isResolving: false,
+  }),
+}));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   useCouncilGate: () => ({ allowed: false, pending: false }),
   useCouncilUiEnabled: () => false,
@@ -333,6 +363,7 @@ beforeEach(() => {
     repositoryCache: { status: 'available', repositories: [] },
   };
   state.bitbucket.isError = false;
+  state.bitbucketStatus = undefined;
   state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
   state.reviews.isError = false;
   state.reviews.isFetching = false;
@@ -534,6 +565,71 @@ describe('Reviewer repository bodies', () => {
     const { renderer, unmount } = await renderWithProviders(reposRoute());
     expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
     expect(renderer.root.find(node => String(node.type) === 'CenteredState')).toBeDefined();
+    unmount();
+  });
+
+  it('paints a web-managed Bitbucket connection as a full state, not a lone line', async () => {
+    // The readiness read sees no workspace token; the status read names the
+    // OAuth authorization the web page owns, so the body is read-only and must
+    // read like the screen's other states: a heading and a body line in the
+    // shared state, with no token form and no control to press.
+    state.platform = 'bitbucket';
+    state.scope = 'org-1';
+    state.organizations = [{ organizationId: 'org-1', organizationName: 'Acme', role: 'owner' }];
+    state.bitbucket.data = {
+      connected: false,
+      repositoryCache: { status: 'unavailable' },
+    };
+    state.bitbucketStatus = {
+      method: 'oauth',
+      status: 'connected',
+      integrationId: 'oauth-1',
+      integrationStatus: 'active',
+      recoveryAction: null,
+      workspace: { uuid: 'ws-uuid', slug: 'acme', displayName: 'Acme' },
+      repositoryCache: { status: 'available', repositories: [], syncedAt: null },
+      canManage: true,
+    };
+
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.title).toBe(i18n.t('codeReviewer.bitbucketConnect.managedOnWebTitle'));
+    expect(empty.props.description).toBe(
+      i18n.t('codeReviewer.bitbucketConnect.managedOnWebRepositories', { organization: 'Acme' })
+    );
+    expect(String(empty.props.description)).not.toContain('{{');
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'BitbucketSetupRecovery')
+    ).toHaveLength(0);
+    unmount();
+  });
+
+  it('leaves the line off while the organization has no name yet', async () => {
+    // A deep link straight into the screen, or a failed membership read, leaves
+    // the organization unnamed. The heading still states the connection's state,
+    // and a stand-alone label never stands where the name belongs.
+    state.platform = 'bitbucket';
+    state.scope = 'org-1';
+    state.organizations = [];
+    state.bitbucket.data = {
+      connected: false,
+      repositoryCache: { status: 'unavailable' },
+    };
+    state.bitbucketStatus = {
+      method: 'oauth',
+      status: 'connected',
+      integrationId: 'oauth-1',
+      integrationStatus: 'active',
+      recoveryAction: null,
+      workspace: { uuid: 'ws-uuid', slug: 'acme', displayName: 'Acme' },
+      repositoryCache: { status: 'available', repositories: [], syncedAt: null },
+      canManage: true,
+    };
+
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.title).toBe(i18n.t('codeReviewer.bitbucketConnect.managedOnWebTitle'));
+    expect(empty.props.description).toBeUndefined();
     unmount();
   });
 
@@ -970,29 +1066,26 @@ describe('Recent review header', () => {
       createElement(ReviewListScreen, { scope: 'org-1' })
     );
     const findHeader = () => renderer.root.find(node => String(node.type) === 'ScreenHeader');
-    await waitFor(() => findHeader().props.title === 'Drain Labs');
+    await waitFor(() => findHeader().props.subtitle === 'Drain Labs');
 
-    expect(findHeader().props.eyebrow).toBe('Recent reviews');
-    // The scope name is prose, but the header paints it on the one line the
-    // personal scope uses: a second line reserved for it made this header
-    // taller than the Personal one, pushing the eyebrow down and opening a
-    // wider gap above the first review. One line needs no reserved blank line —
-    // a name that arrives later still paints on that same line — so the header
-    // keeps the personal header's height instead of outgrowing it.
-    expect(findHeader().props.titleNumberOfLines).toBe(1);
+    // The list's own name titles the screen and the scope sits on the subtitle
+    // line below it: the same two-line header the personal scope paints, so
+    // both scopes keep one header height above the first review.
+    expect(findHeader().props.title).toBe('Recent reviews');
+    expect(findHeader().props.titleNumberOfLines).toBeUndefined();
     expect(findHeader().props.reserveTitleSpace).toBe(false);
     unmount();
   });
 
-  it('names the personal scope, on the single line it always fills', async () => {
+  it('names the personal scope on the subtitle line', async () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: 'personal' })
     );
 
     const node = renderer.root.find(candidate => String(candidate.type) === 'ScreenHeader');
-    expect(node.props.title).toBe('Personal');
-    expect(node.props.eyebrow).toBe('Recent reviews');
-    expect(node.props.titleNumberOfLines).toBe(1);
+    expect(node.props.title).toBe('Recent reviews');
+    expect(node.props.subtitle).toBe('Personal');
+    expect(node.props.titleNumberOfLines).toBeUndefined();
     expect(node.props.reserveTitleSpace).toBe(false);
     unmount();
   });
@@ -1013,13 +1106,13 @@ describe('empty reviews connect action', () => {
   }
 
   /**
-   * The scope title paints from the same `organizations.list` read the role
+   * The scope subtitle paints from the same `organizations.list` read the role
    * comes from, so reading the name means the role has settled too.
    */
   async function settled(renderer: RenderWithProvidersResult['renderer']) {
     await waitFor(
       () =>
-        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.title) ===
+        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.subtitle) ===
         ORG_NAME
     );
   }

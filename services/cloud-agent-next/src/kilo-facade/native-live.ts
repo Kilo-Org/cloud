@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
+import {
+  agentBoardSchema,
+  backgroundActivityInventorySchema,
+} from '@kilocode/session-ingest-contracts';
 import type {
   ControlPlaneControlResult,
   ControlPlaneNativeOperation,
@@ -157,6 +160,12 @@ function parseNativeResult(
     case 'session.background': {
       const parsed = backgroundActivityInventorySchema.safeParse(value);
       return parsed.success && parsed.data.sessionID === kiloSessionId
+        ? bounded(parsed.data)
+        : invalidNativeResult();
+    }
+    case 'session.board': {
+      const parsed = agentBoardSchema.safeParse(value);
+      return parsed.success && parsed.data.ownerSessionID === kiloSessionId
         ? bounded(parsed.data)
         : invalidNativeResult();
     }

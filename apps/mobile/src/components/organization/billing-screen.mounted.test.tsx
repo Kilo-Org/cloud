@@ -140,7 +140,7 @@ describe('OrganizationBillingScreen change plan placement', () => {
     // own neutral tone instead of a second danger colour.
     const plan = renderer.root
       .findAllByType('KvRow' as never)
-      .find(node => node.props.label === 'Organization plan');
+      .find(node => node.props.label === 'Plan');
     expect(plan).toBeDefined();
     expect(plan?.props.valueTone).toBeUndefined();
     unmount();

@@ -38,6 +38,7 @@ import {
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useReviewerBillingRefusal } from '@/lib/hooks/reviewer-refusal';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -59,16 +60,15 @@ const URL_PLACEHOLDER = {
   gitlab: 'https://gitlab.com/group/project/-/merge_requests/123',
 } satisfies Record<ManualReviewPlatform, string>;
 
-// The shared suffix check (matchesCodeReviewUrlSuffix, ported from web's
-// code-review-links.ts) only looks at the end of the URL — it isn't
-// anchored to a host or protocol, so on its own it would accept e.g.
-// "ftp://evil.example/owner/repo/pull/123". Mobile keeps this host/protocol
-// anchor locally and combines it with the shared suffix check, rather than
-// adopting the shared regex unanchored (see isValidManualReviewUrl below).
-// GitHub PR URLs always carry an owner/repo prefix, so the anchor requires
-// it — otherwise structure-free URLs like https://github.com/pull/123 would
-// pass. GitLab nests groups arbitrarily deep, so only the protocol is
-// anchored there; the shared suffix requires the /-/merge_requests/<n> tail.
+// The shared check (matchesCodeReviewUrlSuffix, ported from web's
+// code-review-links.ts) reads the PR/MR shape from the URL path and accepts a
+// link copied from a review sub-tab. It isn't anchored to a host or protocol,
+// so on its own it would accept e.g. "ftp://evil.example/owner/repo/pull/123".
+// Mobile keeps this host/protocol anchor locally and combines it with the
+// shared check, rather than adopting the shared pattern unanchored (see
+// isValidManualReviewUrl below). GitLab nests groups arbitrarily deep, so only
+// the protocol is anchored there; the shared check requires the
+// /-/merge_requests/<n> tail.
 const URL_HOST_PATTERN = {
   github: /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\//,
   gitlab: /^https:\/\//,
@@ -110,6 +110,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  const scopeTitle = useReviewerScopeTitle(scope);
   const colors = useThemeColors();
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
@@ -268,10 +269,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     // about to fill instead of the form it may replace.
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader
-          title={t('codeReviewer.manualReview.title')}
-          eyebrow={t('common.codeReviewer')}
-        />
+        <ReviewerHeader title={t('codeReviewer.manualReview.title')} subtitle={scopeTitle} />
         <ManualReviewSkeleton />
       </View>
     );
@@ -286,10 +284,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const { permanent, variant } = classifyProviderErrorCode(statusErrorCode);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader
-          title={t('codeReviewer.manualReview.title')}
-          eyebrow={t('common.codeReviewer')}
-        />
+        <ReviewerHeader title={t('codeReviewer.manualReview.title')} subtitle={scopeTitle} />
         <QueryError
           variant={variant}
           title={permanent ? undefined : t('codeReviewer.manualReview.couldNotCheckProviderStatus')}
@@ -320,10 +315,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const canConnect = permission.status !== 'ready' || canConnectProvider('github', permission);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader
-          title={t('codeReviewer.manualReview.title')}
-          eyebrow={t('common.codeReviewer')}
-        />
+        <ReviewerHeader title={t('codeReviewer.manualReview.title')} subtitle={scopeTitle} />
         <EmptyState
           icon={GitPullRequest}
           title={t('common.connectProvider')}
@@ -356,10 +348,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader
-        title={t('codeReviewer.manualReview.title')}
-        eyebrow={t('common.codeReviewer')}
-      />
+      <ReviewerHeader title={t('codeReviewer.manualReview.title')} subtitle={scopeTitle} />
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           ref={scrollRef}

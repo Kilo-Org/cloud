@@ -1,6 +1,11 @@
 import type { Part } from '@kilocode/app-shared/opencode';
 import { forgetPartUpdateTime, publishPartsChanged } from './helpers';
-import type { PartOrderingEvidence, PartsSnapshot, SubscriberRegistry } from './helpers';
+import type {
+  PartOrderingEvidence,
+  PartViewCache,
+  PartsSnapshot,
+  SubscriberRegistry,
+} from './helpers';
 import type { SessionStorage } from './types';
 import { forgetMessageVersions, forgetPartVersion, storageVersions } from './versions';
 
@@ -28,17 +33,20 @@ type MessageParts = {
  * the order in which state is forgotten, published and notified; the backend
  * owns how each container is stored (plain maps vs Jotai atoms) and supplies:
  * `beforeStructuralChange` (Jotai flushes its coalesced deltas; memory runs
- * nothing) and `publishPartsRevision` (Jotai bumps its revision atom; memory
- * runs nothing).
+ * nothing), `publishPartsRevision` (Jotai bumps its parts revision atom; memory
+ * runs nothing), and `publishMessagesRevision` (Jotai bumps its messages
+ * revision atom; memory runs nothing).
  */
 type StorageContainers = {
   messages: MessageRows;
   parts: MessageParts;
   snapshot: PartsSnapshot;
+  views: PartViewCache;
   evidence: PartOrderingEvidence;
   subscribers: SubscriberRegistry;
   beforeStructuralChange(): void;
   publishPartsRevision(): void;
+  publishMessagesRevision(): void;
 };
 
 /** Drop one part and republish its parts channel. */
@@ -74,6 +82,7 @@ function deleteMessageFromStorage(
   const hadMessage = containers.messages.has(messageId);
   if (hadMessage) {
     containers.messages.remove(messageId);
+    containers.publishMessagesRevision();
     containers.messages.setIds(containers.messages.ids().filter(id => id !== messageId));
   }
 
@@ -83,6 +92,7 @@ function deleteMessageFromStorage(
   }
   containers.parts.remove(messageId);
   containers.snapshot.delete(messageId);
+  containers.views.delete(messageId);
   if (hadParts) {
     containers.publishPartsRevision();
     containers.subscribers.notifyParts(messageId);
@@ -101,10 +111,12 @@ function clearStorage(sessionStorage: SessionStorage, containers: StorageContain
   const existingPartMessageIds = containers.parts.messageIds();
 
   containers.messages.clear();
+  containers.publishMessagesRevision();
   containers.messages.setIds([]);
   containers.parts.clear();
   containers.publishPartsRevision();
   containers.snapshot.clear();
+  containers.views.clear();
   containers.evidence.clear();
 
   for (const messageId of existingMessageIds) {

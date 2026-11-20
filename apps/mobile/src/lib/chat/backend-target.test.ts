@@ -44,6 +44,18 @@ describe('backendFailureKey', () => {
     expect(backendFailureKey(new Error('upstream 500'))).toBe('common.somethingWentWrong');
   });
 
+  it('names the connection when the request or its stream breaks while the device reads online', () => {
+    const dropped = new ModelError({
+      reason: 'transport',
+      cause: new TypeError('Network request failed'),
+    });
+
+    expect(backendFailureKey(dropped)).toBe('modelChat.connectionLost');
+    expect(backendFailureKey(new ModelError({ reason: 'body', cause: '{' }))).toBe(
+      'common.somethingWentWrong'
+    );
+  });
+
   it('says the account cannot pay when the gateway answers payment required', () => {
     const failure = new ModelError({
       reason: 'status',
@@ -85,9 +97,90 @@ describe('backendFailureKey', () => {
   });
 
   it('keeps another gateway status generic', () => {
-    const failure = new ModelError({ reason: 'status', status: 429, cause: 'slow down' });
+    const failure = new ModelError({ reason: 'status', status: 418, cause: 'teapot' });
 
     expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('common.somethingWentWrong');
+  });
+
+  it('says the provider is limiting requests on 429', () => {
+    const failure = new ModelError({ reason: 'status', status: 429, cause: 'slow down' });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('modelChat.providerRateLimited');
+  });
+
+  it('says the provider is limiting requests on 429 from a custom backend', () => {
+    const failure = new ModelError({ reason: 'status', status: 429, cause: 'slow down' });
+
+    expect(backendFailureKey(failure, backendTargetId(first, modelId))).toBe(
+      'modelChat.providerRateLimited'
+    );
+  });
+
+  it('says a custom backend refused its key on 401', () => {
+    const failure = new ModelError({ reason: 'status', status: 401, cause: 'refused' });
+
+    expect(backendFailureKey(failure, backendTargetId(first, modelId))).toBe(
+      'modelChat.providerKeyRefused'
+    );
+  });
+
+  it('says a custom backend refused its key on 403', () => {
+    const failure = new ModelError({ reason: 'status', status: 403, cause: 'refused' });
+
+    expect(backendFailureKey(failure, backendTargetId(first, modelId))).toBe(
+      'modelChat.providerKeyRefused'
+    );
+  });
+
+  it('says a custom backend no longer serves the model on 404', () => {
+    const failure = new ModelError({ reason: 'status', status: 404, cause: 'not found' });
+
+    expect(backendFailureKey(failure, backendTargetId(first, modelId))).toBe(
+      'modelChat.providerModelMissing'
+    );
+  });
+
+  it('keeps a gateway 401 generic, because the account key is not the one at fault', () => {
+    const failure = new ModelError({ reason: 'status', status: 401, cause: 'refused' });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('common.somethingWentWrong');
+  });
+
+  it('says the provider is unavailable on 502 from the gateway', () => {
+    const failure = new ModelError({ reason: 'status', status: 502, cause: 'bad gateway' });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('modelChat.providerUnavailable');
+  });
+
+  it('says the provider is unavailable on 500 from a custom backend', () => {
+    const failure = new ModelError({ reason: 'status', status: 500, cause: 'crashed' });
+
+    expect(backendFailureKey(failure, backendTargetId(first, modelId))).toBe(
+      'modelChat.providerUnavailable'
+    );
+  });
+
+  it('says the provider is unavailable on a status failure received with no model', () => {
+    const failure = new ModelError({ reason: 'status', status: 503, cause: 'down' });
+
+    expect(backendFailureKey(failure)).toBe('modelChat.providerUnavailable');
+  });
+
+  it('maps a status failure carried as the cause of an outer failure the same way', () => {
+    const status = new ModelError({ reason: 'status', status: 403, cause: 'refused' });
+    const outer = new ModelError({ reason: 'transport', cause: status });
+
+    expect(backendFailureKey(outer, backendTargetId(first, modelId))).toBe(
+      'modelChat.providerKeyRefused'
+    );
+  });
+
+  it('names the connection when a custom backend fails in transport, not a status', () => {
+    const failure = new ModelError({ reason: 'transport', cause: 'socket closed' });
+
+    expect(backendFailureKey(failure, backendTargetId(first, modelId))).toBe(
+      'modelChat.connectionLost'
+    );
   });
 });
 

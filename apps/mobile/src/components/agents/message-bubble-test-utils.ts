@@ -112,7 +112,6 @@ export function isActionsOverlayProps(props: Record<string, unknown>): boolean {
     props.accessible === true &&
     props.pointerEvents === 'none' &&
     typeof props.className === 'string' &&
-    props.className.includes('opacity-0') &&
     props.className.includes('absolute')
   );
 }

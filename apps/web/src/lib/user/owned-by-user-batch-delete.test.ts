@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { cloud_agent_code_reviews, webhook_events } from '@kilocode/db/schema';
+import { cloud_agent_code_reviews, webhook_events, webhook_events_v2 } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   deleteAllOwnedByUserIdPages,
@@ -31,6 +31,22 @@ describe('owned-by-user batch delete', () => {
     expect(await countOwnedWebhookEvents(other.id)).toBe(1);
   });
 
+  it('drains every page of partitioned webhook events and leaves other users untouched', async () => {
+    const user = await insertTestUser({
+      google_user_email: `batch-v2-owner-${crypto.randomUUID()}@example.com`,
+    });
+    const other = await insertTestUser({
+      google_user_email: `batch-v2-other-${crypto.randomUUID()}@example.com`,
+    });
+    await insertPartitionedWebhookEvents(user.id, 3);
+    await insertPartitionedWebhookEvents(other.id, 1);
+
+    await db.transaction(tx => deleteAllOwnedByUserIdPages(tx, 'webhook_events_v2', user.id, 2));
+
+    expect(await countOwnedPartitionedWebhookEvents(user.id)).toBe(0);
+    expect(await countOwnedPartitionedWebhookEvents(other.id)).toBe(1);
+  });
+
   it('drains every page of code reviews for the target user', async () => {
     const user = await insertTestUser({
       google_user_email: `batch-reviews-${crypto.randomUUID()}@example.com`,
@@ -57,6 +73,28 @@ async function insertWebhookEvents(userId: string, count: number): Promise<void>
       event_signature: `sig-${userId}-${index}-${crypto.randomUUID()}`,
     }))
   );
+}
+
+async function insertPartitionedWebhookEvents(userId: string, count: number): Promise<void> {
+  await db.insert(webhook_events_v2).values(
+    Array.from({ length: count }, (_, index) => ({
+      owned_by_user_id: userId,
+      platform: 'github',
+      event_type: 'push',
+      event_action: 'created',
+      payload: { index },
+      headers: {},
+      event_signature: `sig-${userId}-${index}-${crypto.randomUUID()}`,
+    }))
+  );
+}
+
+async function countOwnedPartitionedWebhookEvents(userId: string): Promise<number> {
+  const rows = await db
+    .select({ id: webhook_events_v2.id })
+    .from(webhook_events_v2)
+    .where(eq(webhook_events_v2.owned_by_user_id, userId));
+  return rows.length;
 }
 
 async function insertCodeReviews(userId: string, count: number): Promise<void> {

@@ -8,7 +8,7 @@ import edenai from './edenai';
 import inceptronByok from './inceptron-byok';
 import kimiCoding from './kimi-coding';
 import morph from './morph';
-import neuralwatt from './neurowatt';
+import neuralwatt from './neuralwatt';
 import nvidiaByok from './nvidia-byok';
 import ollamaCloud from './ollama-cloud';
 import openCodeGo from './opencode-go';

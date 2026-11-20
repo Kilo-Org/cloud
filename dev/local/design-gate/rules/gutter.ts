@@ -9,7 +9,7 @@ import {
   type LayoutTree,
   type Rect,
 } from '../tree';
-import { GUTTER_TOLERANCE_DP, SCREEN_GUTTER_DP } from './thresholds';
+import { GUTTER_TOLERANCE_DP, SCREEN_GUTTER_DP, TOLERANCE_DP } from './thresholds';
 
 const fmt = (value: number) => `${Math.round(value * 10) / 10} dp`;
 
@@ -396,6 +396,13 @@ export function checkGutter(tree: LayoutTree): Finding[] {
       continue;
     }
 
+    // A row the window or a scroller cuts may have lost the leading element it
+    // places its content after (a row at a list's bottom edge keeps a sliver of
+    // its title and drops its chevron), so its content says nothing about the
+    // column.
+    const [, , visibleWidth, visibleHeight] = node.visibleRect;
+    const [, , width, height] = node.rect;
+    if (visibleWidth < width - TOLERANCE_DP || visibleHeight < height - TOLERANCE_DP) continue;
     if (insidePaintedBlock(nodes, page)) continue;
     if (!alignedToContentStart(node, page)) continue;
     if (insideCenteredBlock(nodes, page)) continue;

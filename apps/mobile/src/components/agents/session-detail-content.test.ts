@@ -280,8 +280,8 @@ vi.mock('expo-router', () => ({
 // the navigation call so these assertions stay about the resulting route list.
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({
-    replace: (href: string) => {
-      navigationRoutes.splice(-1, 1, href);
+    replace: (href: string | { pathname: string }) => {
+      navigationRoutes.splice(-1, 1, typeof href === 'string' ? href : href.pathname);
     },
   }),
 }));
@@ -2847,6 +2847,33 @@ describe('session detail stored transcript with no reply recorded', () => {
       ],
     };
     const view = await mountDetails([storedPrompt(), reasoning]);
+    expect(renderedText(view.renderer.root)).not.toContain(NOTE);
+  });
+
+  it('draws no note under a prompt whose row draws its failed preparation', async () => {
+    // The failed group moves into the prompt's own row, so the prompt is the
+    // transcript's last item; the group still states what happened to the turn.
+    const view = await mountDetails([storedPrompt()]);
+    const failedAttempt: PreparationAttempt = {
+      id: 'attempt-stored-failed',
+      triggerMessageId: PROMPT_ID,
+      status: 'failed',
+      startedAt: 0,
+      completedAt: 1,
+      safeError: 'sandbox_lost',
+      revision: 1,
+      steps: [],
+    };
+    act(() => {
+      view.store.set<readonly PreparationAttempt[], [readonly PreparationAttempt[]], unknown>(
+        view.manager.atoms.preparationAttempts,
+        [failedAttempt]
+      );
+    });
+
+    expect(
+      view.renderer.root.find(node => Object.is(node.type, 'PreparationGroup')).props.attempt
+    ).toBe(failedAttempt);
     expect(renderedText(view.renderer.root)).not.toContain(NOTE);
   });
 

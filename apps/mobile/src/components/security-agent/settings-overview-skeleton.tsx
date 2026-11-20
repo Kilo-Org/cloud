@@ -11,10 +11,11 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 /**
  * The Security Agent settings page while its first reads are in flight.
  *
- * It mirrors the settled page instead of three equal cards: one switch row,
- * one helper line, and one `ConfigureRow` whose 30pt icon tile sits beside a
- * title and a subtitle. Group and row keep the loaded screen's geometry, so the
- * body does not reflow when the queries answer.
+ * It mirrors the settled page instead of three equal cards: one switch row plus
+ * the helper line that follows it in the same 7 dp group, and one
+ * `ConfigureRow` whose 30pt icon tile sits beside a title and a subtitle. Group
+ * and row keep the loaded screen's geometry, so the body does not reflow when
+ * the queries answer.
  *
  * The header action belongs to the header, not to the loaded body: a ⋯ that
  * appeared only after the queries answered changed the header between the two
@@ -31,15 +32,15 @@ export function SettingsOverviewSkeleton({ scope }: Readonly<{ scope: string }>)
         headerRight={<AuditReportButton scope={scope} />}
       />
       <View className={SCREEN_BODY_CLASS}>
-        <RowGroup>
-          <RowSkeleton subtitle />
-        </RowGroup>
-        <View className="gap-3">
-          <Skeleton className="h-4 w-56 rounded" />
+        <View className="gap-2">
           <RowGroup>
-            <RowSkeleton tile subtitle />
+            <RowSkeleton subtitle />
           </RowGroup>
+          <Skeleton className="h-4 w-56 rounded" />
         </View>
+        <RowGroup>
+          <RowSkeleton tile subtitle />
+        </RowGroup>
       </View>
     </View>
   );

@@ -234,14 +234,14 @@ function getSignupIp(requestHeaders?: Headers): string | null {
 async function checkNormalizedEmailUnique(
   normalizedEmail: string,
   tx: DrizzleTransaction
-): Promise<Result<null, 'EMAIL-ALREADY-USED'>> {
+): Promise<OptionalError<'EMAIL-ALREADY-USED'>> {
   const [existing] = await tx
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
     .where(eq(kilocode_users.normalized_email, normalizedEmail))
     .limit(1);
 
-  if (!existing) return successResult(null);
+  if (!existing) return successResult();
 
   console.warn('[auth] Signup rejected: normalized_email already in use', {
     normalized_email: normalizedEmail,
@@ -1204,7 +1204,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   the person's own openai_chatgpt_connections rows, their Claude billing
- *   grants, agent_configs, webhook_events,
+ *   grants, agent_configs, webhook_events, webhook_events_v2,
  *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
@@ -1713,6 +1713,13 @@ export async function anonymizeCloudUserData(
     .where(eq(coding_plan_availability_intents.user_id, userId));
   await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
   await deleteAllOwnedByUserIdPages(tx, 'webhook_events', userId, OWNED_BY_USER_DELETE_PAGE_SIZE);
+  // No foreign key cascades into the partitioned table, so its rows are deleted here.
+  await deleteAllOwnedByUserIdPages(
+    tx,
+    'webhook_events_v2',
+    userId,
+    OWNED_BY_USER_DELETE_PAGE_SIZE
+  );
   await tx
     .delete(security_analysis_owner_state)
     .where(eq(security_analysis_owner_state.owned_by_user_id, userId));

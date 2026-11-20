@@ -88,6 +88,7 @@ describe('TRPCContext transport', () => {
       byok_private_providers: Array.from({ length: 1000 }, () => crypto.randomUUID()),
       enkrypt_output_guardrail: Array.from({ length: 1000 }, () => crypto.randomUUID()),
       gateway_settings: Array.from({ length: 1000 }, () => crypto.randomUUID()),
+      org_permission_policy: Array.from({ length: 1000 }, () => crypto.randomUUID()),
     };
 
     if (skipBatch === undefined) {

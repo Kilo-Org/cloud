@@ -32,7 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import {
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -84,7 +84,7 @@ export async function getModelGatewayUserByokProviders(
     return [];
   }
   const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([
-    getVercelModelsFromDatabase(),
+    getVercelLanguageModelIdsFromDatabase(),
     mapModelIdToVercel(modelId),
     isValidOpenRouterModelId(modelId),
   ]);
@@ -164,19 +164,29 @@ function ownerColumn(owner: ByokOwner): ByokOwnerColumn {
   return owner.type === 'organization' ? byok_api_keys.organization_id : byok_api_keys.kilo_user_id;
 }
 
-// Each reader parses only its own setting, so an invalid private provider definition cannot hide the rest.
-const CatalogModeSettingsSchema = ByokApiKeySettingsSchema.pick({ serve_catalog_models: true });
-const PrioritySettingsSchema = ByokApiKeySettingsSchema.pick({ priority: true });
 const PrivateProviderSettingsSchema = z.object({ private_provider: z.unknown() });
 
+/**
+ * The stored settings other than the private provider definition, which
+ * `readByokPrivateProviderDefinition` parses on its own so that an invalid one cannot hide the rest.
+ */
+const StoredByokSettingsSchema = ByokApiKeySettingsSchema.omit({ private_provider: true });
+
+export type StoredByokSettings = z.infer<typeof StoredByokSettingsSchema>;
+
+/** Stored per-key settings, with invalid or missing settings read as empty. */
+export function parseByokSettings(settings: unknown): StoredByokSettings {
+  return StoredByokSettingsSchema.safeParse(settings).data ?? {};
+}
+
 /** Whether stored key settings put the key in catalog mode. */
-export function servesCatalogModels(settings: unknown): boolean {
-  return CatalogModeSettingsSchema.safeParse(settings).data?.serve_catalog_models === true;
+export function servesCatalogModels(settings: StoredByokSettings): boolean {
+  return settings.serve_catalog_models === true;
 }
 
 /** The owner's chosen priority of a key, or undefined when the key keeps its default order. */
-export function getByokKeyPriority(settings: unknown): number | undefined {
-  return PrioritySettingsSchema.safeParse(settings).data?.priority;
+export function getByokKeyPriority(settings: StoredByokSettings): number | undefined {
+  return settings.priority;
 }
 
 /**
@@ -253,11 +263,12 @@ function toByokKeyState(row: {
 }): ByokKeyState | null {
   const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
   if (!providerId.success) return null;
+  const settings = parseByokSettings(row.settings);
   const state: ByokKeyState = {
     providerId: providerId.data,
-    serveCatalogModels: servesCatalogModels(row.settings),
+    serveCatalogModels: servesCatalogModels(settings),
     isEnabled: row.is_enabled,
-    priority: getByokKeyPriority(row.settings),
+    priority: getByokKeyPriority(settings),
   };
   if (!isByokPrivateProviderId(providerId.data)) return state;
   const privateProvider = readByokPrivateProviderDefinition(row);
@@ -334,12 +345,8 @@ export async function getStoredByokKeys(
       // Keys are unique per owner and provider.
       const row = rows.find(candidate => candidate.provider_id === providerId);
       if (!row?.is_enabled) throw new Error(`No enabled BYOK key for ${providerId}`);
-      const priority = getByokKeyPriority(row.settings);
       try {
-        return {
-          ...(await decryptByokRow(row)),
-          ...(priority !== undefined && { priority }),
-        };
+        return await toByokResult(row, parseByokSettings(row.settings));
       } catch (error) {
         reportByokDecryptFailure(row.id, error);
         throw error;
@@ -349,7 +356,7 @@ export async function getStoredByokKeys(
 }
 
 export async function getUserByokProviderIds(
-  fromDb: typeof db,
+  fromDb: ByokSourceDb,
   userId: string
 ): Promise<UserByokProviderId[]> {
   const providers = await getEnabledByokProviders(fromDb, { type: 'user', id: userId });
@@ -357,7 +364,7 @@ export async function getUserByokProviderIds(
 }
 
 export async function getOrganizationByokProviderIds(
-  fromDb: typeof db,
+  fromDb: ByokSourceDb,
   organizationId: string
 ): Promise<UserByokProviderId[]> {
   const providers = await getEnabledByokProviders(fromDb, {
@@ -561,6 +568,18 @@ export async function decryptByokRow(row: {
 
 export type ByokCredential = BYOKResult & { serveCatalogModels: boolean };
 
+/**
+ * The one construction of a decrypted credential: the routing and list paths differ only in the
+ * settings they add, so a new credential field needs one edit. An undefined priority is omitted.
+ */
+async function toByokResult(
+  row: Parameters<typeof decryptByokRow>[0],
+  settings: StoredByokSettings
+): Promise<BYOKResult> {
+  const priority = getByokKeyPriority(settings);
+  return { ...(await decryptByokRow(row)), ...(priority !== undefined && { priority }) };
+}
+
 /** The owner's enabled keys for `providerIds`, in `BYOK_KEY_ORDER`. */
 export async function getByokCredentials(
   fromDb: ByokSourceDb,
@@ -583,11 +602,13 @@ export async function getByokCredentials(
     .orderBy(...BYOK_KEY_ORDER);
 
   const results = await Promise.allSettled(
-    rows.map(async row => ({
-      ...(await decryptByokRow(row)),
-      serveCatalogModels: servesCatalogModels(row.settings),
-      priority: getByokKeyPriority(row.settings),
-    }))
+    rows.map(async row => {
+      const settings = parseByokSettings(row.settings);
+      return {
+        ...(await toByokResult(row, settings)),
+        serveCatalogModels: servesCatalogModels(settings),
+      };
+    })
   );
 
   const credentials: ByokCredential[] = [];
@@ -614,15 +635,11 @@ async function getByokRowsForOwner(
   const credentials = await getByokCredentials(fromDb, owner, providerIds);
   return credentials.length === 0
     ? null
-    : credentials.map(({ decryptedAPIKey, providerId, priority }) => ({
-        decryptedAPIKey,
-        providerId,
-        ...(priority !== undefined && { priority }),
-      }));
+    : credentials.map(({ serveCatalogModels: _serveCatalogModels, ...result }) => result);
 }
 
 export async function getBYOKforUser(
-  fromDb: typeof db,
+  fromDb: ByokSourceDb,
   userId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
@@ -630,7 +647,7 @@ export async function getBYOKforUser(
 }
 
 export async function getBYOKforOrganization(
-  fromDb: typeof db | DrizzleTransaction,
+  fromDb: ByokSourceDb,
   organizationId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {

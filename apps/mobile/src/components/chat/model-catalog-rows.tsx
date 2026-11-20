@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { Cpu, Download, Star } from '@/components/ui/icons';
@@ -18,6 +17,7 @@ import { type CatalogModel } from '@/lib/chat/gguf-catalog';
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfListedModel, hfModelName } from '@/lib/chat/hf-catalog';
 import { useHfSmallestDownload } from '@/lib/chat/use-hf-catalog';
+import { useIsLargeFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { formatFileSize } from '@/lib/format';
 
 import { GgufDownloadControls } from './gguf-model-section';
@@ -26,6 +26,7 @@ import {
   CatalogStat,
   compactNumber,
   FitBadge,
+  fitLabelKey,
   useCatalogDownload,
 } from './model-catalog-parts';
 
@@ -47,12 +48,42 @@ export function RecommendedRow({
   const fit = deviceFit(downloadBytes(model), budget);
   const [, owner, repo] = new URL(model.url).pathname.split('/');
   const displayName = model.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const title = (
+    <>
+      <Text className="min-w-0 flex-1 font-semibold">{displayName}</Text>
+      <FitBadge fit={fit} />
+    </>
+  );
   return (
     <Card>
-      <View className="flex-row items-center justify-between gap-3">
-        <Text className="min-w-0 shrink font-semibold">{displayName}</Text>
-        <FitBadge fit={fit} />
-      </View>
+      {owner !== undefined && repo !== undefined ? (
+        // The title line opens the model's page, as a list row's chevron does,
+        // so the card carries one button (its download) instead of a second
+        // full-width "Details" button repeated in every card. The press spans
+        // the card's top inset and the gap under the line, so its own node
+        // reaches the 44pt target without moving the line.
+        // An explicit label replaces the children's text for assistive
+        // technology, so it carries the fit the badge shows as well.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={[
+            t('modelChat.catalog.detailsA11y', { name: displayName }),
+            t(fitLabelKey(fit)),
+          ].join(', ')}
+          onPress={() => {
+            router.push({
+              pathname: '/model-catalog/[owner]/[repo]',
+              params: { owner, repo },
+            });
+          }}
+          className="-mx-4 -mb-3 -mt-4 flex-row items-center gap-3 px-4 pb-3 pt-4 active:opacity-70"
+        >
+          {title}
+          <RowChevron />
+        </Pressable>
+      ) : (
+        <View className="flex-row items-center gap-3">{title}</View>
+      )}
       <CatalogCapabilities images={model.projector !== undefined} />
       <Text variant="muted" className="text-xs">
         {t(
@@ -80,20 +111,6 @@ export function RecommendedRow({
               }
         }
       />
-      {owner !== undefined && repo !== undefined && (
-        <Button
-          variant="ghost"
-          accessibilityLabel={t('modelChat.catalog.detailsA11y', { name: displayName })}
-          onPress={() => {
-            router.push({
-              pathname: '/model-catalog/[owner]/[repo]',
-              params: { owner, repo },
-            });
-          }}
-        >
-          <Text>{t('common.details')}</Text>
-        </Button>
-      )}
     </Card>
   );
 }
@@ -106,6 +123,10 @@ export function ModelRow({
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const smallest = useHfSmallestDownload(model.id, model.parameters);
+  // The row title rule: one line, and a second one at a large font scale, where
+  // a model name such as "HyperCLOVAX SEED Text Instruct 1.5B Q4_K_M" lost its
+  // distinguishing tail.
+  const nameLines = useIsLargeFontScale() ? 2 : 1;
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);
   if (fitsOnly) {
@@ -132,7 +153,7 @@ export function ModelRow({
     >
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center gap-2">
-          <Text className="min-w-0 shrink text-sm font-medium" numberOfLines={1}>
+          <Text className="min-w-0 shrink text-sm font-medium" numberOfLines={nameLines}>
             {name}
           </Text>
           {smallest.isFetched && <FitBadge fit={fit} />}

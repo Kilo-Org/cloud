@@ -234,14 +234,14 @@ function getSignupIp(requestHeaders?: Headers): string | null {
 async function checkNormalizedEmailUnique(
   normalizedEmail: string,
   tx: DrizzleTransaction
-): Promise<Result<null, 'EMAIL-ALREADY-USED'>> {
+): Promise<OptionalError<'EMAIL-ALREADY-USED'>> {
   const [existing] = await tx
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
     .where(eq(kilocode_users.normalized_email, normalizedEmail))
     .limit(1);
 
-  if (!existing) return successResult(null);
+  if (!existing) return successResult();
 
   console.warn('[auth] Signup rejected: normalized_email already in use', {
     normalized_email: normalizedEmail,
@@ -1204,7 +1204,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   the person's own openai_chatgpt_connections rows, their Claude billing
- *   grants, agent_configs, webhook_events,
+ *   grants, agent_configs, webhook_events, webhook_events_v2,
  *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
@@ -1220,7 +1220,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_notification_preferences)
  * - the organization's shared-services openai_chatgpt_connections row is kept
  *   (it belongs to the organization): the deleted connector's reference is
- *   cleared, and `created_by` keeps the record of who connected it
+ *   cleared, and `created_by` keeps the record of who connected it, so the
+ *   organization's shared connection reports that it needs a reconnect until an
+ *   owner reconnects it
  * - spend alert settings and their rules/state, the personal-scope hourly
  *   counters, and the personal-scope deliveries (recipients contain billing
  *   contact PII); organization-scoped alert rows are retained, with the deleted
@@ -1347,6 +1349,7 @@ export async function anonymizeCloudUserData(
       customer_source: null,
       signup_ip: null,
       external_id: null,
+      anthropic_user_profile_id: null,
     })
     .where(eq(kilocode_users.id, userId));
 
@@ -1685,6 +1688,8 @@ export async function anonymizeCloudUserData(
   // row is the organization's connection, so it stays behind and only loses the
   // reference to the connector who is being deleted. `created_by` keeps the
   // record of who connected it, and the next reconnect names the new connector.
+  // Until an owner reconnects it, the organization's shared connection reports
+  // that it needs a reconnect.
   await tx
     .delete(openai_chatgpt_connections)
     .where(
@@ -1708,6 +1713,13 @@ export async function anonymizeCloudUserData(
     .where(eq(coding_plan_availability_intents.user_id, userId));
   await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
   await deleteAllOwnedByUserIdPages(tx, 'webhook_events', userId, OWNED_BY_USER_DELETE_PAGE_SIZE);
+  // No foreign key cascades into the partitioned table, so its rows are deleted here.
+  await deleteAllOwnedByUserIdPages(
+    tx,
+    'webhook_events_v2',
+    userId,
+    OWNED_BY_USER_DELETE_PAGE_SIZE
+  );
   await tx
     .delete(security_analysis_owner_state)
     .where(eq(security_analysis_owner_state.owned_by_user_id, userId));

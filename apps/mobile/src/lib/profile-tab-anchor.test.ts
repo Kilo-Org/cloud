@@ -51,11 +51,11 @@ describe('findingDetailBackTarget', () => {
 describe('finding detail back control wiring', () => {
   // Source-read fallback: the pure project cannot mount the screen, so pin the
   // forced back control by reading the source. The loaded state renders its own
-  // `ScreenHeader`; the loading, failure and not-found states share the one that
-  // reserves the eyebrow line, because neither a failure nor a not-found can be
-  // known before the first paint — that first frame is the loading one. This
-  // fails if a state stops rendering a header, or if its back control is
-  // removed.
+  // `ScreenHeader`; the loading, failure and not-found states share one, because
+  // neither a failure nor a not-found can be known before the first paint — that
+  // first frame is the loading one. The mounted finding-detail suite pins that
+  // this header keeps its subtitle line reserved. This fails if a state stops
+  // rendering a header, or if its back control is removed.
   const screenPath = fileURLToPath(
     new URL('../components/security-agent/finding-detail-screen.tsx', import.meta.url)
   );
@@ -63,22 +63,10 @@ describe('finding detail back control wiring', () => {
   const screenHeaderCount = (source.match(/<ScreenHeader\b/g) ?? []).length;
   const showBackButtonCount = (source.match(/\bshowBackButton\b/g) ?? []).length;
   const pendingHeaderCount = (source.match(/\{pendingHeader\}/g) ?? []).length;
-  const pendingHeaderSource = /const pendingHeader = \(([\s\S]*?)\n {2}\);/.exec(source)?.[1] ?? '';
 
   it('renders the loaded state and the single pending state through a header', () => {
     expect(screenHeaderCount).toBe(2);
     expect(pendingHeaderCount).toBe(3);
-  });
-
-  it('keeps the eyebrow line reserved for every state without a payload', () => {
-    // The payload draws the finding's repository on the eyebrow line above the
-    // title, and the first frame of every open reserves that line while the read
-    // runs. A failure or a not-found that dropped the line would pull the title
-    // up out of the position the loading frame gave it, and a retry would move
-    // it back down again. `eyebrowHeaderProps` is what turns the pending state
-    // into that reserved line; the mounted suite pins that it holds it blank
-    // after a failure.
-    expect(pendingHeaderSource).toMatch(/eyebrowHeaderProps\(pendingEyebrow\)/);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {

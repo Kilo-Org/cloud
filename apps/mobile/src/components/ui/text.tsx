@@ -8,6 +8,7 @@ import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
 
 import {
   containsJoinedScript,
+  contentTextDirection,
   hasRtlScript,
   NATURAL_LETTER_SPACING,
   RTL_WRITING_DIRECTION,
@@ -74,7 +75,7 @@ export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
 
 /**
  * The RTL-script twin of the eyebrow's size. The Latin display treatment leans
- * on full capitals and letterspacing, and a joined/Arabic-script label can take
+ * on full capitals and letterspacing, and an Arabic-script label can take
  * neither: its tracking is reset (`NATURAL_LETTER_SPACING`) and its capitals do
  * not exist, so without them the label kept only the 10px size — measured in an
  * Arabic interface, `الفواتير` inked 25.9 x 9.14 dp against the Latin
@@ -83,7 +84,9 @@ export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
  * Latin capitals' cap height. The script is the copy's, not the interface's,
  * exactly like `withoutMonoFamily`. Kept in step with the reserved eyebrow twin
  * in `screen-header.tsx`, which holds this same line box before the label
- * arrives.
+ * arrives. The Brahmic and Southeast Asian scripts in `JOINED_SCRIPT` lose the
+ * tracking but keep the 10px size: their stacked vowel signs already ink taller
+ * than the Latin capitals (a Tamil eyebrow inked 12.19 dp tall at 10px).
  */
 export const EYEBROW_RTL_SCRIPT_DISPLAY = 'text-[13px]';
 
@@ -106,10 +109,20 @@ function Text({
   className,
   asChild = false,
   variant = 'default',
+  direction,
   ...props
 }: React.ComponentProps<typeof RNText> &
   TextVariantProps & {
     asChild?: boolean;
+    /**
+     * The paragraph's base direction. App copy omits it and names the
+     * interface's. `auto` is for copy the app did not write — a server's
+     * message, a finding's description, a user's own text — which names its
+     * own direction, so English content keeps its left edge and the
+     * punctuation that ends it inside a right-to-left interface
+     * (`contentTextDirection`).
+     */
+    direction?: 'auto';
   }) {
   const textClass = React.useContext(TextClassContext);
   const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), props.maxFontSizeMultiplier);
@@ -157,22 +170,27 @@ function Text({
     textClass,
     className
   );
+  // The paragraph's base direction: the interface's for app copy, and the
+  // copy's own first letter's for content (`direction="auto"`), named for the
+  // node's layout as well, which is what makes a Latin sentence keep its left
+  // edge and the punctuation that ends it inside a right-to-left interface.
+  const interfaceDirection: TextStyle | undefined = isRTL ? RTL_WRITING_DIRECTION : undefined;
+  const writingDirection =
+    direction === 'auto'
+      ? (contentTextDirection(props.children) ?? interfaceDirection)
+      : interfaceDirection;
   // The direction and reset land in the same array the component has always
   // built, so a non-eyebrow text node's style never grows an empty entry; the
   // eyebrow's line box leads its own array, before `props.style`, so a caller's
   // `lineHeight` still wins (`ownStyles` reads the last entry).
   const directionStyle =
-    isRTL || resetsTracking
-      ? [
-          isRTL ? RTL_WRITING_DIRECTION : undefined,
-          resetsTracking ? NATURAL_LETTER_SPACING : undefined,
-          props.style,
-        ]
+    writingDirection !== undefined || resetsTracking
+      ? [writingDirection, resetsTracking ? NATURAL_LETTER_SPACING : undefined, props.style]
       : props.style;
   const resolvedStyle = eyebrowLineHeight
     ? [
         eyebrowLineHeight,
-        isRTL ? RTL_WRITING_DIRECTION : undefined,
+        writingDirection,
         resetsTracking ? NATURAL_LETTER_SPACING : undefined,
         props.style,
       ]

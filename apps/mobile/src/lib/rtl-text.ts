@@ -149,17 +149,74 @@ export function codeFieldTextStyle(): TextStyle {
   };
 }
 
+/** A letter: the strong characters a paragraph's direction resolves from. */
+const LETTER = /\p{L}/u;
+
+/** The first letter of a React child tree, or `undefined` when it has none. */
+function firstLetter(node: ReactNode): string | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node as ReactNode[]) {
+      const letter = firstLetter(child);
+      if (letter !== undefined) {
+        return letter;
+      }
+    }
+    return undefined;
+  }
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return firstLetter(node.props.children);
+  }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+  if (typeof node === 'string') {
+    return LETTER.exec(node)?.[0];
+  }
+  return undefined;
+}
+
 /**
- * The start alignment for a block of prose. A renderer that resolves a
- * paragraph's direction from its first strong character — the native markdown
- * text does — leaves a Latin reply at the left edge of a right-to-left
- * interface while the rows around it sit on the start edge, so the interface
- * names the alignment itself. In a left-to-right interface the patch is empty
- * and the renderer keeps its natural alignment; a centered block is unaffected
- * because it never takes this patch.
+ * The code point ranges whose letters are right to left (bidi class R or AL):
+ * Hebrew through Arabic Extended-A, the Hebrew and Arabic presentation forms,
+ * and the two supplementary areas Unicode reserves for right-to-left scripts
+ * (U+10800-U+10FFF, Cypriot Syllabary through Elymaic and Arabic Extended-C;
+ * U+1E800-U+1EFFF, Mende Kikakui through the Arabic mathematical symbols).
+ * Every letter in these ranges is R or AL, Cypriot, Lydian and Meroitic
+ * included. Unlike `RTL_SCRIPT`, which lists the scripts the app has glyphs
+ * for, this covers every right-to-left script content can arrive in — Syriac,
+ * Thaana, NKo, Samaritan, Mandaic, Adlam. Only a letter is tested, so the few
+ * neutral code points in these ranges never decide a direction.
  */
-export function rtlBlockTextAlign(isRtl: boolean): { textAlign?: 'right' } {
-  return isRtl ? { textAlign: 'right' } : {};
+const RTL_LETTER =
+  /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
+
+const CONTENT_RTL_DIRECTION: TextStyle = { direction: 'rtl', writingDirection: 'rtl' };
+
+/**
+ * Base direction for copy the app did not write — a server's message, a user's
+ * own text, an issue body. The paragraph takes the direction of its own first
+ * letter, so English content keeps its left edge and the punctuation that ends
+ * it inside a right-to-left interface, and Arabic content still aligns to the
+ * right. `undefined` when the copy has no letter: it then keeps the interface's
+ * direction.
+ *
+ * The text node's own layout `direction` is named as well as its
+ * `writingDirection`. iOS takes a paragraph's alignment from the node's layout
+ * direction, not from its writing direction: Fabric reads the Yoga node's
+ * resolved direction into `layoutDirection` (`ParagraphShadowNode.cpp`), and
+ * `RCTResolveTextAlignment` (`RCTAttributedTextUtils.mm`) turns natural into
+ * right and swaps left and right whenever that direction is right to left. So
+ * `writingDirection` alone fixed an English description's punctuation but left
+ * it on the right edge of an Arabic screen. Pinning the node's direction to the
+ * copy's own makes the natural alignment resolve to the copy's start edge on
+ * both platforms (Android resolves gravity against the same direction), and
+ * unlike `textAlign` it leaves an explicit `text-center` alone. It is set on
+ * the `Text` itself, so the box still sits where the interface's flexbox puts it.
+ */
+export function contentTextDirection(children: ReactNode): TextStyle | undefined {
+  const letter = firstLetter(children);
+  if (letter === undefined) {
+    return undefined;
+  }
+  return RTL_LETTER.test(letter) ? CONTENT_RTL_DIRECTION : LTR_TEXT_DIRECTION;
 }
 
 /**
@@ -171,9 +228,16 @@ export function rtlBlockTextAlign(isRtl: boolean): { textAlign?: 'right' } {
  * Arabic Extended-B, Arabic Extended-A and the two Arabic Presentation Forms
  * blocks are the ranges a joined Arabic run arrives in. Hebrew is right to
  * left and joins nothing, so it stays out of this range.
+ *
+ * The Brahmic scripts combine instead of joining, with the same effect: a
+ * vowel sign or virama shapes onto its consonant as one cluster, and tracking
+ * pulls the cluster apart («இப்போது» draws as «இ ப் போ து»). U+0900-U+0DFF
+ * covers Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil, Telugu,
+ * Kannada, Malayalam and Sinhala; U+0E00-U+0EFF Thai and Lao; U+1000-U+109F
+ * Myanmar; U+1780-U+17FF Khmer.
  */
 export const JOINED_SCRIPT =
-  /[\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  /[\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0900-\u0DFF\u0E00-\u0EFF\u1000-\u109F\u1780-\u17FF]/;
 
 /**
  * Letter-spacing reset: no added advance between glyphs, what a joined script's

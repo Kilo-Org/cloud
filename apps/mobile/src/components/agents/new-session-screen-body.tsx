@@ -63,6 +63,7 @@ import { useSessionEnvironment } from '@/lib/cloud-environments/use-session-envi
 import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
@@ -93,6 +94,7 @@ import {
 } from '@/lib/hooks/remote-instance-spawn-classifier';
 import {
   resolveContinueStartDisabled,
+  resolveGatewayModelsReadFailed,
   resolveNewSessionConnectProvider,
   resolveNewSessionProfileGate,
   resolveNewSessionStartBlockedReason,
@@ -290,10 +292,8 @@ export function NewSessionScreenBody() {
   // the personal account or one of the reader's organizations, and its sheet is
   // titled "Select account" (`profile.selectAccount`).
   const accountSection = (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('preferences.account')}
-      </Text>
+    <View className="mt-5 gap-2">
+      <FormFieldLabel label={t('preferences.account')} />
       {isCloneEntry ? (
         <ContextControl
           scope={{ organizationId: organizationId ?? null, isResolved: true }}
@@ -350,6 +350,8 @@ export function NewSessionScreenBody() {
     models,
     isLoading: isLoadingModels,
     isError: isModelsError,
+    isFetching: isFetchingModels,
+    isFetched: isFetchedModels,
     refetch: refetchModels,
   } = useAvailableModels(organizationId);
   const instanceCatalog = useInstanceModelCatalog(runOnInstance?.connectionId ?? null);
@@ -1293,6 +1295,14 @@ export function NewSessionScreenBody() {
         }
   );
 
+  const gatewayModelsReadFailed = resolveGatewayModelsReadFailed({
+    isRemoteTargetSelected,
+    isError: isModelsError,
+    isLoading: isLoadingModels,
+    isFetched: isFetchedModels,
+    modelCount: models.length,
+  });
+
   let startBlockedReason: string | null = null;
   let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
   // `connect-provider` is not mapped here: the repository section's connect card
@@ -1307,6 +1317,17 @@ export function NewSessionScreenBody() {
     startBlockedReason = stripInlineCodeMarkers(
       t('agentChat.instancePicker.noCliInstancesDescription')
     );
+  } else if (gatewayModelsReadFailed) {
+    // The composer keeps its toolbar and does not state the failure, so the
+    // footer names it and carries its Retry whatever else is still missing:
+    // with a remembered model the picker would otherwise open empty with no
+    // explanation, and with none it would ask for a pick it cannot offer.
+    startBlockedReason = t('agentChat.newSession.couldNotLoadModels');
+    startBlockedAction = {
+      label: t('common.retry'),
+      onPress: () => void refetchModels(),
+      isBusy: isFetchingModels,
+    };
   } else if (startBlockedReasonKey === 'refresh-repositories') {
     startBlockedReason = t('common.noRepositoriesFound');
     startBlockedAction = {

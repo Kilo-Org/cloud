@@ -1,19 +1,19 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { selectionHaptic } from '@/lib/haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
+import { AlertCircle, Info, Plus, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
+import { type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Input } from '@/components/ui/input';
+import { SearchField } from '@/components/ui/search-field';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
-import { FIELD_CLEAR_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { providerKeyAddHref } from '@/lib/byok/provider-key-scope';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -26,6 +26,7 @@ import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/p
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body.
@@ -36,6 +37,7 @@ export function ModelPickerContent() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { favorites, favoritesError, addFavorite, removeFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
   const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
@@ -56,9 +58,19 @@ export function ModelPickerContent() {
   const selectedModelRef = useRef(selectedModel);
   const selectedVariantRef = useRef(selectedVariant);
   const selectionChangedRef = useRef(false);
+  // Set only by the closes that keep the pick: Done, and the pick's own close
+  // (a single-effort model, or an effort chip). Every other way out — Cancel,
+  // Android Back, an iOS swipe-down — leaves it unset, so the focus cleanup
+  // drops a pick still waiting for its effort and the caller keeps its model.
+  const commitOnCloseRef = useRef(false);
   const closePickerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closePicker = useCallback(() => {
+    commitOnCloseRef.current = true;
+    router.back();
+  }, [router]);
+
+  const cancelPicker = useCallback(() => {
     router.back();
   }, [router]);
 
@@ -77,6 +89,7 @@ export function ModelPickerContent() {
       selectedModelRef.current = nextModel;
       selectedVariantRef.current = nextVariant;
       selectionChangedRef.current = false;
+      commitOnCloseRef.current = false;
       setBridge(nextBridge);
       setSelectedModel(nextModel);
       setSelectedVariant(nextVariant);
@@ -90,7 +103,7 @@ export function ModelPickerContent() {
         }
 
         const activeBridge = bridgeRef.current;
-        if (activeBridge && selectionChangedRef.current) {
+        if (activeBridge && selectionChangedRef.current && commitOnCloseRef.current) {
           commitModelPickerSelection(
             activeBridge,
             selectedModelRef.current,
@@ -115,8 +128,7 @@ export function ModelPickerContent() {
 
   // Shared by the in-field X and the "No matches" empty state's CTA: drops the
   // query and the input's visible text in one step, so the full list returns
-  // without backspacing. The field carries its own control because Android has
-  // no native `clearButtonMode` counterpart.
+  // without backspacing.
   const handleClearSearch = useCallback(() => {
     searchInputRef.current?.clear();
     setSearch('');
@@ -184,6 +196,21 @@ export function ModelPickerContent() {
     [acceptsVariant, bridge, closePicker]
   );
 
+  // A remote session whose CLI reports no models projects one row with
+  // `unavailable: true` and the session's current selection, so the sheet drew
+  // a dead row with no explanation of why it could not be picked. The state
+  // sits in the list header rather than in the zero-rows branch so the row the
+  // session is on, the search field and the sheet's height keep their places;
+  // `instance-picker`'s zero-instance state is the same shape. The state also
+  // owns the way out: an unavailable model is a missing credential, so its one
+  // action opens the provider-key form instead of leaving the sheet a dead end.
+  // It also owns the row's check: with nothing pickable, a check would claim a
+  // selection the state denies.
+  const allOptionsUnavailable =
+    bridge !== undefined &&
+    bridge.options.length > 0 &&
+    bridge.options.every(option => option.unavailable === true);
+
   // Hoisted out of the list body: the inline arrow gave the virtualized list a
   // new renderer on every render, which re-rendered every mounted row. Height
   // differs between the group header and a model row, so `getItemType` lets
@@ -206,6 +233,7 @@ export function ModelPickerContent() {
           acceptsVariant={acceptsVariant}
           isFavorite={item.isFavorite}
           showProvider={item.showsProvider}
+          suppressUnavailableCheck={allOptionsUnavailable}
           onSelectModel={handleSelectModel}
           onSelectVariant={handleSelectVariant}
           onToggleFavorite={handleToggleFavorite}
@@ -214,6 +242,7 @@ export function ModelPickerContent() {
     },
     [
       acceptsVariant,
+      allOptionsUnavailable,
       handleSelectModel,
       handleSelectVariant,
       handleToggleFavorite,
@@ -227,6 +256,7 @@ export function ModelPickerContent() {
       <PickerSheet
         title={t('agentChat.modelPicker.title')}
         onDone={closePicker}
+        onCancel={cancelPicker}
         scrollable={false}
         expired
       />
@@ -237,66 +267,18 @@ export function ModelPickerContent() {
     <PickerSheet
       title={t('agentChat.modelPicker.title')}
       onDone={closePicker}
+      onCancel={cancelPicker}
       scrollable={false}
       headerContent={
         <View>
-          <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
-            <Search size={18} color={colors.mutedForeground} />
-            {/* The placeholder is a single-line Text overlay, not the input's own
-                placeholder: Android lays the native hint out at the field's width
-                with no line cap, so copy wider than a narrow field wraps onto a
-                second line. A tail-ellipsized Text truncates the copy at any width
-                instead. The shared box draws the value on one line box and centres
-                it, and both texts start at the field's left edge so the overlay
-                sits exactly where the typed text will. The input also needs the
-                physical `pl-0 pr-0`: Android's TextInput ignores the logical
-                padding `px-0` compiles to and keeps its default inset. */}
-            <View className="relative flex-1">
-              <Input
-                ref={searchInputRef}
-                accessibilityLabel={t('common.searchModels')}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="search"
-                className="flex-1 px-0 pl-0 pr-0 text-base text-foreground"
-                onChangeText={setSearch}
-              />
-              {search.length === 0 ? (
-                <View className="absolute inset-0 justify-center" pointerEvents="none">
-                  <Text
-                    accessible={false}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                    className="text-base leading-[normal] font-normal px-0 text-muted-foreground"
-                  >
-                    {t('common.searchModels')}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            {/* In-field clear, on every platform: the native clear affordance is not
-                available on the platform without one, so the field carries its
-                own control. The frame, not the 16pt glyph, is what a
-                control-size audit reads, so the control renders a box that
-                carries the whole target on its own node, and it adds no
-                `hitSlop`: the box already reaches past the target, and a reach
-                across `gap-2` would take taps the search field should get. The
-                box cancels its own extra height, so the field keeps its height.
-                `-me-3` (the field's own `px-3`) puts the box's trailing edge on
-                the field's edge, so the whole box stays inside the field's
-                frame; it is a logical margin, so it mirrors with the row in
-                right-to-left layouts. */}
-            {search.length > 0 ? (
-              <Pressable
-                onPress={handleClearSearch}
-                accessibilityLabel={t('common.clearSearch')}
-                accessibilityRole="button"
-                className={`${FIELD_CLEAR_BOX_CLASS} -me-3 active:opacity-70`}
-              >
-                <X size={16} color={colors.mutedForeground} />
-              </Pressable>
-            ) : null}
-          </View>
+          <SearchField
+            className="mx-4 my-3"
+            inputRef={searchInputRef}
+            placeholder={t('common.searchModels')}
+            hasText={search.length > 0}
+            onChangeText={setSearch}
+            onClear={handleClearSearch}
+          />
           {favoritesError ? (
             <View className="mx-4 mb-3 flex-row items-center gap-1.5">
               <AlertCircle size={14} color={colors.destructive} />
@@ -342,8 +324,44 @@ export function ModelPickerContent() {
           nestedScrollEnabled
           ref={listRef}
           maintainVisibleContentPosition={{ disabled: true }}
-          style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
+          style={[
+            listStyle,
+            { backgroundColor: colors.background, marginBottom: bottom },
+            sideInsetMarginStyle,
+          ]}
           data={rows}
+          ListHeaderComponent={
+            allOptionsUnavailable ? (
+              <EmptyState
+                // The sheet's sections sit 21pt apart, and the state keeps
+                // one section gap on each side of itself: below the search
+                // field and above the first section header.
+                className="mt-3 mb-6"
+                icon={Info}
+                placement="top"
+                inset="gutter"
+                compact
+                title={t('agentChat.modelPicker.allUnavailableTitle')}
+                description={t('agentChat.modelPicker.allUnavailableDescription')}
+                // The state is not a dead end: the only surface that can make
+                // these models pickable again holds the provider keys.
+                action={
+                  <StateAction
+                    label={t('profile.providerKeys.add')}
+                    icon={Plus}
+                    onPress={() => {
+                      // The slot is cleared when the sheet loses focus, so
+                      // opening the key flow on top of it would come back to
+                      // an expired picker: close the sheet with no pick, then
+                      // open the provider-key flow from the chat surface.
+                      cancelPicker();
+                      router.push(providerKeyAddHref({ kind: 'personal' }));
+                    }}
+                  />
+                }
+              />
+            ) : undefined
+          }
           // FlashList stores its props during render. When React discards a
           // deferred search render, FlashList can keep that render's shorter
           // rows and then ask for a row past their end, so the row can be

@@ -207,13 +207,13 @@ export async function validateOrganizationAutoTarget(
   }
 
   const directByokTarget = await getDirectByokModel(rawModelId);
-  if (directByokTarget.provider && directByokTarget.model) {
+  if (directByokTarget) {
     const key = (
       await getEnabledByokProviders(options.dbClient ?? readDb, {
         type: 'organization',
         id: organization.id,
       })
-    ).find(candidate => candidate.providerId === directByokTarget.provider?.id);
+    ).find(candidate => candidate.providerId === directByokTarget.provider.id);
     if (!key) {
       return {
         kind: 'error',

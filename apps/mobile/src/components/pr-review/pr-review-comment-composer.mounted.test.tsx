@@ -303,7 +303,7 @@ describe('PrReviewCommentComposer submit phase', () => {
 
     act(() => {
       press(renderer, 'Comment now');
-      press(renderer, 'Cancel');
+      press(renderer, 'Discard');
     });
 
     await act(async () => {
@@ -326,19 +326,19 @@ describe('PrReviewCommentComposer submit phase', () => {
     act(() => {
       press(renderer, 'Comment now');
     });
-    press(renderer, 'Cancel');
+    press(renderer, 'Discard');
     act(() => {
       press(renderer, 'Comment now');
     });
 
     // The abandoned attempt's gate resolves: it writes nothing, and the
-    // successor's slot survives so Cancel still reaches the newer attempt.
+    // successor's slot survives so Discard still reaches the newer attempt.
     await act(async () => {
       abandoned.resolve({ accepted: true, currentVersion: 'v1' });
       await Promise.resolve();
     });
     expect(confirmRequests).toHaveLength(1);
-    press(renderer, 'Cancel');
+    press(renderer, 'Discard');
     expect(confirmRequests).toHaveLength(2);
 
     await act(async () => {

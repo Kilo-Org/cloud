@@ -9,10 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import {
-  isCancellableReviewStatus,
-  isRetriggerableReviewStatus,
-} from '@kilocode/app-shared/code-review';
+import { canRetriggerReview, isCancellableReviewStatus } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-rows';
 import {
@@ -28,17 +25,17 @@ import {
   CouncilSection,
   FindingCard,
   GateSection,
-  MetaRow,
 } from '@/components/code-reviewer/review-detail-sections';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
-import { type HeaderEyebrow } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
-import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -95,13 +92,14 @@ export function ReviewDetailScreen({
   // review, without an effect that would also fire on a plain re-render.
   const [transcriptReviewId, setTranscriptReviewId] = useState<string | null>(null);
   const loadedReview = data?.success ? data.review : undefined;
-  // Only a retriggerable automatic review needs the reviewer config. Bitbucket
-  // is org-only, and a personal Bitbucket query would throw in toPersonalPlatform.
+  // Only a retriggerable automatic review needs the reviewer config, and a
+  // review a newer commit replaced can never be retried. Bitbucket is org-only,
+  // and a personal Bitbucket query would throw in toPersonalPlatform.
   const reviewPlatform = loadedReview?.platform ?? 'github';
   const configQueryEnabled =
     loadedReview != null &&
     loadedReview.manual_config == null &&
-    isRetriggerableReviewStatus(loadedReview.status) &&
+    canRetriggerReview(loadedReview) &&
     !(isPersonal(scope) && reviewPlatform === 'bitbucket');
   const reviewConfig = useReviewConfig(scope, reviewPlatform, { enabled: configQueryEnabled });
 
@@ -152,20 +150,22 @@ export function ReviewDetailScreen({
     );
   }
 
-  // One header for every state. The eyebrow is the review's repository, which
-  // only the payload knows, so its line is reserved while the read is pending —
-  // with the placeholder bar, because the label is on its way — and after the
-  // read stopped, where the same line stays reserved and blank so the title
-  // keeps its place without an animation: a retry re-enters the loading state on
-  // that line, so neither the failure nor the retry moves the title.
-  let eyebrow: HeaderEyebrow = { kind: 'held' };
-  if (loadedReview) {
-    eyebrow = { kind: 'ready', text: loadedReview.repo_full_name };
-  } else if (isLoading) {
-    eyebrow = { kind: 'loading' };
-  }
-  const eyebrowProps = eyebrowHeaderProps(eyebrow);
-  const header = <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} {...eyebrowProps} />;
+  // One header for every state. The subtitle is the review's repository, which
+  // only the payload knows, so its line stays reserved in every state. While the
+  // read is pending the placeholder bar paints over it, because the name is on
+  // its way; after the read stopped the line stays blank so the title keeps its
+  // place without an animation: a retry re-enters the loading state on that
+  // line, so neither the failure nor the retry moves the title.
+  const header = (
+    <ReviewerHeader
+      title={t('codeReviewer.reviewDetail.title')}
+      subtitle={loadedReview?.repo_full_name}
+      reserveSubtitle
+      subtitlePlaceholder={
+        !loadedReview && isLoading ? <Skeleton className="h-3.5 w-28 rounded-full" /> : undefined
+      }
+    />
+  );
 
   if (isLoading) {
     return (
@@ -216,7 +216,7 @@ export function ReviewDetailScreen({
   const { review, tokenUsage } = data;
   const meta = statusMeta(review.status);
   const canCancel = isCancellableReviewStatus(review.status);
-  const retryAction = isRetriggerableReviewStatus(review.status)
+  const retryAction = canRetriggerReview(review)
     ? selectRetryAction({
         hasManualConfig: review.manual_config != null,
         configPending: configQueryEnabled && reviewConfig.isPending,
@@ -342,46 +342,58 @@ export function ReviewDetailScreen({
 
         {/* Metadata: technical details after the outcome. */}
         <Section label={t('common.details')}>
-          <Card className="gap-1">
-            <MetaRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
-            <MetaRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} />
-            {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
-            <MetaRow
+          {/* One row height for every key/value row on this screen, the
+              shared one: the gate's check run and the council's votes above
+              stand at this same pitch. */}
+          <RowGroup>
+            <KvRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
+            <KvRow
+              label={t('common.platform')}
+              value={reviewerPlatformLabel(review.platform)}
+              valueFace="text"
+            />
+            {review.model ? <KvRow label={t('common.model')} value={review.model} /> : null}
+            <KvRow
               label={t('codeReviewer.reviewDetail.created')}
               value={timeAgo(parseTimestamp(review.created_at), undefined, now)}
+              valueFace="text"
             />
             {review.started_at ? (
-              <MetaRow
+              <KvRow
                 label={t('codeReviewer.reviewDetail.started')}
                 value={timeAgo(parseTimestamp(review.started_at), undefined, now)}
+                valueFace="text"
               />
             ) : null}
             {review.completed_at ? (
-              <MetaRow
+              <KvRow
                 label={t(
                   review.status === 'completed'
                     ? 'common.completed'
                     : 'codeReviewer.reviewDetail.reviewEnded'
                 )}
                 value={timeAgo(parseTimestamp(review.completed_at), undefined, now)}
+                valueFace="text"
               />
             ) : null}
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
-              <MetaRow
+              <KvRow
                 label={t('common.cost')}
                 value={formatPrefixedMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
+                valueFace="text"
               />
             ) : null}
             {tokenUsage.input > 0 || tokenUsage.output > 0 ? (
-              <MetaRow
+              <KvRow
                 label={t('codeReviewer.reviewDetail.tokens')}
                 value={t('codeReviewer.reviewDetail.tokensInOut', {
                   input: formatNumber(tokenUsage.input, i18n.language),
                   output: formatNumber(tokenUsage.output, i18n.language),
                 })}
+                valueFace="text"
               />
             ) : null}
-          </Card>
+          </RowGroup>
         </Section>
 
         {/* Actions. The pull request is the screen's primary action, so it takes
@@ -447,6 +459,7 @@ export function ReviewDetailScreen({
 
           {retryAction === 'retry' ? (
             <Button
+              testID="review-detail-retry"
               variant="secondary"
               loading={retriggerReview.isPending}
               disabled={retriggerReview.isPending}

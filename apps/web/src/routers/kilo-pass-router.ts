@@ -96,6 +96,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   billingHistoryResponseSchema,
+  mapKiloPassInvoiceLine,
   mapStripeInvoiceToBillingHistoryEntry,
 } from '@/lib/subscriptions/subscription-center';
 import type Stripe from 'stripe';
@@ -974,7 +975,7 @@ const GetPurchasePresentationInputSchema = z.object({
 
 const PurchasePresentationCtaOutputSchema = z.object({
   label: z.string().nullable(),
-  action: z.enum(['none', 'open_web', 'open_native']),
+  action: z.enum(['none', 'open_web']),
 });
 
 const GetPurchasePresentationOutputSchema = z.object({
@@ -2504,7 +2505,10 @@ export const kiloPassRouter = createTRPCRouter({
 
       const hasMore = invoices.data.length > limit;
       const page = hasMore ? invoices.data.slice(0, limit) : invoices.data;
-      const entries = page.map(mapStripeInvoiceToBillingHistoryEntry);
+      const entries = page.map(invoice => ({
+        ...mapStripeInvoiceToBillingHistoryEntry(invoice),
+        line: mapKiloPassInvoiceLine(invoice),
+      }));
       const lastInvoice = page[page.length - 1];
       const cursor = hasMore && lastInvoice ? lastInvoice.id : null;
 

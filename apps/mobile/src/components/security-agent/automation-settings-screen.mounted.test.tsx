@@ -2,122 +2,28 @@
 // auto-remediation" toggle hydrates from the loaded config, persists through
 // the save patch object, and renders disabled for read-only viewers.
 
+// The helper import is first: its vi.mock registrations must be in place
+// before any other import evaluates.
+import {
+  capability,
+  config,
+  connectivity,
+  pillGroups,
+  platformError,
+  retryConfig,
+  save,
+  saveButton,
+  toastSuccess,
+  toggleRows,
+  trackInteraction,
+} from './automation-settings-screen.mounted.test-helpers';
+
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AutomationSettingsScreen } from './automation-settings-screen';
-
-const config = vi.hoisted(() => ({
-  data: null as unknown,
-  isLoading: false,
-  isError: false,
-  refetch: vi.fn(),
-}));
-const capability = vi.hoisted(() => ({
-  canManage: true,
-}));
-const save = vi.hoisted(() => ({
-  mutateAsync: vi.fn(),
-  isPending: false,
-  options: undefined as { announceSaved?: boolean } | undefined,
-}));
-const trackInteraction = vi.hoisted(() => ({
-  mutate: vi.fn(),
-}));
-
-const toggleRows = vi.hoisted(() => ({
-  rows: [] as {
-    title: string;
-    accessibilityLabel?: string;
-    subtitle?: string;
-    value: boolean;
-    disabled: boolean;
-    onValueChange: (value: boolean) => void;
-  }[],
-}));
-const pillGroups = vi.hoisted(() => ({
-  groups: [] as { label: string; accessibilityLabel?: string }[],
-}));
-const saveButton = vi.hoisted(() => ({
-  onSave: null as (() => Promise<void>) | null,
-}));
-
-vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('@/components/ui/icons', () => ({
-  Check: 'Check',
-  CircleCheck: 'CircleCheck',
-  Clock: 'Clock',
-  GitPullRequest: 'GitPullRequest',
-  ScanSearch: 'ScanSearch',
-  Trash2: 'Trash2',
-}));
-vi.mock('react-native', () => ({
-  View: 'View',
-  Alert: { alert: vi.fn() },
-}));
-const toastSuccess = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { success: (message: string) => toastSuccess(message), error: vi.fn() },
-}));
-vi.mock('@kilocode/app-shared/security-agent', () => ({
-  getSettingsDirtyState: () => 'clean',
-}));
-vi.mock('@/lib/hooks/use-security-agent', () => ({
-  useSecurityAgentCapability: () => capability,
-  useSecurityAgentConfig: () => config,
-  useSaveSecurityAgentConfig: (_scope: string, options?: { announceSaved?: boolean }) => {
-    save.options = options;
-    return save;
-  },
-  useTrackSecurityAgentInteraction: () => trackInteraction,
-}));
-vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
-  useSecurityAgentSettingsRedirect: () => undefined,
-  useSettingsBackGuard: () => ({
-    onBack: () => undefined,
-    skipNextGuardRef: { current: false },
-    dialog: null,
-  }),
-}));
-vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
-}));
-vi.mock('@/components/security-agent/settings-pill-group', () => ({
-  PillGroup: (props: { label: string; accessibilityLabel?: string }) => {
-    pillGroups.groups.push(props);
-    return null;
-  },
-}));
-vi.mock('@/components/security-agent/settings-save-button', () => ({
-  SettingsSaveButton: (props: { onSave: () => Promise<void> }) => {
-    saveButton.onSave = props.onSave;
-    return null;
-  },
-}));
-vi.mock('@/components/ui/preference-row', () => ({
-  PreferenceRow: (props: {
-    title: string;
-    accessibilityLabel?: string;
-    subtitle?: string;
-    value: boolean;
-    disabled: boolean;
-    onValueChange: (value: boolean) => void;
-  }) => {
-    toggleRows.rows.push(props);
-    return null;
-  },
-}));
-vi.mock('@/components/platform-error-screen', () => ({ PlatformErrorScreen: () => null }));
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { headerRight?: unknown }) => props.headerRight ?? null,
-}));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
-}));
 
 const APPROVAL_ROW_TITLE = 'Require approval before auto-remediation';
 
@@ -169,7 +75,11 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.data = null;
     config.isLoading = false;
     config.isError = false;
+    config.isPending = false;
+    config.fetchStatus = 'idle';
     capability.canManage = true;
+    retryConfig.retry.mockClear();
+    retryConfig.isRetrying = false;
     save.isPending = false;
     save.mutateAsync.mockReset();
     save.mutateAsync.mockResolvedValue({});
@@ -178,6 +88,8 @@ describe('AutomationSettingsScreen approval gate', () => {
     pillGroups.groups = [];
     saveButton.onSave = null;
     toastSuccess.mockClear();
+    connectivity.committed = 'online';
+    platformError.props = null;
   });
 
   it('hydrates the approval toggle from the loaded config', () => {
@@ -230,6 +142,70 @@ describe('AutomationSettingsScreen approval gate', () => {
     renderScreen();
 
     expect(approvalRow().disabled).toBe(true);
+  });
+
+  it('names the connection and offers Retry for a first read paused offline', () => {
+    // The online manager paused the cold read on a confirmed-offline device:
+    // pending, no data, no error. The loading gate would hold the skeleton
+    // until connectivity returns.
+    config.data = null;
+    config.isPending = true;
+    config.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    renderScreen();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('paused first read did not render the failure screen');
+    }
+    expect(error.variant).toBe('offline');
+    expect(error.message).toBe(i18n.t('securityAgent.automation.couldNotLoad'));
+    expect(error.title).toBe(i18n.t('securityAgent.automation.title'));
+    // The retry routes through the deliberate paused-read hook, not the plain
+    // query refetch, and the branch forwards the hook's busy state.
+    expect(error.isRetrying).toBe(false);
+    act(() => {
+      error.onRetry?.();
+    });
+    expect(retryConfig.retry).toHaveBeenCalledOnce();
+    expect(config.refetch).not.toHaveBeenCalled();
+  });
+
+  it("pushes the retry hook's busy state into the paused failure screen", () => {
+    config.data = null;
+    config.isPending = true;
+    config.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    retryConfig.isRetrying = true;
+    renderScreen();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('paused first read did not render the failure screen');
+    }
+    expect(error.isRetrying).toBe(true);
+    expect(error.variant).toBe('offline');
+  });
+
+  it('keeps the skeleton for a pause while connectivity is unsettled', () => {
+    // The online manager also pauses on an unsettled NetInfo report, which is
+    // the normal cold-launch window: that is not a connection failure yet.
+    config.data = null;
+    config.isPending = true;
+    config.fetchStatus = 'paused';
+    connectivity.committed = 'unknown';
+    renderScreen();
+
+    expect(platformError.props).toBeNull();
+  });
+
+  it('keeps the skeleton for a first read still in flight', () => {
+    config.data = null;
+    config.isLoading = true;
+    config.fetchStatus = 'fetching';
+    renderScreen();
+
+    expect(platformError.props).toBeNull();
   });
 
   it('names each repeated control with the section it belongs to', () => {

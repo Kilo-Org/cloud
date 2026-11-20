@@ -11,8 +11,10 @@
  * allowlists, wording and exit behavior, including what it does with a key that
  * is not a plural category.
  */
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { regularFileState } from './fs-entries.mjs';
 
 /** The plural categories i18next selects from, as they end a catalog key. */
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -34,13 +36,29 @@ export function pluralParts(key) {
  * 'unreadable' an entry stat cannot follow (stat threw), and 'other' an
  * entry that exists but is not a regular file, such as a directory named
  * like a catalog.
+ *
+ * The follow-symlink decision itself is `regularFileState`'s, shared with the
+ * source walk, so the two audits cannot disagree on what a file is.
  */
 export function catalogEntryKind(dir, name) {
-  try {
-    return statSync(join(dir, name)).isFile() ? 'file' : 'other';
-  } catch {
-    return 'unreadable';
-  }
+  return regularFileState(join(dir, name));
+}
+
+/**
+ * The `.json`-named entries of `dir`, sorted, without the `.json` extension,
+ * leaving out every entry whose `catalogEntryKind` is `excludedKind`.
+ *
+ * The two readers of a catalog folder reject a different kind on purpose: the
+ * tag set keeps an entry it cannot stat, so the audit's own later read reports
+ * the problem, while the membership rule names such an entry as a stray.
+ */
+export function catalogEntryNames(dir, excludedKind) {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(
+      entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== excludedKind
+    )
+    .map(entry => entry.name.replace(/\.json$/, ''))
+    .sort();
 }
 
 /**
@@ -53,10 +71,7 @@ export function catalogEntryKind(dir, name) {
  * deliberately: the audit's own later read of that path reports the problem.
  */
 export function catalogTags(dir) {
-  return readdirSync(dir, { withFileTypes: true })
-    .filter(entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== 'other')
-    .map(entry => entry.name.replace(/\.json$/, ''))
-    .sort();
+  return catalogEntryNames(dir, 'other');
 }
 
 /**

@@ -72,6 +72,61 @@ const CLASS_BY_TOOL: ReadonlyMap<string, BrowserGrantClass> = new Map([
 export const toolGrantClass = (toolName: string): BrowserGrantClass =>
   CLASS_BY_TOOL.get(toolName) ?? 'act';
 
+/**
+ * Every tool whose page action can start a download: a click, a dropped or
+ * dragged item, a key press (Enter on a focused link), a form filled or
+ * submitted, the two tools that run model-authored code, and a load the page
+ * did not ask a human for — a navigate to an attachment URL, a back/forward to
+ * one, or a tab opened at a URL that answers with a file.
+ */
+const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
+  'browser_click',
+  'browser_drag',
+  'browser_drop',
+  'browser_evaluate',
+  // Fills each field through the page's own `input`/`change` handler, and clicks a checkbox or radio into place.
+  'browser_fill_form',
+  'browser_navigate',
+  'browser_navigate_back',
+  'browser_navigate_forward',
+  'browser_press_key',
+  'browser_reload',
+  'browser_run_code_unsafe',
+  // Dispatches `change` on the element, and an export-style handler can answer with an attachment.
+  'browser_select_option',
+  'browser_tabs',
+  // `submit` presses Enter on the filled field, and typing alone fires the page's `input` handler.
+  'browser_type',
+  // Runs page-registered code, which can start a download like any other page action.
+  'browser_webmcp_call',
+]);
+
+/** `browser_tabs` opens a page only for `new`; list, select and close touch no document. */
+export const canStartDownload = (toolName: string, args: Record<string, unknown> = {}): boolean => {
+  if (toolName === 'browser_tabs') {
+    return args['action'] === 'new';
+  }
+
+  return DOWNLOAD_CAPABLE_TOOLS.has(toolName);
+};
+
+/**
+ * The tab an approved download step opened is gone, so there is no tab to
+ * repeat that step on. Opening a fresh one would download the file again
+ * without the approval the human gave.
+ */
+export const DOWNLOAD_STEP_TAB_GONE_ERROR =
+  'The tab that step opened is gone. Take a fresh snapshot and try again (blocked).';
+
+/**
+ * A refusal for a download-capable call when neither guard can run: the
+ * optional `downloads` permission is missing and the tab's target cannot
+ * intercept responses either. The switch re-requests the permission, so the
+ * message names the one action that fixes it.
+ */
+export const DOWNLOAD_PERMISSION_MISSING_ERROR =
+  'The browser cannot cancel downloads for this agent call: the optional Downloads permission is not granted (blocked). Turn "Allow local agents" off and on again to grant it, then retry.';
+
 const DEFAULT_PORTS = { 'http:': '80', 'https:': '443' } as const;
 
 const parseUrl = (url: string): URL | undefined => {
@@ -153,6 +208,12 @@ export interface BrowserPermissionItem {
 export interface BrowserNeedsPermission {
   readonly items: readonly BrowserPermissionItem[];
   readonly kind: 'needs_permission';
+  /**
+   * The step whose repeat needs the approval, when it is not simply this call:
+   * a late download is reported by the next call, so the CLI must bind the
+   * token to the click that started it, not to the call carrying the news.
+   */
+  readonly step?: { readonly argumentsHash: string; readonly tool: string };
   /** Present for sensitive steps: the token the CLI retries with once a human approves. */
   readonly stepToken?: string;
 }
@@ -167,6 +228,35 @@ export interface BrowserOriginChanged {
 /** The tool error text a refused call carries when the bridge is not in the loop (E2E, panel). */
 export const NEEDS_PERMISSION_ERROR =
   'The browser action needs permission for this origin. Nothing was changed.';
+
+/**
+ * The D9 refusal: an agent reached for a tab outside its session's group. The
+ * bridge maps it onto `blocked` (-32011); the message names the fix.
+ */
+export const AGENT_TAB_OUTSIDE_GROUP_ERROR =
+  'This tab is not in the agent session\u2019s tab group (blocked). Share it first or pick a tab in the group.';
+
+/**
+ * The extension cannot run Playwright code: a snippet would have to be compiled
+ * in the extension, and the MV3 script policy of Chrome and Firefox forbids
+ * evaluating strings there. The bridge maps it onto `unsupported_in_browser`
+ * (-32005) before the gate runs.
+ */
+export const RUN_CODE_UNSUPPORTED_ERROR =
+  'browser_run_code_unsafe is not available: the Kilo extension cannot run Playwright code in Chrome or Firefox. Run a JavaScript function in the page with browser_evaluate instead.';
+
+/**
+ * The pinned tools no backend can run here. The vendored contract keeps them —
+ * its SHA-256 is of the upstream `tools/list` and the handshake compares that —
+ * but a listing must not offer a tool whose every call is refused above.
+ */
+export const UNSERVED_BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'browser_run_code_unsafe',
+]);
+
+/** The two tools that run model-authored page code (D11: they need the `act` grant). */
+export const isScriptTool = (toolName: string): boolean =>
+  toolName === 'browser_evaluate' || toolName === 'browser_run_code_unsafe';
 /** A CSS selector that names more than one element: a call that cannot run must not ask for permission. */
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
@@ -177,12 +267,14 @@ export const ORIGIN_CHANGED_ERROR =
 /** Sensitive reasons, kept short and free of page content so they are safe to show a model. */
 export const SENSITIVE_REASON = {
   cardFormSubmit: 'submitting a form with payment fields',
-  download: 'starting a download',
+  download: 'downloading a file',
   fileUpload: 'uploading a file',
   oauthConsent: 'acting on an OAuth consent page',
   oneTimeCode: 'typing a one-time code',
   password: 'typing a password',
   paymentField: 'typing into a payment field',
+  script: 'a page script can reach a sensitive field',
+  scriptUnverified: 'a page script could reach a field that could not be inspected',
   unknownField: 'typing into a field that could not be inspected',
 } as const;
 
@@ -331,12 +423,28 @@ export interface StepTokenBinding {
   readonly argumentHash: string;
   readonly element?: string | undefined;
   readonly origin: string;
+  /** The agent session the approval belongs to: another session's token never applies. */
+  readonly session: string;
   readonly tabId: number;
   readonly toolName: string;
 }
 
+/** The one download a step's approval buys: the tab it was on and the url of the file it started. */
+export interface StepTokenNeed {
+  readonly tabId: number;
+  readonly url: string;
+}
+
 export interface StepTokenIssue extends StepTokenBinding {
+  /** The download this approval is for, when the step was refused for one: the call keeps that file alone. */
+  readonly need?: StepTokenNeed | undefined;
   readonly reason: string;
+}
+
+/** What consuming a token answered: whether it named the call, and the file its approval buys. */
+export interface StepTokenTake {
+  readonly need?: StepTokenNeed | undefined;
+  readonly ok: boolean;
 }
 
 export interface StepTokenStore {
@@ -344,6 +452,11 @@ export interface StepTokenStore {
   readonly issue: (input: StepTokenIssue) => string;
   /** Consumes a token: true only when it names the same call and has not expired. */
   readonly consume: (token: string, binding: StepTokenBinding) => boolean;
+  /**
+   * Consumes a token and answers what it carried. The need lives exactly as long as the token — a human may take
+   * Minutes to approve — so it is never tied to a download record the browser's own pruning removes.
+   */
+  readonly take: (token: string, binding: StepTokenBinding) => StepTokenTake;
   readonly size: () => number;
 }
 
@@ -364,6 +477,25 @@ export const parseToolArguments = (args: unknown): Record<string, unknown> => {
   return parsed.success ? parsed.data : {};
 };
 
+/**
+ * The canonical text of a call's arguments, hashed to the name a step token
+ * binds. The form, which a CLI must reproduce to read `step.argumentsHash`:
+ *
+ * - An array is `[` + its items in order, each canonical, joined by `,` + `]`.
+ * - A plain object is `{` + its keys sorted by UTF-16 code unit (`toSorted()`)
+ *   written as `"key":value` joined by `,` + `}` — key order never matters.
+ * - Every other value is `JSON.stringify(value) ?? 'null'`, so a string keeps
+ *   its JSON quotes, `undefined` becomes `null`, and absent arguments hash as
+ *   `null`.
+ *
+ * The hash starts at `2_166_136_261` and walks the canonical text once per
+ * UTF-16 index (`index < text.length`): at each index it XORs
+ * `text.codePointAt(index) ?? 0` and multiplies by `16_777_619`. An astral
+ * character therefore contributes its full code point at its first index and
+ * its low surrogate at the second, which a plain code-unit fold would not. The
+ * result is `hex:length`: the hash in unpadded lowercase hexadecimal, a colon,
+ * and the canonical text's length counted in UTF-16 code units.
+ */
 export const hashBrowserToolArguments = (args: unknown): string => {
   const canonical = (value: unknown): string => {
     if (Array.isArray(value)) {
@@ -399,6 +531,7 @@ export const stepTokenBindingMatches = (
   stored: StepTokenBinding & { readonly expiresAt: number; readonly reason: string },
   binding: StepTokenBinding
 ): boolean =>
+  stored.session === binding.session &&
   stored.tabId === binding.tabId &&
   stored.toolName === binding.toolName &&
   stored.argumentHash === binding.argumentHash &&
@@ -419,7 +552,11 @@ export const createStepTokenStore = ({
 } = {}): StepTokenStore => {
   const tokens = new Map<
     string,
-    StepTokenBinding & { readonly expiresAt: number; readonly reason: string }
+    StepTokenBinding & {
+      readonly expiresAt: number;
+      readonly need?: StepTokenNeed | undefined;
+      readonly reason: string;
+    }
   >();
 
   const prune = (): void => {
@@ -432,21 +569,27 @@ export const createStepTokenStore = ({
     }
   };
 
+  const take: StepTokenStore['take'] = (token, binding) => {
+    prune();
+
+    const stored = tokens.get(token);
+
+    if (stored === undefined) {
+      return { ok: false };
+    }
+
+    // A token is single use: even a mismatch burns it, so a replay cannot probe for a valid binding.
+    tokens.delete(token);
+
+    if (!stepTokenBindingMatches(stored, binding)) {
+      return { ok: false };
+    }
+
+    return stored.need === undefined ? { ok: true } : { need: stored.need, ok: true };
+  };
+
   return {
-    consume: (token, binding) => {
-      prune();
-
-      const stored = tokens.get(token);
-
-      if (stored === undefined) {
-        return false;
-      }
-
-      // A token is single use: even a mismatch burns it, so a replay cannot probe for a valid binding.
-      tokens.delete(token);
-
-      return stepTokenBindingMatches(stored, binding);
-    },
+    consume: (token, binding) => take(token, binding).ok,
     issue: input => {
       prune();
 
@@ -458,8 +601,10 @@ export const createStepTokenStore = ({
         expiresAt: now() + STEP_TOKEN_TTL_MS,
         origin: input.origin,
         reason: input.reason,
+        session: input.session,
         tabId: input.tabId,
         toolName: input.toolName,
+        ...(input.need === undefined ? {} : { need: input.need }),
       });
 
       return token;
@@ -469,6 +614,7 @@ export const createStepTokenStore = ({
 
       return tokens.size;
     },
+    take,
   };
 };
 

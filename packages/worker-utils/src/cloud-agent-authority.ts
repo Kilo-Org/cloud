@@ -118,12 +118,27 @@ export const requestedEnvironmentSchema = z
   })
   .strict();
 
+/**
+ * The one rule for a cloud-agent prompt: non-blank after trim, length-bounded.
+ * Every boundary that accepts a first-user-instruction prompt applies it here
+ * instead of keeping its own copy. A prepare boundary is always strict: its
+ * prompt is the whole launch instruction, so a blank one is refused even when
+ * attachments ride along. The grouped `start` and `send` boundaries, whose
+ * message may be files only, apply the same trim rule through an
+ * attachment-aware check.
+ */
+export const cloudAgentPromptSchema = z
+  .string()
+  .min(1)
+  .max(100_000)
+  .refine(prompt => prompt.trim().length > 0, { message: 'Prompt is required' });
+
 const scopedPrepareSessionSchema = z
   .object({
     githubRepo: z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/),
     model: z.string().min(1).max(200),
     mode: z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask', 'build', 'architect']),
-    prompt: z.string().min(1).max(100_000),
+    prompt: cloudAgentPromptSchema,
     variant: z.string().min(1).max(50).optional(),
     upstreamBranch: z.string().min(1).max(500).optional(),
     stackOnWorktreeId: cloudAgentWorktreeIdSchema
@@ -196,11 +211,7 @@ const scopedChildOperations = {
         payload: z
           .object({
             type: z.literal('prompt'),
-            prompt: z
-              .string()
-              .min(1)
-              .max(100_000)
-              .refine(prompt => prompt.trim().length > 0),
+            prompt: cloudAgentPromptSchema,
             mode: scopedPrepareSessionSchema.shape.mode,
             model: scopedPrepareSessionSchema.shape.model,
             variant: scopedPrepareSessionSchema.shape.variant,
@@ -299,9 +310,14 @@ function assertAuthorityOrganization(
   }
 }
 
+export function cloudAgentNextProcedurePrefix(
+  authority: CloudAgentAuthority
+): 'cloudAgentNext' | 'organizations.cloudAgentNext' {
+  return authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
+}
+
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
-  const prefix =
-    authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
+  const prefix = cloudAgentNextProcedurePrefix(authority);
   return [
     ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
     MODELS_LIST_PROCEDURE,
@@ -344,9 +360,7 @@ export function cloudAgentAuthorityInputSchema(
 }
 
 export function cloudAgentAuthorityProcedure(authority: CloudAgentAuthority) {
-  return authority.organizationId === null
-    ? 'cloudAgentNext.prepareSession'
-    : 'organizations.cloudAgentNext.prepareSession';
+  return `${cloudAgentNextProcedurePrefix(authority)}.prepareSession`;
 }
 
 export function validateCloudAgentAuthorityRequest(

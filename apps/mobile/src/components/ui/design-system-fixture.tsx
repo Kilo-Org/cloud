@@ -21,6 +21,7 @@ import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup, RowGroupItem } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ScreenFooter } from '@/components/ui/screen-footer';
+import { SearchField } from '@/components/ui/search-field';
 import { Section } from '@/components/ui/section';
 import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -130,6 +131,9 @@ export function DesignSystemFixture() {
                 value: switchOn,
                 onValueChange: setSwitchOn,
                 testID: 'fixture-row-switch',
+                // A label-only content press is hidden from assistive
+                // technology, so the switch carries the row's name.
+                accessibilityLabel: 'Switch with its own handle',
               }}
               pressTarget="content"
             />
@@ -421,6 +425,19 @@ export function DesignSystemFixture() {
               A read-only box that swaps with the field above
             </Text>
           </View>
+          <SearchField placeholder={LONG_TITLE} hasText={false} onChangeText={() => undefined} />
+          <SearchField
+            placeholder="Search"
+            defaultValue="A typed query"
+            hasText
+            onChangeText={() => undefined}
+          />
+          <SearchField
+            placeholder="Search"
+            hasText={false}
+            busy="Searching"
+            onChangeText={() => undefined}
+          />
         </Section>
 
         <Section label="Segmented control">

@@ -7,7 +7,7 @@
     "directory": "תיקיית עבודה",
     "createSession": "יצירת סשן בפרוטוקול נייטיב",
     "queueIfOffline": "הוספת הפרומפט לתור אם המארח לא מחובר",
-    "prompt": "פרומפט או /command",
+    "prompt": "פרומפט או \u2066/command\u2069",
     "localClear": "ניקוי התצוגה המקומית",
     "abort": "עצירת הסבב",
     "failed": "פעולת השליטה מרחוק בפרוטוקול נייטיב נכשלה",
@@ -19,7 +19,10 @@
     "presenceStatus": "מארחים: {{connection}}",
     "commandStatus": "מסירת הפקודה: {{status}}",
     "delivered": "נמסרה",
-    "expired": "פג התוקף"
+    "expired": "פג התוקף",
+    "recoveryGaps_one": "חסר חלק {{displayCount}} מתמלול זה.",
+    "recoveryGaps_two": "חסרים {{displayCount}} חלקים מתמלול זה.",
+    "recoveryGaps_other": "חסרים {{displayCount}} חלקים מתמלול זה."
   },
   "common": {
     "manageOnWeb": "ניהול באתר",
@@ -57,6 +60,7 @@
     "link": "קישור",
     "takingLonger": "זה לוקח יותר זמן מהצפוי. אפשר לסגור את המסך הזה ולבדוק שוב.",
     "model": "מודל",
+    "notSelected": "לא נבחר",
     "accessDenied": "אין הרשאת גישה.",
     "allRepositories": "כל המאגרים",
     "personal": "אישי",
@@ -147,6 +151,7 @@
     "performance": "ביצועים",
     "preferences": "העדפות",
     "privacyPolicy": "מדיניות פרטיות",
+    "termsOfService": "תנאי השירות",
     "profile": "פרופיל",
     "reactions": "תגובות אמוג׳י",
     "recent": "אחרונות",
@@ -170,6 +175,7 @@
     "generating": "יוצר…",
     "working": "בפעולה",
     "yourOwnRepositories": "המאגרים שלך",
+    "organizationRepositories": "מאגרי הארגון",
     "dismissed": "סומן להתעלמות",
     "agent": "סוֹכֵן",
     "durationMinuteShort": "min",
@@ -216,8 +222,8 @@
     "verifyCode": "אימות הקוד",
     "resendCode": "שליחת הקוד שוב",
     "termsPrefix": "המשך השימוש מהווה הסכמה למסמכים הבאים: ",
+    "termsInSentence": "תנאי השירות",
     "terms": "תנאי השימוש",
-    "termsInSentence": "תנאי השימוש",
     "termsConnector": " וכן ",
     "termsSuffix": ".",
     "moreSignInOptions": "אפשרויות כניסה נוספות",
@@ -667,7 +673,7 @@
     },
     "instructions": {
       "title": "הוראות מותאמות אישית",
-      "deprecation": "התמיכה בהוראות מותאמות אישית צפויה להסתיים. העבר את ההנחיות האלה לקובץ REVIEW.md במאגר שלך.",
+      "deprecation": "ההוראות המותאמות אישית יוסרו. העבר את ההנחיות האלה לקובץ REVIEW.md במאגר שלך.",
       "placeholder": "לדוגמה: הקפדה על כללי הטיפול בשגיאות שלנו…",
       "clearTitle": "להסיר את ההוראות המותאמות אישית?",
       "clearMessage": "שמירת שדה ריק תמחק את ההוראות המותאמות אישית שנשמרו עבור סוקר הקוד הזה."
@@ -692,12 +698,17 @@
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket אינו מחובר. בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו."
+      "notConnectedReadOnly": "Bitbucket אינו מחובר. בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו.",
+      "notConnectedReadOnlyPlan": "תקופת הניסיון של הארגון הסתיימה, ולכן הבעלים חייבים לעדכן את החיוב ב-⁨kilo.ai⁩."
     },
     "bitbucketConnect": {
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
+      "managedOnWebTitle": "מנוהל באתר",
+      "managedOnWebShort": "החיבור הזה מנוהל באתר דרך מחשב.",
+      "managedOnWebRepositories": "בחר את המאגרים עבור {{organization}} באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "descriptionReconnect": "צור אסימון גישה חדש לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
+      "descriptionOverview": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו במסך הבא.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
       "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
       "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
@@ -733,6 +744,7 @@
     "platformList": {
       "activity": "פעילות",
       "checking": "בבדיקה…",
+      "needsAttention": "נדרש טיפול",
       "platforms": "פלטפורמות",
       "statusUnavailable": "המצב אינו זמין"
     },
@@ -1224,7 +1236,7 @@
       "dueThisWeekDetail_two": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "dueThisWeekDetail_other": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "noDeadline": "אין מועד אחרון",
-      "reviewSlaAssignment": "בדיקת המועדים שנקבעו לפי SLA",
+      "reviewSlaAssignment": "בדיקת הקצאת ה-SLA",
       "allOpenFindingsTracked": "כל הממצאים הפתוחים במעקב"
     },
     "dismiss": {
@@ -2249,6 +2261,8 @@
     "modelPicker": {
       "title": "בחירת מודל",
       "noModelsDescription": "אין מודלים זמינים לבחירה.",
+      "allUnavailableTitle": "לא ניתן להשתמש באף מודל",
+      "allUnavailableDescription": "הוסף מפתח ספק ונסה שוב.",
       "favorites": "מועדפים"
     },
     "modelSelector": {
@@ -2498,6 +2512,7 @@
     "noSessions": "אין חיבורים פעילים",
     "noSessionsDescription": "היכנס לאפליקציית Kilo במכשיר אחר, והמכשיר יופיע כאן.",
     "signedIn": "מועד הכניסה: {{signedIn}} · פעילות אחרונה: {{lastSeen}}",
+    "signedInThisDevice": "מועד הכניסה: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "כאן מופיעים חיבורים מאפליקציית Kilo, מ-Kilo CLI ומדפדפן. חיבורים דרך העורך אינם מופיעים ברשימה.",
     "thisDevice": "המכשיר הזה",
     "viewProfile": "הצגת הפרופיל",
@@ -2631,6 +2646,11 @@
       "billingHistory": "היסטוריית חיובים",
       "billingHistoryEmpty": "אין עדיין היסטוריית חיובים.",
       "billingHistoryError": "לא ניתן לטעון את היסטוריית החיובים",
+      "billingRowInitial": "חיוב ראשון · {{tier}}",
+      "billingRowRenewal": "חידוש · {{tier}}",
+      "billingRowSubscription": "מינוי · {{tier}}",
+      "billingRowTrial": "תקופת ניסיון חינם · {{tier}}",
+      "billingRowUpgrade": "שינוי מסלול · {{tier}}",
       "cancel": "ביטול המינוי",
       "cancelDescription": "ה-Kilo Pass שלך יישאר פעיל עד סוף תקופת החיוב ולא יתחדש.",
       "cancelScheduled": "יבוטל בתאריך {{date}}",
@@ -2656,6 +2676,8 @@
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
     "endedOn": "הסתיים ב-{{date}}",
     "notAvailableInApp": "Kilo Pass אינו זמין באפליקציה.",
+    "notAvailableTitle": "Kilo Pass אינו מוצע באפליקציה",
+    "noPassDescription": "לחשבון זה אין Kilo Pass.",
     "statusActive": "פעיל",
     "statusTrialing": "בתקופת ניסיון",
     "statusPastDue": "התשלום באיחור",
@@ -2726,6 +2748,7 @@
     "revokeConsent": "הסרת ההסכמה",
     "revokeConsentTitle": "לבטל את ההסכמה לשיתוף נתונים?",
     "acceptAndContinue": "אישור והמשך",
+    "loadingConsentSettings": "טוען את הגדרות ההסכמה שלך…",
     "decline": "סירוב",
     "declineAndSignOut": "סירוב והתנתקות",
     "declineTitle": "לסרב לשיתוף נתונים?",
@@ -2916,7 +2939,6 @@
       "submitReply": "שליחת תשובה",
       "termsAcceptRetry": "לא ניתן היה לאשר את תנאי השירות. בדוק את החיבור ונסה שוב.",
       "termsCopy": "הפרסום מותר מגיל 13 ומעלה.",
-      "termsTitle": "תנאי השירות",
       "threadAccessibilityLabel": "שרשור דיון {{anchorLabel}}",
       "unavailable": "הדיון אינו זמין.",
       "unavailableMessage": "ייתכן שבקשת המשיכה הזו הוסרה.",
@@ -3275,6 +3297,9 @@
       "partialPostedStale_two": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "partialPostedStale_other": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "submitCountOfTotal": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_one": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_two": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitCountOfTotal_other": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
       "submitReview": "שליחת סקירה",
       "pendingComment_two": "תגובות ממתינות",
       "blockedRequestChanges": "הוסף סיכום או לפחות תגובה אחת כדי לבקש שינויים.",
@@ -3288,6 +3313,10 @@
     },
     "tabs": {
       "discussion": "דיון",
+      "discussionAccessibility": "{{title}}: {{displayCount}} תגובות",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} תגובות",
+      "discussionAccessibility_one": "{{title}}: תגובה אחת",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} תגובות",
       "files": "קבצים",
       "overview": "סקירה כללית"
     },
@@ -3477,14 +3506,13 @@
     "hub": {
       "balance": "יתרה",
       "lowBalanceBelow": "מתחת ל-{{amount}}",
-      "organizationSeats": "רישיונות הארגון",
-      "plan": "תוכנית הארגון",
+      "plan": "תוכנית",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · הסתיים",
       "planEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה.",
       "manageBilling": "ניהול חיובים",
-      "renamePlaceholder": "שם הארגון",
+      "renamePlaceholder": "יש להזין שם לארגון",
       "renameTitle": "שינוי שם הארגון"
     },
     "inviteMember": {
@@ -3521,7 +3549,7 @@
       "retentionLimit": "מוצגות החשבוניות העדכניות ביותר."
     },
     "lowBalanceAlert": {
-      "enableA11y": "הפעלת התראה על יתרה נמוכה",
+      "subtitle": "שלח התראה בדוא״ל לכתובות שציינת כאשר היתרה של הארגון יורדת מתחת לסכום שהגדרת.",
       "notifyEmailsLabel": "כתובות דוא״ל לקבלת התראות",
       "permissionDenied": "אין לך הרשאה לנהל התראות חיוב.",
       "separateEmailsHint": "אם הזנת כמה כתובות דוא״ל, הפרד ביניהן בפסיקים.",
@@ -3597,6 +3625,7 @@
       "truncated": "בשעה הזו יש יותר בקשות ממה שמוצג ברשימה.",
       "emptyTitle": "אין בקשות בשעה הזו",
       "emptyDescription": "השתמשו ב-'שעה קודמת' כדי לראות בקשות קודמות.",
+      "emptyBoundDescription": "יומני הבקשות לא מגיעים אחורה יותר מכך.",
       "loadError": "לא ניתן לטעון את יומני הבקשות.",
       "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו.",
       "tokens": "קלט {{input}} · פלט {{output}}",
@@ -3699,7 +3728,8 @@
     "signupStepUp": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithGoogle)'.",
-    "invalidCode": "הקוד שגוי. נסה שוב.",
+    "signupStepUpBack": "כדי להשלים את יצירת החשבון שלך, חזור אחורה ובחר ב-'$t(login.moreSignInOptions)'.",
+    "invalidCode": "הקוד שגוי או שפג תוקפו. נסה שוב או בחר ב-'$t(login.resendCode)'.",
     "codeInProgress": "הקוד שלך נבדק. המתן רגע ונסה שוב.",
     "tooManyAttempts": "יותר מדי ניסיונות. בקש קוד חדש.",
     "invalidToken": "ההתחברות נכשלה. אפשר לנסות שוב.",
@@ -3828,6 +3858,7 @@
   },
   "modelChat": {
     "offlineFailure": "מודל זה דורש חיבור לאינטרנט. התחבר ונסה שוב, או עבור למודל במכשיר זה.",
+    "connectionLost": "החיבור למודל נותק. בדוק את החיבור ונסה שוב.",
     "empty": {
       "title": "התחל שיחה",
       "description": "שלח הודעה כדי לשוחח עם מודל."
@@ -3968,6 +3999,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) שולחת בקשת הסקה קצרה לנקודת הקצה הזו באמצעות הפרוטוקול והמודל שנבחרו. הספק עשוי לגבות תשלום על כך.",
       "connectionSucceeded": "המודל השלים בקשה באמצעות הפרוטוקול הזה.",
       "connectionFailed": "המודל לא הצליח להשלים בקשה. בדקו את כתובת הבסיס של ה-API, הפרוטוקול, פרטי ההזדהות ומזהה המודל.",
+      "requestTimedOut": "נקודת הקצה לא השיבה בזמן. בדקו את כתובת הבסיס של ה-API ואת החיבור שלכם, ואז נסו שוב.",
+      "requestUnauthorized": "נקודת הקצה דחתה את פרטי ההזדהות. בדקו את מפתח ה-API ואת הכותרות המותאמות, ואז נסו שוב.",
+      "requestNotFound": "נקודת הקצה או המודל לא נמצאו. בדקו את כתובת הבסיס של ה-API ואת מזהה המודל.",
+      "requestRateLimited": "נקודת הקצה מגבילה את קצב הבקשות. המתינו רגע ונסו שוב.",
+      "requestUnavailable": "נקודת הקצה אינה זמינה כרגע. נסו שוב בעוד רגע.",
+      "requestUnreachable": "לא ניתן היה להגיע לנקודת הקצה. בדקו את כתובת הבסיס של ה-API ואת החיבור שלכם.",
+      "requestInvalidResponse": "נקודת הקצה לא השיבה בפורמט הצפוי. בדקו שכתובת הבסיס של ה-API והפרוטוקול תואמים לשרת, ואז נסו שוב.",
+      "discoveryNoModels": "נקודת הקצה לא הציגה מודלים. הזינו מודלים באופן ידני.",
+      "connectionIncomplete": "המודל השיב אך לא סיים. נסו שוב, או בדקו את מזהה המודל ואת הפרוטוקול.",
       "invalidInput": "הזינו שם שרת, כותרות תקינות ולפחות מודל אחד עם מזהה ושם ייחודיים. מגבלות האסימונים חייבות להיות מספרים שלמים חיוביים.",
       "invalidUrl": "הזינו כתובת בסיס של API המשתמשת ב-HTTP או ב-HTTPS, ללא פרטי הזדהות, שאילתה או מקטע.",
       "publicHttp": "נקודות קצה ציבוריות המשתמשות ב-HTTP אינן מותרות. השתמשו ב-HTTPS או בנקודת קצה מקומית פרטית.",
@@ -4106,10 +4146,20 @@
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     },
-    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו."
+    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו.",
+    "providerKeyRefused": "הספק דחה את פרטי ההזדהות. בדקו את מפתח ה-API שלו, ואז שלחו שוב.",
+    "providerModelMissing": "השרת הזה לא מספק עוד את המודל הזה. בחרו אחר.",
+    "providerRateLimited": "הספק מגביל את קצב הבקשות. המתינו רגע ושלחו שוב.",
+    "providerUnavailable": "הספק אינו זמין כרגע. שלחו שוב בקרוב."
   },
   "settingsTools": {
-    "confirmTitle": "לאשר את השינוי הזה?"
+    "confirmTitle": "לאשר את השינוי הזה?",
+    "guarded": {
+      "spendAlertsOff": "לכבות התראות הוצאה? תפסיקו לקבל התראות על חציית ספי הוצאה ועל קפיצות שעתיות.",
+      "balanceAlertsOff": "לכבות התראות יתרה? תפסיקו לקבל התראות כשהקרדיטים שלכם אוזלים.",
+      "securityFindingsOff": "לכבות ממצאי אבטחה? תפסיקו לקבל התראות על ממצאי אבטחה חדשים.",
+      "hideBalanceOn": "להסתיר את היתרות שלכם? יתרות הקרדיט לא יופיעו יותר במסכי הפרופיל ובמרכז הארגון."
+    }
   },
   "appActions": {
     "start": {
@@ -4259,6 +4309,7 @@
     "instructionsHint": "חוקי Markdown שמוחלים על כל הפעלה שמשתמשת בפרופיל הזה.",
     "instructionsEmpty": "אין עדיין קבצי הוראות",
     "instructionsEmptyDescription": "הוסיפו קבצי חוקים שכל הפעלה שמשתמשת בפרופיל הזה תחיל.",
+    "instructionsEmptyDescriptionReadOnly": "קובצי כללים שנוספים כאן חלים על כל סשן שמשתמש בפרופיל הזה.",
     "instructionNameRequired": "הזינו שם קובץ",
     "instructionNameTooLong": "שם הקובץ חייב להכיל {{max}} תווים לכל היותר",
     "instructionNameInvalid": "התחילו באות או בספרה והשתמשו רק באותיות לטיניות קטנות, ספרות ומקפים",
@@ -4486,6 +4537,7 @@
     "pickPackToBuyAgain": "בחרו חבילה למעלה כדי להתחיל רכישה חדשה.",
     "purchasePending": "החנות עדיין מעבדת את התשלום הזה. הקרדיטים שלך יגיעו ברגע שהיא תאשר את החיוב.",
     "buyAgain": "לקנות שוב",
+    "checkPurchase": "בדיקת הרכישה",
     "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
     "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   },
@@ -4583,7 +4635,9 @@
     },
     "saveSheet": {
       "title": "שמירה ברשימה",
-      "saved": "נשמר ברשימה {{list}}"
+      "saved": "נשמר ברשימה {{list}}",
+      "saveFailed": "לא הצלחנו לשמור את המשימה. בדקו את החיבור ונסו שוב.",
+      "saveRefused": "לא הצלחנו לשמור את המשימה ברשימה הזו. בחרו רשימה אחרת."
     }
   },
   "agentBriefing": {
@@ -4595,6 +4649,7 @@
     "empty": "אין פעילות בחלון הדוח הזה",
     "emptyHint": "סשנים שלך לקידוד בענן וב-CLI יופיעו כאן כשיש פעילות בדוח מתוזמן.",
     "loadError": "לא ניתן לטעון דוחות",
+    "estimateLoadError": "לא ניתן לטעון את הערכת העלות.",
     "view": "קריאת הדוח",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4608,6 +4663,7 @@
     "summary": "סיכום AI",
     "summaryPending": "סיכום ה-AI בהכנה. הוא יצורף כאן כשיהיה מוכן.",
     "summaryUnavailable": "סיכום ה-AI אינו זמין. הדוח המובנה עדיין זמין.",
+    "summaryNotAdmitted": "סיכום ה-AI לא נוצר עבור דוח זה. הדוח המובנה עדיין זמין.",
     "summaryCharge": "חיוב AI: {{cost}}",
     "summaryChargePending": "חיוב AI ממתין להתאמה",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4696,7 +4752,7 @@
     "topFeatures": "תכונות מובילות",
     "emptyTitle": "אין שימוש בתקופה זו",
     "unavailableTitle": "השימוש אינו זמין",
-    "unavailableDescription": "סביבת העבודה הזו אינה מדווחת על שימוש. ניסיון חוזר לא יעזור.",
+    "unavailableDescription": "השימוש אינו מוגדר עבור סביבת העבודה הזו. פנו לתמיכה אם אתם מצפים לראות כאן נתוני שימוש.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
     "viewDetails": "הצגת פרטי השימוש"
   },
@@ -4704,7 +4760,7 @@
     "title": "אינטגרציות",
     "sectionTitle": "שירותים מחוברים",
     "entrySubtitle": "GitHub, Slack, Linear ועוד",
-    "subtitle": "חיבור כלי הפיתוח ותהליכי העבודה שלך ל-Kilo",
+    "subtitle": "חיבור כלי הפיתוח ותהליכי העבודה שלך ל-Kilo.",
     "disconnect": "ניתוק",
     "disconnectTitle": "לנתק את {{provider}}?",
     "disconnectMessage": "Kilo יפסיק להגיב ב-{{provider}}. אפשר להתחבר מחדש בכל עת.",
@@ -4776,7 +4832,6 @@
       "nameLocked": "לא ניתן לשנות את השם לאחר יצירת הטריגר.",
       "repositoryLocked": "לא ניתן לשנות את המאגר לאחר יצירת הטריגר.",
       "environmentAutomatic": "אוטומטי לפי המאגר",
-      "notSelected": "לא נבחר",
       "profileDefaults": "השתמשו בברירות מחדל",
       "profileHelp": "הגדרות הפרופיל חלות כשהטריגר פועל. הסודות שלו יאותרו אז.",
       "customAgent": "סוכן מותאם אישית",
@@ -4866,7 +4921,7 @@
   },
   "organizationGuardrails": {
     "title": "מעקות בטיחות לבינה מלאכותית",
-    "permissionDenied": "רק בעלי הארגון והמנהלים יכולים לנהל מעקות בטיחות לבינה מלאכותית.",
+    "permissionDenied": "רק בעלי הארגון והמנהלים יכולים לנהל מעקות בטיחות לבינה מלאכותית. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "מעקות בטיחות לבינה מלאכותית אינם מופעלים",
     "unavailable": "Kilo מפעילה מעקות בטיחות לבינה מלאכותית עבור ארגון לפי בקשה. צרו קשר עם {{supportEmail}}, וצוות Kilo יפעיל אותם עבור הארגון שלך.",
     "contactSupport": "פנייה לתמיכה",
@@ -5004,7 +5059,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "תכונת ארגונים",
-    "enterpriseOnly": "זוהי תכונה לארגונים בלבד.",
+    "enterpriseOnly": "ספקים ומודלים זמינים בתוכנית Enterprise.",
     "readOnly": "רק בעלי הארגון והמנהלים יכולים לשנות הגדרות אלה.",
     "loadError": "לא ניתן היה לטעון ספקים ומודלים",
     "tabModels": "מודלים",
@@ -5018,6 +5073,7 @@
     "providersDescription": "כבה ספק כדי למנוע מ-Kilo לנתב אליו בקשות עבור הארגון הזה.",
     "providersNeedCatalog": "מתגי הספקים יישארו לקריאה בלבד עד שקטלוג המודלים המלא ייטען. לחץ על ניסיון חוזר למעלה כדי לערוך אותם.",
     "providersEmpty": "אין ספקים שמתאימים לחיפוש הזה.",
+    "providersNone": "אין ספקים זמינים עבור הארגון הזה.",
     "allowAllShown": "אשר את כל המוצגים",
     "denyAllShown": "חסום את כל המוצגים",
     "gatewaysDescription": "Kilo מנתב בקשות מודל דרך Vercel AI Gateway או OpenRouter. שער מושבת מכשיל את הבקשות האלה.",

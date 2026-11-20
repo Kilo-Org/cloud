@@ -755,42 +755,27 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(action('New session')).toBeDefined();
   });
 
-  it('names the accepted-empty body history link and the header control after the same destination', async () => {
+  it('keeps the accepted-empty body to creation, with history in the header alone', async () => {
     await renderScreen();
     const historyLabel = i18n.t('agents.sessionList.pastSessions');
-    const bodyLink = nodes('Pressable').find(
-      node => node.props.testID === 'agents-view-history-empty'
-    );
-    if (!bodyLink) {
-      throw new Error('Missing body history link');
-    }
-    expect(bodyLink.props.accessibilityLabel).toBe(historyLabel);
-    expect(bodyLink.findByType(Text).children).toEqual([historyLabel]);
-    // One destination carries one name, so the header control and the body link
-    // both read it; only their test ids tell the two controls apart.
+    // The header control is the one route into stored history: an accepted
+    // empty body that carried a second link repeated the control above it and
+    // offered nothing the reader could not already press.
+    expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
-    // The body link is the second route into stored history: pressing it must
-    // reach the same destination the header control does.
-    pressControl('agents-view-history-empty');
-    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
-    // The non-empty live list keeps the history route in the header alone: the
-    // body link is gone, and the header keeps the same name.
-    state.live.activeSessions = [row];
-    await renderScreen();
     expect(nodes('Pressable').some(node => node.props.testID === 'agents-view-history-empty')).toBe(
       false
     );
-    expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
+    expect(action('New session')).toBeDefined();
   });
 
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
-    // The full controls row exists only over a non-empty live list (the
-    // accepted-empty state withholds the row and carries the history route in
-    // the body), so a populated render covers it before this case switches to
-    // the empty body it tests. The list controls share the title's row through
-    // `inlineActions`; the heading keeps `flex-1 min-w-0`, so the title keeps
-    // its tail ellipsis and nothing stacks the controls onto a second row.
+    // The full controls row exists only over a non-empty live list, so a
+    // populated render covers it before this case switches to the empty body it
+    // tests. The list controls share the title's row through `inlineActions`;
+    // the heading keeps `flex-1 min-w-0`, so the title keeps its tail ellipsis
+    // and nothing stacks the controls onto a second row.
     state.live.activeSessions = [row];
     await renderScreen();
     expect(header().props.inlineActions).toBeDefined();

@@ -20,13 +20,17 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
+import {
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+} from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
+  useRetrySecurityAgentConfig,
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -88,6 +92,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const save = useSaveSecurityAgentConfig(scope, { announceSaved: false, announceFailed: false });
   const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
+  const pausedRetry = useRetrySecurityAgentConfig(scope);
 
   const [autoAnalysisEnabled, setAutoAnalysisEnabled] = useState(false);
   const [autoAnalysisMinSeverity, setAutoAnalysisMinSeverity] = useState<MinSeverity>('all');
@@ -215,6 +220,23 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
         })}
         message={t('securityAgent.automation.couldNotLoad')}
         onRetry={() => void config.refetch()}
+      />
+    );
+  }
+  // A first read the online manager paused (the app's connectivity is known,
+  // offline or online) can never finish: the loading gate would hold the
+  // skeleton until connectivity returns. Name the connection and offer Retry,
+  // like the findings filter sheet's paused branch does.
+  if (isReadPausedBeforeData({ ...config, connectivity })) {
+    return (
+      <PlatformErrorScreen
+        title={t('securityAgent.automation.title')}
+        variant="offline"
+        message={t('securityAgent.automation.couldNotLoad')}
+        onRetry={() => {
+          void pausedRetry.retry();
+        }}
+        isRetrying={pausedRetry.isRetrying}
       />
     );
   }

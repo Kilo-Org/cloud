@@ -21,6 +21,7 @@ beforeEach(() => {
       destroy() {},
       retryReconnect() {},
       recoverAfterSuccessfulMutation() {},
+      socketPhase: () => 'absent' as const,
     };
   });
 });

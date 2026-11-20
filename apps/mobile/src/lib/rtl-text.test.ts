@@ -1,12 +1,12 @@
 import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   codeFieldTextStyle,
   containsJoinedScript,
+  contentTextDirection,
   hasRtlScript,
   ltrValueTextStyle,
-  rtlBlockTextAlign,
   withoutMonoFamily,
 } from './rtl-text';
 
@@ -124,6 +124,25 @@ describe('containsJoinedScript', () => {
   );
 
   it.each([
+    ['Hindi (Devanagari)', 'अभी'],
+    ['Bengali', 'এখন'],
+    ['Punjabi (Gurmukhi)', 'ਹੁਣ'],
+    ['Gujarati', 'હવે'],
+    ['Odia', 'ବର୍ତ୍ତମାନ'],
+    ['Tamil', 'இப்போது'],
+    ['Telugu', 'ఇప్పుడు'],
+    ['Kannada', 'ಈಗ'],
+    ['Malayalam', 'ഇപ്പോൾ'],
+    ['Sinhala', 'දැන්'],
+    ['Thai', 'ตอนนี้'],
+    ['Lao', 'ດຽວນີ້'],
+    ['Myanmar', 'ယခု'],
+    ['Khmer', 'ឥឡូវនេះ'],
+  ])('reads a combining cluster script in %s', (_name, text) => {
+    expect(containsJoinedScript(text)).toBe(true);
+  });
+
+  it.each([
     ['English', 'Preferences'],
     ['Hebrew (right-to-left, not joined)', 'הגדרות'],
     ['Greek', 'Ρυθμίσεις'],
@@ -187,16 +206,48 @@ describe('withoutMonoFamily', () => {
   });
 });
 
-describe('rtlBlockTextAlign', () => {
-  // A native markdown paragraph resolves its direction from its first strong
-  // character, so an English reply would sit at the left edge of an Arabic
-  // interface while the rows around it sit on the start edge.
-  it('names the start edge in a right-to-left interface', () => {
-    expect(rtlBlockTextAlign(true)).toEqual({ textAlign: 'right' });
+describe('contentTextDirection', () => {
+  afterEach(() => {
+    i18nManager.isRTL = false;
   });
 
-  it('leaves the renderer its natural alignment in a left-to-right interface', () => {
-    expect(rtlBlockTextAlign(false)).toEqual({});
+  const LTR = { direction: 'ltr', writingDirection: 'ltr' };
+  const RTL = { direction: 'rtl', writingDirection: 'rtl' };
+
+  // Copy the app did not write takes the direction of its own first letter, so
+  // an English sentence keeps its left edge inside an Arabic interface, and an
+  // Arabic one still aligns to the right. The node's layout `direction` is
+  // named too: iOS resolves a paragraph's alignment from it, not from
+  // `writingDirection`.
+  it.each([false, true])('names English content left to right (isRTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    expect(contentTextDirection('1. Prototype pollution: لا')).toEqual(LTR);
+  });
+
+  it.each([false, true])('names Arabic content right to left (isRTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    expect(contentTextDirection(['  ', createElement('Text', null, 'تلوث Prototype')])).toEqual(
+      RTL
+    );
+  });
+
+  // Hebrew, and the right-to-left scripts the app has no glyphs for, still
+  // arrive in content: Syriac, Thaana, NKo, Samaritan, Mandaic, Adlam, and the
+  // supplementary scripts Unicode classes R — Cypriot, Lydian, Meroitic.
+  it.each(['שלום', 'ܫܠܡܐ', 'ދިވެހި', 'ߒߞߏ', 'ࠀࠁ', 'ࡀࡁ', '𞤀𞤁', '𐠀𐠁', '𐤠𐤡', '𐦀𐦁'])(
+    'names %s content right to left',
+    text => {
+      expect(contentTextDirection(`1. ${text}`)).toEqual(RTL);
+    }
+  );
+
+  it('names Greek and Cyrillic content left to right', () => {
+    expect(contentTextDirection('Ελληνικά')).toEqual(LTR);
+    expect(contentTextDirection('Русский')).toEqual(LTR);
+  });
+
+  it('leaves copy with no letter to the interface', () => {
+    expect(contentTextDirection(['42 · ', 7])).toBeUndefined();
   });
 });
 

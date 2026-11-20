@@ -25,6 +25,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', X: 'X' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000', foreground: '#111111' }),
 }));
@@ -65,7 +66,7 @@ function fieldRow(renderer: TestRenderer.ReactTestRenderer) {
   return row;
 }
 
-/** The un-bordered frame that owns the page gutter and the sensor insets. */
+/** The un-bordered frame that owns the page gutter only. */
 function fieldGutter(renderer: TestRenderer.ReactTestRenderer) {
   const gutter = renderer.root
     .findAll(
@@ -79,6 +80,18 @@ function fieldGutter(renderer: TestRenderer.ReactTestRenderer) {
     throw new Error('search field gutter was not found');
   }
   return gutter;
+}
+
+/**
+ * The frame outside the page gutter, where the landscape sensor insets land. It
+ * must stay a separate View: inline padding on the gutter would replace `px-4`.
+ */
+function insetFrame(renderer: TestRenderer.ReactTestRenderer) {
+  const frame = fieldGutter(renderer).parent;
+  if (!frame || frame.type !== ('View' as ElementType)) {
+    throw new Error('search field inset frame was not found');
+  }
+  return frame;
 }
 
 function searchInput(renderer: TestRenderer.ReactTestRenderer) {
@@ -114,27 +127,57 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
     expect(String(fieldGutter(renderer).props.className).split(' ')).toContain('px-4');
     expect(fieldGutter(renderer).props.style).toBeUndefined();
+    expect(insetFrame(renderer).props.style).toBeUndefined();
     // The bordered field keeps its own inset, outside the page gutter.
-    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('px-2');
+    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('pl-3');
+    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('pr-3');
     expect(String(fieldRow(renderer).props.className).split(' ')).not.toContain('px-4');
   });
 
-  it('gains the landscape sensor insets on both sides so the field clears the housing', async () => {
+  it('adds the landscape sensor insets outside the page gutter so the gutter survives', async () => {
     state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldGutter(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    expect(insetFrame(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    // Inline padding on the gutter View would replace its `px-4`, dropping the
+    // field to the cutout edge instead of the page gutter plus the inset.
+    expect(String(fieldGutter(renderer).props.className).split(' ')).toContain('px-4');
+    expect(fieldGutter(renderer).props.style).toBeUndefined();
     expect(fieldRow(renderer).props.style).toBeUndefined();
   });
 
   it('updates the insets on rotation without a remount', async () => {
     state.insets = { top: 59, right: 0, bottom: 34, left: 0 };
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(fieldGutter(renderer).props.style).toBeUndefined();
+    expect(insetFrame(renderer).props.style).toBeUndefined();
     state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
     await act(() => {
       renderer.update(<SessionListSearchHeader {...baseProps} />);
     });
-    expect(fieldGutter(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    expect(insetFrame(renderer).props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    expect(String(fieldGutter(renderer).props.className).split(' ')).toContain('px-4');
+  });
+
+  it('takes neither the gutter nor the insets when the field sits inline in a header row', async () => {
+    state.insets = { top: 59, right: 59, bottom: 34, left: 47 };
+    const renderer = await mount(<SessionListSearchHeader {...baseProps} inline />);
+    const inlineFrame = renderer.root.children.at(0);
+    if (!inlineFrame || typeof inlineFrame === 'string') {
+      throw new Error('inline search field frame was not found');
+    }
+    expect(inlineFrame.type).toBe('View');
+    // The header row already carries the page gutter and the insets.
+    expect(String(inlineFrame.props.className).split(' ')).toEqual(
+      expect.arrayContaining(['min-w-0', 'flex-1'])
+    );
+    expect(inlineFrame.props.style).toBeUndefined();
+    expect(
+      renderer.root.findAll(
+        node =>
+          node.type === ('View' as ElementType) &&
+          typeof node.props.className === 'string' &&
+          node.props.className.split(' ').includes('my-2')
+      )
+    ).toHaveLength(0);
   });
 
   it('asks the IME for no full-screen editor so the screen keeps the keyboard', async () => {

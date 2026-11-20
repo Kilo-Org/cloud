@@ -9,11 +9,11 @@ import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { StateAction } from '@/components/empty-state';
-import { ScreenHeader } from '@/components/screen-header';
+import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { RotateCcw, Wallet } from '@/components/ui/icons';
+import { AlertCircle, RotateCcw, Wallet } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ScreenFooter } from '@/components/ui/screen-footer';
@@ -26,8 +26,10 @@ import {
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { getNextCreditExpiry } from '@/lib/credits/credit-expiry';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import {
+  getStoreCreditExpiryCaption,
   getStoreCreditExpiryMessageKey,
   type StoreCreditProduct,
 } from '@/lib/credits/store-products';
@@ -35,11 +37,13 @@ import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products'
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { formatPrefixedMoney } from '@/lib/format';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useSideInsetStyle } from '@/lib/screen-insets';
+import { modalSheetSurfaceClass } from '@/lib/form-sheet';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { type LegalDocument } from '@/lib/legal-document';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
@@ -52,16 +56,18 @@ import { CreditExpiryNote } from './credit-expiry-note';
 /**
  * The room the scroller keeps at its end for the floating purchase error.
  *
- * Only the card's text scales, so only the text is multiplied: three capped
- * `text-sm` lines, then the card's own padding, then the 8 dp gap its wrapper
- * keeps above the footer. Multiplying the whole sum would under-reserve at a
- * scale below 1 and leave the content under the card. The home-indicator band
- * is not part of the sum: the footer below the scroller owns it.
+ * Only the tile's text scales, so only the text is multiplied: three capped
+ * `text-sm` lines, then the danger tile's own padding and border, then the
+ * 8 dp gap its wrapper keeps above the footer. Multiplying the whole sum would
+ * under-reserve at a scale below 1 and leave the content under the tile. The
+ * home-indicator band is not part of the sum: the footer below the scroller
+ * owns it.
  */
-const PURCHASE_ERROR_TEXT_HEIGHT = 63;
-const PURCHASE_ERROR_CHROME = 28;
+const PURCHASE_ERROR_TEXT_HEIGHT = 52.5;
+const PURCHASE_ERROR_CHROME = 19.5;
 const purchaseErrorClearance = (fontScale: number): number =>
   PURCHASE_ERROR_TEXT_HEIGHT * fontScale + PURCHASE_ERROR_CHROME + 8;
+const PURCHASE_ERROR_ICON_SIZE = 16;
 
 /**
  * The balance card's data slots, at the default font scale.
@@ -85,13 +91,6 @@ function expiryCaptionFloor(fontScale: number): number {
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
 
-/**
- * The scale at which `ConfigureRow` stacks its tile above the copy, shared with
- * the loading placeholder so the reservation and the row it stands in for take
- * the same shape. `configure-row.tsx` keeps the number itself.
- */
-const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
-
 /** The row and the pending card say the same thing about a waiting request. */
 const WAIT_COPY_KEYS = {
   store: 'credits.waitingForStore',
@@ -109,15 +108,17 @@ const WAIT_COPY_KEYS = {
 export function CreditPurchaseScreen() {
   const { t, i18n } = useTranslation();
   const storefront = getCreditStorefront();
+  const surfaceClass = modalSheetSurfaceClass();
   // The footer and the error overlay sit outside the scroller, so they take the
   // side insets the scroller applies to its own content.
   const sideInsetStyle = useSideInsetStyle();
   const fontScale = useLiveFontScale();
+  const colors = useThemeColors();
   const { width } = useWindowDimensions();
   // The same presentation `ConfigureRow` picks for the loaded rows: a narrow
   // window or a large Dynamic Type scale hands the copy the row's full width,
   // so the loading placeholder reserves that shape instead of a shorter one.
-  const stackRows = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
+  const stackRows = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
   const trpc = useTRPC();
   const {
     connected,
@@ -207,17 +208,26 @@ export function CreditPurchaseScreen() {
   const showRows = !isLoading && !identityUnavailable && !packsEmpty && !storeUnavailable;
   // The store's credit-expiry policy belongs to the pack group, so the screen
   // states it once under the rows instead of repeating the same sentence under
-  // every pack. A catalogue whose packs differ (one expiring, the rest not)
-  // contributes one caption per distinct policy, still once each.
-  const expiryNotes = showRows
-    ? [
-        ...new Set(
-          products
-            .map(pack => getStoreCreditExpiryMessageKey(pack.backend, storefront))
-            .filter((key): key is NonNullable<typeof key> => key !== undefined)
-        ),
-      ].map(key => t(key))
-    : [];
+  // every pack. Only a catalogue whose packs share one policy has a sentence to
+  // state; a mixed one is disclosed per row instead.
+  const expiryCaption = showRows
+    ? getStoreCreditExpiryCaption(
+        products.map(pack => pack.backend),
+        storefront
+      )
+    : undefined;
+  // The balance card states non-expiry in exactly one state: its read settled
+  // with no future expiry, which is when it paints `credits.noExpiringCredits`.
+  // While it paints its skeleton, `credits.expiryUnavailable`, or the next
+  // expiring block, it says nothing about the purchase terms, so the pack group
+  // must state them itself.
+  const balanceStatesNoExpiry =
+    creditBlocksQuery.isSuccess &&
+    getNextCreditExpiry(creditBlocksQuery.data.creditBlocks) === undefined;
+  const expiryNote =
+    expiryCaption !== undefined && !(balanceStatesNoExpiry && !expiryCaption.expires)
+      ? t(expiryCaption.key)
+      : null;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so
@@ -331,8 +341,20 @@ export function CreditPurchaseScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background" testID="credit-purchase-screen">
-      <ScreenHeader title={t('credits.title')} modal centerTitle={false} backIcon="back" />
+    <View className={cn('flex-1', surfaceClass)} testID="credit-purchase-screen">
+      {/* The route is a modal (an iOS page sheet), so its header is the sheet
+          header: the X closes the sheet, where a back chevron would say "go
+          back" and the pushed-screen header left an empty band above the
+          title. */}
+      <SheetHeader
+        title={t('credits.title')}
+        variant="close"
+        topInset="android-window-top"
+        surfaceClassName={surfaceClass}
+        onDone={() => {
+          router.back();
+        }}
+      />
       <View className="flex-1">
         <DetailScreenScrollView
           className="flex-1"
@@ -523,8 +545,9 @@ export function CreditPurchaseScreen() {
                         // the state phrase never wraps into a second line, so
                         // no row changes height when a purchase or the store
                         // state changes. The expiry policy is stated once for
-                        // the group below the rows; the row's accessible label
-                        // still carries it per pack.
+                        // the group below the rows, and only when the balance
+                        // card does not already state it; the row's accessible
+                        // label still carries it per pack.
                         subtitleNumberOfLines={1}
                         variant="action"
                         disabled={disabled}
@@ -547,11 +570,7 @@ export function CreditPurchaseScreen() {
               </RowGroup>
             )}
 
-            {expiryNotes.map(note => (
-              <Text key={note} variant="caption">
-                {note}
-              </Text>
-            ))}
+            {expiryNote !== null && <Text variant="caption">{expiryNote}</Text>}
           </View>
 
           {/* The purchase state is its own slot after the pack rows: a request
@@ -596,14 +615,26 @@ export function CreditPurchaseScreen() {
             is not one of the four pack states, so it takes no layout height,
             and the live region stays the announcement channel the store sheet
             leaves available. The scroller keeps a trailing clearance so the
-            last content can scroll clear of the card, and the footer below
-            this area clears the home indicator. */}
+            last content can scroll clear of the tile, and the footer below
+            this area clears the home indicator. It is the app's inline error
+            tile, as the organization plan refusal draws it: an alert icon and
+            small error text on the danger tint, never a larger line than the
+            pack rows it reports on. */}
         {purchaseErrorMessageKey !== null && (
           <View className="pointer-events-none absolute inset-x-0 bottom-0" style={sideInsetStyle}>
             <View className="px-4 pb-2">
-              <Card>
-                <AccessibleStatus message={t(purchaseErrorMessageKey)} numberOfLines={3} />
-              </Card>
+              <View className="flex-row items-start gap-2 rounded-lg border border-danger-tile-border bg-danger-tile-bg px-3 py-2.5">
+                <View className="pt-0.5">
+                  <AlertCircle size={PURCHASE_ERROR_ICON_SIZE} color={colors.destructive} />
+                </View>
+                <View className="min-w-0 flex-1">
+                  <AccessibleStatus
+                    message={t(purchaseErrorMessageKey)}
+                    className="text-sm"
+                    numberOfLines={3}
+                  />
+                </View>
+              </View>
             </View>
           </View>
         )}
@@ -621,7 +652,7 @@ export function CreditPurchaseScreen() {
           the control-size audit can read, which keeps its height in the flow so
           the two boxes never overlap when a long locale wraps them onto two
           lines. */}
-      <ScreenFooter>
+      <ScreenFooter className={surfaceClass}>
         <Text variant="caption">{t('credits.description')}</Text>
         <View className={LEGAL_LINK_ROW_CLASS}>
           <Pressable

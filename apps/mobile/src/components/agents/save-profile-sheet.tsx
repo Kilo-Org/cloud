@@ -55,7 +55,7 @@ function saveFailureMessage(t: (key: string) => string): string {
 }
 
 /**
- * The `Save as Profile` sheet. Mounted only while open, so every open seeds
+ * The `Save as profile` sheet. Mounted only while open, so every open seeds
  * fresh fields. Fields are uncontrolled (refs) per the app's iOS text-input
  * rule; a refused name or an over-long description shows the matching inline
  * error and persists nothing. A failed save keeps the name, description and
@@ -149,24 +149,6 @@ export function SaveProfileSheet({
         showsVerticalScrollIndicator={false}
       >
         <Text variant="muted">{t('agentChat.newSession.saveProfileDescription')}</Text>
-        {/* The refusal overlays the copy this slot already lays out, so a
-            rejected save never inserts space and the fields cannot move. */}
-        <View testID="save-profile-status">
-          <View
-            className="opacity-0"
-            pointerEvents="none"
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            testID="save-profile-status-reserve"
-          >
-            <Text className="text-sm">{saveFailureMessage(t)}</Text>
-          </View>
-          {save.failure !== null ? (
-            <View className="absolute inset-0 justify-center" testID="save-profile-status-live">
-              <AccessibleStatus className="text-sm" message={saveFailureMessage(t)} />
-            </View>
-          ) : null}
-        </View>
         <ProfileNameField
           defaultValue=""
           error={nameField.error}
@@ -215,6 +197,15 @@ export function SaveProfileSheet({
             ) : null}
           </Card>
         ) : null}
+        {/* The refusal closes the form: it is the last block of the body, so a
+            rejected save adds its line under everything else and no field
+            moves, and the intro text sits on the first field with no space
+            held for a line that is usually absent. A null message renders
+            nothing. */}
+        <AccessibleStatus
+          className="text-sm"
+          message={save.failure === null ? null : saveFailureMessage(t)}
+        />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

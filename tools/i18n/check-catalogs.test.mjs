@@ -20,7 +20,13 @@ import { checkCatalogs } from './check-catalogs.mjs';
 // The checker parses with oxc through the shared scanner, so the import-only
 // probe links the repository's dependency tree at its own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_MODULES = [
+  'ast.mjs',
+  'catalogs.mjs',
+  'entry-point.mjs',
+  'fs-entries.mjs',
+  'source-files.mjs',
+];
 const WORDING_EXCEPTIONS = readFileSync(
   new URL('./wording-exceptions.json', import.meta.url),
   'utf8'
@@ -920,6 +926,47 @@ test('still rejects a category that drops a placeholder English requires', () =>
   assert.match(
     found.join('\n'),
     /mobile\/ru: "agents\.liveCount_other" placeholders differ from English \(count,total\)/
+  );
+});
+
+// A placeholder token may hold a comma: `{{a,b}}` is one token. The family
+// exemption has to read the tokens the text writes, or a category that adds a
+// family token whose name holds a comma looks like one that adds two tokens no
+// value of the family uses.
+const COMMA_TOKEN_ENGLISH = {
+  agents: {
+    title: 'Agents',
+    liveCount_one: '{{count}} live session',
+    liveCount_other: '{{count}} items {{a,b}}',
+  },
+};
+
+test('accepts a family token that spells a comma inside one placeholder', () => {
+  const found = run({
+    english: COMMA_TOKEN_ENGLISH,
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session {{a,b}}',
+        liveCount_few: '{{count}} localized sessions (few) {{a,b}}',
+        liveCount_many: '{{count}} localized sessions (many) {{a,b}}',
+        liveCount_other: '{{count}} localized items {{a,b}}',
+      },
+    },
+  });
+  assert.ok(!found.join('\n').includes('placeholders differ from English'), found.join('\n'));
+});
+
+test('still rejects a translation that repeats a placeholder token', () => {
+  const found = run({
+    translated: {
+      agents: { ...TRANSLATED.agents, liveCount_one: '{{count}} {{count}} localized session' },
+    },
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ru: "agents\.liveCount_one" placeholders differ from English \(count\)/
   );
 });
 
@@ -1876,6 +1923,51 @@ test('rejects two push keys that hold one piece of copy', () => {
     found.join('\n'),
     /notifications\/en: 2 keys hold the copy "A security check has an update"/
   );
+});
+
+// The prefix expansion reads one snapshot of the literals: `b.` then `a.` over
+// the literal `c` builds `b.c` and `a.c`, never `a.b.c`.
+test('rejects a push key that only a second prefix pass would synthesize', () => {
+  const found = run({
+    pushEnglish: { a: { b: { c: 'Translated elsewhere' } } },
+    pushTranslated: { a: { b: { c: 'Переведено' } } },
+    pushSource: [
+      "const leaf = 'c';",
+      'translatePush(locale, `b.${leaf}`, undefined, stored);',
+      'translatePush(locale, `a.${leaf}`, undefined, stored);',
+    ].join('\n'),
+  });
+  assert.match(
+    found.join('\n'),
+    /^notifications: en\.json defines "a\.b\.c", which no source file uses$/m
+  );
+});
+
+// The exemption is looked up through wording(), so the remedy has to print that
+// same folded form: adding the raw copy would leave the duplicate in place.
+test('names the folded copy in the duplicate-copy remedy', () => {
+  const found = run({
+    english: { agents: { title: 'Cancel' }, profile: { action: 'Cancel' } },
+    translated: { agents: { title: 'Отмена' }, profile: { action: 'Отменить' } },
+    source: "t('agents.title');\nt('profile.action');",
+  });
+  const text = found.join('\n');
+  assert.match(text, /or add "cancel" to TWO_SENSE_COPY in tools\/i18n\/check-catalogs\.mjs/);
+  assert.ok(
+    text.includes(
+      ' (entries are compared after trimming, case folding and dropping trailing sentence punctuation)'
+    ),
+    'the remedy explains how the entry is compared'
+  );
+
+  // A copy the fold leaves alone is printed as it stands, with no explanation.
+  const plain = run({
+    english: { agents: { title: 'not now' }, profile: { action: 'not now' } },
+    translated: { agents: { title: 'не сейчас' }, profile: { action: 'не сейчас' } },
+    source: "t('agents.title');\nt('profile.action');",
+  }).join('\n');
+  assert.match(plain, /or add "not now" to TWO_SENSE_COPY/);
+  assert.ok(!plain.includes('entries are compared after trimming'), 'no note when nothing folds');
 });
 
 test('accepts push producers that read one shared key', () => {

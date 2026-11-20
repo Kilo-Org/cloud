@@ -17,7 +17,7 @@ import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-in
 import { planLegalInContentLink } from './legal-document-link';
 
 const TITLE_KEY = {
-  terms: 'login.termsInSentence',
+  terms: 'common.termsOfService',
   privacy: 'common.privacyPolicy',
 } as const satisfies Record<LegalDocument, string>;
 
@@ -112,7 +112,16 @@ export function LegalDocumentScreen({
             <Text>{t('common.legalDocumentEnglishOnly')}</Text>
           </Card>
         ) : null}
-        <MarkdownText value={state.html} documentDirection="ltr" onPressLink={openInContentLink} />
+        {/* A selectable body becomes one focusable selection block per
+            paragraph group, so a screen reader meets legal prose as controls.
+            The body reads as plain text instead, as every other link-bearing
+            markdown surface renders it. */}
+        <MarkdownText
+          value={state.html}
+          documentDirection="ltr"
+          selectable={false}
+          onPressLink={openInContentLink}
+        />
       </ScrollView>
     );
   }

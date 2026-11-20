@@ -27,7 +27,11 @@ import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-nat
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { ContextControl, useContextPicker } from '@/components/context-control';
+import {
+  CONTEXT_CONTROL_INLINE_MIN_DP,
+  ContextControl,
+  useContextPicker,
+} from '@/components/context-control';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -279,6 +283,7 @@ export function ProfileScreen() {
         showBackButton={false}
         inlineActions={<ContextControl />}
         allowInlineActionsStacking={false}
+        inlineActionsMinWidth={CONTEXT_CONTROL_INLINE_MIN_DP}
       />
       <TabScreenScrollView
         ref={deleteScrollRef}

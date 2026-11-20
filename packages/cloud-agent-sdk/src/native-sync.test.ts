@@ -83,7 +83,7 @@ const hello = (runnerConnected = true) => ({
 async function flush() {
   for (let index = 0; index < 25; index++) await Promise.resolve();
 }
-function fixture() {
+function fixture(respond?: (path: string) => Promise<Response> | undefined) {
   const calls: {
     path: string;
     body: Record<string, unknown>;
@@ -104,6 +104,8 @@ function fixture() {
         ticket: 'private-ticket',
         expiresAt: new Date(Date.now() + 90_000).toISOString(),
       });
+    const overridden = await respond?.(path);
+    if (overridden) return overridden;
     return Response.json({ commandID: body.commandID ?? 'known', status: 'queued' });
   });
   const client = new NativeSyncClient({
@@ -287,6 +289,66 @@ test('rejects offline live-only commands and queues opt-in prompts with TTL and 
     type: 'send_message',
   });
   expect(await connection.getCommandStatus(commandID)).toBe('queued');
+  connection.close();
+});
+
+test('keeps the newest command status when a frame advances it before the POST answer settles', async () => {
+  let answer: (response: Response) => void = () => {
+    throw new Error('command POST answer was not requested');
+  };
+  const pending = new Promise<Response>(resolve => {
+    answer = resolve;
+  });
+  const { client, calls } = fixture(path => (path.endsWith('/commands') ? pending : undefined));
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  const sent = connection.sendMessage('queue me', { queueIfOffline: true });
+  await flush();
+  const posted = calls.find(call => call.path.endsWith('/commands'))?.body.commandID;
+  expect(typeof posted).toBe('string');
+  const commandID = posted as string;
+  socket.frame('command_status', { commandID, status: 'delivered' });
+  await flush();
+  expect(state?.commands[commandID]).toBe('delivered');
+  answer(Response.json({ commandID, status: 'queued' }));
+  await sent;
+  await flush();
+  expect(state?.commands[commandID]).toBe('delivered');
+  connection.close();
+});
+
+test('a late status poll answer does not regress a frame-reported expiry', async () => {
+  let answer: (response: Response) => void = () => {
+    throw new Error('status poll answer was not requested');
+  };
+  const pending = new Promise<Response>(resolve => {
+    answer = resolve;
+  });
+  const { client } = fixture(path =>
+    path.endsWith('/commands/cmd_expired') ? pending : undefined
+  );
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame('command_status', { commandID: 'cmd_expired', status: 'expired' });
+  await flush();
+  expect(state?.commands['cmd_expired']).toBe('expired');
+  const status = connection.getCommandStatus('cmd_expired');
+  await flush();
+  answer(Response.json({ commandID: 'cmd_expired', status: 'queued' }));
+  await expect(status).resolves.toBe('expired');
+  expect(state?.commands['cmd_expired']).toBe('expired');
   connection.close();
 });
 
@@ -540,6 +602,42 @@ test('unreadable pending inventory clears controls without blocking later ordere
   expect(state?.pending.permissions.map(item => item.id)).toEqual(['new']);
   expect(state?.connection).toBe('connected');
   expect(FakeSocket.sockets).toHaveLength(1);
+  connection.close();
+});
+
+test('a mixed pending inventory publishes readable cards and an unreadable notice together', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame(
+    'remote.state',
+    {
+      incarnation: 'runner',
+      runID: 'run',
+      pending: {
+        permissions: [
+          { requestID: 'readable', tool: 'edit', summary: 'file' },
+          { requestID: 'unreadable', tool: 'edit', summary: 7 },
+        ],
+        questions: [
+          { requestID: 'question', fields: [{ type: 'string', key: 'q', title: 'Which?' }] },
+        ],
+      },
+    },
+    1,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.permissions.map(item => item.id)).toEqual(['readable']);
+  expect(state?.pending.unreadablePermissions).toEqual([{ requestId: 'unreadable' }]);
+  expect(state?.pending.questions.map(item => item.id)).toEqual(['question']);
+  expect(state?.connection).toBe('connected');
   connection.close();
 });
 
@@ -2033,6 +2131,74 @@ test('a replaced native asset re-reports stale references through already covere
   connection.close();
 });
 
+test('an unresolved private asset keeps the notice and starts recovery', async () => {
+  const key = kilo2AssetKey('msg_file_000000_file_0', 'file:///owned/stale.png', 'image/png');
+  const fileMessage = {
+    message: {
+      id: 'msg_file',
+      type: 'assistant',
+      time: { created: 1, completed: 5 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call',
+          name: 'read',
+          time: { created: 1, ran: 1, completed: 1 },
+          state: {
+            status: 'completed' as const,
+            input: { path: 'stale.png' },
+            content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }],
+          },
+        },
+      ],
+    },
+    seq: 1,
+  };
+  snapshot.mockResolvedValueOnce({
+    position: 5,
+    revision: 2,
+    session: sessionMetadata,
+    entities: [],
+    messages: [fileMessage],
+  });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(), 3);
+  await flush();
+  if (!state) throw new Error('Missing native state');
+  expect(state.error).toBeUndefined();
+  // No pending identity names this message, yet the unresolved asset is a gap, so recovery
+  // reads the canonical snapshot that can authorize its bytes.
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(snapshot.mock.calls.length).toBeGreaterThan(1);
+  // A published failure stays visible through `subscribed` while the transcript is still gapped.
+  connectedSocket().frame('error', { code: 'Session command failed' });
+  await flush();
+  expect(state.error).toBe('Session command failed');
+  connectedSocket().frame('subscribed', { seq: 6 }, 6);
+  await flush();
+  expect(state.error).toBe('Session command failed');
+  snapshot.mockResolvedValueOnce({
+    position: 6,
+    revision: 3,
+    session: sessionMetadata,
+    entities: [],
+    assetURLs: { [key]: 'data:image/png;base64,c3RhbGU=' },
+    messages: [fileMessage],
+  });
+  await jest.advanceTimersByTimeAsync(500);
+  await flush();
+  expect(state.pendingSnapshotMessageIDs).toBeUndefined();
+  expect(state.error).toBeUndefined();
+  expect(readNativeConversation(state).error).toBeUndefined();
+  connection.close();
+});
+
 test('a reset keeps its integrity error through snapshots, reconnect and subscribed', async () => {
   snapshot.mockResolvedValue(complete(5));
   const { client } = fixture();
@@ -2123,7 +2289,7 @@ test('session moves wait for a revision-pinned authoritative canonical message i
   expect(state?.messages).toEqual([]);
   expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
   if (!state) throw new Error('Missing native state');
-  expect(readNativeConversation(state).error).toContain('incomplete');
+  expect(readNativeConversation(state)).toMatchObject({ recoveryGaps: 1, error: undefined });
   await jest.advanceTimersByTimeAsync(250);
   await flush();
   expect(state.pendingSnapshotMessageIDs).toEqual(['msg_2']);
@@ -2341,6 +2507,76 @@ test('missing metadata recovery stops at its bound with a visible error, not a c
   if (!state) throw new Error('Missing native state');
   expect(readNativeConversation(state).error).toContain('incomplete');
   expect(readNativeConversation(state).loading).toBe(false);
+  connection.close();
+});
+
+test('requestRecovery retries missing parts over the live socket and resolves once they arrive', async () => {
+  const initial: NativeSnapshot = {
+    position: 1,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    messages: [],
+  };
+  snapshot.mockResolvedValue(initial);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  socket.frame(
+    'session.moved',
+    {
+      syncPosition: 1,
+      data: { data: { sessionID: 'ses_a', location: { directory: '/after' } } },
+    },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
+  // Let the automatic run reach its bound, so the retry below is the only recovery left.
+  await jest.advanceTimersByTimeAsync(3750);
+  await flush();
+  expect(state?.error).toContain('incomplete');
+  const sockets = FakeSocket.sockets.length;
+  const reads = snapshot.mock.calls.length;
+  snapshot.mockResolvedValue({
+    ...initial,
+    position: 2,
+    revision: 2,
+    messages: [
+      {
+        seq: 2,
+        message: {
+          id: 'msg_2',
+          type: 'location-switched',
+          time: { created: 2 },
+          location: { directory: '/after' },
+          previous: { location: { directory: '/before' } },
+        },
+      },
+    ],
+  });
+  const recovered = connection.requestRecovery();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  await recovered;
+  // The same socket carried the retry: no reconnect, no teardown.
+  expect(FakeSocket.sockets.length).toBe(sockets);
+  expect(snapshot.mock.calls.length).toBe(reads + 1);
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  expect(state?.error).toBeUndefined();
+  if (!state) throw new Error('Missing recovered state');
+  expect(readNativeConversation(state).recoveryGaps).toBe(0);
+  // Nothing is missing any more, so a later retry resolves without reading a snapshot.
+  const clean = snapshot.mock.calls.length;
+  await connection.requestRecovery();
+  expect(snapshot.mock.calls.length).toBe(clean);
   connection.close();
 });
 

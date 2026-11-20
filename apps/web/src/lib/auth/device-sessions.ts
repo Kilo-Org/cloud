@@ -485,20 +485,22 @@ export async function rotateRefreshToken(
  * Bind key persistence and session creation atomically so that a partial failure
  * never leaves one committed without the other when supportsRefresh is true.
  *
+ * The session, the attested key and the minted credentials all name the account
+ * of `params.user`, so they cannot disagree.
+ *
  * Returns the session ID and credential pair on success.
  * Throws KeyCollisionError if the key already belongs to a different user.
  */
 export async function createDeviceSessionWithAttestedKey(params: {
-  userId: string;
   userAgent?: string;
   user: User;
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
   const { credentials, evictedSessionIds } = await db.transaction(async tx => {
-    await persistAttestedKey(params.userId, params.verification, tx);
+    await persistAttestedKey(params.user.id, params.verification, tx);
 
     const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
-      userId: params.userId,
+      userId: params.user.id,
       userAgent: params.userAgent,
     });
 

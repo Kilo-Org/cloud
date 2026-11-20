@@ -38,6 +38,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 import { buildMembersListItems, type MembersListItem } from './members-list-items';
@@ -85,6 +86,7 @@ export function OrganizationMembersScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const { userId: currentUserId } = useCurrentUserId();
@@ -257,7 +259,7 @@ export function OrganizationMembersScreen() {
       />
       {emptyBody ?? (
         <FlashList
-          style={listStyle}
+          style={[listStyle, sideInsetMarginStyle]}
           // The design gate's proof readiness marker for this route.
           testID="organization-members-list"
           data={items}

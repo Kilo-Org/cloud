@@ -118,10 +118,119 @@ const DETACH_REASON_TARGET_CLOSED = 'target_closed';
  * Evidence: https://github.com/BrowserMCP/mcp/blob/main/packages/mcp/spikes/hidden-tabs/RESULTS.md
  */
 const INPUT_COMMAND_TIMEOUT_MS = 5000;
+/**
+ * Bound on the frame a background tab's screencast is asked for. Chrome makes
+ * that frame on the request in about 11 ms (measured on the click-then-
+ * screenshot cycle); past this bound the plain capture takes over, so a
+ * screenshot is never slower or absent because of the shortcut.
+ */
+const SCREENCAST_FRAME_TIMEOUT_MS = 250;
+const SCREENCAST_FRAME_EVENT = 'Page.screencastFrame';
 const FOCUS_EMULATION_METHOD = 'Emulation.setFocusEmulationEnabled';
 const visibilityStateSchema = z.object({
   result: z.object({ value: z.string().optional() }).optional(),
 });
+const layoutViewportSchema = z.object({
+  layoutViewport: z.object({ clientHeight: z.number(), clientWidth: z.number() }).optional(),
+});
+const screencastFrameSchema = z.object({
+  data: z.string(),
+  sessionId: z.number(),
+});
+
+/**
+ * How many base64 characters of a frame are decoded to read its pixel size:
+ * a PNG header sits in the first 24 bytes, and a JPEG's frame header follows
+ * its application segments, which fit well inside this prefix.
+ */
+const IMAGE_HEADER_BASE64_CHARS = 8192;
+/** The PNG signature: 137 80 78 71 13 10 26 10 opens every PNG. */
+const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10] as const;
+/** `SOF0`..`SOF15` as decimal bytes, minus 196, 200 and 204, which carry something other than a frame. */
+const JPEG_FRAME_MARKERS = new Set([
+  192, 193, 194, 195, 197, 198, 199, 201, 202, 203, 205, 206, 207,
+]);
+
+/** The bytes of a base64 prefix, or `undefined` when it is not base64 at all. */
+const decodeBase64 = (text: string): Uint8Array | undefined => {
+  try {
+    return Uint8Array.from(atob(text), character => character.codePointAt(0) ?? 0);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The pixel size of a base64 png or jpeg, decoded from its own header.
+ *
+ * The screencast's `deviceWidth`/`deviceHeight` are in device-independent
+ * pixels while `Page.captureScreenshot` answers in device pixels — measured at
+ * 1280x720 against 2560x1440 on a DPR-2 Chromium — so the metadata cannot say
+ * whether the frame is the image the mask geometry was computed for. The
+ * encoded image can, whatever the ratio. `undefined` when the header cannot be
+ * read, which falls back to the plain capture rather than risk a mis-scaled one.
+ */
+const imagePixelSize = (
+  base64: string,
+  format: 'jpeg' | 'png'
+): { readonly height: number; readonly width: number } | undefined => {
+  const prefix = base64.slice(0, IMAGE_HEADER_BASE64_CHARS - (IMAGE_HEADER_BASE64_CHARS % 4));
+  const bytes = decodeBase64(prefix);
+
+  if (bytes === undefined) {
+    return undefined;
+  }
+
+  if (format === 'png') {
+    const isPng = bytes.length >= 24 && PNG_SIGNATURE.every((byte, index) => bytes[index] === byte);
+
+    if (!isPng) {
+      return undefined;
+    }
+
+    // IHDR follows the 8-byte signature, a 4-byte length and the 4-byte type: width then height,
+    // Each a 4-byte big-endian integer, so 256 ^ 3 down to 256 ^ 0 are the byte positions.
+    const at = (offset: number): number => bytes[offset] ?? 0;
+    const width = ((at(16) * 256 + at(17)) * 256 + at(18)) * 256 + at(19);
+    const height = ((at(20) * 256 + at(21)) * 256 + at(22)) * 256 + at(23);
+
+    return { height, width };
+  }
+
+  // 255 216 is the JPEG start-of-image marker: anything else is not a jpeg at all.
+  if (bytes.length < 4 || bytes[0] !== 255 || bytes[1] !== 216) {
+    return undefined;
+  }
+
+  // Walk the segment chain to the frame header: `FF <marker> <2-byte length>`.
+  let offset = 2;
+
+  while (offset + 9 < bytes.length) {
+    if (bytes[offset] !== 255) {
+      return undefined;
+    }
+
+    const marker = bytes[offset + 1] ?? 0;
+
+    if (JPEG_FRAME_MARKERS.has(marker)) {
+      // Height and width follow the 8-bit precision and the segment length.
+      return {
+        height: (bytes[offset + 5] ?? 0) * 256 + (bytes[offset + 6] ?? 0),
+        width: (bytes[offset + 7] ?? 0) * 256 + (bytes[offset + 8] ?? 0),
+      };
+    }
+
+    const length = (bytes[offset + 2] ?? 0) * 256 + (bytes[offset + 3] ?? 0);
+
+    if (length < 2) {
+      return undefined;
+    }
+
+    offset += 2 + length;
+  }
+
+  return undefined;
+};
 
 export interface BrowserConsoleMessage {
   /** The frame that produced it, when the debugger reported one. */
@@ -222,7 +331,11 @@ export type BrowserToolCallResult =
  */
 export interface BrowserToolTabsApi {
   readonly create?:
-    | ((properties: { readonly url?: string }) => Promise<BrowserTabInfo> | BrowserTabInfo)
+    | ((properties: {
+        readonly active?: boolean;
+        readonly url?: string;
+        readonly windowId?: number;
+      }) => Promise<BrowserTabInfo> | BrowserTabInfo)
     | undefined;
   readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
 }
@@ -246,6 +359,19 @@ export interface BrowserToolCallGuard {
   readonly cancelled: () => boolean;
 }
 
+/**
+ * One out-of-process iframe auto-attached under the tab's debugger. Chrome
+ * leaves these out of `Page.getFrameTree`, so `Target.attachedToTarget` is the
+ * only place the tab learns the frame exists, its URL (hence its origin), and
+ * the flattened child session that can read it.
+ */
+export interface BrowserToolChildFrame {
+  /** The frame's URL, as the target reported it when it attached. */
+  readonly url: string;
+  /** The flattened child session; commands addressed to it read the frame's own document. */
+  readonly sessionId: string;
+}
+
 export interface BrowserToolSession {
   /**
    * Attaches the debugger and enables the CDP domains, once. Idempotent, and
@@ -264,11 +390,43 @@ export interface BrowserToolSession {
    */
   readonly bindCaller: (callerKey: string, guard?: BrowserToolCallGuard) => BrowserToolSession;
   /**
+   * Out-of-process iframes attached under this tab, keyed by their frame id
+   * (for an OOPIF the frame id is the target id). Auto-attach populates it;
+   * on a platform without `chrome.debugger` there are none, so it is absent.
+   * A caller that cannot see a frame here must treat it as unreadable.
+   */
+  readonly childFrames?: () => ReadonlyMap<string, BrowserToolChildFrame>;
+  /**
    * Which platform the session drives. `scripting` means `chrome.debugger` is
    * unavailable (Firefox) and the page is driven through
    * `browser.scripting.executeScript` in the MAIN world.
    */
   readonly backend: BrowserToolBackend;
+  /**
+   * One base64 image of the tab's viewport, of the page as it is now, taken
+   * without activating the tab. Chrome renders an inactive tab about one frame
+   * per second, so `Page.captureScreenshot` of a page that just changed waits
+   * for that frame (~1 s on the measured click-then-screenshot cycle); a
+   * screencast frame is made on request (~11 ms), and the focus emulation the
+   * session holds from attach is what makes the renderer paint the change.
+   *
+   * `undefined` when no frame arrives in time, its size is not the layout
+   * viewport (the mask geometry is laid over this image, so it must be the size
+   * a plain capture of the viewport is), or the platform has no screencast. The
+   * caller then captures the ordinary way: a screenshot never fails because of
+   * this.
+   *
+   * `guard` is checked before every command the capture sends, so a call the
+   * panel took over mid-capture stops at once; its own screencast is stopped
+   * once, and nothing else. A `webp` request takes no frame: `Page.startScreencast`
+   * has no webp format, and the plain capture keeps the media type truthful.
+   */
+  readonly captureViewportImage: (
+    format: 'jpeg' | 'png' | 'webp',
+    /** How the image is sized: `size` is the viewport in CSS pixels; absent keeps the tab's own device pixels. */
+    options?: { readonly size?: { readonly height: number; readonly width: number } | undefined },
+    guard?: BrowserToolCallGuard
+  ) => Promise<string | undefined>;
   /**
    * Runs one upstream browser tool. On the scripting backend this is the only
    * way to reach the page: snapshot, find, screenshot, wait_for, evaluate,
@@ -328,14 +486,28 @@ export interface BrowserToolSession {
    */
   readonly disposeCaller: (callerKey: string) => void;
   readonly resolveTarget: (target: string) => Promise<BrowserToolResolvedTarget | undefined>;
+  /**
+   * One CDP command on the tab's session. `sessionId` addresses a flattened
+   * child session (an out-of-process iframe) instead, so a caller holding one
+   * reads that frame's own document.
+   */
   readonly send: (
     method: string,
-    params?: Record<string, unknown>
+    params?: Record<string, unknown>,
+    sessionId?: string
   ) => Promise<Record<string, unknown> | undefined>;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
   /** Returns the downloads seen since the last call and clears them. */
   readonly takeDownloads: () => readonly BrowserToolDownload[];
+  /**
+   * Calls `listener` for every download the tab announces as it arrives, and
+   * returns the function that stops it. A guard that keeps listening for a late
+   * download needs the announcement itself: the browser names a download a
+   * moment before the item exists, and a call that arrives in between must not
+   * have to wait for it.
+   */
+  readonly watchDownloads: (listener: (download: BrowserToolDownload) => void) => () => void;
   /** The tab's viewport identity, shared with every caller view of this tab. */
   readonly viewportState: BrowserToolViewportState;
 }
@@ -420,6 +592,18 @@ const frameNavigatedParamsSchema = z.object({
     parentId: z.string().optional(),
     url: z.string().optional(),
   }),
+});
+const attachedToTargetParamsSchema = z.object({
+  sessionId: z.string(),
+  targetInfo: z.object({
+    targetId: z.string(),
+    type: z.string().optional(),
+    url: z.string().optional(),
+  }),
+});
+const detachedFromTargetParamsSchema = z.object({
+  sessionId: z.string(),
+  targetId: z.string().optional(),
 });
 const domGetDocumentResponseSchema = z.object({
   root: z.object({ nodeId: z.number() }).optional(),
@@ -1117,7 +1301,7 @@ const resolveScriptingTarget = (
 
   if (entry?.selector === undefined) {
     return {
-      error: `Unknown element reference ${ref}. Take a fresh kilo_browser_snapshot and use a ref from it.`,
+      error: `Unknown element reference ${ref}. Take a new page snapshot and use a ref from it.`,
       kind: 'error',
     };
   }
@@ -1367,6 +1551,7 @@ interface MutableNetworkRequest {
 
 export const createBrowserToolSession = ({
   debuggerApi,
+  ownedTab,
   scriptingApi,
   tabId,
   tabsApi,
@@ -1376,6 +1561,14 @@ export const createBrowserToolSession = ({
    * which selects the scripting backend.
    */
   readonly debuggerApi?: ChromeDebuggerApi | undefined;
+  /**
+   * Whether the runtime still vouches for this tab as one it opened: such a
+   * tab starts at `about:blank`, whose url the browser withholds without the
+   * `tabs` permission, so the precheck cannot judge it and the attach reports
+   * an unreachable page instead. A function, because the voucher ends with the
+   * tab's first document.
+   */
+  readonly ownedTab?: (() => boolean) | undefined;
   /** `chrome.scripting`/`browser.scripting`; the scripting backend's way to reach the page. */
   readonly scriptingApi?: BrowserScriptingApi | undefined;
   readonly tabId: number;
@@ -1391,6 +1584,8 @@ export const createBrowserToolSession = ({
   const viewportState: BrowserToolViewportState = { tabId };
   const consoleBuffer: BrowserConsoleMessage[] = [];
   const downloadBuffer: BrowserToolDownload[] = [];
+  // Listeners a still-armed guard registered for the announcement itself, not the buffer it drains.
+  const downloadListeners = new Set<(download: BrowserToolDownload) => void>();
   const networkById = new Map<string, MutableNetworkRequest>();
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
@@ -1398,6 +1593,17 @@ export const createBrowserToolSession = ({
   let attached = false;
   let disposed = false;
   let focusEmulated = false;
+  // The capture waiting on a screencast frame, so an event that arrives between commands is delivered.
+  // Keyed by its own attempt: a capture that has given up may not answer, clear or stop a newer capture's frame.
+  let pendingScreencastFrame:
+    | {
+        readonly attempt: number;
+        readonly resolve: (params: Record<string, unknown> | undefined) => void;
+      }
+    | undefined = undefined;
+  // The capture whose screencast is running: only it may stop the screencast.
+  let screencastOwner: number | undefined = undefined;
+  let screencastAttempt = 0;
   let attachPromise: Promise<void> | undefined = undefined;
   // Bumped by every Debugger.detach for this tab, so an attach in flight can tell that the debugger it just acquired is gone.
   let detachCount = 0;
@@ -1409,6 +1615,8 @@ export const createBrowserToolSession = ({
   let consoleMessagesSinceNavigation = 0;
   // `Runtime.executionContextId` → frame id, so a console entry can be attributed to its frame.
   const frameIdByExecutionContext = new Map<number, string>();
+  // Out-of-process iframes auto-attached under this tab, keyed by frame id (for an OOPIF the frame id is the target id). `Page.getFrameTree` omits them, so this map is the tab's only record of them.
+  const childFrames = new Map<string, BrowserToolChildFrame>();
   // The tab's main frame id, learned from `Page.frameNavigated`. A `Document` request in this frame is a page load.
   let mainFrameId: string | undefined = undefined;
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
@@ -1440,6 +1648,7 @@ export const createBrowserToolSession = ({
     consoleMessagesSinceNavigation = 0;
     networkById.clear();
     mainFrameId = undefined;
+    childFrames.clear();
     clearRefs();
     documentNodeId = undefined;
     dialog = undefined;
@@ -1699,8 +1908,49 @@ export const createBrowserToolSession = ({
     invalidateDocument();
   };
 
+  // Flattened auto-attach reports every related target: the OOPIFs are the ones typed `iframe`. Their target id is their frame id.
+  const handleAttachedToTarget = (params: Record<string, unknown> | undefined): void => {
+    const parsed = attachedToTargetParamsSchema.safeParse(params);
+
+    if (!parsed.success || parsed.data.targetInfo.type !== 'iframe') {
+      return;
+    }
+
+    childFrames.set(parsed.data.targetInfo.targetId, {
+      sessionId: parsed.data.sessionId,
+      url: parsed.data.targetInfo.url ?? '',
+    });
+  };
+
+  const handleDetachedFromTarget = (params: Record<string, unknown> | undefined): void => {
+    const parsed = detachedFromTargetParamsSchema.safeParse(params);
+
+    if (!parsed.success) {
+      return;
+    }
+
+    if (parsed.data.targetId !== undefined) {
+      childFrames.delete(parsed.data.targetId);
+      return;
+    }
+
+    // An older protocol reports only the session; drop the frame that held it.
+    for (const [frameId, frame] of childFrames) {
+      if (frame.sessionId === parsed.data.sessionId) {
+        childFrames.delete(frameId);
+        return;
+      }
+    }
+  };
+
   const handleEvent: ChromeDebuggerEventListener = (source, method, params) => {
     if (disposed || (source.tabId !== undefined && source.tabId !== tabId)) {
+      return;
+    }
+
+    if (method === SCREENCAST_FRAME_EVENT) {
+      // The frame a capture is waiting for; one nobody waits for any more is dropped.
+      pendingScreencastFrame?.resolve(params);
       return;
     }
 
@@ -1761,6 +2011,16 @@ export const createBrowserToolSession = ({
 
     if (method === 'Page.frameNavigated') {
       handleFrameNavigated(params);
+      return;
+    }
+
+    if (method === 'Target.attachedToTarget') {
+      handleAttachedToTarget(params);
+      return;
+    }
+
+    if (method === 'Target.detachedFromTarget') {
+      handleDetachedFromTarget(params);
       return;
     }
 
@@ -1842,7 +2102,12 @@ export const createBrowserToolSession = ({
   };
 
   const doAttach = async (): Promise<void> => {
-    const resolution = await getInspectableTab({ tabId, tabsApi });
+    // A tab this runtime opened for a session starts blank, and a blank url is unreadable without the `tabs` permission.
+    // Its caller vouches for it until its first document commits, so the attach reports what it cannot reach.
+    const resolution =
+      ownedTab?.() === true
+        ? ({ ok: true, tab: undefined } as const)
+        : await getInspectableTab({ tabId, tabsApi });
 
     if (!resolution.ok) {
       throw new Error(resolution.error);
@@ -1862,7 +2127,24 @@ export const createBrowserToolSession = ({
     // Counted before the attach request so a detach that lands while the domains are being enabled is not overwritten by `attached = true` below.
     const detachCountBeforeAttach = detachCount;
 
-    await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
+    try {
+      await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
+    } catch (error) {
+      /*
+       * Chrome keeps this extension's debugger on the tab when it stops the service worker, and refuses the new
+       * worker's attach while it is there. That attachment is the extension's own: release it and attach again.
+       * Another debugger's attachment cannot be released from here, so the second attach reports it as before.
+       */
+      const message = error instanceof Error ? error.message : '';
+
+      if (!message.startsWith('Another debugger is already attached')) {
+        throw error;
+      }
+
+      // Chrome sends no `onDetach` for the extension's own `detach` (only for a closed target or a cancelled infobar), so `detachCount` still counts browser detaches only.
+      await detachQuietly();
+      await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
+    }
 
     try {
       for (const method of ENABLED_CDP_DOMAINS) {
@@ -1940,6 +2222,154 @@ export const createBrowserToolSession = ({
     return parsed.success ? parsed.data.result?.value : undefined;
   };
 
+  const stopScreencast = async (): Promise<void> => {
+    try {
+      await debuggerApi?.sendCommand(target, 'Page.stopScreencast');
+    } catch {
+      // A tab that is already gone has nothing left to stop.
+    }
+  };
+
+  /** A cancelled call sends nothing more: the panel owns the tab from the moment it took over. */
+  const assertCallLive = (guard: BrowserToolCallGuard | undefined): void => {
+    if (guard?.cancelled() === true) {
+      throw new Error(TAB_TAKEN_ERROR);
+    }
+  };
+
+  /**
+   * The screencast's next frame, asked for on this call: `Page.startScreencast`
+   * makes the compositor produce one and the event brings it back. The waiter
+   * is registered before the command goes out, so the answer cannot be missed,
+   * and a frame that answers a capture nobody waits for any more is dropped.
+   *
+   * Each capture owns one attempt: its `finally` clears the waiter only if that
+   * waiter is still its own, and stops the screencast only if it started it, so
+   * two captures overlapping on one tab cannot answer or stop each other's.
+   *
+   * `undefined` when no frame arrives inside the bound — the caller falls back.
+   */
+  const readScreencastFrame = async (
+    format: 'jpeg' | 'png',
+    size: { readonly height: number; readonly width: number } | undefined,
+    guard: BrowserToolCallGuard | undefined
+  ): Promise<z.infer<typeof screencastFrameSchema> | undefined> => {
+    if (debuggerApi === undefined) {
+      return undefined;
+    }
+
+    const attempt = screencastAttempt + 1;
+    screencastAttempt = attempt;
+
+    const { promise, resolve } = Promise.withResolvers<Record<string, unknown> | undefined>();
+    const timer = setTimeout(() => {
+      // eslint-disable-next-line unicorn/no-useless-undefined -- an expired bound answers with no frame
+      resolve(undefined);
+    }, SCREENCAST_FRAME_TIMEOUT_MS);
+
+    pendingScreencastFrame = { attempt, resolve };
+    let started = false;
+
+    try {
+      assertCallLive(guard);
+      await debuggerApi.sendCommand(target, 'Page.startScreencast', {
+        everyNthFrame: 1,
+        format,
+        // The screencast itself renders the frame at the requested size: a CSS-pixel capture of a 2x tab is
+        // Downscaled by the browser, which keeps the forced frame (and so the latency) the same at any ratio.
+        ...(size === undefined ? {} : { maxHeight: size.height, maxWidth: size.width }),
+      });
+      started = true;
+      screencastOwner = attempt;
+
+      const parsed = screencastFrameSchema.safeParse(await promise);
+
+      if (!parsed.success) {
+        return undefined;
+      }
+
+      // A taken-over capture stops at once instead of acking a frame the panel's own capture now owns.
+      assertCallLive(guard);
+      await debuggerApi.sendCommand(target, 'Page.screencastFrameAck', {
+        sessionId: parsed.data.sessionId,
+      });
+
+      return parsed.data;
+    } catch {
+      // A screencast this browser refuses leaves the ordinary capture in place.
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+
+      if (pendingScreencastFrame?.attempt === attempt) {
+        pendingScreencastFrame = undefined;
+      }
+
+      if (started && screencastOwner === attempt) {
+        // Its own screencast only: a newer capture's frame must not be stopped by the one it replaced.
+        screencastOwner = undefined;
+        await stopScreencast();
+      }
+    }
+  };
+
+  const captureViewportImage = async (
+    format: 'jpeg' | 'png' | 'webp',
+    options?: { readonly size?: { readonly height: number; readonly width: number } | undefined },
+    guard?: BrowserToolCallGuard
+  ): Promise<string | undefined> => {
+    const size = options?.size;
+    // `Page.startScreencast` has no webp: the plain capture keeps the requested type truthful.
+    if (debuggerApi === undefined || format === 'webp') {
+      return undefined;
+    }
+
+    assertCallLive(guard);
+    await attach();
+
+    try {
+      assertCallLive(guard);
+      const metrics = layoutViewportSchema.safeParse(
+        await debuggerApi.sendCommand(target, 'Page.getLayoutMetrics')
+      );
+      const layout = metrics.data?.layoutViewport;
+
+      if (!metrics.success || layout === undefined) {
+        return undefined;
+      }
+
+      // An inactive tab reports no damage to the compositor, so its first screencast frame would be
+      // The stale frame the plain capture waits a second for; focus emulation makes the change paint.
+      if (!focusEmulated) {
+        assertCallLive(guard);
+        await applyFocusEmulation();
+      }
+
+      assertCallLive(guard);
+      const frame = await readScreencastFrame(format, size, guard);
+
+      if (frame === undefined) {
+        return undefined;
+      }
+
+      const frameSize = imagePixelSize(frame.data, format);
+      // The frame must be exactly the image the caller asked for: a CSS-pixel capture downscales the compositor's
+      // Frame to the viewport's CSS size, a device-pixel one is the viewport itself.
+      const wanted = size ?? { height: layout.clientHeight, width: layout.clientWidth };
+
+      // The mask geometry is laid over this image: it must be the pixel size a plain capture of this viewport is.
+      // The screencast's own metadata is in device-independent pixels, so the encoded frame is what decides.
+      return frameSize !== undefined &&
+        frameSize.width === wanted.width &&
+        frameSize.height === wanted.height
+        ? frame.data
+        : undefined;
+    } catch {
+      // A taken-over call sends nothing more, and a tab that cannot be measured is captured the ordinary way.
+      return undefined;
+    }
+  };
+
   /**
    * Input goes through one guard: re-apply focus emulation when the tab is
    * hidden, then bound the command. A timeout fails the call with the observed
@@ -1981,7 +2411,8 @@ export const createBrowserToolSession = ({
 
   const send = async (
     method: string,
-    params?: Record<string, unknown>
+    params?: Record<string, unknown>,
+    sessionId?: string
   ): Promise<Record<string, unknown> | undefined> => {
     if (debuggerApi === undefined) {
       // Never a silent answer: without CDP the caller must use `callTool`, and a method that backs a tool Firefox cannot express fails by that tool's name.
@@ -2000,7 +2431,10 @@ export const createBrowserToolSession = ({
       return sendInputCommand(method, params);
     }
 
-    return debuggerApi.sendCommand(target, method, params);
+    // A child session runs in its own process, so the tab's input timing rules do not apply to it.
+    return sessionId === undefined
+      ? debuggerApi.sendCommand(target, method, params)
+      : debuggerApi.sendCommand({ ...target, sessionId }, method, params);
   };
 
   const getDocumentNodeId = async (): Promise<number | undefined> => {
@@ -2165,18 +2599,33 @@ export const createBrowserToolSession = ({
       return;
     }
 
-    downloadBuffer.push({
+    const announced: BrowserToolDownload = {
       ...(parsed.data.guid === undefined ? {} : { guid: parsed.data.guid }),
       ...(parsed.data.suggestedFilename === undefined
         ? {}
         : { suggestedFilename: parsed.data.suggestedFilename }),
       ...(parsed.data.url === undefined ? {} : { url: parsed.data.url }),
       startedAt: Date.now(),
-    });
+    };
+
+    downloadBuffer.push(announced);
 
     if (downloadBuffer.length > MAX_BROWSER_TOOL_CONSOLE_MESSAGES) {
       downloadBuffer.shift();
     }
+
+    // A guard that is still on duty for a late download learns about it now, not when the item exists.
+    for (const listener of downloadListeners) {
+      listener(announced);
+    }
+  };
+
+  const watchDownloads = (listener: (download: BrowserToolDownload) => void): (() => void) => {
+    downloadListeners.add(listener);
+
+    return () => {
+      downloadListeners.delete(listener);
+    };
   };
 
   const takeDownloads = (): readonly BrowserToolDownload[] => {
@@ -2319,8 +2768,7 @@ export const createBrowserToolSession = ({
 
       if (request === undefined) {
         return {
-          error:
-            'No matching network request. Use kilo_browser_network_requests for the numbered list.',
+          error: 'No matching network request. List the network requests for the numbered list.',
           ok: false,
         };
       }
@@ -2915,7 +3363,7 @@ export const createBrowserToolSession = ({
 
         if (list === undefined || tool === undefined) {
           return {
-            error: `WebMCP tool "${parsed.data.name}" is not available. Call kilo_browser_webmcp_list first.`,
+            error: `WebMCP tool "${parsed.data.name}" is not available. List the page's WebMCP tools first.`,
             ok: false,
           };
         }
@@ -3019,6 +3467,12 @@ export const createBrowserToolSession = ({
         throwIfCancelled();
         return runCallTool(toolName, args ?? {}, refs);
       },
+      captureViewportImage: (format, options, callGuard) => {
+        throwIfCancelled();
+        // The capture checks the same guard before each command it sends, so a take-over mid-capture stops it.
+        return captureViewportImage(format, options, callGuard ?? guard);
+      },
+      childFrames: () => new Map(childFrames),
       consoleMessages: () => [...consoleBuffer],
       // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
       dispose: () => {
@@ -3043,13 +3497,14 @@ export const createBrowserToolSession = ({
         throwIfCancelled();
         return resolveTarget(targetText, refs);
       },
-      send: (method, params) => {
+      send: (method, params, sessionId) => {
         throwIfCancelled();
-        return send(method, params);
+        return send(method, params, sessionId);
       },
       takeDialog,
       takeDownloads,
       viewportState,
+      watchDownloads,
     };
   };
 
@@ -3063,6 +3518,8 @@ export const createBrowserToolSession = ({
     backend,
     bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
+    captureViewportImage,
+    childFrames: () => new Map(childFrames),
     consoleMessages: () => [...consoleBuffer],
     dispose,
     disposeCaller: callerKey => {
@@ -3083,5 +3540,6 @@ export const createBrowserToolSession = ({
     takeDialog,
     takeDownloads,
     viewportState,
+    watchDownloads,
   };
 };

@@ -132,6 +132,7 @@ import {
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
+  webhook_events_v2,
   bouncer_usage_event_outbox,
   external_side_effect_outbox,
   user_data_exports,
@@ -2500,6 +2501,14 @@ describe('User', () => {
         release();
         await writer;
       }
+    });
+
+    it('clears the Anthropic user profile id', async () => {
+      const user = await insertTestUser({ anthropic_user_profile_id: 'uprof_test_soft_delete' });
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(await findUserById(user.id)).toMatchObject({ anthropic_user_profile_id: null });
     });
 
     it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
@@ -5289,6 +5298,34 @@ describe('User', () => {
       const remainingOutbox = await db.select().from(external_side_effect_outbox);
       expect(remainingOutbox).toHaveLength(1);
       expect(remainingOutbox[0].invitation_id).toBe(forUser2.id);
+    });
+
+    it("deletes the user's partitioned webhook events, which no foreign key cascades into", async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+      await db.insert(webhook_events_v2).values(
+        [user1.id, user2.id].map(userId => ({
+          owned_by_user_id: userId,
+          platform: 'github',
+          event_type: 'pull_request',
+          payload: { sender: { login: `login-${userId}` } },
+          headers: {},
+          event_signature: `delivery-${crypto.randomUUID()}`,
+        }))
+      );
+
+      await softDeleteUser(user1.id);
+
+      const remainingForDeletedUser = await db
+        .select({ id: webhook_events_v2.id })
+        .from(webhook_events_v2)
+        .where(eq(webhook_events_v2.owned_by_user_id, user1.id));
+      expect(remainingForDeletedUser).toHaveLength(0);
+      const remainingForOtherUser = await db
+        .select({ id: webhook_events_v2.id })
+        .from(webhook_events_v2)
+        .where(eq(webhook_events_v2.owned_by_user_id, user2.id));
+      expect(remainingForOtherUser).toHaveLength(1);
     });
 
     it('deletes the bouncer credit-event outbox rows for the deleted user', async () => {

@@ -84,9 +84,12 @@ export function IntegrationProviderRow({
     role,
     action: 'disconnect',
   });
-  let subtitle = t('common.connected');
+  // A row that offers Connect already says it is not connected, so it carries
+  // no subtitle that repeats the action. A row the viewer cannot connect keeps
+  // "Not connected", because nothing else on it names the state.
+  let subtitle: string | undefined = t('common.connected');
   if (!row.installed) {
-    subtitle = t('common.notConnected');
+    subtitle = canConnect ? undefined : t('common.notConnected');
   } else if (row.accountLabel) {
     subtitle = t('integrations.connectedTo', { account: row.accountLabel });
   }
@@ -161,10 +164,13 @@ export function IntegrationProviderRow({
     // its control: it keeps the action's name and its label while the browser
     // is on its way, refuses a second press, and announces the wait. Replacing
     // the control with a bare spinner dropped the name the tap had, so a
-    // reader was told nothing while the row sat unanswerable.
+    // reader was told nothing while the row sat unanswerable. Every row of the
+    // hub can offer Connect, so the label takes the neutral ink: four accent
+    // labels were the strongest colour on the screen.
     action = {
       kind: 'action',
       label: t('common.connect'),
+      tone: 'neutral',
       onPress: onConnect,
       disabled: connecting,
       accessibilityLabel: namedAction(t('common.connect')),

@@ -99,13 +99,17 @@ internal object HomeWidgetStore {
       if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE, request)
   }
   /**
-   * Every configuration refusal is a `null` return: no placed widget, fixture mode, a
-   * missing endpoint, token, scope or epoch, a disallowed endpoint host, a response that
-   * names another scope, or a non-200 answer. A current 401 is the one exception: it
+   * Every refusal is a `null` return: no placed widget, fixture mode, a missing endpoint,
+   * token, scope or epoch, a disallowed endpoint host, a non-200 answer, a body over the
+   * cap, a response that names another scope, a response with no `home` object, a
+   * snapshot without `updatedAt` or older than the retained one, or a stored state that
+   * is no longer current when the request finishes. A current 401 is the exception: it
    * clears the stored content and returns the terminal fence the widget draws instead.
    * It still throws what the JDK throws on a malformed URL or transport failure, and
-   * `JSONException` on a stored value or a response body that is not shaped as expected;
-   * the caller (`HomeWidgetRefreshWorker.doWork`) catches every one of those.
+   * `JSONException` when the body does not parse or lacks the `snapshot`, `details` or
+   * `refreshAt` member, when a retained payload is not the expected JSON type, or when
+   * `accountEpoch` is not a number. The caller (`HomeWidgetRefreshWorker.doWork`) catches
+   * every one of those.
    */
   fun fetch(context: Context): JSONObject? {
     val config: JSONObject

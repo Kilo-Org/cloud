@@ -12,6 +12,7 @@ import {
 import type {
   ApprovalNeed,
   DownloadHoldItem,
+  DownloadSettle,
   DownloadSign,
   DownloadStep,
 } from './browser-download-hold';
@@ -764,25 +765,24 @@ describe('the recorded state', () => {
 
 describe('a sign-gated settle', () => {
   const attachment = 'https://app.example/reports/q4.pdf';
-  const sign = (signed: () => DownloadSign) => signed;
 
   it('waits for the item a sign announced, and the call decides the file it names', async () => {
     const downloads = makeDownloads();
     const { hold } = makeHold(downloads);
-    let signed = false;
+    let sign: DownloadSign = 'none';
 
     hold.tab(agentTab());
 
     const settled = hold.settle('session-1', {
       graceMs: 40,
-      sign: sign(() => (signed ? 'download' : 'none')),
+      sign: () => sign,
       since: Date.now(),
       timeoutMs: 1500,
     });
 
     // The browser announces the file inside the grace, and creates the item 300 ms in.
     await vi.advanceTimersByTimeAsync(20);
-    signed = true;
+    sign = 'download';
     await vi.advanceTimersByTimeAsync(300);
 
     hold.handle({ id: 1, referrer: page, url: attachment }, () => {
@@ -793,7 +793,7 @@ describe('a sign-gated settle', () => {
     await expect(settled).resolves.toBe('decided');
     // The item's own decision is the block path every other case covers; here the point is that the call waited
     // Past the short grace for the item its sign announced.
-    expect(signed).toBe(true);
+    expect(sign).toBe('download');
   });
 
   it('answers an unsigned call after the short grace, without waiting for an item', async () => {
@@ -804,7 +804,7 @@ describe('a sign-gated settle', () => {
 
     const settled = hold.settle('session-1', {
       graceMs: 40,
-      sign: sign(() => 'none'),
+      sign: () => 'none',
       since: Date.now(),
       timeoutMs: 1500,
     });
@@ -822,7 +822,7 @@ describe('a sign-gated settle', () => {
 
     const settled = hold.settle('session-1', {
       graceMs: 40,
-      sign: sign(() => 'download'),
+      sign: () => 'download',
       since: Date.now(),
       timeoutMs: 1500,
     });
@@ -854,23 +854,25 @@ describe('a sign-gated settle', () => {
     });
 
     // The grace is long spent, and the call still has a Document in flight: it is not "no download".
-    let outcome: string | undefined;
-    void settled.then(value => {
-      outcome = value;
-    });
+    let outcome: DownloadSettle | 'pending' = 'pending';
+    const consuming = (async (): Promise<void> => {
+      outcome = await settled;
+    })();
+
     await vi.advanceTimersByTimeAsync(400);
-    expect(outcome).toBeUndefined();
+    expect(outcome).toBe('pending');
 
     sign = 'none';
     await vi.advanceTimersByTimeAsync(60);
+    await consuming;
 
-    await expect(settled).resolves.toBe('no_sign');
+    expect(outcome).toBe('no_sign');
   });
 
   it('hears the announcement that lands after the tool answered, on that same call', async () => {
     const downloads = makeDownloads();
     const { hold } = makeHold(downloads);
-    let signed = false;
+    let sign: DownloadSign = 'none';
 
     hold.tab(agentTab());
 
@@ -882,14 +884,14 @@ describe('a sign-gated settle', () => {
 
     const settled = hold.settle('session-1', {
       graceMs: 40,
-      sign: sign(() => (signed ? 'download' : 'none')),
+      sign: () => sign,
       since: callStartedAt,
       timeoutMs: 1500,
     });
 
     // The tab announces the file at +130, twenty milliseconds into the settle: inside the sign grace.
     await vi.advanceTimersByTimeAsync(20);
-    signed = true;
+    sign = 'download';
     await vi.advanceTimersByTimeAsync(1400);
 
     // A signed call that decided nothing inside the bound: the call answers the refusal itself, not the next one.

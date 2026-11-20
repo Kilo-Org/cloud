@@ -125,21 +125,26 @@ export type ApprovalNeed =
 export type EscapedReason = 'cancel-failed' | 'complete' | 'unobserved';
 
 /**
+ * A download attributed to an agent tab whose decision is in flight: Chrome holds the item until `suggest` runs, so
+ * the item id is always known and every later state is reached from here.
+ */
+export interface HeldDownload {
+  readonly filename: string;
+  readonly itemId: number;
+  readonly kind: 'held';
+  readonly need: ApprovalNeed;
+  readonly since: number;
+  readonly tabId: number;
+  readonly url: string | undefined;
+}
+
+/**
  * One download the hold is deciding. Every state carries the need its token
  * carries, so the need lives exactly as long as the token does and nothing
  * outlives it into a later session.
  */
 export type TrackedDownload =
-  /** Attributed to an agent tab; the decision is in flight and Chrome is holding the item. */
-  | {
-      readonly filename: string;
-      readonly itemId: number;
-      readonly kind: 'held';
-      readonly need: ApprovalNeed;
-      readonly since: number;
-      readonly tabId: number;
-      readonly url: string | undefined;
-    }
+  | HeldDownload
   /** Approved: the need is spent and `suggest` let the file land. */
   | {
       readonly filename: string;
@@ -672,11 +677,7 @@ export const createDownloadHold = ({
   };
 
   /** `held` → `allowed`: the need is spent and `suggest` lets the file land under the browser's name. */
-  const allow = (state: TrackedDownload, suggest: SuggestFilename): void => {
-    if (state.kind !== 'held') {
-      return;
-    }
-
+  const allow = (state: HeldDownload, suggest: SuggestFilename): void => {
     tracked.set(state.itemId, {
       filename: state.filename,
       itemId: state.itemId,
@@ -700,11 +701,7 @@ export const createDownloadHold = ({
    * is written last, after its report is queued: a call's settle ends on a settled state, and the call that reads its
    * reports must not find a verdict it was never told about.
    */
-  const block = async (state: TrackedDownload, suggest: SuggestFilename): Promise<void> => {
-    if (state.kind !== 'held') {
-      return;
-    }
-
+  const block = async (state: HeldDownload, suggest: SuggestFilename): Promise<void> => {
     let cancelled = true;
 
     try {
@@ -724,7 +721,7 @@ export const createDownloadHold = ({
   };
 
   /** The state a cancelled item settled into: `blocked`, or `escaped` when the browser says otherwise. */
-  const settledFor = async (state: TrackedDownload): Promise<TrackedDownload> => {
+  const settledFor = async (state: HeldDownload): Promise<TrackedDownload> => {
     const blocked: TrackedDownload = {
       filename: state.filename,
       itemId: state.itemId,
@@ -822,7 +819,7 @@ export const createDownloadHold = ({
       return false;
     }
 
-    const state: TrackedDownload = {
+    const state: HeldDownload = {
       filename,
       itemId: item.id,
       kind: 'held',
@@ -1070,16 +1067,12 @@ export const createDownloadHold = ({
         if (state === 'no_sign' && sign === 'pending' && now() < until) {
           // eslint-disable-next-line no-await-in-loop -- one bounded poll for the response this call is owed
           await waitFor(HOLD_POLL_MS);
-
-          continue;
-        }
-
-        if (state === 'no_sign' && now() >= graceUntil) {
+        } else if (state === 'no_sign' && now() >= graceUntil) {
           return state;
+        } else {
+          // eslint-disable-next-line no-await-in-loop -- one bounded poll for this call's own decision
+          await waitFor(HOLD_POLL_MS);
         }
-
-        // eslint-disable-next-line no-await-in-loop -- one bounded poll for this call's own decision
-        await waitFor(HOLD_POLL_MS);
       }
     },
     tab: input => {

@@ -59,9 +59,13 @@ export type InterceptWaitState =
   /** Every one of the call's Documents is answered, or the bound is spent: the pauses are released. */
   | { readonly kind: 'released' };
 
+/** One step of the settle: whether the pause stays armed, and the state it waits in. */
+export interface InterceptWaitStep {
+  readonly state: InterceptWaitState;
+  readonly step: 'hold' | 'release';
+}
+
 /**
- * One step of the settle: whether the pause stays armed, and the state it waits in.
- *
  * The sign is a Document the call started that the interceptor has not answered yet. A plain click's `element.click()`
  * starts none — nothing on the fixture page is an attachment — so such a call releases after one confirming poll. A
  * link click on an attachment starts one, and its pause arrives a few milliseconds later; releasing there would answer
@@ -70,7 +74,7 @@ export type InterceptWaitState =
 export const interceptWait = (
   state: InterceptWaitState,
   reading: InterceptWaitReading
-): { readonly state: InterceptWaitState; readonly step: 'hold' | 'release' } => {
+): InterceptWaitStep => {
   if (state.kind === 'released') {
     return { state, step: 'release' };
   }
@@ -78,8 +82,7 @@ export const interceptWait = (
   if (reading.documents.some(document => !reading.answeredIds.has(document.requestId))) {
     // The bound runs from the settle's own entry, never from this poll: a call that keeps seeing its Document
     // Unanswered must still release inside {@link INTERCEPT_WAIT_MS}, or the page hangs behind a pause nobody answers.
-    const deadline =
-      state.kind === 'owed' ? state.deadline : reading.now + INTERCEPT_WAIT_MS;
+    const deadline = state.kind === 'owed' ? state.deadline : reading.now + INTERCEPT_WAIT_MS;
 
     return reading.now < deadline
       ? { state: { deadline, kind: 'owed' }, step: 'hold' }

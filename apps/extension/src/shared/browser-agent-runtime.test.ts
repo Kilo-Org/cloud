@@ -5924,10 +5924,11 @@ describe('the download hold on a real call', () => {
       });
 
     const guarded = await click();
-    const refused = guarded.kind === 'needs_permission' && !guarded.result.ok ? guarded.result.error : '';
+    const refused =
+      guarded.kind === 'needs_permission' && !guarded.result.ok ? guarded.result.error : '';
 
     // The one approval is for the link's own file — the document this call asked for — and the second file is named
-    // beside it, so the human is never asked for a file the model did not ask for.
+    // Beside it, so the human is never asked for a file the model did not ask for.
     expect(refused).toContain('The download of report.txt was stopped');
     expect(refused).toContain('second.txt');
 
@@ -5988,7 +5989,7 @@ describe('the download hold on a real call', () => {
     repeat = true;
 
     // The approved call waits the hold's own bound for the item its approval bought; the browser creates none, and
-    // the call answers with what that means.
+    // The call answers with what that means.
     const approved = await click([token]);
 
     // The one approval bought a file the browser never created: the model is told the browser refused it, and the

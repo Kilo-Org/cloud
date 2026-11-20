@@ -12,7 +12,11 @@ import {
   interceptWait,
   isDownloadResponse,
 } from './browser-download-intercept';
-import type { InterceptWaitReading, InterceptWaitState } from './browser-download-intercept';
+import type {
+  DownloadResponsePause,
+  InterceptWaitReading,
+  InterceptWaitState,
+} from './browser-download-intercept';
 
 const attachmentPause = (requestId: string) => ({
   documentURL: 'https://app.example/reports/q4.pdf',
@@ -24,13 +28,23 @@ const attachmentPause = (requestId: string) => ({
   ],
 });
 
+/** The pause one response head becomes: a head the interceptor rejected is a failure, not an assertion to weaken. */
+const pausedOf = (params: Record<string, unknown> | undefined): DownloadResponsePause => {
+  const pause = downloadResponsePause(params);
+
+  if (pause === undefined) {
+    throw new Error('expected the response head to be paused');
+  }
+
+  return pause;
+};
+
 describe('the response pause', () => {
   it('reads the response that would become a file, and names it by its Content-Disposition', () => {
-    const pause = downloadResponsePause(attachmentPause('r1'));
+    const pause = pausedOf(attachmentPause('r1'));
 
-    expect(pause).toBeDefined();
-    expect(pause === undefined ? false : isDownloadResponse(pause)).toBe(true);
-    expect(pause === undefined ? '' : downloadResponseName(pause)).toBe('q4.pdf');
+    expect(isDownloadResponse(pause)).toBe(true);
+    expect(downloadResponseName(pause)).toBe('q4.pdf');
     // The tier arms Document responses only: a catch-all would pause every image and script on the tab.
     expect(DOWNLOAD_RESPONSE_PATTERNS).toStrictEqual([
       { requestStage: 'Response', resourceType: 'Document' },
@@ -38,13 +52,13 @@ describe('the response pause', () => {
   });
 
   it('continues a rendered page and fails a file, with the protocol reason that writes nothing', () => {
-    const page = downloadResponsePause({
+    const page = pausedOf({
       documentURL: 'https://app.example/dashboard',
       requestId: 'r2',
       responseHeaders: [{ name: 'Content-Type', value: 'text/html' }],
     });
 
-    expect(page === undefined ? true : isDownloadResponse(page)).toBe(false);
+    expect(isDownloadResponse(page)).toBe(false);
     expect(DOWNLOAD_FAIL_REASON).toBe('Aborted');
   });
 });
@@ -60,14 +74,14 @@ describe('the settle that keeps the pause armed', () => {
   });
 
   it('releases at once for a call that started no Document, after one confirming poll', () => {
-    const start: InterceptWaitState = { kind: 'entered', since: 1_000 };
+    const start: InterceptWaitState = { kind: 'entered', since: 1000 };
 
     // The very first read confirms: the call's own navigation request can be recorded after the tool answered.
-    expect(interceptWait(start, reading({ now: 1_000 }))).toStrictEqual({
+    expect(interceptWait(start, reading({ now: 1000 }))).toStrictEqual({
       state: start,
       step: 'hold',
     });
-    expect(interceptWait(start, reading({ now: 1_000 + INTERCEPT_POLL_MS }))).toStrictEqual({
+    expect(interceptWait(start, reading({ now: 1000 + INTERCEPT_POLL_MS }))).toStrictEqual({
       state: { kind: 'released' },
       step: 'release',
     });
@@ -80,8 +94,8 @@ describe('the settle that keeps the pause armed', () => {
    * Document still owes its answer.
    */
   it('holds an unanswered Document the call started, and releases once the interceptor answered it', () => {
-    const start: InterceptWaitState = { kind: 'entered', since: 1_000 };
-    const first = 1_000 + INTERCEPT_POLL_MS;
+    const start: InterceptWaitState = { kind: 'entered', since: 1000 };
+    const first = 1000 + INTERCEPT_POLL_MS;
     const owedReading = reading({ documents: [{ requestId: 'nav-1' }], now: first });
 
     const held = interceptWait(start, owedReading);
@@ -108,10 +122,10 @@ describe('the settle that keeps the pause armed', () => {
 
   it('releases an unanswered Document at the bound rather than holding the page forever', () => {
     const documents = [{ requestId: 'nav-1' }];
-    const state: InterceptWaitState = { deadline: 2_000, kind: 'owed' };
+    const state: InterceptWaitState = { deadline: 2000, kind: 'owed' };
 
-    expect(interceptWait(state, reading({ documents, now: 1_999 })).step).toBe('hold');
-    expect(interceptWait(state, reading({ documents, now: 2_000 }))).toStrictEqual({
+    expect(interceptWait(state, reading({ documents, now: 1999 })).step).toBe('hold');
+    expect(interceptWait(state, reading({ documents, now: 2000 }))).toStrictEqual({
       state: { kind: 'released' },
       step: 'release',
     });
@@ -121,7 +135,7 @@ describe('the settle that keeps the pause armed', () => {
     expect(
       interceptWait(
         { kind: 'released' },
-        reading({ documents: [{ requestId: 'nav-1' }], now: 1_001 })
+        reading({ documents: [{ requestId: 'nav-1' }], now: 1001 })
       )
     ).toStrictEqual({ state: { kind: 'released' }, step: 'release' });
   });

@@ -968,16 +968,16 @@ const armResponseInterceptor = async (
         // eslint-disable-next-line no-await-in-loop -- one bounded poll, then the state decides again
         const reading = readingSupplier();
 
-        const next = interceptWait(state, {
+        const { state: nextState, step } = interceptWait(state, {
           ...reading,
           answeredIds: new Set(answers.keys()),
         });
 
-        if (next.step === 'release') {
+        if (step === 'release') {
           break;
         }
 
-        state = next.state;
+        state = nextState;
 
         // eslint-disable-next-line no-await-in-loop -- one bounded poll for the pause this call is owed
         await after(INTERCEPT_POLL_MS);
@@ -3019,14 +3019,18 @@ export const createBrowserRuntime = ({
           need,
           origin,
           step,
-          tabId,
+          tokenTabId,
         }: {
           readonly need: StepTokenNeed | undefined;
           readonly origin: string;
           readonly step: DownloadStep | undefined;
-          readonly tabId: number;
+          readonly tokenTabId: number;
         }): BrowserToolRunOutcome => {
-          const token = issueSensitiveToken({ origin, reason: SENSITIVE_REASON.download }, tabId, need);
+          const token = issueSensitiveToken(
+            { origin, reason: SENSITIVE_REASON.download },
+            tokenTabId,
+            need
+          );
 
           return needsPermissionOutcome(
             [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
@@ -3837,15 +3841,21 @@ export const createBrowserRuntime = ({
           // An approved repeat is a call for exactly the one file its approval bought. When the call ends with that
           // Approval still unspent and no file of its own, the browser named no item for it — Chrome's own
           // Multiple-downloads limiter refuses it — so the answer says so instead of a success the human cannot trust.
-          if (downloadApproved && ownLate.length === 0 && downloadHold.needOf(sessionKey)?.kind === 'armed') {
+          if (
+            downloadApproved &&
+            ownLate.length === 0 &&
+            downloadHold.needOf(sessionKey)?.kind === 'armed'
+          ) {
+            const approvedNeed = approvedFile?.need;
+
             return browserBlockedRefusal({
               need:
-                approvedFile === undefined
+                approvedNeed === undefined
                   ? undefined
-                  : { tabId: approvedFile.need.tabId, url: approvedFile.need.url },
+                  : { tabId: approvedNeed.tabId, url: approvedNeed.url },
               origin: preflight?.ok ? preflight.origin : '',
               step: downloadStep,
-              tabId: runTabId,
+              tokenTabId: runTabId,
             });
           }
 
@@ -4037,7 +4047,7 @@ export const createBrowserRuntime = ({
                 : { tabId: approvedFile?.need.tabId ?? runTabId, url: approvedUrl },
             origin: preflight?.ok ? preflight.origin : '',
             step: downloadStep,
-            tabId: runTabId,
+            tokenTabId: runTabId,
           });
         }
 

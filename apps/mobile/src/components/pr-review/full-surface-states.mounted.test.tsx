@@ -340,6 +340,27 @@ describe('PR Overview full-body states', () => {
     expect(scroll.findByProps({ children: 'Saved title' })).toBeDefined();
     unmount();
   });
+
+  // The Overview's offline arm owns a first load that never reached the
+  // server: with nothing cached the body must name the connection instead of
+  // the backend, keep the page refresh control, and offer the Retry that a
+  // restored network makes useful.
+  it('names the connection when the first load never reached the server', async () => {
+    query.data = undefined;
+    // A code-less, envelope-less rejection: the shape a failed fetch produces
+    // when the device has no network.
+    query.error = new Error('Network request failed');
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.refreshControl).toBe(overviewProps.refreshControl);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    (error.props.onRetry as () => void)();
+    expect(query.refetch).toHaveBeenCalledOnce();
+    unmount();
+  });
 });
 
 describe.each([

@@ -913,7 +913,12 @@ export type AutoCompleteInstallationOutcome =
   | { ok: true }
   | {
       ok: false;
-      reason: 'not_pending' | 'requester_mismatch' | 'account_mismatch' | 'installation_claimed';
+      reason:
+        | 'not_pending'
+        | 'requester_mismatch'
+        | 'account_mismatch'
+        | 'installation_claimed'
+        | 'multiple_installations_disabled';
     };
 
 /**
@@ -1020,6 +1025,38 @@ export async function autoCompleteInstallation(
       )
       .limit(1);
     if (peer) return { ok: false, reason: 'installation_claimed' };
+    // An organization that is not entitled to multiple installations holds one
+    // live installation slot, and completion must not take a second one. Same
+    // rule, lock key, and lock order as connectVerifiedGitHubInstallation and
+    // upsertPlatformIntegrationForOwner, so all three writers serialize.
+    const organizationId = pending.owned_by_organization_id;
+    if (organizationId && !canOrganizationUseMultipleGitHubInstallations(organizationId)) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`org:${organizationId}`}))`);
+      const ownerIntegrations = await tx
+        .select({
+          installationId: platform_integrations.platform_installation_id,
+          appType: platform_integrations.github_app_type,
+        })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.owned_by_organization_id, organizationId),
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            // A locally disconnected connection has relinquished its slot.
+            isNull(platform_integrations.github_disconnected_at)
+          )
+        );
+      if (
+        ownerIntegrations.some(integration =>
+          occupiesAnotherGitHubInstallationSlot(integration, {
+            installationId: installationData.installation_id,
+            appType,
+          })
+        )
+      ) {
+        return { ok: false, reason: 'multiple_installations_disabled' };
+      }
+    }
     // The early read is only a fast path: a writer that does not hold this
     // installation's advisory lock (an owner-scoped delete) can remove the
     // pending row between the read and this update. Gate the outcome on the

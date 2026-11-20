@@ -63,6 +63,33 @@ class KiloSurfaceGeometryModule : Module() {
       Unit
     }.runOnQueue(Queues.MAIN)
 
+    // Where the surface's own origin sits in its window, in dp, or a negative
+    // value when the view is gone.
+    //
+    // The walk sums the vertical offsets from the surface to the window's root
+    // view and subtracts each parent's scroll, which is the same chain the
+    // observer's `localToScreen` builds: no array or rect is allocated, because
+    // this runs on the same main queue as the per-frame observer. iOS's
+    // counterpart (`KiloSurfaceGeometryModule.swift`) carries the presentation
+    // offset a `UISheetPresentationController` applies; here the value is the
+    // sheet's own edge inside its window, which is what the settled header
+    // already reads. Both platforms answer one contract
+    // (`presentedSheetTopClearance`).
+    AsyncFunction("presentedSurfaceOriginTop") { tag: Int ->
+      val view = appContext.findView<View>(tag) ?: return@AsyncFunction -1.0
+      val density = view.resources.displayMetrics.density
+      if (density <= 0f) return@AsyncFunction -1.0
+      var origin = 0f
+      var current: View? = view
+      while (current != null) {
+        origin += current.top
+        val parent = current.parent as? View
+        if (parent != null) origin -= parent.scrollY
+        current = parent
+      }
+      (origin / density).toDouble()
+    }.runOnQueue(Queues.MAIN)
+
     OnStopObserving { stopObserving() }
     OnDestroy {
       destroyed = true

@@ -88,10 +88,11 @@ function sameSaveContent(a: SaveContent, b: SaveContent): boolean {
   });
 }
 
-/** One list row this module reads: the counts the saved profile reports. */
+/** One list row this module reads: the description and the counts the saved profile reports. */
 type RecoveryRow = Readonly<{
   id: string;
   name: string;
+  description: string | null;
   varCount: number;
   commandCount: number;
   isDefault: boolean;
@@ -175,9 +176,11 @@ export function lostSaveProfile({
     return null;
   }
   // The row must still hold what the attempt submitted: the create stores the
-  // submitted list, so a count or default flag that disagrees with it is that
-  // row's own evidence of an edit made after the lost write.
+  // submitted description, counts and default flag, so any of them disagreeing
+  // with the submission is that row's own evidence of an edit made after the
+  // lost write.
   if (
+    (only.description ?? undefined) !== attempt.content.description ||
     only.varCount !== attempt.content.vars.length ||
     only.commandCount !== attempt.content.commands.length ||
     only.isDefault !== attempt.content.setAsDefault

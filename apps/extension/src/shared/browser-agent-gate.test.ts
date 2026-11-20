@@ -6,6 +6,7 @@ import {
   createStepTokenStore,
   hashBrowserToolArguments,
   SENSITIVE_REASON,
+  STALE_REF_ERROR,
 } from './browser-agent-checks';
 import type { BrowserGrant, StepTokenStore } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall } from './browser-agent-gate';
@@ -78,6 +79,8 @@ const createSession = (
     readonly probeElements?: Record<string, Element>;
     readonly ambiguousSelectors?: Record<string, number>;
     readonly selectors?: Record<string, { readonly nodeId: number }>;
+    /** Refs no snapshot registered: `resolveTarget` finds nothing for them. */
+    readonly unknownRefs?: readonly string[];
     /** The node name `DOM.describeNode` reports for a ref target (e.g. `IFRAME`). */
     readonly targetNodeName?: string;
   } = {}
@@ -263,7 +266,12 @@ const createSession = (
         return { kind: 'selector', nodeId: selector.nodeId, selector: target };
       }
 
-      return target.startsWith('e') && Number.isInteger(Number(target.slice(1)))
+      const knownRef =
+        target.startsWith('e') &&
+        Number.isInteger(Number(target.slice(1))) &&
+        options.unknownRefs?.includes(target) !== true;
+
+      return knownRef
         ? { backendNodeId: Number(target.slice(1)), kind: 'ref', ref: target }
         : undefined;
     },
@@ -408,6 +416,151 @@ describe('origin grants', () => {
     expect(failureOf(result)).toStrictEqual({
       items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
       kind: 'needs_permission',
+    });
+  });
+
+  describe('a call on an iframe element', () => {
+    const iframeSession = () =>
+      createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      });
+
+    it('needs act on the owner document for an evaluate granted only on the hosted frame', async () => {
+      const result = await run({
+        args: { function: '() => document.cookie', target: 'e12' },
+        authorized: [{ class: 'act', origin: 'https://pay.example.com' }],
+        session: iframeSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'act', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('allows an evaluate granted on both the owner document and the hosted frame', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [
+          { class: 'act', origin: 'https://app.example.com' },
+          { class: 'act', origin: 'https://pay.example.com' },
+        ],
+        session: iframeSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://pay.example.com' });
+    });
+
+    it('needs read on the owner document for a screenshot granted only on the hosted frame', async () => {
+      const result = await run({
+        args: { target: 'e12' },
+        authorized: [{ class: 'read', origin: 'https://pay.example.com' }],
+        session: iframeSession(),
+        toolName: 'browser_take_screenshot',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'read', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('leaves a plain element of the main document needing only the main grant', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e5' },
+        authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+        session: createSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://app.example.com' });
+    });
+
+    // The <iframe> e12 sits in frame f1 (shop) and hosts frame f2 (pay).
+    const nestedOwnerSession = () =>
+      createSession({
+        frameIdForBackendNode: backendNodeId => (backendNodeId === 12 ? 'f1' : 'main'),
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 30,
+            securityOrigin: 'https://shop.example.com',
+            url: 'https://shop.example.com/cart',
+          },
+          {
+            frameId: 'f2',
+            ownerBackendNodeId: 12,
+            parentId: 'f1',
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      });
+
+    it('needs the grants of a nested owner frame and its hosted frame, both labelled frames', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [],
+        session: nestedOwnerSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [
+          { class: 'act', frame: true, origin: 'https://shop.example.com' },
+          { class: 'act', frame: true, origin: 'https://pay.example.com' },
+        ],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('allows an element in a nested owner frame granted on both frames', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [
+          { class: 'act', origin: 'https://shop.example.com' },
+          { class: 'act', origin: 'https://pay.example.com' },
+        ],
+        session: nestedOwnerSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://pay.example.com' });
+    });
+
+    it('asks once, as the top-level page, for a same-site iframe whose owner shares its origin', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [],
+        session: createSession({
+          nestedFrames: [
+            {
+              frameId: 'f1',
+              ownerBackendNodeId: 12,
+              securityOrigin: 'https://app.example.com',
+              url: 'https://app.example.com/embedded',
+            },
+          ],
+          targetNodeName: 'IFRAME',
+        }),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'act', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
     });
   });
 
@@ -879,6 +1032,19 @@ describe('sensitive steps', () => {
     });
     // A call that cannot run never becomes a permission ask.
     expect(failureOf(result)).not.toHaveProperty('items');
+  });
+
+  it('answers a stale ref with the tool error instead of a sensitive-step ask', async () => {
+    const result = await run({
+      args: { element: 'the Click me button', target: 'e1' },
+      session: createSession({ unknownRefs: ['e1'] }),
+      toolName: 'browser_click',
+    });
+
+    expect(result).toStrictEqual({
+      failure: { error: STALE_REF_ERROR, kind: 'blocked' },
+      ok: false,
+    });
   });
 
   it('counts a selector that resolves nothing as sensitive', async () => {

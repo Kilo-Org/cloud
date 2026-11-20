@@ -2,6 +2,8 @@
 import { z } from 'zod';
 import {
   ambiguousSelectorError,
+  looksLikeBrowserRef,
+  STALE_REF_ERROR,
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
@@ -25,6 +27,7 @@ import {
   readAgentFrameTree,
 } from './browser-agent-frames';
 import type { AgentFrameInventory, BrowserAgentFrame } from './browser-agent-frames';
+import { readIsolatedHostedFrame } from './browser-agent-isolated-probe';
 import {
   classifyFocusedElement,
   classifyTargetElement,
@@ -108,6 +111,12 @@ interface TargetFrame {
   /** The target sits in a child frame, not the tab's top-level document. */
   readonly frame: boolean;
   readonly origin: string;
+  /**
+   * The document holding a targeted frame element: a tool on an `<iframe>`
+   * runs in, reads or captures its owner's document, so the call needs that
+   * document's grant as well as the hosted frame's.
+   */
+  readonly owner?: { readonly frame: boolean; readonly origin: string };
 }
 
 /**
@@ -265,6 +274,25 @@ const targetFrameOf = async (
     return undefined;
   }
 
+  // Without a debugger protocol the probe names the frame a frame element hosts (Firefox).
+  if (session.isolatedProbe !== undefined && resolved.kind === 'selector') {
+    const hosted = await readIsolatedHostedFrame(session.isolatedProbe, resolved.selector);
+
+    if (hosted !== undefined) {
+      const frame = frames.find(candidate => candidate.id === hosted.frameId);
+      const main = mainFrameOf(frames);
+
+      return {
+        frame: true,
+        origin: frame?.origin ?? OPAQUE_ORIGIN,
+        owner:
+          main === undefined
+            ? { frame: true, origin: OPAQUE_ORIGIN }
+            : { frame: false, origin: main.origin },
+      };
+    }
+  }
+
   let node: z.infer<typeof describeNodeSchema>['node'] = undefined;
 
   try {
@@ -290,8 +318,17 @@ const targetFrameOf = async (
   if ((nodeName === 'FRAME' || nodeName === 'IFRAME') && ownerBackendNodeId !== undefined) {
     const hosted = await frameWithOwnerNode(session, frames, ownerBackendNodeId);
 
+    const owning = await frameOwningNode(session, frames, ownerBackendNodeId);
+
     // A frame owner whose frame this tab cannot see (an out-of-process iframe, a frame still loading) has no origin the gate can judge.
-    return { frame: true, origin: hosted?.origin ?? OPAQUE_ORIGIN };
+    return {
+      frame: true,
+      origin: hosted?.origin ?? OPAQUE_ORIGIN,
+      owner:
+        owning === undefined
+          ? { frame: true, origin: OPAQUE_ORIGIN }
+          : { frame: owning.parentId !== undefined, origin: owning.origin },
+    };
   }
 
   // A selector is answered by the tab's own document root, so it can only name a node there.
@@ -606,9 +643,17 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
       : { frame: primaryTargetFrame.frame, origin: primaryTargetFrame.origin };
   const origin = destinationOrigin ?? targetFrame?.origin ?? mainOrigin;
   const targetOriginFrame = grantClass !== 'navigate' && targetFrame?.frame === true;
-  // Every named target's frame needs the grant, not only the tab's top-level origin.
-  const requiredOrigins = new Set<string>(targetFrames.map(frame => frame.origin));
-  const frameByOrigin = new Map(targetFrames.map(frame => [frame.origin, frame.frame]));
+  // Every named target's frame needs the grant, not only the tab's top-level origin, and so does the document a tool on a frame element runs in.
+  const requiredFrames = targetFrames.flatMap(frame =>
+    frame.owner === undefined ? [frame] : [frame.owner, frame]
+  );
+  const requiredOrigins = new Set<string>(requiredFrames.map(frame => frame.origin));
+  // An origin is labelled a frame only when no required document of that origin is the tab's top-level one: a same-site iframe's grant also covers its owner page.
+  const frameByOrigin = new Map<string, boolean>();
+
+  for (const frame of requiredFrames) {
+    frameByOrigin.set(frame.origin, (frameByOrigin.get(frame.origin) ?? true) && frame.frame);
+  }
 
   if (requiredOrigins.size === 0) {
     requiredOrigins.add(origin);
@@ -628,7 +673,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     return { failure: { items, kind: 'needs_permission' }, ok: false };
   }
 
-  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements cannot run, so it is refused plainly before any sensitive-step ask instead of prompting for a call that would fail.
+  // The call is granted: only now spend a DOM read on cardinality. A selector that names several elements, or a ref no snapshot holds any more, cannot run, so it is refused plainly with the tool's own error before any sensitive-step ask instead of prompting for a call that would fail.
   for (const text of targetReferencesOf(input.args)) {
     // eslint-disable-next-line no-await-in-loop -- one resolution per reference, in argument order
     const resolved = await input.session.resolveTarget(text);
@@ -638,6 +683,10 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
         failure: { error: ambiguousSelectorError(resolved.matches), kind: 'blocked' },
         ok: false,
       };
+    }
+
+    if (resolved === undefined && looksLikeBrowserRef(text)) {
+      return { failure: { error: STALE_REF_ERROR, kind: 'blocked' }, ok: false };
     }
   }
 

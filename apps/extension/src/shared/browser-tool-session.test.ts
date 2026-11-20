@@ -1,14 +1,18 @@
 /* eslint-disable max-lines, max-classes-per-file, vitest/max-expects -- the page-global fakes below need several instanceof-identity classes in this one test file, and one contract is several assertions */
 import { describe, expect, it, vi } from 'vitest';
+// eslint-disable-next-line import/no-nodejs-modules -- the snapshot walker runs against a real DOM
+import { JSDOM } from 'jsdom';
 import {
   FIREFOX_PLATFORM_LIMIT,
   FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
   MAX_BROWSER_TOOL_CONSOLE_MESSAGES,
   MAX_BROWSER_TOOL_NETWORK_REQUESTS,
+  MAX_BROWSER_TOOL_REFS,
   createBrowserToolSession,
   getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
+import { STALE_REF_ERROR } from './browser-agent-checks';
 import { TAB_TAKEN_ERROR } from './browser-caller';
 import type {
   BrowserScriptingApi,
@@ -488,6 +492,102 @@ const createExecutingScriptingSession = () => {
       tabId: 7,
       tabsApi: tabsApi.api,
     }),
+  };
+};
+
+type TabUpdatedListener = (
+  tabId: number,
+  changeInfo: { readonly status?: string; readonly url?: string }
+) => void;
+
+const SHOP_ORIGIN = 'https://shop.example.com';
+const PAY_ORIGIN = 'https://pay.example.com';
+
+/**
+ * One tab behind two real documents: the shop page (frame 0) and the pay
+ * frame it embeds (frame 4). MAIN-world code runs in the document its target
+ * frame names; the ISOLATED probe answers the frame tree.
+ */
+const createFramedScriptingSession = () => {
+  const shop = new JSDOM('<body><button>Top</button><iframe></iframe></body>', {
+    url: `${SHOP_ORIGIN}/`,
+  });
+  const pay = new JSDOM('<body><button>Buy</button><input></body>', { url: `${PAY_ORIGIN}/` });
+  const documents = new Map([
+    [0, shop],
+    [4, pay],
+  ]);
+  const frameAnswers = [
+    { frameId: 0, origin: SHOP_ORIGIN, owners: [4], parentFrameId: null },
+    { frameId: 4, origin: PAY_ORIGIN, owners: [], parentFrameId: 0 },
+  ];
+  const isolatedKinds: string[] = [];
+  const mainWorldFrames: (number | undefined)[] = [];
+  const updatedListeners: TabUpdatedListener[] = [];
+  const scriptingApi: BrowserScriptingApi = {
+    executeScript: async details => {
+      if (details.world === 'ISOLATED') {
+        isolatedKinds.push(details.args[0] ?? '');
+
+        return details.args[0] === 'frame'
+          ? frameAnswers.map(({ frameId, ...answer }) => ({
+              frameId,
+              result: JSON.stringify({ ...answer, url: `${answer.origin}/` }),
+            }))
+          : [];
+      }
+
+      const frameId = details.target.frameIds?.[0];
+      const dom = documents.get(frameId ?? 0);
+      const results: unknown[] = [];
+
+      mainWorldFrames.push(frameId);
+
+      if (dom !== undefined) {
+        Object.defineProperty(dom.window.HTMLElement.prototype, 'scrollIntoView', {
+          configurable: true,
+          value: vi.fn(),
+        });
+        await withPageGlobals(
+          {
+            MouseEvent: dom.window.MouseEvent,
+            document: dom.window.document,
+            location: dom.window.location,
+            window: dom.window,
+          },
+          async () => {
+            results.push(await executeWrappedPageCode(details.args[0] ?? ''));
+          }
+        );
+      }
+
+      return [{ documentId: `doc-${String(frameId ?? 0)}`, result: results[0] }];
+    },
+  };
+  const tabsApi: BrowserTabsApi = {
+    ...createTabsApi().api,
+    onUpdated: {
+      addListener: listener => {
+        updatedListeners.push(listener);
+      },
+      removeListener: () => {},
+    },
+  };
+
+  return {
+    emitUpdated: (
+      tabId: number,
+      changeInfo: { readonly status?: string; readonly url?: string }
+    ) => {
+      for (const listener of updatedListeners) {
+        listener(tabId, changeInfo);
+      }
+    },
+    isolatedKinds,
+    mainWorldFrames,
+    pay,
+    session: createBrowserToolSession({ scriptingApi, tabId: 7, tabsApi }),
+    shop,
   };
 };
 
@@ -1261,7 +1361,7 @@ describe('browser tool session', () => {
 });
 
 const scriptingSnapshotPayload = {
-  lines: ['- button "Go" e1'],
+  lines: ['- button "Go" [ref=e1]'],
   nextRef: 1,
   refs: [{ ref: 'e1', selector: 'button.go' }],
 };
@@ -1270,6 +1370,19 @@ const scriptingSnapshotPayload = {
 // The fake keys its payload off the aria builder in the code.
 const scriptingResultForCode = (code: string): unknown =>
   code.includes('__buildAria') ? scriptingSnapshotPayload : 'ok';
+
+/** A snapshot whose page registered more refs than the cap while its returned text names only e1 and e2. */
+const oversizedSnapshotPayload = {
+  lines: ['- button "One" [ref=e1]', '- button "Two" [ref=e2]'],
+  nextRef: MAX_BROWSER_TOOL_REFS + 1,
+  refs: Array.from({ length: MAX_BROWSER_TOOL_REFS + 1 }, (_slot, index) => ({
+    ref: `e${String(index + 1)}`,
+    selector: `#node-${String(index + 1)}`,
+  })),
+};
+
+const oversizedSnapshotResultForCode = (code: string): unknown =>
+  code.includes('__buildAria') ? oversizedSnapshotPayload : 'ok';
 
 describe('browser tool session scripting backend', () => {
   it('selects the scripting backend when chrome.debugger is unavailable', () => {
@@ -1476,7 +1589,7 @@ describe('browser tool session scripting backend', () => {
 
     await expect(session.callTool('kilo_browser_snapshot')).resolves.toStrictEqual({
       ok: true,
-      value: '- button "Go" e1',
+      value: '- button "Go" [ref=e1]',
     });
 
     await session.callTool('kilo_browser_click', { target: 'e1' });
@@ -1497,6 +1610,169 @@ describe('browser tool session scripting backend', () => {
 
     expect(input.value).toBe('Ada');
     expect(input.events.map(event => event.type)).toStrictEqual(['input', 'change']);
+  });
+
+  it('renders the snapshot contract format: refs, label names and printed-ancestor depth', async () => {
+    const dom = new JSDOM(
+      '<body><h1>Parity</h1><p>idle</p>' +
+        '<label>Name <input id="name"></label>' +
+        '<label><input type="checkbox" checked> Agree</label>' +
+        '<label>Color <select><option>Red</option><option>Blue</option></select></label>' +
+        '<div><span id="caption">Send it</span><button aria-labelledby="caption">x</button></div>' +
+        '<section><iframe title="Pay"></iframe></section>' +
+        '</body>'
+    );
+    const { session } = createExecutingScriptingSession();
+
+    await withPageGlobals(
+      { document: dom.window.document, location: dom.window.location, window: dom.window },
+      async () => {
+        await expect(session.callTool('browser_snapshot', {})).resolves.toStrictEqual({
+          ok: true,
+          value: [
+            '- heading "Parity"[level=1]',
+            '- paragraph "idle"',
+            '- textbox "Name" [ref=e1]',
+            '- checkbox "Agree" [ref=e2][checked]',
+            '- combobox "Color" [ref=e3]',
+            '  - option "Red" [ref=e4]',
+            '  - option "Blue" [ref=e5]',
+            '- text: Send it',
+            '- button "Send it" [ref=e6]',
+            '- iframe [ref=e7]',
+          ].join('\n'),
+        });
+      }
+    );
+  });
+
+  it('keeps the snapshot refs after a find, which only adds its own', async () => {
+    const dom = new JSDOM('<body><button id="go">Go</button><p>idle</p></body>');
+    const { session } = createExecutingScriptingSession();
+
+    await withPageGlobals(
+      { document: dom.window.document, location: dom.window.location, window: dom.window },
+      async () => {
+        await expect(session.callTool('browser_snapshot', {})).resolves.toStrictEqual({
+          ok: true,
+          value: '- button "Go" [ref=e1]\n- paragraph "idle"',
+        });
+        await expect(session.callTool('browser_find', { text: 'go' })).resolves.toStrictEqual({
+          ok: true,
+          value: 'Found 1 matching line(s):\n\n- button "Go" [ref=e2]\n- paragraph "idle"',
+        });
+        await expect(session.resolveTarget('e1')).resolves.toMatchObject({ kind: 'selector' });
+        await expect(session.resolveTarget('e2')).resolves.toMatchObject({ kind: 'selector' });
+      }
+    );
+  });
+
+  it('splices a granted frame without a ref on its line, which would only reach the owner element', async () => {
+    const { isolatedKinds, session } = createFramedScriptingSession();
+
+    await expect(
+      session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] })
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+    });
+    await expect(session.resolveTarget('e2')).resolves.toBeUndefined();
+    expect(isolatedKinds).toStrictEqual(['frame']);
+  });
+
+  it('splices from the call’s frame inventory instead of probing the frames again', async () => {
+    const { isolatedKinds, session } = createFramedScriptingSession();
+    const readFrames = vi.fn(() =>
+      Promise.resolve({
+        childSessions: new Map<string, string>(),
+        complete: true,
+        frames: [
+          { id: '0', origin: SHOP_ORIGIN, url: `${SHOP_ORIGIN}/` },
+          { id: '4', origin: PAY_ORIGIN, parentId: '0', url: `${PAY_ORIGIN}/` },
+        ],
+        owners: new Map<string, readonly (string | undefined)[]>([
+          ['0', ['4']],
+          ['4', []],
+        ]),
+      })
+    );
+
+    await expect(
+      session.callTool(
+        'browser_snapshot',
+        {},
+        { readFrames, readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+      )
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+    });
+    expect(readFrames.mock.calls).toStrictEqual([[]]);
+    expect(isolatedKinds).toStrictEqual([]);
+  });
+
+  it('makes every scripting ref stale once the tab starts loading another document', async () => {
+    const { emitUpdated, session } = createFramedScriptingSession();
+
+    await session.callTool('browser_snapshot', {});
+    emitUpdated(7, { url: `${SHOP_ORIGIN}/#section` });
+    emitUpdated(8, { status: 'loading' });
+    await expect(session.resolveTarget('e1')).resolves.toMatchObject({ kind: 'selector' });
+
+    emitUpdated(7, { status: 'loading' });
+
+    await expect(session.resolveTarget('e1')).resolves.toBeUndefined();
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
+      error: STALE_REF_ERROR,
+      ok: false,
+    });
+  });
+
+  it('caps a caller’s merged refs, dropping the oldest earlier refs first', async () => {
+    const { session } = createScriptingSession();
+
+    session.registerRefs(
+      Array.from({ length: MAX_BROWSER_TOOL_REFS }, (_slot, index) => ({
+        ref: `e${String(index + 1)}`,
+        selector: `#node-${String(index + 1)}`,
+      })),
+      { merge: true }
+    );
+    session.registerRefs([{ ref: 'e9999', selector: '#late' }], { merge: true });
+
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toStrictEqual({
+      error: STALE_REF_ERROR,
+      ok: false,
+    });
+    await expect(session.callTool('browser_click', { target: 'e2' })).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('never evicts the refs of the registration it is making', async () => {
+    const { session } = createScriptingSession();
+
+    session.registerRefs(
+      Array.from({ length: MAX_BROWSER_TOOL_REFS + 1 }, (_slot, index) => ({
+        ref: `e${String(index + 1)}`,
+        selector: `#node-${String(index + 1)}`,
+      })),
+      { merge: true }
+    );
+
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('registers only the refs a snapshot’s returned text names', async () => {
+    const { session } = createScriptingSession({ result: oversizedSnapshotResultForCode });
+
+    await expect(session.callTool('browser_snapshot', {})).resolves.toMatchObject({ ok: true });
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toMatchObject({
+      ok: true,
+    });
+    await expect(session.resolveTarget('e3')).resolves.toBeUndefined();
   });
 
   it('types slowly character by character with key events through the injected code', async () => {
@@ -1603,11 +1879,14 @@ describe('browser tool session scripting backend', () => {
     }
   );
 
-  it('names the upstream tool in the Firefox error and keeps it off the debugger backend', () => {
+  it('names the tool the way the caller called it and keeps it off the debugger backend', () => {
     const { session } = createScriptingSession();
 
     expect(getFirefoxUnsupportedToolError('browser_console_messages')).toBe(
-      `kilo_browser_console_messages is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+      `browser_console_messages is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+    );
+    expect(getFirefoxUnsupportedToolError('kilo_browser_drag')).toBe(
+      `kilo_browser_drag is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
     );
     expect(session.getToolUnavailableError('kilo_browser_console_messages')).toContain(
       FIREFOX_PLATFORM_LIMIT

@@ -1,7 +1,12 @@
 /* eslint-disable id-length, max-lines -- CDP mouse commands name their coordinates `x` and `y`; one module owns the eight interaction tools and the shared CDP and page-helper plumbing keeps their shapes consistent. */
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
-import { ambiguousSelectorError } from './browser-agent-checks';
+import {
+  ambiguousSelectorError,
+  FRESH_SNAPSHOT_HINT,
+  looksLikeBrowserRef,
+  STALE_REF_ERROR,
+} from './browser-agent-checks';
 import { RETARGET_TO_CONTROL_FUNCTION } from './browser-agent-probes';
 import type { BrowserToolResolvedTarget, BrowserToolUniqueTarget } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
@@ -48,11 +53,6 @@ const toUpstreamToolName = (name: string): string =>
 export const isInteractBrowserToolName = (name: string): boolean =>
   INTERACT_BROWSER_TOOL_NAME_SET.has(toUpstreamToolName(name));
 
-const STALE_REF_ERROR_PREFIX = 'The element reference is stale or unknown.';
-const FRESH_SNAPSHOT_HINT =
-  'Take a fresh kilo_browser_snapshot and use a ref from that snapshot, or pass a unique CSS selector.';
-const STALE_REF_ERROR = `${STALE_REF_ERROR_PREFIX} ${FRESH_SNAPSHOT_HINT}`;
-
 const ok = (message: string): EvalTabResult => ({ ok: true, value: message });
 const fail = (error: string): EvalTabResult => ({ error, ok: false });
 
@@ -63,9 +63,6 @@ const okValue = (value: PageHelperValue): EvalTabResult => ({ ok: true, value })
 
 const invalidArguments = (tool: string, error: string): EvalTabResult =>
   fail(`${tool}: invalid arguments. ${error}`);
-
-const refPattern = /^(?:ref=)?(?:f\d+)?e\d+$/u;
-const looksLikeRef = (target: string): boolean => refPattern.test(target.trim());
 
 type TargetResolution =
   | { readonly ok: true; readonly target: BrowserToolUniqueTarget }
@@ -85,7 +82,7 @@ const resolveTargetOrError = async (
     return { ok: true, target: resolved };
   }
 
-  if (looksLikeRef(target)) {
+  if (looksLikeBrowserRef(target)) {
     return { error: STALE_REF_ERROR, ok: false };
   }
 

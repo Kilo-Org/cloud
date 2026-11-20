@@ -608,12 +608,17 @@ const snapshotRootFrameId = async (
   }
 };
 
+/**
+ * `mergeRefs` keeps the refs earlier snapshots registered: a find reads the same
+ * tree, and like Playwright MCP a ref stays valid until the next snapshot.
+ */
 const captureScopedSnapshot = async (
   deps: BrowserReadActionDeps,
-  options: BrowserSnapshotArguments
+  options: BrowserSnapshotArguments,
+  mergeRefs = false
 ): Promise<BrowserAriaSnapshotCapture> => {
   if (deps.agentScope === undefined) {
-    return captureBrowserAriaSnapshot(deps.session, options);
+    return captureBrowserAriaSnapshot(deps.session, options, { mergeRefs });
   }
 
   const target = options.target ?? '';
@@ -622,7 +627,7 @@ const captureScopedSnapshot = async (
 
   return captureAgentSnapshotView(deps.session, deps.agentScope, {
     ...(options.depth === undefined ? {} : { depth: options.depth }),
-    mergeRefs: target !== '',
+    mergeRefs: mergeRefs || target !== '',
     ...(rootFrameId === undefined ? {} : { rootFrameId }),
   });
 };
@@ -838,7 +843,7 @@ const browserFindHandler: BrowserReadActionHandler = async (arguments_, deps) =>
     );
   }
 
-  const capture = await captureScopedSnapshot(deps, {});
+  const capture = await captureScopedSnapshot(deps, {}, true);
   const matches: number[] = [];
 
   for (const [index, line] of capture.lines.entries()) {

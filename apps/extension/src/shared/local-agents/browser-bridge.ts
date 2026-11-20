@@ -369,6 +369,13 @@ export const createRuntimeBrowserBridge = ({
       throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabBusy, TAB_BUSY_ERROR);
     }
 
+    if (outcome.kind === 'unsupported') {
+      throw new LocalAgentRpcError(
+        LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+        outcome.result.ok ? 'This browser cannot run the tool.' : outcome.result.error
+      );
+    }
+
     if (outcome.result.ok) {
       const content = contentOf(outcome.result);
 

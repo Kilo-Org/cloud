@@ -55,7 +55,12 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
 }));
 vi.mock('@/lib/persist/use-form-draft', () => ({
-  useFormDraft: () => ({ kind: 'ready', value: null, save: () => undefined, clear: () => undefined }),
+  useFormDraft: () => ({
+    kind: 'ready',
+    value: null,
+    save: () => undefined,
+    clear: () => undefined,
+  }),
 }));
 vi.mock('@/lib/persist/drafts', () => ({
   orgGuardrailsFormDraftKey: (organizationId: string) => `org-guardrails-form:${organizationId}`,

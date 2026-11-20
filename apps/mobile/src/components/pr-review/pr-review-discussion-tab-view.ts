@@ -10,6 +10,7 @@ export type DiscussionTabView = {
     | 'not-found'
     | 'reconnect'
     | 'retryable'
+    | 'offline'
     | 'service-unavailable'
     | 'loading'
     | 'empty'
@@ -18,7 +19,13 @@ export type DiscussionTabView = {
 
 export function selectDiscussionTabView(args: {
   firstPageErrorState: {
-    kind: 'permission' | 'not-found' | 'reconnect' | 'retryable' | 'service-unavailable';
+    kind:
+      | 'permission'
+      | 'not-found'
+      | 'reconnect'
+      | 'retryable'
+      | 'offline'
+      | 'service-unavailable';
   } | null;
   isPending: boolean;
   /**

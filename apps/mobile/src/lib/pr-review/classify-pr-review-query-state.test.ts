@@ -72,11 +72,14 @@ describe('classifyPrReviewQueryState', () => {
     });
   });
 
-  it('falls back to retryable for unknown / non-tRPC errors', () => {
-    expect(classifyPrReviewQueryState(new Error('network down'))).toEqual({ kind: 'retryable' });
-    expect(classifyPrReviewQueryState('string error')).toEqual({ kind: 'retryable' });
-    expect(classifyPrReviewQueryState(null)).toEqual({ kind: 'retryable' });
-    expect(classifyPrReviewQueryState(undefined)).toEqual({ kind: 'retryable' });
+  // D5: an error with no tRPC code never reached the server, so the inbox said
+  // "Something went wrong on our end" for a missing network. The connection
+  // now owns that case, with its own copy and the Retry that fixes it.
+  it('names the connection for an error that reached no server', () => {
+    expect(classifyPrReviewQueryState(new Error('network down'))).toEqual({ kind: 'offline' });
+    expect(classifyPrReviewQueryState('string error')).toEqual({ kind: 'offline' });
+    expect(classifyPrReviewQueryState(null)).toEqual({ kind: 'offline' });
+    expect(classifyPrReviewQueryState(undefined)).toEqual({ kind: 'offline' });
   });
 
   it('falls back to retryable for tRPC 5xx-class codes', () => {

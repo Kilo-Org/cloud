@@ -9,10 +9,19 @@
 // the same decision tree. No React, no react-query, no expo modules —
 // that keeps it testable in plain Node.
 
-import { readTrpcErrorField } from '@/lib/trpc-error';
+import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
 
 export type PrReviewQueryState =
+  | {
+      /**
+       * The read never reached the server: the app has confirmed it is offline,
+       * or the request failed before any server answer. The caller paints the
+       * connection's own wording with Retry — never the server's copy, which
+       * would blame the backend for the device's missing network.
+       */
+      kind: 'offline';
+    }
   | {
       /**
        * The fetch failed with a transient error (network, 5xx, etc.). The
@@ -59,6 +68,13 @@ export type PrReviewQueryState =
     };
 
 export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
+  // A read that never reached the server is the connection, not the backend:
+  // a transport rejection carries no tRPC code, and a code-less error is not a
+  // server answer (see `servedAnswer`). Checked before the code table so an
+  // offline inbox never reads "Something went wrong on our end".
+  if (!isTrpcClientError(error) && readTrpcErrorField(error, 'code') === undefined) {
+    return { kind: 'offline' };
+  }
   const code = readTrpcErrorField(error, 'code');
   if (code === 'PRECONDITION_FAILED') {
     return { kind: 'reconnect' };

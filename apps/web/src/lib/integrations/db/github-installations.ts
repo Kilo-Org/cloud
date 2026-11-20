@@ -153,7 +153,13 @@ export async function connectVerifiedGitHubInstallation(
             eq(platform_integrations.owned_by_organization_id, owner.id),
             eq(platform_integrations.platform, PLATFORM.GITHUB),
             // A locally disconnected connection has relinquished its slot; it
-            // must not block attaching a different installation.
+            // must not block attaching a different installation. This is
+            // deliberately narrower than the health condition the connection
+            // role uses (`isPlatformIntegrationHealthy`): this check decides
+            // how many installations the organization holds, and a suspended
+            // association is restored to active by
+            // `observeGitHubInstallationLifecycle`, so it must keep occupying
+            // the slot.
             isNull(platform_integrations.github_disconnected_at)
           )
         );

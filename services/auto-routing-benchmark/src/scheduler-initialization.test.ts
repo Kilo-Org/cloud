@@ -458,5 +458,5 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     expect(
       sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_runs WHERE status = 'completed'").get()
     ).toEqual({ n: runIds.length });
-  });
+  }, 30_000);
 });

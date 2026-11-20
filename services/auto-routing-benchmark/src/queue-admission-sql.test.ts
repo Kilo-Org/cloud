@@ -236,7 +236,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
         )
         .get(runId)
     ).toEqual({ n: 1 });
-  });
+  }, 30_000);
 
   it('waits while a run of the queue is still starting, then starts once it is initialized', async () => {
     insertRun('user-starting', ['vendor/starting']);

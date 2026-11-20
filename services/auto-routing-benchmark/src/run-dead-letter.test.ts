@@ -77,6 +77,7 @@ const claim = {
   token: 'owned-token',
   attempts: 2,
   throttle_deferrals: 0,
+  catalog_deferrals: 0,
 } satisfies SchedulerClaim;
 const env = {
   BENCH_DB: { prepare: schedulerPrepare } as unknown as D1Database,
@@ -290,11 +291,10 @@ describe('processDeadLetter — legacy migration', () => {
       await processDeadLetter(env, { runId, kind: 'decider', model: 'b/dead' });
       expect(fetcher).not.toHaveBeenCalled();
       expect(scheduleRunChunks).not.toHaveBeenCalled();
-      expect(markProfilesFailedForRun).toHaveBeenCalledWith(
-        env.BENCH_DB,
-        runId,
-        'Benchmark run is missing its execution identity.'
-      );
+      expect(markProfilesFailedForRun).toHaveBeenCalledWith(env.BENCH_DB, runId, {
+        failureClass: 'run_init_failed',
+        reason: 'Benchmark run is missing its execution identity.',
+      });
       expect(markRunFailed).toHaveBeenCalledWith(
         env.BENCH_DB,
         runId,

@@ -17,7 +17,7 @@ import {
   pendingStatusInsertStatement,
   registerProfiles,
 } from './profiles';
-import { requeueFailedCurrentProfiles } from './db';
+import { requeueRetryableCurrentProfiles } from './db';
 
 const SCHEMA_SQL = `
   CREATE TABLE benchmark_profiles (
@@ -29,6 +29,11 @@ const SCHEMA_SQL = `
     status TEXT NOT NULL,
     run_id TEXT,
     failure_reason TEXT,
+    failure_class TEXT,
+    failure_attempts INTEGER NOT NULL DEFAULT 0,
+    model_failure_attempts INTEGER NOT NULL DEFAULT 0,
+    first_failed_at TEXT,
+    retry_after TEXT,
     invalidated_at TEXT,
     requested_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -324,11 +329,24 @@ describe('registerProfiles multi-variant quota (migrated SQLite)', () => {
           now,
         });
         expect(result.statuses).toEqual(
-          pairs.map(entry => ({
-            entry,
-            status: entry.variant === 'low' ? 'failed' : 'pending',
-            failureReason: entry.variant === 'low' ? 'previous failure' : null,
-          }))
+          pairs.map(entry =>
+            entry.variant === 'low'
+              ? {
+                  entry,
+                  status: 'failed',
+                  failureReason: 'previous failure',
+                  failure: {
+                    kind: 'retryable',
+                    failureClass: 'unknown',
+                    reason: 'previous failure',
+                    attempts: 1,
+                    firstFailedAt: now.toISOString(),
+                    lastFailedAt: now.toISOString(),
+                    retryAfter: now.toISOString(),
+                  },
+                }
+              : { entry, status: 'pending', failureReason: null }
+          )
         );
         expect(
           sqlite
@@ -459,7 +477,7 @@ describe('pendingRegisterUpsertStatement (real SQLite)', () => {
       },
     } as unknown as D1Database;
     expect(
-      await requeueFailedCurrentProfiles(
+      await requeueRetryableCurrentProfiles(
         binding,
         { engineIdentity: values.engine_identity, repetitions: values.repetitions },
         'user'

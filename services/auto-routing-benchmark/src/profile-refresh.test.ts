@@ -61,7 +61,7 @@ beforeEach(() => {
 afterEach(() => sqlite.close());
 
 describe('targeted benchmark refresh', () => {
-  it('invalidates only selected current pairs and leaves unavailable models failed', async () => {
+  it('invalidates only selected current pairs and fails unavailable models permanently', async () => {
     seedProfile('vendor/selected');
     seedProfile('vendor/removed');
     seedProfile('vendor/other');
@@ -103,7 +103,7 @@ describe('targeted benchmark refresh', () => {
       {
         model: 'vendor/removed',
         engine_identity: 'test-engine',
-        status: 'failed',
+        status: 'unavailable',
         invalidated_at: refreshedAt,
       },
       {

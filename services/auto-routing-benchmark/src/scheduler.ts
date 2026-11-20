@@ -1,6 +1,7 @@
 import {
   BENCHMARK_CONTAINER_BUDGET,
   BenchmarkSchedulerLimitSchema,
+  type BenchmarkProfileFailureClass,
   type BenchmarkSchedulerConfigResponse,
   type BenchmarkSchedulerOverrides,
   type BenchmarkSchedulerSetting,
@@ -163,6 +164,12 @@ export const SCHEDULER_MAX_ATTEMPTS = 6;
  * about an hour before it falls back to ordinary attempts and can fail its lane.
  */
 export const SCHEDULER_MAX_THROTTLE_DEFERRALS = 16;
+/**
+ * A catalog load failure is global, not the chunk's, so it refunds the attempt and counts
+ * here. Its own budget (about 1.7 hours of backoff) still ends a catalog outage that never
+ * clears: the chunk then falls back to ordinary attempts and can fail its lane.
+ */
+export const SCHEDULER_MAX_CATALOG_DEFERRALS = 24;
 export const SCHEDULER_DISPATCH_LEASE_MS = 20_000;
 export const SCHEDULER_INIT_BUDGET_MS = 20_000;
 export const SCHEDULER_INIT_LEASE_MS = 2 * 60_000;
@@ -186,6 +193,7 @@ export type SchedulerClaim = {
   token: string;
   attempts: number;
   throttle_deferrals: number;
+  catalog_deferrals: number;
 };
 
 type SchedulerLaneHead = {
@@ -541,8 +549,9 @@ export async function claimScheduledChunks(
         db
           .prepare('SELECT scope, key FROM scheduler_cooldowns WHERE until > ?')
           .bind(now)
-          .all<{ scope: 'model' | 'provider'; key: string }>(),
+          .all<{ scope: 'model' | 'provider' | 'catalog'; key: string }>(),
       ]);
+      if (cooldowns.results.some(row => row.scope === 'catalog')) break;
       const selection = selectScheduledChunks({
         config,
         live: live.results,
@@ -666,6 +675,21 @@ export async function deferThrottledChunk(
     .run();
 }
 
+export async function deferCatalogChunk(
+  db: D1Database,
+  id: string,
+  token: string,
+  availableAt: number
+): Promise<void> {
+  await db
+    .prepare(`UPDATE scheduler_chunks SET status = 'pending', attempts = MAX(attempts - 1, 0),
+    catalog_deferrals = catalog_deferrals + 1, available_at = ?, slot = NULL, token = NULL,
+    lease_until = 0
+    WHERE id = ? AND token = ? AND status IN ('queued', 'active')`)
+    .bind(availableAt, id, token)
+    .run();
+}
+
 export async function failChunk(db: D1Database, id: string, token: string): Promise<void> {
   await db
     .prepare(`UPDATE scheduler_chunks SET status = 'failed', slot = NULL, lease_until = 0
@@ -677,13 +701,14 @@ export async function failChunk(db: D1Database, id: string, token: string): Prom
 export async function failScheduledEntry(
   db: D1Database,
   claim: SchedulerClaim,
+  failureClass: BenchmarkProfileFailureClass,
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   await db.batch([
     db
       .prepare(`
-        INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at)
-        SELECT run_id, model, variant, rep, MIN(chunk), 0, ?
+        INSERT INTO run_lane_failures (run_id, model, variant, rep, chunk, shard, failed_at, failure_class)
+        SELECT run_id, model, variant, rep, MIN(chunk), 0, ?, ?
         FROM scheduler_chunks
         WHERE run_id = ? AND model = ? AND variant = ?
           AND EXISTS (
@@ -693,7 +718,7 @@ export async function failScheduledEntry(
         GROUP BY run_id, model, variant, rep
         ON CONFLICT DO NOTHING
       `)
-      .bind(nowIso, claim.run_id, claim.model, claim.variant, claim.id, claim.token),
+      .bind(nowIso, failureClass, claim.run_id, claim.model, claim.variant, claim.id, claim.token),
     db
       .prepare(`
         WITH owned AS MATERIALIZED (
@@ -1028,4 +1053,13 @@ export async function cooldownProviders(
         .bind(entry.scope, entry.key, until)
     )
   );
+}
+
+/** Holds every dispatch until `until`: a catalog that cannot load fails every chunk alike. */
+export async function cooldownCatalog(db: D1Database, until: number): Promise<void> {
+  await db
+    .prepare(`INSERT INTO scheduler_cooldowns (scope, key, until) VALUES ('catalog', 'catalog', ?)
+      ON CONFLICT (scope, key) DO UPDATE SET until = MAX(until, excluded.until)`)
+    .bind(until)
+    .run();
 }

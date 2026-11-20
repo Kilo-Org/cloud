@@ -13,7 +13,7 @@ type RefreshInput = {
   mode: 'refresh' | 'repair_unavailable';
 };
 
-type RefreshedRow = { model: string; variant: string; status: 'pending' | 'failed' };
+type RefreshedRow = { model: string; variant: string; status: 'pending' | 'unavailable' };
 
 type RecordedLookupResult = {
   run_id: string;
@@ -105,12 +105,20 @@ export async function refreshCurrentProfiles(
     FROM json_each(?4) AS requested
     WHERE json_extract(requested.value, '$.model') = benchmark_profiles.model
       AND json_extract(requested.value, '$.variant') = benchmark_profiles.variant`;
+  // Re-admitting clears the failure history, so the retry budgets start over. A pair the
+  // catalog cannot run fails permanently here instead, before any paid call.
   const result = await db
     .prepare(`UPDATE benchmark_profiles SET
-      status = CASE WHEN (${availableSql}) THEN 'pending' ELSE 'failed' END,
+      status = CASE WHEN (${availableSql}) THEN 'pending' ELSE 'unavailable' END,
       failure_reason = CASE WHEN (${availableSql}) THEN NULL
         ELSE 'Model or variant is unavailable to the benchmark CLI.' END,
-      run_id = NULL, requested_at = ?5, updated_at = ?5, completed_at = NULL,
+      failure_class = CASE WHEN (${availableSql}) THEN NULL ELSE 'catalog_absent' END,
+      failure_attempts = CASE WHEN (${availableSql}) THEN 0 ELSE 1 END,
+      model_failure_attempts = 0,
+      first_failed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?5 END,
+      retry_after = NULL,
+      run_id = NULL, requested_at = ?5, updated_at = ?5,
+      completed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?5 END,
       invalidated_at = ?5
     WHERE router = ?1 AND engine_identity = ?2 AND repetitions = ?3
       AND EXISTS (${availableSql}) AND status != 'running'

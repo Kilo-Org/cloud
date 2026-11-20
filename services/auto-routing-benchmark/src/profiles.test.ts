@@ -133,6 +133,11 @@ vi.mock('drizzle-orm/d1', () => {
       requested_at: String(row.requested_at),
       updated_at: String(row.updated_at),
       completed_at: (row.completed_at as string | null) ?? null,
+      failure_class: (row.failure_class as string | null) ?? null,
+      failure_attempts: Number(row.failure_attempts ?? 0),
+      model_failure_attempts: Number(row.model_failure_attempts ?? 0),
+      first_failed_at: (row.first_failed_at as string | null) ?? null,
+      retry_after: (row.retry_after as string | null) ?? null,
       platform_requested: row.platform_requested === true,
       user_requested: row.user_requested !== false,
     };
@@ -400,9 +405,27 @@ function profileRow(
     requested_at: '2026-07-27T00:00:00.000Z',
     updated_at: '2026-07-27T00:00:00.000Z',
     completed_at: null,
+    failure_class: null,
+    failure_attempts: 0,
+    model_failure_attempts: 0,
+    first_failed_at: null,
+    retry_after: null,
     platform_requested: false,
     user_requested: true,
     ...partial,
+  };
+}
+
+/** The wire failure of a `profileRow` fixture failed before failure history was recorded. */
+function legacyRetryableFailure(reason: string) {
+  return {
+    kind: 'retryable',
+    failureClass: 'unknown',
+    reason,
+    attempts: 1,
+    firstFailedAt: '2026-07-27T00:00:00.000Z',
+    lastFailedAt: '2026-07-27T00:00:00.000Z',
+    retryAfter: '2026-07-27T00:00:00.000Z',
   };
 }
 
@@ -572,7 +595,44 @@ describe('classifyProfileAdmission', () => {
         e,
         false
       )
-    ).toEqual({ kind: 'report', status: 'failed', failureReason: 'boom' });
+    ).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'boom',
+      failure: legacyRetryableFailure('boom'),
+    });
+  });
+
+  it('reports a permanent failure as failed with its cause', () => {
+    expect(
+      classifyProfileAdmission(
+        [
+          profileRow({
+            model: 'm',
+            status: 'unavailable',
+            failure_reason: 'gone',
+            failure_class: 'catalog_absent',
+            failure_attempts: 1,
+          }),
+        ],
+        current,
+        e,
+        false
+      )
+    ).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'gone',
+      failure: {
+        kind: 'permanent',
+        failureClass: 'catalog_absent',
+        reason: 'gone',
+        attempts: 1,
+        firstFailedAt: '2026-07-27T00:00:00.000Z',
+        lastFailedAt: '2026-07-27T00:00:00.000Z',
+        cause: 'terminal_class',
+      },
+    });
   });
 
   it('charges admission for explicit failed retry', () => {
@@ -784,6 +844,7 @@ describe('registerProfiles', () => {
         entry: entry('a/fail'),
         status: 'failed',
         failureReason: 'container crash',
+        failure: legacyRetryableFailure('container crash'),
       },
     ]);
     expect(store.events).toHaveLength(0);
@@ -1065,7 +1126,12 @@ describe('lookupProfileStatuses', () => {
 
     expect(result.statuses).toEqual([
       { entry: entry('a/ready'), status: 'ready', failureReason: null },
-      { entry: entry('a/fail'), status: 'failed', failureReason: 'nope' },
+      {
+        entry: entry('a/fail'),
+        status: 'failed',
+        failureReason: 'nope',
+        failure: legacyRetryableFailure('nope'),
+      },
     ]);
     expect(store.events).toHaveLength(0);
   });

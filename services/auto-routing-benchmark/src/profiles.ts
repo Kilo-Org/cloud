@@ -1,6 +1,7 @@
 import type {
   AutoRouter,
   BenchmarkProfileEntryStatus,
+  BenchmarkProfileFailure,
   BenchmarkProfileQuotaError,
   BenchmarkProfileStatus,
   BenchmarkProfileStatusesResponse,
@@ -21,6 +22,7 @@ import { benchmarkProfiles, profileRequestEvents } from './db-schema';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
+import { parseProfileState, wireProfileFailure, wireProfileStatus } from './profile-failure';
 
 /** Rolling 24h owner admission limit per base router (charged new/retry only). */
 export const PROFILE_ADMISSION_LIMIT = 20;
@@ -72,12 +74,18 @@ export function currentProfileContextFromConfig(
 }
 
 export type AdmissionClass =
-  | { kind: 'report'; status: BenchmarkProfileStatus; failureReason?: string | null }
+  | {
+      kind: 'report';
+      status: BenchmarkProfileStatus;
+      failureReason?: string | null;
+      failure?: BenchmarkProfileFailure;
+    }
   | { kind: 'admit'; charged: boolean };
 
 /**
  * Pure classification of one entry against existing registry rows for that
  * exact pair. `retry` is true when the owner listed this entry in retryEntries.
+ * An explicit retry re-admits a failed row, permanent or not: it is charged.
  */
 export function classifyProfileAdmission(
   entryRows: readonly ProfileRow[],
@@ -87,14 +95,9 @@ export function classifyProfileAdmission(
 ): AdmissionClass {
   const currentRow = entryRows.find(row => isCurrentBenchmarkProfile(row, current, entry));
   if (currentRow) {
-    if (
-      currentRow.status === 'ready' ||
-      currentRow.status === 'pending' ||
-      currentRow.status === 'running'
-    ) {
-      return { kind: 'report', status: currentRow.status };
-    }
-    // failed
+    const state = parseProfileState(currentRow);
+    const failure = wireProfileFailure(state);
+    if (!failure) return { kind: 'report', status: wireProfileStatus(state) };
     if (retry) {
       return { kind: 'admit', charged: true };
     }
@@ -102,6 +105,7 @@ export function classifyProfileAdmission(
       kind: 'report',
       status: 'failed',
       failureReason: currentRow.failure_reason,
+      failure,
     };
   }
 
@@ -221,10 +225,13 @@ function groupRowsByEntry(rows: readonly ProfileRow[]): Map<string, ProfileRow[]
 }
 
 function statusFromRow(entry: BenchmarkPair, row: ProfileRow): BenchmarkProfileEntryStatus {
+  const state = parseProfileState(row);
+  const failure = wireProfileFailure(state);
   return {
     entry,
-    status: row.status,
-    failureReason: row.status === 'failed' ? boundFailureReason(row.failure_reason) : null,
+    status: wireProfileStatus(state),
+    failureReason: failure ? boundFailureReason(row.failure_reason) : null,
+    ...(failure ? { failure } : {}),
   };
 }
 
@@ -311,8 +318,9 @@ const PROFILE_PK_TARGET = [
 
 /**
  * Register-path upsert: insert a pending current row, or only transition an
- * existing current row from `failed` → `pending`. Never regresses
- * pending/running/ready or clears their provenance.
+ * existing current failed row, retryable or permanent, to `pending`. Never
+ * regresses pending/running/ready or clears their provenance. The failure
+ * history stays, so the retry budgets keep counting.
  */
 export function pendingRegisterUpsertStatement(
   orm: ReturnType<typeof drizzle>,
@@ -327,12 +335,13 @@ export function pendingRegisterUpsertStatement(
         status: 'pending',
         run_id: null,
         failure_reason: null,
+        retry_after: null,
         requested_at: values.requested_at,
         updated_at: values.updated_at,
         completed_at: null,
       },
       where: and(
-        eq(benchmarkProfiles.status, 'failed'),
+        inArray(benchmarkProfiles.status, ['failed', 'unavailable']),
         noLiveBenchmarkChunks({
           router: values.router ?? 'efficient',
           model: values.model,
@@ -664,6 +673,7 @@ export async function registerProfiles(
         classification.status === 'failed'
           ? boundFailureReason(classification.failureReason)
           : null,
+      ...(classification.failure ? { failure: classification.failure } : {}),
     };
   });
 

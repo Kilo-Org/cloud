@@ -115,7 +115,8 @@ vi.mock('./db', async importOriginal => {
     getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     countCurrentProfilesByStatus: vi.fn(),
     listCurrentPlatformProfileStatuses: vi.fn(),
-    requeueFailedCurrentProfiles: vi.fn(),
+    listCurrentFailedProfiles: vi.fn().mockResolvedValue([]),
+    requeueRetryableCurrentProfiles: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
     markProfilesReadyForRun: vi.fn(),
@@ -149,6 +150,7 @@ import {
   listReadyCurrentProfilesForEntries,
   getSummariesForRuns,
   syncPlatformRegistryRows,
+  listCurrentFailedProfiles,
   listCurrentPlatformProfileStatuses,
   countCurrentProfilesByStatus,
   listRuns,
@@ -1113,6 +1115,7 @@ describe('GET /admin/registry', () => {
       platform: { pending: 0, running: 0, ready: 0, failed: 0 },
       user: { pending: 0, running: 0, ready: 0, failed: 0 },
       platformEntries: [],
+      failedEntries: [],
     });
     expect(BenchmarkRegistryResponseSchema.parse(body).router).toBe(router);
     expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, router);
@@ -1132,6 +1135,37 @@ describe('GET /admin/registry', () => {
       router: 'efficient',
       repetitions: 1,
       platformEntries,
+    });
+  });
+
+  it('lists failed entries of both queues with their retry state', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    const failedEntries = [
+      {
+        model: 'model/gone',
+        variant: null,
+        queues: ['platform' as const, 'user' as const],
+        runId: null,
+        failure: {
+          kind: 'permanent' as const,
+          failureClass: 'catalog_absent' as const,
+          reason: 'Not in the catalog.',
+          attempts: 1,
+          firstFailedAt: '2026-11-19T22:59:00.000Z',
+          lastFailedAt: '2026-11-19T22:59:00.000Z',
+          cause: 'terminal_class' as const,
+        },
+      },
+    ];
+    vi.mocked(listCurrentFailedProfiles).mockResolvedValueOnce(failedEntries);
+    const response = await authedGet('/admin/registry');
+    expect(response.status).toBe(200);
+    const body = BenchmarkRegistryResponseSchema.parse(await response.json());
+    expect(body.failedEntries).toEqual(failedEntries);
+    expect(listCurrentFailedProfiles).toHaveBeenCalledWith(env.BENCH_DB, {
+      router: 'efficient',
+      engineIdentity: expect.any(String),
+      repetitions: 1,
     });
   });
 });

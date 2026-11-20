@@ -962,8 +962,9 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 | `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
-| `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
-| `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
+| `GET /admin/registry` | Queue counts, exact platform entry statuses and the failed entries of both queues (retryable and permanent, with class, attempts and retry window) under the current engine identity and repetitions |
+| `POST /admin/registry/requeue` | Put retryable failed registry rows whose retry window has passed back to `pending` (`{scope}`); permanent rows are skipped; charges no owner quota |
+| `POST /admin/registry/refresh` | Re-admit exact pairs (`{router, mode, entries}`), clearing their failure history; the console's per-row Re-admit uses `mode: 'refresh'` |
 | `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
@@ -1032,16 +1033,34 @@ profiles without charging quota twice.
 
 ```
 pending → running → ready
-                 ↘ failed (bounded failure_reason; Retry re-admits)
+                 ↘ failed (retryable) → pending only by an admin action or the owner's Retry
+                 ↘ unavailable (permanent; wire status `failed`) → pending only by a per-row re-admit or the owner's Retry
 ```
 
 - **running**: set when a decider run of either queue claims the entries at `startRun`.
 - **ready**: set when that run completes successfully (`run_id` provenance
-  points at the measuring run).
-- **failed**: set when the run fails (enqueue, timeout sweep, etc.) — or, at
-  profile-run completion, per entry whose lane dead-lettered while the run's
-  other entries become `ready`. Only rows still pointing at that `run_id`
-  transition — a newer pending/ready row is never clobbered.
+  points at the measuring run). Clears the failure history.
+- **failed / unavailable**: set when the run fails (enqueue, timeout sweep, etc.), per
+  entry whose lane died, or per entry whose cases nearly all failed with one provider
+  rejection. Only rows still pointing at that `run_id` transition — a newer pending/ready
+  row is never clobbered.
+
+`src/profile-failure.ts` owns the failure state: `parseProfileState` is the one reader of
+the row, and `profileFailureAssignments` is the one failed transition. Each failure has a
+class; the class decides whether the failure is permanent:
+
+| Tier | Classes | Rule |
+|---|---|---|
+| Terminal | `catalog_absent`, `context_too_small`, `model_not_found`, `unsupported` | Permanent at once |
+| Model | `provider_unavailable`, `model_resolution` | Permanent after 3 failed runs since the last ready measurement |
+| Infrastructure | `ambiguous_execution`, `container_capacity`, `catalog_load`, `grader`, `run_timed_out`, `orphaned_claim`, `run_init_failed`, `unknown` | Never counted against the model; any 5 consecutive failed runs are permanent |
+
+`unsupported`: at least 95% of an entry's measured cases failed with the same provider
+rejection (numbers ignored). Timeouts, content filters, throttles, empty output and wrong
+answers stay measurements.
+
+A retryable failure waits `2^(attempts-1)` hours, capped at a day, before
+`POST /admin/registry/requeue` takes it. Nothing re-admits a failed row automatically.
 
 Currency: a profile is current only when `engine_identity`, `repetitions`, and
 exact variant match the live decider engine. The platform table never uses a stale row.
@@ -1294,17 +1313,21 @@ can no longer arrive.
 Classifier dead-letter handling remains fail-fast.
 
 `run_lane_failures` preserves lane-aware finalization: a run settles once each
-(model, variant, repetition) lane has all its cases or a recorded infrastructure failure.
+(model, variant, repetition) lane has all its cases or a recorded failure, and each record
+carries the failure class of its cause.
 
 The periodic dispatch sweep ignores pending chunks in failed lanes when checking run completion.
 It retries finalization after a canceled completion handler without starting duplicate inference.
 
 - **Decider runs of either queue** complete per-entry: entries whose lanes all
-  finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did
-  not finish…"). A requeue re-admits them — the owner's Retry (quota-charged) or
-  the admin's `POST /admin/registry/requeue` (free). One failing model never
-  discards the results of the others, which matters because each one cost real
-  money to produce.
+  finished go `ready`; entries with a dead lane fail with the most severe class their
+  lanes recorded (terminal over model over infrastructure). The admin requeue, a
+  per-row re-admit or the owner's Retry (quota-charged) re-admits them. One failing
+  model never discards the results of the others, which matters because each one cost
+  real money to produce.
+- **Catalog load failures** refund the chunk's attempt and hold every dispatch for the
+  backoff, like provider throttles. After 24 catalog deferrals the chunk falls back to
+  ordinary attempts, so a catalog that never loads still ends the lane.
 - **Classifier runs** still fail fast on a dead lane: their models are not
   registry-tracked and the winner must come from one comparable set.
 - **Backstop**: the 6h stale sweep salvages legacy decider runs that never completed

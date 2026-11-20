@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
-  benchmarkPairUnavailableReason,
+  benchmarkPairUnavailability,
   CATALOG_CONTEXT_TOO_SMALL_REASON,
   CATALOG_PAIR_UNAVAILABLE_REASON,
   MIN_BENCHMARK_INPUT_TOKENS,
@@ -302,15 +302,24 @@ describe('platform catalog expansion', () => {
       ],
     });
     const reason = (model: string, variant: string | null = null) =>
-      benchmarkPairUnavailableReason(executable, { model, variant });
-    expect(reason('reka-like/model', 'high')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
-    expect(reason('reserved/model')).toBe(CATALOG_CONTEXT_TOO_SMALL_REASON);
+      benchmarkPairUnavailability(executable, { model, variant });
+    expect(reason('reka-like/model', 'high')).toEqual({
+      failureClass: 'context_too_small',
+      reason: CATALOG_CONTEXT_TOO_SMALL_REASON,
+    });
+    expect(reason('reserved/model')).toEqual({
+      failureClass: 'context_too_small',
+      reason: CATALOG_CONTEXT_TOO_SMALL_REASON,
+    });
     expect(reason('capped/model')).toBeNull();
     expect(reason('default-reserve/model')).toBeNull();
     expect(reason('roomy/model')).toBeNull();
     expect(reason('unknown/model')).toBeNull();
     expect(reason('malformed/model')).toBeNull();
-    expect(reason('missing/model')).toBe(CATALOG_PAIR_UNAVAILABLE_REASON);
+    expect(reason('missing/model')).toEqual({
+      failureClass: 'catalog_absent',
+      reason: CATALOG_PAIR_UNAVAILABLE_REASON,
+    });
     expect(
       catalogSupportsBenchmarkPair(executable, { model: 'reserved/model', variant: null })
     ).toBe(true);

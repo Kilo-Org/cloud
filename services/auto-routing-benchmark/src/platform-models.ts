@@ -6,6 +6,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 import { exactPairKey } from './db';
+import type { ProfileFailure } from './profile-failure';
 import type { RunModelEntry } from './run';
 
 const CatalogTokenPriceSchema = z
@@ -93,15 +94,17 @@ export function catalogSupportsBenchmarkPair(
  * Why the drain cannot benchmark this exact pair, or null when it can. Registration
  * admits a pair whose window is too small, so its profile fails here with that reason.
  */
-export function benchmarkPairUnavailableReason(
+export function benchmarkPairUnavailability(
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   pair: { model: string; variant: string | null }
-): string | null {
-  if (!catalogSupportsBenchmarkPair(catalog, pair)) return CATALOG_PAIR_UNAVAILABLE_REASON;
+): ProfileFailure | null {
+  if (!catalogSupportsBenchmarkPair(catalog, pair)) {
+    return { failureClass: 'catalog_absent', reason: CATALOG_PAIR_UNAVAILABLE_REASON };
+  }
   const model = catalog.data.find(model => model.id === pair.model);
   const room = model ? catalogModelInputRoom(model) : null;
   return room !== null && room < MIN_BENCHMARK_INPUT_TOKENS
-    ? CATALOG_CONTEXT_TOO_SMALL_REASON
+    ? { failureClass: 'context_too_small', reason: CATALOG_CONTEXT_TOO_SMALL_REASON }
     : null;
 }
 

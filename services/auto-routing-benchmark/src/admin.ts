@@ -60,11 +60,12 @@ import {
 } from './run';
 import {
   countCurrentProfilesByStatus,
+  listCurrentFailedProfiles,
   listCurrentPlatformProfileStatuses,
   getClassifierWinner,
   getLatestRoutingTable,
   listRuns,
-  requeueFailedCurrentProfiles,
+  requeueRetryableCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
@@ -320,10 +321,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       engineIdentity: computeEngineIdentity('decider', router),
       repetitions: resolveEffectivePolicy(config).deciderRepetitions,
     };
-    const [platform, user, platformEntries] = await Promise.all([
+    const [platform, user, platformEntries, failedEntries] = await Promise.all([
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform'),
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user'),
       listCurrentPlatformProfileStatuses(c.env.BENCH_DB, current),
+      listCurrentFailedProfiles(c.env.BENCH_DB, current),
     ]);
     const toQueue = (rows: Awaited<ReturnType<typeof countCurrentProfilesByStatus>>) => {
       const queue: BenchmarkRegistryQueue = { pending: 0, running: 0, ready: 0, failed: 0 };
@@ -337,6 +339,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       platform: toQueue(platform),
       user: toQueue(user),
       platformEntries,
+      failedEntries,
     });
   });
 
@@ -371,8 +374,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  // Admin requeue of failed registry rows. Charges no owner quota — an owner's
-  // own Retry goes through /admin/profiles/register and is quota-charged there.
+  // Admin requeue of retryable failed registry rows whose retry window has passed.
+  // Permanent failures are re-admitted one at a time through /admin/registry/refresh.
+  // Charges no owner quota — an owner's own Retry goes through
+  // /admin/profiles/register and is quota-charged there.
   app.post(
     '/admin/registry/requeue',
     zodJsonValidator(RequeueBenchmarkRegistryRequestSchema, {
@@ -384,7 +389,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       if (!config) {
         return c.json({ error: 'benchmark config not set: save it in the admin panel first' }, 400);
       }
-      const requeued = await requeueFailedCurrentProfiles(
+      const requeued = await requeueRetryableCurrentProfiles(
         c.env.BENCH_DB,
         {
           router,

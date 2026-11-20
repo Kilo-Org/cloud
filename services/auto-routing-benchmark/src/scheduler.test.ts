@@ -288,7 +288,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
       row => row.run_id !== 'run' || row.model !== 'shared/model' || row.variant !== 'low'
     );
 
-    await failScheduledEntry(db, unavailable);
+    await failScheduledEntry(db, unavailable, 'model_not_found');
     const stopped = storedChunks(sqlite).filter(
       row => row.run_id === 'run' && row.model === 'shared/model' && row.variant === 'low'
     );
@@ -311,10 +311,26 @@ describe('scheduler (production migrations and real SQLite)', () => {
       )
     ).toEqual(unrelated);
     expect(
-      sqlite.prepare('SELECT run_id, model, variant, rep FROM run_lane_failures ORDER BY rep').all()
+      sqlite
+        .prepare(
+          'SELECT run_id, model, variant, rep, failure_class FROM run_lane_failures ORDER BY rep'
+        )
+        .all()
     ).toEqual([
-      { run_id: 'run', model: 'shared/model', variant: 'low', rep: 0 },
-      { run_id: 'run', model: 'shared/model', variant: 'low', rep: 1 },
+      {
+        run_id: 'run',
+        model: 'shared/model',
+        variant: 'low',
+        rep: 0,
+        failure_class: 'model_not_found',
+      },
+      {
+        run_id: 'run',
+        model: 'shared/model',
+        variant: 'low',
+        rep: 1,
+        failure_class: 'model_not_found',
+      },
     ]);
     expect(await getPaidCaseStartedAt(db, paidCase(unavailable, 'case-a'))).toBe(NOW);
     expect(await startChunk(db, unavailable.id, unavailable.token, NOW)).toBe(false);
@@ -334,7 +350,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     if (!claim) throw new Error('Missing active claim');
     await startChunk(db, claim.id, claim.token, NOW);
     const before = storedChunks(sqlite);
-    await failScheduledEntry(db, { ...claim, token: 'replaced-token' });
+    await failScheduledEntry(db, { ...claim, token: 'replaced-token' }, 'model_not_found');
     expect(storedChunks(sqlite)).toEqual(before);
     expect(sqlite.prepare('SELECT * FROM run_lane_failures').all()).toEqual([]);
   });

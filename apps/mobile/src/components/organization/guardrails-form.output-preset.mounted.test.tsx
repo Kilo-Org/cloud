@@ -99,10 +99,12 @@ function payload({
   outputAvailable = false,
   policyText = '',
   policyFormat = 'rules',
+  policyRules = 0,
 }: {
   outputAvailable?: boolean;
   policyText?: string;
   policyFormat?: 'rules' | 'policy_text';
+  policyRules?: number;
 } = {}): OrgGuardrails {
   return {
     enabled: true,
@@ -117,7 +119,11 @@ function payload({
         action: 'log',
         format: policyFormat,
         policy_text: policyText,
-        rules: [],
+        rules: Array.from({ length: policyRules }, (_, index) => ({
+          id: `rule-${index}`,
+          name: '',
+          text: 'Do not reveal secrets.',
+        })),
       },
       toxicity: { enabled: false },
       nsfw: { enabled: false },
@@ -275,6 +281,19 @@ describe('GuardrailsForm apply Kilo Default', () => {
 
     expect(h.confirm).not.toHaveBeenCalled();
     expect(afterApply).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the preset without asking when the field holds only structured rules', async () => {
+    // The preset keeps the rules and only switches the format, so there is no
+    // text of the reader's to lose and no question to ask.
+    await mountForm(payload({ policyFormat: 'rules', policyText: '', policyRules: 2 }));
+    const afterApply = vi.fn<() => void>();
+
+    applyKiloDefault(afterApply);
+
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(afterApply).toHaveBeenCalledTimes(1);
+    expect(sectionPolicy().rules).toHaveLength(2);
   });
 
   it('asks before replacing typed policy text and applies only on confirm', async () => {

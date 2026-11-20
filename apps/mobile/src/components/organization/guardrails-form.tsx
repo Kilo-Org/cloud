@@ -108,15 +108,15 @@ export function GuardrailsForm({
   };
   // The preset overwrites the policy violation detector with Kilo's English
   // text, and the field reads its draft only on mount. A reader who left the
-  // detector empty loses nothing, so that press applies straight away. Text or
-  // rules already on screen do have to be confirmed: the preset replaces the
-  // text, and it switches the format away from the rules the reader wrote.
+  // text empty loses nothing, so that press applies straight away. Text still
+  // on screen has to be confirmed, because the preset replaces it. Structured
+  // rules need no question: the preset keeps them, and switching the format
+  // back shows them again.
   const applyKiloDefault = (afterApply: () => void) => {
-    const head: GuardrailsDraft['detectors']['policy_violation'] = draft.detectors.policy_violation;
-    const replacesRules = head.format === 'rules' && head.rules.length > 0;
     const replacesText =
-      head.policy_text.trim().length > 0 && head.policy_text !== KILO_DEFAULT_POLICY_TEXT;
-    if (!replacesRules && !replacesText) {
+      draft.detectors.policy_violation.policy_text.trim().length > 0 &&
+      draft.detectors.policy_violation.policy_text !== KILO_DEFAULT_POLICY_TEXT;
+    if (!replacesText) {
       applyKiloDefaultPresetNow();
       afterApply();
       return;

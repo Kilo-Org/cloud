@@ -40,9 +40,6 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
   return {
     userId: data?.id,
     email: data?.email,
-    // The latest attempt's error object, for a caller that must read a server
-    // verdict from it (a blocked account) rather than only "the read failed".
-    error,
     isLoading,
     // True while an attempt is in flight: a retry is running.
     isFetching,
@@ -50,7 +47,10 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     /**
      * The last attempt's error, for a surface that must name WHAT failed: a
      * refusal and a terminal code are not transient failures, and the card that
-     * reads this identity must not offer a retry for them.
+     * reads this identity must not offer a retry for them. It is also how a
+     * caller reads a server verdict out of the failure rather than only "the
+     * read failed" — the blocked-account explanation comes from the refusal
+     * this object carries.
      */
     error,
     // True when the latest attempt failed even though a cached identity is

@@ -27,6 +27,7 @@ import {
   countAdmissionCondition,
   resetAdmissionCountersForTests,
   validateAdmissionPayload,
+  classifyAdmissionPayload,
   issueAdmissionChallenge,
   verifyAdmissionAsync,
   persistAttestedKey,
@@ -381,6 +382,80 @@ describe('validateAdmissionPayload', () => {
   });
 });
 
+describe('classifyAdmissionPayload', () => {
+  test.each([
+    [undefined, 'absent'],
+    [null, 'not_an_object'],
+    ['garbage', 'not_an_object'],
+    [{}, 'platform_invalid'],
+    [{ platform: 'windows', kind: 'assertion', challenge: 'c', payload: 'p' }, 'platform_invalid'],
+    [{ platform: 'android', kind: 'wrong', challenge: 'c', payload: 'p' }, 'kind_invalid'],
+    [{ platform: 'android', kind: 'assertion', payload: 'p' }, 'challenge_missing'],
+    [{ platform: 'android', kind: 'assertion', challenge: '', payload: 'p' }, 'challenge_missing'],
+    [{ platform: 'android', kind: 'assertion', challenge: 'c' }, 'payload_missing'],
+    [
+      {
+        platform: 'android',
+        kind: 'assertion',
+        challenge: 'c',
+        payload: 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS + 1),
+      },
+      'payload_oversized',
+    ],
+    [{ platform: 'ios', kind: 'attestation', challenge: 'c', payload: 'p' }, 'key_id_missing'],
+  ] as const)('names the shape rule that refused %j', (raw, expected) => {
+    const result = classifyAdmissionPayload(raw);
+    expect(result).toEqual({ ok: false, reason: expected });
+    // The same input stays undefined through the gate's public entry point.
+    expect(validateAdmissionPayload(raw)).toBeUndefined();
+  });
+
+  test('separates an absent field from a supplied explicit null', () => {
+    expect(classifyAdmissionPayload(undefined)).toEqual({ ok: false, reason: 'absent' });
+    expect(classifyAdmissionPayload(null)).toEqual({ ok: false, reason: 'not_an_object' });
+  });
+
+  test('returns the sanitized payload for a well-formed proof', () => {
+    const result = classifyAdmissionPayload({
+      platform: 'android',
+      kind: 'assertion',
+      challenge: 'ch123',
+      payload: 'integrityToken',
+    });
+    expect(result).toEqual({
+      ok: true,
+      payload: {
+        platform: 'android',
+        kind: 'assertion',
+        challenge: 'ch123',
+        payload: 'integrityToken',
+        keyId: undefined,
+      },
+    });
+  });
+
+  test('never carries a supplied value in the refusal', () => {
+    // Every rule that can refuse with a supplied field present is exercised
+    // with a distinctive value: none may appear in the classification.
+    const refusals = [
+      classifyAdmissionPayload({ platform: 'sensitive-platform' }),
+      classifyAdmissionPayload({ platform: 'android', kind: 'sensitive-kind' }),
+      classifyAdmissionPayload({ platform: 'android', kind: 'assertion', payload: 'sensitive' }),
+      classifyAdmissionPayload({
+        platform: 'ios',
+        kind: 'assertion',
+        challenge: 'sensitive-challenge',
+        payload: 'sensitive-payload',
+      }),
+    ];
+
+    for (const refusal of refusals) {
+      expect(refusal.ok).toBe(false);
+      expect(JSON.stringify(refusal)).not.toContain('sensitive');
+    }
+  });
+});
+
 // ── Proof requirement ──────────────────────────────────────────────────────
 
 describe('requireAdmissionPayload', () => {
@@ -627,7 +702,15 @@ describe('verifyAdmissionAsync', () => {
       keyId: 'key1',
     };
     const result = await verifyAdmissionAsync(admission);
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'challenge_unknown_or_expired',
+        source: 'challenge',
+        proofPlatform: 'ios',
+      },
+    });
   });
 
   test('returns error when challenge is expired', async () => {
@@ -646,7 +729,15 @@ describe('verifyAdmissionAsync', () => {
       keyId: 'key1',
     };
     const result = await verifyAdmissionAsync(admission);
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'challenge_unknown_or_expired',
+        source: 'challenge',
+        proofPlatform: 'ios',
+      },
+    });
   });
 
   // ── iOS attestation ────────────────────────────────────────────────────
@@ -746,7 +837,16 @@ describe('verifyAdmissionAsync', () => {
       keyId: 'key1',
     };
     const result = await verifyAdmissionAsync(admission);
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'attestation_cert_chain_invalid',
+        source: 'apple',
+        proofPlatform: 'ios',
+        proofKind: 'attestation',
+      },
+    });
     expect(mockCaptureMessage).toHaveBeenCalledWith('apple_attestation_failed: CERT_CHAIN_INVALID');
   });
 
@@ -777,6 +877,12 @@ describe('verifyAdmissionAsync', () => {
       ok: false,
       errorCode: 'ADMISSION_REQUIRED',
       recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+      detail: {
+        reason: 'assertion_key_unknown',
+        source: 'apple',
+        proofPlatform: 'ios',
+        proofKind: 'assertion',
+      },
     });
     expect(mockCaptureMessage).toHaveBeenCalledWith('apple_assertion_unknown_key');
   });
@@ -812,7 +918,16 @@ describe('verifyAdmissionAsync', () => {
 
     // A key this database knows, refused on its merits, gets no recovery: a
     // new key would not repair an invalid assertion.
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'assertion_invalid',
+        source: 'apple',
+        proofPlatform: 'ios',
+        proofKind: 'assertion',
+      },
+    });
     expect(mockCaptureMessage).toHaveBeenCalledWith('apple_assertion_failed: INVALID_ASSERTION');
   });
 
@@ -845,7 +960,16 @@ describe('verifyAdmissionAsync', () => {
       keyId: 'key1',
     };
     const result = await verifyAdmissionAsync(admission);
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'assertion_stale_or_replayed',
+        source: 'apple',
+        proofPlatform: 'ios',
+        proofKind: 'assertion',
+      },
+    });
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       'apple_assertion_stale_or_replayed: asserted 5 rejected'
     );
@@ -967,7 +1091,16 @@ describe('verifyAdmissionAsync', () => {
         keyId: 'key1',
       };
       const result = await verifyAdmissionAsync(admission);
-      expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+      expect(result).toEqual({
+        ok: false,
+        errorCode: 'ADMISSION_REQUIRED',
+        detail: {
+          reason: 'assertion_stale_or_replayed',
+          source: 'apple',
+          proofPlatform: 'ios',
+          proofKind: 'assertion',
+        },
+      });
       expect(mockCaptureMessage).toHaveBeenCalledWith(
         `apple_assertion_stale_or_replayed: asserted ${staleCount} rejected`
       );
@@ -1016,6 +1149,11 @@ describe('verifyAdmissionAsync', () => {
     mockVerifyPlayIntegrity.mockResolvedValue({
       ok: false,
       error: 'DEVICE_NOT_RECOGNIZED',
+      diagnostics: {
+        appRecognition: 'play_recognized',
+        certificatePresent: false,
+        deviceIntegrity: 'empty',
+      },
     });
 
     const admission: AdmissionPayload = {
@@ -1025,7 +1163,21 @@ describe('verifyAdmissionAsync', () => {
       payload: 'integrityToken',
     };
     const result = await verifyAdmissionAsync(admission);
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'integrity_device_not_recognized',
+        source: 'play_integrity',
+        proofPlatform: 'android',
+        proofKind: 'assertion',
+        android: {
+          appRecognition: 'play_recognized',
+          certificatePresent: false,
+          deviceIntegrity: 'empty',
+        },
+      },
+    });
   });
 
   test('android attestation kind is refused', async () => {
@@ -1043,7 +1195,16 @@ describe('verifyAdmissionAsync', () => {
       payload: 'integrityToken',
     };
     const result = await verifyAdmissionAsync(admission);
-    expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'integrity_kind_unsupported',
+        source: 'play_integrity',
+        proofPlatform: 'android',
+        proofKind: 'attestation',
+      },
+    });
   });
 });
 

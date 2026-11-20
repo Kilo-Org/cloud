@@ -12,7 +12,9 @@ import {
   verifyAppleAttestation,
   verifyAppleAssertion,
 } from './native-admission-apple';
+import type { AppleAttestError } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
+import type { PlayIntegrityDiagnostics, PlayIntegrityError } from './native-admission-google';
 import { checkFirewallRateLimit } from './firewall-rate-limit';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -162,10 +164,80 @@ export class ChallengeRateLimitError extends Error {
  */
 export const MAX_ADMISSION_PAYLOAD_CHARS = 16 * 1024;
 
-/** Whether an admission object carries a payload longer than the contract accepts. */
-function payloadExceedsMaxLength(obj: Record<string, unknown>): boolean {
+/**
+ * Why the admission gate refused a request body. Every value names a shape
+ * rule that failed, never a field value, so a telemetry record built from it
+ * carries no client-supplied string. `absent` means the body had no
+ * `admission` field at all; every other value means the field was supplied and
+ * failed that rule.
+ */
+export type AdmissionMissingReason =
+  | 'absent'
+  | 'not_an_object'
+  | 'platform_invalid'
+  | 'kind_invalid'
+  | 'challenge_missing'
+  | 'payload_missing'
+  | 'payload_oversized'
+  | 'key_id_missing';
+
+export type AdmissionClassification =
+  | { ok: true; payload: AdmissionPayload }
+  | { ok: false; reason: AdmissionMissingReason };
+
+/**
+ * Classify the admission payload received from the client against the wire
+ * contract. This is the single shape rule `validateAdmissionPayload` and
+ * `requireAdmissionPayload` apply; it additionally names the rule that failed.
+ */
+export function classifyAdmissionPayload(raw: unknown): AdmissionClassification {
+  if (raw === undefined) return { ok: false, reason: 'absent' };
+  if (typeof raw !== 'object' || raw === null) return { ok: false, reason: 'not_an_object' };
+  const obj = raw as Record<string, unknown>;
+
+  // Length is checked before the other shape rules so the aggregate counter
+  // built on this reason keeps firing for every oversized payload, whatever
+  // else about it is wrong. This preserves the pre-existing counter semantics.
+  const rawPayload = obj['payload'];
+  if (typeof rawPayload === 'string' && rawPayload.length > MAX_ADMISSION_PAYLOAD_CHARS) {
+    return { ok: false, reason: 'payload_oversized' };
+  }
+
+  const platform = obj['platform'];
+  if (platform !== 'ios' && platform !== 'android') {
+    return { ok: false, reason: 'platform_invalid' };
+  }
+
+  const kind = obj['kind'];
+  if (kind !== 'attestation' && kind !== 'assertion') {
+    return { ok: false, reason: 'kind_invalid' };
+  }
+
+  const challenge = obj['challenge'];
+  if (typeof challenge !== 'string' || !challenge) {
+    return { ok: false, reason: 'challenge_missing' };
+  }
+
   const payload = obj['payload'];
-  return typeof payload === 'string' && payload.length > MAX_ADMISSION_PAYLOAD_CHARS;
+  if (typeof payload !== 'string' || !payload) {
+    return { ok: false, reason: 'payload_missing' };
+  }
+
+  const keyId = obj['keyId'];
+  if (platform === 'ios' && (typeof keyId !== 'string' || !keyId)) {
+    return { ok: false, reason: 'key_id_missing' };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      platform,
+      kind,
+      challenge,
+      payload,
+      keyId: typeof keyId === 'string' ? keyId : undefined,
+    },
+  };
 }
 
 /**
@@ -173,30 +245,8 @@ function payloadExceedsMaxLength(obj: Record<string, unknown>): boolean {
  * Returns a sanitized AdmissionPayload on success, undefined on failure.
  */
 export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undefined {
-  if (typeof raw !== 'object' || raw === null) return undefined;
-  const obj = raw as Record<string, unknown>;
-
-  if (obj['platform'] !== 'ios' && obj['platform'] !== 'android') return undefined;
-  if (obj['kind'] !== 'attestation' && obj['kind'] !== 'assertion') return undefined;
-  if (typeof obj['challenge'] !== 'string' || !obj['challenge']) return undefined;
-  if (typeof obj['payload'] !== 'string' || !obj['payload']) return undefined;
-  if (payloadExceedsMaxLength(obj)) return undefined;
-
-  const kind = obj['kind'] as AdmissionKind;
-  const platform = obj['platform'] as AdmissionPlatform;
-  const keyId = obj['keyId'];
-
-  if (platform === 'ios') {
-    if (typeof keyId !== 'string' || !keyId) return undefined;
-  }
-
-  return {
-    platform,
-    kind,
-    challenge: obj['challenge'],
-    payload: obj['payload'],
-    keyId: typeof keyId === 'string' ? keyId : undefined,
-  };
+  const result = classifyAdmissionPayload(raw);
+  return result.ok ? result.payload : undefined;
 }
 
 // ── Admission gate ─────────────────────────────────────────────────────────
@@ -214,18 +264,13 @@ export function requireAdmissionPayload(
   // of a sparse traffic pattern still flushes.
   rollAdmissionWindowIfNeeded(Date.now());
 
-  const raw = body['admission'];
-  if (
-    typeof raw === 'object' &&
-    raw !== null &&
-    payloadExceedsMaxLength(raw as Record<string, unknown>)
-  ) {
-    // A payload longer than the contract accepts is aggregated as
-    // native_admission_oversized.
+  const result = classifyAdmissionPayload(body['admission']);
+  // A payload longer than the contract accepts is aggregated as
+  // native_admission_oversized.
+  if (!result.ok && result.reason === 'payload_oversized') {
     countAdmissionCondition('native_admission_oversized');
   }
-
-  return validateAdmissionPayload(raw);
+  return result.ok ? result.payload : undefined;
 }
 
 /**
@@ -260,14 +305,62 @@ function isDevSentinel(admission: AdmissionPayload): boolean {
 export type AdmissionRecoveryHint = 'IOS_ASSERTION_UNKNOWN_KEY';
 
 /**
+ * Fixed, log-safe reason a verifier refused a proof. Each value names the rule
+ * that failed, never the values compared: no key id, nonce, digest, sign count,
+ * or Google verdict string can reach a log record through it.
+ */
+export type AdmissionRefusalReason =
+  | 'challenge_unknown_or_expired'
+  | 'key_id_missing'
+  | 'attestation_invalid_format'
+  | 'attestation_cert_chain_invalid'
+  | 'attestation_rp_id_mismatch'
+  | 'attestation_nonce_mismatch'
+  | 'attestation_key_id_mismatch'
+  | 'assertion_key_unknown'
+  | 'assertion_invalid'
+  | 'assertion_stale_or_replayed'
+  | 'integrity_token_invalid'
+  | 'integrity_nonce_mismatch'
+  | 'integrity_package_mismatch'
+  | 'integrity_app_not_recognized'
+  | 'integrity_cert_digest_mismatch'
+  | 'integrity_device_not_recognized'
+  | 'integrity_kind_unsupported';
+
+/**
+ * Where a refusal was decided. `apple` and `play_integrity` ran a platform
+ * verifier; `challenge` failed before any verifier ran.
+ */
+export type AdmissionRefusalSource = 'challenge' | 'apple' | 'play_integrity';
+
+/**
+ * The log-safe description of a refusal. It is deliberately separate from the
+ * wire response: `errorCode` stays what shipped clients read, and this detail
+ * is what telemetry consumes.
+ */
+export type AdmissionRefusalDetail = {
+  reason: AdmissionRefusalReason;
+  source: AdmissionRefusalSource;
+  /** The platform the parsed payload declared. */
+  proofPlatform: AdmissionPlatform;
+  /** The proof shape from the payload, for an Apple or Android refusal. */
+  proofKind?: AdmissionKind;
+  /** Allowlisted Play Integrity classification, on an Android refusal only. */
+  android?: PlayIntegrityDiagnostics;
+};
+
+/**
  * A refused admission proof. `recovery` is set only for the unknown-key case
  * above; every other refusal leaves it undefined so the wire response stays
- * exactly what it was.
+ * exactly what it was. `detail` is for telemetry only and never serialized to
+ * the client.
  */
 export type AdmissionRefusal = {
   ok: false;
   errorCode: string;
   recovery?: AdmissionRecoveryHint;
+  detail: AdmissionRefusalDetail;
 };
 
 /**
@@ -323,7 +416,15 @@ export async function verifyAdmissionAsync(
     .returning();
 
   if (!consumed) {
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return {
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'challenge_unknown_or_expired',
+        source: 'challenge',
+        proofPlatform: admission.platform,
+      },
+    };
   }
 
   if (isDevSentinel(admission)) {
@@ -332,16 +433,11 @@ export async function verifyAdmissionAsync(
     return { ok: true, platform: 'android' };
   }
 
-  // Route to platform-specific verifier
-  if (admission.platform === 'ios') {
-    return verifyAppleAdmission(admission);
-  }
-
-  if (admission.platform === 'android') {
-    return verifyAndroidAdmission(admission);
-  }
-
-  return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+  // The payload validator admits exactly these two platforms, so the dispatch
+  // is total.
+  return admission.platform === 'ios'
+    ? verifyAppleAdmission(admission)
+    : verifyAndroidAdmission(admission);
 }
 
 // ── Apple (iOS) admission ──────────────────────────────────────────────────
@@ -365,13 +461,35 @@ function findAttestedKey(
   });
 }
 
+/**
+ * Fixed reasons for each attestation verifier error. A lookup table keeps the
+ * two enums from drifting: a new verifier error fails type checking here rather
+ * than silently reporting an unmapped value.
+ */
+const ATTESTATION_REFUSAL_REASONS: Record<AppleAttestError, AdmissionRefusalReason> = {
+  INVALID_ATTEST_FORMAT: 'attestation_invalid_format',
+  CERT_CHAIN_INVALID: 'attestation_cert_chain_invalid',
+  RP_ID_MISMATCH: 'attestation_rp_id_mismatch',
+  NONCE_MISMATCH: 'attestation_nonce_mismatch',
+  KEY_ID_MISMATCH: 'attestation_key_id_mismatch',
+};
+
 async function verifyAppleAdmission(
   admission: AdmissionPayload
 ): Promise<VerifyAdmissionOk | AdmissionRefusal> {
   const { kind, challenge, payload, keyId } = admission;
 
   if (!keyId) {
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return {
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'key_id_missing',
+        source: 'apple',
+        proofPlatform: admission.platform,
+        proofKind: kind,
+      },
+    };
   }
 
   if (kind === 'attestation') {
@@ -380,7 +498,16 @@ async function verifyAppleAdmission(
 
     if (!result.ok) {
       captureMessage(`apple_attestation_failed: ${result.error}`);
-      return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+      return {
+        ok: false,
+        errorCode: 'ADMISSION_REQUIRED',
+        detail: {
+          reason: ATTESTATION_REFUSAL_REASONS[result.error],
+          source: 'apple',
+          proofPlatform: admission.platform,
+          proofKind: kind,
+        },
+      };
     }
 
     // Check whether this keyId already exists — the caller uses this for
@@ -411,6 +538,12 @@ async function verifyAppleAdmission(
       ok: false,
       errorCode: 'ADMISSION_REQUIRED',
       recovery: 'IOS_ASSERTION_UNKNOWN_KEY',
+      detail: {
+        reason: 'assertion_key_unknown',
+        source: 'apple',
+        proofPlatform: admission.platform,
+        proofKind: kind,
+      },
     };
   }
 
@@ -425,7 +558,16 @@ async function verifyAppleAdmission(
 
   if (!assertionResult.ok) {
     captureMessage(`apple_assertion_failed: ${assertionResult.error}`);
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return {
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'assertion_invalid',
+        source: 'apple',
+        proofPlatform: admission.platform,
+        proofKind: kind,
+      },
+    };
   }
 
   // Atomic monotonic sign-count gate. The check and the update are a single
@@ -454,7 +596,16 @@ async function verifyAppleAdmission(
     captureMessage(
       `apple_assertion_stale_or_replayed: asserted ${assertionResult.signCount} rejected`
     );
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return {
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'assertion_stale_or_replayed',
+        source: 'apple',
+        proofPlatform: admission.platform,
+        proofKind: kind,
+      },
+    };
   }
 
   return {
@@ -468,6 +619,19 @@ async function verifyAppleAdmission(
 
 // ── Android (Play Integrity) admission ─────────────────────────────────────
 
+/**
+ * Fixed reasons for each Play Integrity verdict error. Same contract as the
+ * attestation table: a new verifier error fails type checking here.
+ */
+const INTEGRITY_REFUSAL_REASONS: Record<PlayIntegrityError, AdmissionRefusalReason> = {
+  INVALID_TOKEN: 'integrity_token_invalid',
+  NONCE_MISMATCH: 'integrity_nonce_mismatch',
+  PACKAGE_MISMATCH: 'integrity_package_mismatch',
+  APP_NOT_RECOGNIZED: 'integrity_app_not_recognized',
+  CERT_DIGEST_MISMATCH: 'integrity_cert_digest_mismatch',
+  DEVICE_NOT_RECOGNIZED: 'integrity_device_not_recognized',
+};
+
 async function verifyAndroidAdmission(
   admission: AdmissionPayload
 ): Promise<VerifyAdmissionOk | AdmissionRefusal> {
@@ -475,7 +639,16 @@ async function verifyAndroidAdmission(
 
   // Android sends Play Integrity tokens with kind 'assertion' per the plan.
   if (kind !== 'assertion') {
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return {
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: 'integrity_kind_unsupported',
+        source: 'play_integrity',
+        proofPlatform: admission.platform,
+        proofKind: kind,
+      },
+    };
   }
 
   // verifyPlayIntegrity throws on infrastructure faults — caller must
@@ -484,7 +657,17 @@ async function verifyAndroidAdmission(
 
   if (!result.ok) {
     captureMessage(`play_integrity_failed: ${result.error}`);
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return {
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      detail: {
+        reason: INTEGRITY_REFUSAL_REASONS[result.error],
+        source: 'play_integrity',
+        proofPlatform: admission.platform,
+        proofKind: kind,
+        android: result.diagnostics,
+      },
+    };
   }
 
   // Android Play Integrity tokens are per-request — no persistent key

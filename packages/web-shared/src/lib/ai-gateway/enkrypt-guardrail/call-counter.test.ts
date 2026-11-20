@@ -1,6 +1,7 @@
 import {
   countEnkryptCalls,
   ENKRYPT_CALL_COUNT_TTL_SECONDS,
+  ENKRYPT_CALL_COUNT_WINDOW_MINUTES,
   getEnkryptCallCounts,
   recordEnkryptCalls,
   type EnkryptCallCountStore,
@@ -43,7 +44,10 @@ const DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 describe('Enkrypt call counter', () => {
   afterEach(() => jest.useRealTimers());
 
-  it('adds counts to their minute buckets in one pipeline, with a 24 hour TTL', async () => {
+  it('adds counts to their minute buckets in one pipeline, with a TTL past the read window', async () => {
+    expect(ENKRYPT_CALL_COUNT_TTL_SECONDS).toBeGreaterThan(
+      ENKRYPT_CALL_COUNT_WINDOW_MINUTES * 60 + 60
+    );
     const { store, counts, expiries, pipelines } = memoryStore();
     await recordEnkryptCalls(
       new Map([

@@ -4,8 +4,12 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const MINUTE_MS = 60_000;
 
-export const ENKRYPT_CALL_COUNT_TTL_SECONDS = 24 * 60 * 60;
-export const ENKRYPT_CALL_COUNT_WINDOW_MINUTES = ENKRYPT_CALL_COUNT_TTL_SECONDS / 60;
+export const ENKRYPT_CALL_COUNT_WINDOW_MINUTES = 24 * 60;
+/**
+ * A bucket's TTL restarts with each write, which can come at the end of its minute, so it is kept a
+ * few minutes beyond the window for its oldest bucket to still be there when read.
+ */
+export const ENKRYPT_CALL_COUNT_TTL_SECONDS = (ENKRYPT_CALL_COUNT_WINDOW_MINUTES + 5) * 60;
 
 export type EnkryptCallCountStore = {
   pipeline(): {

@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Opdrachtbezorging: {{status}}",
     "delivered": "Bezorgd",
-    "expired": "Verlopen"
+    "expired": "Verlopen",
+    "recoveryGaps_one": "{{displayCount}} deel van dit transcript ontbreekt.",
+    "recoveryGaps_other": "{{displayCount}} delen van dit transcript ontbreken."
   },
   "common": {
     "manageOnWeb": "Beheren op het web",
@@ -699,6 +701,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",
+      "managedOnWebTitle": "Via het web beheerd",
+      "managedOnWebShort": "Deze verbinding wordt via het web op een computer beheerd.",
+      "managedOnWebRepositories": "Kies voor {{organization}} de repositories via het web op een computer.",
       "description": "Maak voor {{organization}} een toegangstoken voor de werkruimte en plak het hieronder.",
       "descriptionReconnect": "Maak voor {{organization}} een nieuw toegangstoken voor de werkruimte en plak het hieronder.",
       "descriptionOverview": "Maak voor {{organization}} een toegangstoken voor de werkruimte en plak het op het volgende scherm.",
@@ -737,6 +742,7 @@
     "platformList": {
       "activity": "Activiteit",
       "checking": "Controleren…",
+      "needsAttention": "Aandacht vereist",
       "platforms": "Platformen",
       "statusUnavailable": "Status niet beschikbaar"
     },
@@ -2227,7 +2233,9 @@
     "modelPicker": {
       "title": "Model selecteren",
       "favorites": "Favorieten",
-      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren."
+      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren.",
+      "allUnavailableTitle": "Geen enkel model kan worden gebruikt",
+      "allUnavailableDescription": "Voeg een providersleutel toe en probeer het opnieuw."
     },
     "modelSelector": {
       "provider": "Aanbieder {{id}}",
@@ -3230,6 +3238,8 @@
       "partialPostedStale_one": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "partialPostedStale_other": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "submitCountOfTotal": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
+      "submitCountOfTotal_one": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
+      "submitCountOfTotal_other": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
       "submitReview": "Beoordeling verzenden",
       "blockedRequestChanges": "Voeg een samenvatting of minstens één opmerking toe om wijzigingen te vragen.",
       "blockedComment": "Voeg een samenvatting of minstens één opmerking toe om een beoordeling met opmerkingen te verzenden."
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "De aanbieder is op dit moment niet beschikbaar. Verzend het zo opnieuw."
   },
   "settingsTools": {
-    "confirmTitle": "Deze wijziging bevestigen?"
+    "confirmTitle": "Deze wijziging bevestigen?",
+    "guarded": {
+      "spendAlertsOff": "Uitgavenmeldingen uitschakelen? Je krijgt dan geen meldingen meer over het overschrijden van uitgavendrempels en pieken per uur.",
+      "balanceAlertsOff": "Saldomeldingen uitschakelen? Je krijgt dan geen meldingen meer wanneer je credits bijna op zijn.",
+      "securityFindingsOff": "Beveiligingsbevindingen uitschakelen? Je krijgt dan geen meldingen meer over nieuwe beveiligingsbevindingen.",
+      "hideBalanceOn": "Je saldi verbergen? Je creditsaldo's worden dan niet meer weergegeven op de profielschermen en in de organisatiehub."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "Schakel een aanbieder uit om te voorkomen dat Kilo voor deze organisatie naar die aanbieder routeert.",
     "providersNeedCatalog": "De schakelaars voor aanbieders blijven alleen-lezen totdat de volledige modelcatalogus is geladen. Tik hierboven op Opnieuw proberen om ze te bewerken.",
     "providersEmpty": "Geen aanbieders komen overeen met deze zoekopdracht.",
+    "providersNone": "Er zijn geen aanbieders beschikbaar voor deze organisatie.",
     "allowAllShown": "Alle getoonde toestaan",
     "denyAllShown": "Alle getoonde weigeren",
     "gatewaysDescription": "Kilo routeert modelverzoeken via Vercel AI Gateway of OpenRouter. Een uitgeschakelde toegangspoort laat die verzoeken mislukken.",

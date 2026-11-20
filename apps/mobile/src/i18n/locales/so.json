@@ -19,7 +19,9 @@
     "presenceStatus": "Martigeliyeyaasha: {{connection}}",
     "commandStatus": "Gaarsiinta amarka: {{status}}",
     "delivered": "La gaarsiiyay",
-    "expired": "Waqtigiisu dhacay"
+    "expired": "Waqtigiisu dhacay",
+    "recoveryGaps_one": "{{displayCount}} qayb oo ka mid ah qoraalkan ayaa maqan.",
+    "recoveryGaps_other": "{{displayCount}} qaybood oo ka mid ah qoraalkan ayaa maqan."
   },
   "common": {
     "manageOnWeb": "Ku maamul shabakadda",
@@ -963,6 +965,8 @@
       "pendingComment": "faallooyin aan weli la gudbin",
       "pendingComment_other": "faallooyin aan weli la gudbin",
       "submitCountOfTotal": "Dir {{displayFreshCount}} ka mid ah {{displayTotalCount}} faallo",
+      "submitCountOfTotal_one": "Dir {{displayFreshCount}} ka mid ah {{displayTotalCount}} faallo",
+      "submitCountOfTotal_other": "Dir {{displayFreshCount}} ka mid ah {{displayTotalCount}} faallo",
       "submitReview": "Gudbi dib-u-eegista",
       "partialPostedFresh": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
       "partialPostedFresh_one": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "managedOnWebTitle": "Waxaa lagu maamulaa shabakadda",
+      "managedOnWebShort": "Xiriirkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "managedOnWebRepositories": "Dooro keydadka {{organization}} ee shabakadda adigoo kombiyuutar isticmaalaya.",
       "description": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "descriptionReconnect": "Abuur summad gelitaan cusub oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "descriptionOverview": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna ku dheji shaashadda xigta.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "Waa la hubinayaa…",
       "statusUnavailable": "Xaaladda lama heli karo",
+      "needsAttention": "U baahan fiiro",
       "platforms": "Madalaha",
       "activity": "Hawlaha"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "Dooro moodeel",
       "noModelsDescription": "Ma jiraan moodeello aad dooran karto.",
+      "allUnavailableTitle": "Ma jiro moodeel la isticmaali karo",
+      "allUnavailableDescription": "Ku dar fure bixiye, ka dibna isku day mar kale.",
       "favorites": "Kuwa la jecel yahay"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "Adeeg-bixiyuhu hadda ma heli karo. Dib u dir farriinta dhawaan."
   },
   "settingsTools": {
-    "confirmTitle": "Ma xaqiijinayaa isbeddelkan?"
+    "confirmTitle": "Ma xaqiijinayaa isbeddelkan?",
+    "guarded": {
+      "spendAlertsOff": "Ma daminaysaa digniinaha kharashka? Waxaad joojin lahayd helitaanka ogeysiisyada ku saabsan gaaritaanka xadka kharashka iyo kor u kaca saacadlaha ah.",
+      "balanceAlertsOff": "Ma daminaysaa digniinaha hadhaaga? Waxaad joojin lahayd helitaanka ogeysiisyada marka kreditkaagu hoos u dhaco.",
+      "securityFindingsOff": "Ma daminaysaa natiijooyinka amniga? Waxaad joojin lahayd helitaanka ogeysiisyada ku saabsan natiijooyin amni oo cusub.",
+      "hideBalanceOn": "Ma qarinaysaa hadhaagaaga? Hadhaaga kreditka mar dambe kama soo muuqan doono shaashadaha profile-ka iyo xarunta ururka."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "Dami bixiye si aad u joojiso Kilo inuu u jiheeyo bixiyahan ururkan.",
     "providersNeedCatalog": "Furayaasha bixiyeyaasha waa akhris-kaliya ilaa liiska moodellada oo dhan uu soo dego. Si aad u beddesho, taabo Mar kale isku day ee korka ku yaal.",
     "providersEmpty": "Ma jiraan bixiyeyaal u dhigma raadintan.",
+    "providersNone": "Ma jiraan bixiyeyaal diyaar u ah ururkan.",
     "allowAllShown": "Oggolow dhammaan kuwa la muujiyay",
     "denyAllShown": "Diid dhammaan kuwa la muujiyay",
     "gatewaysDescription": "Kilo wuxuu codsiyada moodeelka mariyaa Vercel AI Gateway ama OpenRouter. Irrid la damiyay waxay fashilmaa codsiyadaas.",

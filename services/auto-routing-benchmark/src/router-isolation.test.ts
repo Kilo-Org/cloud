@@ -78,7 +78,6 @@ describe('router contracts and database isolation', () => {
         startedAt: 'now',
         completedAt: 'later',
         error: null,
-        summaries: [],
       }).router
     ).toBe('efficient');
     expect(AutoRouterSchema.safeParse('unknown').success).toBe(false);

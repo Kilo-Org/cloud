@@ -19,7 +19,10 @@
     "presenceStatus": "Gazde: {{connection}}",
     "commandStatus": "Livrarea comenzii: {{status}}",
     "delivered": "Livrat",
-    "expired": "Expirat"
+    "expired": "Expirat",
+    "recoveryGaps_one": "Lipsește {{displayCount}} parte din această transcriere.",
+    "recoveryGaps_few": "Lipsesc {{displayCount}} părți din această transcriere.",
+    "recoveryGaps_other": "Lipsesc {{displayCount}} de părți din această transcriere."
   },
   "common": {
     "manageOnWeb": "Gestionează pe web",
@@ -980,6 +983,9 @@
       "pendingComment": "comentarii în așteptare",
       "pendingComment_other": "comentarii în așteptare",
       "submitCountOfTotal": "Trimite {{displayFreshCount}} din {{displayTotalCount}} comentarii",
+      "submitCountOfTotal_one": "Trimite {{displayFreshCount}} din {{displayTotalCount}} comentarii",
+      "submitCountOfTotal_few": "Trimite {{displayFreshCount}} din {{displayTotalCount}} comentarii",
+      "submitCountOfTotal_other": "Trimite {{displayFreshCount}} din {{displayTotalCount}} comentarii",
       "submitReview": "Trimite revizuirea",
       "partialPostedFresh": "Comentarii publicate: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentarii publicate: {{displayFreshCount}}. ",
@@ -1415,6 +1421,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",
+      "managedOnWebTitle": "Gestionată pe web",
+      "managedOnWebShort": "Această conexiune se gestionează pe web, de pe un computer.",
+      "managedOnWebRepositories": "Alege repository-urile pentru {{organization}} pe web, de pe un computer.",
       "description": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "descriptionReconnect": "Creează un nou token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "descriptionOverview": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l pe ecranul următor.",
@@ -1438,6 +1447,7 @@
     "platformList": {
       "checking": "Se verifică…",
       "statusUnavailable": "Stare indisponibilă",
+      "needsAttention": "Necesită atenție",
       "platforms": "Platforme",
       "activity": "Activitate"
     },
@@ -2834,7 +2844,9 @@
     "modelPicker": {
       "title": "Model",
       "favorites": "Favorite",
-      "noModelsDescription": "Nu este disponibil niciun model."
+      "noModelsDescription": "Nu este disponibil niciun model.",
+      "allUnavailableTitle": "Niciun model nu poate fi folosit",
+      "allUnavailableDescription": "Adaugă o cheie de furnizor, apoi încearcă din nou."
     },
     "modelSelector": {
       "provider": "Furnizor {{id}}",
@@ -4139,7 +4151,13 @@
     "providerUnavailable": "Furnizorul este indisponibil acum. Trimite din nou în curând."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmi această modificare?"
+    "confirmTitle": "Confirmi această modificare?",
+    "guarded": {
+      "spendAlertsOff": "Dezactivați alertele de cheltuieli? Nu veți mai primi notificări despre depășirea pragurilor de cheltuieli și despre vârfurile orare.",
+      "balanceAlertsOff": "Dezactivați alertele de sold? Nu veți mai primi notificări când creditele sunt aproape epuizate.",
+      "securityFindingsOff": "Dezactivați constatările de securitate? Nu veți mai primi notificări despre constatări de securitate noi.",
+      "hideBalanceOn": "Ascundeți soldurile? Soldurile de credite nu vor mai apărea pe ecranele de profil și în hub-ul organizației."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,6 +5071,7 @@
     "providersDescription": "Dezactivați un furnizor pentru a opri rutarea Kilo către acesta pentru această organizație.",
     "providersNeedCatalog": "Comutatoarele furnizorilor rămân doar pentru citire până la încărcarea catalogului complet de modele. Atingeți Reîncearcă mai sus pentru a le edita.",
     "providersEmpty": "Niciun furnizor nu corespunde acestei căutări.",
+    "providersNone": "Nu există furnizori disponibili pentru această organizație.",
     "allowAllShown": "Permite toate cele afișate",
     "denyAllShown": "Interzice toate cele afișate",
     "gatewaysDescription": "Kilo direcționează cererile către modele prin Vercel AI Gateway sau OpenRouter. O poartă de acces dezactivată face ca aceste cereri să eșueze.",

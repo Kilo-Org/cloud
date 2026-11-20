@@ -19,7 +19,11 @@
     "presenceStatus": "Хости: {{connection}}",
     "commandStatus": "Доставка команди: {{status}}",
     "delivered": "Доставлено",
-    "expired": "Термін дії минув"
+    "expired": "Термін дії минув",
+    "recoveryGaps_one": "Відсутня {{displayCount}} частина цього транскрипту.",
+    "recoveryGaps_few": "Відсутні {{displayCount}} частини цього транскрипту.",
+    "recoveryGaps_many": "Відсутня {{displayCount}} частин цього транскрипту.",
+    "recoveryGaps_other": "Відсутні {{displayCount}} частини цього транскрипту."
   },
   "common": {
     "manageOnWeb": "Керувати у вебверсії",
@@ -699,6 +703,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Підключенням Bitbucket для {{organization}} можна керувати лише у вебверсії з комп'ютера.",
+      "managedOnWebTitle": "Керується у вебверсії",
+      "managedOnWebShort": "Це підключення керується у вебверсії з комп'ютера.",
+      "managedOnWebRepositories": "Виберіть репозиторії для {{organization}} у вебверсії з комп'ютера.",
       "description": "Створіть токен доступу до робочого простору для {{organization}} та вставте його нижче.",
       "descriptionReconnect": "Створіть новий токен доступу до робочого простору для {{organization}} та вставте його нижче.",
       "descriptionOverview": "Створіть токен доступу до робочого простору для {{organization}} та вставте його на наступному екрані.",
@@ -737,6 +744,7 @@
     "platformList": {
       "activity": "Активність",
       "checking": "Перевіряємо…",
+      "needsAttention": "Потребує уваги",
       "platforms": "Платформи",
       "statusUnavailable": "Стан недоступний"
     },
@@ -2279,6 +2287,8 @@
     "modelPicker": {
       "title": "Вибір моделі",
       "noModelsDescription": "Немає доступних моделей.",
+      "allUnavailableTitle": "Жодну модель не можна використати",
+      "allUnavailableDescription": "Додайте ключ постачальника, а потім спробуйте ще раз.",
       "favorites": "Обране"
     },
     "modelSelector": {
@@ -3342,6 +3352,10 @@
       "partialPostedStale_many": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "partialPostedStale_other": "У черзі залишилися коментарі до попереднього коміту: {{displayStaleCount}}.",
       "submitCountOfTotal": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_one": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_few": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_many": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
+      "submitCountOfTotal_other": "Надіслати {{displayFreshCount}} із {{displayTotalCount}} коментарів",
       "submitReview": "Надіслати результати перевірки",
       "pendingComment_few": "ненадіслані коментарі",
       "pendingComment_many": "ненадісланих коментарів",
@@ -4201,7 +4215,13 @@
     "providerUnavailable": "Постачальник зараз недоступний. Надішліть ще раз незабаром."
   },
   "settingsTools": {
-    "confirmTitle": "Підтвердити цю зміну?"
+    "confirmTitle": "Підтвердити цю зміну?",
+    "guarded": {
+      "spendAlertsOff": "Вимкнути сповіщення про витрати? Ви перестанете отримувати сповіщення про перевищення порогів витрат і погодинні сплески.",
+      "balanceAlertsOff": "Вимкнути сповіщення про баланс? Ви перестанете отримувати сповіщення, коли ваші кредити закінчуються.",
+      "securityFindingsOff": "Вимкнути сповіщення про проблеми безпеки? Ви перестанете отримувати сповіщення про нові проблеми безпеки.",
+      "hideBalanceOn": "Приховати ваші баланси? Баланси кредитів більше не відображатимуться на екранах профілю та в центрі організації."
+    }
   },
   "appActions": {
     "start": {
@@ -5129,6 +5149,7 @@
     "providersDescription": "Вимкніть провайдера, щоб Kilo більше не маршрутизував до нього запити для цієї організації.",
     "providersNeedCatalog": "Перемикачі провайдерів доступні лише для читання, доки не завантажиться повний каталог моделей. Щоб змінити їх, натисніть Повторити вище.",
     "providersEmpty": "Жоден провайдер не відповідає цьому пошуку.",
+    "providersNone": "Для цієї організації немає доступних провайдерів.",
     "allowAllShown": "Дозволити всі показані",
     "denyAllShown": "Заборонити всі показані",
     "gatewaysDescription": "Kilo спрямовує запити до моделей через Vercel AI Gateway або OpenRouter. Вимкнений шлюз відхиляє такі запити.",

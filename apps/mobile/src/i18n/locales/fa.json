@@ -7,7 +7,7 @@
     "directory": "پوشهٔ کاری",
     "createSession": "ایجاد نشست نیتیو",
     "queueIfOffline": "قرار دادن پرامپت در صف اگر میزبان آفلاین است",
-    "prompt": "پرامپت یا /command",
+    "prompt": "پرامپت یا \u2066/command\u2069",
     "localClear": "پاک کردن نمای محلی",
     "abort": "لغو نوبت",
     "failed": "عملیات دسترسی از راه دور نیتیو ناموفق بود",
@@ -19,7 +19,9 @@
     "presenceStatus": "میزبان‌ها: {{connection}}",
     "commandStatus": "تحویل فرمان: {{status}}",
     "delivered": "تحویل داده شد",
-    "expired": "منقضی شد"
+    "expired": "منقضی شد",
+    "recoveryGaps_one": "{{displayCount}} بخش از این رونوشت موجود نیست.",
+    "recoveryGaps_other": "{{displayCount}} بخش از این رونوشت موجود نیست."
   },
   "common": {
     "manageOnWeb": "مدیریت در وب",
@@ -963,6 +965,8 @@
       "pendingComment": "نظر در انتظار ارسال",
       "pendingComment_other": "نظر در انتظار ارسال",
       "submitCountOfTotal": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
+      "submitCountOfTotal_one": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
+      "submitCountOfTotal_other": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
       "submitReview": "ارسال بازبینی",
       "partialPostedFresh": "{{displayFreshCount}} نظر ارسال شد. ",
       "partialPostedFresh_one": "{{displayFreshCount}} نظر ارسال شد. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "اتصال Bitbucket به {{organization}} از طریق وب و با رایانه مدیریت می‌شود.",
+      "managedOnWebTitle": "از طریق وب مدیریت می‌شود",
+      "managedOnWebShort": "این اتصال از طریق وب و با رایانه مدیریت می‌شود.",
+      "managedOnWebRepositories": "مخزن‌های {{organization}} را از طریق وب و با رایانه انتخاب کنید.",
       "description": "یک توکن دسترسی فضای کاری برای {{organization}} ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
       "descriptionReconnect": "یک توکن دسترسی فضای کاری جدید برای {{organization}} ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
       "descriptionOverview": "یک توکن دسترسی فضای کاری برای {{organization}} ایجاد کنید و آن را در صفحهٔ بعد جای‌گذاری کنید.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "در حال بررسی…",
       "statusUnavailable": "وضعیت در دسترس نیست",
+      "needsAttention": "نیازمند رسیدگی",
       "platforms": "پلتفرم‌ها",
       "activity": "فعالیت"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "انتخاب مدل",
       "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست.",
+      "allUnavailableTitle": "هیچ مدلی قابل استفاده نیست",
+      "allUnavailableDescription": "یک کلید ارائه‌دهنده اضافه کنید، سپس دوباره تلاش کنید.",
       "favorites": "موارد دلخواه"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "ارائه‌دهنده همین حالا در دسترس نیست. به‌زودی دوباره ارسال کنید."
   },
   "settingsTools": {
-    "confirmTitle": "این تغییر تأیید شود؟"
+    "confirmTitle": "این تغییر تأیید شود؟",
+    "guarded": {
+      "spendAlertsOff": "هشدارهای هزینه خاموش شوند؟ دیگر اعلان‌هایی درباره عبور از آستانه هزینه و جهش‌های ساعتی دریافت نخواهید کرد.",
+      "balanceAlertsOff": "هشدارهای موجودی خاموش شوند؟ دیگر هنگام کم شدن اعتبارتان اعلانی دریافت نخواهید کرد.",
+      "securityFindingsOff": "یافته‌های امنیتی خاموش شوند؟ دیگر اعلان‌هایی درباره یافته‌های امنیتی جدید دریافت نخواهید کرد.",
+      "hideBalanceOn": "موجودی‌هایتان پنهان شوند؟ موجودی اعتبار دیگر در صفحه‌های نمایه و مرکز سازمان نمایش داده نخواهد شد."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "با خاموش کردن یک ارائه‌دهنده، Kilo دیگر درخواست‌های این سازمان را به آن هدایت نمی‌کند.",
     "providersNeedCatalog": "کلیدهای ارائه‌دهنده تا زمانی که فهرست کامل مدل‌ها بارگیری نشود فقط‌خواندنی می‌مانند. برای ویرایش آن‌ها، روی تلاش مجدد در بالا ضربه بزنید.",
     "providersEmpty": "هیچ ارائه‌دهنده‌ای با این جست‌وجو مطابقت ندارد.",
+    "providersNone": "هیچ ارائه‌دهنده‌ای برای این سازمان در دسترس نیست.",
     "allowAllShown": "مجاز کردن همه موارد نمایش‌داده‌شده",
     "denyAllShown": "ممنوع کردن همه موارد نمایش‌داده‌شده",
     "gatewaysDescription": "Kilo درخواست‌های مدل را از طریق Vercel AI Gateway یا OpenRouter هدایت می‌کند. اگر درگاهی غیرفعال باشد، این درخواست‌ها ناموفق می‌شوند.",

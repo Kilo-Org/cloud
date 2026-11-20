@@ -19,7 +19,9 @@
     "presenceStatus": "Värdar: {{connection}}",
     "commandStatus": "Kommandoleverans: {{status}}",
     "delivered": "Levererat",
-    "expired": "Utgånget"
+    "expired": "Utgånget",
+    "recoveryGaps_one": "{{displayCount}} del av den här transkriptionen saknas.",
+    "recoveryGaps_other": "{{displayCount}} delar av den här transkriptionen saknas."
   },
   "common": {
     "manageOnWeb": "Hantera på webben",
@@ -963,6 +965,8 @@
       "pendingComment": "oskickade kommentarer",
       "pendingComment_other": "oskickade kommentarer",
       "submitCountOfTotal": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Skicka granskning",
       "partialPostedFresh": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
+      "managedOnWebTitle": "Hanteras på webben",
+      "managedOnWebShort": "Den här anslutningen hanteras på webben från en dator.",
+      "managedOnWebRepositories": "Välj repositorier för {{organization}} på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionOverview": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den på nästa skärm.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "Kontrollerar…",
       "statusUnavailable": "Status inte tillgänglig",
+      "needsAttention": "Kräver åtgärd",
       "platforms": "Plattformar",
       "activity": "Aktivitet"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "Välj modell",
       "noModelsDescription": "Det finns inga modeller att välja mellan.",
+      "allUnavailableTitle": "Inga modeller kan användas",
+      "allUnavailableDescription": "Lägg till en leverantörsnyckel och försök igen.",
       "favorites": "Favoriter"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "Leverantören är inte tillgänglig just nu. Skicka igen om en stund."
   },
   "settingsTools": {
-    "confirmTitle": "Bekräfta denna ändring?"
+    "confirmTitle": "Bekräfta denna ändring?",
+    "guarded": {
+      "spendAlertsOff": "Stänga av förbrukningsvarningar? Du skulle sluta få aviseringar om överskridna förbrukningströsklar och timtoppar.",
+      "balanceAlertsOff": "Stänga av saldovarningar? Du skulle sluta få aviseringar när dina krediter börjar ta slut.",
+      "securityFindingsOff": "Stänga av säkerhetsfynd? Du skulle sluta få aviseringar om nya säkerhetsfynd.",
+      "hideBalanceOn": "Dölja dina saldon? Kreditsaldon visas inte längre på profilsidorna och organisationshubben."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "Stäng av en leverantör för att stoppa Kilo från att dirigera till den för den här organisationen.",
     "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
     "providersEmpty": "Inga leverantörer matchar den här sökningen.",
+    "providersNone": "Inga leverantörer är tillgängliga för den här organisationen.",
     "allowAllShown": "Tillåt alla som visas",
     "denyAllShown": "Neka alla som visas",
     "gatewaysDescription": "Kilo dirigerar modellbegäranden via Vercel AI Gateway eller OpenRouter. En inaktiverad nätbrygga gör att dessa begäranden misslyckas.",

@@ -102,6 +102,9 @@ describe.each([
       });
       const wrapper = findElementByType(tree, 'Pressable');
       expect(wrapper?.props.accessible).toBe(false);
+      // Not a native click target either: a focusable wrapper stayed a
+      // role-less clickable stop around the whole row on Android.
+      expect(wrapper?.props.focusable).toBe(false);
       expect(wrapper?.props.accessibilityRole).toBeUndefined();
       expect(wrapper?.props.accessibilityLabel).toBeUndefined();
       expect(wrapper?.props.accessibilityHint).toBeUndefined();
@@ -133,6 +136,9 @@ describe.each([
       expect(host?.props.accessibilityRole).toBe('text');
       expect(host?.props.accessibilityLabel).toBe(label);
       expect(host?.props.children).toBeUndefined();
+      // Android treats a zero-opacity view as invisible to the user, so a
+      // transparent-by-opacity host never reached TalkBack.
+      expect(String(host?.props.className)).not.toContain('opacity-0');
       const exposed = host?.props.accessibilityActions as { name: string; label: string }[];
       expect(exposed).toEqual(
         actions.map(name => ({

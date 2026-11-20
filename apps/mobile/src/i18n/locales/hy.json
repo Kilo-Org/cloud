@@ -19,7 +19,9 @@
     "presenceStatus": "Հոսթեր՝ {{connection}}",
     "commandStatus": "Հրամանի առաքում՝ {{status}}",
     "delivered": "Առաքված",
-    "expired": "Ժամկետանց"
+    "expired": "Ժամկետանց",
+    "recoveryGaps_one": "Այս տեքստագրության {{displayCount}} մասը բացակայում է։",
+    "recoveryGaps_other": "Այս տեքստագրության {{displayCount}} մասը բացակայում է։"
   },
   "common": {
     "manageOnWeb": "Կառավարել վեբում",
@@ -963,6 +965,8 @@
       "pendingComment": "չուղարկված մեկնաբանություն",
       "pendingComment_other": "չուղարկված մեկնաբանություն",
       "submitCountOfTotal": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
+      "submitCountOfTotal_one": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
+      "submitCountOfTotal_other": "Ուղարկել {{displayTotalCount}} մեկնաբանությունից {{displayFreshCount}}-ը",
       "submitReview": "Ուղարկել վերանայումը",
       "partialPostedFresh": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
       "partialPostedFresh_one": "Հրապարակվել է {{displayFreshCount}} մեկնաբանություն։ ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ի Bitbucket միացումը կառավարվում է վեբում՝ համակարգչից։",
+      "managedOnWebTitle": "Կառավարվում է վեբում",
+      "managedOnWebShort": "Այս միացումը կառավարվում է վեբում՝ համակարգչից։",
+      "managedOnWebRepositories": "Ընտրիր {{organization}}-ի ռեպոզիտորիաները վեբում՝ համակարգչից։",
       "description": "Ստեղծիր աշխատանքային տարածքի հասանելիության տոկեն {{organization}}-ի համար և տեղադրիր այն ստորև։",
       "descriptionReconnect": "Ստեղծիր նոր աշխատանքային տարածքի հասանելիության տոկեն {{organization}}-ի համար և տեղադրիր այն ստորև։",
       "descriptionOverview": "Ստեղծիր աշխատանքային տարածքի հասանելիության տոկեն {{organization}}-ի համար և տեղադրիր այն հաջորդ էկրանին։",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "Ստուգվում է…",
       "statusUnavailable": "Կարգավիճակը հասանելի չէ",
+      "needsAttention": "Ուշադրության կարիք",
       "platforms": "Հարթակներ",
       "activity": "Գործունեություն"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "Մոդելի ընտրություն",
       "noModelsDescription": "Ընտրելու համար հասանելի մոդելներ չկան։",
+      "allUnavailableTitle": "Ոչ մի մոդել չի կարող օգտագործվել",
+      "allUnavailableDescription": "Ավելացրեք մատակարարի բանալի և կրկին փորձեք։",
       "favorites": "Նախընտրածներ"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "Մատակարարը հենց հիմա անհասանելի է։ Կարճ ժամանակ անց նորից ուղարկեք։"
   },
   "settingsTools": {
-    "confirmTitle": "Հաստատե՞լ այս փոփոխությունը։"
+    "confirmTitle": "Հաստատե՞լ այս փոփոխությունը։",
+    "guarded": {
+      "spendAlertsOff": "Անջատե՞լ ծախսերի ծանուցումները։ Դուք այլևս չեք ստանա ծանուցումներ ծախսերի շեմերի հատման և ժամային կտրուկ աճերի մասին։",
+      "balanceAlertsOff": "Անջատե՞լ մնացորդի ծանուցումները։ Դուք այլևս չեք ստանա ծանուցումներ, երբ ձեր կրեդիտները քիչ լինեն։",
+      "securityFindingsOff": "Անջատե՞լ անվտանգության հայտնաբերումները։ Դուք այլևս չեք ստանա ծանուցումներ նոր անվտանգության հայտնաբերումների մասին։",
+      "hideBalanceOn": "Թաքցնե՞լ ձեր մնացորդները։ Կրեդիտների մնացորդներն այլևս չեն երևա պրոֆիլի էկրաններում և կազմակերպության կենտրոնում։"
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "Անջատեք մատակարարին, որպեսզի Kilo-ն այս կազմակերպության համար չուղղորդի հարցումները դեպի նա։",
     "providersNeedCatalog": "Մատակարարների փոխանջատիչները մնում են միայն ընթերցման համար, քանի դեռ մոդելների ամբողջական կատալոգը չի բեռնվել։ Դրանք խմբագրելու համար սեղմեք վերևի Կրկին փորձել կոճակը։",
     "providersEmpty": "Ոչ մի մատակարար չի համապատասխանում այս որոնմանը։",
+    "providersNone": "Այս կազմակերպության համար հասանելի մատակարարներ չկան։",
     "allowAllShown": "Թույլատրել բոլոր ցուցադրվածները",
     "denyAllShown": "Արգելել բոլոր ցուցադրվածները",
     "gatewaysDescription": "Kilo-ն մոդելի հարցումները ուղղորդում է Vercel AI Gateway-ի կամ OpenRouter-ի միջոցով։ Անջատված դարպասը ձախողում է այդ հարցումները։",

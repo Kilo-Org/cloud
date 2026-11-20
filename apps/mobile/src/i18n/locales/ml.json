@@ -19,7 +19,9 @@
     "presenceStatus": "ഹോസ്റ്റുകൾ: {{connection}}",
     "commandStatus": "കമാൻഡ് ഡെലിവറി: {{status}}",
     "delivered": "ഡെലിവർ ചെയ്തു",
-    "expired": "കാലഹരണപ്പെട്ടു"
+    "expired": "കാലഹരണപ്പെട്ടു",
+    "recoveryGaps_one": "ഈ ട്രാൻസ്ക്രിപ്റ്റിന്റെ {{displayCount}} ഭാഗം കാണുന്നില്ല.",
+    "recoveryGaps_other": "ഈ ട്രാൻസ്ക്രിപ്റ്റിന്റെ {{displayCount}} ഭാഗങ്ങൾ കാണുന്നില്ല."
   },
   "common": {
     "manageOnWeb": "വെബിൽ നിയന്ത്രിക്കുക",
@@ -963,6 +965,8 @@
       "pendingComment": "സമർപ്പിക്കാത്ത അഭിപ്രായങ്ങൾ",
       "pendingComment_other": "സമർപ്പിക്കാത്ത അഭിപ്രായങ്ങൾ",
       "submitCountOfTotal": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
+      "submitCountOfTotal_one": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
+      "submitCountOfTotal_other": "{{displayTotalCount}}-ൽ {{displayFreshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
       "submitReview": "പരിശോധന സമർപ്പിക്കുക",
       "partialPostedFresh": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
       "partialPostedFresh_one": "{{displayFreshCount}} അഭിപ്രായങ്ങൾ പോസ്റ്റ് ചെയ്തു. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ന്റെ Bitbucket കണക്ഷൻ ഒരു കമ്പ്യൂട്ടറിൽ നിന്ന് വെബിലാണ് നിയന്ത്രിക്കുന്നത്.",
+      "managedOnWebTitle": "വെബിൽ നിയന്ത്രിക്കുന്നു",
+      "managedOnWebShort": "ഈ കണക്ഷൻ ഒരു കമ്പ്യൂട്ടറിൽ നിന്ന് വെബിലാണ് നിയന്ത്രിക്കുന്നത്.",
+      "managedOnWebRepositories": "{{organization}}-ന്റെ റിപ്പോസിറ്ററികൾ ഒരു കമ്പ്യൂട്ടറിൽ നിന്ന് വെബിൽ തിരഞ്ഞെടുക്കുക.",
       "description": "{{organization}}-നുള്ള ഒരു വർക്ക്സ്പെയ്സ് ആക്സസ് ടോക്കൺ സൃഷ്ടിച്ച് താഴെ ഒട്ടിക്കുക.",
       "descriptionReconnect": "{{organization}}-നുള്ള ഒരു പുതിയ വർക്ക്സ്പെയ്സ് ആക്സസ് ടോക്കൺ സൃഷ്ടിച്ച് താഴെ ഒട്ടിക്കുക.",
       "descriptionOverview": "{{organization}}-നുള്ള ഒരു വർക്ക്സ്പെയ്സ് ആക്സസ് ടോക്കൺ സൃഷ്ടിച്ച് അടുത്ത സ്ക്രീനിൽ ഒട്ടിക്കുക.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "പരിശോധിക്കുന്നു…",
       "statusUnavailable": "നില ലഭ്യമല്ല",
+      "needsAttention": "ശ്രദ്ധ ആവശ്യം",
       "platforms": "പ്ലാറ്റ്ഫോമുകൾ",
       "activity": "പ്രവർത്തനം"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "മോഡൽ തിരഞ്ഞെടുക്കുക",
       "noModelsDescription": "തിരഞ്ഞെടുക്കാൻ മോഡലുകൾ ലഭ്യമല്ല.",
+      "allUnavailableTitle": "ഒരു മോഡലും ഉപയോഗിക്കാൻ കഴിയില്ല",
+      "allUnavailableDescription": "ഒരു പ്രൊവൈഡർ കീ ചേർത്ത ശേഷം വീണ്ടും ശ്രമിക്കുക.",
       "favorites": "പ്രിയപ്പെട്ടവ"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "ദാതാവ് ഇപ്പോൾ ലഭ്യമല്ല. അൽപ്പസമയത്തിനുശേഷം വീണ്ടും അയയ്ക്കുക."
   },
   "settingsTools": {
-    "confirmTitle": "ഈ മാറ്റം സ്ഥിരീകരിക്കണോ?"
+    "confirmTitle": "ഈ മാറ്റം സ്ഥിരീകരിക്കണോ?",
+    "guarded": {
+      "spendAlertsOff": "ചെലവ് അലേർട്ടുകൾ ഓഫാക്കണോ? ചെലവ് പരിധി കവിയുമ്പോഴും മണിക്കൂർ തോറുമുള്ള കുതിച്ചുചാട്ടങ്ങളെക്കുറിച്ചും നിങ്ങൾക്ക് അറിയിപ്പുകൾ ലഭിക്കാതെ വരും.",
+      "balanceAlertsOff": "ബാലൻസ് അലേർട്ടുകൾ ഓഫാക്കണോ? നിങ്ങളുടെ ക്രെഡിറ്റുകൾ കുറയുമ്പോൾ നിങ്ങൾക്ക് അറിയിപ്പുകൾ ലഭിക്കാതെ വരും.",
+      "securityFindingsOff": "സെക്യൂരിറ്റി കണ്ടെത്തലുകൾ ഓഫാക്കണോ? പുതിയ സെക്യൂരിറ്റി കണ്ടെത്തലുകളെക്കുറിച്ച് നിങ്ങൾക്ക് അറിയിപ്പുകൾ ലഭിക്കാതെ വരും.",
+      "hideBalanceOn": "നിങ്ങളുടെ ബാലൻസുകൾ മറയ്ക്കണോ? പ്രൊഫൈൽ സ്ക്രീനുകളിലും ഓർഗനൈസേഷൻ ഹബ്ബിലും ക്രെഡിറ്റ് ബാലൻസുകൾ ഇനി ദൃശ്യമാകില്ല."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "ഈ ഓർഗനൈസേഷനിൽ Kilo അതിലേക്ക് റൂട്ട് ചെയ്യുന്നത് നിർത്താൻ ഒരു പ്രൊവൈഡർ ഓഫാക്കുക.",
     "providersNeedCatalog": "മുഴുവൻ മോഡൽ കാറ്റലോഗ് ലോഡ് ആകുന്നതുവരെ പ്രൊവൈഡർ സ്വിച്ചുകൾ വായിക്കാൻ മാത്രമായിരിക്കും. അവ എഡിറ്റ് ചെയ്യാൻ മുകളിലുള്ള വീണ്ടും ശ്രമിക്കുക ടാപ്പ് ചെയ്യുക.",
     "providersEmpty": "ഈ തിരയലുമായി പൊരുത്തപ്പെടുന്ന പ്രൊവൈഡർമാരില്ല.",
+    "providersNone": "ഈ ഓർഗനൈസേഷനിൽ ലഭ്യമായ പ്രൊവൈഡർമാരില്ല.",
     "allowAllShown": "കാണിച്ചിരിക്കുന്ന എല്ലാം അനുവദിക്കുക",
     "denyAllShown": "കാണിച്ചിരിക്കുന്ന എല്ലാം നിരസിക്കുക",
     "gatewaysDescription": "Kilo മോഡൽ അഭ്യർത്ഥനകൾ Vercel AI Gateway അല്ലെങ്കിൽ OpenRouter വഴി റൂട്ട് ചെയ്യുന്നു. പ്രവർത്തനരഹിതമാക്കിയ ഗേറ്റ്വേ ആ അഭ്യർത്ഥനകൾ പരാജയപ്പെടുത്തുന്നു.",

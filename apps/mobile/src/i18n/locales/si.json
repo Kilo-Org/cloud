@@ -19,7 +19,9 @@
     "presenceStatus": "හෝස්ට්: {{connection}}",
     "commandStatus": "විධානය යැවීම: {{status}}",
     "delivered": "ලැබී ඇත",
-    "expired": "කල් ඉකුත් වී ඇත"
+    "expired": "කල් ඉකුත් වී ඇත",
+    "recoveryGaps_one": "මෙම පිටපතේ කොටස් {{displayCount}}ක් අස්ථානගත වී ඇත.",
+    "recoveryGaps_other": "මෙම පිටපතේ කොටස් {{displayCount}}ක් අස්ථානගත වී ඇත."
   },
   "common": {
     "manageOnWeb": "වෙබයේ කළමනාකරණය කරන්න",
@@ -963,6 +965,8 @@
       "pendingComment": "යැවීමට ඇති අදහස්",
       "pendingComment_other": "යැවීමට ඇති අදහස්",
       "submitCountOfTotal": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ක් ඉදිරිපත් කරන්න",
+      "submitCountOfTotal_one": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ක් ඉදිරිපත් කරන්න",
+      "submitCountOfTotal_other": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ක් ඉදිරිපත් කරන්න",
       "submitReview": "සමාලෝචනය ඉදිරිපත් කරන්න",
       "partialPostedFresh": "අදහස් {{displayFreshCount}} ක් පළ කර ඇත. ",
       "partialPostedFresh_one": "අදහස් {{displayFreshCount}} ක් පළ කර ඇත. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "managedOnWebTitle": "වෙබය හරහා කළමනාකරණය කෙරේ",
+      "managedOnWebShort": "මෙම සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "managedOnWebRepositories": "{{organization}} සඳහා පරිගණකයකින් වෙබය හරහා රෙපොසිටරි තෝරන්න.",
       "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionOverview": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා ඊළඟ තිරයේ අලවන්න.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "පරීක්ෂා කරමින්…",
       "statusUnavailable": "තත්ත්වය ලබා ගත නොහැක",
+      "needsAttention": "අවධානය අවශ්‍යයි",
       "platforms": "වේදිකා",
       "activity": "ක්‍රියාකාරකම්"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "මාදිලිය තෝරන්න",
       "noModelsDescription": "තේරීමට මාදිලි නොමැත.",
+      "allUnavailableTitle": "කිසිදු මාදිලියක් භාවිත කළ නොහැක",
+      "allUnavailableDescription": "සපයන්නාගේ යතුරක් එක් කර නැවත උත්සාහ කරන්න.",
       "favorites": "ප්‍රියතමයන්"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "සැපයුම්කරු දැනට ලබා ගත නොහැක. කෙටි වේලාවකින් නැවත යවන්න."
   },
   "settingsTools": {
-    "confirmTitle": "මෙම වෙනස තහවුරු කරන්නද?"
+    "confirmTitle": "මෙම වෙනස තහවුරු කරන්නද?",
+    "guarded": {
+      "spendAlertsOff": "වියදම් ඇඟවීම් ක්‍රියා විරහිත කරන්නද? වියදම් සීමා ඉක්මවීම් සහ පැයක තියුණු වැඩිවීම් පිළිබඳ දැනුම්දීම් ලැබීම නතර වේ.",
+      "balanceAlertsOff": "ශේෂ ඇඟවීම් ක්‍රියා විරහිත කරන්නද? ඔබගේ ක්‍රෙඩිට් අඩු වන විට දැනුම්දීම් ලැබීම නතර වේ.",
+      "securityFindingsOff": "ආරක්ෂක සොයාගැනීම් ක්‍රියා විරහිත කරන්නද? නව ආරක්ෂක සොයාගැනීම් පිළිබඳ දැනුම්දීම් ලැබීම නතර වේ.",
+      "hideBalanceOn": "ඔබගේ ශේෂ සඟවන්නද? ක්‍රෙඩිට් ශේෂ තවදුරටත් පැතිකඩ තිරවල සහ සංවිධාන කේන්ද්‍රයේ දිස් නොවේ."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "මෙම සංවිධානය සඳහා Kilo එයට මාර්ගගත කිරීම නැවැත්වීමට සපයන්නෙකු ක්‍රියා විරහිත කරන්න.",
     "providersNeedCatalog": "සම්පූර්ණ මාදිලි නාමාවලිය පූරණය වන තුරු සපයන්නන්ගේ ස්විච කියවීමට පමණි. ඒවා සංස්කරණය කිරීමට ඉහත ඇති නැවත උත්සාහ කරන්න බොත්තම තට්ටු කරන්න.",
     "providersEmpty": "මෙම සෙවුමට ගැළපෙන සපයන්නන් නැත.",
+    "providersNone": "මෙම සංවිධානය සඳහා ලබා ගත හැකි සපයන්නන් නොමැත.",
     "allowAllShown": "පෙන්වා ඇති සියල්ලට ඉඩ දෙන්න",
     "denyAllShown": "පෙන්වා ඇති සියල්ල ප්‍රතික්ෂේප කරන්න",
     "gatewaysDescription": "Kilo ආකෘති ඉල්ලීම් Vercel AI Gateway හෝ OpenRouter හරහා මාර්ගගත කරයි. ක්‍රියා විරහිත ද්වාරයක් එම ඉල්ලීම් අසාර්ථක කරයි.",

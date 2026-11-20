@@ -19,7 +19,9 @@
     "presenceStatus": "হোস্ট: {{connection}}",
     "commandStatus": "কমান্ড ডেলিভারি: {{status}}",
     "delivered": "পৌঁছেছে",
-    "expired": "মেয়াদ শেষ"
+    "expired": "মেয়াদ শেষ",
+    "recoveryGaps_one": "এই ট্রান্সক্রিপ্টের {{displayCount}}টি অংশ অনুপস্থিত।",
+    "recoveryGaps_other": "এই ট্রান্সক্রিপ্টের {{displayCount}}টি অংশ অনুপস্থিত।"
   },
   "common": {
     "manageOnWeb": "ওয়েবে পরিচালনা করুন",
@@ -963,6 +965,8 @@
       "pendingComment": "অপেক্ষমাণ মন্তব্য",
       "pendingComment_other": "অপেক্ষমাণ মন্তব্য",
       "submitCountOfTotal": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
+      "submitCountOfTotal_one": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
+      "submitCountOfTotal_other": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
       "submitReview": "পর্যালোচনা জমা দিন",
       "partialPostedFresh": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
       "partialPostedFresh_one": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-এর Bitbucket সংযোগ কম্পিউটার থেকে ওয়েবে পরিচালনা করা হয়।",
+      "managedOnWebTitle": "ওয়েবে পরিচালিত",
+      "managedOnWebShort": "এই সংযোগটি কম্পিউটার থেকে ওয়েবে পরিচালনা করা হয়।",
+      "managedOnWebRepositories": "কম্পিউটার থেকে ওয়েবে {{organization}}-এর জন্য রিপোজিটরি বেছে নিন।",
       "description": "{{organization}}-এর জন্য একটি ওয়ার্কস্পেস অ্যাক্সেস টোকেন তৈরি করে নিচে পেস্ট করুন।",
       "descriptionReconnect": "{{organization}}-এর জন্য একটি নতুন ওয়ার্কস্পেস অ্যাক্সেস টোকেন তৈরি করে নিচে পেস্ট করুন।",
       "descriptionOverview": "{{organization}}-এর জন্য একটি ওয়ার্কস্পেস অ্যাক্সেস টোকেন তৈরি করে পরের স্ক্রিনে পেস্ট করুন।",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "পরীক্ষা করা হচ্ছে…",
       "statusUnavailable": "অবস্থা জানা যাচ্ছে না",
+      "needsAttention": "মনোযোগ প্রয়োজন",
       "platforms": "প্ল্যাটফর্ম",
       "activity": "কার্যকলাপ"
     },
@@ -2784,7 +2792,9 @@
     "modelPicker": {
       "title": "মডেল নির্বাচন",
       "favorites": "পছন্দের তালিকা",
-      "noModelsDescription": "বেছে নেওয়ার মতো কোনো মডেল নেই।"
+      "noModelsDescription": "বেছে নেওয়ার মতো কোনো মডেল নেই।",
+      "allUnavailableTitle": "কোনো মডেল ব্যবহার করা যাবে না",
+      "allUnavailableDescription": "একটি প্রোভাইডার কী যোগ করুন, তারপর আবার চেষ্টা করুন।"
     },
     "modelSelector": {
       "provider": "প্রোভাইডার {{id}}",
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "প্রদানকারী এই মুহূর্তে উপলব্ধ নেই। কিছুক্ষণ পরে আবার পাঠান।"
   },
   "settingsTools": {
-    "confirmTitle": "এই পরিবর্তন নিশ্চিত করবেন?"
+    "confirmTitle": "এই পরিবর্তন নিশ্চিত করবেন?",
+    "guarded": {
+      "spendAlertsOff": "খরচের সতর্কতা বন্ধ করবেন? খরচের সীমা অতিক্রম এবং ঘণ্টাভিত্তিক বাড়াবাড়ির বিষয়ে আপনি আর নোটিফিকেশন পাবেন না।",
+      "balanceAlertsOff": "ব্যালেন্স সতর্কতা বন্ধ করবেন? আপনার ক্রেডিট কমে এলে আপনি আর নোটিফিকেশন পাবেন না।",
+      "securityFindingsOff": "নিরাপত্তা ফলাফল বন্ধ করবেন? নতুন নিরাপত্তা ফলাফলের বিষয়ে আপনি আর নোটিফিকেশন পাবেন না।",
+      "hideBalanceOn": "আপনার ব্যালেন্স লুকাবেন? প্রোফাইল স্ক্রিন এবং অর্গানাইজেশন হাবে ক্রেডিট ব্যালেন্স আর দেখাবে না।"
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "কোনো প্রোভাইডার বন্ধ করলে Kilo এই প্রতিষ্ঠানের অনুরোধ আর সেটিতে রাউট করবে না।",
     "providersNeedCatalog": "সম্পূর্ণ মডেল ক্যাটালগ লোড না হওয়া পর্যন্ত প্রোভাইডার সুইচগুলো শুধু পড়ার জন্য থাকবে। এগুলো সম্পাদনা করতে উপরের আবার চেষ্টা করুন বোতামে ট্যাপ করুন।",
     "providersEmpty": "এই অনুসন্ধানের সাথে কোনো প্রোভাইডার মেলেনি।",
+    "providersNone": "এই প্রতিষ্ঠানের জন্য কোনো প্রোভাইডার উপলব্ধ নেই।",
     "allowAllShown": "দেখানো সবগুলো অনুমোদন করুন",
     "denyAllShown": "দেখানো সবগুলো নিষিদ্ধ করুন",
     "gatewaysDescription": "Kilo মডেলের অনুরোধ Vercel AI Gateway বা OpenRouter-এর মাধ্যমে রাউট করে। কোনো গেটওয়ে বন্ধ থাকলে সেই অনুরোধগুলো ব্যর্থ হয়।",

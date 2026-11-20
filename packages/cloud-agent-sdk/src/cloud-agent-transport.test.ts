@@ -2576,7 +2576,9 @@ describe('CloudAgentTransport snapshot read recovery', () => {
       // (onInitialPageLoaded fires) without replaying rows — no
       // session.created, no message rows over the socket's own replay.
       expect(fetchCloudSnapshotPage).toHaveBeenCalledTimes(3);
-      expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+      // The manager receives the projected page: the wire `source` is gone and
+      // the version is explicit, so the seed can tell a v1 page from v2.
+      expect(onInitialPageLoaded).toHaveBeenCalledWith({ ...page, sourceVersion: 'v1' });
       expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
       // One sentinel per socket — the pre-close mark and the reconnect's wire
       // event — both delivered to the service sink.
@@ -2684,6 +2686,71 @@ describe('CloudAgentTransport snapshot read recovery', () => {
       expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
       expect(onInitialPageLoaded).toHaveBeenCalledWith(retryPage);
       expect(errors).toEqual(['Connection lost. Please retry in a moment.']);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('records a superseded page whose read belonged to a record-only retry chain', async () => {
+    jest.useFakeTimers();
+    try {
+      const page = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: 'cursor-B',
+        omittedItemCount: 0,
+      };
+      let resolvePending: (read: SessionSnapshotPageOutcome | null) => void = () => undefined;
+      const pendingRead = new Promise<SessionSnapshotPageOutcome | null>(resolve => {
+        resolvePending = resolve;
+      });
+      const fetchSnapshotPage = jest
+        .fn()
+        // The initial read fails and arms the replay chain.
+        .mockRejectedValueOnce(new Error('Connection lost.'))
+        // That chain's retry fires during the reconnect and fails too.
+        .mockRejectedValueOnce(new Error('Connection lost.'))
+        // The reconnect's record-only read fails and arms a record-only chain.
+        .mockRejectedValueOnce(new Error('Connection lost.'))
+        // The record-only chain's timer read stays in flight.
+        .mockReturnValueOnce(pendingRead);
+      const { transport, serviceEvents, onInitialPageLoaded } = createSnapshotTransport({
+        fetchSnapshotPage,
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+      sendRaw({ ...sentinel, eventId: 55 });
+      await reconnectWithoutCursor();
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(3);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+
+      // The record-only chain arms and its timer read hangs.
+      jest.advanceTimersByTime(500);
+      await flushMicrotasks();
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(4);
+
+      // A newer reconnect supersedes that in-flight read.
+      mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+      jest.advanceTimersByTime(2000);
+      await flushMicrotasks();
+      const newerSocket = newestSocket();
+      newerSocket.onopen?.(new Event('open'));
+      newerSocket.onmessage?.({ data: JSON.stringify(sentinel) } as MessageEvent);
+      await flushMicrotasks();
+
+      resolvePending(page);
+      await flushMicrotasks();
+
+      // The superseded page still seeds the manager: its older-pages cursor and
+      // queued turns are the only seed this connection gets, and its rows stay
+      // out of the newer live replay. One rule covers every catch-up path.
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
 
       transport.destroy();
     } finally {

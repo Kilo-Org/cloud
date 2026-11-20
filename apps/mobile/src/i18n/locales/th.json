@@ -19,7 +19,9 @@
     "presenceStatus": "โฮสต์: {{connection}}",
     "commandStatus": "การส่งคำสั่ง: {{status}}",
     "delivered": "ส่งถึงแล้ว",
-    "expired": "หมดอายุแล้ว"
+    "expired": "หมดอายุแล้ว",
+    "recoveryGaps_one": "ส่วน {{displayCount}} ของบันทึกนี้หายไป",
+    "recoveryGaps_other": "ส่วน {{displayCount}} ของบันทึกนี้หายไป"
   },
   "common": {
     "manageOnWeb": "จัดการบนเว็บ",
@@ -963,6 +965,8 @@
       "pendingComment": "ความคิดเห็นที่รอส่ง",
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_one": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
+      "submitCountOfTotal_other": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitReview": "ส่งรีวิว",
       "partialPostedFresh": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
       "partialPostedFresh_one": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "การเชื่อมต่อ Bitbucket ของ {{organization}} ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
+      "managedOnWebTitle": "จัดการบนเว็บ",
+      "managedOnWebShort": "การเชื่อมต่อนี้ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
+      "managedOnWebRepositories": "เลือกที่เก็บสำหรับ {{organization}} บนเว็บจากคอมพิวเตอร์",
       "description": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานสำหรับ {{organization}} แล้ววางโทเค็นด้านล่าง",
       "descriptionReconnect": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานใหม่สำหรับ {{organization}} แล้ววางโทเค็นด้านล่าง",
       "descriptionOverview": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานสำหรับ {{organization}} แล้ววางโทเค็นในหน้าจอถัดไป",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "กำลังตรวจสอบ…",
       "statusUnavailable": "ไม่สามารถดูสถานะได้",
+      "needsAttention": "ต้องดำเนินการ",
       "platforms": "แพลตฟอร์ม",
       "activity": "กิจกรรม"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "เลือกโมเดล",
       "noModelsDescription": "ไม่มีโมเดลให้เลือก",
+      "allUnavailableTitle": "ไม่มีโมเดลใดใช้งานได้",
+      "allUnavailableDescription": "เพิ่มคีย์ผู้ให้บริการ แล้วลองอีกครั้ง",
       "favorites": "รายการโปรด"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "ผู้ให้บริการไม่พร้อมใช้งานในขณะนี้ ส่งอีกครั้งในอีกไม่ช้า"
   },
   "settingsTools": {
-    "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่"
+    "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่",
+    "guarded": {
+      "spendAlertsOff": "ปิดการแจ้งเตือนการใช้จ่ายหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเกี่ยวกับการข้ามเกณฑ์การใช้จ่ายและการพุ่งขึ้นรายชั่วโมง",
+      "balanceAlertsOff": "ปิดการแจ้งเตือนยอดคงเหลือหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเมื่อเครดิตของคุณเหลือน้อย",
+      "securityFindingsOff": "ปิดการแจ้งเตือนการค้นพบด้านความปลอดภัยหรือไม่ คุณจะหยุดได้รับการแจ้งเตือนเกี่ยวกับการค้นพบด้านความปลอดภัยใหม่",
+      "hideBalanceOn": "ซ่อนยอดคงเหลือของคุณหรือไม่ ยอดคงเหลือเครดิตจะไม่แสดงบนหน้าจอโปรไฟล์และศูนย์กลางขององค์กรอีกต่อไป"
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "ปิดผู้ให้บริการเพื่อหยุดการกำหนดเส้นทางของ Kilo ไปยังผู้ให้บริการนั้นสำหรับองค์กรนี้",
     "providersNeedCatalog": "สวิตช์ผู้ให้บริการจะเป็นแบบอ่านอย่างเดียวจนกว่าแค็ตตาล็อกโมเดลทั้งหมดจะโหลดเสร็จ แตะลองอีกครั้งด้านบนเพื่อแก้ไข",
     "providersEmpty": "ไม่มีผู้ให้บริการที่ตรงกับการค้นหานี้",
+    "providersNone": "ไม่มีผู้ให้บริการที่พร้อมใช้งานสำหรับองค์กรนี้",
     "allowAllShown": "อนุญาตทั้งหมดที่แสดง",
     "denyAllShown": "ปฏิเสธทั้งหมดที่แสดง",
     "gatewaysDescription": "Kilo กำหนดเส้นทางคำขอของโมเดลผ่าน Vercel AI Gateway หรือ OpenRouter เกตเวย์ที่ปิดใช้งานจะทำให้คำขอเหล่านั้นล้มเหลว",

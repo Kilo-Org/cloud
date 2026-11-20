@@ -59,6 +59,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     warn: '#9F6612',
+    foreground: '#1C1917',
     mutedForeground: '#6F6A61',
     primary: '#4F5A10',
   }),
@@ -189,7 +190,7 @@ describe('ModelPickerOptionRow unavailable row', () => {
     expect(nameClass(renderer, 'Minimax M2.5')).toBe('text-base text-foreground');
   });
 
-  it('dims the selected check and leaves the badge copy readable', () => {
+  it('marks a selected unavailable row with the muted check and keeps the badge copy readable', () => {
     const renderer = renderRow(
       cliCatalogOption({ unavailable: true, hasUserByokAvailable: true, name: 'Minimax M2.5' }),
       { selected: true }
@@ -202,6 +203,23 @@ describe('ModelPickerOptionRow unavailable row', () => {
     );
     expect(views.some(node => String(node.props.className).includes('opacity-50'))).toBe(false);
     expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+  });
+
+  it('draws no check on a selected unavailable row the all-unavailable sheet shows', () => {
+    const renderer = renderRow(cliCatalogOption({ unavailable: true, name: 'Minimax M2.5' }), {
+      selected: true,
+      suppressUnavailableCheck: true,
+    });
+
+    // Nothing is pickable in that sheet, so a check would claim a selection
+    // the state above denies.
+    expect(checkAccessories(renderer)).toHaveLength(0);
+  });
+
+  it('still draws the check on a selected available row', () => {
+    const renderer = renderRow(cliCatalogOption({ name: 'Minimax M2.5' }), { selected: true });
+
+    expect(checkAccessories(renderer)).toEqual([{ color: '#1C1917', size: 18 }]);
   });
 });
 

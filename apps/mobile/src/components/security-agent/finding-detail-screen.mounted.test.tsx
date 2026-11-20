@@ -155,6 +155,7 @@ const viewSwitch = vi.hoisted(() => ({
     value: string;
     onChange: (next: string) => void;
     accessibilityLabel: string;
+    semantics?: 'choice' | 'tabs';
   },
 }));
 vi.mock('@/components/ui/segmented-control', () => ({
@@ -163,6 +164,7 @@ vi.mock('@/components/ui/segmented-control', () => ({
     value: string;
     onChange: (next: string) => void;
     accessibilityLabel: string;
+    semantics?: 'choice' | 'tabs';
   }) => {
     viewSwitch.props = props;
     return null;
@@ -258,8 +260,9 @@ describe('FindingDetailScreen view switch', () => {
       'remediation',
     ]);
     expect(control.value).toBe('details');
-    // The group is named by the screen's own title, so a reader hears the
-    // finding's views rather than an unnamed radio group.
+    // Each view swaps the body below the strip, so a reader hears tabs, and the
+    // tab list is named by the screen's own title.
+    expect(control.semantics).toBe('tabs');
     expect(control.accessibilityLabel).toBe('securityAgent.findingDetail.title');
   });
 });

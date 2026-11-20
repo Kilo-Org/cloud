@@ -18,9 +18,11 @@ import {
   BENCHMARK_SCHEDULER_SETTING_KEYS,
   BenchmarkConfigSchema,
   BenchmarkConfigAdminLegacyFieldsSchema,
+  BenchmarkRunAdminLegacyFieldsSchema,
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
   BenchmarkProfileStatusesRequestSchema,
+  BenchmarkSchedulerConfigResponseSchema,
   BenchmarkSchedulerOverridesSchema,
   CustomRoutingTableRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
@@ -285,6 +287,13 @@ describe('BenchmarkConfigSchema defaults', () => {
     ).toBe(false);
   });
 
+  it('accepts only an empty transitional summaries array on admin runs', () => {
+    expect(BenchmarkRunAdminLegacyFieldsSchema.parse({ summaries: [] })).toEqual({ summaries: [] });
+    expect(
+      BenchmarkRunAdminLegacyFieldsSchema.safeParse({ summaries: [{ model: 'm' }] }).success
+    ).toBe(false);
+  });
+
   it('builds scheduler overrides from the shared scheduler key list', () => {
     const defaults = BenchmarkSchedulerOverridesSchema.parse({});
     expect(Object.keys(defaults).sort()).toEqual([...BENCHMARK_SCHEDULER_SETTING_KEYS].sort());
@@ -298,6 +307,36 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(BenchmarkSchedulerOverridesSchema.safeParse({ slots: 1, notASetting: 1 }).success).toBe(
       false
     );
+    expect(BenchmarkSchedulerOverridesSchema.safeParse({ providerConcurrency: 48 }).success).toBe(
+      false
+    );
+  });
+
+  it('parses a scheduler config response that still carries the retired provider settings', () => {
+    const setting = (effective: number) => ({
+      effective,
+      source: 'default' as const,
+      override: null,
+      fallback: effective,
+    });
+    const parsed = BenchmarkSchedulerConfigResponseSchema.parse({
+      settings: {
+        slots: setting(250),
+        modelConcurrency: setting(12),
+        providerConcurrency: setting(250),
+        unknownProviderConcurrency: setting(250),
+      },
+      updatedAt: null,
+      updatedBy: null,
+    });
+    expect(parsed.settings).toEqual({ slots: setting(250), modelConcurrency: setting(12) });
+    expect(
+      BenchmarkSchedulerConfigResponseSchema.safeParse({
+        settings: { slots: setting(250) },
+        updatedAt: null,
+        updatedBy: null,
+      }).success
+    ).toBe(false);
   });
 
   it.each(['efficient', 'frontier'])(

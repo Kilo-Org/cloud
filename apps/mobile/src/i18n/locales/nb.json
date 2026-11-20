@@ -19,7 +19,9 @@
     "presenceStatus": "Verter: {{connection}}",
     "commandStatus": "Kommandolevering: {{status}}",
     "delivered": "Levert",
-    "expired": "Utløpt"
+    "expired": "Utløpt",
+    "recoveryGaps_one": "{{displayCount}} del av denne transkripsjonen mangler.",
+    "recoveryGaps_other": "{{displayCount}} deler av denne transkripsjonen mangler."
   },
   "common": {
     "manageOnWeb": "Administrer på nettet",
@@ -963,6 +965,8 @@
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Send gjennomgang",
       "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er publisert. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er publisert. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
+      "managedOnWebTitle": "Administreres på nettet",
+      "managedOnWebShort": "Denne tilkoblingen administreres på nettet fra en datamaskin.",
+      "managedOnWebRepositories": "Velg repositorier for {{organization}} på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "descriptionReconnect": "Opprett et nytt tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "descriptionOverview": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn på neste skjerm.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "Sjekker…",
       "statusUnavailable": "Status utilgjengelig",
+      "needsAttention": "Oppfølging nødvendig",
       "platforms": "Plattformer",
       "activity": "Aktivitet"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "Velg modell",
       "noModelsDescription": "Det er ingen modeller å velge mellom.",
+      "allUnavailableTitle": "Ingen modeller kan brukes",
+      "allUnavailableDescription": "Legg til en leverandørnøkkel, og prøv igjen.",
       "favorites": "Favoritter"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "Leverandøren er utilgjengelig akkurat nå. Send på nytt om litt."
   },
   "settingsTools": {
-    "confirmTitle": "Bekrefte denne endringen?"
+    "confirmTitle": "Bekrefte denne endringen?",
+    "guarded": {
+      "spendAlertsOff": "Slå av forbruksvarsler? Du vil ikke lenger få varsler om at forbruksterskler overskrides og om timesvise topper.",
+      "balanceAlertsOff": "Slå av saldovarsler? Du vil ikke lenger få varsler når du begynner å gå tom for kreditt.",
+      "securityFindingsOff": "Slå av sikkerhetsfunn? Du vil ikke lenger få varsler om nye sikkerhetsfunn.",
+      "hideBalanceOn": "Skjul saldoene dine? Kredittsaldoer vil ikke lenger vises på profilskjermene og i organisasjonssenteret."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "Slå av en leverandør for å hindre at Kilo ruter til den for denne organisasjonen.",
     "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
     "providersEmpty": "Ingen leverandører samsvarer med dette søket.",
+    "providersNone": "Ingen leverandører er tilgjengelige for denne organisasjonen.",
     "allowAllShown": "Tillat alle viste",
     "denyAllShown": "Nekt alle viste",
     "gatewaysDescription": "Kilo ruter modellforespørsler gjennom Vercel AI Gateway eller OpenRouter. En deaktivert inngangsportal får disse forespørslene til å feile.",

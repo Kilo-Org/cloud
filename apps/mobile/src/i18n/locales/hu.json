@@ -19,7 +19,9 @@
     "presenceStatus": "Gazdagépek: {{connection}}",
     "commandStatus": "Parancs kézbesítése: {{status}}",
     "delivered": "Kézbesítve",
-    "expired": "Lejárt"
+    "expired": "Lejárt",
+    "recoveryGaps_one": "{{displayCount}} rész hiányzik ebből az átiratból.",
+    "recoveryGaps_other": "{{displayCount}} rész hiányzik ebből az átiratból."
   },
   "common": {
     "manageOnWeb": "Kezelés a weben",
@@ -963,6 +965,8 @@
       "pendingComment": "elküldésre váró hozzászólás",
       "pendingComment_other": "elküldésre váró hozzászólás",
       "submitCountOfTotal": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
+      "submitCountOfTotal_one": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
+      "submitCountOfTotal_other": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
       "submitReview": "Ellenőrzés elküldése",
       "partialPostedFresh": "{{displayFreshCount}} hozzászólás elküldve. ",
       "partialPostedFresh_one": "{{displayFreshCount}} hozzászólás elküldve. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
+      "managedOnWebTitle": "A weben kezelve",
+      "managedOnWebShort": "Ezt a kapcsolatot a weben, számítógépről kezelheti.",
+      "managedOnWebRepositories": "Válassza ki {{organization}} tárolóit a weben, számítógépről.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, majd illeszd be a következő képernyőn.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "Ellenőrzés…",
       "statusUnavailable": "Az állapot nem érhető el",
+      "needsAttention": "Beavatkozást igényel",
       "platforms": "Platformok",
       "activity": "Tevékenység"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "Modell kiválasztása",
       "noModelsDescription": "Nincs kiválasztható modell.",
+      "allUnavailableTitle": "Egyetlen modell sem használható",
+      "allUnavailableDescription": "Adj hozzá egy szolgáltatói kulcsot, majd próbáld újra.",
       "favorites": "Kedvencek"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "A szolgáltató jelenleg nem érhető el. Küldd el újra hamarosan."
   },
   "settingsTools": {
-    "confirmTitle": "Megerősíted ezt a módosítást?"
+    "confirmTitle": "Megerősíted ezt a módosítást?",
+    "guarded": {
+      "spendAlertsOff": "Kikapcsolja a költési riasztásokat? Ezután nem kap értesítéseket a költési küszöbértékek átlépéséről és az óránkénti kiugrásokról.",
+      "balanceAlertsOff": "Kikapcsolja az egyenlegriasztásokat? Ezután nem kap értesítéseket, amikor a kreditek alacsonyra csökkennek.",
+      "securityFindingsOff": "Kikapcsolja a biztonsági észleléseket? Ezután nem kap értesítéseket az új biztonsági észlelésekről.",
+      "hideBalanceOn": "Elrejti az egyenlegeit? A kreditegyenlegek többé nem jelennek meg a profilképernyőkön és a szervezeti központban."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "Kapcsoljon ki egy szolgáltatót, hogy a Kilo ne irányítson hozzá kéréseket ennél a szervezetnél.",
     "providersNeedCatalog": "A szolgáltatók kapcsolói csak olvashatók maradnak, amíg a teljes modellkatalógus be nem töltődik. A szerkesztésükhöz koppintson fent az Újrapróbálkozás gombra.",
     "providersEmpty": "Nincs a keresésnek megfelelő szolgáltató.",
+    "providersNone": "Ennél a szervezetnél nem érhetők el szolgáltatók.",
     "allowAllShown": "Az összes megjelenített engedélyezése",
     "denyAllShown": "Az összes megjelenített letiltása",
     "gatewaysDescription": "A Kilo a modellkéréseket a Vercel AI Gateway vagy az OpenRouter használatával irányítja. A letiltott átjáró sikertelenné teszi ezeket a kéréseket.",

@@ -19,7 +19,11 @@
     "presenceStatus": "Hostitelé: {{connection}}",
     "commandStatus": "Doručení příkazu: {{status}}",
     "delivered": "Doručeno",
-    "expired": "Platnost vypršela"
+    "expired": "Platnost vypršela",
+    "recoveryGaps_one": "Chybí {{displayCount}} část tohoto přepisu.",
+    "recoveryGaps_few": "Chybí {{displayCount}} části tohoto přepisu.",
+    "recoveryGaps_many": "Chybí {{displayCount}} části tohoto přepisu.",
+    "recoveryGaps_other": "Chybí {{displayCount}} částí tohoto přepisu."
   },
   "common": {
     "manageOnWeb": "Spravovat na webu",
@@ -997,6 +1001,10 @@
       "pendingComment": "neodeslaných komentářů",
       "pendingComment_other": "neodeslaných komentářů",
       "submitCountOfTotal": "Odeslat {{displayFreshCount}} z {{displayTotalCount}} komentářů",
+      "submitCountOfTotal_one": "Odeslat {{displayFreshCount}} z {{displayTotalCount}} komentářů",
+      "submitCountOfTotal_few": "Odeslat {{displayFreshCount}} z {{displayTotalCount}} komentářů",
+      "submitCountOfTotal_many": "Odeslat {{displayFreshCount}} z {{displayTotalCount}} komentářů",
+      "submitCountOfTotal_other": "Odeslat {{displayFreshCount}} z {{displayTotalCount}} komentářů",
       "submitReview": "Odeslat výsledek kontroly",
       "partialPostedFresh": "Počet odeslaných komentářů: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Počet odeslaných komentářů: {{displayFreshCount}}. ",
@@ -1439,6 +1447,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
+      "managedOnWebTitle": "Spravuje se na webu",
+      "managedOnWebShort": "Toto připojení se spravuje na webu z počítače.",
+      "managedOnWebRepositories": "Vyberte repozitáře pro {{organization}} na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionOverview": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej na další obrazovce.",
@@ -1462,6 +1473,7 @@
     "platformList": {
       "checking": "Kontroluje se…",
       "statusUnavailable": "Stav nedostupný",
+      "needsAttention": "Vyžaduje pozornost",
       "platforms": "Platformy",
       "activity": "Aktivita"
     },
@@ -2884,7 +2896,9 @@
     "modelPicker": {
       "title": "Výběr modelu",
       "favorites": "Oblíbené",
-      "noModelsDescription": "K výběru nejsou k dispozici žádné modely."
+      "noModelsDescription": "K výběru nejsou k dispozici žádné modely.",
+      "allUnavailableTitle": "Žádný model nelze použít",
+      "allUnavailableDescription": "Přidejte klíč poskytovatele a poté to zkuste znovu."
     },
     "modelSelector": {
       "provider": "Poskytovatel {{id}}",
@@ -4201,7 +4215,13 @@
     "providerUnavailable": "Poskytovatel je nyní nedostupný. Odešlete znovu za chvíli."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrdit tuto změnu?"
+    "confirmTitle": "Potvrdit tuto změnu?",
+    "guarded": {
+      "spendAlertsOff": "Vypnout upozornění na výdaje? Přestali byste dostávat oznámení o překročení prahů výdajů a hodinových špičkách.",
+      "balanceAlertsOff": "Vypnout upozornění na zůstatek? Přestali byste dostávat oznámení, když vám klesne zůstatek kreditů.",
+      "securityFindingsOff": "Vypnout bezpečnostní nálezy? Přestali byste dostávat oznámení o nových bezpečnostních nálezech.",
+      "hideBalanceOn": "Skrýt zůstatky? Zůstatky kreditů se už nebudou zobrazovat na obrazovkách profilu a v centru organizace."
+    }
   },
   "appActions": {
     "start": {
@@ -5129,6 +5149,7 @@
     "providersDescription": "Po vypnutí poskytovatele k němu Kilo pro tuto organizaci přestane směrovat požadavky.",
     "providersNeedCatalog": "Přepínače poskytovatelů zůstanou jen pro čtení, dokud se nenačte celý katalog modelů. Pokud je chcete upravit, klepněte výše na Zkusit znovu.",
     "providersEmpty": "Hledání neodpovídají žádní poskytovatelé.",
+    "providersNone": "Pro tuto organizaci nejsou k dispozici žádní poskytovatelé.",
     "allowAllShown": "Povolit vše zobrazené",
     "denyAllShown": "Zakázat vše zobrazené",
     "gatewaysDescription": "Kilo směruje požadavky na modely přes Vercel AI Gateway nebo OpenRouter. Pokud je brána vypnutá, tyto požadavky selžou.",

@@ -19,7 +19,10 @@
     "presenceStatus": "Hostovi: {{connection}}",
     "commandStatus": "Isporuka naredbe: {{status}}",
     "delivered": "Isporučeno",
-    "expired": "Isteklo"
+    "expired": "Isteklo",
+    "recoveryGaps_one": "Nedostaje {{displayCount}} dio ovog transkripta.",
+    "recoveryGaps_few": "Nedostaju {{displayCount}} dijela ovog transkripta.",
+    "recoveryGaps_other": "Nedostaje {{displayCount}} dijelova ovog transkripta."
   },
   "common": {
     "manageOnWeb": "Upravljaj na webu",
@@ -980,6 +983,9 @@
       "pendingComment": "neposlanih komentara",
       "pendingComment_other": "neposlanih komentara",
       "submitCountOfTotal": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_one": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_few": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
+      "submitCountOfTotal_other": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
       "submitReview": "Pošalji pregled",
       "partialPostedFresh": "Broj objavljenih komentara: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Broj objavljenih komentara: {{displayFreshCount}}. ",
@@ -1415,6 +1421,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računala.",
+      "managedOnWebTitle": "Upravlja se na webu",
+      "managedOnWebShort": "Ova veza se upravlja na webu s računala.",
+      "managedOnWebRepositories": "Odaberite repozitorije za {{organization}} na webu s računala.",
       "description": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "descriptionReconnect": "Stvori novi token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "descriptionOverview": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem zaslonu.",
@@ -1438,6 +1447,7 @@
     "platformList": {
       "checking": "Provjera…",
       "statusUnavailable": "Status nedostupan",
+      "needsAttention": "Potrebna pozornost",
       "platforms": "Platforme",
       "activity": "Aktivnost"
     },
@@ -2834,6 +2844,8 @@
     "modelPicker": {
       "title": "Odaberi model",
       "noModelsDescription": "Nema dostupnih modela za odabir.",
+      "allUnavailableTitle": "Nijedan model nije moguće koristiti",
+      "allUnavailableDescription": "Dodaj ključ pružatelja usluga, a zatim pokušaj ponovno.",
       "favorites": "Favoriti"
     },
     "modelSelector": {
@@ -4139,7 +4151,13 @@
     "providerUnavailable": "Pružatelj trenutačno nije dostupan. Pošalji ponovno uskoro."
   },
   "settingsTools": {
-    "confirmTitle": "Potvrditi ovu promjenu?"
+    "confirmTitle": "Potvrditi ovu promjenu?",
+    "guarded": {
+      "spendAlertsOff": "Isključiti upozorenja o potrošnji? Prestali biste dobivati obavijesti o prekoračenjima pragova potrošnje i satnim skokovima.",
+      "balanceAlertsOff": "Isključiti upozorenja o stanju? Prestali biste dobivati obavijesti kada vam krediti padnu na nisku razinu.",
+      "securityFindingsOff": "Isključiti sigurnosne nalaze? Prestali biste dobivati obavijesti o novim sigurnosnim nalazima.",
+      "hideBalanceOn": "Sakriti vaša stanja? Stanja kredita više se ne bi prikazivala na zaslonima profila i u središtu organizacije."
+    }
   },
   "appActions": {
     "start": {
@@ -5053,6 +5071,7 @@
     "providersDescription": "Isključite pružatelja kako Kilo za ovu organizaciju ne bi usmjeravao zahtjeve na njega.",
     "providersNeedCatalog": "Prekidači pružatelja ostaju samo za čitanje dok se ne učita cijeli katalog modela. Dodirnite Pokušaj ponovno iznad kako biste ih mogli uređivati.",
     "providersEmpty": "Nijedan pružatelj ne odgovara ovom pretraživanju.",
+    "providersNone": "Nema dostupnih pružatelja za ovu organizaciju.",
     "allowAllShown": "Dopusti sve prikazano",
     "denyAllShown": "Zabrani sve prikazano",
     "gatewaysDescription": "Kilo usmjerava zahtjeve modela kroz Vercel AI Gateway ili OpenRouter. Onemogućen pristupnik odbija te zahtjeve.",

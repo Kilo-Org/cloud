@@ -19,7 +19,9 @@
     "presenceStatus": "હોસ્ટ: {{connection}}",
     "commandStatus": "આદેશ ડિલિવરી: {{status}}",
     "delivered": "પહોંચાડાયું",
-    "expired": "સમયસીમા સમાપ્ત"
+    "expired": "સમયસીમા સમાપ્ત",
+    "recoveryGaps_one": "આ ટ્રાન્સક્રિપ્ટનો {{displayCount}} ભાગ ખૂટે છે.",
+    "recoveryGaps_other": "આ ટ્રાન્સક્રિપ્ટના {{displayCount}} ભાગ ખૂટે છે."
   },
   "common": {
     "manageOnWeb": "વેબ પર મેનેજ કરો",
@@ -963,6 +965,8 @@
       "pendingComment": "મોકલવાની બાકી ટિપ્પણીઓ",
       "pendingComment_other": "મોકલવાની બાકી ટિપ્પણીઓ",
       "submitCountOfTotal": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
+      "submitCountOfTotal_one": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
+      "submitCountOfTotal_other": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
       "submitReview": "સમીક્ષા મોકલો",
       "partialPostedFresh": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",
       "partialPostedFresh_one": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. ",
@@ -1391,6 +1395,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} નું Bitbucket કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
+      "managedOnWebTitle": "વેબ પર મેનેજ કરવામાં આવે છે",
+      "managedOnWebShort": "આ કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
+      "managedOnWebRepositories": "કમ્પ્યુટર પરથી વેબ પર {{organization}} માટે રિપોઝિટરીઝ પસંદ કરો.",
       "description": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
       "descriptionReconnect": "{{organization}} માટે નવો વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
       "descriptionOverview": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને પછીની સ્ક્રીન પર પેસ્ટ કરો.",
@@ -1414,6 +1421,7 @@
     "platformList": {
       "checking": "તપાસ થઈ રહી છે…",
       "statusUnavailable": "સ્થિતિ ઉપલબ્ધ નથી",
+      "needsAttention": "ધ્યાન જરૂરી",
       "platforms": "પ્લેટફોર્મ્સ",
       "activity": "પ્રવૃત્તિ"
     },
@@ -2784,6 +2792,8 @@
     "modelPicker": {
       "title": "મોડલ પસંદ કરો",
       "noModelsDescription": "પસંદ કરવા માટે કોઈ મોડલ ઉપલબ્ધ નથી.",
+      "allUnavailableTitle": "કોઈ પણ મોડલનો ઉપયોગ કરી શકાતો નથી",
+      "allUnavailableDescription": "પ્રદાતાની કી ઉમેરો, પછી ફરી પ્રયાસ કરો.",
       "favorites": "મનપસંદ"
     },
     "modelSelector": {
@@ -4077,7 +4087,13 @@
     "providerUnavailable": "પ્રદાતા હમણાં ઉપલબ્ધ નથી. થોડી વારમાં ફરી મોકલો."
   },
   "settingsTools": {
-    "confirmTitle": "આ ફેરફારની પુષ્ટિ કરવી?"
+    "confirmTitle": "આ ફેરફારની પુષ્ટિ કરવી?",
+    "guarded": {
+      "spendAlertsOff": "ખર્ચ સૂચનાઓ બંધ કરવી છે? ખર્ચ મર્યાદા ઓળંગવા અને કલાકદીઠ વધારા વિશેની સૂચનાઓ તમને મળવાનું બંધ થઈ જશે.",
+      "balanceAlertsOff": "બેલેન્સ સૂચનાઓ બંધ કરવી છે? તમારા ક્રેડિટ ઓછા થાય ત્યારે સૂચનાઓ તમને મળવાનું બંધ થઈ જશે.",
+      "securityFindingsOff": "સુરક્ષા શોધો બંધ કરવી છે? નવી સુરક્ષા શોધો વિશેની સૂચનાઓ તમને મળવાનું બંધ થઈ જશે.",
+      "hideBalanceOn": "તમારા બેલેન્સ છુપાવવા છે? ક્રેડિટ બેલેન્સ હવે પ્રોફાઇલ સ્ક્રીનો અને ઓર્ગેનાઇઝેશન હબ પર દેખાશે નહીં."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4993,7 @@
     "providersDescription": "આ સંસ્થા માટે Kilo તેના તરફ રૂટ કરવાનું બંધ કરવા પ્રદાતાને બંધ કરો.",
     "providersNeedCatalog": "સંપૂર્ણ મૉડલ કૅટલૉગ લોડ ન થાય ત્યાં સુધી પ્રદાતા સ્વિચ ફક્ત વાંચવા માટે રહે છે. તેમને સંપાદિત કરવા ઉપર ફરી પ્રયાસ કરો.",
     "providersEmpty": "આ શોધ સાથે કોઈ પ્રદાતા મેળ ખાતા નથી.",
+    "providersNone": "આ સંસ્થા માટે કોઈ પ્રદાતા ઉપલબ્ધ નથી.",
     "allowAllShown": "બતાવેલા બધાને મંજૂર કરો",
     "denyAllShown": "બતાવેલા બધાને નકારો",
     "gatewaysDescription": "Kilo મોડેલ વિનંતીઓને Vercel AI Gateway અથવા OpenRouter દ્વારા રૂટ કરે છે. નિષ્ક્રિય ગેટવે તે વિનંતીઓને નિષ્ફળ કરે છે.",

@@ -28,11 +28,13 @@
  * can no longer desynchronise a rule or hide the call sites after it.
  *
  * The mobile layout contract's rules are the table below: `LAYOUT_RULES` holds
- * each rule's id (the id a diagnostic and the baseline key carry), what it
- * bans, and the primitive that replaces it; `LAYOUT_ALLOWLIST` names the
- * modules that own the scale and may write those values. Those two constants
- * are the only description of the layout rules — retarget, rename or relax a
- * rule there, not in the checks that read it.
+ * each rule's id (the id a diagnostic and the baseline key carry), the detector
+ * that finds it, and the primitive that replaces it; `LAYOUT_ALLOWLIST` names
+ * the modules that own the scale and may write those values. Those two
+ * constants are the only description of the layout rules: `checkLayout`
+ * dispatches over the table and builds each diagnostic from the entry it
+ * dispatched from, so a rule's id is written once, in the table. Retarget,
+ * rename or relax a rule there, not in the checks that read it.
  *
  * A violation that already existed when the rules landed stays admitted by
  * `tools/nativewind/layout-baseline.json` (file path → count per rule). A file
@@ -85,13 +87,25 @@ const LAYOUT_ALLOWLIST = [
 const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
 
 /**
- * The layout contract's rules. `patterns` read one class string (a `className`,
- * a `cn()` argument, a `*_CLASS` constant) and carry the offending class in the
- * diagnostic; a rule without `patterns` reads markup and names what it found.
- * `advice` is the primitive the contract names for the concern, so every
- * diagnostic points at the replacement instead of restating the ban.
+ * The layout contract's rules. Each entry states one rule once: `id` (the id a
+ * diagnostic and the baseline key carry) and `advice` (the primitive the
+ * contract names for the concern, so every diagnostic points at the replacement
+ * instead of restating the ban), plus exactly one detector:
+ *
+ * - `patterns` read one class string (a `className`, a `cn()` argument, a
+ *   `*_CLASS` constant) and carry the offending class in the diagnostic.
+ * - `detectSurface` reads one laid-out class surface: it receives the `group`
+ *   holding that surface's chunks and names what it found.
+ * - `detect` reads the whole file, for a rule whose ban is a shape rather than
+ *   a class string, and names what it found.
+ *
+ * `checkLayout` calls the detector each entry carries, so the dispatch below
+ * needs no rule-specific code and a rule's id exists only in the table.
+ *
+ * Exported for the structural test that keeps this promise: an entry without a
+ * detector, a duplicated id, or a second detector on one entry fails there.
  */
-const LAYOUT_RULES = [
+export const LAYOUT_RULES = [
   {
     id: 'L1',
     patterns: [
@@ -112,6 +126,7 @@ const LAYOUT_RULES = [
     id: 'L2',
     advice:
       'use SCREEN_BODY_CLASS from @/lib/layout (gutter px-4) for the scroll body, and leave ScreenHeader/SheetHeader their own gutter',
+    detect: detectScrollGutters,
   },
   {
     id: 'L3',
@@ -120,6 +135,7 @@ const LAYOUT_RULES = [
   },
   {
     id: 'L4',
+    detectSurface: detectCardSurface,
     advice: 'use Card, RowGroup or a row primitive for the surface',
   },
   {
@@ -129,10 +145,12 @@ const LAYOUT_RULES = [
   },
   {
     id: 'L6',
+    detect: detectInlineStyles,
     advice: 'use the layout classes or the constants in @/lib/layout',
   },
   {
     id: 'L7',
+    detect: detectRowChevrons,
     advice: 'use RowChevron or a row primitive',
   },
   {
@@ -151,14 +169,17 @@ const LAYOUT_RULES = [
     id: 'L9',
     advice:
       'a row divider is border-hair-soft at 0.5pt; use RowGroup/RowGroupItem/RowFrame, or border-hair-soft directly',
+    detectSurface: detectDivider,
   },
   {
     id: 'L10',
     advice:
       'use title with titleAccessory; titleContent replaces the title node and re-spells its typography',
+    detect: detectTitleContent,
   },
   {
     id: 'L11',
+    detect: detectSheetHeader,
     advice: 'render SheetHeader as the first child of every Sheet, so the sheet has its title row',
   },
   {
@@ -176,23 +197,15 @@ const LAYOUT_RULES = [
   },
   {
     id: 'L13',
+    detect: detectStateActionButtons,
     advice:
       'fill a state\u2019s action slot with StateAction from @/components/empty-state; a Button there re-decides the state action\u2019s frame, icon spacing and 48pt floor',
   },
 ];
 
-/** One rule from the table above, by id. */
-function layoutRule(id) {
-  const rule = LAYOUT_RULES.find(candidate => candidate.id === id);
-  if (rule === undefined) {
-    throw new Error(`check-classes: layout rule ${id} is missing from LAYOUT_RULES`);
-  }
-  return rule;
-}
-
 /** One diagnostic for one rule, naming the class or prop it read. */
-function layoutProblem(relative, line, id, offending) {
-  return `${relative}:${line}: [${id}] "${offending}": ${layoutRule(id).advice}`;
+function layoutProblem(relative, line, rule, offending) {
+  return `${relative}:${line}: [${rule.id}] "${offending}": ${rule.advice}`;
 }
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */
@@ -323,14 +336,36 @@ function rules() {
 }
 
 /**
- * Horizontal padding on a scroll container's own `className` reaches the
- * native scroll view instead of its content, and in RTL the content is then
- * offset by the padding — measured at 0dp / 42dp on a screen that should have
- * been 21 / 21, with cards running off the trailing edge. Correct in LTR, so
- * nothing catches it until someone reads the app in Arabic, Farsi or Hebrew.
+ * Every JSX tag that scrolls, as bare tag names: the two RTL rules below both
+ * judge one of these, so a container added here is read by both instead of
+ * satisfying one rule while the other stays blind to it.
+ *
+ * Both defects reach the same native scroll view, which is why the inventory
+ * is not split per rule. A horizontal inset on the container's own `className`
+ * does not narrow its content, and in RTL the content is then offset by it, so
+ * cards run off the trailing edge. Correct in LTR, so nothing catches it until
+ * someone reads the app in Arabic, Farsi or Hebrew. A page gutter written on
+ * the content container moves the inset the layout contract fixed instead.
+ *
+ * `DetailScreenScrollView` and `SheetScrollView` are wrappers: each spreads its
+ * props onto a plain `ScrollView`, so a caller's `className` lands on the same
+ * native view. `FlatList` takes a content container exactly like `FlashList`.
  */
-const SCROLL_CONTAINER =
-  /^(?:Animated\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)$/;
+const SCROLL_CONTAINERS = new Set([
+  'ScrollView',
+  'TabScreenScrollView',
+  'DetailScreenScrollView',
+  'SheetScrollView',
+  'FlatList',
+  'FlashList',
+  'KeyboardAwareScrollView',
+]);
+
+/** The inventory's answer for one tag, with any `Animated.` wrapper removed. */
+function isScrollContainer(name) {
+  return SCROLL_CONTAINERS.has(name.replace(/^Animated\./, ''));
+}
+
 const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 
 /**
@@ -415,27 +450,44 @@ function chunksWithin(chunks, node) {
   return found;
 }
 
+/**
+ * The class tokens one element writes through the attribute `name`, deduped
+ * and sorted: the attribute lookup, the chunk split and the per-token filter
+ * that both RTL rules below share. A rule supplies only what it judges — which
+ * attribute it reads and the predicate that marks a token as its violation.
+ *
+ * The chunks are the file's own (`fileFacts`), searched by position, so the
+ * value a rule reads is the same one whether the element is the whole file or
+ * came from an earlier walk.
+ */
+function classTokens(chunks, element, name, isBanned) {
+  const attribute = element.attributes.find(
+    candidate =>
+      candidate.type === 'JSXAttribute' &&
+      candidate.name.type === 'JSXIdentifier' &&
+      candidate.name.name === name
+  );
+  const tokens = [
+    ...new Set(
+      chunksWithin(chunks, attribute?.value)
+        .map(chunk => chunk.value)
+        .flatMap(classes => classes.split(/\s+/))
+        .filter(isBanned)
+    ),
+  ].sort();
+  return { attribute, tokens };
+}
+
 export function checkScrollPadding(relative, elements, chunks, text, lineOf) {
   const problems = [];
   for (const node of elements) {
     const name = tagName(node, text);
-    if (!SCROLL_CONTAINER.test(name)) {
+    if (!isScrollContainer(name)) {
       continue;
     }
-    const attribute = node.attributes.find(
-      candidate =>
-        candidate.type === 'JSXAttribute' &&
-        candidate.name.type === 'JSXIdentifier' &&
-        candidate.name.name === 'className'
+    const { tokens: padding } = classTokens(chunks, node, 'className', classes =>
+      HORIZONTAL_PADDING.test(classes)
     );
-    const padding = [
-      ...new Set(
-        chunksWithin(chunks, attribute?.value)
-          .map(chunk => chunk.value)
-          .flatMap(classes => classes.split(/\s+/))
-          .filter(classes => HORIZONTAL_PADDING.test(classes))
-      ),
-    ].sort();
     if (padding.length > 0) {
       const line = lineOf(node.start);
       problems.push(
@@ -656,21 +708,12 @@ function layoutGroups(program, text) {
 }
 
 /**
- * A page gutter written on a scroll body other than `px-4` — or horizontal
- * padding on a `CenteredState` content container, which is the same page inset
- * inside the centered band — and any horizontal padding on a
- * `ScreenHeader`/`SheetHeader` `className`: both move the page inset the
- * contract fixed, and the header's own gutter is what the next screen lines up
- * against.
+ * The container each rule's page-inset check reads. A scroll container is
+ * judged on its content container, because that is what carries the page
+ * inset; a `CenteredState` applies the class to its content box for the same
+ * reason, and a `ScreenHeader`/`SheetHeader` is the page inset itself, so its
+ * own `className` must not move it.
  */
-const SCROLL_BODIES = new Set([
-  'ScrollView',
-  'TabScreenScrollView',
-  'DetailScreenScrollView',
-  'SheetScrollView',
-  'FlashList',
-  'KeyboardAwareScrollView',
-]);
 const CENTERED_BODIES = new Set(['CenteredState']);
 const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
 
@@ -699,15 +742,25 @@ function anyPadding(token) {
   return /^-?(?:p|px|ps|pe|pl|pr)-/.test(utilityOf(token));
 }
 
-function checkScrollGutters(relative, program, text, lineOf) {
+/**
+ * A page gutter written on a scroll container's content container other than
+ * `px-4` — or horizontal padding on a `CenteredState` content container, which
+ * is the same page inset inside the centered band — and any horizontal padding
+ * on a `ScreenHeader`/`SheetHeader` `className`: both move the page inset the
+ * contract fixed, and the header's own gutter is what the next screen lines up
+ * against.
+ */
+function detectScrollGutters({ program, chunks, text, lineOf }) {
   const problems = [];
   walk(program, node => {
     if (node.type !== 'JSXOpeningElement') {
       return;
     }
+    // `Animated.X` and `X` are one element to every rule here, so the wrapper
+    // is removed once and each lookup below reads the same bare tag.
     const name = tagName(node, text).replace(/^Animated\./, '');
     const gutter =
-      SCROLL_BODIES.has(name) || CENTERED_BODIES.has(name)
+      SCROLL_CONTAINERS.has(name) || CENTERED_BODIES.has(name)
         ? 'contentContainerClassName'
         : HEADER_TAGS.has(name)
           ? 'className'
@@ -715,29 +768,14 @@ function checkScrollGutters(relative, program, text, lineOf) {
     if (gutter === null) {
       return;
     }
-    const attribute = node.attributes.find(
-      candidate =>
-        candidate.type === 'JSXAttribute' &&
-        candidate.name.type === 'JSXIdentifier' &&
-        candidate.name.name === gutter
+    const { attribute, tokens } = classTokens(chunks, node, gutter, classes =>
+      gutter === 'className' ? anyPadding(classes) : wrongGutter(classes)
     );
-    const tokens = [
-      ...new Set(
-        stringChunks(attribute?.value, text)
-          .map(chunk => chunk.value)
-          .flatMap(classes => classes.split(/\s+/))
-          .filter(classes => (gutter === 'className' ? anyPadding(classes) : wrongGutter(classes)))
-      ),
-    ].sort();
     for (const token of tokens) {
-      problems.push(
-        layoutProblem(
-          relative,
-          lineOf(attribute.start),
-          'L2',
-          `${token} on <${tagName(node, text)}> ${gutter}`
-        )
-      );
+      problems.push({
+        line: lineOf(attribute.start),
+        offending: `${token} on <${tagName(node, text)}> ${gutter}`,
+      });
     }
   });
   return problems;
@@ -752,14 +790,14 @@ function checkScrollGutters(relative, program, text, lineOf) {
 const CARD_SURFACE = /(?<![\w-])bg-(?:secondary|card)(?![\w-])/;
 const CARD_RADIUS = /(?<![\w-])rounded-(?:(?:t|b|l|r|tl|tr|bl|br)-)?(?:md|lg|xl|2xl|3xl)(?![\w-])/;
 
-function cardSurfaceProblem(relative, group, lineOf) {
+function detectCardSurface({ lineOf, group }) {
   const classes = group.chunks.map(chunk => chunk.value).join(' ');
   const surface = CARD_SURFACE.exec(classes);
   const radius = CARD_RADIUS.exec(classes);
   if (surface === null || radius === null) {
-    return null;
+    return [];
   }
-  return layoutProblem(relative, lineOf(group.start), 'L4', `${surface[0]} ${radius[0]}`);
+  return [{ line: lineOf(group.start), offending: `${surface[0]} ${radius[0]}` }];
 }
 
 /**
@@ -770,13 +808,13 @@ function cardSurfaceProblem(relative, group, lineOf) {
 const DIVIDER_SIDE = /(?<![\w-])border-(?:b|t)(?:-(?:\d+|\[[^\]\s]+\]))?(?![\w-])/;
 const DIVIDER_COLOUR = /(?<![\w-])border-border(?![\w-])/;
 
-function dividerProblem(relative, group, lineOf) {
+function detectDivider({ lineOf, group }) {
   const classes = group.chunks.map(chunk => chunk.value).join(' ');
   const side = DIVIDER_SIDE.exec(classes);
   if (side === null || !DIVIDER_COLOUR.test(classes)) {
-    return null;
+    return [];
   }
-  return layoutProblem(relative, lineOf(group.start), 'L9', `${side[0]} border-border`);
+  return [{ line: lineOf(group.start), offending: `${side[0]} border-border` }];
 }
 
 /**
@@ -821,7 +859,7 @@ function styleObjects(value) {
     .filter(element => element.type === 'ObjectExpression');
 }
 
-function checkInlineStyles(relative, program, text, lineOf) {
+function detectInlineStyles({ program, text, lineOf }) {
   const problems = [];
   walk(program, node => {
     if (node.type !== 'JSXOpeningElement') {
@@ -852,7 +890,7 @@ function checkInlineStyles(relative, program, text, lineOf) {
             continue;
           }
           const written = text.slice(property.key.start, property.value.end).replace(/\s+/g, ' ');
-          problems.push(layoutProblem(relative, lineOf(property.start), 'L6', written));
+          problems.push({ line: lineOf(property.start), offending: written });
         }
       }
     }
@@ -868,7 +906,7 @@ function checkInlineStyles(relative, program, text, lineOf) {
 const ROW_CHEVRON_MODULES = new Set(['@/components/ui/directional-icons', '@/components/ui/icons']);
 const ROW_CHEVRON_NAMES = new Set(['ChevronRight', 'DirectionalChevronRight']);
 
-function checkRowChevrons(relative, program, lineOf) {
+function detectRowChevrons({ program, lineOf }) {
   const problems = [];
   walk(program, node => {
     if (node.type !== 'ImportDeclaration' || node.importKind === 'type') {
@@ -883,7 +921,7 @@ function checkRowChevrons(relative, program, lineOf) {
       }
       const name = importedName(specifier.imported);
       if (ROW_CHEVRON_NAMES.has(name)) {
-        problems.push(layoutProblem(relative, lineOf(specifier.start), 'L7', name));
+        problems.push({ line: lineOf(specifier.start), offending: name });
       }
     }
   });
@@ -902,7 +940,7 @@ const TITLE_CONTENT_ALLOWLIST = new Set([
   'apps/mobile/src/components/profiles/profile-overview-screen.tsx',
 ]);
 
-function checkTitleContent(relative, program, lineOf) {
+function detectTitleContent({ relative, program, lineOf }) {
   if (TITLE_CONTENT_ALLOWLIST.has(relative)) {
     return [];
   }
@@ -913,7 +951,7 @@ function checkTitleContent(relative, program, lineOf) {
       node.name.type === 'JSXIdentifier' &&
       node.name.name === 'titleContent'
     ) {
-      problems.push(layoutProblem(relative, lineOf(node.start), 'L10', 'titleContent'));
+      problems.push({ line: lineOf(node.start), offending: 'titleContent' });
     }
   });
   return problems;
@@ -985,7 +1023,7 @@ function localComponentDrawsHeader(name, text, components, visited) {
   );
 }
 
-function checkSheetHeader(relative, program, text, lineOf) {
+function detectSheetHeader({ relative, program, text, lineOf }) {
   if (SHEET_ALLOWLIST.has(relative)) {
     return [];
   }
@@ -1020,12 +1058,12 @@ function checkSheetHeader(relative, program, text, lineOf) {
     if (!sheetNames.has(name)) {
       return;
     }
-    // The header belongs to this sheet's own subtree. A file-level flag would
-    // let a second, headerless sheet pass on the first one's header; a nested
-    // sheet's header must not count for the sheet that contains it either.
+    // The header belongs to this sheet's own subtree: a header inside a nested
+    // sheet is that sheet's, not this one's, and the same nesting rule serves
+    // both a literal SheetHeader and a local component that draws one.
     const headers = [];
-    const nested = [];
     const candidates = [];
+    const nested = [];
     walk(node, descendant => {
       if (descendant === node) {
         return;
@@ -1040,19 +1078,22 @@ function checkSheetHeader(relative, program, text, lineOf) {
         if (tag === 'SheetHeader') {
           headers.push(descendant.start);
         } else if (components.has(tag)) {
-          candidates.push(tag);
+          candidates.push({ tag, start: descendant.start });
         }
       }
     });
+    const outsideNested = start => !nested.some(child => start > child.start && start < child.end);
     const header =
-      headers.some(start => !nested.some(child => start > child.start && start < child.end)) ||
+      headers.some(outsideNested) ||
       // A sheet whose body is a local component (`<SessionFilterContent />`)
       // can draw its header there; follow the component it renders.
-      candidates.some(candidate =>
-        localComponentDrawsHeader(candidate, text, components, new Set())
+      candidates.some(
+        candidate =>
+          outsideNested(candidate.start) &&
+          localComponentDrawsHeader(candidate.tag, text, components, new Set())
       );
     if (!header) {
-      problems.push(layoutProblem(relative, lineOf(node.start), 'L11', `<${name}>`));
+      problems.push({ line: lineOf(node.start), offending: `<${name}>` });
     }
   });
   return problems;
@@ -1080,7 +1121,7 @@ function stateActionButton(expression, text) {
   return found;
 }
 
-function checkStateActionButtons(relative, program, text, lineOf) {
+function detectStateActionButtons({ program, text, lineOf }) {
   const problems = [];
   walk(program, node => {
     if (node.type !== 'JSXOpeningElement' || !STATE_ACTION_TAGS.has(tagName(node, text))) {
@@ -1099,7 +1140,7 @@ function checkStateActionButtons(relative, program, text, lineOf) {
       }
       const button = stateActionButton(attribute.value.expression, text);
       if (button !== null) {
-        problems.push(layoutProblem(relative, lineOf(button.start), 'L13', '<Button>'));
+        problems.push({ line: lineOf(button.start), offending: '<Button>' });
       }
     }
   });
@@ -1122,43 +1163,41 @@ function layoutExempt(path) {
 }
 
 /** Every layout problem one file has, from the table's rules. */
-export function checkLayout(relative, program, text, lineOf) {
+export function checkLayout(relative, program, chunks, text, lineOf) {
   if (layoutExempt(relative)) {
     return [];
   }
   const problems = [];
-  const seen = new Set();
+  const format = (rule, findings) =>
+    findings.map(finding => layoutProblem(relative, finding.line, rule, finding.offending));
+  // Each chunk belongs to exactly one group: `layoutGroups` filters every
+  // candidate through its `covered` set and records what it hands out, so this
+  // dispatch reads each chunk once without a second guard of its own.
   for (const group of layoutGroups(program, text)) {
     for (const chunk of group.chunks) {
-      if (seen.has(chunk.start)) {
-        continue;
-      }
-      seen.add(chunk.start);
       for (const rule of LAYOUT_RULES) {
         for (const pattern of rule.patterns ?? []) {
           for (const match of chunk.value.matchAll(pattern)) {
             problems.push(
-              layoutProblem(relative, lineOf(chunk.start + match.index), rule.id, match[0])
+              layoutProblem(relative, lineOf(chunk.start + match.index), rule, match[0])
             );
           }
         }
       }
     }
-    const surface = cardSurfaceProblem(relative, group, lineOf);
-    if (surface !== null) {
-      problems.push(surface);
-    }
-    const divider = dividerProblem(relative, group, lineOf);
-    if (divider !== null) {
-      problems.push(divider);
+    for (const rule of LAYOUT_RULES) {
+      if (rule.detectSurface === undefined) {
+        continue;
+      }
+      problems.push(...format(rule, rule.detectSurface({ relative, text, lineOf, group })));
     }
   }
-  problems.push(...checkScrollGutters(relative, program, text, lineOf));
-  problems.push(...checkInlineStyles(relative, program, text, lineOf));
-  problems.push(...checkRowChevrons(relative, program, lineOf));
-  problems.push(...checkTitleContent(relative, program, lineOf));
-  problems.push(...checkSheetHeader(relative, program, text, lineOf));
-  problems.push(...checkStateActionButtons(relative, program, text, lineOf));
+  for (const rule of LAYOUT_RULES) {
+    if (rule.detect === undefined) {
+      continue;
+    }
+    problems.push(...format(rule, rule.detect({ relative, program, chunks, text, lineOf })));
+  }
   return problems;
 }
 
@@ -1407,7 +1446,7 @@ export function checkParsedFile({ file, path, text, program, lineOf, problems })
     ...checkRawText(path, imports, lineOf),
     ...checkDirectIntl(path, file, calls, lineOf),
     ...checkRules(path, chunks, lineOf),
-    ...checkLayout(path, program, text, lineOf),
+    ...checkLayout(path, program, chunks, text, lineOf),
   ];
 }
 

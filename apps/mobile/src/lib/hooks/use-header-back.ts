@@ -6,6 +6,7 @@ import {
   type HeaderBackGuardState,
   resolveHeaderBack,
 } from '@/lib/hooks/header-back';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 /** What a header declares about its Back press. */
 export type HeaderBackOptions = Readonly<{
@@ -30,6 +31,7 @@ export type HeaderBackOptions = Readonly<{
  */
 export function useHeaderBack({ onBack, backFallback, canGoBack }: HeaderBackOptions): () => void {
   const router = useRouter();
+  const { replace } = useStackSafeReplace();
   const guardRef = useRef<HeaderBackGuardState>({ lastBackAt: 0 });
 
   return useCallback(() => {
@@ -53,10 +55,11 @@ export function useHeaderBack({ onBack, backFallback, canGoBack }: HeaderBackOpt
     }
     // Only 'fallback' reaches here: a press with nothing to run returned above.
     if (backFallback !== undefined) {
-      // POP_TO keeps the fallback's contract (land on this destination) while
-      // truncating any routes the app left above it; with no history it still
-      // creates the destination.
-      router.dismissTo(backFallback);
+      // With no history the router also has nothing to dismiss to: POP_TO would
+      // rewrite the stack in one commit, the remove-and-insert shape Android
+      // drops. The fallback therefore takes this screen's place, and the
+      // stack-safe replacement retires it once its push settles.
+      replace(backFallback);
     }
-  }, [backFallback, canGoBack, onBack, router]);
+  }, [backFallback, canGoBack, onBack, replace, router]);
 }

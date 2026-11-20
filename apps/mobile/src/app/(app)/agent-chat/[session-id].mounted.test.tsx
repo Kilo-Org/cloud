@@ -572,6 +572,17 @@ beforeEach(() => {
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
     },
+    // The stack-safe replacement pushes its destination, then retires the route
+    // it came from once that push settles: the end state is the one `replace`
+    // produces, so the source is gone from the modelled stack.
+    push: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? href : href.pathname;
+      const source = navigationRoutes.length - 1;
+      navigationRoutes.push(path);
+      if (source >= 0) {
+        navigationRoutes.splice(source, 1);
+      }
+    },
     // The POP_TO end state the component relies on: find the destination at or
     // below the current index, truncate everything above it; with no match,
     // drop the current route and land on the destination. An object href lands
@@ -1845,6 +1856,24 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     });
 
     // Truncated to the tabs entry: the composer is no longer on the stack.
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    expect(rootRequests).toEqual([]);
+  });
+
+  it('lands on the sessions list when the session route has nothing beneath it', async () => {
+    confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
+    // The only-route shape: a cold open leaves the session as the stack's only
+    // screen, so there is nothing to dismiss to. The press must still land on
+    // the sessions list, which the stack-safe replacement pushes over this
+    // route before retiring it.
+    const renderer = await mountRoute();
+    const back = findByType(renderer.root, 'Button').find(button =>
+      findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
+    );
+    act(() => {
+      pressControl(back);
+    });
+
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(rootRequests).toEqual([]);
   });

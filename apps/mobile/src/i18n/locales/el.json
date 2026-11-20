@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Χωρίς επίδραση στο υπόλοιπο",
         "deduction": "Αφαίρεση",
         "grant": "Παροχή μονάδων",
+        "welcomeCredits": "Μονάδες καλωσορίσματος",
         "purchase": "Αγορά"
       },
       "purchaseFallback": "Αγορά μονάδων",

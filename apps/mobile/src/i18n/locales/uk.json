@@ -4579,6 +4579,7 @@
         "balanceNeutral": "Без зміни балансу",
         "deduction": "Списання",
         "grant": "Нарахування кредитів",
+        "welcomeCredits": "Вітальні кредити",
         "purchase": "Покупка"
       },
       "purchaseFallback": "Покупка кредитів",

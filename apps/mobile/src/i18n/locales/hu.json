@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Egyenlegsemleges",
         "deduction": "Levonás",
         "grant": "Kreditjuttatás",
+        "welcomeCredits": "Üdvözlő kreditek",
         "purchase": "Vásárlás"
       },
       "purchaseFallback": "Kreditvásárlás",

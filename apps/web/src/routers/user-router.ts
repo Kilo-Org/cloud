@@ -78,7 +78,7 @@ import {
   AutoTopUpAmountCentsSchema,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
-import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { getCreditBlocks, getCreditGrants, CreditGrantKindSchema } from '@/lib/getCreditBlocks';
 import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -239,9 +239,17 @@ const CreditDeductionSchema = z.object({
     .nullable(),
 });
 
+const CreditGrantSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  amount_mUsd: z.number().positive(),
+  kind: CreditGrantKindSchema,
+});
+
 const GetCreditBlocksOutputSchema = z.object({
   creditBlocks: z.array(CreditBlockSchema),
   deductions: z.array(CreditDeductionSchema),
+  grants: z.array(CreditGrantSchema),
   totalBalance_mUsd: z.number(),
   isFirstPurchase: z.boolean(),
   autoTopUpEnabled: z.boolean(),
@@ -961,6 +969,7 @@ export const userRouter = createTRPCRouter({
 
       return {
         ...result,
+        grants: getCreditGrants(transactions),
         deductions: enrichedDeductions,
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };

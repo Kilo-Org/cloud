@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Saldoneutral",
         "deduction": "Avdrag",
         "grant": "Kredittilldelning",
+        "welcomeCredits": "Välkomstkrediter",
         "purchase": "Köp"
       },
       "purchaseFallback": "Kreditköp",

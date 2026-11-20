@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Aftrekking",
         "grant": "Kredniettoekenning",
+        "welcomeCredits": "Welkomkrediete",
         "purchase": "Aankoop"
       },
       "purchaseFallback": "Kredietaankoop",

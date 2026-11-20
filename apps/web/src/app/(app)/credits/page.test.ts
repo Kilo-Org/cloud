@@ -96,6 +96,7 @@ function renderPage(policy: { creditExpiryPolicy: 'one_year' | 'never' } | undef
       data: {
         creditBlocks: [],
         deductions,
+        grants: [],
         totalBalance_mUsd: 0,
         isFirstPurchase: false,
         autoTopUpEnabled: false,

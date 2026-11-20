@@ -133,6 +133,7 @@ const EXPIRING_BACKENDS: typeof backends = {
 const creditBlocks: RouterOutputs['user']['getCreditBlocks'] = {
   creditBlocks: [],
   deductions: [],
+  grants: [],
   totalBalance_mUsd: 0,
   isFirstPurchase: true,
   autoTopUpEnabled: false,

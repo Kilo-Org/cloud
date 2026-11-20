@@ -4437,6 +4437,7 @@
         "balanceNeutral": "잔액 변동 없음",
         "deduction": "차감",
         "grant": "크레딧 지급",
+        "welcomeCredits": "환영 크레딧",
         "purchase": "구매"
       },
       "purchaseFallback": "크레딧 구매",

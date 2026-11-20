@@ -4437,6 +4437,7 @@
         "balanceNeutral": "ব্যালেন্স অপরিবর্তিত",
         "deduction": "কর্তন",
         "grant": "ক্রেডিট অনুদান",
+        "welcomeCredits": "স্বাগত ক্রেডিট",
         "purchase": "কেনাকাটা"
       },
       "purchaseFallback": "ক্রেডিট কেনাকাটা",

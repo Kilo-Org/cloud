@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
 import { computeExpiration, computeCreditLotAllocations } from '@kilocode/db/credit-expiration';
 import { toNonNullish } from '@/lib/utils';
@@ -134,4 +135,49 @@ export function getCreditBlocks(
     totalBalance_mUsd,
     isFirstPurchase,
   };
+}
+
+export const CreditGrantKindSchema = z.enum(['referral', 'welcome', 'kilo_pass', 'grant']);
+export type CreditGrantKind = z.infer<typeof CreditGrantKindSchema>;
+
+export type CreditGrant = {
+  readonly id: string;
+  readonly date: string;
+  readonly amount_mUsd: number;
+  readonly kind: CreditGrantKind;
+};
+
+function grantKindOf(creditCategory: string | null): CreditGrantKind {
+  if (creditCategory?.startsWith('referral-')) {
+    return 'referral';
+  }
+  if (creditCategory === 'automatic-welcome-credits') {
+    return 'welcome';
+  }
+  if (creditCategory === 'kilo-pass-bonus') {
+    return 'kilo_pass';
+  }
+  return 'grant';
+}
+
+/**
+ * The free credit rows a purchase history cannot list: its predicate requires
+ * `is_free = false`, so a balance funded by a welcome grant or a referral bonus
+ * has a row here instead.
+ */
+export function getCreditGrants(
+  transactions: readonly CreditTransactionForBlocks[]
+): CreditGrant[] {
+  return transactions
+    .filter(transaction => transaction.amount_microdollars > 0 && transaction.is_free)
+    .sort((a, b) => {
+      const byDate = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return byDate !== 0 ? byDate : b.id.localeCompare(a.id);
+    })
+    .map(transaction => ({
+      id: transaction.id,
+      date: transaction.created_at,
+      amount_mUsd: transaction.amount_microdollars,
+      kind: grantKindOf(transaction.credit_category),
+    }));
 }

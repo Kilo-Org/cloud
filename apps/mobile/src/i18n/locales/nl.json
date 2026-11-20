@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Afschrijving",
         "grant": "Tegoedtoekenning",
+        "welcomeCredits": "Welkomsttegoed",
         "purchase": "Aankoop"
       },
       "purchaseFallback": "Tegoedaankoop",

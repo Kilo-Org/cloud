@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Hefur ekki áhrif á stöðu",
         "deduction": "Frádráttur",
         "grant": "Úthlutuð inneign",
+        "welcomeCredits": "Velkomuinneign",
         "purchase": "Kaup"
       },
       "purchaseFallback": "Kaup á inneign",

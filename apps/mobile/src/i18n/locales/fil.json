@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Walang epekto sa balanse",
         "deduction": "Bawas",
         "grant": "Libreng credit",
+        "welcomeCredits": "Panimulang credit",
         "purchase": "Pagbili"
       },
       "purchaseFallback": "Pagbili ng credit",

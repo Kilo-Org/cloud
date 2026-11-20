@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Ei vaikuta saldoon",
         "deduction": "Veloitus",
         "grant": "Myönnetyt krediitit",
+        "welcomeCredits": "Tervetulokrediitit",
         "purchase": "Osto"
       },
       "purchaseFallback": "Krediittiosto",

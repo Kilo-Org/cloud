@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { i18n } from '@/i18n';
-import { type CreditPurchaseEntry } from '@/lib/credits/credit-history';
+import { type CreditGrant, type CreditPurchaseEntry } from '@/lib/credits/credit-history';
 
-import { PurchaseHistoryRow } from './credit-history-rows';
+import { GrantHistoryRow, PurchaseHistoryRow } from './credit-history-rows';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -46,6 +46,31 @@ async function renderRow(purchase: CreditPurchaseEntry) {
     throw new Error('Failed to create test renderer');
   }
   return renderer;
+}
+
+async function renderGrantRow(grantRow: CreditGrant) {
+  const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  await act(async () => {
+    holder.current = TestRenderer.create(
+      createElement(GrantHistoryRow, { grant: grantRow, last: false })
+    );
+    await Promise.resolve();
+  });
+  const renderer = holder.current;
+  if (!renderer) {
+    throw new Error('Failed to create test renderer');
+  }
+  return renderer;
+}
+
+function grant(overrides: Partial<CreditGrant> = {}): CreditGrant {
+  return {
+    id: 'grant-1',
+    date: '2026-11-12T10:00:00.000Z',
+    amount_mUsd: 12_500_000,
+    kind: 'referral',
+    ...overrides,
+  };
 }
 
 /** Every string the row paints, so a line the row drops is visible to a test. */
@@ -232,6 +257,63 @@ describe('PurchaseHistoryRow in the reader language', () => {
       const expiry = painted.find(text => text.includes('(UTC)'));
       expect(expiry).toContain('\u00A0\u2068(UTC)\u2069');
       expect(expiry).not.toContain(' (UTC)');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+});
+
+describe('GrantHistoryRow', () => {
+  it('titles each grant kind in English', async () => {
+    const referral = await renderGrantRow(grant({ kind: 'referral' }));
+    expect(texts(referral)).toContain('Referral bonus');
+    referral.unmount();
+
+    const pass = await renderGrantRow(grant({ kind: 'kilo_pass' }));
+    expect(texts(pass)).toContain('Kilo Pass');
+    pass.unmount();
+
+    const admin = await renderGrantRow(grant({ kind: 'grant' }));
+    expect(texts(admin)).toContain('Credit grant');
+    admin.unmount();
+
+    const welcome = await renderGrantRow(grant({ kind: 'welcome' }));
+    expect(texts(welcome)).toContain('Welcome credits');
+    welcome.unmount();
+  });
+
+  it('paints the amount as a positive run and the grant date under it', async () => {
+    const renderer = await renderGrantRow(grant({ amount_mUsd: 12_500_000 }));
+
+    const { amount, date } = paintedAmountAndDate(renderer);
+    expect(amount).toBe('+$12.50');
+    // The grant's own date, not the deduction or purchase date the other rows
+    // prefer: this row has nothing else to print.
+    expect(date).toBe('11/12/2026');
+    renderer.unmount();
+  });
+
+  it('keeps the amount in its own left-to-right run in Arabic', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderGrantRow(grant({ kind: 'referral' }));
+
+      const painted = texts(renderer);
+      expect(painted).toContain('مكافأة الإحالة');
+      const amount = painted.find(text => text.includes('$'));
+      if (amount === undefined) {
+        throw new Error('The grant row did not paint an amount');
+      }
+      // The isolates pin the run's direction; the paragraph's own direction
+      // would otherwise reorder the sign against the digits.
+      expect(amount.startsWith('\u2066')).toBe(true);
+      expect(amount.endsWith('\u2069')).toBe(true);
+      expect(readable(amount)).toBe('+$12.50');
       renderer.unmount();
     } finally {
       await act(async () => {

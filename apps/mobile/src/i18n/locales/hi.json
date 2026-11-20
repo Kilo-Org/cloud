@@ -4437,6 +4437,7 @@
         "balanceNeutral": "बैलेंस पर असर नहीं",
         "deduction": "कटौती",
         "grant": "मुफ़्त क्रेडिट",
+        "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरीदारी"
       },
       "purchaseFallback": "क्रेडिट खरीदारी",

@@ -4437,6 +4437,7 @@
         "balanceNeutral": "بدون تأثیر بر موجودی",
         "deduction": "کسر",
         "grant": "اعطای اعتبار",
+        "welcomeCredits": "اعتبار خوش‌آمد",
         "purchase": "خرید"
       },
       "purchaseFallback": "خرید اعتبار",

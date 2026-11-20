@@ -4437,6 +4437,7 @@
         "balanceNeutral": "ბალანსზე გავლენის გარეშე",
         "deduction": "ჩამოჭრა",
         "grant": "კრედიტების მინიჭება",
+        "welcomeCredits": "მისალმების კრედიტები",
         "purchase": "შენაძენი"
       },
       "purchaseFallback": "კრედიტების შეძენა",

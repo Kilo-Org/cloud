@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Aan saamaynin haraaga",
         "deduction": "Ka-goyn",
         "grant": "Deeq kiredit",
+        "welcomeCredits": "Kiredit soo dhawoow",
         "purchase": "Iibsasho"
       },
       "purchaseFallback": "Iibsashada kiredit",

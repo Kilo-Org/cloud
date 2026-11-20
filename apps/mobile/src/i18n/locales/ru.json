@@ -4579,6 +4579,7 @@
         "balanceNeutral": "Без изменения баланса",
         "deduction": "Списание",
         "grant": "Начисление кредитов",
+        "welcomeCredits": "Приветственные кредиты",
         "purchase": "Покупка"
       },
       "purchaseFallback": "Покупка кредитов",

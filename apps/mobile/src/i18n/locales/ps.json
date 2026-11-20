@@ -4437,6 +4437,7 @@
         "balanceNeutral": "په بیلانس بې اغېزې",
         "deduction": "کسر",
         "grant": "د کریډیټ ورکړه",
+        "welcomeCredits": "د ښه راغلاست کریډیټ",
         "purchase": "پېرود"
       },
       "purchaseFallback": "د کریډیټ پېرود",

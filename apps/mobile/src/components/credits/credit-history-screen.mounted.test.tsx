@@ -88,6 +88,7 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/components/credits/credit-history-rows', () => ({
   PurchaseHistoryRow: 'PurchaseHistoryRow',
   LedgerHistoryRow: 'LedgerHistoryRow',
+  GrantHistoryRow: 'GrantHistoryRow',
 }));
 vi.mock('@/lib/hooks/use-personal-credits', () => ({
   useCreditPurchaseHistory: () => state.purchases,
@@ -266,6 +267,35 @@ describe('PersonalCreditHistoryScreen', () => {
 
     expect(texts(renderer)).not.toContain(i18n.t('credits.history.retentionLimit'));
     expect(texts(renderer)).toContain('Older credit activity is available.');
+    unmount();
+  });
+
+  it('renders a positive grant from the credit blocks as its own row', async () => {
+    state.blocks.data = {
+      creditBlocks: [],
+      deductions: [],
+      grants: [
+        {
+          id: 'grant-1',
+          date: '2026-11-10T10:00:00.000Z',
+          amount_mUsd: 12_500_000,
+          kind: 'referral',
+        },
+      ],
+      totalBalance_mUsd: 12_500_000,
+      isFirstPurchase: true,
+      autoTopUpEnabled: false,
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    const grants = nodesOfType(renderer, 'GrantHistoryRow');
+    expect(grants).toHaveLength(1);
+    expect(grants[0]?.props.grant).toMatchObject({ id: 'grant-1', amount_mUsd: 12_500_000 });
+    // A balance funded only by a grant still lists it, so the empty state
+    // cannot swallow the one row the account has.
+    expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
     unmount();
   });
 });

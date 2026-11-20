@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Neutral baki",
         "deduction": "Potongan",
         "grant": "Pemberian kredit",
+        "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
       },
       "purchaseFallback": "Pembelian kredit",

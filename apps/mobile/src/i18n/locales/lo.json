@@ -4437,6 +4437,7 @@
         "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
         "deduction": "ການຫັກ",
         "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "welcomeCredits": "ເຄຣດິດຕ້ອນຮັບ",
         "purchase": "ການຊື້"
       },
       "purchaseFallback": "ການຊື້ເຄຣດິດ",

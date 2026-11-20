@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Saldoan eraginik gabe",
         "deduction": "Kenketa",
         "grant": "Kreditu-emakida",
+        "welcomeCredits": "Ongietorri kredituak",
         "purchase": "Erosketa"
       },
       "purchaseFallback": "Kreditu-erosketa",

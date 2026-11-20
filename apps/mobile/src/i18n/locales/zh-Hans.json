@@ -4437,6 +4437,7 @@
         "balanceNeutral": "余额不变",
         "deduction": "扣除",
         "grant": "赠送积分",
+        "welcomeCredits": "欢迎积分",
         "purchase": "购买"
       },
       "purchaseFallback": "积分购买",

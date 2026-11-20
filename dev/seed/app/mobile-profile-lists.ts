@@ -27,8 +27,9 @@ export const usage = '<email>';
  *   with a body that runs past three lines.
  * - provider keys: an Anthropic key and an OpenAI key, both wrapped by the
  *   local `byok-kms` service with a placeholder secret upstream rejects.
- * - credit history: two paid purchases, a grant, that grant's expiry, and one
- *   usage deduction, so the purchase list and the ledger both have rows.
+ * - credit history: two paid purchases, an expiring grant with its expiry row,
+ *   two unspent free grants, and one usage deduction, so the purchase list and
+ *   the ledger both have rows.
  *
  * Two screens need no seed for their empty state, and two cannot be seeded: a
  * fresh account already shows the empty blocked-people list and the empty
@@ -38,10 +39,12 @@ export const usage = '<email>';
  * Trusted hosts live in the device's own SQLCipher store, so there is no backend
  * row to write.
  *
- * The credit ledger renders purchases and negative rows only
- * (`buildCreditHistoryItems`), so a positive grant appears through the expiry
- * row that closes it: the grant is seeded with a past expiry date and an
- * expiry row that names it, which is the shape `computeExpiration` writes.
+ * The credit history lists purchases, the free grants no expiry row prints, and
+ * negative rows (`buildCreditHistoryItems` merges the three sources). An expired
+ * grant appears through the expiry row that closes it: that grant is seeded with
+ * a past expiry date and an expiry row that names it, which is the shape
+ * `computeExpiration` writes. The two unspent grants carry no expiry date, so no
+ * expiry row closes them and they are rows of their own.
  *
  * The passkey rows carry generated credential ids and a placeholder COSE key:
  * they render in the list, and the device cannot sign in with them, because
@@ -57,7 +60,7 @@ export const usage = '<email>';
  *
  * A rerun deletes the rows this topic owns — the two derived passkey credential
  * ids, the four moderation logins, the five idempotency keys, the two derived
- * provider ids and the five credit transaction ids — then inserts them again.
+ * provider ids and the seven credit transaction ids — then inserts them again.
  */
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -75,7 +78,15 @@ const NOTIFICATION_KEYS = [
 
 const BYOK_PROVIDERS = ['anthropic', 'openai'] as const;
 
-const CREDIT_KEYS = ['purchase-1', 'purchase-2', 'grant', 'grant-expiry', 'usage'] as const;
+const CREDIT_KEYS = [
+  'purchase-1',
+  'purchase-2',
+  'grant',
+  'grant-expiry',
+  'usage',
+  'welcome-grant',
+  'referral-grant',
+] as const;
 
 /** Stable UUID for one account's fixture key: a rerun replaces the same rows. */
 function seedUuid(userId: string, key: string): string {
@@ -403,6 +414,26 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       is_free: false,
       description: 'Usage',
       created_at: iso(-6 * DAY_MS),
+    },
+    {
+      id: creditIds[5],
+      kilo_user_id: userId,
+      amount_microdollars: 4_000_000,
+      is_free: true,
+      description: 'Welcome credits',
+      credit_category: 'automatic-welcome-credits',
+      credit_source: 'promotion',
+      created_at: iso(-120 * DAY_MS),
+    },
+    {
+      id: creditIds[6],
+      kilo_user_id: userId,
+      amount_microdollars: 2_000_000,
+      is_free: true,
+      description: 'Referral bonus',
+      credit_category: 'referral-referring-bonus',
+      credit_source: 'promotion',
+      created_at: iso(-60 * DAY_MS),
     },
   ]);
 

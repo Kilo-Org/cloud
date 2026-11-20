@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Без промена на салдото",
         "deduction": "Одбивање",
         "grant": "Доделени кредити",
+        "welcomeCredits": "Кредити за добредојде",
         "purchase": "Купување"
       },
       "purchaseFallback": "Купување кредити",

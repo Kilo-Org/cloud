@@ -4437,6 +4437,7 @@
         "balanceNeutral": "残高変動なし",
         "deduction": "差し引き",
         "grant": "クレジット付与",
+        "welcomeCredits": "ウェルカムクレジット",
         "purchase": "購入"
       },
       "purchaseFallback": "クレジットの購入",

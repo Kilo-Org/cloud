@@ -7,7 +7,11 @@ import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
-import { LedgerHistoryRow, PurchaseHistoryRow } from '@/components/credits/credit-history-rows';
+import {
+  GrantHistoryRow,
+  LedgerHistoryRow,
+  PurchaseHistoryRow,
+} from '@/components/credits/credit-history-rows';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -67,9 +71,10 @@ export function PersonalCreditHistoryScreen() {
   );
 
   const deductions = blocks.data?.deductions;
+  const grants = blocks.data?.grants;
   const items = useMemo<CreditHistoryItem[]>(
-    () => buildCreditHistoryItems(purchases.entries, deductions ?? []),
-    [purchases.entries, deductions]
+    () => buildCreditHistoryItems(purchases.entries, deductions ?? [], grants ?? []),
+    [purchases.entries, deductions, grants]
   );
 
   const openReceipt = useCallback(
@@ -83,21 +88,25 @@ export function PersonalCreditHistoryScreen() {
     : null;
 
   const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<CreditHistoryItem>) =>
-      item.kind === 'purchase' ? (
-        <PurchaseHistoryRow
-          entry={item.entry}
-          isOpeningReceipt={openingReceiptId === item.entry.id}
-          onOpenReceipt={openReceipt}
-          last={index === items.length - 1}
-        />
-      ) : (
-        <LedgerHistoryRow
-          deduction={item.deduction}
-          grantListed={item.grantListed}
-          last={index === items.length - 1}
-        />
-      ),
+    ({ item, index }: ListRenderItemInfo<CreditHistoryItem>) => {
+      const last = index === items.length - 1;
+      if (item.kind === 'purchase') {
+        return (
+          <PurchaseHistoryRow
+            entry={item.entry}
+            isOpeningReceipt={openingReceiptId === item.entry.id}
+            onOpenReceipt={openReceipt}
+            last={last}
+          />
+        );
+      }
+      if (item.kind === 'grant') {
+        return <GrantHistoryRow grant={item.grant} last={last} />;
+      }
+      return (
+        <LedgerHistoryRow deduction={item.deduction} grantListed={item.grantListed} last={last} />
+      );
+    },
     [openReceipt, openingReceiptId, items.length]
   );
 

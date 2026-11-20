@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Saldoneutral",
         "deduction": "Abzug",
         "grant": "Credit-Gutschrift",
+        "welcomeCredits": "Willkommens-Credits",
         "purchase": "Kauf"
       },
       "purchaseFallback": "Credit-Kauf",

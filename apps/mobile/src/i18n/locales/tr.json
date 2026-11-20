@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Bakiyeyi etkilemez",
         "deduction": "Düşüm",
         "grant": "Kredi hediyesi",
+        "welcomeCredits": "Hoş geldin kredisi",
         "purchase": "Satın alım"
       },
       "purchaseFallback": "Kredi satın alımı",

@@ -4437,6 +4437,7 @@
         "balanceNeutral": "బ్యాలెన్స్‌పై ప్రభావం లేదు",
         "deduction": "తగ్గింపు",
         "grant": "క్రెడిట్ మంజూరు",
+        "welcomeCredits": "స్వాగత క్రెడిట్",
         "purchase": "కొనుగోలు"
       },
       "purchaseFallback": "క్రెడిట్ కొనుగోలు",

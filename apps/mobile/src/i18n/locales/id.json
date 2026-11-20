@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Saldo tetap",
         "deduction": "Pengurangan",
         "grant": "Kredit gratis",
+        "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
       },
       "purchaseFallback": "Pembelian kredit",

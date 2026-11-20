@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Saldot ei mõjuta",
         "deduction": "Mahaarvamine",
         "grant": "Tasuta krediit",
+        "welcomeCredits": "Tervituskrediit",
         "purchase": "Ost"
       },
       "purchaseFallback": "Krediidiost",

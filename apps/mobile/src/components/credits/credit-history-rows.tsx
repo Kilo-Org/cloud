@@ -10,6 +10,7 @@ import { INLINE_LINK_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import {
   type CreditDeduction,
+  type CreditGrant,
   type CreditGrantKind,
   creditGrantKind,
   creditPurchaseChannel,
@@ -63,6 +64,14 @@ function grantTypeLabel(grant: { credit_source: string | null; is_free: boolean 
     GRANT_LABEL_KEYS[creditGrantKind({ creditSource: grant.credit_source, isFree: grant.is_free })]
   );
 }
+
+/** The row title a positive grant renders, in the reader's language. */
+const GRANT_TITLE_KEYS = {
+  referral: 'kiloPass.bonusReferral',
+  welcome: 'credits.history.kind.welcomeCredits',
+  kilo_pass: 'kiloPass.title',
+  grant: 'credits.history.kind.grant',
+} satisfies Record<CreditGrant['kind'], string>;
 
 /** A signed credit amount, kept in its own left-to-right run. */
 function creditAmountLabel(amountMicrodollars: number): string {
@@ -180,7 +189,8 @@ function LedgerLine({
   muted,
 }: Readonly<{
   title: string;
-  typeLabel: string;
+  /** Absent when the row's own title already names the kind it records. */
+  typeLabel?: string;
   amountMicrodollars: number;
   date: string | null;
   muted?: boolean;
@@ -199,7 +209,7 @@ function LedgerLine({
         {date != null && (
           <Text variant="caption">{formatDate(parseTimestamp(date), i18n.language)}</Text>
         )}
-        <Text variant="caption">{typeLabel}</Text>
+        {typeLabel != null && <Text variant="caption">{typeLabel}</Text>}
       </View>
     </View>
   );
@@ -243,6 +253,26 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
           muted
         />
       )}
+    </View>
+  );
+});
+
+/**
+ * One positive grant the person did not buy: a welcome grant, a referral bonus,
+ * a Kilo Pass month, or an admin grant. The title already names the kind, so
+ * the row carries no type caption.
+ */
+export const GrantHistoryRow = memo(function GrantHistoryRow({
+  grant,
+  last,
+}: Readonly<{ grant: CreditGrant; last: boolean }>) {
+  // A kind this app predates still paints a title: the generic grant label is
+  // the row name, and an empty one reads as a broken row.
+  const title = i18n.t(lookup(GRANT_TITLE_KEYS, grant.kind) ?? 'credits.history.kind.grant');
+
+  return (
+    <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
+      <LedgerLine title={title} amountMicrodollars={grant.amount_mUsd} date={grant.date} />
     </View>
   );
 });

@@ -4508,6 +4508,7 @@
         "balanceNeutral": "Saldo invariato",
         "deduction": "Detrazione",
         "grant": "Crediti omaggio",
+        "welcomeCredits": "Crediti di benvenuto",
         "purchase": "Acquisto"
       },
       "purchaseFallback": "Acquisto crediti",

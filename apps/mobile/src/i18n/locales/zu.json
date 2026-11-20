@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Akuthinti ibhalansi",
         "deduction": "Ukudonswa",
         "grant": "Isibonelelo samakhredithi",
+        "welcomeCredits": "Amakhredithi okwamukela",
         "purchase": "Ukuthenga"
       },
       "purchaseFallback": "Ukuthengwa kwamakhredithi",

@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Без промяна в баланса",
         "deduction": "Приспадане",
         "grant": "Безплатни кредити",
+        "welcomeCredits": "Приветствени кредити",
         "purchase": "Покупка"
       },
       "purchaseFallback": "Покупка на кредити",

@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Pa ndikim në bilanc",
         "deduction": "Zbritje",
         "grant": "Kredi të dhuruara",
+        "welcomeCredits": "Kredi mirëseardhjeje",
         "purchase": "Blerje"
       },
       "purchaseFallback": "Blerje kredish",

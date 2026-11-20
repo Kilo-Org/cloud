@@ -4529,6 +4529,7 @@
         "balanceNeutral": "Balance neutral",
         "deduction": "Deduction",
         "grant": "Credit grant",
+        "welcomeCredits": "Welcome credits",
         "purchase": "Purchase"
       },
       "purchaseFallback": "Credit purchase",

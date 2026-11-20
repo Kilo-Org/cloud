@@ -4579,6 +4579,7 @@
         "balanceNeutral": "Bez vplyvu na zostatok",
         "deduction": "Odpočet",
         "grant": "Pridelené kredity",
+        "welcomeCredits": "Uvítacie kredity",
         "purchase": "Nákup"
       },
       "purchaseFallback": "Nákup kreditov",

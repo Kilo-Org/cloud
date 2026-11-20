@@ -4437,6 +4437,7 @@
         "balanceNeutral": "இருப்பு மாறாதது",
         "deduction": "கழிவு",
         "grant": "கிரெடிட் வழங்கல்",
+        "welcomeCredits": "வரவேற்பு கிரெடிட்",
         "purchase": "வாங்குதல்"
       },
       "purchaseFallback": "கிரெடிட் வாங்குதல்",

@@ -1,5 +1,5 @@
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
-import { getCreditBlocks } from './getCreditBlocks';
+import { getCreditBlocks, getCreditGrants } from './getCreditBlocks';
 
 const makeTransaction = (
   id: string,
@@ -264,5 +264,60 @@ describe('getCreditBlocks', () => {
 
     expect(result.deductions).toHaveLength(1);
     expect(result.deductions[0].purchase).toBeNull();
+  });
+});
+
+describe('getCreditGrants', () => {
+  it('lists a free grant with its amount and date, newest first', () => {
+    const transactions = [
+      makeTransaction('welcome', 0, 500_000, {
+        credit_category: 'automatic-welcome-credits',
+        created_at: '2024-01-02',
+      }),
+      makeTransaction('referral', 0, 1_000_000, {
+        credit_category: 'referral-referring-bonus',
+        created_at: '2024-01-05',
+      }),
+    ];
+
+    expect(getCreditGrants(transactions)).toEqual([
+      { id: 'referral', date: '2024-01-05', amount_mUsd: 1_000_000, kind: 'referral' },
+      { id: 'welcome', date: '2024-01-02', amount_mUsd: 500_000, kind: 'welcome' },
+    ]);
+  });
+
+  it('leaves out a paid row and a negative row', () => {
+    const transactions = [
+      makeTransaction('paid', 0, 1_000_000, { is_free: false, created_at: '2024-01-03' }),
+      makeTransaction('deduction', 0, -200_000, { is_free: true, created_at: '2024-01-04' }),
+      makeTransaction('grant', 0, 100_000, { created_at: '2024-01-05' }),
+    ];
+
+    expect(getCreditGrants(transactions).map(grant => grant.id)).toEqual(['grant']);
+  });
+
+  it('maps each credit category to its grant kind', () => {
+    const transactions = [
+      makeTransaction('referral', 0, 100, {
+        credit_category: 'referral-referring-bonus',
+        created_at: '2024-01-01',
+      }),
+      makeTransaction('welcome', 0, 100, {
+        credit_category: 'automatic-welcome-credits',
+        created_at: '2024-01-02',
+      }),
+      makeTransaction('kilo-pass', 0, 100, {
+        credit_category: 'kilo-pass-bonus',
+        created_at: '2024-01-03',
+      }),
+      makeTransaction('other', 0, 100, { created_at: '2024-01-04' }),
+    ];
+
+    expect(getCreditGrants(transactions).map(grant => grant.kind)).toEqual([
+      'grant',
+      'kilo_pass',
+      'welcome',
+      'referral',
+    ]);
   });
 });

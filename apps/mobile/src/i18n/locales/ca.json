@@ -4508,6 +4508,7 @@
         "balanceNeutral": "Sense efecte en el saldo",
         "deduction": "Deducció",
         "grant": "Concessió de crèdits",
+        "welcomeCredits": "Crèdits de benvinguda",
         "purchase": "Compra"
       },
       "purchaseFallback": "Compra de crèdits",

@@ -4437,6 +4437,7 @@
         "balanceNeutral": "Không ảnh hưởng số dư",
         "deduction": "Khấu trừ",
         "grant": "Tặng tín dụng",
+        "welcomeCredits": "Tín dụng chào mừng",
         "purchase": "Mua"
       },
       "purchaseFallback": "Mua tín dụng",

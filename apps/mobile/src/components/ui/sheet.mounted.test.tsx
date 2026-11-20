@@ -675,6 +675,49 @@ describe('Sheet', () => {
     expect(sheet(renderer)).toBeUndefined();
   });
 
+  it('keeps the self-dismissal deadline when the parent re-renders with new handlers', async () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const { renderer, queryClient } = await mount({ onClose, onDismiss });
+    const node = sheet(renderer);
+    if (!node) {
+      throw new Error('sheet not rendered');
+    }
+
+    // The swipe was granted while `visible` stays true, so this occurrence is
+    // tracked by the other flag of the same bound.
+    await act(async () => {
+      expect((node.props.onRequestDismiss as () => boolean)()).toBe(true);
+      await Promise.resolve();
+    });
+
+    // A parent publishing state during the dismissal hands the sheet a fresh
+    // handler identity on every render; the bound still belongs to the one
+    // occurrence, not to a render.
+    for (let render = 0; render < 9; render += 1) {
+      // eslint-disable-next-line no-await-in-loop -- each render must land before the next one replaces it
+      await settleTimers(100);
+      // eslint-disable-next-line no-await-in-loop -- each render must land before the next one replaces it
+      await updateSheet(renderer, queryClient, {
+        visible: true,
+        onClose: () => {
+          onClose();
+        },
+        onDismiss: () => {
+          onDismiss();
+        },
+      });
+    }
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    await settleTimers(100);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(sheet(renderer)).toBeUndefined();
+  });
+
   it('ends the sheet when the native sheet dismisses on its own (swipe, backdrop or Back)', async () => {
     const onClose = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();

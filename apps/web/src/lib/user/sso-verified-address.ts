@@ -4,11 +4,8 @@ import {
   getLowerDomainFromEmail,
 } from '@kilocode/web-shared/lib/email-address';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import {
-  getOrganizationById,
-  getUserOrgMemberships,
-} from '@kilocode/web-shared/lib/organizations/organizations';
-import { listDnsVerifiedDomains } from '@/lib/scim/directory-verified-domains';
+import { getUserOrgMemberships } from '@kilocode/web-shared/lib/organizations/organizations';
+import { getDnsVerifiedDomainsByExternalId } from '@/lib/scim/directory-verified-domains';
 
 /**
  * Whether a company SSO sign-in proved the account's primary address.
@@ -25,18 +22,20 @@ import { listDnsVerifiedDomains } from '@/lib/scim/directory-verified-domains';
  * So the proof is a `workos` row for the primary address whose `hosted_domain`
  * is the primary address's domain, with the sign-in's authority still in force
  * now: the domain requires SSO, the account is a member of the organization
- * that is its authority, and that organization's WorkOS organization has
- * verified the domain through DNS. A domain whose SSO was turned off, moved to
+ * that is its authority, and the WorkOS organization whose `externalId` is
+ * that organization's id has verified the domain through DNS. That is the same
+ * link the sign-in checks. A domain whose SSO was turned off, moved to
  * another organization, or left misconfigured proves nothing, and neither does
  * an account that has left the authority organization.
  *
  * DNS verification is required because neither the authority nor the sign-in
  * shows the organization controls the domain: an owner can set any unclaimed
  * domain as `sso_domain`, and WorkOS lists a domain attached to an
- * organization before it is verified. `listDnsVerifiedDomains` is the
- * repository's bar for domain control. A lookup that fails for any reason
- * answers false, so the exchange succeeds without the address and the next
- * exchange asks again.
+ * organization before it is verified. DNS verification
+ * (`dnsVerifiedDomains`) is the repository's bar for domain control. No linked
+ * WorkOS organization, or a lookup that fails for any reason, answers false,
+ * so the exchange succeeds without the address and the next exchange asks
+ * again.
  *
  * Directory sync can move an SSO row's address within the same domain
  * (`applyDirectoryUserChanges`), keeping its profile id and `hosted_domain`.
@@ -80,12 +79,9 @@ async function authorityDnsVerifiedDomain(
   organizationId: string,
   domain: string
 ): Promise<boolean> {
-  const organization = await getOrganizationById(organizationId);
-  if (!organization?.external_org_id) return false;
-
   try {
-    const verified = await listDnsVerifiedDomains(organization.external_org_id);
-    return verified.includes(domain);
+    const verified = await getDnsVerifiedDomainsByExternalId(organizationId);
+    return verified?.includes(domain) ?? false;
   } catch (error) {
     console.warn('[pages-auth] Could not read the SSO authority verified domains', {
       organizationId,

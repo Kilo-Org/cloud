@@ -86,6 +86,37 @@ export async function listDnsVerifiedDomains(workOSOrganizationId: string): Prom
     );
   }
 
+  return dnsVerifiedDomains(organization);
+}
+
+/**
+ * Lowercased domains a WorkOS organization has verified through DNS, found by
+ * its `externalId`, which is the Kilo organization id. That is the link SSO
+ * sign-in checks (`processSSOInternal`), and it does not depend on
+ * `organizations.external_org_id`, which only directory sync writes.
+ *
+ * Null when no WorkOS organization carries that external id. Any other failure
+ * throws `VerifiedDomainLookupError`.
+ */
+export async function getDnsVerifiedDomainsByExternalId(
+  kiloOrganizationId: string
+): Promise<string[] | null> {
+  let organization: Organization;
+  try {
+    organization = await workos.organizations.getOrganizationByExternalId(kiloOrganizationId);
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw new VerifiedDomainLookupError(
+      `Could not read the WorkOS organization for ${kiloOrganizationId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+  return dnsVerifiedDomains(organization);
+}
+
+/** Lowercased, non-empty domains on the organization that are verified through DNS. */
+export function dnsVerifiedDomains(organization: Pick<Organization, 'domains'>): string[] {
   // `?? []` because the SDK types `domains` as present but other readers in
   // this repo do not trust that (`organization-sso-router.ts:150,158,182`).
   // Without it an omitted field throws a TypeError, which the caller wraps as

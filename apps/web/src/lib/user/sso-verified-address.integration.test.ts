@@ -31,20 +31,20 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   deleteStripeCustomer: jest.fn().mockResolvedValue(undefined),
 }));
 
-// WorkOS is unreachable in tests too (`.env.test` carries an invalid key).
-jest.mock('@/lib/scim/directory-verified-domains', () => {
-  class VerifiedDomainLookupError extends Error {}
-  class VerifiedDomainOwnerMissingError extends Error {}
-  return {
-    VerifiedDomainLookupError,
-    VerifiedDomainOwnerMissingError,
-    listDnsVerifiedDomains: jest.fn(),
-  };
-});
+// WorkOS is unreachable in tests too (`.env.test` carries an invalid key), so
+// the lookup by external id answers from `workOSDnsVerifiedDomains`, keyed by
+// Kilo organization id. An absent key is a Kilo organization no WorkOS
+// organization links to.
+jest.mock('@/lib/scim/directory-verified-domains', () => ({
+  ...jest.requireActual('@/lib/scim/directory-verified-domains'),
+  getDnsVerifiedDomainsByExternalId: jest.fn(),
+}));
 
-const verifiedDomains = jest.requireMock<{ listDnsVerifiedDomains: jest.Mock }>(
+const verifiedDomains = jest.requireMock<{ getDnsVerifiedDomainsByExternalId: jest.Mock }>(
   '@/lib/scim/directory-verified-domains'
 );
+
+const workOSDnsVerifiedDomains = new Map<string, string[]>();
 
 let suffix: string;
 let domain: string;
@@ -57,9 +57,10 @@ beforeEach(() => {
   suffix = randomUUID();
   domain = `sso-${suffix}.test`;
   email = `person@${domain}`;
-  verifiedDomains.listDnsVerifiedDomains.mockReset();
-  verifiedDomains.listDnsVerifiedDomains.mockImplementation(async (workOSOrganizationId: string) =>
-    workOSOrganizationId === `org_${suffix}` ? [domain] : []
+  workOSDnsVerifiedDomains.clear();
+  verifiedDomains.getDnsVerifiedDomainsByExternalId.mockReset();
+  verifiedDomains.getDnsVerifiedDomainsByExternalId.mockImplementation(
+    async (kiloOrganizationId: string) => workOSDnsVerifiedDomains.get(kiloOrganizationId) ?? null
   );
 });
 
@@ -83,17 +84,22 @@ afterEach(async () => {
   }
 });
 
-/** `workOSOrganizationId` defaults to the one whose DNS-verified domains include `domain`. */
+/**
+ * An organization with no directory binding, so `external_org_id` stays null.
+ * `dnsVerified` is what its linked WorkOS organization verified through DNS;
+ * null means no WorkOS organization links to it.
+ */
 async function seedOrganization(
   ssoDomain: string | null,
-  workOSOrganizationId = `org_${suffix}`
+  dnsVerified: string[] | null = [domain]
 ): Promise<string> {
   const organization = await createOrganization(`SSO Org ${randomUUID()}`, null, false);
   createdOrganizationIds.push(organization.id);
   await db
     .update(organizations)
-    .set({ sso_domain: ssoDomain, external_org_id: workOSOrganizationId })
+    .set({ sso_domain: ssoDomain })
     .where(eq(organizations.id, organization.id));
+  if (dnsVerified) workOSDnsVerifiedDomains.set(organization.id, dnsVerified);
   return organization.id;
 }
 
@@ -127,14 +133,30 @@ async function ssoVerified(userId: string): Promise<boolean> {
 }
 
 describe('hasSsoVerifiedPrimaryAddress', () => {
-  test('counts an SSO sign-in on a domain whose authority the account belongs to', async () => {
+  test('counts an SSO sign-in through an authority with no directory binding, found by its WorkOS external id', async () => {
     const authorityId = await seedOrganization(domain);
     const user = await seedAccount();
     await addUserToOrganization(authorityId, user.id, 'member');
 
     await signInThroughSso();
 
+    const [authority] = await db
+      .select({ externalOrgId: organizations.external_org_id })
+      .from(organizations)
+      .where(eq(organizations.id, authorityId));
+    expect(authority.externalOrgId).toBeNull();
     expect(await ssoVerified(user.id)).toBe(true);
+    expect(verifiedDomains.getDnsVerifiedDomainsByExternalId).toHaveBeenCalledWith(authorityId);
+  });
+
+  test('does not count an SSO sign-in when no WorkOS organization links to the authority', async () => {
+    const authorityId = await seedOrganization(domain, null);
+    const user = await seedAccount();
+    await addUserToOrganization(authorityId, user.id, 'member');
+
+    await signInThroughSso();
+
+    expect(await ssoVerified(user.id)).toBe(false);
   });
 
   test('does not count a directory-provisioned row until an SSO sign-in replaces it', async () => {
@@ -144,6 +166,7 @@ describe('hasSsoVerifiedPrimaryAddress', () => {
       name: `SCIM Org ${suffix}`,
     });
     createdOrganizationIds.push(directory.id);
+    workOSDnsVerifiedDomains.set(directory.id, [domain]);
     // The SSO domain satisfies directory sync's domain gate without asking WorkOS.
     await db
       .update(organizations)
@@ -173,7 +196,7 @@ describe('hasSsoVerifiedPrimaryAddress', () => {
   });
 
   test("does not count an SSO sign-in when the authority's WorkOS organization has not verified the domain through DNS", async () => {
-    const authorityId = await seedOrganization(domain, `org_unverified_${suffix}`);
+    const authorityId = await seedOrganization(domain, [`other-${suffix}.test`]);
     const user = await seedAccount();
     await addUserToOrganization(authorityId, user.id, 'member');
 
@@ -183,7 +206,7 @@ describe('hasSsoVerifiedPrimaryAddress', () => {
       expect.objectContaining({ provider: 'workos', email, hosted_domain: domain }),
     ]);
     expect(await ssoVerified(user.id)).toBe(false);
-    expect(verifiedDomains.listDnsVerifiedDomains).toHaveBeenCalledWith(`org_unverified_${suffix}`);
+    expect(verifiedDomains.getDnsVerifiedDomainsByExternalId).toHaveBeenCalledWith(authorityId);
   });
 
   test('does not count an SSO sign-in once the domain no longer requires SSO', async () => {
@@ -202,7 +225,7 @@ describe('hasSsoVerifiedPrimaryAddress', () => {
 
   test('does not count an SSO sign-in when the account is outside the authority organization', async () => {
     const authorityId = await seedOrganization(domain);
-    const otherId = await seedOrganization(null, `org_other_${suffix}`);
+    const otherId = await seedOrganization(null);
     const user = await seedAccount();
     await addUserToOrganization(otherId, user.id, 'member');
     await signInThroughSso();

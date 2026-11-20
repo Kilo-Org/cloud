@@ -10,17 +10,27 @@ import { describe, expect, test } from '@jest/globals';
 // and retrieved afterwards rather than captured from an outer `const`.
 jest.mock('@workos-inc/node', () => {
   const getOrganization = jest.fn();
+  const getOrganizationByExternalId = jest.fn();
   return {
-    WorkOS: jest.fn().mockImplementation(() => ({ organizations: { getOrganization } })),
+    WorkOS: jest.fn().mockImplementation(() => ({
+      organizations: { getOrganization, getOrganizationByExternalId },
+    })),
     __getOrganization: getOrganization,
+    __getOrganizationByExternalId: getOrganizationByExternalId,
   };
 });
 
-const { __getOrganization: getOrganization } = jest.requireMock<{ __getOrganization: jest.Mock }>(
-  '@workos-inc/node'
-);
+const {
+  __getOrganization: getOrganization,
+  __getOrganizationByExternalId: getOrganizationByExternalId,
+} = jest.requireMock<{
+  __getOrganization: jest.Mock;
+  __getOrganizationByExternalId: jest.Mock;
+}>('@workos-inc/node');
 
 import {
+  dnsVerifiedDomains,
+  getDnsVerifiedDomainsByExternalId,
   listDnsVerifiedDomains,
   VerifiedDomainLookupError,
   VerifiedDomainOwnerMissingError,
@@ -95,5 +105,59 @@ describe('listDnsVerifiedDomains', () => {
     getOrganization.mockResolvedValueOnce({});
 
     await expect(listDnsVerifiedDomains('org_1')).resolves.toEqual([]);
+  });
+});
+
+describe('dnsVerifiedDomains', () => {
+  test('keeps domains verified through DNS and drops manual, pending and failed ones', () => {
+    expect(
+      dnsVerifiedDomains({
+        domains: [
+          domain('dns.test', 'verified', 'dns'),
+          domain('manual.test', 'verified', 'manual'),
+          domain('pending.test', 'pending', 'dns'),
+          domain('failed.test', 'failed', 'dns'),
+        ],
+      } as never)
+    ).toEqual(['dns.test']);
+  });
+
+  test('trims, lowercases and drops blanks', () => {
+    expect(
+      dnsVerifiedDomains({
+        domains: [domain('  MiXeD.TEST ', 'verified', 'dns'), domain('   ', 'verified', 'dns')],
+      } as never)
+    ).toEqual(['mixed.test']);
+  });
+
+  test('answers none when the field is missing', () => {
+    expect(dnsVerifiedDomains({} as never)).toEqual([]);
+  });
+});
+
+describe('getDnsVerifiedDomainsByExternalId', () => {
+  test('reads the WorkOS organization linked to the Kilo organization and keeps DNS-verified domains', async () => {
+    getOrganizationByExternalId.mockResolvedValueOnce({
+      domains: [domain('dns.test', 'verified', 'dns'), domain('manual.test', 'verified', 'manual')],
+    });
+
+    await expect(getDnsVerifiedDomainsByExternalId('kilo-org-1')).resolves.toEqual(['dns.test']);
+    expect(getOrganizationByExternalId).toHaveBeenCalledWith('kilo-org-1');
+  });
+
+  test('answers null when no WorkOS organization carries the external id', async () => {
+    getOrganizationByExternalId.mockRejectedValueOnce(
+      Object.assign(new Error('Not found'), { status: 404 })
+    );
+
+    await expect(getDnsVerifiedDomainsByExternalId('kilo-org-1')).resolves.toBeNull();
+  });
+
+  test('reports any other failure as a lookup error', async () => {
+    getOrganizationByExternalId.mockRejectedValueOnce(new Error('503 upstream'));
+
+    await expect(getDnsVerifiedDomainsByExternalId('kilo-org-1')).rejects.toBeInstanceOf(
+      VerifiedDomainLookupError
+    );
   });
 });

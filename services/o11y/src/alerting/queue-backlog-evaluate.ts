@@ -1,5 +1,6 @@
 import type { QueueBacklogMetrics } from './queue-backlog';
 import {
+  type QueueBacklogPagePolicy,
   readQueueBacklogState,
   transitionQueueBacklogState,
   writeQueueBacklogState,
@@ -24,11 +25,12 @@ type NotifyFn = (alert: AlertPayload, env: QueueBacklogEnv) => Promise<void>;
 export async function evaluateQueueBacklogAlert(
   env: QueueBacklogEnv,
   queryFn: QueryFn = queryQueueBacklog,
-  notifyFn: NotifyFn = sendAlertNotification
+  notifyFn: NotifyFn = sendAlertNotification,
+  pagePolicy: QueueBacklogPagePolicy = 'escalate'
 ): Promise<void> {
   const metrics = await queryFn(env);
   const currentState = await readQueueBacklogState(env.O11Y_ALERT_STATE, metrics.queueId);
-  const transition = transitionQueueBacklogState(currentState, metrics.backlogCount);
+  const transition = transitionQueueBacklogState(currentState, metrics.backlogCount, pagePolicy);
 
   if (transition.alert !== null) {
     await notifyFn(
@@ -41,6 +43,8 @@ export async function evaluateQueueBacklogAlert(
         backlogCount: metrics.backlogCount,
         backlogBytes: metrics.backlogBytes,
         thresholdCount: transition.alert.thresholdCount,
+        ...(metrics.queueName ? { queueName: metrics.queueName } : {}),
+        ...(metrics.runbookUrl ? { runbookUrl: metrics.runbookUrl } : {}),
         oldestMessageTimestamp: metrics.oldestMessageTimestamp,
       },
       env

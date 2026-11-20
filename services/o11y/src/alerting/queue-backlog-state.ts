@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { AlertSeverity } from './slo-config';
 import { QUEUE_BACKLOG_PAGE_INTERVAL, QUEUE_BACKLOG_THRESHOLDS } from './queue-backlog';
 
+export type QueueBacklogPagePolicy = 'escalate' | 'once-until-resolved';
+
 const CONSECUTIVE_BELOW_TO_RESOLVE = 3;
 
 const InactiveTierStateSchema = z.object({
@@ -117,13 +119,18 @@ function activePageState(backlogCount: number): PageState {
 
 function transitionPage(
   state: PageState,
-  backlogCount: number
+  backlogCount: number,
+  pagePolicy: QueueBacklogPagePolicy
 ): { state: PageState; thresholdCount: number | null } {
   if (backlogCount >= QUEUE_BACKLOG_THRESHOLDS.page) {
-    if (!state.active || backlogCount >= state.nextThresholdCount) {
+    const escalate = pagePolicy === 'escalate';
+    // Keep the persisted page shape; once-only checks honor active state but ignore its next threshold.
+    if (!state.active || (escalate && backlogCount >= state.nextThresholdCount)) {
       return {
-        state: activePageState(backlogCount),
-        thresholdCount: pageThresholdAtOrBelow(backlogCount),
+        state: activePageState(escalate ? backlogCount : QUEUE_BACKLOG_THRESHOLDS.page),
+        thresholdCount: escalate
+          ? pageThresholdAtOrBelow(backlogCount)
+          : QUEUE_BACKLOG_THRESHOLDS.page,
       };
     }
 
@@ -152,10 +159,11 @@ function transitionPage(
 
 export function transitionQueueBacklogState(
   state: QueueBacklogState,
-  backlogCount: number
+  backlogCount: number,
+  pagePolicy: QueueBacklogPagePolicy = 'escalate'
 ): QueueBacklogTransition {
   const ticket = transitionTicket(state.ticket, backlogCount >= QUEUE_BACKLOG_THRESHOLDS.ticket);
-  const page = transitionPage(state.page, backlogCount);
+  const page = transitionPage(state.page, backlogCount, pagePolicy);
   const stateChanged = ticket.state !== state.ticket || page.state !== state.page;
   let alert: QueueBacklogTransition['alert'] = null;
 

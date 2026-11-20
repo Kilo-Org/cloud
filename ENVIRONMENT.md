@@ -342,11 +342,11 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 - `POSTGRES_URL` - Primary Postgres connection string. `[SECRET]`
 - `POSTGRES_REPLICA_US_URL` - US read replica used by `readDb` in US Vercel regions (`sfo1`); see `packages/web-shared/src/lib/drizzle.ts`. When unset, `readDb` falls back to the primary, so it must be set on every project that runs in `sfo1`, including `kilocode-ai-gateway`. `[SECRET]`
-- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
+- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; in EU regions `readDb` picks one per request by hashing the client IP (per instance at random when there is no IP) and falls back to the primary when neither is set. `[SECRET]`
+- `POSTGRES_REPLICAS_DISABLED` - Comma-separated read replica names to switch off without deleting their URLs: `us-west`, `eu-central-1`, `eu-central-2` (the names in replication health alerts). `readDb` skips them and falls back as if their URL were unset. The replication health check logs the disabled names and skips their probes. Disabling every replica is a health check error in production. An unknown name triggers a startup warning and a health check error. Set it on every project that reads replicas (`kilocode-app` and `kilocode-ai-gateway`) and redeploy; see `packages/web-shared/src/lib/read-replicas.ts`. [SERVER]
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]
-- `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. When unset, the connection string's `sslmode` parameter decides: `require`/`prefer`/`no-verify` encrypt, `verify-ca`/`verify-full` also verify the server certificate against the system trust store, `disable` or no `sslmode` keeps TLS off for local development. [SERVER]
 - `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`

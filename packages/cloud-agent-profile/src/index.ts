@@ -3,6 +3,7 @@ export type {
   ProfileOwner,
   ProfileOwnerType,
   ProfileDatabase,
+  ProfileTransaction,
   RepositoryPlatform,
   ProfileVarResponse,
   ProfileCommandResponse,

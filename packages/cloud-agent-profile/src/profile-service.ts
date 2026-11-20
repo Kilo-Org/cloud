@@ -12,7 +12,13 @@ import {
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
-import type { ProfileDatabase, ProfileOwner, ProfileSummary, ProfileResponse } from './types';
+import type {
+  ProfileDatabase,
+  ProfileTransaction,
+  ProfileOwner,
+  ProfileSummary,
+  ProfileResponse,
+} from './types';
 import {
   assertOwnerProfileLimit,
   buildOwnershipCondition,
@@ -53,11 +59,11 @@ export async function createProfile(
 
 /**
  * Insert one profile under the owner's creation lock and inside the owner's
- * profile cap. Takes the caller's open transaction so a create that also
- * writes vars, commands or the default flag stays one atomic unit.
+ * profile cap. Takes the caller's open transaction, so the lock, the cap check
+ * and the insert are one unit and read one snapshot.
  */
 export async function insertProfileRow(
-  db: ProfileDatabase,
+  db: ProfileTransaction,
   owner: ProfileOwner,
   createdByUserId: string,
   name: string,
@@ -389,7 +395,9 @@ export async function getProfile(
  * Make one profile the owner's default: clear whichever profile holds the flag
  * for that owner, then set this one. Accepts a pool or an open transaction so a
  * composite write can flip the default in the same unit as the profile insert.
- * Callers authorize the profile themselves.
+ *
+ * Both statements are owner-scoped, so the pair moves the flag only between
+ * profiles the owner holds. Callers still authorize the profile themselves.
  */
 export async function applyDefaultProfile(
   db: ProfileDatabase,
@@ -404,7 +412,7 @@ export async function applyDefaultProfile(
   await db
     .update(agent_environment_profiles)
     .set({ is_default: true })
-    .where(eq(agent_environment_profiles.id, profileId));
+    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.id, profileId)));
 }
 
 /**

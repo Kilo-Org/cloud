@@ -25,7 +25,12 @@ import { AgentConfigSchema } from '@kilocode/db/schema-types';
 import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
-import { getPostgresErrorCode, isUniqueViolation } from '@/lib/db-errors';
+import {
+  getPostgresErrorCode,
+  getUniqueViolationConstraint,
+  isProfileNameUniqueConstraint,
+  isUniqueViolation,
+} from '@/lib/db-errors';
 
 /**
  * Mutating anything on an organization-owned profile — its content, its MCP
@@ -517,13 +522,24 @@ export const agentProfilesRouter = createTRPCRouter({
           input
         );
       } catch (error) {
-        // The per-owner profile name unique index: `UQ_agent_env_profiles_org_name`
-        // for an organization, `UQ_agent_env_profiles_user_name` for a user. The
-        // dialog shows this sentence as the reason the name was refused.
-        if (isUniqueViolation(error)) {
+        // Separates a per-owner profile name clash from every other constraint
+        // a create can trip. Only `UQ_agent_env_profiles_org_name` and
+        // `UQ_agent_env_profiles_user_name` earn the duplicate-name sentence the
+        // dialog shows as its inline error. Every other 23505 on this path keeps
+        // a CONFLICT code with a truthful sentence, so the client shows a
+        // readable answer instead of an internal error. A 23505 that carries no
+        // constraint name takes the same fallback, because the name is unknown.
+        const constraint = getUniqueViolationConstraint(error);
+        if (isProfileNameUniqueConstraint(constraint)) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'A profile with this name already exists',
+          });
+        }
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A profile could not be created. Try again.',
           });
         }
         throw error;

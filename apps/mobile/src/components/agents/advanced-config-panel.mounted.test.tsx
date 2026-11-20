@@ -770,6 +770,35 @@ describe('AdvancedConfigPanel', () => {
     expect(renderer.root.findByType('SheetHeader' as never).props.doneDisabled).toBe(false);
   });
 
+  it('states the neutral line when the save fails unexpectedly', async () => {
+    const mocks = mutations();
+    // An unexpected failure carries diagnostic text and a payload with the
+    // code, status, path and stack. The sheet states its own line and offers
+    // the retry, because the server wrote no sentence for a person.
+    mocks.create.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('probe diagnostic text'), {
+        name: 'TRPCClientError',
+        data: {
+          code: 'INTERNAL_SERVER_ERROR',
+          httpStatus: 500,
+          path: 'agentProfiles.create',
+          stack: 'probe stack',
+        },
+      })
+    );
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    expect(toast.success).not.toHaveBeenCalled();
+    const message = saveSheetMessage(renderer);
+    expect(message).toBe(i18n.t('profiles.saveFailed'));
+    expect(message).not.toContain('probe diagnostic text');
+  });
+
   it('a retry after a refusal reissues the same complete payload once more', async () => {
     const mocks = mutations();
     mocks.create.mutateAsync.mockRejectedValueOnce(new Error('Took too long'));

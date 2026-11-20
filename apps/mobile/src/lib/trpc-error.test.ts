@@ -108,6 +108,48 @@ describe('readTrpcServerMessage', () => {
     expect(readTrpcServerMessage(answered)).toBe('A profile with this name already exists');
   });
 
+  it('yields no sentence for an internal server error', () => {
+    // An unexpected failure carries diagnostic text. Only a sentence the
+    // application wrote for a person reaches the sheet.
+    const failed = Object.assign(
+      new Error('probe diagnostic text'),
+      {
+        name: 'TRPCClientError',
+        data: {
+          code: 'INTERNAL_SERVER_ERROR',
+          httpStatus: 500,
+          path: 'agentProfiles.create',
+          stack: 'probe stack',
+        },
+      }
+    );
+    expect(readTrpcServerMessage(failed)).toBeUndefined();
+  });
+
+  it('yields no sentence for the internal server error of an unset key', () => {
+    const unconfigured = Object.assign(
+      new Error('Agent environment encryption key not configured'),
+      {
+        name: 'TRPCClientError',
+        data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'agentProfiles.create' },
+      }
+    );
+    expect(readTrpcServerMessage(unconfigured)).toBeUndefined();
+  });
+
+  it('yields no sentence for a validation payload', () => {
+    const invalid = Object.assign(new Error('Input validation failed'), {
+      name: 'TRPCClientError',
+      data: {
+        code: 'BAD_REQUEST',
+        httpStatus: 400,
+        path: 'agentProfiles.create',
+        zodError: { formErrors: [['Too small']], fieldErrors: { name: ['Required'] } },
+      },
+    });
+    expect(readTrpcServerMessage(invalid)).toBeUndefined();
+  });
+
   it('returns a message carried under a shaped answer', () => {
     expect(
       readTrpcServerMessage({

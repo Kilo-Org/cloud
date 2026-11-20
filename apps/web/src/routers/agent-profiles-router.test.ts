@@ -24,7 +24,61 @@ import {
 } from '@kilocode/cloud-agent-profile';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { User, Organization } from '@kilocode/db/schema';
+import type * as ProfileModule from '@kilocode/cloud-agent-profile';
 import type { PoolClient } from 'pg';
+import { DrizzleQueryError } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+
+/**
+ * The router reaches `createProfileWithContent` through the package namespace,
+ * so replacing that one export puts a driver-shaped failure at the service
+ * boundary. Every other export stays the real module, and the default
+ * implementation is the real create, so no other case in this file changes.
+ *
+ * The factory delegates through an arrow closure, so it reads no `const`
+ * binding while the mock registers: the module is first required during this
+ * file's own imports, before the declarations below have run.
+ */
+jest.mock('@kilocode/cloud-agent-profile', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@kilocode/cloud-agent-profile');
+  return {
+    ...actual,
+    createProfileWithContent: (...args: Parameters<typeof realCreateProfileWithContent>) =>
+      createProfileWithContentMock(...args),
+  };
+});
+
+const realCreateProfileWithContent = jest.requireActual<typeof ProfileModule>(
+  '@kilocode/cloud-agent-profile'
+).createProfileWithContent;
+
+const createProfileWithContentMock = jest.fn(realCreateProfileWithContent);
+
+// A queued once-value that a case never reached would fire inside the next one.
+afterEach(() => {
+  createProfileWithContentMock.mockReset();
+  createProfileWithContentMock.mockImplementation(realCreateProfileWithContent);
+});
+
+/** A `pg` driver error: SQLSTATE and index name on the same object. */
+function postgresConstraintError(code: string, constraint: string): Error {
+  const error = new Error('duplicate key value violates unique constraint');
+  return Object.assign(error, { code, constraint });
+}
+
+/**
+ * The error a service call rejects with once Drizzle has wrapped a driver
+ * failure twice: the transaction wraps the failing statement, and the failing
+ * statement wraps the driver error that carries the index name.
+ */
+function wrappedConstraintError(code: string, constraint: string): DrizzleQueryError {
+  const statement = new DrizzleQueryError(
+    'insert into "agent_environment_profile_vars" ("profile_id", "key") values ($1, $2)',
+    ['profile', 'DUPLICATE_KEY'],
+    postgresConstraintError(code, constraint)
+  );
+  return new DrizzleQueryError('insert into "agent_environment_profiles"', [], statement);
+}
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -442,6 +496,76 @@ describe('Agent Profiles Router', () => {
 
           const previousDefault = await caller.agentProfiles.get({ profileId: previousDefaultId });
           expect(previousDefault.isDefault).toBe(false);
+        });
+      });
+
+      /**
+       * A create answers a CONFLICT whose sentence names the real problem. Only
+       * the per-owner profile name index earns the duplicate-name sentence;
+       * every other 23505 on this path must keep a different sentence, or the
+       * dialog tells the user to rename a profile that collided on a variable
+       * key.
+       *
+       * The var-key index cannot collide through the procedure: the payload
+       * rules reject a duplicate key, and a new profile holds no other rows. The
+       * refusal is injected at the service boundary in the shape Drizzle throws,
+       * with the index name two `.cause` levels below the top error.
+       */
+      describe('constraint refusals', () => {
+        async function ownerProfileIds(userId: string): Promise<string[]> {
+          const rows = await db
+            .select({ id: agent_environment_profiles.id })
+            .from(agent_environment_profiles)
+            .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+          return rows.map(row => row.id);
+        }
+
+        test('answers a non-name unique violation without the name sentence', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const profilesBefore = await ownerProfileIds(ownerUser.id);
+
+          createProfileWithContentMock.mockRejectedValueOnce(
+            wrappedConstraintError('23505', 'UQ_agent_env_profile_vars_profile_key')
+          );
+
+          const refusal = await caller.agentProfiles
+            .create({
+              name: 'Var Key Collision',
+              vars: [{ key: 'API_KEY', value: 'value', isSecret: false }],
+            })
+            .then(
+              () => null,
+              (error: unknown) => error
+            );
+
+          expect(refusal).toBeInstanceOf(TRPCError);
+          if (!(refusal instanceof TRPCError)) throw new Error('create must reject a TRPCError');
+
+          // Pre-fix every 23505 answered the duplicate-name sentence, which sent
+          // the user to rename a profile that collided on a variable key.
+          expect(refusal.code).toBe('CONFLICT');
+          expect(refusal.message.length).toBeGreaterThan(0);
+          expect(refusal.message).not.toBe('A profile with this name already exists');
+
+          expect(await ownerProfileIds(ownerUser.id)).toEqual(profilesBefore);
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Var Key Collision')).toBe(false);
+        });
+
+        test('keeps the duplicate-name sentence for the profile name index', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          createProfileWithContentMock.mockRejectedValueOnce(
+            wrappedConstraintError('23505', 'UQ_agent_env_profiles_user_name')
+          );
+
+          await expect(
+            caller.agentProfiles.create({ name: 'Name Collision' })
+          ).rejects.toMatchObject({
+            code: 'CONFLICT',
+            message: 'A profile with this name already exists',
+          });
         });
       });
     });

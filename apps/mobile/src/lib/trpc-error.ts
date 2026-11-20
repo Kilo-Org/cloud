@@ -14,6 +14,7 @@ const DirectErrorSchema = z.looseObject({
     code: z.string().optional(),
     message: z.string().optional(),
     upstreamCode: z.string().optional(),
+    zodError: z.unknown().optional(),
   }),
 });
 const ShapedErrorSchema = z.looseObject({
@@ -22,6 +23,7 @@ const ShapedErrorSchema = z.looseObject({
       code: z.string().optional(),
       message: z.string().optional(),
       upstreamCode: z.string().optional(),
+      zodError: z.unknown().optional(),
     }),
   }),
 });
@@ -74,23 +76,55 @@ export function readTrpcErrorField(
 }
 
 /**
- * The sentence a tRPC SERVER answered with, or undefined when this error is not
- * a server answer.
+ * Whether this envelope carries a refusal the application wrote, so its
+ * sentence may be shown to a person.
  *
- * The envelope's presence is the signal, not a message inside it: the server's
- * formatted `data` carries the code, status, path and zod error but no message,
- * so the sentence lives only on `Error.message`. A transport wrapper is named
- * `TRPCClientError` too and sets the same message field with engineering text,
- * and it carries no `data`, so this refuses it.
+ * Wire shape of a mobile call: the client rejects with a `TRPCClientError`
+ * whose `message` is the server's message, and whose `data` holds the code,
+ * status, path and stack. The code decides which sentences the application
+ * wrote for a person:
+ *
+ * - An authored refusal, such as a duplicate name, carries a sentence written
+ *   for the person, so the caller shows it.
+ * - `INTERNAL_SERVER_ERROR` carries diagnostic text, so the caller states its
+ *   own neutral line and gives the next step instead.
+ * - A non-null `zodError` names an input contract failure, which has no
+ *   reading for the person, so the caller states the neutral line too.
+ *
+ * An envelope without a code is not a server answer, so it yields no sentence.
+ */
+function isAuthoredRefusal(code: string | undefined, zodError: unknown): boolean {
+  if (code === undefined || code === 'INTERNAL_SERVER_ERROR') {
+    return false;
+  }
+  return zodError === undefined || zodError === null;
+}
+
+/**
+ * The sentence a tRPC SERVER answered with, or undefined when this error is not
+ * a refusal the application wrote for a person.
+ *
+ * The envelope's code decides, not the presence of text: the server's formatted
+ * `data` carries the code, status, path and zod error, so the sentence lives on
+ * `Error.message` (`shape.data.message` when shaped). A 5xx or a validation
+ * payload yields no sentence, and the caller states its neutral line.
+ *
+ * A transport wrapper is named `TRPCClientError` too and carries no `data`, so
+ * it yields no sentence either.
  */
 export function readTrpcServerMessage(error: unknown): string | undefined {
   const direct = DirectErrorSchema.safeParse(error);
   if (direct.success) {
+    const { code, zodError } = direct.data.data;
+    if (!isAuthoredRefusal(code, zodError)) {
+      return undefined;
+    }
     return error instanceof Error ? error.message : undefined;
   }
   const shaped = ShapedErrorSchema.safeParse(error);
   if (shaped.success) {
-    return shaped.data.shape.data.message;
+    const { code, message, zodError } = shaped.data.shape.data;
+    return isAuthoredRefusal(code, zodError) ? message : undefined;
   }
   return undefined;
 }
